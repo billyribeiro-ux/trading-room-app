@@ -33,6 +33,60 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 10:58 EDT — session control leaves RoomUserActions, because the contract said extract and I had asked a question it already answered
+
+**Runtime impact: no.** Eleven action names moved between modules and behave identically. What changed
+is that `forceReload` can now ship, and that no ceiling was raised to let it.
+
+**The decision was already written down.** I had asked which of "raise" or "extract" you wanted, and
+`source-size-contract.test.ts` states it in its own failure message: *"extract a slice into a module
+or component rather than raising this number."* Asking was the error; two raises I had made on
+inference were reverted first.
+
+**The seam was proven before anything moved.** `RoomUserActions`'s own ceiling entry calls it
+"everything that can be done TO a user", and locking a session is not that. The evidence is the
+DEPENDENCY SURFACE: eleven names need four collaborators — `dialogs`, `closeModal`, `reload`,
+`savePreference` — and touch no roster, no target user, no presenter command, no `localStorage` key,
+none of the muted or followed lists. A group that takes a quarter of its old home's collaborators
+with it was already a separate thing. **749 → 708**, under its untouched 730.
+
+**Reading the boundaries is what saved it.** `session-send-video` is a session action by name and did
+NOT move: it is nested inside another action's prompt callback rather than being a branch of its own,
+so a mechanical cut on `if (action === …)` would have taken half and orphaned the rest.
+`session-lock-kick` and `session-hard-reset-revoke` are second names inside their siblings'
+conditions and travelled intact with them.
+
+**`handle` returns a boolean so `ModalHost` keeps ONE door.** Splitting `onUserAction` at the call
+site would make the caller decide which class owns a string — the coupling that made "Bring everyone
+here" a lie. `false` means "not mine", never "nothing happened".
+
+**THREE GATES CAUGHT ME, and each was right.**
+
+* The **disposition contract** read one dispatcher, so every moved action reported as "dispatched
+  into the void" — a defect report about working code. It now reads both; a gate that does not follow
+  an extraction goes red on the refactor and green on the regression.
+* **`remote-call-sites`** refused a namespace import, then refused split import statements. It looks
+  400 characters before the FIRST occurrence of a module specifier, so both defeat the check that
+  every remote function has a caller — and that check exists because `presenterCommand` shipped dead
+  for three commits. Single named import restored, and the two lines found elsewhere.
+* **`unbound-method-contract`** demanded the new class join its registry.
+
+**And the last two lines came from a real simplification rather than a trim.** `create-room` was two
+over. The reorder that would have removed a forward reference turned out to cascade — `notes` depends
+on `modals`, which is built after `roomEvents` — so it was abandoned on the evidence rather than
+forced. What worked: `unmuteChat` was imported under an alias it never needed, since nothing else in
+that file binds the name. Dropping it let all four `commands` properties become shorthand, and the
+object then fit on one line: **six lines to one**, 1088 → 1083.
+
+**Verified.** Room **2,592 tests / 185 files**, `svelte-check` **1,228 files, 0 errors, 0 warnings**,
+`eslint` and `prettier` clean. `RoomSessionControl` is capped on arrival. Four contracts were
+re-pointed at the code that now owns their subject rather than deleted — `unmute-chat`'s three
+assertions, and the room-class registry.
+
+**One defect of mine, caught by the type checker.** Re-pointing an assertion, I substituted a
+TypeScript signature into the middle of a string literal and broke the file's parse. Eight errors,
+all mine, all from one careless replace.
+
 ### 2026-08-23 10:18 EDT — two real bugs fixed: a permanent mute that did nothing, and a second "Bring everyone here" that brought nobody
 
 **Runtime impact: yes, twice.** A member muted indefinitely by the owner can no longer post, and the

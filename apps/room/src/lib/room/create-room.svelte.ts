@@ -57,7 +57,7 @@ import { RoomMenus } from '#lib/room/menus.svelte.js';
 import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
-import { unmuteChat as unmuteChatCommand } from '../../routes/chat-mute.remote';
+import { unmuteChat } from '../../routes/chat-mute.remote';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -795,12 +795,7 @@ export function createRoom(deps: RoomDeps) {
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
-    commands: {
-      presenter: presenterCommand,
-      editUsername: (payload) => editUsername(payload),
-      unmuteChat: (payload) => unmuteChatCommand(payload),
-      forceReload
-    },
+    commands: { presenter: presenterCommand, editUsername, unmuteChat, forceReload },
     session: () => data,
     isPresenter: () => isPresenter,
     talking: () => media.talking,

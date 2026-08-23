@@ -89,12 +89,17 @@ describe('the unmute reaches the server', () => {
       being asserted is unchanged and is the whole point of this test: the command is reached by
       NAME through a real import, so deleting it is a compile error rather than a silent no-op.
     */
-    expect(rootCode).toContain(
-      "import { unmuteChat as unmuteChatCommand } from '../../routes/chat-mute.remote';"
-    );
+    /*
+      The alias went on 2026-08-23 — `unmuteChat` is not otherwise bound in the composition root, so
+      it was never needed, and dropping it let the whole `commands` object sit on one line. The
+      PROPERTY being asserted is unchanged and is still the whole point: the command is reached by
+      NAME through a real import, so deleting it is a compile error rather than a silent no-op.
+      Property shorthand keeps that property exactly — `unmuteChat` IS `unmuteChat: unmuteChat`.
+    */
+    expect(rootCode).toContain("import { unmuteChat } from '../../routes/chat-mute.remote';");
     // The ROOT hands the command in; the CLASS is what calls it. Both ends asserted, because
     // either alone passes with the wire cut.
-    expect(rootCode).toContain('unmuteChat: (payload) => unmuteChatCommand(payload)');
+    expect(rootCode).toMatch(/commands: \{[^}]*\bunmuteChat\b/);
     expect(userActions).toContain('await this.#commands.unmuteChat({ targetUserId: user.id });');
     // The endpoint-as-a-magic-string this replaced. Its return is what nobody had to check.
     expect(pageCode).not.toContain("fetch('?/unmuteChat'");
