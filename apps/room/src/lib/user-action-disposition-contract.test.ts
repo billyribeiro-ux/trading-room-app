@@ -172,7 +172,23 @@ describe('the dispatch surface is fully enumerated', () => {
 describe('every dispatched action has exactly one disposition', () => {
   const dispatched = dispatchedActions();
   const handled = handledActions();
-  const alerted = new Set(TOAST_ONLY_ACTIONS);
+  /*
+    ALERTED means "reaches the alert tail and NOTHING ELSE" — the liars. It is DERIVED by subtracting
+    the handled set rather than taken from `EXACT_ALERTS` directly, and that changed on 2026-08-23
+    when `restart-audio` was wired.
+
+    Why the subtraction is right rather than a loosening: `EXACT_ALERTS` is "the fixed alert for an
+    action", not a defect list. Two entries in it belong to controls that genuinely send —
+    `save-permissions`, which has always read its string from there, and now `restart-audio`, whose
+    capture raises `bootbox.alert("Audio restart request sent OK")` immediately after the send at
+    byte 2080461. Treating a table entry as proof of a lie would report both as dead controls, which
+    is a defect report about working wires.
+
+    The load-bearing rule is untouched: an action with NO branch and NO entry anywhere is still an
+    orphan, and handled-AND-inert is still a contradiction. What is no longer a contradiction is
+    "has a branch AND has a string", because that is what a working control with an alert looks like.
+  */
+  const alerted = new Set(TOAST_ONLY_ACTIONS.filter((name) => !handled.has(name)));
   const inert = new Set(INERT_ACTION_NAMES);
 
   it('handled, alerted and inert are the three buckets, and they do not overlap', () => {
@@ -417,6 +433,7 @@ describe('an inert action really does nothing, executed', () => {
           Promise.resolve(null)
         ),
         editUsername: () => Promise.resolve(null),
+        restartAudio: () => Promise.resolve(null),
         unmuteChat: () => Promise.resolve(null),
         forceReload: () => Promise.resolve(null)
       },
@@ -479,17 +496,22 @@ describe('an inert action really does nothing, executed', () => {
   });
 
   it('an ALERTED action raises its fixed alert — the second control', () => {
+    /*
+      The exemplar moved from `restart-audio` to `mute-chat-indefinitely` on 2026-08-23, because
+      `restart-audio` was WIRED that day and is no longer one of these. This is the last dispatched
+      control that reaches the alert tail and nothing else: it is `muteChat("0")` upstream, and an
+      indefinite mute already exists as the controller's opcode 3 — what is missing is a door from
+      the room to it.
+    */
     const { actions, dialogs } = make();
-    actions.handle('restart-audio', {
+    actions.handle('mute-chat-indefinitely', {
       id: 5,
       nick: 'Bo',
       emailHash: 'h',
       pic: '',
       status: 'online'
     } as never);
-    expect(dialogs.alert, "row W's family lies, and the lie is observable").toBe(
-      'Audio restart request sent OK'
-    );
+    expect(dialogs.alert, "row W's family lies, and the lie is observable").toBe('user chat muted');
   });
 
   it('every INERT action produces no dialog, no toast and no command', () => {

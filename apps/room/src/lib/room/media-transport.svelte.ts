@@ -833,6 +833,81 @@ export class RoomMediaTransport {
     }
   }
 
+  /**
+   * `reconnectAudio()` — re-consume every microphone in the room, and touch nothing else.
+   *
+   * The member's half of `remoteRestartAudio`. A presenter presses *" Restart Audio "* on somebody
+   * whose sound has gone one-way, and THAT PERSON'S browser does the work; the authority to ask is
+   * checked on the server, never here.
+   *
+   * ## What upstream does, and why this is narrower than `restart()`
+   *
+   * Byte 1133537, in full:
+   *
+   * ```js
+   * reconnectAudio(){
+   *   "closed" != this.globals.sessData.currentState
+   *     ? ($("[id^='msRemAudio-']").remove(),
+   *        this.talkingUsers.forEach(e => this.mediaSoupService.startListeningToPresenter(e)))
+   *     : P("reconnectAudio called.. but session closed. abort...")
+   * }
+   * ```
+   *
+   * Two steps: drop the remote audio, then listen again. **It does not touch transports, producers,
+   * screens or webcams**, which is exactly what separates it from `restart()` directly above —
+   * `restart()` rebuilds the whole session after a role change and is far too large a hammer for a
+   * one-way microphone. Reproducing that narrowness is the point; a presenter fixing one member's
+   * audio must not blank their screen tabs.
+   *
+   * ## Clearing the two maps IS the equivalent of removing the elements
+   *
+   * There are no `msRemAudio-` nodes to remove by hand here — Svelte owns them, keyed off
+   * `remoteAudioStreams`. Emptying that map unmounts every sink AND releases the dedupe guard, which
+   * is the half that matters: `addRemoteAudio` returns early on `remoteAudioStreams.has(...)`, so
+   * without the clear the `getProducers` snapshot below would find every producer already "known"
+   * and consume none of them. That is the failure `dropRemoteMedia` documents at length, and it is
+   * why this clears rather than re-requesting over the top.
+   *
+   * `audioProducerOwners` goes with it — it is keyed by producer id and would otherwise attribute a
+   * recycled id to whoever held it last. It is cleared DIRECTLY rather than through
+   * `removeRemoteAudio`, and that is deliberate: that method calls `stopTalking` per producer, which
+   * would empty the talking list this is trying to restore. Upstream keeps `talkingUsers` and
+   * re-listens to each; keeping the map's contents out of `RoomMedia` is how the same thing happens
+   * here, with `addRemoteAudio` re-populating the owners as it re-consumes.
+   *
+   * ## The closed-session guard is upstream's, in this room's terms
+   *
+   * `"closed" != sessData.currentState` becomes "there is a live session and a socket". A room with
+   * neither has nothing to re-consume from, and issuing `getProducers` against it would reject.
+   *
+   * **NOT VERIFIED AT RUNTIME.** The state transitions are unit-tested; that a real second peer's
+   * microphone becomes audible again needs two browsers in a live room and is the owner's to
+   * confirm. Recorded rather than implied.
+   */
+  async reconnectAudio(): Promise<void> {
+    const active = this.session;
+    const socket = this.#mediaSignalling;
+    // Upstream's `"closed" != currentState` abort, in this room's terms.
+    if (!active || !socket) return;
+
+    this.#remoteAudioStreams.clear();
+    this.#audioProducerOwners.clear();
+
+    try {
+      const { producers } = await socket.request('getProducers');
+      for (const producer of producers) {
+        // AUDIO ONLY. Screens and webcams were never dropped, so re-consuming them would be
+        // refused by their own dedupe guards anyway — and asking is a round trip for nothing.
+        await this.addRemoteAudio(active, producer);
+      }
+    } catch (error) {
+      // Loud, and NOT a state reset: `sessionReady` belongs to the session, which this never
+      // touched. Swallowing it would leave a member silently deaf with the presenter told it worked.
+      console.error('[media] audio could not be reconnected', error);
+      throw error;
+    }
+  }
+
   /** The SFU session, handed over once it has connected. */
   attachSession(session: MediaSession | null): void {
     this.#mediaSession = session;

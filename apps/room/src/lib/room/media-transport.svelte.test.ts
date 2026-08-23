@@ -187,6 +187,37 @@ describe('every reactive group actually carries its rune', () => {
   });
 });
 
+describe('reconnectAudio on a room with no media wired', () => {
+  /*
+    ## What this proves, and — because it was measured — what it does NOT
+
+    It proves the method RESOLVES rather than throwing when the room has no session and no socket.
+    That is a real failure mode and not a formality: `reconnectAudio` is called from a `privCmds`
+    frame handler, and a rejection there is an unhandled promise on a member who merely has media
+    switched off.
+
+    **It does not prove the guard distinguishes its two halves, and it does not cover the work.**
+    Both were checked by negative control on 2026-08-23 and both came back GREEN:
+
+      - deleting `this.#remoteAudioStreams.clear()` / `#audioProducerOwners.clear()` — no failure
+      - deleting the `!active` half of the guard — no failure, because `!socket` returns first
+
+    The reason is structural: the signalling client is created inside `connect()` and is not
+    reachable from here, so there is no way to construct the state where a session exists and the
+    clear-then-re-consume path actually runs.
+
+    So **the part of `reconnectAudio` that does the work has no automated control**, and that is
+    recorded here rather than left to be inferred from the presence of a test file. That a second
+    peer's microphone becomes audible again needs two browsers in a live room, and it is the owner's
+    to confirm. Making it testable means exposing the signalling client, which is its own change.
+  */
+  it('resolves rather than throwing, so an unwired member does not reject a frame handler', async () => {
+    const { transport } = make();
+    // No `attachSession` and no `connect()` — neither collaborator the method needs exists.
+    await expect(transport.reconnectAudio()).resolves.toBeUndefined();
+  });
+});
+
 describe('the receiver keeps the five collections in step', () => {
   it('clears every guard the three consumers read, not just the visible streams', () => {
     /*

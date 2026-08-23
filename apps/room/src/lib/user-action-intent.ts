@@ -100,6 +100,18 @@ const EXACT_ALERTS: Readonly<Record<string, string>> = {
     than faked with a 24-hour mute wearing an "indefinite" label.
   */
   'mute-chat-indefinitely': 'user chat muted',
+  /*
+    `restart-audio` KEEPS ITS ENTRY AND IS NO LONGER A LIAR — 2026-08-23.
+
+    Unlike `unmute-chat`, `force-reload` and `mute-chat-24`, which were REMOVED when they were wired,
+    this one stays: the capture's sender genuinely raises `bootbox.alert("Audio restart request sent
+    OK")` right after `sendServerAdminCommand("remoteRestartAudio", this.user)` at byte 2080461. The
+    string is real and belongs to a real action, so it lives here for the same reason
+    `save-permissions` does — this table is "the fixed alert for an action", not a defect list.
+
+    Which entries are DEAD is established by `user-action-disposition-contract.test.ts`, which scans
+    for a branch. `restart-audio` now has one, in `RoomUserActions.handle`.
+  */
   'restart-audio': 'Audio restart request sent OK'
   /*
     `force-reload` was HERE and is gone, 2026-08-23 — the second entry ever removed from this table,

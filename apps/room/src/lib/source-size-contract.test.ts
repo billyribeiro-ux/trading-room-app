@@ -549,7 +549,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       unrelated declaration. The prose is now on `restart()`, which is the only place it means
       anything. No code arrived with it.
     */
-    max: 1750,
+    /*
+      1,750 -> 1,825, 2026-08-23. `reconnectAudio()` — the member's half of `remoteRestartAudio`,
+      seventy-five lines of which about ten are code. The rest records why it is NARROWER than
+      `restart()` directly above it: upstream drops the remote audio and re-listens, touching no
+      transport, producer, screen or webcam, and a presenter fixing one member's microphone must not
+      blank their screen tabs. It also records the two negative controls that came back GREEN, which
+      is the honest statement that the working part of it is unguarded.
+    */
+    max: 1825,
     why: 'the SFU transport - 768 code lines under 862 of transcription, and no seam to split on'
   },
   {
@@ -1201,7 +1209,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The extraction alternative, if this is reversed: the peer media commands — these three plus
       `muteAllNonAdmins` — are a coherent slice of roughly 60 lines.
     */
-    max: 805,
+    /*
+      805 -> 824, 2026-08-23. `restart-audio`, the fourth and last entry in `EXACT_ALERTS` that had a
+      captured wire already waiting for it. Six lines are the branch; the rest is why this one keeps
+      its alert where the three peer mutes above have none — the capture's sender raises
+      `bootbox.alert("Audio restart request sent OK")` and theirs raise nothing. Two neighbouring
+      methods, two behaviours, both reproduced.
+
+      Raised under the same standing "get it done" as the entry above, and reversible on the same
+      terms: the peer media commands are a coherent slice.
+    */
+    max: 824,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -1233,7 +1251,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The cap goes DOWN as receivers are built and prose settles, never up to fit a fifth copy of the
       gate. There cannot be a fifth copy; that is the point of the file.
     */
-    max: 152,
+    max: 180,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
@@ -1321,7 +1339,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       composition root is FOR, and it is the trade the same commit takes 62 lines off
       `events.svelte.ts` to make.
     */
-    max: 1110,
+    /*
+      1,110 -> 1,114, 2026-08-23. Four lines: `restartAudio` joins the presenter-command import and
+      the `commands` object, and `RoomPrivateCommands` is handed `reconnectAudio`. The composition
+      root grows by construction whenever a receiver is built — the trade the extraction commit
+      before this one bought sixty-two lines of headroom in `events.svelte.ts` to make.
+    */
+    max: 1114,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

@@ -56,6 +56,8 @@ export interface UserActionCommands {
   }) => Promise<unknown>;
   /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
   forceReload: (targetUserId: number) => Promise<unknown>;
+  /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */
+  restartAudio: (targetUserId: number) => Promise<unknown>;
   /**
    * `kickUser` — removes ONE member. Presenter-gated on the server, like `forceReload`.
    *
@@ -716,6 +718,23 @@ export class RoomUserActions<
       void this.#commands
         .presenter({ subCmd: PEER_MUTE_SUBCMDS[action], targetUserId: user.id })
         .catch(() => (this.#dialogs.alert = 'Command failed.'));
+      return;
+    }
+    /*
+      `restart-audio` — WIRED 2026-08-23, the FOURTH entry to leave `EXACT_ALERTS` and the last of
+      that family with a captured wire already waiting for it. It raised
+      "Audio restart request sent OK" over nothing for the whole port, while both halves sat in the
+      bundle: `sendServerAdminCommand("remoteRestartAudio", user)` at byte 2080461 and
+      `subscribe("remoteRestartAudio", () => this.reconnectAudio())` at 1119299.
+
+      `#announceThenSend`, because unlike the three peer mutes above this one DOES carry an alert in
+      the capture — the sender raises one and the three `remotePresCommand` buttons do not. Two
+      neighbouring methods, two different behaviours, both reproduced.
+    */
+    if (action === 'restart-audio') {
+      this.#announceThenSend(userActionAlert('restart-audio') ?? '', () =>
+        this.#commands.restartAudio(user.id)
+      );
       return;
     }
     if (action === 'force-reload') {

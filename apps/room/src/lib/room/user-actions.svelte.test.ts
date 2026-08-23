@@ -66,6 +66,7 @@ const make = (
   const kicksSent: { targetUserId: number; message: string; ban?: boolean }[] = [];
   const urlsSent: { cmd: string; url: string }[] = [];
   const mutesSent: { targetUserId: number }[] = [];
+  const audioRestarts: number[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
   const saved: [string, boolean][] = [];
@@ -96,6 +97,10 @@ const make = (
         unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null),
       sessionSendUrl: (payload: { cmd: string; url: string }) => (
         urlsSent.push(payload),
+        Promise.resolve(null)
+      ),
+      restartAudio: (targetUserId: number) => (
+        audioRestarts.push(targetUserId),
         Promise.resolve(null)
       ),
       kickUser: (payload: { targetUserId: number; message: string; ban?: boolean }) => (
@@ -152,6 +157,7 @@ const make = (
     kicksSent,
     urlsSent,
     mutesSent,
+    audioRestarts,
     permsSent,
     failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
@@ -400,6 +406,20 @@ describe('the dispatcher', () => {
     failPresenter();
     actions.handle('stop-screens', TARGET);
     await vi.waitFor(() => expect(dialogs.alert).toBe('Command failed.'));
+  });
+
+  it("restart-audio sends to the named member and keeps the capture's own alert", () => {
+    /*
+      The fourth and last liar with a captured wire already waiting for it. Unlike the three peer
+      mutes above, this sender DOES raise an alert upstream —
+      `sendServerAdminCommand("remoteRestartAudio", this.user), bootbox.alert("Audio restart request
+      sent OK")` at byte 2080461 — so the alert is asserted as well as the send. Two neighbouring
+      methods in the same capture, two different behaviours, both reproduced.
+    */
+    const { actions, dialogs, audioRestarts } = make();
+    actions.handle('restart-audio', TARGET);
+    expect(audioRestarts).toEqual([TARGET.id]);
+    expect(dialogs.alert).toBe('Audio restart request sent OK');
   });
 
   it('mute-chat-24 is no longer one of the controls that only talk', () => {

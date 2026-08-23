@@ -105,6 +105,7 @@ const make = () => {
   */
   const chatMuted: string[] = [];
   const chatNotices: string[] = [];
+  const audioReconnects: boolean[] = [];
   const chatMute = new RoomChatMute({
     commands: { muteChat: () => Promise.resolve(null), unmuteChat: () => Promise.resolve(null) },
     alert: (message) => chatMuted.push(message),
@@ -141,7 +142,8 @@ const make = () => {
       chatMute,
       forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true),
       kicked: (message: string) =>
-        kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true })
+        kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true }),
+      reconnectAudio: () => (audioReconnects.push(true), Promise.resolve())
     })
     /*
       Records the message AND whether the stream was already closed when it arrived. That second
@@ -150,7 +152,17 @@ const make = () => {
       either ordering.
     */
   });
-  return { stream, missed, tabs, played, reloadAsked, kicked, chatMuted, chatNotices };
+  return {
+    stream,
+    missed,
+    tabs,
+    played,
+    reloadAsked,
+    kicked,
+    chatMuted,
+    chatNotices,
+    audioReconnects
+  };
 };
 
 /** Read inside an effect root, mutate inside it, assert on the result outside. */
@@ -290,7 +302,8 @@ const hiddenTabStream = (missed: true[]) =>
         announceThenSend: () => {}
       }),
       forceReloadRequested: () => {},
-      kicked: () => {}
+      kicked: () => {},
+      reconnectAudio: () => Promise.resolve()
     })
   });
 
@@ -451,6 +464,49 @@ describe('the two receivers reach the page', () => {
       })
     });
     expect(chatMuted).toEqual(['Chat Disabled']);
+  });
+
+  it('a remoteRestartAudio frame reconnects the addressed member, silently', () => {
+    /*
+      `case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")` at byte 995973, whose
+      subscriber at 1119299 is `() => { this.reconnectAudio() }` — one line, no toast and no dialog.
+
+      SILENCE IS ASSERTED, not just the call. This receiver is the last of the "reports success,
+      sends nothing" family to be wired, and the temptation on wiring one is to add a confirmation
+      the capture does not have. The member is not the one who pressed anything.
+    */
+    const { stream, audioReconnects, chatMuted, chatNotices } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'privCmds',
+        data: { cmd: 'remoteRestartAudio', targetUserId: 1 }
+      })
+    });
+    expect(audioReconnects).toEqual([true]);
+    expect(chatMuted, 'no dialog — the capture raises none here').toEqual([]);
+    expect(chatNotices, 'and no toast either').toEqual([]);
+    expect(
+      FakeEventSource.last?.closed,
+      'and the stream stays up — this is not a kick or a reload'
+    ).toBe(false);
+  });
+
+  it('and a remoteRestartAudio aimed at somebody else reconnects nothing', () => {
+    /*
+      The one gate, exercised on the newest branch. A broadcast rebuild would have every member in
+      the room re-consume every producer at once — a thundering herd at the SFU, from a button meant
+      for one person.
+    */
+    const { stream, audioReconnects } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'privCmds',
+        data: { cmd: 'remoteRestartAudio', targetUserId: 99 }
+      })
+    });
+    expect(audioReconnects).toEqual([]);
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {

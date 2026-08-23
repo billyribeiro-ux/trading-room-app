@@ -203,6 +203,43 @@ export const forceReload = command(z.number().int().positive(), async (targetUse
  * server decides the caller is a presenter and scopes the frame to the caller's own room in one call,
  * so no client assertion is trusted. That is the 2026-08-07 rule.
  */
+/**
+ * `remoteRestartAudio` — ask ONE member's browser to re-consume every microphone in the room.
+ *
+ * ## Both halves were captured and neither was built
+ *
+ * ```js
+ * remoteRestartAudio(){ this.appService.sendServerAdminCommand("remoteRestartAudio", this.user),
+ *                       bootbox.alert("Audio restart request sent OK") }   // byte 2080461
+ * case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")      // byte 995973
+ * subscribe("remoteRestartAudio", () => { this.reconnectAudio() })         // byte 1119299
+ * ```
+ *
+ * The alert existed here as an `EXACT_ALERTS` entry — *"Audio restart request sent OK"* raised over
+ * nothing at all — for the whole port. It is the fourth entry to leave that table and the last of
+ * the "reports success, sends nothing" family that had a captured wire waiting for it.
+ *
+ * ## The payload is the TARGET and nothing else
+ *
+ * Upstream sends `this.user`; the frame the member reads carries no fields its receiver consults —
+ * `emit("remoteRestartAudio")` passes nothing. So the only thing that has to cross is who it is for,
+ * and inventing a richer payload would be inventing evidence.
+ *
+ * ADDRESSED via `publishToUsers`, like `forceReload` beside it. Broadcasting a request to rebuild
+ * audio would have every member in the room re-consume every producer at once — a thundering herd
+ * against the SFU, triggered by a button meant for one person.
+ *
+ * Presenter-gated by `presenterRoom()`, which is the same call that decides `forceReload` and
+ * `kickUser`: the authority is the server's, from data the server owns.
+ */
+export const restartAudio = command(z.number().int().positive(), async (targetUserId) => {
+  ensureDatabase();
+  publishToUsers(presenterRoom(), [targetUserId], {
+    channel: 'privCmds',
+    data: { cmd: 'remoteRestartAudio', targetUserId }
+  });
+});
+
 export const kickUser = command(
   z.object({
     targetUserId: z.number().int().positive(),

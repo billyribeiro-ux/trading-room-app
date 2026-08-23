@@ -242,7 +242,7 @@ export type RoomEvent =
   | {
       channel: 'privCmds';
       data: {
-        cmd: 'forceReload' | 'unmuteChat' | 'kickUser' | 'muteChat';
+        cmd: 'forceReload' | 'unmuteChat' | 'kickUser' | 'muteChat' | 'remoteRestartAudio';
         targetUserId?: number;
         msg?: string;
         mutedTill?: string;

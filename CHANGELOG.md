@@ -33,6 +33,78 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-24 01:20 EDT — `remoteRestartAudio`, and the last liar with a wire already waiting
+
+**Runtime impact: YES,** with an honest gap: *" Restart Audio "* now asks the named member's browser
+to re-consume every microphone in the room. It raised *"Audio restart request sent OK"* over nothing
+for the whole port.
+
+**Branch `feat/save-permissions`.** Fifth of row 9's eleven receivers.
+
+#### Both halves were captured and neither was built
+
+```js
+remoteRestartAudio(){ sendServerAdminCommand("remoteRestartAudio", this.user),
+                      bootbox.alert("Audio restart request sent OK") }   // 2080461
+case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")      // 995973
+subscribe("remoteRestartAudio", () => { this.reconnectAudio() })         // 1119299
+reconnectAudio(){ $("[id^='msRemAudio-']").remove();
+                  this.talkingUsers.forEach(e => startListeningToPresenter(e)) }  // 1133537
+```
+
+#### Clearing the two maps IS removing the elements
+
+There are no `msRemAudio-` nodes to remove by hand — Svelte owns them, keyed off
+`remoteAudioStreams`. Emptying that map unmounts every sink **and releases the dedupe guard**, which
+is the half that matters: `addRemoteAudio` returns early on `remoteAudioStreams.has(...)`, so without
+the clear the `getProducers` snapshot would find every producer already "known" and consume none —
+the exact failure `dropRemoteMedia` documents at length.
+
+`audioProducerOwners` is cleared DIRECTLY rather than through `removeRemoteAudio`, because that
+method calls `stopTalking` per producer and would empty the talking list this is trying to restore.
+
+**Narrower than `restart()` on purpose.** Upstream touches no transport, producer, screen or webcam.
+A presenter fixing one member's microphone must not blank their screen tabs.
+
+#### The alert stays, and the three peer mutes have none — both are the capture
+
+`restart-audio` KEEPS its `EXACT_ALERTS` entry rather than leaving the table like the three before
+it, because upstream genuinely raises that alert right after the send. Two neighbouring methods in
+one capture, two behaviours, both reproduced. Which entries are DEAD is established by the
+disposition contract scanning for a branch — not by presence in a table.
+
+That forced a correction to the bucket model: **ALERTED is now DERIVED as "has a string and no
+branch"** rather than read off `EXACT_ALERTS`. Two entries there belong to controls that genuinely
+send — `save-permissions` always did, and now this one. Treating a table entry as proof of a lie
+would report both as dead controls. The load-bearing rule is untouched: no branch and no entry
+anywhere is still an orphan, and handled-AND-inert is still a contradiction.
+
+#### HONEST GAP: the part that does the work has no automated control
+
+Two negative controls came back **GREEN** and are recorded in the test file rather than left to be
+inferred:
+
+- deleting `remoteAudioStreams.clear()` / `audioProducerOwners.clear()` — no failure
+- deleting the `!active` half of the guard — no failure, because `!socket` returns first
+
+The reason is structural: the signalling client is created inside `connect()` and cannot be reached
+from a test, so the state where the clear-then-re-consume path actually runs cannot be constructed.
+The one test that exists proves only that the method RESOLVES on an unwired room — a real failure
+mode, since it is called from a frame handler — and its docblock says exactly that and no more.
+**Two browsers in a live room is the owner's confirmation.** Making it testable means exposing the
+signalling client, which is its own change.
+
+#### Ceilings
+
+`media-transport` 1750 → 1825, `user-actions` 805 → 824, `private-commands` 152 → 180, `create-room`
+1110 → 1114 — all recorded with what bought them, and the two under the standing "get it done"
+say so in those words.
+
+**Verified:** room `svelte-check` **1,241 files, 0/0**; `vitest` **2,673 / 188**; `eslint` and
+`prettier` clean. **Two negative controls seen RED** — the branch alerting without sending, and
+dropping the addressing gate (which turned five tests red, including behavioural ones). The two that
+came back green are reported above rather than quietly dropped.
+
 ### 2026-08-24 00:35 EDT — the addressed channel becomes one gate instead of four copies
 
 **Runtime impact: no.** A structural change, taken on the owner's ruling, ahead of the receivers

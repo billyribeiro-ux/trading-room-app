@@ -69,7 +69,8 @@ import {
   focusOnSessionNote,
   forceReload,
   kickUser,
-  presenterCommand
+  presenterCommand,
+  restartAudio
 } from '../../routes/presenter-commands.remote';
 import { sessionSendUrl, videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
 
@@ -804,6 +805,7 @@ export function createRoom(deps: RoomDeps) {
       muteChat,
       unmuteChat,
       forceReload,
+      restartAudio,
       kickUser,
       sessionSendUrl,
       savePermissions
@@ -871,7 +873,9 @@ export function createRoom(deps: RoomDeps) {
       forceReloadRequested: () =>
         dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
       // The presenter's own message, as text. No page swap: see `private-commands.svelte.ts`.
-      kicked: (message: string) => (dialogs.alert = message)
+      kicked: (message: string) => (dialogs.alert = message),
+      // Audio only — narrower than a session restart on purpose. See `reconnectAudio`.
+      reconnectAudio: () => mediaTransport.reconnectAudio()
     })
   });
 

@@ -63,17 +63,27 @@ export class RoomPrivateCommands {
     forceReloadRequested: () => void;
     /** `kickUser` — the member is removed; the argument is the presenter's own message. */
     kicked: (message: string) => void;
+    /**
+     * `remoteRestartAudio` — THIS browser re-consumes every microphone in the room.
+     *
+     * The work is `RoomMediaTransport.reconnectAudio`, which is narrower than a session restart on
+     * purpose. Injected rather than reached through a media collaborator, so this class keeps no
+     * opinion about media beyond "somebody asked for audio to come back".
+     */
+    reconnectAudio: () => Promise<void>;
   }) {
     this.#viewerId = options.viewerId;
     this.#chatMute = options.chatMute;
     this.#forceReloadRequested = options.forceReloadRequested;
     this.#kicked = options.kicked;
+    this.#reconnectAudio = options.reconnectAudio;
   }
 
   readonly #viewerId: () => number;
   readonly #chatMute: RoomChatMute;
   readonly #forceReloadRequested: () => void;
   readonly #kicked: (message: string) => void;
+  readonly #reconnectAudio: () => Promise<void>;
 
   /**
    * Route one addressed frame.
@@ -123,6 +133,24 @@ export class RoomPrivateCommands {
     }
     if (command.cmd === 'unmuteChat') {
       this.#chatMute.unmuted();
+      return true;
+    }
+
+    if (command.cmd === 'remoteRestartAudio') {
+      /*
+        `case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")` at byte 995973, whose
+        subscriber at 1119299 is one line: `() => { this.reconnectAudio() }`.
+
+        NOTHING IS SHOWN TO THE MEMBER, and that is the capture rather than an omission — the
+        subscriber raises no toast and no dialog. The presenter is the one who gets told, by the
+        alert on their own button, and even that is only ever "request sent". A member whose audio is
+        being repaired has no reason to be interrupted about it.
+
+        A FAILURE is still surfaced, because a silent failure here leaves somebody deaf while the
+        presenter has been told the request went out. `reconnectAudio` rethrows for that reason and
+        the handler passes it on.
+      */
+      void this.#reconnectAudio();
       return true;
     }
 
