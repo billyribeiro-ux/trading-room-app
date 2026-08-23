@@ -12,6 +12,7 @@ import { playSoundEffect } from '#lib/sound-effects.js';
 import type { FollowChatStyle, ManagedChatUser, ModalName, ModalTargetUser } from '#lib/types.js';
 import {
   MISSING_SCHEME_ALERT,
+  PEER_MUTE_SUBCMDS,
   addVideoToList,
   isAcceptableSendUrl,
   userActionAlert
@@ -693,6 +694,30 @@ export class RoomUserActions<
       `Command failed.` is inherited from the sibling handlers here, not captured — the reference
       never showed us a failure for either control.
     */
+    /*
+      THE THREE PEER COMMANDS WHOSE WIRE WAS ALREADY BUILT, and whose buttons were dead because
+      nobody had written these six lines. `user-action-intent.ts` carries the full account: the
+      command, the receiver and a neighbouring caller all existed, behind an `INERT_ACTIONS` entry
+      claiming they were blocked on a server-side presenter check that had been there all along.
+
+      NO SUCCESS ALERT, and that is the capture rather than an omission. `remotePresCommand(c)` at
+      byte 2080529 is one line — `sendServerAdminCommand("remotePresCommand", {user, cmd:c})` — with
+      no `bootbox` after it, unlike `forceReload` and `remoteRestartAudio` two lines below, which
+      both raise one. Adding one here would invent a string.
+
+      A FAILURE is loud anyway. Silent-on-success is the reference; silent-on-FAILURE is the defect
+      class this whole sweep exists to remove, and a member whose microphone was not cut is
+      something the presenter has to know about.
+
+      The modal is NOT closed. Every neighbouring branch that closes it does so on evidence; nothing
+      read says these three do, and closing it would be a behaviour this room invented.
+    */
+    if (action in PEER_MUTE_SUBCMDS) {
+      void this.#commands
+        .presenter({ subCmd: PEER_MUTE_SUBCMDS[action], targetUserId: user.id })
+        .catch(() => (this.#dialogs.alert = 'Command failed.'));
+      return;
+    }
     if (action === 'force-reload') {
       this.#announceThenSend('Reload request sent OK', () => this.#commands.forceReload(user.id));
       return;

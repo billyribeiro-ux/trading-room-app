@@ -33,6 +33,81 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-23 23:55 EDT — three dead buttons whose wire had been built all along
+
+**Runtime impact: YES.** *" Mute Audio "*, *" Mute Camera "* and *" Stop Screens "* in the user modal
+now do what they say. They have been dead for the whole port.
+
+**Branch `feat/save-permissions`.** Prompted by the owner's instruction to check what already exists
+before building anything — which is exactly what found this.
+
+#### The recorded blocker was false, and it is what stopped anyone looking
+
+`INERT_ACTIONS` said all three were *"Blocked on a SERVER-side presenter check, not on evidence"*.
+Every end was already built, and one of them was already in daily use:
+
+```
+SEND     presenter-commands.remote.ts:60  presenterCommand
+         z.enum(['mutemic','mutecam','mutescreens']), gated by presenterRoom(),
+         ADDRESSED via publishToUsers
+RECEIVE  events.svelte.ts:573-582         the member's OWN browser does the work —
+         toggleMicrophone() / toggleWebcam() / stopScreenSharing()
+IN USE   muteAllNonAdmins() in RoomUserActions has been calling that exact command,
+         with that exact subCmd, since it was built
+```
+
+A working command with a working receiver, exercised by a neighbouring control in the same class,
+sat behind three buttons dispatching action strings nothing had a branch for. **What was missing was
+the branch.** This is the third time an inert entry's stated blocker has turned out to be a search
+that stopped at one directory, and the entry now says so in those words.
+
+#### One branch, not three, and the table is exported
+
+`if (action in PEER_MUTE_SUBCMDS)`. Three near-identical branches would be three chances for the
+mapping to cross, and a crossed mapping cuts the wrong stream on somebody else's machine with
+nothing on screen to say so. The test asserts all three mappings individually for that reason.
+
+**No success alert**, and that is the capture rather than an omission: `remotePresCommand(c)` at byte
+2080529 is one line with no `bootbox` after it, unlike `forceReload` and `remoteRestartAudio` two
+lines below which both raise one. A FAILURE is still loud — silent-on-failure is the defect class
+being removed. The modal is not closed, because nothing read says it is.
+
+#### A fourth form of handling, and the gate was blind to it
+
+The disposition contract scans for `action === '…'` and cannot see a table, so it reported all three
+as *"dispatched into the void"* — a defect report about a working wire, which is the manufactured
+defect its own docblock forbids. It now imports `PEER_MUTE_SUBCMDS` and unions the keys. Imported,
+not regexed: a regex over the table's text would fail silently where the import fails loudly.
+
+#### Two more corrections found in the same audit
+
+**`save-permissions` is not a liar, and `TOAST_ONLY_ACTIONS` has been overstating the defect by one.**
+The `EXACT_ALERTS` docblock claimed *"Every entry here is a button that reports success and sends
+nothing"*. That is false: `savePermissions` reads its string from this table via
+`userActionAlert('save-permissions')` and then genuinely sends, through `permissions.remote.ts`,
+reached from `RoomOverlays.svelte:563`. It is an announcement for a real action stored beside the
+liars. The docblock now says what the table actually is, and points at the disposition contract as
+the thing that establishes which entries are dead — by scanning for a branch rather than by trusting
+a sentence.
+
+**The recording pair's blocker was mis-stated too**, though `start-recording` and `stop-recording`
+really are unbuilt. `recording-state.remote.ts:61` accepts `startRec|stopRec|pauseRec|resumeRec`, but
+it is `publishToRoom` — the PRESENTER'S OWN recording, announced to everybody. Upstream's
+`remotePresCommand("startRec")` is addressed to one member and tells THEIR browser to record
+(`startRecForMuser(null)`, byte 1119480). Two acts sharing a verb; collapsing them would make the
+button start the presenter's own recording while claiming to start somebody else's.
+
+#### Ceiling
+
+`user-actions.svelte.ts` 780 → 805, **raised without a separate asking** under the owner's "it all
+needs to be done", and the entry says so in those words so it can be reversed on sight. Seven lines
+are the branch; eighteen are the account above. The extraction alternative is recorded with it: the
+peer media commands plus `muteAllNonAdmins` are a coherent ~60-line slice.
+
+**Verified:** room `svelte-check` **1,240 files, 0/0**; `vitest` **2,665 / 188**; `eslint` and
+`prettier` clean. **Two negative controls seen RED** with the mutation verified to have landed first:
+crossing `mute-camera` to `mutemic`, and inventing a success alert.
+
 ### 2026-08-23 22:40 EDT — the chat mute was enforced and never announced. Now the member is told
 
 **Runtime impact: YES.** Two changes a member can see: a mute now says so the moment it lands, and

@@ -74,6 +74,7 @@ const make = (
   let previewsHidden = 0;
   let reloaded = 0;
   let unmuteFails = false;
+  let presenterFails = false;
   /* The five checkboxes as they left the class, and a switch to make the control plane refuse. */
   const permsSent: { targetUserId: number; granted: string[] }[] = [];
   let permsFails = false;
@@ -82,7 +83,10 @@ const make = (
     dialogs,
     toasts,
     commands: {
-      presenter: (payload) => (sent.push(payload), Promise.resolve(null)),
+      presenter: (payload) =>
+        presenterFails
+          ? Promise.reject(new Error('refused'))
+          : (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
       muteChat: (payload: { targetUserId: number }) => (
         mutesSent.push(payload),
@@ -151,6 +155,7 @@ const make = (
     permsSent,
     failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
+    failPresenter: () => (presenterFails = true),
     modalClosed: () => modalClosed,
     messageCleared: () => messageCleared,
     previewsHidden: () => previewsHidden,
@@ -354,6 +359,47 @@ describe('the dispatcher', () => {
     expect(dialogs.alert, "the capture's own wording, from muteChat(e) at byte 2080089").toBe(
       'user chat muted'
     );
+  });
+
+  it('the three peer commands each send their own subCmd to the named member', () => {
+    /*
+      These three buttons were DEAD while their command, their receiver and a neighbouring caller
+      (`muteAllNonAdmins`) all existed — `user-action-intent.ts` carries the account. The assertion
+      is per-action rather than "something was sent", because the failure that matters here is a
+      CROSSED mapping: `mute-camera` reaching `mutemic` would cut the wrong stream on somebody
+      else's machine and nothing on screen would say so.
+    */
+    const { actions, sent } = make();
+    actions.handle('mute-mic', TARGET);
+    actions.handle('mute-camera', TARGET);
+    actions.handle('stop-screens', TARGET);
+    expect(sent).toEqual([
+      { subCmd: 'mutemic', targetUserId: TARGET.id },
+      { subCmd: 'mutecam', targetUserId: TARGET.id },
+      { subCmd: 'mutescreens', targetUserId: TARGET.id }
+    ]);
+  });
+
+  it('raises NO success alert for them, because the capture raises none', () => {
+    /*
+      `remotePresCommand(c)` at byte 2080529 is one line with no `bootbox` after it, unlike
+      `forceReload` and `remoteRestartAudio` directly below it, which both raise one. An alert here
+      would be an invented string — and the three were in `INERT_ACTIONS`, not `EXACT_ALERTS`, which
+      is the same fact recorded from the other side.
+    */
+    const { actions, dialogs, toasts } = make();
+    actions.handle('mute-mic', TARGET);
+    expect(dialogs.alert).toBeNull();
+    expect(toasts.notices).toEqual([]);
+  });
+
+  it('surfaces a refused peer command rather than dropping it', async () => {
+    // Silent on success is the reference. Silent on FAILURE is the defect class being removed: a
+    // presenter whose mute did not land has to know.
+    const { actions, dialogs, failPresenter } = make();
+    failPresenter();
+    actions.handle('stop-screens', TARGET);
+    await vi.waitFor(() => expect(dialogs.alert).toBe('Command failed.'));
   });
 
   it('mute-chat-24 is no longer one of the controls that only talk', () => {

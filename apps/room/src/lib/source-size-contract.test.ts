@@ -1186,7 +1186,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this class, so building the slice from outside would mean a second copy of it. Three lines
       over, and the extraction it paid for moved 191.
     */
-    max: 780,
+    /*
+      780 -> 805, 2026-08-23, and RAISED WITHOUT A SEPARATE ASKING because the owner's instruction at
+      the time was "it all needs to be done" — recorded here so it can be reversed on sight rather
+      than discovered later.
+
+      What bought it: `mute-mic`, `mute-camera` and `stop-screens` became live. Seven of the lines
+      are the branch; the other eighteen are the account of why three buttons were dead for months
+      while their command (`presenterCommand`), their receiver (`events.svelte.ts:573-582`) and a
+      neighbouring caller (`muteAllNonAdmins`, in this same class) all already existed. That account
+      is the asset — the `INERT_ACTIONS` entry claiming they were "blocked on a SERVER-side presenter
+      check" is what stopped anyone looking, and it was false the day it was written.
+
+      The extraction alternative, if this is reversed: the peer media commands — these three plus
+      `muteAllNonAdmins` — are a coherent slice of roughly 60 lines.
+    */
+    max: 805,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
