@@ -12,6 +12,7 @@ import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
 import { RoomEventStream } from './events.svelte';
 import { RoomGates } from './gates.svelte';
+import { RoomLocalCapture } from './local-capture.svelte';
 import { RoomMediaTransport } from './media-transport.svelte';
 import { RoomAlertsPane } from './alerts-pane';
 import { RoomArrivals, RoomOrderedArrivals } from './arrivals';
@@ -92,6 +93,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   messageActions: RoomMessageActions,
   screens: RoomScreens,
   mediaTransport: RoomMediaTransport,
+  localCapture: RoomLocalCapture,
   recording: RoomRecording,
   roomEvents: RoomEventStream,
   chatMute: RoomChatMute,

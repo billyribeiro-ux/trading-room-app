@@ -114,7 +114,19 @@ describe('the presenter toast matches, including being undismissable', () => {
     const at = BUNDLE.indexOf('Reconnecting media (presenter)');
     expect(BUNDLE.slice(at - 220, at)).toContain('liveMicTrack');
     expect(code).toContain('const holdsLiveTrack = Boolean(');
-    expect(code).toContain(
+    /*
+      The three-way test moved to `RoomLocalCapture.isProducing` on 2026-08-26 — it reads three
+      fields that all left with the local publisher, so asserting the expression here would have
+      been asserting it against a file that no longer holds any of them.
+
+      Both halves are checked: the transport ASKS, and the owner still spells out the same three
+      conditions. Checking only the call would let the predicate be quietly narrowed to the
+      microphone and this test would not notice; a presenter sharing only a screen would then lose
+      the reconnect toast, which is precisely the case the reference's `liveScreenTrack` covers.
+    */
+    expect(code).toContain('this.#localCapture.isProducing');
+    const capture = readFileSync(resolve(cwd, 'src/lib/room/local-capture.svelte.ts'), 'utf8');
+    expect(capture).toContain(
       'this.#localMicProducerId || this.#webcamStream || this.#localScreenStreams.size > 0'
     );
     expect(code).toContain('if (holdsLiveTrack && this.#presenterReconnectToastId === null)');

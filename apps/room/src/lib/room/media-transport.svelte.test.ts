@@ -185,6 +185,51 @@ describe('every reactive group actually carries its rune', () => {
     );
     expect(seen).toEqual([false, true]);
   });
+
+  it('the local webcam stream stays reactive THROUGH the delegating getter', async () => {
+    /*
+      THE ONE THING THE 2026-08-26 SPLIT COULD HAVE BROKEN SILENTLY.
+
+      `#webcamStream` is the only `$state` field that left for `RoomLocalCapture`, and it is now read
+      through TWO getters — `transport.webcamStream` returns `localCapture.webcamStream`, which
+      returns the rune. Every other assertion in this file reads a field the transport still owns, so
+      none of them touches the new hop.
+
+      A signal read through a getter chain is still a signal read; that is the claim, and it is the
+      kind of claim that is obviously true right up until a refactor makes the middle getter return a
+      cached snapshot. `room-mtx.svelte.test.ts` records this exact family: the field renders once,
+      correctly, and never updates, while svelte-check, the autofixer and every source-reading
+      assertion stay green and the presenter's own camera preview stays black.
+
+      Driven through `toggleWebcam` rather than by assigning the field, because assigning it would
+      test the setter this class does not have. `getUserMedia` is stubbed and no media session is
+      attached, so the acquire succeeds and the produce is skipped — which is enough: the assertion
+      is about the stream reaching a reader, not about the SFU.
+    */
+    const track = { stop: () => {}, readyState: 'live', kind: 'video' };
+    const fakeStream = { id: 'cam', getTracks: () => [track], getVideoTracks: () => [track] };
+    const devices = { getUserMedia: async () => fakeStream };
+    Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+      value: devices,
+      configurable: true
+    });
+
+    const { transport } = make();
+    const seen: (string | null)[] = [];
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(transport.webcamStream?.id ?? null);
+      });
+      flushSync();
+    });
+    // Awaited OUTSIDE the root, because the acquire is async and `$effect.root` does not wait.
+    await transport.toggleWebcam();
+    flushSync();
+    stop();
+
+    // null at subscribe, then the acquired stream. A plain field would give [null].
+    expect(seen).toEqual([null, 'cam']);
+  });
 });
 
 describe('reconnectAudio on a room with no media wired', () => {

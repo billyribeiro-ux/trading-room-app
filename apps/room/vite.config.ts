@@ -164,6 +164,37 @@ export default defineConfig({
   test: {
     // Points the suite at a throwaway database instead of the app's; see vitest.setup.ts.
     setupFiles: ['./vitest.setup.ts'],
+    /*
+      Both of these exist for one Kit change, and they stand or fall together.
+
+      Kit 3.0.0-next.25 rewired its server runtime: `src/runtime/app/paths/server.js` now imports
+      `'<sveltekit:generated>/server.js'`, a specifier only the Kit Vite plugin's alias can resolve
+      (next.23 used a relative import that Node could follow on its own). Under Vitest, files in
+      node_modules are externalized by default - Node resolves their imports natively, no Vite
+      alias applies, and every test file that touches `$app`'s server flavour died at import with
+      "Cannot find module '<sveltekit:generated>/server.js'": fifteen contract files, zero tests
+      collected in each.
+
+      `deps.inline` routes Kit's runtime through Vite's transform so the alias CAN apply; `alias`
+      supplies the targets. TWO of them, because `svelte-kit sync` - the only generation step this
+      suite runs - splits the flavours: `generated/build/` has `server.js` but no `env/`, while
+      `generated/dev/` has the whole `env/` tree but no `server.js` (that one appears only once a
+      real dev server has run). Verified by deleting `.svelte-kit/generated` and re-running sync,
+      then listing both directories. The exact-file entry must sit above the prefix entry - vitest
+      tries aliases in order.
+    */
+    alias: {
+      '<sveltekit:generated>/server.js': new URL(
+        './.svelte-kit/generated/build/server.js',
+        import.meta.url
+      ).pathname,
+      '<sveltekit:generated>': new URL('./.svelte-kit/generated/dev', import.meta.url).pathname
+    },
+    server: {
+      deps: {
+        inline: [/@sveltejs[\\/]kit/]
+      }
+    },
     // `new-room-control` is a separate SvelteKit project that happens to sit in this directory. Its
     // files resolve `$lib` against ITS src, so collecting them from this root fails at import with
     // "Cannot find module '$lib/sanitize-html'" - five red files that are not this app's tests. It

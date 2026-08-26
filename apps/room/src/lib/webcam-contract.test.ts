@@ -58,7 +58,19 @@ const stripCode = stripComments(
 
   The page keeps what wires them: the navbar handler, the `<video>` attachment, the preview.
 */
-const transportCode = stripComments(
+/*
+  TWO FILES SINCE 2026-08-26, and `bodyOf` picks between them rather than either one being guessed.
+
+  `RoomLocalCapture` took the capture paths — `toggleWebcam` acquires the device and produces it.
+  `RoomMediaTransport` kept the CARD list, because a webcam card can belong to a remote peer and the
+  card set is therefore not the local publisher's business. That is the same line the module split
+  was drawn on, and this file straddles it by design: it exists to hold "acquiring a device" and
+  "showing a card" apart, so it must be able to read both sides.
+*/
+const captureCode = stripComments(
+  readFileSync(new URL('./room/local-capture.svelte.ts', import.meta.url), 'utf8')
+);
+const mediaTransportCode = stripComments(
   readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8')
 );
 
@@ -81,10 +93,52 @@ const webcamsCode = stripComments(
  * that found the call would slice a body that is not the one being asserted about.
  */
 function bodyOf(name: string) {
-  const at = transportCode.search(new RegExp(`\\n {2}(?:async )?${name}\\(`));
-  expect(at, `${name} should exist in the transport`).toBeGreaterThan(-1);
-  const end = transportCode.indexOf('\n  }', at);
-  return transportCode.slice(at, end);
+  const pattern = new RegExp(`\\n {2}(?:async )?${name}\\(`);
+  const found = [
+    { label: 'local-capture.svelte.ts', code: captureCode, at: captureCode.search(pattern) },
+    {
+      label: 'media-transport.svelte.ts',
+      code: mediaTransportCode,
+      at: mediaTransportCode.search(pattern)
+    }
+  ]
+    .filter((candidate) => candidate.at > -1)
+    /*
+      A DELEGATION IS NOT A DECLARATION, and this filter is the split's one real ambiguity.
+
+      `RoomMediaTransport` keeps `toggleWebcam()`, `toggleMicrophone()` and four more as one-line
+      forwards so the page and eleven contract tests did not all have to be re-pointed in the same
+      commit as the extraction. Their bodies are `return this.#localCapture.X(…)` and nothing else,
+      so they declare a name and decide nothing.
+
+      Counting them would make the "exactly one" assertion below fire on correct code, and the fix
+      for that would have been to delete the assertion — which is how a duplicate implementation
+      would then have slipped in unnoticed. Excluding the forwards keeps the guard pointed at what
+      it is actually for: the same BEHAVIOUR written in two places.
+    */
+    .filter((candidate) => {
+      const end = candidate.code.indexOf('\n  }', candidate.at);
+      const body = candidate.code.slice(candidate.at, end);
+      return !/^\s*return this\.#localCapture\.\w+\([^)]*\);\s*$/.test(
+        body.slice(body.indexOf('{') + 1)
+      );
+    });
+
+  /*
+    EXACTLY ONE, asserted both ways. Zero means the member was renamed or moved again and every
+    assertion below would slice the empty string — the vacuity this suite is full of guards against.
+    Two means the split left a duplicate, which is the failure mode a shared surface actually has,
+    and picking the first would hide it behind a passing test.
+  */
+  expect(
+    found.map((candidate) => candidate.label),
+    `${name} must be declared in exactly one of the two media modules`
+  ).toHaveLength(1);
+
+  const { code, at } = found[0];
+  const end = code.indexOf('\n  }', at);
+  expect(end, 'the method must close at two-space indent').toBeGreaterThan(-1);
+  return code.slice(at, end);
 }
 
 /** The body of a top-level `function name(` … `\n  }` still on the page. */
@@ -123,7 +177,8 @@ describe('webcam: the capture separates preview from device', () => {
 describe('webcam: this room reproduces that split', () => {
   it('the toolbar stops the tracks and drops the stream', () => {
     const toggle = bodyOf('toggleWebcam');
-    expect(toggle).toContain('this.#stopStream(this.#webcamStream)');
+    // A module-level function since the split: both classes call the same one.
+    expect(toggle).toContain('stopStream(this.#webcamStream)');
     expect(toggle).toContain('this.#webcamStream = null');
     // A fresh acquire on the way back in - a stopped track cannot be revived, so the old
     // `webcamStream ??= …` cache would have handed back a dead stream.

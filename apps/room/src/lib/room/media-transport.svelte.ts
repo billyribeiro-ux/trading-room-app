@@ -1,20 +1,14 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { ScreenTab } from '#lib/components/ScreenTabs.svelte';
-import {
-  type MediaCaptureKind,
-  type MediaPermissionKind,
-  captureErrorMessage,
-  captureErrorName,
-  mediaCaptureErrorMessage,
-  permissionForCapture
-} from '#lib/media-capture-error.js';
+import { type MediaPermissionKind } from '#lib/media-capture-error.js';
 import { MediaSession } from '#lib/media/session.js';
 import { joinsMediaAsProducer } from '#lib/roster-gates.js';
 import { SignallingClient, legacyUserId, type ProducerInfo } from '#lib/media/signalling.js';
 import type { WebcamPresenter } from '#lib/types.js';
 
 import type { RoomDialogs } from './dialogs.svelte';
+import { RoomLocalCapture } from './local-capture.svelte';
 import type { RoomMedia } from './media.svelte';
 import type { RoomScreens } from './screens.svelte';
 import type { RoomToasts } from './toasts.svelte';
@@ -35,42 +29,6 @@ import type { RoomVolume } from './volume.svelte';
  */
 const TOP_SPATIAL_LAYER = 9;
 
-/**
- * "Name for this screen?" - the step that runs BEFORE anything is captured.
- *
- * Transcribed from the captured `startScreenSharing(e)` (`docs/source/main.d6d3c112b59b7d0d.js`):
- *
- * ```js
- * this.mediaSoupService.connected
- *   ? pa.prompt({ value: `Screen ${this.mediaSoupService.screenProducers.size+1}`,
- *       title: "Name for this screen ? Press OK for default. (You can share multiple screens
- *               from the same room and name each one here)",
- *       inputType: "text",
- *       callback: o => { if (!o) return; let r = o; r || (r = `Screen ${…length+1}`);
- *                        this.mediaSoupService.startScreenSharing(e, r, …) } })
- *   : pa.alert("Not connected to media server yet, please wait a second or two...")
- * ```
- *
- * Three things that were not obvious and are worth stating, because I got one of them wrong
- * before this line was found:
- *
- * 1. **There IS a generated default** - `Screen ${screenProducers.size + 1}` - prefilled into the
- *    input. A live room showing `FUTURES` and `MAIN / SPX` was the presenter typing over it, not
- *    evidence against a generator. Both are true: the name is free text, and the box starts
- *    populated.
- * 2. **Cancel aborts the share entirely.** `if (!o) return` runs before any capture, so no
- *    getDisplayMedia prompt appears. The `r || (r = …)` line after it is dead in the original -
- *    `o` is already truthy there - so the fallback it describes can never fire, and it is not
- *    reproduced.
- * 3. **Disconnected refuses instead of sharing**, with its own message. Sharing a screen the
- *    SFU cannot carry is the failure this exists to prevent: the presenter's own preview would
- *    look perfect while the room saw nothing.
- */
-const SCREEN_NAME_PROMPT =
-  'Name for this screen ? Press OK for default. (You can share multiple screens from the same room and name each one here)';
-
-const MEDIA_NOT_CONNECTED_ALERT =
-  'Not connected to media server yet, please wait a second or two... Or reload the page if it takes too long... *** If nothing else works, use the Gear icon on the right to open the Session Control and reset the media server...';
 /** The load values the transport reads, taken as a thunk so a navigation reaches them. */
 export interface TransportSession {
   user: {
@@ -157,18 +115,12 @@ export class RoomMediaTransport {
 
   #sessionReady: Promise<void> | null;
   #mediaSignalling: SignallingClient | null;
-  #microphoneStream: MediaStream | null;
-  #webcamStream: MediaStream | null;
-  #localWebcamProducerId: string | null;
-  #localMicProducerId: string | null;
-  #screenStream: MediaStream | null;
   #webcamPresenters: WebcamPresenter[];
   #sharedScreens: ScreenTab[];
   #screenStreams: SvelteMap<string, MediaStream>;
   #webcamStreams: SvelteMap<string, MediaStream>;
   #mediaSession: MediaSession | null;
-  #localScreenProducerId: string | null;
-  #localScreenStreams: Map<string, MediaStream>;
+  readonly #localCapture: RoomLocalCapture;
   #audioProducerOwners: Map<string, { userID: number; name: string }>;
   #remoteAudioStreams: SvelteMap<string, MediaStream>;
   #reconnectToastId: number | null;
@@ -237,34 +189,6 @@ export class RoomMediaTransport {
     /** The live socket, so the caption sender can issue commands without reaching into MediaSession. */
     this.#mediaSignalling = null;
 
-    this.#microphoneStream = null;
-
-    /**
-     * Reactive, unlike the other capture streams, because a `<video>` has to follow it.
-     *
-     * As a plain `let` this held a live camera track that nothing could observe: `toggleWebcam`
-     * acquired it and enabled it, so the browser lit the in-use indicator, and the preview stayed
-     * black because no attachment re-ran and no element ever received it. Both halves had to change
-     * - see {@link attachLocalWebcam}.
-     */
-    this.#webcamStream = $state<MediaStream | null>(null);
-
-    /**
-     * The capture's `camProducer`. Its presence is what `toggleCam()` branches on, and `stopCam()`
-     * is a no-op without it - `stopCam() { if (this.camProducer) { … } }`.
-     */
-    this.#localWebcamProducerId = null;
-
-    /**
-     * The capture's `micProducer`. Muting PAUSES it rather than closing it - `muteMic()` calls
-     * `micProducer.pause()` and emits `pauseProducer`, while only `disableMic()` closes it and stops
-     * the track. Keeping the producer across a mute is what lets unmuting resume without a new
-     * transport negotiation.
-     */
-    this.#localMicProducerId = null;
-
-    this.#screenStream = null;
-
     /**
      * `webcamingUsers`, as far as this room can populate it.
      *
@@ -316,22 +240,6 @@ export class RoomMediaTransport {
      * Null until the socket is up; every call guards on it rather than assuming.
      */
     this.#mediaSession = null;
-
-    /**
-     * The most recent local screen producer — this peer's own, so stopping the share can close it.
-     * Kept for the single-screen callers (`applyScreenLayers` skipping our own producer) that only
-     * need "one of ours".
-     */
-    this.#localScreenProducerId = null;
-
-    /**
-     * Every screen THIS presenter is currently sharing, producer id -> its capture stream.
-     *
-     * The mirror of the capture's `this.screenProducers = new Map` (byte 1072217). A plain Map, not
-     * a SvelteMap: nothing renders from it - the tab bar renders from `sharedScreens`, which comes
-     * back from the SFU - so making it reactive would buy a dependency and no redraw.
-     */
-    this.#localScreenStreams = new Map<string, MediaStream>();
 
     /**
      * producer id -> the peer that audio producer belongs to.
@@ -423,6 +331,50 @@ export class RoomMediaTransport {
      * in the room, and every entry is removed the moment it is consumed.
      */
     this.#deferredScreens = new Map<string, ProducerInfo>();
+
+    /*
+      THE LOCAL PUBLISHER — `#lib/room/local-capture.svelte.ts`.
+
+      Built LAST, and that ordering is load-bearing: every port below closes over a field of this
+      class, and two of them (`tabs.list`, `tabs.streams`) are read through arrows rather than
+      captured by value, so the tab list stays a single object with two writers rather than becoming
+      two lists that drift. Constructing it earlier throws on the temporal dead zone, which is how
+      the ordering was established rather than chosen.
+    */
+    this.#localCapture = new RoomLocalCapture({
+      dialogs: this.#dialogs,
+      toasts: this.#toasts,
+      media: this.#media,
+      screens: this.#screens,
+      session: () => this.#session(),
+      beginSpeech: () => this.#beginSpeech(),
+      endSpeech: () => this.#endSpeech(),
+      stopRecording: () => this.#stopRecording(),
+      checkPermissionState: (kind, agent) => this.#checkPermissionState(kind, agent),
+      closeScreenMenu: () => this.#closeScreenMenu(),
+      videoDeviceId: () => this.#videoDeviceId(),
+      mediaSession: () => this.#mediaSession,
+      mediaSignalling: () => this.#mediaSignalling,
+      tabs: {
+        /*
+          ARROWS, not an object getter/setter pair. A literal's own accessor binds `this` to the
+          literal, so reaching a private field of this class from inside one needs `const owner =
+          this`, which `@typescript-eslint/no-this-alias` refuses — correctly, because the alias is
+          exactly the thing that makes it unclear which object a line is talking about. An arrow
+          closes over `this` lexically and needs no alias at all.
+        */
+        list: () => this.#sharedScreens,
+        setList: (next: ScreenTab[]) => {
+          this.#sharedScreens = next;
+        },
+        streams: this.#screenStreams,
+        select: (id) => this.selectScreenTabOfId(id)
+      },
+      webcams: {
+        add: (presenter) => this.addWebcamPresenter(presenter),
+        remove: (producerId) => this.removeWebcamPresenter(producerId)
+      }
+    });
   }
 
   get screens(): ScreenTab[] {
@@ -451,7 +403,7 @@ export class RoomMediaTransport {
   }
 
   isLocalScreen(screenId: string): boolean {
-    return this.#localScreenStreams.has(screenId);
+    return this.#localCapture.localScreenStreams.has(screenId);
   }
 
   get sessionReady(): Promise<void> | null {
@@ -470,24 +422,64 @@ export class RoomMediaTransport {
     this.#mediaSignalling = next;
   }
 
+  /*
+    THE LOCAL PUBLISHER'S SURFACE, kept here and delegated.
+
+    `#lib/room/local-capture.svelte.ts` owns these now. The accessors stay because the page,
+    `RoomRecording`, `RoomEventStream` and eleven contract tests read them off the transport, and
+    re-pointing every one of those in the same commit as the extraction would have made the two
+    changes impossible to tell apart in review.
+  */
+  get localCapture(): RoomLocalCapture {
+    return this.#localCapture;
+  }
+
   get microphoneStream(): MediaStream | null {
-    return this.#microphoneStream;
+    return this.#localCapture.microphoneStream;
   }
 
   get webcamStream(): MediaStream | null {
-    return this.#webcamStream;
+    return this.#localCapture.webcamStream;
   }
 
   get screenStream(): MediaStream | null {
-    return this.#screenStream;
+    return this.#localCapture.screenStream;
   }
 
   set screenStream(next: MediaStream | null) {
-    this.#screenStream = next;
+    this.#localCapture.screenStream = next;
   }
 
   get localScreenStreams(): Map<string, MediaStream> {
-    return this.#localScreenStreams;
+    return this.#localCapture.localScreenStreams;
+  }
+
+  toggleMicrophone(): Promise<void> {
+    return this.#localCapture.toggleMicrophone();
+  }
+
+  toggleWebcam(): Promise<void> {
+    return this.#localCapture.toggleWebcam();
+  }
+
+  stopScreenSharing(): void {
+    this.#localCapture.stopScreenSharing();
+  }
+
+  promptForScreenName(source: 'screen' | 'camera'): void {
+    this.#localCapture.promptForScreenName(source);
+  }
+
+  startScreenSharing(source: 'screen' | 'camera', screenName: string): Promise<void> {
+    return this.#localCapture.startScreenSharing(source, screenName);
+  }
+
+  stopLocalScreen(producerId: string): void {
+    this.#localCapture.stopLocalScreen(producerId);
+  }
+
+  restartLocalScreens(): Promise<void> {
+    return this.#localCapture.restartLocalScreens();
   }
 
   get audioProducerOwners(): Map<string, { userID: number; name: string }> {
@@ -1029,9 +1021,7 @@ export class RoomMediaTransport {
       `localScreenStreams` its screen shares. A mic that is MUTED still counts — muting pauses the
       producer rather than closing it, so there is still a track to re-share.
     */
-    const holdsLiveTrack = Boolean(
-      this.#localMicProducerId || this.#webcamStream || this.#localScreenStreams.size > 0
-    );
+    const holdsLiveTrack = Boolean(this.#localCapture.isProducing);
     if (holdsLiveTrack && this.#presenterReconnectToastId === null) {
       this.#presenterReconnectToastId = this.#toasts.show(
         {
@@ -1319,45 +1309,6 @@ export class RoomMediaTransport {
     this.#screens.screenAdded(producerId);
   }
 
-  /**
-   * Gives the presenter a tab for a screen they are sharing themselves.
-   *
-   * `addRemoteScreen` refuses our own producer on purpose - consuming yourself is refused by the
-   * server with `unknownTransport` - which left a presenter sharing a screen with no tab for it at
-   * all, seeing only other people's. The capture does not consume its own screen either; it adds a
-   * LOCAL one:
-   *
-   * ```js
-   * this.globals.user.id == r.userID && (
-   *   this.isScreenSharing = !0, this.addLocalStream(r), …,
-   *   setTimeout(() => { this.guiEventBus.emit("selectScreenTabOfId", r) }, 500))
-   * ```
-   *
-   * So the stream behind this tab is the capture itself, straight from getDisplayMedia, never a
-   * round trip through the SFU - which is also why it costs nothing and cannot fail.
-   */
-  #addLocalScreen(producerId: string, screenName: string, stream: MediaStream) {
-    if (this.#sharedScreens.some((screen) => screen.id === producerId)) return;
-    this.#sharedScreens = [
-      ...this.#sharedScreens,
-      {
-        id: producerId,
-        name: this.#session().user.displayName,
-        screenName,
-        avatarUrl: this.#session().user.avatarUrl
-      }
-    ];
-    this.#screenStreams.set(producerId, stream);
-
-    // `setTimeout(() => guiEventBus.emit("selectScreenTabOfId", r), 500)` in the capture: the view
-    // moves to the new screen a moment after it appears rather than in the same frame.
-    globalThis.setTimeout(() => {
-      if (this.#sharedScreens.some((screen) => screen.id === producerId)) {
-        this.selectScreenTabOfId(producerId);
-      }
-    }, 500);
-  }
-
   async applyScreenLayers() {
     const session = this.#mediaSession;
     if (!session) return;
@@ -1366,7 +1317,7 @@ export class RoomMediaTransport {
       // Our own screens play from the local capture and are never consumed, so there is no
       // consumer whose layers could be preferred - asking would earn one `unknownConsumer` warning
       // per tab switch for a stream that was never going over the network in the first place.
-      if (this.#localScreenStreams.has(screen.id)) continue;
+      if (this.#localCapture.localScreenStreams.has(screen.id)) continue;
       try {
         await session.setPreferredLayers(
           screen.id,
