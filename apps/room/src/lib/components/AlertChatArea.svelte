@@ -45,6 +45,7 @@
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
+  import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
   import type { RoomChat } from '#lib/room/chat.svelte.js';
   import type { RoomFeedScroll } from '#lib/room/feed-scroll.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
@@ -65,6 +66,13 @@
     /** The outer area's style and the inner pair's — one instance, because it is one gutter. */
     split: RoomSplit;
     alerts: RoomAlerts;
+    /**
+     * The room-wide broadcasts, for the ONE thing this pane renders from them: the sales image a
+     * presenter pins over the chat column. Passed whole rather than as a url prop because the
+     * overlay has a close receiver as well as a value, and splitting those is how a stop gets
+     * half-applied — the reason `RoomBroadcasts` holds receivers instead of setters.
+     */
+    broadcasts: RoomBroadcasts;
     chat: RoomChat;
     polls: RoomPolls;
     /** The page owns which menu is open, so only one is open across every column at once. */
@@ -194,6 +202,7 @@
   let {
     split,
     alerts,
+    broadcasts,
     chat,
     polls,
     menus,
@@ -667,7 +676,20 @@
       </app-alerts>
     </as-split-area>
 
-    <as-split-area minsize="0" class="chat-box as-split-area" style={split.chatAreaStyle}>
+    <!--
+      `position-relative` when the overlay is up, which is `un(".chat-box").addClass("position-relative")`
+      at byte 2502040. It is REQUIRED, not decoration: `#added-image-to-chat` is
+      `position: absolute; top: 0; left: 0; width: 100%; height: 100%` (complete-app-styles.css:7004),
+      so without a positioned ancestor it would size itself against the viewport and cover the room.
+
+      Conditional rather than always-on, because the capture adds the class when the image arrives
+      and this pane has no other absolutely-positioned child that wants it.
+    -->
+    <as-split-area
+      minsize="0"
+      class="chat-box as-split-area {broadcasts.salesImageUrl ? 'position-relative' : ''}"
+      style={split.chatAreaStyle}
+    >
       <app-chat>
         <div class="chat d-flex flex-column h-100" style="overflow-y: hidden;">
           <div class="bs-component">
@@ -990,6 +1012,66 @@
           {/if}
         </div>
       </app-chat>
+      <!--
+        `sendSalesImageToChat` — the image a presenter pins over the chat column.
+
+        Transcribed from the subscriber at byte 2502019, which builds this by hand and appends it:
+
+          un(".chat-box").addClass("position-relative");
+          const o = un(`<div id="added-image-to-chat">
+              <div class="text-right m-2">
+                <span class="p-2" onclick="removeImageFromChat()" title="Close">&times;</span>
+              </div>
+              <a href="${i.url}" target="_blank" title="Open link: ${i.url}"><img src="${i.url}"/></a>
+            </div>`);
+          un(".chat-box").append(o)
+
+        Every class and the id are the capture's, and all four CSS rules were already shipped
+        verbatim at `css/complete-app-styles.css:7004-7007` — this markup is what they were waiting
+        for.
+
+        THREE DIVERGENCES, all forced and all stated:
+
+        * `rel="noopener noreferrer"` on the anchor. The url is presenter-chosen and arbitrary;
+          `target="_blank"` without it hands the opened page a live `window.opener`.
+        * `role`/`tabindex`/`onkeydown` on the close control. Upstream is a bare `<span onclick>`,
+          which no keyboard can reach. The element stays a `<span>` because the captured CSS selects
+          `#added-image-to-chat span`; only the affordances are added.
+        * `alt=""`. The image is decorative sales material with no captured description, and an
+          invented one would be inventing evidence. Empty is the correct value for "decorative",
+          not a missing attribute.
+
+        NO width/height ON THE IMAGE, which the repository's no-CLS rule would normally require. It
+        cannot cause layout shift here: the overlay is `position: absolute` filling an ancestor of
+        fixed size, so it is out of flow entirely, and the url is remote with an unknowable intrinsic
+        ratio. Stated rather than left as a silent exception.
+      -->
+      {#if broadcasts.salesImageUrl}
+        <div id="added-image-to-chat">
+          <div class="text-right m-2">
+            <span
+              class="p-2"
+              role="button"
+              tabindex="0"
+              title="Close"
+              onclick={() => broadcasts.salesImageDismissed()}
+              onkeydown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  broadcasts.salesImageDismissed();
+                }
+              }}>&times;</span
+            >
+          </div>
+          <a
+            href={broadcasts.salesImageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open link: {broadcasts.salesImageUrl}"
+            ><img src={broadcasts.salesImageUrl} alt="" /></a
+          >
+        </div>
+      {/if}
     </as-split-area>
 
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

@@ -416,6 +416,39 @@ export class RoomEventStream<Entry> {
         }
 
         /*
+          `sendSalesImageToChat` / `sendUsersToURL`, verbatim at bytes 1015180 and 1015357:
+
+            case "sendSalesImageToChat": if (!i || !i.url) return;
+              this.globals.isPresenter || this.appEventBus.emit("sendSalesImageToChat", i)
+
+          The senders shipped on 2026-08-23 and these did not, so both buttons raised
+          "Command send OK." over a frame nothing read. `TODO.md` row 7.
+
+          **`isPresenter ||` is a GUARD**: the receiver runs only for a NON-presenter, so a presenter
+          is neither shown their own image nor navigated out of the room they are running. That is
+          the opposite of `softResetDone` above, which returns to its sender on purpose.
+        */
+        if (command?.cmd === 'sendSalesImageToChat') {
+          if (typeof command.url === 'string' && command.url && !this.#isPresenter()) {
+            this.#broadcasts.salesImageShown(command.url);
+          }
+          return;
+        }
+        if (command?.cmd === 'sendUsersToURL') {
+          /*
+            The most destructive frame in the room: the member loses a half-typed message and a live
+            screenshare with no warning. Faithful — the reference's receiver is one statement with no
+            guard near it, and no confirm was found. Recorded in `TODO.md` row 7 as a divergence
+            candidate for the owner rather than invented here. `broadcastableUrl` already refused
+            anything but http/https on the way out.
+          */
+          if (typeof command.url === 'string' && command.url && !this.#isPresenter()) {
+            globalThis.location.href = command.url;
+          }
+          return;
+        }
+
+        /*
           `playVideoForAll` / `stopVideoForAll`, verbatim (bytes 1,966,711 and 1,966,882):
 
             subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url;

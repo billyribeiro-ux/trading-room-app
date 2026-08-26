@@ -735,3 +735,50 @@ describe('the youtube overlay confines every url to the youtube origin', () => {
     );
   });
 });
+
+/*
+  THE TWO RECEIVERS, AND THE GUARD THAT KEEPS A PRESENTER OUT OF THEM.
+
+  Added 2026-08-26 because a negative control came back GREEN: deleting `!this.#isPresenter()` from
+  the `sendSalesImageToChat` branch — which is what pins the image over the SENDER'S own chat column
+  and, on the sibling branch, navigates the sender out of the room they are running — failed nothing
+  in 2,881 tests.
+
+  The guard is the capture's, not a preference: `this.globals.isPresenter || emit(...)` at bytes
+  1015228 and 1015399. It is easy to read as a truthiness shorthand and delete, and it is the exact
+  species of line this file exists to hold in place — the same reason the youtube-origin assertions
+  above were written.
+*/
+const RECEIVERS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+
+const receiverBranch = (cmd: string): string => {
+  const at = RECEIVERS.indexOf(`command?.cmd === '${cmd}'`);
+  expect(at, `${cmd} has no receiver branch in events.svelte.ts`).toBeGreaterThan(-1);
+  const end = RECEIVERS.indexOf('\n        }', at);
+  expect(end, 'the branch must close at eight-space indent').toBeGreaterThan(at);
+  return RECEIVERS.slice(at, end);
+};
+
+describe('the room-wide "send" receivers exclude the presenter who sent them', () => {
+  it.each(['sendSalesImageToChat', 'sendUsersToURL'])('%s is guarded on isPresenter', (cmd) => {
+    /*
+      Asserted on the BRANCH, not the file: `#isPresenter()` appears elsewhere in this router, so a
+      whole-file `toContain` would pass with the guard deleted from exactly the two places it
+      matters.
+    */
+    expect(receiverBranch(cmd)).toContain('!this.#isPresenter()');
+  });
+
+  it.each(['sendSalesImageToChat', 'sendUsersToURL'])('%s refuses an empty url', (cmd) => {
+    // `!i || !i.url` upstream, checked before the guard. An empty url pins a broken image, or
+    // navigates the room to nowhere.
+    expect(receiverBranch(cmd)).toContain("typeof command.url === 'string' && command.url");
+  });
+
+  it('navigates for sendUsersToURL and pins the overlay for sendSalesImageToChat', () => {
+    // The two do DIFFERENT things, and a copy-paste that gave both the same body would still pass
+    // every assertion above.
+    expect(receiverBranch('sendUsersToURL')).toContain('location.href = command.url');
+    expect(receiverBranch('sendSalesImageToChat')).toContain('salesImageShown(command.url)');
+  });
+});

@@ -56,6 +56,7 @@ export class RoomBroadcasts {
   #scheduledVideoTimer: number | undefined;
   #mp3Playing;
   #mp3Url;
+  #salesImageUrl;
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -153,6 +154,13 @@ export class RoomBroadcasts {
     this.#mp3Playing = $state(false);
 
     this.#mp3Url = $state<string | null>(null);
+
+    /*
+      The pinned sales image: one url or none. The reference appends a FRESH div per arrival without
+      removing the last, stacking overlays until each is closed in turn; a single value renders the
+      same thing a reader sees, minus the pile.
+    */
+    this.#salesImageUrl = $state<string | null>(null);
   }
 
   get youtubeForAllUrl() {
@@ -173,6 +181,10 @@ export class RoomBroadcasts {
 
   get mp3Playing() {
     return this.#mp3Playing;
+  }
+
+  get salesImageUrl(): string | null {
+    return this.#salesImageUrl;
   }
 
   get mp3Url() {
@@ -224,6 +236,33 @@ export class RoomBroadcasts {
   mp3Stopped() {
     this.#mp3Url = null;
     this.#mp3Playing = false;
+  }
+
+  /**
+   * `sendSalesImageToChat` — a presenter pins an image over the chat column.
+   *
+   * Receiver at byte 2502019: it adds `position-relative` to `.chat-box` and appends an
+   * `#added-image-to-chat` div holding a close `<span>` and the url as both link and image. The
+   * markup is transcribed at the render site in `AlertChatArea.svelte`, where the four already-
+   * shipped CSS rules select it.
+   *
+   * **The presenter never sees their own image.** The dispatch guard is
+   * `this.globals.isPresenter || emit(...)` (byte 1015228) — a guard, not a truthiness shorthand —
+   * and it is the opposite of `softResetDone`, which deliberately returns to its sender. Reproduced
+   * rather than normalised; the guard lives at the dispatch, where the capture puts it.
+   */
+  salesImageShown(url: string) {
+    this.#salesImageUrl = url;
+  }
+
+  /**
+   * The overlay's own close button — `onclick="removeImageFromChat()"` in the captured markup.
+   *
+   * A receiver rather than a setter, for this class's stated reason: a caller holding a setter can
+   * half-apply a stop, and this value also drives `position-relative` on the pane around it.
+   */
+  salesImageDismissed() {
+    this.#salesImageUrl = null;
   }
 
   async #sendPresenterFileCommand(cmd: 'playMP3ForAll' | 'stopMp3ForAll', url?: string) {
