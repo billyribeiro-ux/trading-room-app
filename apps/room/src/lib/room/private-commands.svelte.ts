@@ -9,11 +9,25 @@ import type { RoomChatMute } from './chat-mute.svelte';
  * not: every frame here names a single member, and what makes each safe is the same test. That test
  * is the subject, and it now happens ONCE — see below.
  *
- * The upstream switch has ELEVEN cases (bundle bytes 995950-996500, read whole rather than
- * searched). Four are built: `forceReload`, `muteChat`, `unmuteChat`, `kickUser`. `TODO.md` row 9
- * carries the rest with the evidence for each. That queue is why this is a module: more receivers
- * were about to be added to a router with no room for them and no structural guarantee that each
- * would remember to check who the frame was for.
+ * The upstream switch has ELEVEN cases (bundle bytes 995800-997400, read whole rather than
+ * searched). FIVE have a branch here — `forceReload`, `muteChat`, `unmuteChat`, `kickUser`,
+ * `remoteRestartAudio` — and two more are built elsewhere because they are not addressed frames:
+ * `getRoster` in `RoomRoster`, and `remotePresCommand` on the `cmds` channel.
+ *
+ * **THREE ARE LEFT and each is a feature rather than a branch.** `TODO.md` row 9 carries the audit
+ * of 2026-08-26 — what each needs, with the sender's byte offset — and it is deliberately NOT
+ * repeated here: an inventory of unbuilt work in two places is how one of them goes stale, which is
+ * the rule that already cost this row four false blockers.
+ *
+ * ONE of the three has a constraint that belongs in code rather than in a register, because it is
+ * about this gate: **`debugLogResp` cannot be ported as written.** Upstream replies
+ * `{requestor: xe.requestor}` — the CLIENT names who receives the log — so a member could inject
+ * content into any presenter's modal. Whoever builds it must have the server remember who asked and
+ * ignore that field. It is the 2026-08-07 rule arriving on the one frame that travels member→
+ * presenter instead of the other way.
+ *
+ * That queue is why this is a module: more receivers were about to be added to a router with no room
+ * for them and no structural guarantee that each would remember to check who the frame was for.
  *
  * ## THE ADDRESSING TEST IS ONE GATE, AND THAT IS THE POINT
  *
@@ -165,9 +179,13 @@ export class RoomPrivateCommands {
         NOT DONE, a gap rather than a decision: upstream sets `currPage="kicked"` and renders
         `app-kicked-page`. This room has none, so the member is told why and left disconnected.
 
-        A second gap, found 2026-08-23 reading the BROADCAST switch at byte 1010700: upstream also
-        does `i.banned && emit("logout")`, so a banned kick logs the member out as well. This room
-        does not. `TODO.md` row 9 carries it.
+        THE SECOND "GAP" RECORDED HERE WAS NOT ONE, and the correction is kept rather than the claim.
+        This said a banned kick logs the member out upstream and that "this room does not". Both
+        halves were wrong. `logout` occurs EXACTLY ONCE in the whole bundle, at byte 1011431, and
+        that once is the emit — there is no subscriber, so upstream's own line does nothing. Ours
+        ends the session SERVER-side on the next load (`+page.server.ts`, `logout(cookies)` then
+        `redirectSignedOut()`), which a modified client cannot decline the way it can ignore an
+        event. Pinned by `ban-ends-the-session-contract.test.ts`.
       */
       this.#kicked(typeof command.msg === 'string' ? command.msg : '');
       disconnect();
