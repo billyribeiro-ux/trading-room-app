@@ -114,13 +114,6 @@ function clampAndSnap(value: number, min: number, max: number, snap: boolean): n
 }
 
 /**
- * Makes a panel draggable by its own body.
- *
- * Positions with `left`/`top` rather than a transform: the captured panels are absolutely
- * positioned and jQuery UI writes the same two properties, so a transform would fight the
- * stylesheet and break `resizable`'s idea of where the panel is.
- */
-/**
  * How far the pointer must travel before a press becomes a drag.
  *
  * jQuery UI draggable has a `distance` option for exactly this, defaulting to 1px, and the captured
@@ -136,6 +129,13 @@ function clampAndSnap(value: number, min: number, max: number, snap: boolean): n
  */
 const DRAG_THRESHOLD_PX = 3;
 
+/**
+ * Makes a panel draggable by its own body.
+ *
+ * Positions with `left`/`top` rather than a transform: the captured panels are absolutely
+ * positioned and jQuery UI writes the same two properties, so a transform would fight the
+ * stylesheet and break `resizable`'s idea of where the panel is.
+ */
 export function makeDraggable(node: HTMLElement, options: DragOptions = {}): () => void {
   /** A press that is allowed to become a drag, but has not moved far enough yet. */
   let armed = false;

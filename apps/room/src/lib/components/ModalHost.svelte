@@ -1325,28 +1325,8 @@
     return () => cancelAnimationFrame(frame);
   }
 
-  /**
-   * Revoking a permission sends the capture's `remotePresCommand` to that member.
-   *
-   * The capture's three moderation subCmds are carried out by the peer they name -
-   * `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`, `mutescreens` -> `stopSharingAll()` - so
-   * unchecking Microphone here does not edit a row, it tells that member's browser to stop
-   * sending. These checkboxes were bound to local state and sent nowhere, so a presenter could
-   * untick Microphone and nothing at all happened.
-   *
-   * Only the REVOKE direction is wired here, and that is still right: ticking a box is not the
-   * grant. Granting is `giveMicScreen`, a top-level command of its own carrying `{give}`, and its
-   * subscriber flips the member to a limited presenter
-   * (`globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`) and
-   * then reinitialises their media.
-   *
-   * The RECEIVING half now exists — `+page.svelte` dispatches `giveMicScreen` and sets
-   * `isLimitedPresenter`, which is what narrows `archivesAvailableTo()` and the administrative
-   * body of this modal. What is still missing is the control that SENDS it: the capture's
-   * `giveMicScreen(e)` refuses a self-target (`Can't give 'Mic/Screenshare' to yourself.`) and
-   * then `sendServerAdminCommand("giveMicScreen", {user, give})`, but which element calls it has
-   * not been located in the decoded template. `TODO.md` gap 24 rather than a guessed button.
-   */
+  let micScreenAlert = $state<string | null>(null);
+
   /**
    * `giveMicScreen(e)` — hand this member mic and screenshare, or take them back.
    *
@@ -1369,8 +1349,6 @@
    * template — so the button's own markup and label are ours, not transcribed. The behaviour is
    * evidence; the affordance is a reasoned placement.
    */
-  let micScreenAlert = $state<string | null>(null);
-
   async function giveMicScreen(give: boolean) {
     if (!targetUser?.id) return;
     if (targetUser.id === currentUser.id) {
@@ -1387,6 +1365,28 @@
     micScreenAlert = give ? 'Mic/Screenshare given OK' : 'Mic/Screen taken away OK';
   }
 
+  /**
+   * Revoking a permission sends the capture's `remotePresCommand` to that member.
+   *
+   * The capture's three moderation subCmds are carried out by the peer they name -
+   * `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`, `mutescreens` -> `stopSharingAll()` - so
+   * unchecking Microphone here does not edit a row, it tells that member's browser to stop
+   * sending. These checkboxes were bound to local state and sent nowhere, so a presenter could
+   * untick Microphone and nothing at all happened.
+   *
+   * Only the REVOKE direction is wired to the checkboxes, and that is right: ticking a box is not
+   * the grant. Granting is `giveMicScreen` directly above — a top-level command of its own carrying
+   * `{give}`, whose subscriber flips the member to a limited presenter
+   * (`globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`) and
+   * then reinitialises their media.
+   *
+   * This docblock carried a closing paragraph reading *"what is still missing is the control that
+   * SENDS it … `TODO.md` gap 24 rather than a guessed button"* until 2026-08-26. The buttons that
+   * send it are forty lines below, and had been for some time — the claim outlived its subject
+   * because nothing in this repository checks a comment against the code it sits next to. It was
+   * found by the orphan gate, which noticed this block had drifted away from `revokePermission`
+   * entirely; the staleness was the second thing the drift revealed.
+   */
   async function revokePermission(subCmd: 'mutemic' | 'mutecam' | 'mutescreens') {
     if (!targetUser?.id) return;
     /*
@@ -2091,7 +2091,7 @@
                                 class="form-check-input"
                                 bind:checked={userPermissions.hasMic}
                                 onchange={(event) => {
-                                  // Unticking revokes; ticking is `giveMicScreen`, not built.
+                                  // Unticking revokes; ticking is not the grant - that is the Give button below.
                                   if (!event.currentTarget.checked)
                                     void revokePermission('mutemic');
                                 }}
@@ -2108,7 +2108,7 @@
                                 class="form-check-input"
                                 bind:checked={userPermissions.hasScreen}
                                 onchange={(event) => {
-                                  // Unticking revokes; ticking is `giveMicScreen`, not built.
+                                  // Unticking revokes; ticking is not the grant - that is the Give button below.
                                   if (!event.currentTarget.checked)
                                     void revokePermission('mutescreens');
                                 }}
@@ -2125,7 +2125,7 @@
                                 class="form-check-input"
                                 bind:checked={userPermissions.hasCam}
                                 onchange={(event) => {
-                                  // Unticking revokes; ticking is `giveMicScreen`, not built.
+                                  // Unticking revokes; ticking is not the grant - that is the Give button below.
                                   if (!event.currentTarget.checked)
                                     void revokePermission('mutecam');
                                 }}

@@ -377,16 +377,6 @@ export type Commands = {
   resumeProducer: { request: { producerId: string }; response: Record<string, never> };
   getProducers: { request: void; response: { producers: ProducerInfo[] } };
   /**
-   * Restricts a consumer to a spatial/temporal layer of its producer (`server.rs`,
-   * `setPreferredLayers`). Beyond the capture, which never calls it: with several screens shared at
-   * once every consumer is otherwise forwarded the producer's top layer, so a viewer pays full
-   * resolution and decode for screens sitting in background tabs.
-   *
-   * `temporalLayer` is optional - absent means the producer's maximum, not zero. A layer above what
-   * the producer offers is clamped by mediasoup rather than refused, so a caller need not know how
-   * the producer encoded.
-   */
-  /**
    * One closed-caption result, relayed to the room (`server.rs`, `sendSpeechReco`).
    *
    * `sender` is deliberately NOT in the request: the server fills attribution in from the verified
@@ -396,6 +386,16 @@ export type Commands = {
     request: { text: string; isFinal: boolean; timestamp: number; lang: string };
     response: Record<string, never>;
   };
+  /**
+   * Restricts a consumer to a spatial/temporal layer of its producer (`server.rs`,
+   * `setPreferredLayers`). Beyond the capture, which never calls it: with several screens shared at
+   * once every consumer is otherwise forwarded the producer's top layer, so a viewer pays full
+   * resolution and decode for screens sitting in background tabs.
+   *
+   * `temporalLayer` is optional - absent means the producer's maximum, not zero. A layer above what
+   * the producer offers is clamped by mediasoup rather than refused, so a caller need not know how
+   * the producer encoded.
+   */
   setPreferredLayers: {
     request: { consumerId: string; spatialLayer: number; temporalLayer?: number };
     response: Record<string, never>;

@@ -33,6 +33,84 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-26 11:23 EDT — The gate that catches adrift comments could not see 84% of the tree, and two of the sixteen orphans were mine
+
+**Runtime impact: NO.** Comments moved onto the declarations they describe, three stale comments
+corrected, one gate widened. Not one executable line changed — verified by reading the diff with
+comment lines filtered out, which is 51 net lines across 14 files and zero code.
+
+**Branch `feat/save-permissions`.**
+
+#### The finding
+
+`orphaned-comment-contract.test.ts` polices `+page.svelte` plus `src/lib/room/*`. That is 48 files.
+The tree has 220. Running the gate's **own algorithm** over the other 172 found **16 orphaned
+docblocks in six directories it has never been able to see**, and two of them were shipped by me,
+this week, in the two commits directly below this entry:
+
+* `focusOnSessionNote`'s docblock, stranded when `forceReload` was inserted between it and its export
+* `kickUser`'s, stranded the same way by `restartAudio` in `f804ec7`
+
+That is the exact defect this gate exists to catch, committed twice, by the person who wrote the
+gate, into a file one line of configuration away from being covered. **Diligence did not catch it and
+could not have.** I re-read both diffs before pushing and saw two well-formed docblocks above two
+well-formed exports; what I could not see by reading is that they were not the same two.
+
+#### The narrowing was the same lesson, a third time
+
+The file already records its boundary being wrong twice — page-only went red within one slice, and
+JSDoc-only hid four more. Both times the fix widened by one step and stopped. `POLICED` now walks the
+whole tree, because *"one more directory"* is precisely what produced this. The narrowings that
+survive are the ones on CONTENT — JSDoc, or a plain block citing a module — and those are argued for
+in the file and unchanged. A narrowing on LOCATION only ever encodes where somebody last looked.
+
+**Negative control seen RED**, in a newly-policed file: a stray docblock added above `requireSessionId`
+in `server/auth.ts` failed `src/lib/server/auth.ts:49`. Restored, green.
+
+#### What the other fourteen were
+
+All sixteen were READ before the gate widened; not one is a false positive of the algorithm.
+
+| file | the orphan |
+| --- | --- |
+| `routes/+page.server.ts` | a docblock for the `remotePresCommand` **form action, deleted eleven days earlier** — sitting immediately above the note explaining that the *other* deleted action had left |
+| `lib/media/signalling.ts` | `setPreferredLayers`' docblock on `sendSpeechReco`, twenty lines above its own key |
+| `lib/media/session.ts` | `closeProducer`'s one-liner on `setPreferredLayers` |
+| `lib/server/auth.ts` | `requireSessionId`'s one-liner on `requireRoomShortCode` |
+| `lib/server/control-plane.ts` | the room's ONE WRITE explained above `roomEntryUrl`, a read |
+| `lib/server/room-config-client.ts` | `userJoinAndLeavePopup`'s docblock on `tawkPresenterSupport` — the two fields had been reordered and the prose had not |
+| `lib/server/room-events.ts` | `roomRoster`'s docblock on `setRosterLocation`; and two blocks on the roster channel, merged |
+| `lib/ngb-tooltip.ts` | the inline-style transcription on `interface Box`, 80 lines above `place()`, which writes those exact three properties |
+| `lib/panel-drag.ts` | `makeDraggable`'s docblock on `DRAG_THRESHOLD_PX` |
+| `lib/components/RoomMessage.svelte` | two JSDocs on `parseBodySegments`, merged |
+| `routes/session/+page.server.ts` | `Prefill`'s one-liner on the sanitiser; and two blocks on `verifyEntry`, merged |
+
+#### The drift hid a second defect, which is the argument for the gate
+
+`ModalHost.svelte`'s revoke docblock had drifted off `revokePermission`. Reading it to move it back
+showed its closing paragraph asserting **"what is still missing is the control that SENDS it …
+`TODO.md` gap 24 rather than a guessed button"** — while the buttons that send it sit forty lines
+below, calling a `giveMicScreen` that is fully built. Three template comments said the same thing:
+`// Unticking revokes; ticking is `giveMicScreen`, not built.` All four corrected.
+
+Nothing in this repository checks a comment against the code it sits next to. The gate cannot do that
+either — it can only notice that a comment has lost its code, which is what led me to read this one.
+
+#### The ceiling was NOT raised
+
+The ModalHost edit landed the file at 6,023 against a ceiling of 6,022 and `source-size-contract`
+went red. The line came from a one-line docblock **I had invented this session** for a self-evident
+`$state` field. It was removed — new prose of mine, not established explanation — and the file sits
+at **6,021, one under**. Headroom banked rather than spent. No ceiling in this commit moved.
+
+#### Verified
+
+`svelte-check` **1,241 files, 0 errors, 0 warnings**. `vitest` **2,849 passing across 188 files**, up
+from 2,673 — the widened gate contributes 171 new per-file assertions. `eslint` and `prettier --check`
+clean on all 14 touched files. `svelte-autofixer` returns **zero issues** on both `.svelte` files;
+its remaining suggestions are pre-existing and are the ones `TODO.md` records under *"Not gaps —
+decisions taken deliberately"*.
+
 ### 2026-08-24 01:20 EDT — `remoteRestartAudio`, and the last liar with a wire already waiting
 
 **Runtime impact: YES,** with an honest gap: *" Restart Audio "* now asks the named member's browser
