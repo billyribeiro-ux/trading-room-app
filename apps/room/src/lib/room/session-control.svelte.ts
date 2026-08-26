@@ -1,3 +1,5 @@
+import { refreshRoster, softReset } from '../../routes/session-commands.remote';
+
 import type { RoomDialogs } from './dialogs.svelte.js';
 
 /**
@@ -71,18 +73,35 @@ export class RoomSessionControl {
       return true;
     }
 
+    /*
+      IT NOW SENDS, 2026-08-26. This ran `invalidateAll()` — a LOCAL refetch of this presenter's own
+      page — while telling them a command had gone out that "clears the user list" for the room. The
+      wire and the delay it promises are on `refreshRoster` in `session-commands.remote.ts`.
+
+      Alert BEFORE the await, because the reference raises it immediately with nothing waited on. A
+      failure is still surfaced rather than swallowed.
+    */
     if (action === 'session-refresh-roster') {
-      void this.#reload();
       this.#dialogs.alert =
         'Command send OK. Please allow 1/2 minute for old entries to get deleted from the list';
+      void refreshRoster().catch(() => (this.#dialogs.alert = 'Command failed.'));
       return true;
     }
 
+    /*
+      IT NOW SENDS. `softReset` broadcasts `softResetDone`; every client drops its remote media and
+      rebuilds after up to three seconds of per-client jitter — the "gently" on the button's label.
+      Receiver and measurement in `events.svelte.ts`.
+
+      `#reload()` is GONE rather than kept beside the command: it re-read this presenter's own page,
+      which is not what a media reset does to anybody, including them — the broadcast comes back to
+      the sender like every other room frame.
+    */
     if (action === 'session-soft-reset') {
       this.#dialogs.confirm('Are you sure you want to soft reset the room?', () => {
         this.#closeModal();
-        void this.#reload();
         this.#dialogs.alert = 'Soft reset request sent...';
+        void softReset().catch(() => (this.#dialogs.alert = 'Command failed.'));
       });
       return true;
     }

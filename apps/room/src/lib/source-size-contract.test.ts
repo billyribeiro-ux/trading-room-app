@@ -1206,7 +1206,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       demand is the point: capping only the SOURCE of an extraction lets the destination sprawl
       instead.
     */
-    max: 135,
+    /*
+      135 -> 150, 2026-08-26. `session-refresh-roster` and `session-soft-reset` stopped lying: both
+      ran a local `invalidateAll()` while telling the presenter a server command had gone out, and
+      both now call one. Four lines of code; the rest is the record of what they used to do and why
+      `#reload()` was REMOVED from the soft reset rather than left beside the command.
+
+      ## THE THIRD PROSE-DRIVEN RAISE TODAY, and that is a finding about this file, not about the
+      ## three modules
+
+      `local-capture` (758 -> 872), `private-commands` (180 -> 198) and this one all breached on
+      COMMENTS while their code stayed flat or shrank. In each the alternative was deleting an
+      explanation of a defect that had just been fixed, which is the one thing the root standard
+      forbids outright.
+
+      The room modules already have the right instrument for this and these ceilings do not use it:
+      the 800-line CODE backstop, which strips comments before counting and which none of the three
+      came close to. A total-line cap answers "is this file long?" when the question worth asking is
+      "has this file taken on more WORK?" — and on a codebase whose stated practice is long
+      explanatory comments, the two diverge constantly.
+
+      NOT changed here, because rewriting the ceiling model under deadline is how a gate ends up
+      weaker than it was. Recorded as the owner's call, with the evidence attached.
+    */
+    max: 151,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {

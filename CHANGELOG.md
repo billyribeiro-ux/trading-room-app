@@ -33,6 +33,88 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-26 13:16 EDT — Two controls stop lying, and a negative control finds a hole in the guards
+
+**Runtime impact: YES.** *"Refresh Roster & Count"* and *"Soft Reset"* now act on the room. Both had
+raised a captured sentence over a local refetch since they were built.
+
+**Branch `feat/save-permissions`.**
+
+#### The defect table's verdict was wrong, and that is the finding
+
+It read *"uses only existing code … the honest fix needs no protocol at all — correct the message"*.
+That was decided without locating the senders. Both are in the bundle:
+
+```js
+refreshRoster() { sendServerAdminCommand("refreshRoster", null),
+                  bootbox.alert("Command send OK. …") }          // byte 2169139
+case "softResetDone": emit("softResetDone"),
+  let oe = 3e3 * Math.random(); setTimeout(…, oe)                // byte 1023810
+```
+
+Correcting the sentence would have meant giving up a working feature to make a true statement about
+not having it. They are now `session-commands.remote.ts` — a THIRD remote module, because both take
+no argument at all and a third payload shape would have falsified `presenter-commands`' opening
+paragraph about why its two shapes differ.
+
+**`3e3 * Math.random()` is the whole point of the soft reset.** Every client is told in the same
+instant; without per-client jitter the rebuild arrives at the SFU as one burst from the entire room.
+That is the "gently" on the button's own label, and the receiver reproduces it.
+
+Two divergences recorded rather than left to be found: the presenter's own mic and camera are **not**
+cut (upstream does it; our `restart()` re-establishes them, so cutting them would be a presenter
+silencing themselves with a button labelled "reset the room"), and upstream's
+`for (let r of this.screenSharingUsers);` is an **empty statement** that does nothing.
+
+#### The negative control came back GREEN, which was the real discovery
+
+Mutating `publishRosterToRoom(presenterRoom())` to `publishRosterToRoom('some-other-room')` removes
+the presenter check *and* the tenant scope in one line — a member of any room rebuilding a roster in
+a room they had never joined. **Nothing failed.** Not `authorization-contract`, not
+`room-isolation-contract`, not 2,860 tests.
+
+`authorization-contract` reads three remote modules **by name**. There are nineteen. So a new
+`.remote.ts` was covered by nobody, and so would the next one be.
+
+`remote-command-scope-contract.test.ts` now discovers every `src/routes/*.remote.ts` from disk and
+asserts each exported command either establishes its room on the server — `presenterRoom()` or
+`requireRoomShortCode(...)` — or is declared as scoping to the caller's own account with the reason.
+Three commands qualify for the second category and each says what bounds it instead; a fourth
+assertion fails if an exemption goes stale in either direction.
+
+**Both controls seen RED:** the original mutation now names `refreshRoster`, and a throwaway
+ungated module is caught as `zzUngated`, which proves the walk is live rather than the list.
+
+What it does not catch is stated in the file: a command that calls `presenterRoom()` and then
+publishes to a room from an argument anyway. That needs the value traced, not the call spotted.
+
+#### Two guards stopped being hand-kept lists
+
+`ACTS` in the disposition contract listed markers by hand and reported both newly-wired controls as
+still dialog-only — the instrument was wrong, not the code. It now DISCOVERS every name imported from
+a `*.remote` module, because a `.remote` import is by construction a call to the server.
+
+**That is the third hand-kept list to fail in one day**, after the orphan gate's directory boundary
+and `authorization-contract`'s file list.
+
+#### A pattern worth the owner's attention
+
+`session-control` is the **third ceiling raised today on COMMENTS while code stayed flat** — after
+`local-capture` (758 → 872) and `private-commands` (180 → 198). In each the alternative was deleting
+an explanation of a defect just fixed. The room modules already have the right instrument and these
+ceilings do not use it: the 800-line **CODE** backstop strips comments before counting, and none of
+the three came close to it. Recorded in the catalog as the owner's call, with the evidence attached;
+not changed under deadline.
+
+#### Verified
+
+`svelte-check` **1,247 files, 0 errors, 0 warnings**. `vitest` **2,881 across 190**. `eslint`,
+`prettier` and `svelte-autofixer` clean on every touched file.
+
+**Not verified:** that a soft reset actually re-establishes media for a second peer. Two browsers in
+a live room, and the owner's.
+
+
 ### 2026-08-26 12:09 EDT — Three commits: a seam, a sub-command, and a blocker that was already built
 
 **Runtime impact: YES for `restartScreen`.** The other two are a refactor and a test.
