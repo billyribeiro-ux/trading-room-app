@@ -329,7 +329,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines than the proxied declarations took. Not a saving worth chasing - recorded because a
       ceiling that moves for a reason nobody wrote down is the thing this file exists to prevent.
     */
-    max: 1405,
+    max: 1406,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -406,7 +406,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a `RoomPrivateCommands` router lands this file at 880. That option stays on the table for rows
       9 and 10, which add receivers to this same channel.
     */
-    max: 937,
+    /*
+      937 -> 955, 2026-08-26 — `sendSalesImageToChat` / `sendUsersToURL`, the two receivers whose senders
+      shipped on 2026-08-23. Two dispatch branches, guarded and transcribed.
+
+      Raised on the same grounds recorded at `lib/room/session-control.svelte.ts` in this file: the
+      growth is the captured code and the reason the presenter is EXCLUDED from both frames
+      (`isPresenter ||` is a guard, not a truthiness shorthand), which is the single most likely
+      thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
+      The CODE backstop is unaffected.
+    */
+    max: 956,
     why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1067,7 +1077,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and cross as receivers, while their siblings `videoPlayerUrl`/`youtubeForAllUrl` live here.
       Moving them ripples through `PresentationArea` and `RoomNavbar`, which is its own change.
     */
-    max: 445,
+    /*
+      445 -> 483, 2026-08-26 — `sendSalesImageToChat` / `sendUsersToURL`, the two receivers whose senders
+      shipped on 2026-08-23. Two receiver methods plus the overlay's one-url state.
+
+      Raised on the same grounds recorded at `lib/room/session-control.svelte.ts` in this file: the
+      growth is the captured code and the reason the presenter is EXCLUDED from both frames
+      (`isPresenter ||` is a guard, not a truthiness shorthand), which is the single most likely
+      thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
+      The CODE backstop is unaffected.
+    */
+    max: 484,
     why: 'the video, YouTube and mp3 broadcasts; receivers rather than setters, so a stop cannot be half-applied'
   },
   {

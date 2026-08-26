@@ -120,7 +120,11 @@ function buildPage({ detailsNgClick = 'openStripeDetails(user)', detailsText = '
     sel: ['.modal', '[role="dialog"]']
   });
 
-  const row = el('tr', { attrs: { 'ng-repeat': 'user in xrefs' }, children: [stripeBlock], sel: ['tr[ng-repeat]', 'tbody tr'] });
+  const row = el('tr', {
+    attrs: { 'ng-repeat': 'user in xrefs' },
+    children: [stripeBlock],
+    sel: ['tr[ng-repeat]', 'tbody tr']
+  });
   const table = el('table', { attrs: { class: 'table table-striped' }, children: [row], sel: ['table.table-striped'] });
   const body = el('body', { children: [table] });
   /* The download step appends and removes the anchor; the stub DOM needs both. */
@@ -157,7 +161,7 @@ async function runCollector(pageOptions = {}) {
   let downloaded = null;
   let fetches = 0;
 
-    const sandbox = {
+  const sandbox = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout: (fn) => fn(),
     Blob: class {
@@ -165,10 +169,7 @@ async function runCollector(pageOptions = {}) {
         downloaded = parts.join('');
       }
     },
-    URL: Object.assign(
-      class extends globalThis.URL {},
-      { createObjectURL: () => 'blob:stub', revokeObjectURL() {} }
-    ),
+    URL: Object.assign(class extends globalThis.URL {}, { createObjectURL: () => 'blob:stub', revokeObjectURL() {} }),
     location: { href: 'https://protradingroom.com/#/manage/3625', origin: 'https://protradingroom.com' },
     navigator: { userAgent: 'smoke' },
     Date,
@@ -198,7 +199,10 @@ async function runCollector(pageOptions = {}) {
     document: {
       body: page.body,
       styleSheets: [
-        { href: 'https://protradingroom.com/styles.css', cssRules: [{ selectorText: '.label', style: { cssText: 'color: #fff' } }] },
+        {
+          href: 'https://protradingroom.com/styles.css',
+          cssRules: [{ selectorText: '.label', style: { cssText: 'color: #fff' } }]
+        },
         /* A cross-origin sheet: reading `cssRules` throws, and that must be counted, not fatal. */
         {
           href: 'https://cdn.example.com/x.css',

@@ -1139,6 +1139,7 @@
           -->
           {#snippet chatAlertsPane()}
             <AlertChatArea
+              {broadcasts}
               {split}
               {alerts}
               {chat}

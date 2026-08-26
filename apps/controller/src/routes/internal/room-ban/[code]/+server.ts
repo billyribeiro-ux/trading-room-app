@@ -84,8 +84,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
     error(400, 'A JSON body is required.');
   }
 
-  const targetEmail =
-    typeof payload.targetEmail === 'string' ? payload.targetEmail.trim().toLowerCase() : '';
+  const targetEmail = typeof payload.targetEmail === 'string' ? payload.targetEmail.trim().toLowerCase() : '';
   if (!targetEmail) error(400, 'A target member is required.');
 
   /*

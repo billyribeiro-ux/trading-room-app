@@ -92,3 +92,26 @@ new/
 evidence-tooltips-presenter-2026-08-11.json
 
 evidence-tooltips-presenter-2026-08-12.json
+
+# The v3 and v4 reference captures, alongside `docs/source/` above.
+#
+# `docs/source/` has been ignored since 2026-08-04 for a reason that applies identically here and
+# was simply never extended when the dated captures landed: these are EVIDENCE. `CLAUDE.md` states
+# it directly — "the capture directories are evidence … never reformat, rename or 'fix' anything in
+# them" — and `sha256sums.txt` inside `docs/source-v4-2026-08-15/` pins the bytes. Reformatting one
+# changes the bytes every byte-offset citation in this repository is measured against.
+#
+# `AGENTS.md:40-49` already reached this conclusion for the generated CSS: "prettier should not be
+# checking it at all; it belongs in `.prettierignore`". Five of the eleven files that kept
+# `format:check` red were these.
+docs/source-v3-2026-08-15/
+docs/source-v4-2026-08-15/
+
+# Measurements collected from the LIVE original by the scripts in `scripts/`, and read back as
+# expectations by the verifiers in `package.json` (`verify:tooltips`, `verify:screen-volume`,
+# `verify:viewer-only`, `verify:mobile-layout`). Same rule as the two tooltip captures above: the
+# implementation is checked AGAINST these bytes, so reformatting them moves the target.
+evidence-mobile-layout/
+evidence-screen-volume/
+evidence-tooltip-placements/
+evidence-viewer-only/

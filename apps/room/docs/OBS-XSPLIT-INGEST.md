@@ -24,8 +24,7 @@ today, mediasoup) **and from OBS / XSplit**, both at the best quality and lowest
 Byte 2152300, in the update block of the Session Control template:
 
 ```js
-O(153, "RTMP" === e.streamingType ? 153 : -1),
-O(154, "WHIP" === e.streamingType ? 154 : -1)
+(O(153, 'RTMP' === e.streamingType ? 153 : -1), O(154, 'WHIP' === e.streamingType ? 154 : -1));
 ```
 
 `streamingType` is the **Rtmp / Whip radio pair** the panel already has, persisted as a preference.
@@ -35,14 +34,14 @@ Template 153 is the RTMP block, 154 the WHIP block. That is the whole switch.
 block):
 
 ```js
-O(1, e.useMTX ? -1 : 1)          // template 1 is `bDe`
+O(1, e.useMTX ? -1 : 1); // template 1 is `bDe`
 ```
 
 `bDe` is a pair of **"Start WHIP Streaming" / "Stop WHIP Streaming"** buttons calling
 `startStreaming()` / `stopStreaming()`. `-1` means "render nothing", so those buttons appear only
 when `useMediaMTX` is **off** — they belong to a browser-publishes-WHIP path that exists when
 MediaMTX is not in use. **They are deliberately not reproduced here**: this deployment's OBS design
-*is* MediaMTX, so they never render in the reference for this configuration either, and building
+_is_ MediaMTX, so they never render in the reference for this configuration either, and building
 them would be two controls that call nothing.
 
 `useMediaMTX`, `mediaMTXClusterID` and `backupMediaMTXClustterID` are real manage-page settings, all
@@ -56,27 +55,27 @@ process was not needed.
 `handleStreaming()`, byte 2157950, complete:
 
 ```js
-e.yourName = encodeURIComponent(globals.user.name.replace(/[^a-zA-Z0-9_-]/g, "_"));
+e.yourName = encodeURIComponent(globals.user.name.replace(/[^a-zA-Z0-9_-]/g, '_'));
 if (globals.sessData.useMediaMTX) {
   e.useMTX = true;
   e.streamingLinkRTMP = `rtmp://${globals.streamServerMTX}/room__${globals.sessionID}__${e.yourName}?jwt=${globals.mtxToken}`;
-  e.restreamLink      = globals.sessData.restreamToURL ? globals.sessData.restreamToURL : "";
-  e.streamKey         = globals.mtxToken;
-  e.streamingLink     = `http://${globals.streamServerMTX}:8889/room__${globals.sessionID}__${e.yourName}/whip`;
+  e.restreamLink = globals.sessData.restreamToURL ? globals.sessData.restreamToURL : '';
+  e.streamKey = globals.mtxToken;
+  e.streamingLink = `http://${globals.streamServerMTX}:8889/room__${globals.sessionID}__${e.yourName}/whip`;
 } else {
   e.streamingLink = globals.sessData.obsStreamKey
     ? `https://${globals.streamServer}/api/stream/${globals.sessionID}/${globals.sessData.obsStreamKey}?name=${e.yourName}`
-    : "";
+    : '';
 }
 ```
 
-| fact | why it matters |
-| --- | --- |
-| **`streamServerMTX` is a DIFFERENT global from `streamServer`** | MediaMTX is its own host, not a port on the SFU. Ours is the `STREAM_SERVER_MTX` environment variable. |
-| **Port `8889`** | MediaMTX's WebRTC/WHIP port. RTMP carries no port, so it is the standard `1935`. |
-| **Path `room__{sessionID}__{yourName}`** | One MediaMTX *path* per presenter per room. Double underscores are the separator. Ours substitutes the room's **short code** for `sessionID`, that being this application's per-room identifier on every internal route. |
-| **`yourName` is sanitised then encoded** | `replace(/[^a-zA-Z0-9_-]/g, '_')` and THEN `encodeURIComponent`. Both, in that order. Reproduced in `ingestPathFor`. |
-| **ONE token, TWO carriers** | RTMP puts it in the query as **`jwt`**; WHIP does not put it in the URL at all — it is presented as an HTTP **Bearer**. |
+| fact                                                            | why it matters                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`streamServerMTX` is a DIFFERENT global from `streamServer`** | MediaMTX is its own host, not a port on the SFU. Ours is the `STREAM_SERVER_MTX` environment variable.                                                                                                                   |
+| **Port `8889`**                                                 | MediaMTX's WebRTC/WHIP port. RTMP carries no port, so it is the standard `1935`.                                                                                                                                         |
+| **Path `room__{sessionID}__{yourName}`**                        | One MediaMTX _path_ per presenter per room. Double underscores are the separator. Ours substitutes the room's **short code** for `sessionID`, that being this application's per-room identifier on every internal route. |
+| **`yourName` is sanitised then encoded**                        | `replace(/[^a-zA-Z0-9_-]/g, '_')` and THEN `encodeURIComponent`. Both, in that order. Reproduced in `ingestPathFor`.                                                                                                     |
+| **ONE token, TWO carriers**                                     | RTMP puts it in the query as **`jwt`**; WHIP does not put it in the URL at all — it is presented as an HTTP **Bearer**.                                                                                                  |
 
 ## 3. The token
 
@@ -115,19 +114,19 @@ decided in `apps/controller/src/lib/server/stream-ingest.ts`:
 Bytes 2141780–2143720, decoded against the component's `consts` array at byte 2173342. All of it is
 now built in `ModalHost.svelte`'s `obs-streaming` tab:
 
-| element | id / class | state |
-| --- | --- | --- |
-| RTMP / WHIP radio pair, persisted as `streamingType` | `#streaming-rtmp`, `#streaming-whip` | built |
-| intro sentence, typo `streraming` preserved | — | built (RTMP branch only — it is inside `_De`) |
-| RTMP streaming link | `#streaming-link-rtmp`, `form-control border border-danger`, `height: 100px` | built |
-| **Copy** → toast "Copied to clipboard." | `btn btn-outline-info btn-sm m-1`, `fas fa-copy` | built |
-| **New Link** → `getNewToken()` | same classes, `fas fa-sync` | built |
-| RTMP instruction block + `hr` | — | built |
-| WHIP streaming link | `#streaming-link`, `rows="2"`, `height: auto; overflow-y: scroll` | built |
-| WHIP **Bearer** field | `#stream-whip-key`, label literally `Bearer` | built |
-| WHIP instruction block | — | built |
-| restream cross-link → `openRestreamTab()` | `text-primary fw-bold restream-link` | built |
-| Start/Stop WHIP Streaming (`bDe`) | — | deliberately absent — see §1 |
+| element                                              | id / class                                                                   | state                                         |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
+| RTMP / WHIP radio pair, persisted as `streamingType` | `#streaming-rtmp`, `#streaming-whip`                                         | built                                         |
+| intro sentence, typo `streraming` preserved          | —                                                                            | built (RTMP branch only — it is inside `_De`) |
+| RTMP streaming link                                  | `#streaming-link-rtmp`, `form-control border border-danger`, `height: 100px` | built                                         |
+| **Copy** → toast "Copied to clipboard."              | `btn btn-outline-info btn-sm m-1`, `fas fa-copy`                             | built                                         |
+| **New Link** → `getNewToken()`                       | same classes, `fas fa-sync`                                                  | built                                         |
+| RTMP instruction block + `hr`                        | —                                                                            | built                                         |
+| WHIP streaming link                                  | `#streaming-link`, `rows="2"`, `height: auto; overflow-y: scroll`            | built                                         |
+| WHIP **Bearer** field                                | `#stream-whip-key`, label literally `Bearer`                                 | built                                         |
+| WHIP instruction block                               | —                                                                            | built                                         |
+| restream cross-link → `openRestreamTab()`            | `text-primary fw-bold restream-link`                                         | built                                         |
+| Start/Stop WHIP Streaming (`bDe`)                    | —                                                                            | deliberately absent — see §1                  |
 
 Two divergences, both deliberate and both visually identical:
 
@@ -147,7 +146,7 @@ application builds `https://` and `rtmps://…:1936`.
 
 Those URLs carry a **publish** token — thirty days, write access to a named room path. On plain HTTP
 the WHIP `Authorization: Bearer` header is readable by anything on the network path; on plain RTMP
-the token is *in the URL*, inside the connection handshake, where an observer need only watch.
+the token is _in the URL_, inside the connection handshake, where an observer need only watch.
 Presenters stream from hotel and conference networks routinely, and this is a multi-tenant fintech
 application: the failure mode is one tenant publishing into another tenant's room.
 
@@ -163,10 +162,18 @@ From https://mediamtx.org/docs/usage/authentication, MediaMTX with `authMethod: 
 document per attempt to `authHTTPAddress`:
 
 ```json
-{ "user": "", "password": "", "token": "", "ip": "",
+{
+  "user": "",
+  "password": "",
+  "token": "",
+  "ip": "",
   "action": "publish|read|playback|api|metrics|pprof",
-  "path": "", "protocol": "rtsp|rtmp|hls|webrtc|srt",
-  "id": "", "query": "", "userAgent": "" }
+  "path": "",
+  "protocol": "rtsp|rtmp|hls|webrtc|srt",
+  "id": "",
+  "query": "",
+  "userAgent": ""
+}
 ```
 
 **A status beginning `20` allows; anything else denies.** Our endpoint is
@@ -176,7 +183,7 @@ document per attempt to `authHTTPAddress`:
   RTMP URL and the HLS playlist URL), and from nowhere else;
 - authorises `publish` and `read`, each against its own token scope, and refuses `api`, `metrics`
   and `pprof` outright — those are MediaMTX's operator surfaces and no token we mint opens one;
-- verifies the HMAC in memory *before* any database read, so forged tokens cost no query;
+- verifies the HMAC in memory _before_ any database read, so forged tokens cost no query;
 - for `publish`, compares the token's `sub` to the requested `path` by equality, never by prefix;
 - for `read`, parses the room out of the path and compares that by equality;
 - answers 401 for every refusal reason, with the reason only in the log.
@@ -301,9 +308,9 @@ connection of its own, because the `<video>` element does that.
 ```js
 // tab, per stream: shows e.mediaValue.name, with lock / bring-everyone-here controls
 // pane, per stream:
-d(0,'div',73), T(1,'app-streaming-view',117)   //  [muser]="e"
+(d(0, 'div', 73), T(1, 'app-streaming-view', 117)); //  [muser]="e"
 // and when there are none:
-'No one is streaming right now...'
+('No one is streaming right now...');
 ```
 
 ### The player
@@ -330,12 +337,12 @@ loadStream() {
 
 Five things follow, and every one is a build instruction rather than a question:
 
-| fact | consequence |
-| --- | --- |
-| **`index.m3u8`, hls.js, native-HLS fallback** | The player is `hls.js`, not WebRTC. Not WHEP. |
-| **`https://` with no port** | HLS is served on 443 through a TLS proxy, not on 8889. |
-| **`?jwt=${globals.mtxToken}`** | Playback is AUTHENTICATED, with the same token family as ingest — hence the `read` scope in §5. |
-| **Path is `__{producerID}`, not `__{yourName}`** | A playback path is NOT an ingest path. Ingest is keyed by presenter name; playback by producer id. |
+| fact                                                         | consequence                                                                                           |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **`index.m3u8`, hls.js, native-HLS fallback**                | The player is `hls.js`, not WebRTC. Not WHEP.                                                         |
+| **`https://` with no port**                                  | HLS is served on 443 through a TLS proxy, not on 8889.                                                |
+| **`?jwt=${globals.mtxToken}`**                               | Playback is AUTHENTICATED, with the same token family as ingest — hence the `read` scope in §5.       |
+| **Path is `__{producerID}`, not `__{yourName}`**             | A playback path is NOT an ingest path. Ingest is keyed by presenter name; playback by producer id.    |
 | **`__reb` when `mediaValue.serverName !== streamServerMTX`** | A relayed stream gets a suffixed path. `roomKeyOfPath` is unaffected — the room is still segment two. |
 
 The hls.js configuration is captured in full too: three buffer levels from
@@ -399,14 +406,14 @@ different rooms, ~9 minutes total. All three ran to completion and downloaded.
 
 ### Confirmed against the live app
 
-| finding | value |
-| --- | --- |
-| room URL shape | `https://chat.protradingroom.com/?id=<24-hex>` — the session id is a Mongo ObjectId, not the short code. A second room carried `&sl=1`. |
-| the Streams area is real | `#streams-tab`, labelled **"Streams"** — the `presAreaTabs-streams` main tab from `app-presentationarea.full.js`, present in the live DOM. |
-| the empty state renders | `noOneStreaming: true` — *"No one is streaming right now…"* is what the live room shows with no MTX stream. Confirms the transcription target in §6. |
-| the OBS link elements are ABSENT when unconfigured | `#streaming-link-rtmp`, `#streaming-link` and `#stream-whip-key` do not exist in the DOM at all. Confirms both blocks are gated, not merely hidden. |
-| `appService.globals` is NOT on `window` | Production does not expose it. Anything we want from globals has to come off the wire. |
-| webcam elements | `#webcamVideo-` (`.webcamsHolderVideo`), `#webcamScreenLocalPreview` (`.webcamPreviewScreen`). |
+| finding                                            | value                                                                                                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| room URL shape                                     | `https://chat.protradingroom.com/?id=<24-hex>` — the session id is a Mongo ObjectId, not the short code. A second room carried `&sl=1`.              |
+| the Streams area is real                           | `#streams-tab`, labelled **"Streams"** — the `presAreaTabs-streams` main tab from `app-presentationarea.full.js`, present in the live DOM.           |
+| the empty state renders                            | `noOneStreaming: true` — _"No one is streaming right now…"_ is what the live room shows with no MTX stream. Confirms the transcription target in §6. |
+| the OBS link elements are ABSENT when unconfigured | `#streaming-link-rtmp`, `#streaming-link` and `#stream-whip-key` do not exist in the DOM at all. Confirms both blocks are gated, not merely hidden.  |
+| `appService.globals` is NOT on `window`            | Production does not expose it. Anything we want from globals has to come off the wire.                                                               |
+| webcam elements                                    | `#webcamVideo-` (`.webcamsHolderVideo`), `#webcamScreenLocalPreview` (`.webcamPreviewScreen`).                                                       |
 
 ### Not reached, and why — stated rather than worked around
 

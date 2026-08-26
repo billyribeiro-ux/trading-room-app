@@ -172,9 +172,9 @@ describe('the four conditional icons — page.manageSession.html:351-354', () =>
   it('shows the small phone for a registered device only when case-by-case is OFF', () => {
     expect(iconCount(renderCell({ pushTokenCount: 2 }, {}), 'fa fa-mobile')).toBe(1);
     expect(iconCount(renderCell({ pushTokenCount: 0 }, {}), 'fa fa-mobile')).toBe(0);
-    expect(
-      iconCount(renderCell({ pushTokenCount: 2 }, { ptrMobileAppCaseByCaseEnabled: true }), 'fa fa-mobile')
-    ).toBe(0);
+    expect(iconCount(renderCell({ pushTokenCount: 2 }, { ptrMobileAppCaseByCaseEnabled: true }), 'fa fa-mobile')).toBe(
+      0
+    );
   });
 
   it('shows the RED small phone when the member silenced their own notifications', () => {
@@ -390,10 +390,14 @@ describe('the two per-member grants — page.manageSession.html:545-551 and :592
 
   it('gates the divider on the same setting, so neither submenu ends on a trailing rule', () => {
     const before = renderRow({}, {}).split('class="divider"').length - 1;
-    const withBoth = renderRow({}, {
-      ptrMobileAppCaseByCaseEnabled: true,
-      fileAccessCaseByCase: true
-    }).split('class="divider"').length - 1;
+    const withBoth =
+      renderRow(
+        {},
+        {
+          ptrMobileAppCaseByCaseEnabled: true,
+          fileAccessCaseByCase: true
+        }
+      ).split('class="divider"').length - 1;
     expect(withBoth).toBe(before + 2);
   });
 });

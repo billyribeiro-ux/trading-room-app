@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-26 13:58 EDT — Row 7(a): both "Command send OK." receivers ship, and the guard had no cover
+
+**Runtime impact: YES.** A presenter's pinned sales image now appears over members' chat, and
+"Send Users To URL" now navigates them. Both buttons had raised *"Command send OK."* over a frame
+nothing read since the senders shipped on 2026-08-23.
+
+**Branch `feat/save-permissions`.**
+
+#### The guard is the whole subtlety
+
+```js
+case "sendSalesImageToChat": if (!i || !i.url) return;
+  this.globals.isPresenter || this.appEventBus.emit("sendSalesImageToChat", i)   // byte 1015228
+```
+
+`this.globals.isPresenter ||` reads like a truthiness shorthand and is a **guard**: the receiver runs
+only for a NON-presenter. The presenter who sent the image is not shown it over their own chat
+column, and the presenter who sent the URL is not navigated out of the room they are running. That
+is the opposite of `softResetDone`, which deliberately returns to its sender — reading the two side
+by side is the only way to know the difference is upstream's rather than ours.
+
+**A negative control removing that guard came back GREEN** against 2,881 tests.
+`for-all-broadcast-contract.test.ts` now pins it — on the BRANCH, not the file, because
+`#isPresenter()` appears elsewhere in the router and a whole-file `toContain` would pass with the
+guard deleted from exactly the two places it matters. Also pinned: the empty-url refusal, and that
+the two branches have *different* bodies, which a copy-paste would otherwise satisfy. Seen RED.
+
+#### The CSS was already shipped and waiting
+
+All four rules — `#added-image-to-chat`, ` img`, ` span`, ` span:hover` — were already verbatim at
+`css/complete-app-styles.css:7004-7007`. Only the markup was missing. `position-relative` on
+`.chat-box` is required rather than decorative: the overlay is `position:absolute; inset:0` and
+without a positioned ancestor would size against the viewport and cover the room.
+
+Four divergences, all forced and all stated in the markup: `rel="noopener noreferrer"` (the url is
+presenter-chosen and `target="_blank"` alone hands over a live `window.opener`), keyboard
+affordances on the close `<span>` (upstream's is unreachable by keyboard; it stays a `<span>` because
+the captured CSS selects one), `alt=""` (decorative, and inventing a description would be inventing
+evidence), and no `width`/`height` on the image — it cannot shift layout because the overlay is out
+of flow, and a remote url has no knowable intrinsic ratio.
+
+#### Recorded, not built
+
+`sendUsersToURL` destroys a half-typed message and a live screenshare with no warning. That is
+faithful — the reference's receiver is one statement with no guard near it and no confirm was found.
+Flagged in `TODO.md` row 7 as a divergence candidate for the owner rather than invented here.
+
+#### Two ceilings raised, prose tightened twice first
+
+`broadcasts` 445 → 484 and `events` 937 → 956, on the grounds already recorded at `session-control`
+in the same catalog. The prose was cut back twice before either number moved, and the CODE backstop
+is untouched.
+
+#### Verified
+
+`svelte-check` **1,247 files, 0 errors, 0 warnings**. `vitest` **2,886 across 190**. `eslint`,
+`prettier` and `svelte-autofixer` clean.
+
+**Not verified:** that a member actually sees the image. Two browsers in a live room, and the
+owner's.
+
+
 ### 2026-08-26 13:52 EDT — Rows 2 and 10 re-read: one named the wrong setting, the other a sender as a receiver
 
 **Runtime impact: NO.** Evidence and records only. Two TODO rows corrected against the capture, and

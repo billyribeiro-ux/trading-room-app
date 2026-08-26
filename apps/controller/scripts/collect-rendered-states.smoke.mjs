@@ -82,7 +82,10 @@ const rows = [
 ];
 const table = el('table', { attrs: { class: 'table table-striped acc-table' }, children: rows, sel: ['table'] });
 
-const pwInput = el('input', { attrs: { type: 'password', name: 'pw' }, sel: ['input, select, textarea, button, label, a', 'input[type="password"]'] });
+const pwInput = el('input', {
+  attrs: { type: 'password', name: 'pw' },
+  sel: ['input, select, textarea, button, label, a', 'input[type="password"]']
+});
 const loginForm = el('form', {
   attrs: { name: 'loginForm', class: 'form-signin' },
   /* Real-looking PII where the collector DOES capture text, so redaction is proven on output rather
@@ -127,7 +130,19 @@ const sandbox = {
   location: { href: 'https://protradingroom.com/#/page/welcome' },
   navigator: { userAgent: 'smoke' },
   window: null,
-  Date, Set, Map, Object, Array, JSON, String, Number, Boolean, RegExp, Error, Promise, Math,
+  Date,
+  Set,
+  Map,
+  Object,
+  Array,
+  JSON,
+  String,
+  Number,
+  Boolean,
+  RegExp,
+  Error,
+  Promise,
+  Math,
   getComputedStyle: (node) => ({
     getPropertyValue: (p) => (p === 'background-color' ? 'rgb(249, 249, 249)' : `stub-${p}`),
     display: node?._hiddenStyle ? 'none' : 'block'
@@ -138,7 +153,10 @@ const sandbox = {
       {
         href: 'https://protradingroom.com/styles.css',
         cssRules: [
-          { selectorText: '.acc-table > tbody > tr:nth-of-type(odd)', style: { cssText: 'background-color: rgb(249,249,249)' } },
+          {
+            selectorText: '.acc-table > tbody > tr:nth-of-type(odd)',
+            style: { cssText: 'background-color: rgb(249,249,249)' }
+          },
           /* The one that only matches once `:hover` is stripped. */
           { selectorText: '.acc-table > tbody > tr:hover', style: { cssText: 'background-color: rgb(245,245,245)' } }
         ]
@@ -179,8 +197,15 @@ const auto = JSON.parse(downloads[0]);
 assert.ok(auto.striping, 'a striped table must be measured');
 const t = auto.striping[0];
 assert.equal(t.rowCount, 4);
-assert.deepEqual(t.rows.map((r) => r.nthOfType), [1, 2, 3, 4], 'nth-of-type is 1-based and counts EVERY row');
-assert.deepEqual(t.rows.map((r) => r.odd), [true, false, true, false]);
+assert.deepEqual(
+  t.rows.map((r) => r.nthOfType),
+  [1, 2, 3, 4],
+  'nth-of-type is 1-based and counts EVERY row'
+);
+assert.deepEqual(
+  t.rows.map((r) => r.odd),
+  [true, false, true, false]
+);
 assert.deepEqual(
   t.rows.map((r) => r.hidden),
   [false, true, true, false],

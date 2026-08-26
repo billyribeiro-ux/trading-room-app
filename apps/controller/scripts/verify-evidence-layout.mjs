@@ -26,7 +26,7 @@ const expectedDirectories = [
   'login-page',
   'main-nav-login-clicked',
   'register-page',
-  'room-login',
+  'room-login'
   /*
     Added 2026-08-14, from one browser session against the live site. Five FILES rather than
     directories, listed here for the same reason the fetched set above is: this assertion exists to

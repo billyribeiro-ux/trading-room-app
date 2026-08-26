@@ -322,12 +322,9 @@ describe('the allow-list itself', () => {
         FOUR gates RoomMessage.svelte already implemented and the page never fed. Each was a prop
         defaulting false, so the feature was unreachable however the room was configured.
       */
-      usersPublicReply:
-        'RoomMessage.svelte via sourceMessageBehavior() — the Reply menu entry for non-presenters',
-      enableReactions:
-        'RoomMessage.svelte via sourceMessageBehavior() — the reaction picker and the reaction pill',
-      enableEditMessage:
-        'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on CHAT messages',
+      usersPublicReply: 'RoomMessage.svelte via sourceMessageBehavior() — the Reply menu entry for non-presenters',
+      enableReactions: 'RoomMessage.svelte via sourceMessageBehavior() — the reaction picker and the reaction pill',
+      enableEditMessage: 'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on CHAT messages',
       enableEditAlerts:
         'RoomMessage.svelte via sourceMessageBehavior() — the Edit menu entry on ALERTS, gated apart from chat because the reference gates them apart',
       /*

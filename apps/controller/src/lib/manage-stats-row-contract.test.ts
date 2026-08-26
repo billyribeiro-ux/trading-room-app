@@ -22,10 +22,7 @@ import { describe, expect, it } from 'vitest';
  *    renders it that way, so the stats table numbered from 1 while the user table numbered from 0.
  */
 
-const RAW = readFileSync(
-  new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url),
-  'utf8'
-);
+const RAW = readFileSync(new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url), 'utf8');
 
 /**
  * The component source with COMMENTS REMOVED.

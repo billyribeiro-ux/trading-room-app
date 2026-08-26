@@ -30,8 +30,22 @@ describe('minorUnitDigits', () => {
 
   it('is 0 for every Stripe zero-decimal currency', () => {
     for (const c of [
-      'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
-      'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+      'BIF',
+      'CLP',
+      'DJF',
+      'GNF',
+      'JPY',
+      'KMF',
+      'KRW',
+      'MGA',
+      'PYG',
+      'RWF',
+      'UGX',
+      'VND',
+      'VUV',
+      'XAF',
+      'XOF',
+      'XPF'
     ]) {
       expect(minorUnitDigits(c), c).toBe(0);
     }
@@ -84,8 +98,22 @@ describe('THE REFERENCE BUG — zero-decimal currencies are 100x low', () => {
 
   it('ours differs from the reference on EVERY zero-decimal currency', () => {
     for (const c of [
-      'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
-      'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+      'BIF',
+      'CLP',
+      'DJF',
+      'GNF',
+      'JPY',
+      'KMF',
+      'KRW',
+      'MGA',
+      'PYG',
+      'RWF',
+      'UGX',
+      'VND',
+      'VUV',
+      'XAF',
+      'XOF',
+      'XPF'
     ]) {
       expect(formatMoney(1999, c), c).not.toBe(referenceFormatStripeAmount(1999, c));
     }

@@ -22,14 +22,8 @@ import { describe, expect, it } from 'vitest';
  * The template has fourteen gated wrappers over nine distinct expressions.
  */
 
-const TEMPLATE = readFileSync(
-  `${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`,
-  'utf8'
-);
-const PAGE = readFileSync(
-  `${process.cwd()}/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte`,
-  'utf8'
-);
+const TEMPLATE = readFileSync(`${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`, 'utf8');
+const PAGE = readFileSync(`${process.cwd()}/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte`, 'utf8');
 /** Rows the reference has switched off are not rows we must gate. */
 const LIVE = TEMPLATE.replace(/<!--[\s\S]*?-->/g, '');
 
@@ -106,9 +100,7 @@ describe('every conditionally-shown settings row is handled', () => {
 
   it('both gate maps are actually consulted when rendering a row', () => {
     /* A map nothing reads is the same defect as no map. */
-    expect(PAGE).toContain(
-      '(authModeGated[def.name]?.() ?? true) && (profanityGated[def.name]?.() ?? true)'
-    );
+    expect(PAGE).toContain('(authModeGated[def.name]?.() ?? true) && (profanityGated[def.name]?.() ?? true)');
   });
 
   it('the reference spells it `ingnoreBadWordsList`, and we keep the typo', () => {

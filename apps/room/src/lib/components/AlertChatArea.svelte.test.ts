@@ -86,6 +86,9 @@ const render = (over: {
   const props = $state({
     split: { alertChatAreaStyle: '', chatAreaStyle: '', alertsAreaStyle: '' },
     alerts: { search: '', filterSelected: false, toolbarOpen: false, searchOnly: false },
+    // The overlay this pane renders from. `null` is the ordinary case — no image pinned —
+    // and the dismiss receiver is never reached by these assertions.
+    broadcasts: { salesImageUrl: null, salesImageDismissed: noop },
     chat: { tab: 'main', composer: '', focused: noop },
     polls: { minimized: false, active: null },
     menus: { messageId: null, openMessageMenu: noop, emoji: false, giphy: false, set: noop },

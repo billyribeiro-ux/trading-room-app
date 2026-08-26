@@ -122,10 +122,17 @@ while (i < src.length) {
         .split('|')
         .map((c) => c.trim());
     if (!/^[\s|:-]+$/.test(rows[1])) fail(line + 1, 'expected a table separator row');
-    const head = cells(rows[0]).map((c) => `<th>${inline(c, line)}</th>`).join('');
+    const head = cells(rows[0])
+      .map((c) => `<th>${inline(c, line)}</th>`)
+      .join('');
     const body = rows
       .slice(2)
-      .map((r) => `<tr>${cells(r).map((c) => `<td>${inline(c, line)}</td>`).join('')}</tr>`)
+      .map(
+        (r) =>
+          `<tr>${cells(r)
+            .map((c) => `<td>${inline(c, line)}</td>`)
+            .join('')}</tr>`
+      )
       .join('');
     html.push(`<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`);
     continue;
