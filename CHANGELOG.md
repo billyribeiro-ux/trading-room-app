@@ -33,6 +33,92 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-26 12:09 EDT — Three commits: a seam, a sub-command, and a blocker that was already built
+
+**Runtime impact: YES for `restartScreen`.** The other two are a refactor and a test.
+
+**Branch `feat/save-permissions`** — `23bebc3`, `92fbd9e`, `0ac5cec`.
+
+#### 1. `RoomLocalCapture` — the seam the file said it did not have
+
+`media-transport.svelte.ts` crossed the 800-line CODE backstop, which does not accept a number:
+*"find the domain seam rather than raising the backstop."* The seam is the direction media travels —
+what this browser PUBLISHES, as opposed to what it consumes.
+
+    media-transport.svelte.ts   1825 -> 1357   (lowered, never raised)
+    local-capture.svelte.ts     NEW
+
+**The old ceiling note was half right and is corrected rather than deleted.** It said *"it is ONE
+module because there is no seam"* and predicted *"a local/remote split would have cut through
+`#sharedScreens`, which both paths write."* The prediction was exact. Measured across the seam on
+code lines only, before anything moved: 5 members moved cleanly, 10 were shared collaborators, 12
+were state — seven purely local, three reached by thunks, and `#sharedScreens` + `#screenStreams`
+the genuine tangle. They stay owned by the transport and are written through a `ScreenTabPort`. **The
+tab list has two writers, and that is stated at the top of the new module.** They always were; the
+old arrangement had them in one file, which made the tangle invisible rather than absent.
+
+The public surface did not move — six methods and five accessors stay as one-line forwards, so the
+page, `RoomRecording`, `RoomEventStream` and eleven contract tests are untouched.
+
+**Negative control seen RED on the one thing this could break silently.** `#webcamStream` is the only
+`$state` field that moved and is now read through two getters. A new test drives `toggleWebcam` with
+a stubbed `getUserMedia`; with the rune removed it reports `[ null ]` instead of `[ null, 'cam' ]` —
+renders once, never updates, invisible to `svelte-check`, the autofixer and every source assertion.
+
+`webcam-contract` now straddles the seam and asserts a member is declared in EXACTLY ONE module.
+That immediately caught `toggleWebcam` appearing twice, so it learned to discount a pure delegation
+rather than have the assertion deleted.
+
+#### 2. `restartScreen` — and its blocker named the wrong missing half
+
+Fourth of `remotePresCommand`'s six, read whole at byte 1119400. The recorded blocker read
+*"`RoomMediaTransport` has `stopLocalScreen` but no re-share"* — true and irrelevant. **A re-share is
+exactly what the capture does not do, and building one would have been wrong**: it means
+`getDisplayMedia`, which needs a user gesture and can never be reached from a socket.
+`restartScreenSharing` re-produces the SAME live track under `stopTracks:!1`, and `session.ts:562`
+has passed `stopTracks: false` on every produce here since it was written.
+
+Re-reading the diff caught a bug I had just written: `stopLocalScreen` read `sharedScreens[0]` AFTER
+its own filter, so passing it as an argument evaluated it BEFORE — stopping the leftmost of three
+screens would have re-selected the tab being removed.
+
+**`startRec` / `stopRec` stay unbuilt with a corrected reason.** Both resolve to the reference's
+SERVER-side recorder. This room has none. Pointing them at the local `MediaRecorder` would write a
+video file to a member's disk with no prompt, since `startRecording()` calls `downloadRecording()`
+from its own stop handler. Recorded as a gap, not faked.
+
+**Ceiling raised 758 → 872 and recorded in the catalog**, not quietly applied: 758 was set by me one
+commit earlier as a mid-stream snapshot, before the feature it existed to carry. The CODE backstop —
+the number that measures the architecture — is unchanged and passes.
+
+#### 3. The logout-on-ban was already built, and better than the reference
+
+Row 9's last item claimed *"a banned member is disconnected but not logged out."* Both halves false.
+
+**The reference's emit has no subscriber.** `logout` occurs EXACTLY ONCE in the 2,891,205-byte
+bundle, case-insensitively, and that once is the emit (byte 1011431, not the 1010700 recorded). No
+`subscribe("logout")`, no `signOut`. Reproducing it faithfully would be writing a dead line.
+
+Ours ends the session SERVER-side on the next load — `logout(cookies)`, `locals` cleared,
+`redirectSignedOut()` — under a comment that already said it *"handles a ban that lands
+mid-session"*, and refuses re-entry at `/session`. An emit is advice a modified client can decline;
+destroying the session row is not.
+
+**This was the FIFTH false blocker in this sweep**, so it is now pinned by
+`ban-ends-the-session-contract.test.ts` rather than only corrected in prose. A row drifts back; a
+test does not. Negative control seen RED.
+
+#### Verified
+
+`svelte-check` **1,245 files, 0 errors, 0 warnings**. `vitest` **2,859 across 189**. `eslint` and
+`prettier` clean on every touched file. `svelte-autofixer` zero issues; its one suggestion (use
+`SvelteMap`) is refused by the docblock that travelled with the field, which records why a plain Map
+is correct there.
+
+**Not verified, and stated as such:** that a restarted screen actually re-appears for a second peer.
+That needs two browsers in a live room and is the owner's.
+
+
 ### 2026-08-26 12:01 EDT — Every dependency to registry-latest of this day, and every pin that holds one moved with it
 
 **Runtime impact: YES.** Dependency versions ship in both apps and both services; nothing else about
@@ -86,17 +172,36 @@ eight `services/**` files, six leaving the 74-file aggregate for individual pins
 contract files died at import. Fixed in `apps/room/vite.config.ts` test config (inline Kit, alias
 the two generated flavours); the reasoning is on the block.
 
-**Verified:** rustfmt, clippy `-D warnings` clean; media 125 tests; api full integration suite green
-against a throwaway digest-pinned postgres:17 provisioned and migrated exactly as CI does (torn down
-after); cargo-deny 0.20.2 and cargo-audit 0.22.2 pass on the new lock with unchanged configs;
-release-artifact pin contract PASS; provenance PASS 68+30+2; controller 1005/1005 unit tests,
-svelte-check 0 errors across 1535 files, fonts/breakpoints/manage/account/home/room-login/runtime
-verifiers individually green; room 2847/2853 with privacy+schema gates green; both apps build.
-**Not mine, still red, left in place:** room's six failing media-contract assertions track
-`feat/save-permissions` files being edited mid-session; controller `privacy:verify` flags
-`collect-control-plane.smoke.mjs` and the SSOT documents 985 tests where the branch now runs 1005 —
-both reproduced at clean HEAD in a worktree before being attributed. **Not run:** the full Docker
-release-artifact build (CI's release gate) and Playwright e2e.
+**Two pre-existing branch reds, found in the way and fixed rather than stepped around** — each first
+reproduced at clean HEAD in a worktree so the attribution is measured, not assumed:
+
+- `privacy:verify` was failing on `collect-control-plane.smoke.mjs` — the boundary verifier decodes
+  JWT-shaped payloads hunting identity claims, and the smoke test's own fixture was the jwt.io
+  sample carrying `"name":"Ada Lovelace"`. The collector redacts by SHAPE, so the payload now reads
+  `{"sub":…,"scope":"site"}` — same three-segment shape, no identity-claim key. The smoke run still
+  PASSES (the token is still caught and redacted) and the boundary is verified. The detector was
+  never weakened.
+- The documented-count gate: the branch's kick-ban and node-pin suites added 20 Vitest tests and no
+  documented site moved. All four sites now read 98 files / 1005 tests, with the 985 checkpoint
+  history kept in prose where the sentence describes a dated run.
+
+One moderate advisory (esbuild ≤0.24.2, the dev-server request bug) rode in through the same
+deprecated `@esbuild-kit` chain drizzle-kit pins; a targeted override in `pnpm-workspace.yaml` moves
+only that nested copy to the patched line, `pnpm audit` now reports **zero** known vulnerabilities,
+and `drizzle-kit check` still reads its TS config through the patched loader ("Everything's fine").
+
+**Verified, all on this day's tree:** rustfmt and clippy `-D warnings` clean on 1.98.0; media 125
+tests; api full integration suite green against a throwaway digest-pinned postgres:17 provisioned
+and migrated exactly as CI does (torn down after); cargo-deny 0.20.2 and cargo-audit 0.22.2 pass on
+the new lock with unchanged configs; release-artifact pin contract PASS; provenance PASS 68+30+2;
+**controller `pnpm test` green END TO END** — every verifier through the 1005-test suite with
+ratcheted coverage and the four documented-count sites; controller svelte-check 0 errors across
+1535 files; **room `pnpm test` green end to end** — privacy, schema, 2859/2859 — and room
+svelte-check 0 errors across 1244 files; eslint clean in both apps; both apps build under
+vite 8.2.2 + Kit next.25 + adapter-vercel next.8. **Pre-existing and left:** the branch's 26-file
+prettier drift (every file already failing at HEAD, none touched here — a mass reformat does not
+belong inside a dependency diff). **Not run:** the full Docker release-artifact build (CI's release
+gate) and Playwright e2e.
 
 ### 2026-08-26 11:23 EDT — The gate that catches adrift comments could not see 84% of the tree, and two of the sixteen orphans were mine
 
