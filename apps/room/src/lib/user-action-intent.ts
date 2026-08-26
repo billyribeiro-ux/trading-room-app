@@ -52,10 +52,19 @@ export function addVideoToList(existing: readonly string[], url: string): VideoL
  * Actions whose ENTIRE effect is raising one fixed alert.
  *
  * This was an inline `Record<string, string>` named `exactAlerts`, and its existence is a smell the
- * repository has a name for: a control whose only effect is changing its own label. Every entry
- * here is a button that reports success and sends nothing — `mute-chat-24` from this modal does not
- * mute (the working mute is the message context menu's `mute24`), and `force-reload` and
- * `restart-audio` have never been checked for a wire.
+ * repository has a name for: a control whose only effect is changing its own label.
+ *
+ * **"Every entry here is a button that reports success and sends nothing" — that sentence stood at
+ * the top of this docblock and was FALSE, found 2026-08-23.** `save-permissions` reads its string
+ * from this table through `userActionAlert('save-permissions')` and then genuinely sends, via
+ * `RoomUserActions.savePermissions` → `permissions.remote.ts`, reached from
+ * `RoomOverlays.svelte:563`. It is an ANNOUNCEMENT for a real action that happens to be stored here
+ * beside the liars, and counting it as one made `TOAST_ONLY_ACTIONS.length` overstate the defect by
+ * one for as long as the entry has existed.
+ *
+ * So this table is "the fixed alert for an action", and the LIARS are the subset with no branch
+ * anywhere — which the disposition contract is what actually establishes, by scanning for a branch
+ * rather than by trusting a sentence in a comment.
  *
  * They are reproduced as-is because the port is not finished, NOT because they are correct. TODO
  * row W tracks them. Keeping them in one exported table rather than inline is what makes the list
@@ -70,8 +79,39 @@ export function addVideoToList(existing: readonly string[], url: string): VideoL
  */
 const EXACT_ALERTS: Readonly<Record<string, string>> = {
   'save-permissions': 'Permissions applied, user will reload the page now to apply...',
-  'mute-chat-24': 'user chat muted',
+  /*
+    `mute-chat-24` was HERE and is gone, 2026-08-23 — the THIRD entry ever removed, after
+    `unmute-chat` and `force-reload`, and for the identical reason: its presence WAS the bug. The
+    button raised the reference's own "user chat muted" and sent nothing, while a working mute — the
+    message context menu's `mute24` — sat in the same source with nothing joining them. The docblock
+    above still names it as the example, which is now history rather than a live defect. Both doors
+    call `applyChatMute`, in `#lib/server/chat-mute.ts`.
+  */
+  /*
+    `mute-chat-indefinitely` STAYS, and is the one entry here that is honestly blocked rather than
+    merely unbuilt. The reference reaches it with `muteChat("0")` against a " Mute Chat indefinately "
+    label (its own spelling) at bundle byte 2067543, and `"0" >= 0` is true, so it sends
+    `{user, time:0}` down the same command as the 24-hour one.
+
+    An indefinite mute ALREADY EXISTS in this system and is already enforced: the controller's opcode
+    3 sets `role = 3, muted = true`, and `refuseIfChatMuted` reads `member.muted` on every send. What
+    is missing is a DOOR from the room to it — the equivalent of `internal/room-ban` for a ban. That
+    is a controller endpoint with its own authority checks, not a line here, so it is recorded rather
+    than faked with a 24-hour mute wearing an "indefinite" label.
+  */
   'mute-chat-indefinitely': 'user chat muted',
+  /*
+    `restart-audio` KEEPS ITS ENTRY AND IS NO LONGER A LIAR — 2026-08-23.
+
+    Unlike `unmute-chat`, `force-reload` and `mute-chat-24`, which were REMOVED when they were wired,
+    this one stays: the capture's sender genuinely raises `bootbox.alert("Audio restart request sent
+    OK")` right after `sendServerAdminCommand("remoteRestartAudio", this.user)` at byte 2080461. The
+    string is real and belongs to a real action, so it lives here for the same reason
+    `save-permissions` does — this table is "the fixed alert for an action", not a defect list.
+
+    Which entries are DEAD is established by `user-action-disposition-contract.test.ts`, which scans
+    for a branch. `restart-audio` now has one, in `RoomUserActions.handle`.
+  */
   'restart-audio': 'Audio restart request sent OK'
   /*
     `force-reload` was HERE and is gone, 2026-08-23 — the second entry ever removed from this table,
@@ -159,19 +199,50 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     sent to a MEMBER. Whatever MediaMTX does afterwards, the control this room is missing is this
     one, and it is captured.
   */
-  'mute-mic':
-    'ModalHost.svelte:2253 — wire IS captured: remotePresCommand("mutemic"). Blocked on a SERVER-side presenter check, not on evidence',
-  'mute-camera':
-    'ModalHost.svelte:2259 — wire IS captured: remotePresCommand("mutecam"). Same server-authority requirement as mute-mic',
-  'stop-screens':
-    'ModalHost.svelte:2265 — wire IS captured: remotePresCommand("mutescreens"). NOTE: distinct from RoomScreens.stop(), which is an HONEST PARTIAL for your OWN screen; this button targets somebody else',
-  'restart-screens':
-    'ModalHost.svelte:2272 — wire IS captured: remotePresCommand("restartScreen"), singular, against a " Restart Screens " label',
+  /*
+    `mute-mic`, `mute-camera` and `stop-screens` WERE HERE AND ARE GONE, 2026-08-23, and the reason
+    they were here was FALSE THE DAY IT WAS WRITTEN — for the second time on this same block.
 
+    The entry said "Blocked on a SERVER-side presenter check, not on evidence". That check existed
+    the whole time, and so did everything else. All three ends were already built and already in use:
+
+      SEND      `presenterCommand` — `presenter-commands.remote.ts:60`, `z.enum(['mutemic',
+                'mutecam','mutescreens'])`, gated by `presenterRoom()`, ADDRESSED via
+                `publishToUsers` so no other member sees that a named person was silenced
+      RECEIVE   `events.svelte.ts:573-582` — the member's OWN browser does the work:
+                `toggleMicrophone()`, `toggleWebcam()`, `stopScreenSharing()`
+      IN USE    `muteAllNonAdmins()` in this same class has been calling that exact command, with
+                that exact subCmd, since it was built
+
+    So a working command with a working receiver, already exercised by a neighbouring control, sat
+    behind three buttons that dispatched action strings nothing had a branch for. What was missing
+    was the branch — and this table was the reason nobody looked for it.
+
+    THE LESSON, recorded because it has now cost three separate turns: an entry here is a claim
+    about the REPOSITORY, and it must be re-verified against the repository rather than inherited.
+    Every one of these blockers that has been checked so far turned out to be a search that stopped
+    at one directory.
+
+    `restart-screens` stays below, with a corrected reason.
+  */
+  'restart-screens':
+    'ModalHost.svelte:2272 — wire IS captured: remotePresCommand("restartScreen"), singular, against a " Restart Screens " label. NOT blocked on authority — `presenterCommand` is the proven mechanism and this is simply absent from its enum and from the receiver. The member-side act is `for (screen of MY screenSharingUsers) restartScreenSharing(screen)` (byte 1119400), and `RoomMediaTransport` has stopLocalScreen but no re-share',
+
+  /*
+    THE RECORDING PAIR'S BLOCKER WAS ALSO MIS-STATED, though these two really are unbuilt.
+
+    "Blocked on the same server-side presenter check" is wrong for the same reason as above. What
+    IS true, and is a different thing: `recording-state.remote.ts:61` accepts
+    `startRec | stopRec | pauseRec | resumeRec` — but it is `publishToRoom`, announcing the
+    PRESENTER'S OWN recording to everybody. Upstream's `remotePresCommand("startRec")` is addressed
+    to ONE member and tells THEIR browser to record (`startRecForMuser(null)`, byte 1119480). Two
+    different acts that happen to share a verb, and collapsing them would make a presenter's button
+    start their own recording while claiming to start somebody else's.
+  */
   'start-recording':
-    'ModalHost.svelte:2279 — wire IS captured: remotePresCommand("startRec"). NOT blocked on a MediaMTX host; blocked on the same server-side presenter check',
+    'ModalHost.svelte:2279 — wire IS captured: remotePresCommand("startRec") → the MEMBER runs startRecForMuser(null). NOT the same act as recordingState, which broadcasts the presenter\'s own. Absent from presenterCommand\'s enum and from the receiver',
   'stop-recording':
-    'ModalHost.svelte:2285 — wire IS captured: remotePresCommand("stopRec"). Same as start-recording',
+    'ModalHost.svelte:2285 — wire IS captured: remotePresCommand("stopRec") → stopRecForMuser(null). Same distinction as start-recording',
 
   /*
     `getDebugLog` and `setUserProfilePic` are the two this class was already known by — `TODO.md`
@@ -248,25 +319,25 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     sitting in the same menu as `" Mute Microphone for all non-admins "`.
   */
   'get-my-token':
-    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button',
+    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button'
+};
 
-  /*
-    `kick-ban` BECAME INERT ON 2026-08-23, and it moved in the honest direction.
-
-    It used to share a branch with `kick`, and that branch alerted *"User kicked OK"* while sending
-    nothing at all — so both controls lied. `kick` now sends a real, presenter-gated `kickUser`.
-
-    `kick-ban` deliberately did NOT come with it. The reference's payload is
-    `{user, msg, ban, kickAllInstances}`, and a ban has to OUTLIVE the frame: something durable must
-    record that this person may not come back. This room has no such store. Pointing `kick-ban` at
-    the plain kick would drop the ban silently and rebuild the exact defect the kick fix removed —
-    a control reporting something it did not do.
-
-    So it is inert and says so here, which is strictly better than what it was: a lie counted as
-    `handled`. `TODO.md` row 7 carries what it needs.
-  */
-  'kick-ban':
-    'ModalHost.svelte:2362 — no handler since 2026-08-23, when `kick` was given a real command and this was NOT: a ban needs durable storage this room does not have, and reusing the plain kick would drop it silently'
+/**
+ * The three modal buttons that are one `remotePresCommand` sub-command each.
+ *
+ * A TABLE rather than a nested ternary, and exported so the mapping is testable without driving the
+ * class: these three strings crossing to the wrong subCmd would cut the wrong stream on somebody
+ * else's machine, and nothing on screen would say so.
+ *
+ * The sub-command names are the capture's own — `remotePresCommand("mutemic")` and its two
+ * neighbours at bundle bytes 2063708-2064410 — and they are deliberately NOT the action strings:
+ * the reference's labels are " Mute Audio ", " Mute Camera " and " Stop Screens " while the wire
+ * says `mutemic`, `mutecam`, `mutescreens`. Three names for one thing is upstream's, not ours.
+ */
+export const PEER_MUTE_SUBCMDS: Readonly<Record<string, 'mutemic' | 'mutecam' | 'mutescreens'>> = {
+  'mute-mic': 'mutemic',
+  'mute-camera': 'mutecam',
+  'stop-screens': 'mutescreens'
 };
 
 /** Every action that is knowingly silent. Exported so the disposition contract can read it. */

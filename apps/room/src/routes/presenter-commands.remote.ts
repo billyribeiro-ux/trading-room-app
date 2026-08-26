@@ -2,7 +2,10 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 import { presenterRoom, requireUser } from '#lib/server/auth.js';
-import { ensureDatabase } from '#lib/server/db/index.js';
+import { eq } from 'drizzle-orm';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { users } from '#lib/server/db/schema.js';
+import { writeRoomBan } from '#lib/server/room-config-client.js';
 import { grantMediaElevation, revokeMediaElevation } from '#lib/server/media-elevation.js';
 import { publishToRoom, publishToUsers } from '#lib/server/room-events.js';
 
@@ -173,13 +176,24 @@ export const forceReload = command(z.number().int().positive(), async (targetUse
  * cases earlier in the same switch. Both were read in one pass; the asymmetry is upstream's and is
  * reproduced rather than tidied, for the same reason it is preserved on the receiving side.
  *
- * ## `ban` is NOT accepted here, deliberately
+ * ## `ban` IS accepted, and the claim that it could not be was wrong twice
  *
- * The reference's payload carries `ban` and `kickAllInstances`. A ban has to outlive the frame — it
- * needs somewhere durable to record that this person may not return — and this room has no such
- * store. Taking a `ban` flag and dropping it would reproduce the exact defect this command exists to
- * fix: a control that reports something it did not do. `kick-ban` therefore stays unwired and is
- * recorded in `TODO.md` rather than quietly aliased onto this.
+ * This docblock previously said a ban "needs somewhere durable to record that this person may not
+ * return — and this room has no such store". **False.** `roomUsers.banned` has been in the
+ * controller's schema throughout (`schema.ts:335`) and its role model reads *"…4 banned"*. The store
+ * was never missing; the door was. Found by auditing the whole repository instead of `apps/room/src`.
+ *
+ * So the payload now matches the capture's `{user, msg, ban, kickAllInstances}` in the part that
+ * matters: ONE command carries both halves, as upstream sends it. The frame disconnects the socket
+ * now; `writeRoomBan` records the fact for tomorrow.
+ *
+ * **The ban is written BEFORE the kick frame goes out, and the order is load-bearing.** Kick first
+ * and the member is disconnected while the write is still in flight; if that write then fails they
+ * are merely ejected and can walk straight back in, having been told they were banned. Writing first
+ * means a failure refuses the whole action with nothing sent.
+ *
+ * `kickAllInstances` is still NOT accepted: it is a flag in the captured payload whose behaviour is
+ * not shown anywhere read, and `kick-duplicates` already does that job explicitly.
  *
  * ## Addressed, not broadcast
  *
@@ -189,6 +203,43 @@ export const forceReload = command(z.number().int().positive(), async (targetUse
  * server decides the caller is a presenter and scopes the frame to the caller's own room in one call,
  * so no client assertion is trusted. That is the 2026-08-07 rule.
  */
+/**
+ * `remoteRestartAudio` — ask ONE member's browser to re-consume every microphone in the room.
+ *
+ * ## Both halves were captured and neither was built
+ *
+ * ```js
+ * remoteRestartAudio(){ this.appService.sendServerAdminCommand("remoteRestartAudio", this.user),
+ *                       bootbox.alert("Audio restart request sent OK") }   // byte 2080461
+ * case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")      // byte 995973
+ * subscribe("remoteRestartAudio", () => { this.reconnectAudio() })         // byte 1119299
+ * ```
+ *
+ * The alert existed here as an `EXACT_ALERTS` entry — *"Audio restart request sent OK"* raised over
+ * nothing at all — for the whole port. It is the fourth entry to leave that table and the last of
+ * the "reports success, sends nothing" family that had a captured wire waiting for it.
+ *
+ * ## The payload is the TARGET and nothing else
+ *
+ * Upstream sends `this.user`; the frame the member reads carries no fields its receiver consults —
+ * `emit("remoteRestartAudio")` passes nothing. So the only thing that has to cross is who it is for,
+ * and inventing a richer payload would be inventing evidence.
+ *
+ * ADDRESSED via `publishToUsers`, like `forceReload` beside it. Broadcasting a request to rebuild
+ * audio would have every member in the room re-consume every producer at once — a thundering herd
+ * against the SFU, triggered by a button meant for one person.
+ *
+ * Presenter-gated by `presenterRoom()`, which is the same call that decides `forceReload` and
+ * `kickUser`: the authority is the server's, from data the server owns.
+ */
+export const restartAudio = command(z.number().int().positive(), async (targetUserId) => {
+  ensureDatabase();
+  publishToUsers(presenterRoom(), [targetUserId], {
+    channel: 'privCmds',
+    data: { cmd: 'remoteRestartAudio', targetUserId }
+  });
+});
+
 export const kickUser = command(
   z.object({
     targetUserId: z.number().int().positive(),
@@ -198,11 +249,31 @@ export const kickUser = command(
       user-authored text arriving from a client — it gets a length it cannot exceed rather than
       being trusted. Empty is refused because the member would be disconnected with no reason shown.
     */
-    message: z.string().trim().min(1).max(500)
+    message: z.string().trim().min(1).max(500),
+    /** `true` for Kick & Ban. The durable half; see the docblock for why it is written first. */
+    ban: z.boolean().default(false)
   }),
-  async ({ targetUserId, message }) => {
+  async ({ targetUserId, message, ban }) => {
     ensureDatabase();
-    publishToUsers(presenterRoom(), [targetUserId], {
+    const room = presenterRoom();
+
+    if (ban) {
+      const actor = requireUser(getRequestEvent().locals);
+      const target = db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, targetUserId))
+        .get();
+      if (!target) error(404, 'No such user.');
+      // The controller refuses a self-ban too; refusing here as well keeps a member's click from
+      // costing a round trip, which is the reasoning `savePermissions` records for its own copy.
+      if (target.email.trim().toLowerCase() === actor.email.trim().toLowerCase()) {
+        error(403, 'You cannot ban yourself.');
+      }
+      await writeRoomBan(room, actor.email, target.email, true);
+    }
+
+    publishToUsers(room, [targetUserId], {
       channel: 'privCmds',
       // `msg`, not `message`: the receiver reads `xe.msg`, and the wire name is the capture's.
       data: { cmd: 'kickUser', targetUserId, msg: message }

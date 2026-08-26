@@ -11,7 +11,7 @@ export interface KickCandidate {
 
 /** The one command this domain needs. `RoomUserActions` owns the full `UserActionCommands`. */
 export interface KickCommands {
-  kickUser: (payload: { targetUserId: number; message: string }) => Promise<unknown>;
+  kickUser: (payload: { targetUserId: number; message: string; ban?: boolean }) => Promise<unknown>;
 }
 
 /**
@@ -76,7 +76,16 @@ export class RoomKicks<Candidate extends KickCandidate> {
    * `RoomSessionControl.handle` uses, and what keeps `handle()` a chain rather than a switch.
    */
   handle(action: string, user: ModalTargetUser): boolean {
-    if (action === 'kick') {
+    /*
+      ONE prompt and one command for both, as upstream sends one payload — `{user, msg, ban, …}`.
+      Two near-identical blocks would invite the next reader to change only one.
+
+      `kick-ban` was inert until 2026-08-23 on a reason false twice over: a ban was said to need
+      storage this room lacks, and `roomUsers.banned` was in the controller's schema throughout. The
+      server writes it BEFORE the frame goes out — `kickUser` says why that order matters.
+    */
+    if (action === 'kick' || action === 'kick-ban') {
+      const ban = action === 'kick-ban';
       this.#dialogs.prompt = {
         title: 'Enter the kick message for this user',
         value: DEFAULT_KICK_MESSAGE,
@@ -84,7 +93,7 @@ export class RoomKicks<Candidate extends KickCandidate> {
           this.#dialogs.prompt = null;
           this.#closeModal();
           this.#announceThenSend('User kicked OK', () =>
-            this.#commands.kickUser({ targetUserId: user.id, message })
+            this.#commands.kickUser({ targetUserId: user.id, message, ban })
           );
         }
       };

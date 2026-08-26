@@ -13,10 +13,10 @@ import {
   alertQuestions,
   alerts,
   capturedItemOverrides,
-  chatMutes,
   hiddenRoomItems,
   messages
 } from '#lib/server/db/schema.js';
+import { applyChatMute } from '#lib/server/chat-mute.js';
 import { toggleReaction } from '#lib/reaction-toggle.js';
 import { parseReactions } from '#lib/server/reactions.js';
 
@@ -360,23 +360,17 @@ export const messageAction = command(messageActionArgs, async (args) => {
   }
 
   if (args.operation === 'mute24') {
-    const createdAt = new Date();
-    db.insert(chatMutes)
-      .values({
-        /*
-          A mute is granted in the room it was issued in. The controller models the same thing as
-          role 3 CHAT MUTED on a `room_users` membership, which is per room — muting somebody here
-          must not silence them in a room this presenter has no authority over.
+    /*
+      The insert used to be written out here. It moved to `applyChatMute` when the user modal's
+      " Mute Chat for 24hrs " button was wired, because that is a SECOND door onto the same act and a
+      second copy of a rule is how a ban that enforced nothing shipped earlier the same day:
+      `internal/room-ban` hand-copied a mapping instead of calling it and wrote the wrong half.
 
-          `unmuteChat` in `chat-mute.remote.ts` is the other half.
-        */
-        roomShortCode: room,
-        targetUserId: args.targetUserId,
-        mutedByUserId: user.id,
-        expiresAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
-        createdAt
-      })
-      .run();
+      What moving it bought beyond deduplication: the member is now TOLD. This branch wrote the row
+      and announced nothing, so somebody muted mid-conversation kept an enabled composer until their
+      next page load. `unmuteChat` in `chat-mute.remote.ts` is still the other half.
+    */
+    applyChatMute(room, args.targetUserId, user.id);
     return;
   }
 

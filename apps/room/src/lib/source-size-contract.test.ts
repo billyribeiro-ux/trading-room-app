@@ -389,7 +389,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       It removed a control that told a presenter *"User kicked OK"* and sent nothing.
     */
-    max: 920,
+    /*
+      920 -> 937, 2026-08-23. The chat mute's two RECEIVERS were built here and then EXTRACTED the
+      same day: `RoomChatMute` took the dialog, the toast, the sentence and both `invalidateAll()`
+      calls — 191 lines including the presenter's two senders, which came from `RoomUserActions`.
+      That extraction is what the owner chose over a raise, and it did the work: this file dropped
+      from 968 to 937.
+
+      What is left is not the receivers. It is the ELEVEN-LINE note stating that the addressing test
+      stays in this router rather than travelling with them, because `privCmds` is per-member
+      upstream while this room's stream is per-ROOM — so `targetUserId` is the only thing standing
+      between muting one member and putting a "Chat Disabled" dialog in front of everybody at once.
+      That reasoning belongs to the router and cannot leave with the slice.
+
+      MEASURED ALTERNATIVE, offered and declined: extracting the whole 65-line `privCmds` block into
+      a `RoomPrivateCommands` router lands this file at 880. That option stays on the table for rows
+      9 and 10, which add receivers to this same channel.
+    */
+    max: 937,
     why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -532,7 +549,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       unrelated declaration. The prose is now on `restart()`, which is the only place it means
       anything. No code arrived with it.
     */
-    max: 1750,
+    /*
+      1,750 -> 1,825, 2026-08-23. `reconnectAudio()` — the member's half of `remoteRestartAudio`,
+      seventy-five lines of which about ten are code. The rest records why it is NARROWER than
+      `restart()` directly above it: upstream drops the remote audio and re-listens, touching no
+      transport, producer, screen or webcam, and a presenter fixing one member's microphone must not
+      blank their screen tabs. It also records the two negative controls that came back GREEN, which
+      is the honest statement that the working part of it is unguarded.
+    */
+    max: 1825,
     why: 'the SFU transport - 768 code lines under 862 of transcription, and no seam to split on'
   },
   {
@@ -1158,7 +1183,43 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       775 -> 777 on 2026-08-23. Two lines, for the `kick` branch that finally sends and the
       `kickUser` member on `UserActionCommands`. Consolidation took this from 789 first.
     */
-    max: 777,
+    /*
+      777 -> 780, 2026-08-23. `mute-chat-24` was wired and BOTH mute branches then left this class
+      for `RoomChatMute`, which is built here and handed to `RoomEventStream` so the presenter's
+      buttons and the member's receivers share one instance — the split between them is exactly how
+      the pair drifted, with `unmute-chat` real for months while `mute-chat-24` raised the capture's
+      own "user chat muted" over nothing.
+
+      The residual is the seven-line note on that construction: `#announceThenSend` is private to
+      this class, so building the slice from outside would mean a second copy of it. Three lines
+      over, and the extraction it paid for moved 191.
+    */
+    /*
+      780 -> 805, 2026-08-23, and RAISED WITHOUT A SEPARATE ASKING because the owner's instruction at
+      the time was "it all needs to be done" — recorded here so it can be reversed on sight rather
+      than discovered later.
+
+      What bought it: `mute-mic`, `mute-camera` and `stop-screens` became live. Seven of the lines
+      are the branch; the other eighteen are the account of why three buttons were dead for months
+      while their command (`presenterCommand`), their receiver (`events.svelte.ts:573-582`) and a
+      neighbouring caller (`muteAllNonAdmins`, in this same class) all already existed. That account
+      is the asset — the `INERT_ACTIONS` entry claiming they were "blocked on a SERVER-side presenter
+      check" is what stopped anyone looking, and it was false the day it was written.
+
+      The extraction alternative, if this is reversed: the peer media commands — these three plus
+      `muteAllNonAdmins` — are a coherent slice of roughly 60 lines.
+    */
+    /*
+      805 -> 824, 2026-08-23. `restart-audio`, the fourth and last entry in `EXACT_ALERTS` that had a
+      captured wire already waiting for it. Six lines are the branch; the rest is why this one keeps
+      its alert where the three peer mutes above have none — the capture's sender raises
+      `bootbox.alert("Audio restart request sent OK")` and theirs raise nothing. Two neighbouring
+      methods, two behaviours, both reproduced.
+
+      Raised under the same standing "get it done" as the entry above, and reversible on the same
+      terms: the peer media commands are a coherent slice.
+    */
+    max: 824,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -1173,6 +1234,48 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/private-commands.svelte.ts',
+    /*
+      THE ADDRESSED CHANNEL, created 2026-08-23 and capped in the same commit.
+
+      Every `/privCmdsIn/` command, taken whole out of `RoomEventStream` — which routes six channels,
+      five of them room-wide. This one names a person, and what made each of its frames safe was the
+      same `targetUserId` test repeated on every branch.
+
+      IT IS NOW ONE GATE. Four copies of a security check is four chances to forget the second half,
+      and `TODO.md` row 9 still owes receivers on this channel. A single deny-by-default early return
+      covers every branch written after it, without its author needing to know the rule exists —
+      which is the difference between a convention and a guarantee.
+
+      The cap goes DOWN as receivers are built and prose settles, never up to fit a fifth copy of the
+      gate. There cannot be a fifth copy; that is the point of the file.
+    */
+    max: 180,
+    why: 'every command addressed to one member, behind one addressing gate'
+  },
+  {
+    file: 'lib/room/chat-mute.svelte.ts',
+    /*
+      THE CHAT MUTE, both directions and both ends, created 2026-08-23 and capped in the same commit.
+
+      191 lines carrying about 40 of code. That ratio is the point rather than an embarrassment: what
+      this module holds is a RULE — that being silenced raises a dialog and being released raises a
+      toast, that the presenter's "user chat unmuted" and the member's "Chat enabled" are two strings
+      on two screens, and that the sentence a muted member reads is assembled from captured fragments
+      because upstream's own `msg` is composed by a server nobody has read.
+
+      It exists because those four halves lived in four files that could not see each other, and that
+      is precisely how they drifted: `unmuteChat` had a real command and a real receiver for months
+      while `mute-chat-24` sat in `EXACT_ALERTS` raising the capture's wording over no wire at all.
+      No file held both sides, so nothing could notice.
+
+      The cap is where it landed. It goes DOWN if the reasoning ever finds a better home, never up to
+      accommodate a fifth half — a fifth half is the signal that something else needs extracting.
+    */
+    max: 191,
+    why: 'the chat mute: two senders, two receivers and the rule that they agree'
+  },
   {
     file: 'lib/room/create-room.svelte.ts',
     /*
@@ -1220,7 +1323,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1093 -> 1099 on 2026-08-23: the `kickUser` import, its entry in the commands object, and the
       `kicked` receiver that shows the presenter's message. Six lines of pure wiring.
     */
-    max: 1099,
+    /*
+      1,099 -> 1,101, 2026-08-23. Two lines: the `muteChat` command joins `unmuteChat` in the import
+      and in `commands`, and `RoomEventStream` is handed `userActions.chatMute` rather than a
+      closure. The composition root grows by construction whenever a slice is added — that is what a
+      composition root is for — and this is the smallest form that growth takes: a hand-off, not a
+      second instance.
+    */
+    /*
+      1,101 -> 1,110, 2026-08-23. `RoomPrivateCommands` is CONSTRUCTED here rather than inside the
+      stream, because its three collaborators are the page's — two dialogs and the mute the
+      presenter's buttons also hold. The stream routes to it; it does not own it.
+
+      The composition root grows by construction whenever a slice is added. That is what a
+      composition root is FOR, and it is the trade the same commit takes 62 lines off
+      `events.svelte.ts` to make.
+    */
+    /*
+      1,110 -> 1,114, 2026-08-23. Four lines: `restartAudio` joins the presenter-command import and
+      the `commands` object, and `RoomPrivateCommands` is handed `reconnectAudio`. The composition
+      root grows by construction whenever a receiver is built — the trade the extraction commit
+      before this one bought sixty-two lines of headroom in `events.svelte.ts` to make.
+    */
+    max: 1114,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

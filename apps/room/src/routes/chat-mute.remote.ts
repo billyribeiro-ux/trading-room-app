@@ -4,6 +4,7 @@ import { and, eq, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { applyChatMute } from '#lib/server/chat-mute.js';
 import { chatMutes } from '#lib/server/db/schema.js';
 import { publishToUsers } from '#lib/server/room-events.js';
 
@@ -45,6 +46,49 @@ import { publishToUsers } from '#lib/server/room-events.js';
  */
 const unmuteChatArgs = z.strictObject({
   targetUserId: z.number().int().positive()
+});
+
+/**
+ * *" Mute Chat for 24hrs "* — the user modal's button, which until now raised an alert and stopped.
+ *
+ * ## Two doors, one act
+ *
+ * The message context menu's `mute24` has written a real row since the port began. This modal button
+ * sat in `EXACT_ALERTS` raising the reference's own *"user chat muted"* over nothing at all, and the
+ * table's docblock named it: *"`mute-chat-24` from this modal does not mute"*. Both doors now call
+ * `applyChatMute`, so there is one insert and one announcement rather than two of each.
+ *
+ * ## Why here and not beside `mute24`
+ *
+ * `messageAction` is keyed by a MESSAGE — `kind` and `id` are required on every branch of its union,
+ * because every other operation acts on one. This button acts on a PERSON and has no message in
+ * hand; reaching `mute24` from it would mean inventing a message id to satisfy a schema. It belongs
+ * beside `unmuteChat`, which is the command it undoes and which takes exactly the same one argument.
+ *
+ * The reference agrees on the shape. Both directions are one method there —
+ * `muteChat(e){ e >= 0 ? sendServerAdminCommand("muteChat", {user, time:e}) : … "unmuteChat" … }` at
+ * bundle byte 2080089 — and the menu calls it with the strings `"24"`, `"0"` and `"-1"`. Splitting
+ * the sign into two named commands is this repository's boundary, not a divergence in behaviour:
+ * `"-1"` is not a duration, it is a different verb wearing one.
+ *
+ * **`"0"` — *" Mute Chat indefinately "*, the reference's own spelling — is NOT built here**, and is
+ * not silently folded into 24 hours. An indefinite mute already exists in this system as the
+ * controller's opcode 3 (`role = 3`, `muted = true`), which `refuseIfChatMuted` already enforces
+ * through `member.muted`; what is missing is a door from the room to it, the way `internal/room-ban`
+ * is the door for a ban. That is its own change and `TODO.md` carries it with this evidence.
+ */
+export const muteChat = command(unmuteChatArgs, async ({ targetUserId }) => {
+  ensureDatabase();
+
+  const { locals } = getRequestEvent();
+
+  // Identical authority to the unmute below, and for the identical reason. A member who POSTs this
+  // endpoint directly gets a 403 rather than the power to silence somebody.
+  const roomShortCode = requireRoomShortCode(locals);
+  const caller = requireUser(locals);
+  if (!isPresenterRole(caller.role)) error(403, 'Presenters only.');
+
+  applyChatMute(roomShortCode, targetUserId, caller.id);
 });
 
 export const unmuteChat = command(unmuteChatArgs, async ({ targetUserId }) => {

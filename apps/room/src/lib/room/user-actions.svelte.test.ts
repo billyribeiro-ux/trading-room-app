@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TalkingEntry } from '#lib/mute-all-non-admins.js';
 import type { ModalTargetUser } from '#lib/types.js';
-import { MISSING_SCHEME_ALERT } from '#lib/user-action-intent.js';
+import { MISSING_SCHEME_ALERT, TOAST_ONLY_ACTIONS } from '#lib/user-action-intent.js';
 
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomToasts } from './toasts.svelte';
@@ -63,7 +63,10 @@ const make = (
   const toasts = new RoomToasts();
   const sent: { subCmd: string; targetUserId: number }[] = [];
   const reloadsSent: number[] = [];
-  const kicksSent: { targetUserId: number; message: string }[] = [];
+  const kicksSent: { targetUserId: number; message: string; ban?: boolean }[] = [];
+  const urlsSent: { cmd: string; url: string }[] = [];
+  const mutesSent: { targetUserId: number }[] = [];
+  const audioRestarts: number[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
   const saved: [string, boolean][] = [];
@@ -72,6 +75,7 @@ const make = (
   let previewsHidden = 0;
   let reloaded = 0;
   let unmuteFails = false;
+  let presenterFails = false;
   /* The five checkboxes as they left the class, and a switch to make the control plane refuse. */
   const permsSent: { targetUserId: number; granted: string[] }[] = [];
   let permsFails = false;
@@ -80,11 +84,26 @@ const make = (
     dialogs,
     toasts,
     commands: {
-      presenter: (payload) => (sent.push(payload), Promise.resolve(null)),
+      presenter: (payload) =>
+        presenterFails
+          ? Promise.reject(new Error('refused'))
+          : (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
+      muteChat: (payload: { targetUserId: number }) => (
+        mutesSent.push(payload),
+        Promise.resolve(null)
+      ),
       unmuteChat: () =>
         unmuteFails ? Promise.reject(new Error('refused')) : Promise.resolve(null),
-      kickUser: (payload: { targetUserId: number; message: string }) => (
+      sessionSendUrl: (payload: { cmd: string; url: string }) => (
+        urlsSent.push(payload),
+        Promise.resolve(null)
+      ),
+      restartAudio: (targetUserId: number) => (
+        audioRestarts.push(targetUserId),
+        Promise.resolve(null)
+      ),
+      kickUser: (payload: { targetUserId: number; message: string; ban?: boolean }) => (
         kicksSent.push(payload),
         Promise.resolve(null)
       ),
@@ -136,9 +155,13 @@ const make = (
     saved,
     reloadsSent,
     kicksSent,
+    urlsSent,
+    mutesSent,
+    audioRestarts,
     permsSent,
     failPerms: () => (permsFails = true),
     failUnmute: () => (unmuteFails = true),
+    failPresenter: () => (presenterFails = true),
     modalClosed: () => modalClosed,
     messageCleared: () => messageCleared,
     previewsHidden: () => previewsHidden,
@@ -322,6 +345,94 @@ describe('the dispatcher', () => {
       'Enter a new username for "Bo":'
     );
     expect(dialogs.prompt?.value).toBe('');
+  });
+
+  it('mute-chat-24 sends a real mute and says the captured words, in that order', () => {
+    /*
+      The third entry ever removed from `EXACT_ALERTS`. This button raised the reference's own
+      "user chat muted" over nothing at all while a working mute — the message context menu's
+      `mute24` — sat in the same source with nothing joining them.
+
+      Both halves are asserted, because either alone passes against the bug: the ALERT alone passed
+      for months while nothing was sent, and the SEND alone would not catch the wording drifting off
+      the capture.
+    */
+    const { actions, dialogs, mutesSent } = make();
+    actions.handle('mute-chat-24', TARGET);
+    expect(mutesSent, 'the command is sent, to the member the modal is open on').toEqual([
+      { targetUserId: TARGET.id }
+    ]);
+    expect(dialogs.alert, "the capture's own wording, from muteChat(e) at byte 2080089").toBe(
+      'user chat muted'
+    );
+  });
+
+  it('the three peer commands each send their own subCmd to the named member', () => {
+    /*
+      These three buttons were DEAD while their command, their receiver and a neighbouring caller
+      (`muteAllNonAdmins`) all existed — `user-action-intent.ts` carries the account. The assertion
+      is per-action rather than "something was sent", because the failure that matters here is a
+      CROSSED mapping: `mute-camera` reaching `mutemic` would cut the wrong stream on somebody
+      else's machine and nothing on screen would say so.
+    */
+    const { actions, sent } = make();
+    actions.handle('mute-mic', TARGET);
+    actions.handle('mute-camera', TARGET);
+    actions.handle('stop-screens', TARGET);
+    expect(sent).toEqual([
+      { subCmd: 'mutemic', targetUserId: TARGET.id },
+      { subCmd: 'mutecam', targetUserId: TARGET.id },
+      { subCmd: 'mutescreens', targetUserId: TARGET.id }
+    ]);
+  });
+
+  it('raises NO success alert for them, because the capture raises none', () => {
+    /*
+      `remotePresCommand(c)` at byte 2080529 is one line with no `bootbox` after it, unlike
+      `forceReload` and `remoteRestartAudio` directly below it, which both raise one. An alert here
+      would be an invented string — and the three were in `INERT_ACTIONS`, not `EXACT_ALERTS`, which
+      is the same fact recorded from the other side.
+    */
+    const { actions, dialogs, toasts } = make();
+    actions.handle('mute-mic', TARGET);
+    expect(dialogs.alert).toBeNull();
+    expect(toasts.notices).toEqual([]);
+  });
+
+  it('surfaces a refused peer command rather than dropping it', async () => {
+    // Silent on success is the reference. Silent on FAILURE is the defect class being removed: a
+    // presenter whose mute did not land has to know.
+    const { actions, dialogs, failPresenter } = make();
+    failPresenter();
+    actions.handle('stop-screens', TARGET);
+    await vi.waitFor(() => expect(dialogs.alert).toBe('Command failed.'));
+  });
+
+  it("restart-audio sends to the named member and keeps the capture's own alert", () => {
+    /*
+      The fourth and last liar with a captured wire already waiting for it. Unlike the three peer
+      mutes above, this sender DOES raise an alert upstream —
+      `sendServerAdminCommand("remoteRestartAudio", this.user), bootbox.alert("Audio restart request
+      sent OK")` at byte 2080461 — so the alert is asserted as well as the send. Two neighbouring
+      methods in the same capture, two different behaviours, both reproduced.
+    */
+    const { actions, dialogs, audioRestarts } = make();
+    actions.handle('restart-audio', TARGET);
+    expect(audioRestarts).toEqual([TARGET.id]);
+    expect(dialogs.alert).toBe('Audio restart request sent OK');
+  });
+
+  it('mute-chat-24 is no longer one of the controls that only talk', () => {
+    /*
+      The structural half. Re-adding the entry to `EXACT_ALERTS` would restore the exact original
+      defect — `handle` consults that table last, so an entry there is reached only when no branch
+      claimed the action, and the branch above would simply be dead. This is what makes that visible.
+    */
+    expect(TOAST_ONLY_ACTIONS).not.toContain('mute-chat-24');
+    expect(
+      TOAST_ONLY_ACTIONS,
+      'and the indefinite one is still honestly listed — it has no door to the controller yet'
+    ).toContain('mute-chat-indefinitely');
   });
 
   it('surfaces a refused unmute rather than dropping it', async () => {
@@ -563,16 +674,38 @@ describe('kick', () => {
 
     harness.dialogs.prompt?.onconfirm('Please stop.');
 
-    expect(harness.kicksSent).toEqual([{ targetUserId: TARGET.id, message: 'Please stop.' }]);
+    expect(harness.kicksSent).toEqual([
+      { targetUserId: TARGET.id, message: 'Please stop.', ban: false }
+    ]);
     expect(harness.dialogs.alert).toBe('User kicked OK');
   });
 
-  it('kick-ban sends NOTHING — a ban needs storage this room does not have', () => {
+  /*
+    THIS TEST USED TO ASSERT THE OPPOSITE, and its old name recorded a reason that was false:
+    "kick-ban sends NOTHING — a ban needs storage this room does not have". The store,
+    `roomUsers.banned`, had been in the controller's schema the whole time. Inverted 2026-08-23 with
+    the endpoint that reaches it.
+  */
+  it('kick-ban sends the SAME command with ban:true, as upstream does in one payload', () => {
     const harness = make({ isPresenter: true });
     harness.actions.handle('kick-ban', TARGET);
+    harness.dialogs.prompt?.onconfirm('Banned.');
 
-    expect(harness.kicksSent).toEqual([]);
-    expect(harness.dialogs.prompt).toBeNull();
+    expect(harness.kicksSent).toEqual([{ targetUserId: TARGET.id, message: 'Banned.', ban: true }]);
+  });
+
+  /*
+    The two share ONE branch, as upstream shares one payload — so the flag is what distinguishes
+    them, and it is asserted EXPLICITLY on both sides. `false` rather than absent: the schema
+    defaults it, but a plain kick that silently omitted the field would make "did this ban?"
+    depend on a default rather than on what was sent.
+  */
+  it('a plain kick sends ban:false explicitly, so the two cannot be confused', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('kick', TARGET);
+    harness.dialogs.prompt?.onconfirm('Please stop.');
+
+    expect(harness.kicksSent[0]?.ban).toBe(false);
   });
 });
 
@@ -617,5 +750,41 @@ describe('kick-duplicates', () => {
 
     expect(harness.kicksSent).toEqual([]);
     expect(harness.dialogs.alert).toBe('No duplicates found for Bo');
+  });
+});
+
+/**
+ * The two Session Control broadcasts that alerted `Command send OK.` and sent nothing.
+ *
+ * They shared a branch with `session-send-video`, which is GENUINE — it validates, refuses a
+ * duplicate and writes `localStorage`. That is why they lasted: the branch reads as working code.
+ * Command names are the capture's, at bytes 1015180 and 1015357.
+ */
+describe('session send-to-room broadcasts', () => {
+  it('sends the sales image under the captured command name', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('session-send-sales-image', TARGET);
+    harness.dialogs.prompt?.onconfirm('https://example.test/a.png');
+
+    expect(harness.urlsSent).toEqual([
+      { cmd: 'sendSalesImageToChat', url: 'https://example.test/a.png' }
+    ]);
+    expect(harness.dialogs.alert).toBe('Command send OK.');
+  });
+
+  it('sends the users URL under its own command name, not the image one', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('session-send-users-url', TARGET);
+    harness.dialogs.prompt?.onconfirm('https://example.test/go');
+
+    expect(harness.urlsSent).toEqual([{ cmd: 'sendUsersToURL', url: 'https://example.test/go' }]);
+  });
+
+  it('refuses a url with no scheme, and sends nothing', () => {
+    const harness = make({ isPresenter: true });
+    harness.actions.handle('session-send-users-url', TARGET);
+    harness.dialogs.prompt?.onconfirm('example.test/go');
+
+    expect(harness.urlsSent).toEqual([]);
   });
 });

@@ -229,13 +229,24 @@ export type RoomEvent =
    * already does for `forceReload`.
    */
   /*
-    `privCmds` — addressed to ONE member. `msg` is optional because only `kickUser` carries one:
-    the reference's frame is `{cmd:"kickUser", msg}` and its receiver reads `xe.msg`, while
-    `forceReload` and `unmuteChat` carry nothing but the target.
+    `privCmds` — addressed to ONE member. Two fields are optional because only one command each
+    carries them: the reference's kick frame is `{cmd:"kickUser", msg}` and its receiver reads
+    `xe.msg`, while `forceReload` and `unmuteChat` carry nothing but the target.
+
+    `mutedTill` is `muteChat`'s, and it is an ISO string rather than a composed sentence ON PURPOSE.
+    Upstream sends `msg` and the receiver renders it with `bootbox.alert(xe.msg)`, but that sentence
+    is composed by a server which is not in the capture. Sending the INSTANT and letting the client
+    format it means nothing is invented: the receiver builds the text from the `Chat Disabled` block
+    and `formatChatMutedTill`, both of which were read off the reference. See `applyChatMute`.
   */
   | {
       channel: 'privCmds';
-      data: { cmd: 'forceReload' | 'unmuteChat' | 'kickUser'; targetUserId?: number; msg?: string };
+      data: {
+        cmd: 'forceReload' | 'unmuteChat' | 'kickUser' | 'muteChat' | 'remoteRestartAudio';
+        targetUserId?: number;
+        msg?: string;
+        mutedTill?: string;
+      };
     };
 
 type Subscriber = (event: RoomEvent) => void;

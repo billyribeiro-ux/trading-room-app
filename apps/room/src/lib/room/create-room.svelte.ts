@@ -57,7 +57,7 @@ import { RoomMenus } from '#lib/room/menus.svelte.js';
 import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
-import { unmuteChat } from '../../routes/chat-mute.remote';
+import { muteChat, unmuteChat } from '../../routes/chat-mute.remote';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -69,9 +69,10 @@ import {
   focusOnSessionNote,
   forceReload,
   kickUser,
-  presenterCommand
+  presenterCommand,
+  restartAudio
 } from '../../routes/presenter-commands.remote';
-import { videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
+import { sessionSendUrl, videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
 
 import {
   deleteFile as deleteFileCommand,
@@ -112,6 +113,7 @@ import { RoomModals } from '#lib/room/modals.svelte.js';
 import { RoomNotes } from '#lib/room/notes.svelte.js';
 import { RoomFeeds } from '#lib/room/feeds.svelte.js';
 import { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
+import { RoomPrivateCommands } from '#lib/room/private-commands.svelte.js';
 import { RoomEventStream } from '#lib/room/events.svelte.js';
 import { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
 import { RoomRecording } from '#lib/room/recording.js';
@@ -800,9 +802,12 @@ export function createRoom(deps: RoomDeps) {
     commands: {
       presenter: presenterCommand,
       editUsername,
+      muteChat,
       unmuteChat,
       forceReload,
+      restartAudio,
       kickUser,
+      sessionSendUrl,
       savePermissions
     },
     session: () => data,
@@ -855,13 +860,23 @@ export function createRoom(deps: RoomDeps) {
       `notes` is initialised, so the forward reference is resolved by then.
     */
     focusSessionNote: (noteId) => notes.focusNote(noteId),
-    // Byte 2597102, verbatim. Why it is `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
-    forceReloadRequested: () =>
-      dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
-    // The presenter's own message, as text. No page swap: see the receiver in `events.svelte.ts`.
-    kicked: (message: string) => {
-      dialogs.alert = message;
-    }
+    /*
+      THE WHOLE ADDRESSED CHANNEL, built here rather than inside the stream. Its three collaborators
+      are the page's — two dialogs, and the mute the presenter's buttons also hold — and the stream
+      routes to it rather than owning it.
+    */
+    privateCommands: new RoomPrivateCommands({
+      viewerId: () => data.user.id,
+      // ONE instance, shared with the presenter's two buttons — see `RoomChatMute`.
+      chatMute: userActions.chatMute,
+      // Byte 2597102, verbatim. Why `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
+      forceReloadRequested: () =>
+        dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
+      // The presenter's own message, as text. No page swap: see `private-commands.svelte.ts`.
+      kicked: (message: string) => (dialogs.alert = message),
+      // Audio only — narrower than a session restart on purpose. See `reconnectAudio`.
+      reconnectAudio: () => mediaTransport.reconnectAudio()
+    })
   });
 
   /*

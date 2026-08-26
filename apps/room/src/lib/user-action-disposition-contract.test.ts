@@ -3,7 +3,12 @@ import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { INERT_ACTIONS, INERT_ACTION_NAMES, TOAST_ONLY_ACTIONS } from './user-action-intent.js';
+import {
+  INERT_ACTIONS,
+  INERT_ACTION_NAMES,
+  PEER_MUTE_SUBCMDS,
+  TOAST_ONLY_ACTIONS
+} from './user-action-intent.js';
 
 import { RoomDialogs } from './room/dialogs.svelte.js';
 import { RoomToasts } from './room/toasts.svelte.js';
@@ -95,14 +100,34 @@ function handledActions(): Set<string> {
     and it did exactly that on this move — which is the second time that note has paid for itself.
   */
   const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+  // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
+  // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
+  const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
   const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
   const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
   expect(
     tail,
     "handle()'s alert tail was not found — this scanner would read the whole file and mis-bucket the alert path"
   ).toBeGreaterThan(-1);
-  const dispatchBody = source.slice(0, tail) + session + kicks;
-  return new Set([...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]));
+  const dispatchBody = source.slice(0, tail) + session + kicks + chatMute;
+  const literal = [...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]);
+
+  /*
+    A FOURTH FORM OF HANDLING, and this scanner was blind to it — found 2026-08-23 the moment the
+    first one appeared.
+
+    `mute-mic`, `mute-camera` and `stop-screens` are handled by ONE branch, `if (action in
+    PEER_MUTE_SUBCMDS)`, because the three differ only in which sub-command they carry and three
+    near-identical branches would be three chances for the mapping to cross. A literal
+    `action === '…'` scan cannot see a table, so all three were reported as "dispatched into the
+    void" — a defect report about a working wire, which is precisely the manufactured defect the
+    note at the top of this function forbids.
+
+    The KEYS are imported rather than matched out of the source. A regex over the table's text would
+    re-introduce the same fragility one level down, and the import fails loudly if the export is
+    renamed — where a regex would silently match nothing and quietly under-report again.
+  */
+  return new Set([...literal, ...Object.keys(PEER_MUTE_SUBCMDS)]);
 }
 
 describe('the dispatch surface is fully enumerated', () => {
@@ -147,7 +172,23 @@ describe('the dispatch surface is fully enumerated', () => {
 describe('every dispatched action has exactly one disposition', () => {
   const dispatched = dispatchedActions();
   const handled = handledActions();
-  const alerted = new Set(TOAST_ONLY_ACTIONS);
+  /*
+    ALERTED means "reaches the alert tail and NOTHING ELSE" — the liars. It is DERIVED by subtracting
+    the handled set rather than taken from `EXACT_ALERTS` directly, and that changed on 2026-08-23
+    when `restart-audio` was wired.
+
+    Why the subtraction is right rather than a loosening: `EXACT_ALERTS` is "the fixed alert for an
+    action", not a defect list. Two entries in it belong to controls that genuinely send —
+    `save-permissions`, which has always read its string from there, and now `restart-audio`, whose
+    capture raises `bootbox.alert("Audio restart request sent OK")` immediately after the send at
+    byte 2080461. Treating a table entry as proof of a lie would report both as dead controls, which
+    is a defect report about working wires.
+
+    The load-bearing rule is untouched: an action with NO branch and NO entry anywhere is still an
+    orphan, and handled-AND-inert is still a contradiction. What is no longer a contradiction is
+    "has a branch AND has a string", because that is what a working control with an alert looks like.
+  */
+  const alerted = new Set(TOAST_ONLY_ACTIONS.filter((name) => !handled.has(name)));
   const inert = new Set(INERT_ACTION_NAMES);
 
   it('handled, alerted and inert are the three buckets, and they do not overlap', () => {
@@ -241,11 +282,7 @@ describe('every dispatched action has exactly one disposition', () => {
     'admin-notes-password':
       'alerts "Wrong password!" HARDCODED, never comparing — needs sessData.deleteAlertPW delivered to the room',
     'session-save-close-message':
-      'alerts "Message Saved" and writes nothing — needs somewhere to save it',
-    'session-send-sales-image':
-      'alerts "Command send OK." and sends nothing — shares a branch with the GENUINE session-send-video, which is what made it easy to miss',
-    'session-send-users-url':
-      'alerts "Command send OK." and sends nothing — same branch, same reason'
+      'alerts "Message Saved" and writes nothing — needs somewhere to save it'
   };
 
   it('a handled branch that only raises a dialog is DECLARED, not silently counted as handled', () => {
@@ -256,9 +293,12 @@ describe('every dispatched action has exactly one disposition', () => {
     */
     const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
     const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+    // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
+    // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
+    const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
     const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
     const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
-    const body = source.slice(0, tail) + session + kicks;
+    const body = source.slice(0, tail) + session + kicks + chatMute;
 
     const ACTS = [
       'this.#commands.',
@@ -393,6 +433,7 @@ describe('an inert action really does nothing, executed', () => {
           Promise.resolve(null)
         ),
         editUsername: () => Promise.resolve(null),
+        restartAudio: () => Promise.resolve(null),
         unmuteChat: () => Promise.resolve(null),
         forceReload: () => Promise.resolve(null)
       },
@@ -455,17 +496,22 @@ describe('an inert action really does nothing, executed', () => {
   });
 
   it('an ALERTED action raises its fixed alert — the second control', () => {
+    /*
+      The exemplar moved from `restart-audio` to `mute-chat-indefinitely` on 2026-08-23, because
+      `restart-audio` was WIRED that day and is no longer one of these. This is the last dispatched
+      control that reaches the alert tail and nothing else: it is `muteChat("0")` upstream, and an
+      indefinite mute already exists as the controller's opcode 3 — what is missing is a door from
+      the room to it.
+    */
     const { actions, dialogs } = make();
-    actions.handle('restart-audio', {
+    actions.handle('mute-chat-indefinitely', {
       id: 5,
       nick: 'Bo',
       emailHash: 'h',
       pic: '',
       status: 'online'
     } as never);
-    expect(dialogs.alert, "row W's family lies, and the lie is observable").toBe(
-      'Audio restart request sent OK'
-    );
+    expect(dialogs.alert, "row W's family lies, and the lie is observable").toBe('user chat muted');
   });
 
   it('every INERT action produces no dialog, no toast and no command', () => {

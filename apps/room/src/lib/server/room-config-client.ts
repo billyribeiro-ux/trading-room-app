@@ -25,6 +25,7 @@ import {
   mobilePinUrl,
   roomConfigUrl,
   roomEntryUrl,
+  roomBanUrl,
   roomPermissionsUrl,
   roomSettingUrl,
   streamIngestUrl,
@@ -650,6 +651,60 @@ export async function writeRoomPermissions(
   }
 
   if (response.status === 403 || response.status === 404) {
+    throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * `kick-ban`: `POST {control}/internal/room-ban/{shortCode}`.
+ *
+ * The durable half of a ban. `kickUser` disconnects the socket — immediate, and the room's own — and
+ * this is the half that is still true tomorrow, written where `internal/room-config` reads it on
+ * every page load.
+ *
+ * Refusals are DISTINGUISHED from outages for the reason `writeRoomPermissions` gives directly
+ * above: a 403 here is a correct answer that retrying will not change, and it must not reach the
+ * presenter as "the control plane is down".
+ */
+export async function writeRoomBan(
+  shortCode: string,
+  callerEmail: string,
+  targetEmail: string,
+  banned: boolean
+): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomBanUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', callerEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ targetEmail, banned }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the write failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  /*
+    409 joins 403 and 404 as a REFUSAL rather than an outage. The endpoint returns it when the
+    membership row moved between the authority read and the write — a correct answer about a race,
+    not a control plane that is down, and one the presenter should see as "that did not apply".
+  */
+  if (response.status === 403 || response.status === 404 || response.status === 409) {
     throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
   }
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);

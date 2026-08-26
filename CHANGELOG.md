@@ -33,6 +33,452 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-24 01:20 EDT — `remoteRestartAudio`, and the last liar with a wire already waiting
+
+**Runtime impact: YES,** with an honest gap: *" Restart Audio "* now asks the named member's browser
+to re-consume every microphone in the room. It raised *"Audio restart request sent OK"* over nothing
+for the whole port.
+
+**Branch `feat/save-permissions`.** Fifth of row 9's eleven receivers.
+
+#### Both halves were captured and neither was built
+
+```js
+remoteRestartAudio(){ sendServerAdminCommand("remoteRestartAudio", this.user),
+                      bootbox.alert("Audio restart request sent OK") }   // 2080461
+case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")      // 995973
+subscribe("remoteRestartAudio", () => { this.reconnectAudio() })         // 1119299
+reconnectAudio(){ $("[id^='msRemAudio-']").remove();
+                  this.talkingUsers.forEach(e => startListeningToPresenter(e)) }  // 1133537
+```
+
+#### Clearing the two maps IS removing the elements
+
+There are no `msRemAudio-` nodes to remove by hand — Svelte owns them, keyed off
+`remoteAudioStreams`. Emptying that map unmounts every sink **and releases the dedupe guard**, which
+is the half that matters: `addRemoteAudio` returns early on `remoteAudioStreams.has(...)`, so without
+the clear the `getProducers` snapshot would find every producer already "known" and consume none —
+the exact failure `dropRemoteMedia` documents at length.
+
+`audioProducerOwners` is cleared DIRECTLY rather than through `removeRemoteAudio`, because that
+method calls `stopTalking` per producer and would empty the talking list this is trying to restore.
+
+**Narrower than `restart()` on purpose.** Upstream touches no transport, producer, screen or webcam.
+A presenter fixing one member's microphone must not blank their screen tabs.
+
+#### The alert stays, and the three peer mutes have none — both are the capture
+
+`restart-audio` KEEPS its `EXACT_ALERTS` entry rather than leaving the table like the three before
+it, because upstream genuinely raises that alert right after the send. Two neighbouring methods in
+one capture, two behaviours, both reproduced. Which entries are DEAD is established by the
+disposition contract scanning for a branch — not by presence in a table.
+
+That forced a correction to the bucket model: **ALERTED is now DERIVED as "has a string and no
+branch"** rather than read off `EXACT_ALERTS`. Two entries there belong to controls that genuinely
+send — `save-permissions` always did, and now this one. Treating a table entry as proof of a lie
+would report both as dead controls. The load-bearing rule is untouched: no branch and no entry
+anywhere is still an orphan, and handled-AND-inert is still a contradiction.
+
+#### HONEST GAP: the part that does the work has no automated control
+
+Two negative controls came back **GREEN** and are recorded in the test file rather than left to be
+inferred:
+
+- deleting `remoteAudioStreams.clear()` / `audioProducerOwners.clear()` — no failure
+- deleting the `!active` half of the guard — no failure, because `!socket` returns first
+
+The reason is structural: the signalling client is created inside `connect()` and cannot be reached
+from a test, so the state where the clear-then-re-consume path actually runs cannot be constructed.
+The one test that exists proves only that the method RESOLVES on an unwired room — a real failure
+mode, since it is called from a frame handler — and its docblock says exactly that and no more.
+**Two browsers in a live room is the owner's confirmation.** Making it testable means exposing the
+signalling client, which is its own change.
+
+#### Ceilings
+
+`media-transport` 1750 → 1825, `user-actions` 805 → 824, `private-commands` 152 → 180, `create-room`
+1110 → 1114 — all recorded with what bought them, and the two under the standing "get it done"
+say so in those words.
+
+**Verified:** room `svelte-check` **1,241 files, 0/0**; `vitest` **2,673 / 188**; `eslint` and
+`prettier` clean. **Two negative controls seen RED** — the branch alerting without sending, and
+dropping the addressing gate (which turned five tests red, including behavioural ones). The two that
+came back green are reported above rather than quietly dropped.
+
+### 2026-08-24 00:35 EDT — the addressed channel becomes one gate instead of four copies
+
+**Runtime impact: no.** A structural change, taken on the owner's ruling, ahead of the receivers
+`TODO.md` row 9 still owes.
+
+**Branch `feat/save-permissions`.**
+
+#### Why now
+
+`events.svelte.ts` sat at 937/937 with zero headroom, and **41 of 47 capped room files** were in the
+same state — the ratchet's staleness half lowers every ceiling to current size, so a codebase that
+has stopped growing has no slack anywhere. Five more `privCmdsIn` receivers are queued and every one
+of them lands in that file. The owner chose extraction over five consecutive ceiling raises.
+
+#### The real prize is not the line count
+
+`RoomEventStream` routes six channels. Five carry frames for the whole room; this one names a person.
+Upstream does not need an addressing test at all — its channel name contains the member's own id, so
+the server never delivers somebody else's frame. **This room's transport is per-ROOM**, so
+`targetUserId` is the only thing standing between one presenter reloading one member and reloading
+everybody at once, or putting a `Chat Disabled` dialog in front of the entire room.
+
+That test was repeated on every branch: `command?.cmd === 'x' && command.targetUserId === …`. **Four
+copies of a security check is four chances to forget the second half**, with more queued behind them.
+It is now a single early return at the top of `RoomPrivateCommands.handle`, deny by default — a frame
+that is not for this member never reaches a branch, and **a receiver written tomorrow is covered
+without its author knowing the rule exists.** That is the difference between a convention and a
+guarantee, and it is the reason to do this before the five, not after.
+
+`disconnect` is passed per call rather than held: the `EventSource` belongs to one subscription, and
+a field would be a stale handle to a closed stream after any reconnect.
+
+#### The contract got stronger, which is what a re-point is for
+
+Three assertions in `unmute-chat-contract.test.ts` pointed at branches that moved. Re-pointed, they
+now assert the GATE **separately from** the branch. The old form could only say *"this branch tests
+the target"*; the new form says *"no branch on this channel is reachable without the test"* — a
+property no per-branch assertion could ever establish, and the one that actually matters.
+
+The events harness was rebuilt on a real `RoomPrivateCommands` rather than a stub, for the same
+reason: a stub would assert that the router recognised the channel while leaving the gate untested.
+
+#### Ceilings
+
+`events.svelte.ts` **937 → 875**, sixty-two lines under its **unchanged** ceiling — deliberately not
+ratcheted down, because that headroom is what the extraction was for. `create-room.svelte.ts`
+1101 → 1110, recorded: the composition root grows by construction whenever a slice is added, which
+is what a composition root is for. `private-commands.svelte.ts` capped at its measured 152.
+
+**Verified:** room `svelte-check` **1,241 files, 0/0**; `vitest` **2,669 / 188**; `eslint` and
+`prettier` clean. No behaviour changed, which is the claim the 2,669 is evidence for: every existing
+assertion about `forceReload`, `kickUser` and both mute directions still passes against the moved
+code.
+
+### 2026-08-23 23:55 EDT — three dead buttons whose wire had been built all along
+
+**Runtime impact: YES.** *" Mute Audio "*, *" Mute Camera "* and *" Stop Screens "* in the user modal
+now do what they say. They have been dead for the whole port.
+
+**Branch `feat/save-permissions`.** Prompted by the owner's instruction to check what already exists
+before building anything — which is exactly what found this.
+
+#### The recorded blocker was false, and it is what stopped anyone looking
+
+`INERT_ACTIONS` said all three were *"Blocked on a SERVER-side presenter check, not on evidence"*.
+Every end was already built, and one of them was already in daily use:
+
+```
+SEND     presenter-commands.remote.ts:60  presenterCommand
+         z.enum(['mutemic','mutecam','mutescreens']), gated by presenterRoom(),
+         ADDRESSED via publishToUsers
+RECEIVE  events.svelte.ts:573-582         the member's OWN browser does the work —
+         toggleMicrophone() / toggleWebcam() / stopScreenSharing()
+IN USE   muteAllNonAdmins() in RoomUserActions has been calling that exact command,
+         with that exact subCmd, since it was built
+```
+
+A working command with a working receiver, exercised by a neighbouring control in the same class,
+sat behind three buttons dispatching action strings nothing had a branch for. **What was missing was
+the branch.** This is the third time an inert entry's stated blocker has turned out to be a search
+that stopped at one directory, and the entry now says so in those words.
+
+#### One branch, not three, and the table is exported
+
+`if (action in PEER_MUTE_SUBCMDS)`. Three near-identical branches would be three chances for the
+mapping to cross, and a crossed mapping cuts the wrong stream on somebody else's machine with
+nothing on screen to say so. The test asserts all three mappings individually for that reason.
+
+**No success alert**, and that is the capture rather than an omission: `remotePresCommand(c)` at byte
+2080529 is one line with no `bootbox` after it, unlike `forceReload` and `remoteRestartAudio` two
+lines below which both raise one. A FAILURE is still loud — silent-on-failure is the defect class
+being removed. The modal is not closed, because nothing read says it is.
+
+#### A fourth form of handling, and the gate was blind to it
+
+The disposition contract scans for `action === '…'` and cannot see a table, so it reported all three
+as *"dispatched into the void"* — a defect report about a working wire, which is the manufactured
+defect its own docblock forbids. It now imports `PEER_MUTE_SUBCMDS` and unions the keys. Imported,
+not regexed: a regex over the table's text would fail silently where the import fails loudly.
+
+#### Two more corrections found in the same audit
+
+**`save-permissions` is not a liar, and `TOAST_ONLY_ACTIONS` has been overstating the defect by one.**
+The `EXACT_ALERTS` docblock claimed *"Every entry here is a button that reports success and sends
+nothing"*. That is false: `savePermissions` reads its string from this table via
+`userActionAlert('save-permissions')` and then genuinely sends, through `permissions.remote.ts`,
+reached from `RoomOverlays.svelte:563`. It is an announcement for a real action stored beside the
+liars. The docblock now says what the table actually is, and points at the disposition contract as
+the thing that establishes which entries are dead — by scanning for a branch rather than by trusting
+a sentence.
+
+**The recording pair's blocker was mis-stated too**, though `start-recording` and `stop-recording`
+really are unbuilt. `recording-state.remote.ts:61` accepts `startRec|stopRec|pauseRec|resumeRec`, but
+it is `publishToRoom` — the PRESENTER'S OWN recording, announced to everybody. Upstream's
+`remotePresCommand("startRec")` is addressed to one member and tells THEIR browser to record
+(`startRecForMuser(null)`, byte 1119480). Two acts sharing a verb; collapsing them would make the
+button start the presenter's own recording while claiming to start somebody else's.
+
+#### Ceiling
+
+`user-actions.svelte.ts` 780 → 805, **raised without a separate asking** under the owner's "it all
+needs to be done", and the entry says so in those words so it can be reversed on sight. Seven lines
+are the branch; eighteen are the account above. The extraction alternative is recorded with it: the
+peer media commands plus `muteAllNonAdmins` are a coherent ~60-line slice.
+
+**Verified:** room `svelte-check` **1,240 files, 0/0**; `vitest` **2,665 / 188**; `eslint` and
+`prettier` clean. **Two negative controls seen RED** with the mutation verified to have landed first:
+crossing `mute-camera` to `mutemic`, and inventing a success alert.
+
+### 2026-08-23 22:40 EDT — the chat mute was enforced and never announced. Now the member is told
+
+**Runtime impact: YES.** Two changes a member can see: a mute now says so the moment it lands, and
+the user modal's *" Mute Chat for 24hrs "* actually mutes.
+
+**Branch `feat/save-permissions`.** Closes `TODO.md` row 7's third liar and builds the fourth of
+row 9's eleven `privCmdsIn` receivers.
+
+#### Two defects, one subject
+
+**The mute was enforced and never announced.** `refuseIfChatMuted` has refused sends the whole time
+and the loader exposes `chatMutedTill` so the composer can show the captured `Chat Disabled` block —
+but only on the NEXT page load. Between the mute and that load a member sat in front of an enabled
+composer, typed, pressed send, and watched nothing happen. That is verbatim the silence `unmuteChat`
+had until it was given this channel, and its own docblock said so: *"the state changed and nobody was
+told"*.
+
+**And the modal's mute button lied.** `mute-chat-24` sat in `EXACT_ALERTS` raising the reference's
+own *"user chat muted"* over nothing at all, while a working mute — the message context menu's
+`mute24` — sat in the same source with nothing joining them. That table's docblock had named it in as
+many words: *"`mute-chat-24` from this modal does not mute"*. **Third entry ever removed, after
+`unmute-chat` and `force-reload`, and for the identical reason: its presence in that table WAS the
+bug.** `TOAST_ONLY_ACTIONS` is 5 → 4 → **3**.
+
+#### The asymmetry is upstream's and is reproduced, not normalised
+
+Bundle byte 1430423, both subscriptions on adjacent lines:
+
+```js
+subscribe("muteChat",   e  => { this.chatEnabled = !1, bootbox.alert(e) })
+subscribe("unmuteChat", () => { this.chatEnabled = !0, this.alertService.success("Chat enabled") })
+```
+
+Being SILENCED raises a dialog that must be dismissed; being RELEASED raises a passing toast. A
+member who steps away during a transient toast comes back to a composer that has silently stopped
+working. Acknowledgement belongs on the bad news.
+
+#### NOTHING IS COMPOSED — the sentence is assembled from captured fragments
+
+`bootbox.alert(xe.msg)` renders a sentence built by a server that is **not in the capture**, so no
+sentence is guessed. What crosses the wire is the INSTANT, and the receiver assembles the text from
+the two fragments this repository did read off the reference: the `Chat Disabled` block in
+`AlertChatArea.svelte`, and `formatChatMutedTill` — Angular's `EEE @ h:mm a` from the ` till ` span
+beside it. The dialog therefore says exactly what the composer will say after the reload.
+
+#### One insert, two doors — the lesson from 90 minutes earlier, applied
+
+The message context menu and the modal button are two doors onto the same act. A second copy of the
+insert is precisely how `internal/room-ban` shipped a ban that enforced nothing earlier today. Both
+call `applyChatMute` in `#lib/server/chat-mute.ts`, which writes the row and **then** publishes —
+the reverse of `kickUser`'s order and deliberately so: the kick writes first because publishing
+first would disconnect a member mid-write, while here announcing a mute whose insert then failed
+would be the lie.
+
+#### `RoomChatMute` — 191 lines, and the owner chose extraction over a raise
+
+The mute has four halves and they lived in four files that could not see each other. **That split is
+how the pair drifted.** They are now one module: the presenter's two buttons, the member's two
+receivers, and the rule that those agree. It is built inside `RoomUserActions` — `#announceThenSend`
+is private there, so constructing it outside would mean a second copy — and handed to
+`RoomEventStream`, so both ends share ONE instance.
+
+That extraction took `events.svelte.ts` from 968 to 937 and `user-actions.svelte.ts` from 812 to
+780. Three residual raises were put to the owner with measured alternatives and taken **recorded**:
+920→937, 777→780, 1099→1101. A fourth option — extracting the whole 65-line `privCmds` block, which
+lands events at 880 — was offered, declined, and is written into the ceiling entry for rows 9 and 10.
+
+#### What is NOT built, stated rather than faked
+
+*" Mute Chat indefinately "* (the reference's own spelling) is `muteChat("0")` upstream and stays
+INERT. An indefinite mute **already exists** in this system — the controller's opcode 3 sets
+`role = 3, muted = true` and `refuseIfChatMuted` already enforces it through `member.muted`. What is
+missing is a room→controller door, the equivalent of `internal/room-ban`. Folding it into the
+24-hour mute would ship a control whose label and behaviour disagree.
+
+**Verified:** room `svelte-check` **1,240 files, 0/0**; `vitest` **2,662 / 188**; `eslint` and
+`prettier` clean. **Three negative controls seen RED**, each with the mutation verified to have
+landed first: the branch alerting without sending (`expected [] to deeply equal [{targetUserId: 5}]`),
+a second copy of the insert in the other door, and — the one that mattered — deleting the
+`publishToUsers` call, **which the suite first passed**. Nothing asserted that the server announces a
+mute at all, which is the shape of the original defect; `unmute-chat-contract.test.ts` gained a whole
+block written in answer to that measurement rather than for symmetry. Four moved assertions were
+re-pointed at the slice and each gained a hand-off assertion it could not make before.
+
+### 2026-08-23 21:05 EDT — the ban I shipped an hour earlier enforced nothing. A ban is a ROLE
+
+**Runtime impact: YES.** A banned member was still admitted on their next page load.
+
+**Branch `feat/save-permissions`.** This is a correction to the 20:10 entry directly below, found by
+re-reading that diff against `applyUserOpcode` rather than by a test — there was no test.
+
+#### What was wrong
+
+`internal/room-ban/[code]` wrote `.set({ banned })` — the boolean column, alone. Nothing in this
+repository asks about that column when it decides whether somebody is banned. **All three consumers
+read the ROLE:**
+
+```
+internal/room-config/[code]/+server.ts:244   banned: membership.roomUser.role === 4
+internal/stream-read/[code]/+server.ts:92    if (member.roomUser.role === 4) …
+account/rooms/[id]/[[tab]]/+page.svelte:1795 {#if member.role === 4} BANNED
+```
+
+So a member banned from a room kept `role = 2`, `internal/room-config` kept answering
+`banned: false`, and they walked straight back in. The endpoint reported success and enforced
+nothing — **the exact defect class the whole of 2026-08-23 was spent removing, reintroduced by the
+change that was removing it.**
+
+#### The fix is not a test that two copies agree — it is having one copy
+
+`applyUserOpcode` has always held the correct mapping (`case 4: role = 4, banned = true`;
+`case 2: role = 2, banned = false, muted = false`, the reference's own "also Unban"). The endpoint
+had a hand-written second copy, which is how it drifted on day one.
+
+The mapping is now `userOpcodePatch`, a pure exported function split out of `applyUserOpcode`.
+`applyUserOpcode` applies it to a row; the ban endpoint calls `userOpcodePatch(banned ? 4 : 2)`.
+**A mapping that cannot be duplicated cannot drift.**
+
+#### Lifting a ban clears the mute, and that is opcode 2's behaviour rather than an addition
+
+Role holds one value, so a banned member is role 4 and whatever they were before is already gone by
+the time there is a ban to lift. Restoring role 2 with `muted: false` discards nothing that survived
+the ban; leaving `muted: true` beside role 2 would recreate the same role/column disagreement. The
+same argument means a banned PRESENTER returns as a participant — upstream's behaviour, one opcode
+and one destination, reproduced rather than improved on, because a role-restore means storing a
+prior role nothing in the reference stores.
+
+#### The test that should have existed
+
+`ban-is-a-role-contract.test.ts`, four assertions: opcode 4 sets a role and not just a flag, opcode 2
+leaves no flag disagreeing with the role, opcode 3 writes the mute role and flag together, and the
+endpoint is READ to prove it writes through the map rather than an object literal — the one
+assertion that catches the literal shape of the original defect coming back.
+
+**Verified:** controller `svelte-check` **1,535 files, 0 errors, 0 warnings**; `vitest`
+**1,005 / 98** (up 4); `eslint` clean. **Negative control seen RED** — removing `patch.role = 4`
+from case 4 gives `expected { banned: true } to deeply equal { role: 4, banned: true }` — with the
+mutation verified to have landed first, then restored. The room half is untouched, so the room suite
+was not re-run.
+
+### 2026-08-23 20:10 EDT — `kick-ban` is built end to end, and the ban is durable
+
+**Runtime impact: YES.** Kick & Ban now records a ban that survives the disconnect. It previously
+alerted success and did nothing at all.
+
+**Branch `feat/save-permissions`.** Closes `TODO.md` row 6.
+
+#### The claim that blocked it was mine, and it was wrong twice
+
+`kick-ban` sat inert on a recorded reason: a ban "needs durable storage this room does not have".
+`roomUsers.banned` has been in the controller's schema throughout (`schema.ts:335`) and the role
+model directly above it reads *"…4 banned"*. The store was never missing — the door was.
+
+#### Built on the `savePermissions` precedent, read end to end first
+
+`POST /internal/room-ban/<code>?email=<caller>` mirrors `internal/room-permissions`: the same bearer
+MAC, the same account-active check, the same one-read-for-both-memberships, and the same seam rule —
+**the target is named by EMAIL**, because the room's `users.id` and the controller's are different
+rows in different databases.
+
+**Authority is decided twice**, which is the point: `presenterRoom()` refuses a member before a
+request leaves the room process, and the controller re-checks anyway. Neither side may be the only
+check — that was 2026-08-07.
+
+**Two refusals are stricter than the reference, deliberately.** No self-ban, following
+`room-permissions`, which follows `giveMicScreen`'s *"Can't give 'Mic/Screenshare' to yourself."*
+And **no banning the owner**: a room whose owner can be banned by one of their own presenters is a
+room that can be taken from its account holder. No capture says so; it fails closed by choice, and
+the file says that is what it is doing.
+
+The write is one conditional `UPDATE … WHERE id AND roomId … RETURNING` — not SELECT-then-UPDATE,
+which would be the TOCTOU this repository removes everywhere. Zero rows returns 409, and the room
+classes it with 403/404 as a **refusal** rather than an outage.
+
+#### Order is load-bearing
+
+The ban is written **before** the kick frame is published. Kick first and the member is disconnected
+while the write is in flight; if that write then fails they are merely ejected and can walk straight
+back in, having been told they were banned.
+
+#### One branch, both flags asserted
+
+`kick` and `kick-ban` now share a single branch, as upstream shares a single payload
+(`{user, msg, ban, kickAllInstances}`) — merged when the duplicated version pushed `kicks.svelte.ts`
+past its ceiling. **No ceiling was raised**: the duplication was the problem, and removing it took
+the file from 144 to 130 against its unchanged 130.
+
+That merge changed behaviour in one visible way and a test caught it: a plain kick now sends
+`ban: false` explicitly rather than omitting it. Both values are now pinned, because "did this ban?"
+must not depend on a schema default.
+
+`kickAllInstances` is still refused — its behaviour appears nowhere read, and `kick-duplicates`
+already does that job explicitly.
+
+**Verified:** room `vitest` **2,648 / 188**; controller `vitest` **1,001 / 97**; `svelte-check`
+**0/0 in both apps**; `eslint` clean; negative control seen RED (dropping the flag fails the
+assertion) and restored; no ceiling raised.
+
+### 2026-08-23 19:20 EDT — both "Command send OK." liars now send
+
+**Runtime impact: YES, the send half.** Two Session Control broadcasts that alerted success and sent
+nothing now issue a real, presenter-gated, URL-checked command.
+
+**Branch `feat/save-permissions`.**
+
+#### The two, and why they lasted
+
+`session-send-sales-image` and `session-send-users-url` shared a branch with `session-send-video`,
+which is **genuine** — it validates the URL, refuses a duplicate and writes `localStorage`. Its two
+siblings fell past all of that to `closeModal()` and `'Command send OK.'`. **A reader checking that
+branch saw real work and moved on**, which is exactly why they survived every review.
+
+#### Both ends read, and two details that are easy to miss
+
+Bytes 1015180 and 1015357 give the receivers:
+
+```
+case"sendSalesImageToChat": if(!i||!i.url) return;
+  this.globals.isPresenter || this.appEventBus.emit("sendSalesImageToChat",i); break;
+```
+
+The frame is **ignored without a `url`**, so an empty broadcast is a no-op rather than sending members
+nowhere. And `globals.isPresenter ||` means **the presenter does not act on their own broadcast** —
+the sender is deliberately excluded, which qualifies this module's own note that "the sender learns
+its own command from the channel like everybody else": here it learns it and declines.
+
+#### The send only, and the receiver said so
+
+`sessionSendUrl` reuses `broadcastableUrl` — parsed, deny-by-default — because both commands put a
+presenter's typed string into every member's browser, which is the hazard that function exists for.
+**The receiver half is NOT built**: the reference emits an event and what its app then does was not
+read, so building it would be invention. `TODO.md` row 7 says so.
+
+#### Two mistakes of my own, both caught by the gates
+
+The `sessionSendUrl` import landed in the **wrong module's import block** — `presenter-commands`
+rather than `for-all-broadcast` — because the anchor I matched on appeared in both. `svelte-check`
+named it exactly. And the ceiling failed by **one line**, because the contract counts the trailing
+line and `wc -l` does not; reclaimed from my own two-line pointer rather than by raising anything.
+
+**No ceiling was raised.** `user-actions.svelte.ts` 777/777, `create-room.svelte.ts` 1097/1099.
+
+**Verified:** room `vitest` **2,647 passed / 188 files**; `svelte-check` **0 errors, 0 warnings**;
+`eslint .` clean; three new tests including a no-scheme refusal that asserts nothing is sent.
+
 ### 2026-08-23 18:40 EDT — `kick-duplicates` kicks, and `RoomKicks` is the domain it lives in
 
 **Runtime impact: YES.** A presenter kicking a person's other logins now kicks them. It previously
