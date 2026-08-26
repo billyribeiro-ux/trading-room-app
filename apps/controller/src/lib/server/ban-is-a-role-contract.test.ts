@@ -65,10 +65,7 @@ describe('a ban is a role, not a flag', () => {
     original defect — because a patch built inline would never reach `userOpcodePatch` at all.
   */
   it('the room-ban endpoint writes through the opcode map rather than its own object literal', () => {
-    const source = readFileSync(
-      new URL('../../routes/internal/room-ban/[code]/+server.ts', import.meta.url),
-      'utf8'
-    );
+    const source = readFileSync(new URL('../../routes/internal/room-ban/[code]/+server.ts', import.meta.url), 'utf8');
     expect(source).toContain('.set(userOpcodePatch(banned ? 4 : 2))');
     expect(source).not.toContain('.set({ banned })');
   });

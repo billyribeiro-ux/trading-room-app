@@ -49,9 +49,7 @@ const sourceFiles = (dir: string): string[] => {
  */
 const resolveSpecifier = (specifier: string): string | null => {
   const relative = specifier.slice('#lib/'.length);
-  const candidates = relative.endsWith('.js')
-    ? [`${relative.slice(0, -3)}.ts`, relative]
-    : [relative];
+  const candidates = relative.endsWith('.js') ? [`${relative.slice(0, -3)}.ts`, relative] : [relative];
   for (const candidate of candidates) {
     const path = `${LIB}/${candidate}`;
     if (existsSync(path) && statSync(path).isFile()) return path;
@@ -111,8 +109,6 @@ describe('the #lib subpath imports all point at real files', () => {
     const withAlias = sourceFiles(`${ROOT}src`)
       .filter((file) => /from '\$lib\//.test(readFileSync(file, 'utf8')))
       .map((file) => file.slice(ROOT.length));
-    expect(withAlias, `${withAlias.join(', ')} still import from the removed $lib alias`).toEqual(
-      []
-    );
+    expect(withAlias, `${withAlias.join(', ')} still import from the removed $lib alias`).toEqual([]);
   });
 });

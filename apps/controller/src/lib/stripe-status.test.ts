@@ -12,8 +12,7 @@ function referenceGetStripeStatusClass(status: unknown): string {
   const s = ('' + status).toLowerCase();
   if (s === 'active' || s === 'trialing') return 'label-success';
   if (s === 'past_due' || s === 'paused') return 'label-warning';
-  if (s === 'canceled' || s === 'unpaid' || s === 'incomplete' || s === 'incomplete_expired')
-    return 'label-danger';
+  if (s === 'canceled' || s === 'unpaid' || s === 'incomplete' || s === 'incomplete_expired') return 'label-danger';
   return 'label-info';
 }
 
@@ -67,13 +66,7 @@ describe('stripeStatusClass', () => {
   });
 
   it('never returns a class outside the five Bootstrap 3 contextual labels', () => {
-    const allowed = new Set([
-      'label-default',
-      'label-success',
-      'label-warning',
-      'label-danger',
-      'label-info'
-    ]);
+    const allowed = new Set(['label-default', 'label-success', 'label-warning', 'label-danger', 'label-info']);
     for (const s of [...STRIPE_STATUSES, '', 'nonsense', 'ACTIVE']) {
       expect(allowed.has(stripeStatusClass(s)), s).toBe(true);
     }

@@ -31,10 +31,7 @@ import { ROOM_SETTINGS } from './room-settings-schema';
  * disagrees with the data is not automatically the one that is correct.
  */
 
-const TEMPLATE = readFileSync(
-  `${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`,
-  'utf8'
-);
+const TEMPLATE = readFileSync(`${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`, 'utf8');
 /** Rows the reference has switched off are not rows we must match. */
 const LIVE = TEMPLATE.replace(/<!--[\s\S]*?-->/g, '');
 

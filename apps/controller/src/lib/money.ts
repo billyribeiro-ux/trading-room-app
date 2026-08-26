@@ -41,8 +41,22 @@
  * at the call site rather than a silent 100x error at runtime.
  */
 const ZERO_DECIMAL: ReadonlySet<string> = new Set([
-  'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
-  'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'
+  'BIF',
+  'CLP',
+  'DJF',
+  'GNF',
+  'JPY',
+  'KMF',
+  'KRW',
+  'MGA',
+  'PYG',
+  'RWF',
+  'UGX',
+  'VND',
+  'VUV',
+  'XAF',
+  'XOF',
+  'XPF'
 ]);
 
 /**

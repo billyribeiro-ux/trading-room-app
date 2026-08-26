@@ -33,9 +33,7 @@ describe('the reference’s badge row', () => {
   });
 
   it('prints the id in parentheses behind two non-breaking spaces', () => {
-    expect(TEMPLATE).toContain(
-      '<span class="room-badge-id" ng-show="showBadgeID">&nbsp;&nbsp;({{b._id}})</span>'
-    );
+    expect(TEMPLATE).toContain('<span class="room-badge-id" ng-show="showBadgeID">&nbsp;&nbsp;({{b._id}})</span>');
   });
 
   it('adds label-badge-img to the chip only when the badge has an image', () => {

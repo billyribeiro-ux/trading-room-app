@@ -24,10 +24,7 @@ import { ROOM_SETTINGS } from './room-settings-schema';
  * next person implementing eight settings that nothing renders.
  */
 
-const TEMPLATE = readFileSync(
-  `${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`,
-  'utf8'
-);
+const TEMPLATE = readFileSync(`${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`, 'utf8');
 
 /** The template with commented-out markup removed. */
 const LIVE = TEMPLATE.replace(/<!--[\s\S]*?-->/g, '');

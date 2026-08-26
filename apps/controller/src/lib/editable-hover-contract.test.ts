@@ -83,7 +83,9 @@ function block(selector: string): string {
  */
 function decls(selector: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const part of block(selector).slice(block(selector).indexOf('{') + 1).split(';')) {
+  for (const part of block(selector)
+    .slice(block(selector).indexOf('{') + 1)
+    .split(';')) {
     const colon = part.indexOf(':');
     if (colon === -1) continue;
     out[part.slice(0, colon).trim()] = part.slice(colon + 1).trim();

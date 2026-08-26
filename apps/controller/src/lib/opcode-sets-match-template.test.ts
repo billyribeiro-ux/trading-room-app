@@ -28,10 +28,7 @@ import { MANY_OPCODES, USER_OPCODES } from './server/rooms';
  * checked a capture where most menu items were hidden, would not catch a code migrating between them.
  */
 
-const TEMPLATE = readFileSync(
-  `${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`,
-  'utf8'
-);
+const TEMPLATE = readFileSync(`${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`, 'utf8');
 /** Comments stripped: a row the reference has switched off is not a code this UI sends. */
 const LIVE = TEMPLATE.replace(/<!--[\s\S]*?-->/g, '');
 
@@ -40,7 +37,10 @@ const codes = (source: string, re: RegExp) =>
 
 const liveUser = codes(LIVE, /updateUser\((\d+),/g);
 const liveMany = codes(LIVE, /updateManyUsers\((\d+)\)/g);
-const ours = (o: object) => Object.keys(o).map(Number).sort((a, b) => a - b);
+const ours = (o: object) =>
+  Object.keys(o)
+    .map(Number)
+    .sort((a, b) => a - b);
 
 describe('the opcode maps match the reference template exactly', () => {
   it('reads a real set, so the comparison cannot be vacuous', () => {

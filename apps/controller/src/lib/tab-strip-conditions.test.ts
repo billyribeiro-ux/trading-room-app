@@ -26,14 +26,8 @@ import { describe, expect, it } from 'vitest';
  * Widening the gate would show a jwt room a tab with one field it does not use.
  */
 
-const TEMPLATE = readFileSync(
-  `${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`,
-  'utf8'
-);
-const LOADER = readFileSync(
-  `${process.cwd()}/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts`,
-  'utf8'
-);
+const TEMPLATE = readFileSync(`${process.cwd()}/evidence-dumps/TIER1-fetched/views/page.manageSession.html`, 'utf8');
+const LOADER = readFileSync(`${process.cwd()}/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts`, 'utf8');
 const CODE = LOADER.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/[^\n]*/g, '$1');
 
 describe('the reference’s per-tab conditions', () => {

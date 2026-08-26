@@ -18,11 +18,11 @@ either saturates.
 
 It needs three ports:
 
-| port | protocol | what uses it |
-| --- | --- | --- |
-| `8889` | TCP + UDP | WHIP publish (OBS 30+) |
-| `1935` | TCP | RTMP publish (XSplit, OBS, any RTMP encoder) |
-| `8888` | TCP | HLS playback — put the TLS proxy in front of this one, because viewers fetch `https://<host>/<path>/index.m3u8` on 443 |
+| port   | protocol  | what uses it                                                                                                           |
+| ------ | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `8889` | TCP + UDP | WHIP publish (OBS 30+)                                                                                                 |
+| `1935` | TCP       | RTMP publish (XSplit, OBS, any RTMP encoder)                                                                           |
+| `8888` | TCP       | HLS playback — put the TLS proxy in front of this one, because viewers fetch `https://<host>/<path>/index.m3u8` on 443 |
 
 ## A2. Configure it
 
@@ -122,7 +122,7 @@ A stream key is issued the moment the pane opens. You do not have to press anyth
 
 > **Every time you open this pane, or press "New Link", you get a NEW key and the previous one stops
 > working immediately.** That is deliberate — it is how a leaked key is revoked. If you are already
-> live on the old key, you will be cut off. Copy the key into OBS *after* you have opened the pane,
+> live on the old key, you will be cut off. Copy the key into OBS _after_ you have opened the pane,
 > not before.
 
 ## B2a. OBS with WHIP — the low-latency path
@@ -131,11 +131,11 @@ With **Whip** selected, the panel shows two fields. In OBS:
 
 **Settings → Stream**
 
-| OBS field | what to paste |
-| --- | --- |
-| Service | `WHIP` |
-| Server | the **Streaming Link** box (press its Copy button) |
-| Bearer Token | the **Bearer** box (press its Copy button) |
+| OBS field    | what to paste                                      |
+| ------------ | -------------------------------------------------- |
+| Service      | `WHIP`                                             |
+| Server       | the **Streaming Link** box (press its Copy button) |
+| Bearer Token | the **Bearer** box (press its Copy button)         |
 
 The Server value looks like:
 
@@ -164,17 +164,17 @@ rtmps://media.yourdomain.com:1936/room__7f3a__Dana_Vero?jwt=eyJhbGciOiJIUzI1NiIs
 
 **XSplit** — Broadcast → Set up new output → **Custom RTMP**:
 
-| XSplit field | what to paste |
-| --- | --- |
-| RTMP URL | everything up to and including `?jwt=…` — the whole string |
-| Stream name / key | leave **empty** |
+| XSplit field      | what to paste                                              |
+| ----------------- | ---------------------------------------------------------- |
+| RTMP URL          | everything up to and including `?jwt=…` — the whole string |
+| Stream name / key | leave **empty**                                            |
 
 **OBS with RTMP** — Settings → Stream → Service: **Custom…**:
 
-| OBS field | what to paste |
-| --- | --- |
-| Server | the whole link, `?jwt=…` included |
-| Stream Key | leave **empty** |
+| OBS field  | what to paste                     |
+| ---------- | --------------------------------- |
+| Server     | the whole link, `?jwt=…` included |
+| Stream Key | leave **empty**                   |
 
 Some encoders refuse an empty stream key. If yours does, split the link at the last `/`: everything
 before it is the Server, everything after it (`room__…?jwt=…`) is the Stream Key. Both halves
@@ -192,12 +192,12 @@ can publish video into your room under your name for the next 30 days.
 
 ## B4. When it does not connect
 
-| symptom | cause |
-| --- | --- |
-| OBS: "Failed to connect", immediately | The key was rotated. Reopen the pane and copy the current one. |
-| OBS: connects then drops instantly | Encoder is not H.264, or the URL lost a character in transit. |
-| The panel says no ingest server is configured | `STREAM_SERVER_MTX` is unset on the deployment. Operator, Part A3. |
-| The panel says the key could not be issued | Either you are not a presenter in this room, or the controller is unreachable. The message distinguishes them. |
-| Viewers get 401 on the playlist | Their read token has lapsed — it lives 12 hours. Reloading the room mints a new one. |
+| symptom                                                | cause                                                                                                                                                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OBS: "Failed to connect", immediately                  | The key was rotated. Reopen the pane and copy the current one.                                                                                                                            |
+| OBS: connects then drops instantly                     | Encoder is not H.264, or the URL lost a character in transit.                                                                                                                             |
+| The panel says no ingest server is configured          | `STREAM_SERVER_MTX` is unset on the deployment. Operator, Part A3.                                                                                                                        |
+| The panel says the key could not be issued             | Either you are not a presenter in this room, or the controller is unreachable. The message distinguishes them.                                                                            |
+| Viewers get 401 on the playlist                        | Their read token has lapsed — it lives 12 hours. Reloading the room mints a new one.                                                                                                      |
 | Everything says connected, nothing appears in the room | Expected today — see `OBS-XSPLIT-INGEST.md` §6. The publish is authorised and accepted and the stream is live on the media server; the room does not yet render MediaMTX streams as tabs. |
-| Playback returns 401 for viewers | The viewer has no read token, or it has lapsed (12 hours). Reloading the room mints a new one. |
+| Playback returns 401 for viewers                       | The viewer has no read token, or it has lapsed (12 hours). Reloading the room mints a new one.                                                                                            |
