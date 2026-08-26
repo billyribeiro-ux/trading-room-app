@@ -1791,27 +1791,141 @@ export class RoomMediaTransport {
   }
 
   /**
+   * `restartScreen` — re-publish every screen this peer is sharing, WITHOUT re-prompting for it.
+   *
+   * ## The capture, read whole rather than summarised
+   *
+   * ```js
+   * case "restartScreen":
+   *   if (this.screenSharingUsers.length)
+   *     for (let a of this.screenSharingUsers)
+   *       this.globals.user.id == a.userID && (P("MediaHandlerService reconnecting screen: ", a),
+   *         this.mediaSoupService.restartScreenSharing(a));
+   *   break;                                                        // byte 1119400
+   *
+   * restartScreenSharing(e) {
+   *   let s = this.screenProducers.get(e.producerID), r = s.localStream,
+   *       a = r.getVideoTracks()[0];
+   *   f = yield this.producerTransport.produce({ stopTracks:!1, track:a, …,
+   *         appData:{ share:!0, screenName:e.mediaValue.screenName, isReconnect:!0, … } });
+   *   this.appEventBus.emit("swapScreenProducers", {oldProducerID:_, newProducerID:f.id}),
+   *   this.screenProducers.set(f.id, f), this.screenProducers.delete(_);
+   * }                                                               // byte 1106692
+   * ```
+   *
+   * **`stopTracks: !1` is the whole reason this can exist.** A screen capture is only obtainable
+   * from a user gesture — `getDisplayMedia` refuses otherwise — so a command arriving over a socket
+   * can never acquire one. It does not need to: the track is already live, and a restart re-produces
+   * THE SAME TRACK onto a fresh producer. `session.ts:562` already passes `stopTracks: false` on
+   * every produce in this room, for the reason recorded there, so closing the old producer leaves
+   * the capture running and the browser never asks again.
+   *
+   * That is also why this is NOT `stopLocalScreen` followed by a share: `stopLocalScreen` calls
+   * `#stopStream`, which ends the track. Going through it would drop the capture and leave the
+   * presenter's "Restart Screens" looking exactly like "Stop Screens".
+   *
+   * ## Produce first, then close — the capture's order, and it is load-bearing
+   *
+   * `screenProducers.set(f.id, f)` precedes `screenProducers.delete(_)`. Closing first would leave
+   * the room with no producer for that screen for the length of a round trip, and every viewer's
+   * consumer torn down by `producerClosed`; producing first means the tab swaps under them. The cost
+   * is that both producers exist for a moment, which the server tolerates and a black pane does not.
+   *
+   * ## What a failure does
+   *
+   * Nothing, loudly. `produce` throwing leaves the OLD producer untouched and still carrying the
+   * screen — `return void P("screenProducer exception:", …)` is the capture's own answer — so the
+   * worst case is the restart not happening rather than the share ending. Each screen is attempted
+   * independently for the same reason `startLocalScreen` catches per attempt: one failing must not
+   * take the presenter's other shares with it.
+   */
+  async restartLocalScreens(): Promise<void> {
+    const session = this.#mediaSession;
+    if (!session) return;
+
+    // A copy, because the loop reassigns `#localScreenStreams` through `#addLocalScreen` and
+    // `stopLocalScreen`'s bookkeeping below. Iterating the live map would skip entries.
+    for (const [oldProducerId, stream] of [...this.#localScreenStreams]) {
+      const track = stream.getVideoTracks()[0];
+      // `readyState` and not just presence: a track the user has already ended cannot be re-produced,
+      // and asking the SFU to carry a dead one would publish a frozen pane rather than a picture.
+      if (!track || track.readyState !== 'live') continue;
+
+      const screenName =
+        this.#sharedScreens.find((screen) => screen.id === oldProducerId)?.screenName ?? '';
+
+      try {
+        const producer = await session.produceScreen(track, screenName, { isReconnect: true });
+
+        this.#localScreenStreams.set(producer.id, stream);
+        this.#addLocalScreen(producer.id, screenName, stream);
+        track.addEventListener('ended', () => this.stopLocalScreen(producer.id), { once: true });
+        if (this.#localScreenProducerId === oldProducerId) {
+          this.#localScreenProducerId = producer.id;
+        }
+
+        /*
+          The old one goes only once the new one is up. `closeProducer` closes the producer and not
+          the track — `stopTracks: false` above — so this drops the SFU's copy and leaves the capture
+          alone, which is the difference between this and `stopLocalScreen`.
+        */
+        await session.closeProducer(oldProducerId);
+        this.#dropLocalScreen(oldProducerId, producer.id);
+      } catch (error) {
+        // The old producer is still carrying this screen; the restart simply did not happen.
+        console.error('[media] a screen could not be restarted', error);
+      }
+    }
+
+    this.#screenStream = this.#localScreenStreams.values().next().value ?? null;
+  }
+
+  /**
    * Stops one shared screen, leaving the presenter's others running.
    *
    * The capture stops them individually by producer id (byte 1099342), which is the only thing
    * that makes "share multiple screens" usable - a presenter finishing with one chart should not
    * drop the other two.
    */
-  stopLocalScreen(producerId: string) {
+  /**
+   * Forgets one local screen's tab, popout and stream entry. Touches no track and no producer.
+   *
+   * Shared by `stopLocalScreen` and `restartLocalScreens`, which agree on every line of this and
+   * disagree on everything around it: stopping ends the track and closes the producer, restarting
+   * ends neither. Written twice it drifted immediately — the restart path forgot `closePopout`,
+   * leaving a detached window pointed at a producer id the SFU no longer knew.
+   *
+   * `nextSelectedId` is what the tab bar moves to. `stopLocalScreen` passes whichever share is left;
+   * a restart passes the NEW producer, so the viewer stays on the screen they were already watching
+   * rather than being thrown to the first tab in the list.
+   */
+  #dropLocalScreen(producerId: string, nextSelectedId: string | null) {
     this.#screens.closePopout(producerId);
-    const stream = this.#localScreenStreams.get(producerId);
     this.#localScreenStreams.delete(producerId);
+    // Our own tab is ours to remove: no `producerClosed` comes back for a producer we closed, so
+    // nothing else would ever drop it.
+    this.#sharedScreens = this.#sharedScreens.filter((entry) => entry.id !== producerId);
+    this.#screenStreams.delete(producerId);
+    this.#screens.screenRemoved(producerId, nextSelectedId);
+  }
+
+  stopLocalScreen(producerId: string) {
+    const stream = this.#localScreenStreams.get(producerId);
 
     // Close the producer before dropping the track: the server tears the room's consumers down
     // from `producerClosed`, so viewers lose the tab instead of keeping a frozen last frame.
     if (this.#mediaSession) void this.#mediaSession.closeProducer(producerId);
     this.#stopStream(stream ?? null);
 
-    // Our own tab is ours to remove: no `producerClosed` comes back for a producer we closed, so
-    // nothing else would ever drop it.
-    this.#sharedScreens = this.#sharedScreens.filter((entry) => entry.id !== producerId);
-    this.#screenStreams.delete(producerId);
-    this.#screens.screenRemoved(producerId, this.#sharedScreens[0]?.id ?? null);
+    /*
+      The first screen that is NOT this one, computed BEFORE the drop and deliberately not
+      `#sharedScreens[0]`. The line this replaced read `#sharedScreens[0]?.id` AFTER the filter had
+      already removed this entry, so the two are only the same expression if you also move the
+      filter — and passing it as an argument evaluates it first. Stopping the leftmost of three
+      screens would then have re-selected the tab that was being removed.
+    */
+    const nextSelectedId = this.#sharedScreens.find((entry) => entry.id !== producerId)?.id ?? null;
+    this.#dropLocalScreen(producerId, nextSelectedId);
 
     if (this.#localScreenProducerId === producerId) this.#localScreenProducerId = null;
     // The recorder and the local preview follow whichever share is still running, if any.

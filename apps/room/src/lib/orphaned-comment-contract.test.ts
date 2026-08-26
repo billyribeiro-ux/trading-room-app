@@ -104,7 +104,48 @@ const ROOM_MODULES = readdirSync('src/lib/room')
   .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
   .map((name) => `src/lib/room/${name}`);
 
-const POLICED = ['src/routes/+page.svelte', ...ROOM_MODULES];
+/**
+ * Every authored source file under `src`, discovered by walking the tree.
+ *
+ * ## The third time the same narrowing failed (2026-08-26)
+ *
+ * This read `['src/routes/+page.svelte', ...ROOM_MODULES]`, and the reasoning above records why the
+ * modules were added to the page: *"That was half the mechanism and it went red within one slice of
+ * being written."* The set was then left at page-plus-modules, which is the identical shape one
+ * level out — a hand-drawn boundary around the directories an extraction happened to touch, in a
+ * file whose own catalog note says *"a hand-kept list is the failure this file exists to prevent"*.
+ *
+ * Running this file's algorithm over all 220 authored sources found **16 orphans in six directories
+ * it could not see**, and TWO OF THEM WERE SHIPPED BY THE GATE'S OWN AUTHOR — `focusOnSessionNote`'s
+ * docblock and `kickUser`'s, both stranded in `presenter-commands.remote.ts` when a new command was
+ * inserted between a docblock and its export. That is the defect this file exists for, committed
+ * twice, by the person who wrote the file, into a directory one line of code away from being
+ * covered. Diligence did not catch it and could not have; the gate had to.
+ *
+ * All sixteen were READ before this widened — not one is a false positive of the algorithm. The
+ * other fourteen predate this session and span the whole tree: a `setPreferredLayers` docblock in
+ * `media/signalling.ts` sitting on `sendSpeechReco` twenty lines above its own key, `requireSessionId`'s
+ * one-liner on `requireRoomShortCode` in `server/auth.ts`, and in `+page.server.ts` a docblock for a
+ * form action that **no longer exists**, describing code deleted three days earlier.
+ *
+ * ## Why the whole tree rather than one more directory
+ *
+ * Because "one more directory" is what produced this. The narrowings that stay are the ones on
+ * CONTENT — JSDoc, or a plain block citing a module — and those are argued for above and unchanged.
+ * A narrowing on LOCATION only ever encodes where somebody last looked.
+ */
+const walk = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      // `.vite` caches land under `src/lib/room/node_modules` in this workspace; they are not ours.
+      return entry.name === 'node_modules' ? [] : walk(path);
+    }
+    if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.d.ts')) return [];
+    return entry.name.endsWith('.ts') || entry.name.endsWith('.svelte') ? [path] : [];
+  });
+
+const POLICED = walk('src');
 
 /**
  * The slice-citation form: `<subject>, in `#lib/room/<module>``.
@@ -307,6 +348,25 @@ describe('no block comment has lost the code it explains', () => {
   it('finds the files and the comments it is meant to police', () => {
     /* At zero, every assertion below is vacuous — the same guard the reader catalog carries. */
     expect(ROOM_MODULES.length).toBeGreaterThan(20);
+
+    /*
+      THE WALK NEEDS ITS OWN FLOOR, and for a sharper reason than the room modules' one.
+
+      `walk` skips on a suffix test, so a typo in either `endsWith` silently drops a whole file
+      class and the sweep below goes green by covering less — the failure this file is about, in the
+      catalog rather than in the prose. It is also the failure the widening was written to end, so
+      leaving it unguarded would be the narrowing all over again with an extra step.
+
+      220 authored sources were counted on 2026-08-26. The floor sits well below that so ordinary
+      extraction can move files without a false alarm, and above the 48 the old page-plus-modules
+      set covered, so a silent revert to that boundary cannot pass.
+    */
+    expect(
+      POLICED.length,
+      'the walk collected almost nothing — a suffix test is wrong'
+    ).toBeGreaterThan(150);
+    expect(POLICED).toContain('src/routes/presenter-commands.remote.ts');
+    expect(POLICED).toContain('src/lib/media/signalling.ts');
 
     const pageLines = readFileSync('src/routes/+page.svelte', 'utf8').split('\n');
     const pageBlocks = blockComments(pageLines.join('\n'));

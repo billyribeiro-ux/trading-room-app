@@ -33,7 +33,6 @@ export function requireUser(locals: App.Locals): User {
   return locals.user;
 }
 
-/** The session id behind requireUser's account, narrowed the same way and for the same reason. */
 /**
  * The room this session belongs to, or a redirect back to the controller.
  *
@@ -46,6 +45,7 @@ export function requireRoomShortCode(locals: App.Locals): string {
   return locals.roomShortCode;
 }
 
+/** The session id behind requireUser's account, narrowed the same way and for the same reason. */
 export function requireSessionId(locals: App.Locals): string {
   if (!locals.sessionId) redirectSignedOut();
   return locals.sessionId;

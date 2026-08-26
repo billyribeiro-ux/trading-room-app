@@ -49,17 +49,47 @@ import { publishToRoom, publishToUsers } from '#lib/server/room-events.js';
 */
 
 /**
- * `remotePresCommand` — a presenter mutes one member's mic, camera or screens.
+ * `remotePresCommand` — a presenter acts on one member's own browser.
  *
- * The three subCmds are the capture's own and the list is deny-by-default. An unknown string would
- * be forwarded to every client in the room and dispatched by none: a silent no-op, which is worse
- * than a refusal because nothing anywhere reports it. `z.enum` is the allow-list that was a
- * `new Set([...])` check — same three values, now refused before the handler runs rather than inside
- * it.
+ * The subCmds are the capture's own and the list is deny-by-default. An unknown string would be
+ * forwarded to every client in the room and dispatched by none: a silent no-op, which is worse than
+ * a refusal because nothing anywhere reports it. `z.enum` is the allow-list that was a
+ * `new Set([...])` check — refused before the handler runs rather than inside it.
+ *
+ * ## Four of the capture's six, and the other two are an honest gap
+ *
+ * The reference's switch has six cases, read whole at byte 1119400:
+ *
+ * ```js
+ * case "mutemic":       this.mediaSoupService.muteMic();  break;
+ * case "mutecam":       this.mediaSoupService.stopCam();  break;
+ * case "mutescreens":   this.stopSharingAll();            break;
+ * case "restartScreen": for (let a of this.screenSharingUsers)
+ *                         this.globals.user.id == a.userID &&
+ *                           this.mediaSoupService.restartScreenSharing(a);
+ *                       break;
+ * case "startRec":      this.startRecForMuser(null);      break;
+ * case "stopRec":       this.stopRecForMuser(null)
+ * ```
+ *
+ * `restartScreen` joined the enum on 2026-08-26; see `RoomMediaTransport.restartLocalScreens`.
+ *
+ * **`startRec` and `stopRec` are deliberately NOT here, and this is a divergence rather than an
+ * oversight.** Both resolve to `mediaSoupService.startRec(e)` / `stopRec(e)` (byte 1136815), which
+ * is the reference's SERVER-side recorder. This room has no server-side recorder: `RoomRecording`
+ * records in the browser with `MediaRecorder` and its docblock records that as a deliberate
+ * divergence taken because *"server-side recording needs the recording/transcoding workers that the
+ * deployment plan defers"*.
+ *
+ * Pointing this command at that recorder would not be a port of the captured behaviour, it would be
+ * a new one: a presenter causing a video file to be written to a member's own hard drive, with no
+ * prompt, since `RoomRecording.startRecording()` calls `downloadRecording()` from its own `stop`
+ * handler. The reference does nothing of the kind. So the two stay unbuilt and stay recorded as a
+ * gap in `TODO.md` rather than being satisfied with a behaviour nothing evidences.
  */
 export const presenterCommand = command(
   z.strictObject({
-    subCmd: z.enum(['mutemic', 'mutecam', 'mutescreens']),
+    subCmd: z.enum(['mutemic', 'mutecam', 'mutescreens', 'restartScreen']),
     // Names a PERSON. `users.id` is an autoincrement primary key, so every real target is >= 1.
     targetUserId: z.number().int().positive()
   }),
@@ -95,36 +125,11 @@ export const focusOnScreen = command(z.string().trim().min(1), async (screenId) 
 });
 
 /**
- * `focusOnSessionNote` — the same act for a session note, and it is the SAME defect fixed twice.
- *
- * The screen version's contract test opens by recording that *"the menu item said 'Bring everyone
- * here' and brought nobody"*. The note version said it too, from two places, and brought nobody
- * either: both controls were wired to a purely local `selectNote(id)` whose whole body assigned
- * `requestedNoteId` and closed the menu. Fixed 2026-08-23.
- *
- * Read out of the capture rather than modelled on its sibling, and the two turned out to be
- * identical anyway — which is the evidence that reusing the channel is right rather than convenient:
- *
- *   sender A, byte 1474066:  `bringFocusToTab(){…sendServerAdminCommand("focusOnSessionNote",{id:this.tab._id})}`
- *   sender B, byte 1970831:  `bringFocusToTab(e){…sendServerAdminCommand("focusOnSessionNote",{id:e})}`
- *   server frame, byte 1023554: `case"focusOnSessionNote":…emit("focusOnSessionNote",i.id);break;`
- *     — immediately adjacent to `case"focusOnScreen"` in the same switch, same `{id}` shape.
- *
- * **A plain note-tab click must not broadcast**, and that is evidenced by ABSENCE that was read
- * rather than assumed: `bringFocusToTab` occurs exactly four times in the bundle — the two
- * definitions above and their two template call sites — so nothing on the tab-change path calls it.
- * The screen side has the same rule for the same reason, enforced there by only the user-initiated
- * click broadcasting.
- *
- * `.positive()` because `notes.id` is an autoincrement primary key, so every real note is >= 1 — the
- * same bound `presenterCommand` puts on `targetUserId`, and the equivalent of the reference's `e &&`.
- */
-/**
  * `forceReload` — a presenter reloads one member's browser.
  *
  * ## Both ends existed and NOTHING joined them
  *
- * A form action at `+page.server.ts:1318` and a receiver at `events.svelte.ts` had been shipped, and
+ * A form action in `+page.server.ts` and a receiver at `events.svelte.ts` had been shipped, and
  * no call site connected them: `forceReload` appeared nineteen times in the actions export and zero
  * times as a caller. Meanwhile the "Force Reload" button dispatched `force-reload`, a key of
  * `EXACT_ALERTS`, so it raised *"Reload request sent OK"* and sent nothing at all.
@@ -145,6 +150,43 @@ export const forceReload = command(z.number().int().positive(), async (targetUse
   publishToUsers(presenterRoom(), [targetUserId], {
     channel: 'privCmds',
     data: { cmd: 'forceReload', targetUserId }
+  });
+});
+
+/**
+ * `remoteRestartAudio` — ask ONE member's browser to re-consume every microphone in the room.
+ *
+ * ## Both halves were captured and neither was built
+ *
+ * ```js
+ * remoteRestartAudio(){ this.appService.sendServerAdminCommand("remoteRestartAudio", this.user),
+ *                       bootbox.alert("Audio restart request sent OK") }   // byte 2080461
+ * case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")      // byte 995973
+ * subscribe("remoteRestartAudio", () => { this.reconnectAudio() })         // byte 1119299
+ * ```
+ *
+ * The alert existed here as an `EXACT_ALERTS` entry — *"Audio restart request sent OK"* raised over
+ * nothing at all — for the whole port. It is the fourth entry to leave that table and the last of
+ * the "reports success, sends nothing" family that had a captured wire waiting for it.
+ *
+ * ## The payload is the TARGET and nothing else
+ *
+ * Upstream sends `this.user`; the frame the member reads carries no fields its receiver consults —
+ * `emit("remoteRestartAudio")` passes nothing. So the only thing that has to cross is who it is for,
+ * and inventing a richer payload would be inventing evidence.
+ *
+ * ADDRESSED via `publishToUsers`, like `forceReload` beside it. Broadcasting a request to rebuild
+ * audio would have every member in the room re-consume every producer at once — a thundering herd
+ * against the SFU, triggered by a button meant for one person.
+ *
+ * Presenter-gated by `presenterRoom()`, which is the same call that decides `forceReload` and
+ * `kickUser`: the authority is the server's, from data the server owns.
+ */
+export const restartAudio = command(z.number().int().positive(), async (targetUserId) => {
+  ensureDatabase();
+  publishToUsers(presenterRoom(), [targetUserId], {
+    channel: 'privCmds',
+    data: { cmd: 'remoteRestartAudio', targetUserId }
   });
 });
 
@@ -203,43 +245,6 @@ export const forceReload = command(z.number().int().positive(), async (targetUse
  * server decides the caller is a presenter and scopes the frame to the caller's own room in one call,
  * so no client assertion is trusted. That is the 2026-08-07 rule.
  */
-/**
- * `remoteRestartAudio` — ask ONE member's browser to re-consume every microphone in the room.
- *
- * ## Both halves were captured and neither was built
- *
- * ```js
- * remoteRestartAudio(){ this.appService.sendServerAdminCommand("remoteRestartAudio", this.user),
- *                       bootbox.alert("Audio restart request sent OK") }   // byte 2080461
- * case "remoteRestartAudio": e.appEventBus.emit("remoteRestartAudio")      // byte 995973
- * subscribe("remoteRestartAudio", () => { this.reconnectAudio() })         // byte 1119299
- * ```
- *
- * The alert existed here as an `EXACT_ALERTS` entry — *"Audio restart request sent OK"* raised over
- * nothing at all — for the whole port. It is the fourth entry to leave that table and the last of
- * the "reports success, sends nothing" family that had a captured wire waiting for it.
- *
- * ## The payload is the TARGET and nothing else
- *
- * Upstream sends `this.user`; the frame the member reads carries no fields its receiver consults —
- * `emit("remoteRestartAudio")` passes nothing. So the only thing that has to cross is who it is for,
- * and inventing a richer payload would be inventing evidence.
- *
- * ADDRESSED via `publishToUsers`, like `forceReload` beside it. Broadcasting a request to rebuild
- * audio would have every member in the room re-consume every producer at once — a thundering herd
- * against the SFU, triggered by a button meant for one person.
- *
- * Presenter-gated by `presenterRoom()`, which is the same call that decides `forceReload` and
- * `kickUser`: the authority is the server's, from data the server owns.
- */
-export const restartAudio = command(z.number().int().positive(), async (targetUserId) => {
-  ensureDatabase();
-  publishToUsers(presenterRoom(), [targetUserId], {
-    channel: 'privCmds',
-    data: { cmd: 'remoteRestartAudio', targetUserId }
-  });
-});
-
 export const kickUser = command(
   z.object({
     targetUserId: z.number().int().positive(),
@@ -281,6 +286,31 @@ export const kickUser = command(
   }
 );
 
+/**
+ * `focusOnSessionNote` — the same act for a session note, and it is the SAME defect fixed twice.
+ *
+ * The screen version's contract test opens by recording that *"the menu item said 'Bring everyone
+ * here' and brought nobody"*. The note version said it too, from two places, and brought nobody
+ * either: both controls were wired to a purely local `selectNote(id)` whose whole body assigned
+ * `requestedNoteId` and closed the menu. Fixed 2026-08-23.
+ *
+ * Read out of the capture rather than modelled on its sibling, and the two turned out to be
+ * identical anyway — which is the evidence that reusing the channel is right rather than convenient:
+ *
+ *   sender A, byte 1474066:  `bringFocusToTab(){…sendServerAdminCommand("focusOnSessionNote",{id:this.tab._id})}`
+ *   sender B, byte 1970831:  `bringFocusToTab(e){…sendServerAdminCommand("focusOnSessionNote",{id:e})}`
+ *   server frame, byte 1023554: `case"focusOnSessionNote":…emit("focusOnSessionNote",i.id);break;`
+ *     — immediately adjacent to `case"focusOnScreen"` in the same switch, same `{id}` shape.
+ *
+ * **A plain note-tab click must not broadcast**, and that is evidenced by ABSENCE that was read
+ * rather than assumed: `bringFocusToTab` occurs exactly four times in the bundle — the two
+ * definitions above and their two template call sites — so nothing on the tab-change path calls it.
+ * The screen side has the same rule for the same reason, enforced there by only the user-initiated
+ * click broadcasting.
+ *
+ * `.positive()` because `notes.id` is an autoincrement primary key, so every real note is >= 1 — the
+ * same bound `presenterCommand` puts on `targetUserId`, and the equivalent of the reference's `e &&`.
+ */
 export const focusOnSessionNote = command(z.number().int().positive(), async (noteId) => {
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'focusOnSessionNote', noteId } });

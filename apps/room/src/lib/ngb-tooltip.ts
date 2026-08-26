@@ -202,14 +202,6 @@ const OFFSET_DISTANCE = 6;
  */
 let nextId = 1;
 
-/**
- * Positions the bubble the way the captured inline style does.
- *
- * The capture reads `position: absolute; inset: 0px 0px auto auto; margin: 0px;` plus a
- * `translate3d`. That is Popper's own anchoring: pin the box to the top-RIGHT of its containing
- * block, then translate. The offsets are measured rather than computed from the containing block's
- * geometry, because measuring is exact whatever the borders, scroll and zoom happen to be.
- */
 /** The minimum a rect needs for the geometry below; `DOMRect` satisfies it. */
 export interface Box {
   left: number;
@@ -291,6 +283,14 @@ export function roundToDevicePixels(
   return Math.round(value * dpr) / dpr || 0;
 }
 
+/**
+ * Positions the bubble the way the captured inline style does.
+ *
+ * The capture reads `position: absolute; inset: 0px 0px auto auto; margin: 0px;` plus a
+ * `translate3d`. That is Popper's own anchoring: pin the box to the top-RIGHT of its containing
+ * block, then translate. The offsets are measured rather than computed from the containing block's
+ * geometry, because measuring is exact whatever the borders, scroll and zoom happen to be.
+ */
 function place(host: Element, bubble: HTMLElement, popperPlacement: string): void {
   bubble.style.position = 'absolute';
   bubble.style.inset = '0px 0px auto auto';

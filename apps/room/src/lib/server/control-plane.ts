@@ -108,6 +108,19 @@ export function mobilePinUrl(shortCode: string): string | null {
 }
 
 /**
+ * `internal/room-entry/<code>` — may this attempt into this room?
+ *
+ * The room asks rather than decides, because the answer needs `webinarPW`, `banIPList` and the
+ * other credential-shaped settings that `ROOM_VISIBLE_SETTINGS` will never send here. The reference
+ * has the same split for the password: it posts the typed value to its own server and never
+ * compares it in the browser — `webinarPW` appears nowhere in its 2.9 MB bundle.
+ */
+export function roomEntryUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-entry/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * The one WRITE: `POST {control}/internal/room-setting/{shortCode}`.
  *
  * This module described the room's controller surface as two reads, and for every setting but one
@@ -125,19 +138,6 @@ export function mobilePinUrl(shortCode: string): string | null {
  * narrower list than the read allow-list, and the endpoint re-checks that the named member is a
  * presenter of that room. Naming the URL here does not grant anything.
  */
-/**
- * `internal/room-entry/<code>` — may this attempt into this room?
- *
- * The room asks rather than decides, because the answer needs `webinarPW`, `banIPList` and the
- * other credential-shaped settings that `ROOM_VISIBLE_SETTINGS` will never send here. The reference
- * has the same split for the password: it posts the typed value to its own server and never
- * compares it in the browser — `webinarPW` appears nowhere in its 2.9 MB bundle.
- */
-export function roomEntryUrl(shortCode: string): string | null {
-  const origin = controlPlaneOrigin();
-  return origin ? `${origin}/internal/room-entry/${encodeURIComponent(shortCode)}` : null;
-}
-
 export function roomSettingUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/room-setting/${encodeURIComponent(shortCode)}` : null;

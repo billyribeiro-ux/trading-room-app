@@ -1299,25 +1299,21 @@ export const actions: Actions = {
     and had no way to enforce it.
   */
 
-  /**
-   * `remotePresCommand` - a presenter telling ONE member's browser to do something.
-   *
-   * The capture's three moderation subCmds act on the receiving peer, not on the sender:
-   * `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`, `mutescreens` -> `stopSharingAll()`. So
-   * this action does not change any row; it publishes on the command channel and the target's own
-   * client carries it out. That is why it is a command and not a mutation.
-   *
-   * Presenter-only, checked here rather than in the browser: the whole point of the command is
-   * that it acts on someone else's machine, so the authority to send it cannot live on the
-   * machine that sends it.
-   */
   /*
-    `forceReload` WAS a form action here and is gone, 2026-08-23.
+    TWO form actions WERE here and are gone, and both left their docblocks behind.
 
-    It had ZERO call sites — both ends shipped and nothing joined them, which is the `presenterCommand`
-    defect that shipped dead for three commits. It is now a remote command in
-    `presenter-commands.remote.ts`, reached by the "Force Reload" button that used to raise a fixed
-    alert and send nothing. Removing it takes the actions export from nineteen to eighteen.
+    `remotePresCommand` moved to `presenter-commands.remote.ts` as `presenterCommand` on 2026-08-15.
+    `forceReload` followed it on 2026-08-23: it had ZERO call sites — both ends shipped and nothing
+    joined them — and is now reached by the "Force Reload" button that used to raise a fixed alert
+    and send nothing. Removing it took the actions export from nineteen to eighteen.
+
+    The `remotePresCommand` docblock sat here until 2026-08-26 describing an action this file has not
+    exported for eleven days, immediately above this note explaining that the OTHER one had left.
+    Nothing saw it, because the orphan gate policed `+page.svelte` and `lib/room/*` and this is
+    neither. Its content is not lost: the deny-by-default enum is argued at `presenterCommand`
+    itself, and the peer-side mapping — `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`,
+    `mutescreens` -> `stopSharingAll()`, which is why this is a command and not a mutation — is
+    recorded verbatim on `revokePermission` in `ModalHost.svelte`, next to the checkboxes that send it.
   */
 
   /**

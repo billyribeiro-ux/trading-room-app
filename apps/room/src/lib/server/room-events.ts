@@ -165,13 +165,10 @@ export type RoomEvent =
    *
    * So the roster channel is two commands, and only one of them does anything - `getRosterQueue`
    * logs and nothing more. Reproducing the count and leaving the queue out is faithful, not a gap.
-   */
-  /**
-   * `getRosterCount` carries the number; `getRoster` carries the people.
    *
-   * The capture drains both off this channel - `handleRosterCmd` sets `globals.rosterCount` from
-   * one, and `loadRoster()` / the `getRoster` event refresh `globals.roster`, which is what
-   * `checkUserOnlineStatus` reads.
+   * `getRosterCount` carries the number; `getRoster` carries the people. The capture drains both off
+   * this channel - `handleRosterCmd` sets `globals.rosterCount` from one, and `loadRoster()` / the
+   * `getRoster` event refresh `globals.roster`, which is what `checkUserOnlineStatus` reads.
    */
   | {
       channel: 'roster';
@@ -427,13 +424,6 @@ function heldBy(listeners: Map<Subscriber, RosterUser | null>, userId: number): 
 }
 
 /**
- * Everyone currently in the room, one entry per person.
- *
- * Deduped by user id, not by connection: two tabs are one person in the roster. The capture agrees
- * - its roster is keyed on `userXrefID` and `onUserJoin`/`onUserLeave` flip a single entry's
- * `online` flag rather than appending a second row.
- */
-/**
  * Attaches a location to every connection this person holds, and reports whether anything changed.
  *
  * Keyed by user id rather than by listener because one person may hold several tabs and the roster
@@ -452,6 +442,13 @@ export function setRosterLocation(room: string, userId: number, locStr: string):
   return changed;
 }
 
+/**
+ * Everyone currently in the room, one entry per person.
+ *
+ * Deduped by user id, not by connection: two tabs are one person in the roster. The capture agrees
+ * - its roster is keyed on `userXrefID` and `onUserJoin`/`onUserLeave` flip a single entry's
+ * `online` flag rather than appending a second row.
+ */
 export function roomRoster(room: string): RosterUser[] {
   const listeners = subscribers.get(room);
   if (!listeners) return [];

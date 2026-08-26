@@ -45,7 +45,6 @@ import type { Actions, PageServerLoad } from './$types';
  * `room-config-boundary.test.ts` requires of every credential-shaped setting.
  */
 
-/** What the reference prefills before it renders the form. */
 /**
  * `sessData.description` as HTML that is safe on an UNAUTHENTICATED page.
  *
@@ -134,6 +133,7 @@ function sanitizeRoomDescription(html: string): string {
   });
 }
 
+/** What the reference prefills before it renders the form. */
 type Prefill = {
   token: string;
   shortCode: string;
@@ -169,9 +169,8 @@ type Prefill = {
  *
  * Shared by `load` and the action, because a POST is a fresh request that may carry anything: the
  * submit re-runs every one of these rather than trusting a form that says it already passed them.
- */
-/**
- * Who is arriving, and on what authority.
+ *
+ * ## Who is arriving, and on what authority
  *
  * TWO arrivals, and the difference between them is the whole security model of this page:
  *

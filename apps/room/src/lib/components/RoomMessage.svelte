@@ -343,9 +343,8 @@
    * `bypassSecurityTrustHtml` and leans on DOMPurify to make that safe; emitting real elements
    * means the message text can never be parsed as markup in the first place, and the rendered DOM
    * is the same.
-   */
-  /**
-   * Alert Labels, then tickers and links — and that ORDER is the capture's, not a preference.
+   *
+   * ## Alert Labels, then tickers and links — and that ORDER is the capture's, not a preference
    *
    * `parseSymbols` (bundle byte 1,326,855) substitutes its labels into the string FIRST and only
    * then hands the result to `parseStock`, so the `$` pass only ever sees text the label pass has

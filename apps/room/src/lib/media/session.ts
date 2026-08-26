@@ -706,7 +706,6 @@ export class MediaSession {
     }
   }
 
-  /** Closes one local producer and tells the server, which announces `producerClosed` to the room. */
   /**
    * Restricts one remote screen to a lower layer.
    *
@@ -731,6 +730,7 @@ export class MediaSession {
     });
   }
 
+  /** Closes one local producer and tells the server, which announces `producerClosed` to the room. */
   async closeProducer(producerId: string): Promise<void> {
     const producer = this.#producers.get(producerId);
     if (!producer) return;
