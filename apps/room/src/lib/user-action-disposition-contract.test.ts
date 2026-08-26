@@ -300,7 +300,36 @@ describe('every dispatched action has exactly one disposition', () => {
     const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
     const body = source.slice(0, tail) + session + kicks + chatMute;
 
+    /*
+      THE MARKER LIST NEEDED A CATALOG HALF, and 2026-08-26 is when it cost something.
+
+      `session-refresh-roster` and `session-soft-reset` were wired to real commands that day, and
+      this assertion reported both as still dialog-only. The instrument was wrong, not the code:
+      every marker below is a `this.#…` collaborator, and those two branches call an IMPORTED remote
+      command directly — `refreshRoster()`, `softReset()` — because `RoomSessionControl` has no
+      command port to route through.
+
+      Adding two string literals would have worked once and left the next author in the same trap,
+      which is the hand-kept-list failure `source-size-contract` and the orphan gate have each paid
+      for already. So the remote commands are DISCOVERED: every name imported from a `*.remote`
+      module, in any of the four sources, counts as acting. A `.remote` import is by construction a
+      call to the server, which is the strongest possible evidence that a branch is not merely
+      talking to the user.
+
+      The hand-written markers stay for the collaborators, which are not discoverable this way.
+    */
+    const importedRemoteCommands = [
+      ...body.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']*\.remote'/g)
+    ].flatMap((match) =>
+      match[1]
+        .split(',')
+        .map((name) => name.split(' as ').pop()!.trim())
+        .filter(Boolean)
+        .map((name) => `${name}(`)
+    );
+
     const ACTS = [
+      ...importedRemoteCommands,
       'this.#commands.',
       'this.#managed.',
       'this.#savePreference',

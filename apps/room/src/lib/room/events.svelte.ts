@@ -28,6 +28,15 @@ interface EventStreamSession {
 /** `setTimeout(…, 3e3)`. */
 const RECONNECTED_FLASH_MS = 3000;
 
+/**
+ * `let oe = 3e3 * Math.random()` — the soft reset's per-client reconnect delay (byte 1023810).
+ *
+ * The same number as the flash above and a different reason, so it is a separate constant: this one
+ * is a CEILING on a random spread, not a duration. Folding them together would make a later change
+ * to one silently change the other.
+ */
+const SOFT_RESET_JITTER_MS = 3000;
+
 /*
   Three collaborators arrive as the NARROW SURFACE the stream uses, not as their whole class.
 
@@ -550,6 +559,35 @@ export class RoomEventStream<Entry> {
           if (Array.isArray(command.data)) {
             this.#mtx.replaceFromSession(command.data.filter(isMtxStream));
           }
+          return;
+        }
+
+        if (command?.cmd === 'softResetDone') {
+          /*
+            A presenter reset the room's media. Every client drops what it is consuming and rebuilds,
+            AFTER A PER-CLIENT DELAY — `let oe = 3e3 * Math.random(); setTimeout(…, oe)` at byte
+            1023810.
+
+            THE JITTER IS THE FEATURE. The frame reaches everybody in the same instant; without the
+            delay every client would re-consume every producer at once and the reset would arrive at
+            the SFU as one burst from the whole room. That is the same thundering-herd reasoning
+            `remoteRestartAudio` records for staying addressed to one member, and it is why the
+            button's own text says the room reconnects *"gently"*.
+
+            `dropRemoteMedia()` first and immediately, because that half is local and costs the SFU
+            nothing: the tabs and sinks go now, the rebuild is what waits.
+
+            NOT reproduced: upstream also cuts the PRESENTER'S own mic and camera
+            (`isPresenter && (disableMic(), stopCam())`). That is a presenter silencing themselves by
+            pressing a button labelled "reset the media state of the room", and this room's
+            `restart()` re-establishes the local producers rather than dropping them. Stated as a
+            deliberate divergence rather than left to be discovered as a gap.
+          */
+          this.#mediaTransport.dropRemoteMedia();
+          globalThis.setTimeout(
+            () => void this.#mediaTransport.restart(),
+            Math.random() * SOFT_RESET_JITTER_MS
+          );
           return;
         }
 
