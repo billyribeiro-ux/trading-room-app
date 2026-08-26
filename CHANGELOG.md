@@ -33,6 +33,73 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-26 13:52 EDT — Rows 2 and 10 re-read: one named the wrong setting, the other a sender as a receiver
+
+**Runtime impact: NO.** Evidence and records only. Two TODO rows corrected against the capture, and
+both corrections change what the work IS.
+
+**Branch `feat/save-permissions`.**
+
+#### Row 2 named the WRONG SETTING — the sixth false blocker on this file
+
+The row said `admin-notes-password` compares `deleteAlertPW`. It does not. Read whole at byte
+2081768:
+
+```js
+manageAdminNotes(){ globals.sessData.needPasswordForUserNotes && !this.allowToManageNotes
+  ? bootbox.prompt({ title: "Please enter the password to manage user's notes:",
+      callback: e => { e && (e.trim() === globals.sessData.needPasswordForUserNotes
+        ? this.allowToManageNotes = !0 : bootbox.alert("Wrong password!")) } })
+  : this.allowToManageNotes = !0 }
+```
+
+`deleteAlertPW` belongs to `archiveChatDate` (byte 2048693), whose prompt reads *"Please enter the
+password to delete this alert:"*. **The two share only the string `"Wrong password!"`, which occurs
+nine times in the bundle** — that is what the row conflated. Anyone building from the row as written
+would have shipped a password check against a setting that governs a different control.
+
+Three further findings:
+
+* **The precedent is already built.** `POST /internal/room-entry/<code>` takes a typed password,
+  resolves settings on the controller, and returns allow/deny. Its docblock already states this
+  row's design: *"the credential stays here and the QUESTION travels instead."* The room half fails
+  **closed** on outage.
+* **The notes store exists**, and the evidence agent's own report was wrong to deny it —
+  `room_users.note` (`schema.ts:339`), `setUserNote` (`rooms.ts:628-636`), a `?/setUserNote` action
+  and an owner-facing editor. It is ONE nullable column, not the reference's multi-entry log
+  (byte 2065113), and it does not cross to the room. That is a much smaller gap than "build storage".
+* **`needPasswordForUserNotes` matches none of `room-config-boundary.test.ts`'s `credentialShaped`
+  patterns** — the tripwire meant to catch a credential leaking to the room would not catch this one.
+
+#### Row 10 named a sender as a receiver
+
+All four callback receivers sit together at bytes 2596540-2597340; I read them first-hand. The row
+said *"`hardReset` … the sender is `case"changeUserPerms"`"*. Those are two different exchanges:
+
+```js
+case "hardReset":        emit("hardReset"), this.disconnect()             // 1013595
+case "changeUserPerms":  this.disconnect(), emit("permsChangeReload")     // 1025048
+```
+
+Opposite orders, which is upstream's own asymmetry and matches the `forceReload`/`kickUser` pair
+already recorded. **The machinery is built** — `alertThen(message, ondismiss)` exists, is tested and
+is already used by `forceReload`. **The blocker is a missing SENDER, not a receiver:** our
+`session-hard-reset` and `session-open` write preferences and broadcast nothing, so no connected
+client is ever told. `permsChangeReload` stays blocked — `reAuthSessionTok` occurs exactly once in
+2,891,205 bytes and is not defined there.
+
+#### How this was gathered
+
+Three parallel evidence agents plus an adversarial completeness critic, each carrying the evidence
+rules verbatim. **The critic earned its place**: it caught the false "no notes store" claim in one of
+the three reports by noticing the search was for `notes` while the column is `note` — the exact
+failure the read-don't-search rule exists to prevent, committed by an agent that had been given that
+rule. Cost 671k tokens across 294 tool calls.
+
+**Nothing was built from these reports.** They are recorded so the next session builds the right
+thing; two of the three rows would have produced wrong work as written.
+
+
 ### 2026-08-26 13:16 EDT — Two controls stop lying, and a negative control finds a hole in the guards
 
 **Runtime impact: YES.** *"Refresh Roster & Count"* and *"Soft Reset"* now act on the room. Both had
