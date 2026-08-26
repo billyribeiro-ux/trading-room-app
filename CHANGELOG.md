@@ -33,6 +33,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-26 12:01 EDT — Every dependency to registry-latest of this day, and every pin that holds one moved with it
+
+**Runtime impact: YES.** Dependency versions ship in both apps and both services; nothing else about
+the code changed except one import line that rand 0.10 forced.
+
+Every version below was read from its registry on 2026-08-26 — `pnpm outdated -r`, crates.io API,
+nodejs.org release index, GitHub releases, Docker Hub manifests — never from memory.
+
+**JS, both apps.** tiptap 3.29.2 → 3.30.3 (all nine), sanitize-html 2.17.7, hls.js ^1.7.1,
+mediasoup-client ^3.22.0, svelte 5.56.10, svelte-check 4.7.6, vite 8.2.2, vitest 4.1.11 (+coverage),
+eslint 10.9.1, eslint-plugin-svelte 3.23.0, typescript-eslint 8.68.0, globals 17.11.0,
+@types/node 26.3.0, @types/d3-shape 3.2.0, postcss ^8.5.26, @sveltejs/kit 3.0.0-next.25,
+adapter-vercel 7.0.0-next.8 (adapter-node 6.0.0-next.10 already the newest next). pnpm 11.24.0 in
+all three `packageManager` fields, and in the `fonts:verify` literal that failed exactly the way its
+own comment said it had failed once before — that comment now records the second occurrence.
+
+**Held, each with its reason in place, none by neglect:**
+
+- `@fortawesome/fontawesome-free@5.8.1`, `font-awesome@4.3.0`, `animate.css@3.7.2` — capture pins;
+  `apps/room/README.md:80-86` says "must not be upgraded" and the capture's CDN/SRI line and
+  `?v=4.3.0` font URLs are the evidence.
+- TypeScript stays 6.0.3, the newest the toolchain permits: 7.0.2 exists, but svelte-check peers
+  `^5 || ^6` and typescript-eslint peers `<6.1.0`.
+- drizzle-orm 0.45.2 / drizzle-kit 0.31.10 are the latest on the `latest` tag; 1.0.0 exists only as
+  `rc`-channel prereleases and is a migration, not an update. The two deprecated `@esbuild-kit/*`
+  warnings come from drizzle-kit 0.31.10 itself — the latest release still declares them; nothing to
+  fix downstream.
+
+**Rust.** Workspace: thiserror 2.0.20, uuid 1.25.0, time 0.3.55, base64 0.23, sha2 0.11 (the line
+dalek 3 itself uses). api: rand 0.10 — one import changed, `rand::RngCore` → `rand::Rng` in
+`auth/refresh.rs`, the whole source diff of this update. media: mediasoup 0.24 → 0.27,
+tower-http 0.7, ed25519-dalek 2 → 3 (unified with the workspace), base64 0.23 — zero source
+changes. Held with evidence: password-hash 0.5 (argon2 0.5.3, itself latest, declares `^0.5`) and
+tokio-tungstenite 0.29 (axum 0.8.9 pins `^0.29.0`, and being axum's exact crate is that dev-dep's
+stated purpose).
+
+**Toolchain and pins, all moved together and the pin-chain verifier green over the set:**
+Rust 1.98.0 (stable of 2026-08-18) in `rust-toolchain.toml`, `rust-version`, the api builder image
+`rust:1.98.0-alpine3.24` by resolved digest — the new image's libunwind.a and all six native link
+objects hash byte-identical to the pinned values, extracted from the image itself, so only the FROM,
+toolchain, and sysroot lines moved. Node files 24.20.0 (current LTS; the pin test enforces
+agreement, not a number). CI: buildx action v4.3.0 by commit SHA, Buildx v0.36.1,
+BuildKit v0.32.2 by digest, cargo-audit 0.22.2, cargo-deny 0.20.2, Syft 1.51.0 / Grype 0.117.0 with
+their manifest and archive checksums recomputed from the official manifests, postgres:17 and both
+distroless runtimes re-resolved by digest, and `smoke.yml` off floating `@v4` actions onto the same
+SHA-pinned v7s the other workflows use. `verify-backend-provenance` re-pinned per its own rule:
+eight `services/**` files, six leaving the 74-file aggregate for individual pins (74 → 68).
+
+**Kit next.25 broke the room suite's server-side imports** — its runtime now imports
+`'<sveltekit:generated>/server.js'`, which Node cannot resolve for externalized modules, and fifteen
+contract files died at import. Fixed in `apps/room/vite.config.ts` test config (inline Kit, alias
+the two generated flavours); the reasoning is on the block.
+
+**Verified:** rustfmt, clippy `-D warnings` clean; media 125 tests; api full integration suite green
+against a throwaway digest-pinned postgres:17 provisioned and migrated exactly as CI does (torn down
+after); cargo-deny 0.20.2 and cargo-audit 0.22.2 pass on the new lock with unchanged configs;
+release-artifact pin contract PASS; provenance PASS 68+30+2; controller 1005/1005 unit tests,
+svelte-check 0 errors across 1535 files, fonts/breakpoints/manage/account/home/room-login/runtime
+verifiers individually green; room 2847/2853 with privacy+schema gates green; both apps build.
+**Not mine, still red, left in place:** room's six failing media-contract assertions track
+`feat/save-permissions` files being edited mid-session; controller `privacy:verify` flags
+`collect-control-plane.smoke.mjs` and the SSOT documents 985 tests where the branch now runs 1005 —
+both reproduced at clean HEAD in a worktree before being attributed. **Not run:** the full Docker
+release-artifact build (CI's release gate) and Playwright e2e.
+
 ### 2026-08-26 11:23 EDT — The gate that catches adrift comments could not see 84% of the tree, and two of the sixteen orphans were mine
 
 **Runtime impact: NO.** Comments moved onto the declarations they describe, three stale comments
