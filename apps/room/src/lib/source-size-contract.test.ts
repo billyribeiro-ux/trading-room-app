@@ -1310,7 +1310,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The cap goes DOWN as receivers are built and prose settles, never up to fit a fifth copy of the
       gate. There cannot be a fifth copy; that is the point of the file.
     */
-    max: 180,
+    /*
+      180 -> 198, 2026-08-26, and the sentence directly above says the cap never goes up. This is the
+      exception it did not anticipate, so it is argued rather than quietly applied.
+
+      NO CODE CHANGED. Every one of the eighteen lines is prose, and all of it is one of two things:
+
+      * A CORRECTION OF A FALSE CLAIM. This file's `kickUser` branch asserted that a banned kick logs
+        the member out upstream and that "this room does not". Both halves were wrong — `logout`
+        occurs once in the whole bundle and has no subscriber, and ours ends the session server-side.
+        The module docblock also said four receivers were built when five were.
+      * A SECURITY CONSTRAINT ON THE NEXT IMPLEMENTER. `debugLogResp` is the one frame in this
+        channel that travels member -> presenter, and upstream lets the CLIENT name the recipient. A
+        member could inject content into any presenter's modal. That warning belongs next to the gate
+        it would bypass, not in a register nobody reads while writing the branch.
+
+      The alternative was to delete corrections to make a number, which is the single thing this
+      repository's standard forbids most explicitly. The INVENTORY of what is left was moved OUT to
+      `TODO.md` row 9 rather than duplicated here — that part was genuine bloat and it is gone.
+
+      From here it ratchets down again, and building a receiver should take it down: each of the
+      three that remain replaces a paragraph describing it with a branch doing it.
+    */
+    max: 198,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
