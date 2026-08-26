@@ -478,6 +478,10 @@ export class RoomMediaTransport {
     this.#localCapture.stopLocalScreen(producerId);
   }
 
+  restartLocalScreens(): Promise<void> {
+    return this.#localCapture.restartLocalScreens();
+  }
+
   get audioProducerOwners(): Map<string, { userID: number; name: string }> {
     return this.#audioProducerOwners;
   }

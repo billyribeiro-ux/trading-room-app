@@ -12,7 +12,7 @@ import { playSoundEffect } from '#lib/sound-effects.js';
 import type { FollowChatStyle, ManagedChatUser, ModalName, ModalTargetUser } from '#lib/types.js';
 import {
   MISSING_SCHEME_ALERT,
-  PEER_MUTE_SUBCMDS,
+  PEER_SUBCMDS,
   addVideoToList,
   isAcceptableSendUrl,
   userActionAlert
@@ -42,7 +42,7 @@ export interface UserActionCommands {
    * declaring what it can actually send.
    */
   presenter: (payload: {
-    subCmd: 'mutemic' | 'mutecam' | 'mutescreens';
+    subCmd: 'mutemic' | 'mutecam' | 'mutescreens' | 'restartScreen';
     targetUserId: number;
   }) => Promise<unknown>;
   editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
@@ -697,10 +697,10 @@ export class RoomUserActions<
       never showed us a failure for either control.
     */
     /*
-      THE THREE PEER COMMANDS WHOSE WIRE WAS ALREADY BUILT, and whose buttons were dead because
-      nobody had written these six lines. `user-action-intent.ts` carries the full account: the
-      command, the receiver and a neighbouring caller all existed, behind an `INERT_ACTIONS` entry
-      claiming they were blocked on a server-side presenter check that had been there all along.
+      THE PEER COMMANDS, all of which had their wire built before their buttons did. Three arrived on
+      2026-08-23 and `restart-screens` on 2026-08-26; `user-action-intent.ts` carries the full
+      account of each, including that all four `INERT_ACTIONS` entries named a blocker that did not
+      exist. ONE BRANCH for all of them, because they differ only in the string they carry.
 
       NO SUCCESS ALERT, and that is the capture rather than an omission. `remotePresCommand(c)` at
       byte 2080529 is one line — `sendServerAdminCommand("remotePresCommand", {user, cmd:c})` — with
@@ -712,11 +712,11 @@ export class RoomUserActions<
       something the presenter has to know about.
 
       The modal is NOT closed. Every neighbouring branch that closes it does so on evidence; nothing
-      read says these three do, and closing it would be a behaviour this room invented.
+      read says these do, and closing it would be a behaviour this room invented.
     */
-    if (action in PEER_MUTE_SUBCMDS) {
+    if (action in PEER_SUBCMDS) {
       void this.#commands
-        .presenter({ subCmd: PEER_MUTE_SUBCMDS[action], targetUserId: user.id })
+        .presenter({ subCmd: PEER_SUBCMDS[action], targetUserId: user.id })
         .catch(() => (this.#dialogs.alert = 'Command failed.'));
       return;
     }

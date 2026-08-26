@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INERT_ACTIONS,
   INERT_ACTION_NAMES,
-  PEER_MUTE_SUBCMDS,
+  PEER_SUBCMDS,
   TOAST_ONLY_ACTIONS
 } from './user-action-intent.js';
 
@@ -117,7 +117,7 @@ function handledActions(): Set<string> {
     first one appeared.
 
     `mute-mic`, `mute-camera` and `stop-screens` are handled by ONE branch, `if (action in
-    PEER_MUTE_SUBCMDS)`, because the three differ only in which sub-command they carry and three
+    PEER_SUBCMDS)`, because the three differ only in which sub-command they carry and three
     near-identical branches would be three chances for the mapping to cross. A literal
     `action === '…'` scan cannot see a table, so all three were reported as "dispatched into the
     void" — a defect report about a working wire, which is precisely the manufactured defect the
@@ -127,7 +127,7 @@ function handledActions(): Set<string> {
     re-introduce the same fragility one level down, and the import fails loudly if the export is
     renamed — where a regex would silently match nothing and quietly under-report again.
   */
-  return new Set([...literal, ...Object.keys(PEER_MUTE_SUBCMDS)]);
+  return new Set([...literal, ...Object.keys(PEER_SUBCMDS)]);
 }
 
 describe('the dispatch surface is fully enumerated', () => {
