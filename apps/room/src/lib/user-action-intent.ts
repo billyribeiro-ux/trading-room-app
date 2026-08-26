@@ -223,26 +223,48 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     Every one of these blockers that has been checked so far turned out to be a search that stopped
     at one directory.
 
-    `restart-screens` stays below, with a corrected reason.
+    `restart-screens` LEFT TOO, on 2026-08-26, and its stated blocker was wrong in the same way —
+    the fourth entry in a row on this block to be corrected by looking rather than inheriting.
+
+    It read "`RoomMediaTransport` has stopLocalScreen but no re-share". True, and irrelevant: a
+    re-share is not what the capture does. `restartScreenSharing` (byte 1106692) produces the SAME
+    live track onto a new producer under `stopTracks:!1`, and `session.ts:562` has passed
+    `stopTracks: false` on every produce in this room since it was written. So the one piece the
+    entry named as missing was the one piece that would have been WRONG to build: a re-share means
+    `getDisplayMedia`, which needs a user gesture and cannot be reached from a socket at all.
+
+    Built as `RoomMediaTransport.restartLocalScreens`.
   */
-  'restart-screens':
-    'ModalHost.svelte:2272 — wire IS captured: remotePresCommand("restartScreen"), singular, against a " Restart Screens " label. NOT blocked on authority — `presenterCommand` is the proven mechanism and this is simply absent from its enum and from the receiver. The member-side act is `for (screen of MY screenSharingUsers) restartScreenSharing(screen)` (byte 1119400), and `RoomMediaTransport` has stopLocalScreen but no re-share',
 
   /*
-    THE RECORDING PAIR'S BLOCKER WAS ALSO MIS-STATED, though these two really are unbuilt.
+    THE RECORDING PAIR IS AN HONEST GAP, and the reason changed on 2026-08-26 after reading both
+    ends. It is no longer "absent from presenterCommand's enum" — that was true and was not the
+    blocker.
 
-    "Blocked on the same server-side presenter check" is wrong for the same reason as above. What
-    IS true, and is a different thing: `recording-state.remote.ts:61` accepts
-    `startRec | stopRec | pauseRec | resumeRec` — but it is `publishToRoom`, announcing the
-    PRESENTER'S OWN recording to everybody. Upstream's `remotePresCommand("startRec")` is addressed
-    to ONE member and tells THEIR browser to record (`startRecForMuser(null)`, byte 1119480). Two
-    different acts that happen to share a verb, and collapsing them would make a presenter's button
-    start their own recording while claiming to start somebody else's.
+    `startRec` and `stopRec` resolve to `startRecForMuser(e){ this.mediaSoupService.startRec(e) }`
+    (byte 1136815), the reference's SERVER-side recorder. **This room has no server-side recorder.**
+    `RoomRecording`'s own docblock records that as a deliberate divergence: it records in the browser
+    with `MediaRecorder` because *"server-side recording needs the recording/transcoding workers that
+    the deployment plan defers"*, and notes the whole 2.9 MB bundle contains exactly ONE
+    `new MediaRecorder`, which is the microphone test in the AV modal.
+
+    Pointing this command at THAT recorder would not port the captured behaviour, it would invent a
+    worse one: `RoomRecording.startRecording()` calls `downloadRecording()` from its own `stop`
+    handler, so a presenter's click would write a video file to a member's hard drive with no prompt.
+    And on a member not sharing a screen it returns immediately, so the same button would be silently
+    inert for most of the room. Neither is what the reference does.
+
+    So these two stay INERT on purpose, and the entry now says what actually blocks them. They are
+    unblocked by the same thing that unblocks server-side recording generally, and by nothing else.
+
+    `recording-state.remote.ts:61` remains a different act despite sharing the verb: it is
+    `publishToRoom`, announcing the PRESENTER'S OWN recording to everybody. Collapsing the two would
+    make a presenter's button start their own recording while claiming to start somebody else's.
   */
   'start-recording':
-    'ModalHost.svelte:2279 — wire IS captured: remotePresCommand("startRec") → the MEMBER runs startRecForMuser(null). NOT the same act as recordingState, which broadcasts the presenter\'s own. Absent from presenterCommand\'s enum and from the receiver',
+    'ModalHost.svelte:2279 — wire IS captured: remotePresCommand("startRec") → the MEMBER runs startRecForMuser(null) → mediaSoupService.startRec, the SERVER-side recorder. Blocked on this room having no server-side recorder — a deferred deployment decision recorded on RoomRecording. Mapping it onto the local MediaRecorder would write a file to the member\'s own disk unprompted, which the reference never does',
   'stop-recording':
-    'ModalHost.svelte:2285 — wire IS captured: remotePresCommand("stopRec") → stopRecForMuser(null). Same distinction as start-recording',
+    'ModalHost.svelte:2285 — wire IS captured: remotePresCommand("stopRec") → stopRecForMuser(null) → mediaSoupService.stopRec. Same blocker as start-recording: no server-side recorder exists to stop',
 
   /*
     `getDebugLog` and `setUserProfilePic` are the two this class was already known by — `TODO.md`
@@ -323,21 +345,30 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * The three modal buttons that are one `remotePresCommand` sub-command each.
+ * The modal buttons that are one `remotePresCommand` sub-command each.
  *
  * A TABLE rather than a nested ternary, and exported so the mapping is testable without driving the
- * class: these three strings crossing to the wrong subCmd would cut the wrong stream on somebody
- * else's machine, and nothing on screen would say so.
+ * class: these strings crossing to the wrong subCmd would cut the wrong stream on somebody else's
+ * machine, and nothing on screen would say so.
  *
- * The sub-command names are the capture's own — `remotePresCommand("mutemic")` and its two
- * neighbours at bundle bytes 2063708-2064410 — and they are deliberately NOT the action strings:
- * the reference's labels are " Mute Audio ", " Mute Camera " and " Stop Screens " while the wire
- * says `mutemic`, `mutecam`, `mutescreens`. Three names for one thing is upstream's, not ours.
+ * The sub-command names are the capture's own — `remotePresCommand("mutemic")` and its neighbours at
+ * bundle bytes 2063708-2064410 — and they are deliberately NOT the action strings: the reference's
+ * labels are " Mute Audio ", " Mute Camera ", " Stop Screens " and " Restart Screens " while the
+ * wire says `mutemic`, `mutecam`, `mutescreens`, `restartScreen`. Three names for one thing is
+ * upstream's, not ours — and `restartScreen` is SINGULAR against a plural label, which is upstream's
+ * too and is reproduced rather than tidied.
+ *
+ * **Named `PEER_SUBCMDS` since 2026-08-26, and it was `PEER_MUTE_SUBCMDS`.** `restartScreen` is not
+ * a mute; leaving the old name would have made the table's own identifier the least accurate
+ * description of it in the file.
  */
-export const PEER_MUTE_SUBCMDS: Readonly<Record<string, 'mutemic' | 'mutecam' | 'mutescreens'>> = {
+export const PEER_SUBCMDS: Readonly<
+  Record<string, 'mutemic' | 'mutecam' | 'mutescreens' | 'restartScreen'>
+> = {
   'mute-mic': 'mutemic',
   'mute-camera': 'mutecam',
-  'stop-screens': 'mutescreens'
+  'stop-screens': 'mutescreens',
+  'restart-screens': 'restartScreen'
 };
 
 /** Every action that is knowingly silent. Exported so the disposition contract can read it. */

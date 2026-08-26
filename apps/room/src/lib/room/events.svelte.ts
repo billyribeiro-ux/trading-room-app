@@ -562,6 +562,16 @@ export class RoomEventStream<Entry> {
         if (command.subCmd === 'mutecam' && !this.#media.camMuted)
           void this.#mediaTransport.toggleWebcam();
         if (command.subCmd === 'mutescreens') this.#mediaTransport.stopScreenSharing();
+        /*
+          `restartScreen` — the fourth of the capture's six, built 2026-08-26. Note the SINGULAR
+          subCmd against a plural " Restart Screens " label: upstream loops over every screen this
+          peer owns, and `restartLocalScreens` is named for what it does rather than for the wire.
+
+          It re-produces the SAME live track onto a new producer, so no `getDisplayMedia` prompt is
+          raised — which is what makes a socket-driven restart possible at all. `startRec`/`stopRec`,
+          the remaining two, are an honest gap; `presenterCommand` records why.
+        */
+        if (command.subCmd === 'restartScreen') void this.#mediaTransport.restartLocalScreens();
         return;
       }
 

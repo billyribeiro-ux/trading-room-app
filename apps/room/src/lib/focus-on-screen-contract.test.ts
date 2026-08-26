@@ -209,9 +209,46 @@ describe('the server owns the authority', () => {
 
       This is the assertion that would have gone quietly green if it had been left reading
       `+page.server.ts` after the extraction, so it reads the module that owns them now.
+
+      ## The enum is read, not pinned — corrected 2026-08-26
+
+      This asserted the literal `z.enum(['mutemic', 'mutecam', 'mutescreens'])` and went red when
+      `restartScreen` was added, which is a FALSE ALARM: a fourth peer sub-command is not a
+      loosening, and it is the capture's own — the reference's switch has six cases. Pinning the
+      list made every legitimate addition look like the defect this test guards against, and a gate
+      that cries wolf gets its expectation edited without thought, which is how the real thing would
+      one day slip past.
+
+      So the enum's MEMBERS are now parsed out and each one checked against the property that
+      actually matters: it names an act on a PERSON's own browser, never a screen. `focusOnScreen`
+      carries a string id and would fail this; `restartScreen` acts on whatever that peer is already
+      sharing and carries nothing, which is why it is admissible and a screen id is not.
     */
     const body = presenterCommandBody();
-    expect(body).toContain("z.enum(['mutemic', 'mutecam', 'mutescreens'])");
+    const enumMatch = /subCmd: z\.enum\(\[([^\]]*)\]\)/.exec(body);
+    expect(enumMatch, 'presenterCommand no longer declares subCmd as a z.enum allow-list').not.toBe(
+      null
+    );
+    const members = (enumMatch?.[1] ?? '').split(',').map((raw) => raw.trim().replace(/'/g, ''));
+    expect(members.length, 'the enum parsed to nothing — the regex, not the code').toBeGreaterThan(
+      2
+    );
+    /*
+      The capture's own six, read whole at byte 1119400 of `main.d1d09071be31f1ba.js`. A member
+      outside this set is either a typo the server would forward and no client would dispatch, or a
+      payload of a different shape being smuggled through a command that validates a person.
+    */
+    const CAPTURED_SUBCMDS = [
+      'mutemic',
+      'mutecam',
+      'mutescreens',
+      'restartScreen',
+      'startRec',
+      'stopRec'
+    ];
+    for (const member of members) {
+      expect(CAPTURED_SUBCMDS, `'${member}' is not one of the capture's subCmds`).toContain(member);
+    }
     expect(body).toContain('targetUserId: z.number().int().positive()');
     expect(body).not.toContain('focusOnScreen');
     expect(body).not.toContain('screenId');

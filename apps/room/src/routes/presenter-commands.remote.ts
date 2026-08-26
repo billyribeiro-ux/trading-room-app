@@ -49,17 +49,47 @@ import { publishToRoom, publishToUsers } from '#lib/server/room-events.js';
 */
 
 /**
- * `remotePresCommand` — a presenter mutes one member's mic, camera or screens.
+ * `remotePresCommand` — a presenter acts on one member's own browser.
  *
- * The three subCmds are the capture's own and the list is deny-by-default. An unknown string would
- * be forwarded to every client in the room and dispatched by none: a silent no-op, which is worse
- * than a refusal because nothing anywhere reports it. `z.enum` is the allow-list that was a
- * `new Set([...])` check — same three values, now refused before the handler runs rather than inside
- * it.
+ * The subCmds are the capture's own and the list is deny-by-default. An unknown string would be
+ * forwarded to every client in the room and dispatched by none: a silent no-op, which is worse than
+ * a refusal because nothing anywhere reports it. `z.enum` is the allow-list that was a
+ * `new Set([...])` check — refused before the handler runs rather than inside it.
+ *
+ * ## Four of the capture's six, and the other two are an honest gap
+ *
+ * The reference's switch has six cases, read whole at byte 1119400:
+ *
+ * ```js
+ * case "mutemic":       this.mediaSoupService.muteMic();  break;
+ * case "mutecam":       this.mediaSoupService.stopCam();  break;
+ * case "mutescreens":   this.stopSharingAll();            break;
+ * case "restartScreen": for (let a of this.screenSharingUsers)
+ *                         this.globals.user.id == a.userID &&
+ *                           this.mediaSoupService.restartScreenSharing(a);
+ *                       break;
+ * case "startRec":      this.startRecForMuser(null);      break;
+ * case "stopRec":       this.stopRecForMuser(null)
+ * ```
+ *
+ * `restartScreen` joined the enum on 2026-08-26; see `RoomMediaTransport.restartLocalScreens`.
+ *
+ * **`startRec` and `stopRec` are deliberately NOT here, and this is a divergence rather than an
+ * oversight.** Both resolve to `mediaSoupService.startRec(e)` / `stopRec(e)` (byte 1136815), which
+ * is the reference's SERVER-side recorder. This room has no server-side recorder: `RoomRecording`
+ * records in the browser with `MediaRecorder` and its docblock records that as a deliberate
+ * divergence taken because *"server-side recording needs the recording/transcoding workers that the
+ * deployment plan defers"*.
+ *
+ * Pointing this command at that recorder would not be a port of the captured behaviour, it would be
+ * a new one: a presenter causing a video file to be written to a member's own hard drive, with no
+ * prompt, since `RoomRecording.startRecording()` calls `downloadRecording()` from its own `stop`
+ * handler. The reference does nothing of the kind. So the two stay unbuilt and stay recorded as a
+ * gap in `TODO.md` rather than being satisfied with a behaviour nothing evidences.
  */
 export const presenterCommand = command(
   z.strictObject({
-    subCmd: z.enum(['mutemic', 'mutecam', 'mutescreens']),
+    subCmd: z.enum(['mutemic', 'mutecam', 'mutescreens', 'restartScreen']),
     // Names a PERSON. `users.id` is an autoincrement primary key, so every real target is >= 1.
     targetUserId: z.number().int().positive()
   }),
