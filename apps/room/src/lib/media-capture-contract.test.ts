@@ -12,10 +12,14 @@ const roomSource = readFileSync(new URL('../routes/+page.svelte', import.meta.ur
   Reference-bundle assertions are untouched; ours follow the markup into the component.
 */
 const NAVBAR = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
-const TRANSPORT = readFileSync(
-  new URL('./room/media-transport.svelte.ts', import.meta.url),
-  'utf8'
-);
+/*
+  The microphone and camera paths moved to `RoomLocalCapture` on 2026-08-26 — see that module's
+  header for the seam. This constant follows the SUBJECT rather than the old filename: pointed at
+  the transport it would still read a real file, find neither `toggleMicrophone` nor `toggleWebcam`,
+  and the `not.toContain` assertions below would all pass against a file that no longer decides
+  anything. That is the vacuity failure `source-size-contract` polices, arriving through a rename.
+*/
+const TRANSPORT = readFileSync(new URL('./room/local-capture.svelte.ts', import.meta.url), 'utf8');
 
 function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
@@ -72,7 +76,9 @@ describe('media capture activation contract', () => {
       /async toggleWebcam\(\)[\s\S]*?navigator\.mediaDevices\.getUserMedia\(/
     );
     expect(TRANSPORT).toMatch(
-      /async toggleWebcam\(\)[\s\S]*?deviceId: \{ ideal: this\.selectedVideoDeviceId \}/
+      // `selectedVideoDeviceId` is the injected `#videoDeviceId()` thunk since the 2026-08-26
+      // split; the CONSTRAINT it feeds is what this asserts and that is unchanged.
+      /async toggleWebcam\(\)[\s\S]*?deviceId: \{ ideal: this\.#videoDeviceId\(\) \}/
     );
   });
 });

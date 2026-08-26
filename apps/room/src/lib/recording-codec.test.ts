@@ -137,7 +137,8 @@ describe('the preference list itself', () => {
   spend bits on. Read as source text; the component needs a browser and a real screen share.
 */
 describe('the screen track tells the encoder what it is looking at', () => {
-  const page = readFileSync(new URL('./room/media-transport.svelte.ts', import.meta.url), 'utf8');
+  // `startScreenSharing`, which sets the contentHint, moved to `RoomLocalCapture` on 2026-08-26.
+  const page = readFileSync(new URL('./room/local-capture.svelte.ts', import.meta.url), 'utf8');
   const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
   it("sets contentHint='detail' on the captured screen track", () => {

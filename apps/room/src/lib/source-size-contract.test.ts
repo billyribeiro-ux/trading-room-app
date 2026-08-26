@@ -557,8 +557,50 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       blank their screen tabs. It also records the two negative controls that came back GREEN, which
       is the honest statement that the working part of it is unguarded.
     */
-    max: 1825,
-    why: 'the SFU transport - 768 code lines under 862 of transcription, and no seam to split on'
+    /*
+      1,825 -> 1,356, 2026-08-26. THE SEAM THE PARAGRAPHS ABOVE SAID DID NOT EXIST.
+
+      `restartScreen` took the CODE count to 812 against the backstop's 800, and that gate does not
+      accept a number: *"find the domain seam rather than raising the backstop."* So one was found,
+      and the note above is corrected rather than deleted, because it was half right in a way worth
+      keeping.
+
+      It predicted that *"a local/remote split would have cut through `#sharedScreens`, which both
+      paths write"* — and that is exactly what happened. The measurement, taken across the seam on
+      code lines only before anything moved: 5 private members moved cleanly, 10 were collaborators
+      both sides already shared, and 12 were state. Of those twelve, seven were purely local and
+      went; three (`#mediaSession`, `#mediaSignalling`, `#stopStream`) are reached through thunks;
+      and `#sharedScreens` + `#screenStreams` are the genuine tangle the old note named.
+
+      They stay OWNED here and are written from `RoomLocalCapture` through a `ScreenTabPort`. The
+      cost is real and is stated at the top of that module: the tab list has two writers. It is
+      accepted because the alternative was a 1,900-line module whose own gate said it had stopped
+      being one, and because the two writers were always there — the old arrangement simply had them
+      in one file, which made the tangle invisible rather than absent.
+
+      What did NOT change is the public surface. Every accessor the page, `RoomRecording`,
+      `RoomEventStream` and eleven contract tests read is still on this class and now delegates.
+    */
+    max: 1357,
+    why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
+  },
+  {
+    file: 'lib/room/local-capture.svelte.ts',
+    /*
+      WHAT THIS BROWSER PUBLISHES — every path from a `getUserMedia` / `getDisplayMedia` prompt to a
+      producer, taken out of `media-transport.svelte.ts` on 2026-08-26 when that file crossed the
+      800-line CODE backstop.
+
+      758 total, measured AFTER `prettier --write` rather than before it: this is transcribed from a minified capture
+      and most of the file is the finding rather than the code. The two named constants and the
+      "Name for this screen?" docblock travelled with it — leaving them behind would have created
+      exactly the orphan the comment gate catches, which is how they were noticed.
+
+      Lower this when the module shrinks. It has no headroom deliberately: it landed at its measured
+      size, which is the rule for a new entry.
+    */
+    max: 758,
+    why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
     file: 'lib/components/RoomOverlays.svelte',
