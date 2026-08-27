@@ -33,6 +33,77 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-27 22:20 EDT — A clone can run the suite and re-run the enumeration, for the first time
+
+**Runtime impact: NO.** Manifest, one lifecycle script, one published gate and three contract tests.
+Nothing the site serves changed.
+
+**THE ROOM SUITE DID NOT RUN ON A FRESH CHECKOUT, and it did not fail in a way that said so.**
+Measured in a clean container: `pnpm install`, then `vitest run` in `apps/room` —
+
+    Test Files  17 failed | 124 passed (141)
+         Tests   1 failed | 1902 passed (1903)
+    Cannot find module '<sveltekit:generated>/server.js'
+
+Sixteen of the seventeen collected ZERO tests. The count did not go red, it went missing. One
+`svelte-kit sync` and nothing else: **141 passed (141), 2,140 tests.**
+
+The cause is one line that was never there. `apps/controller/package.json` has carried
+`"prepare": "svelte-kit sync"` since it was created; `apps/room` never has, so nothing generated the
+tree before the tests that need it. CI hid it: `quality.yml` runs `pnpm run check` — which opens with
+`svelte-kit sync` — one step before the step that needs it, so the gate was green on a repository a
+contributor could not run. Pinned by `svelte-kit-sync-pin.test.ts`, which finds the Kit apps by their
+`@sveltejs/kit` dependency rather than by a list of two names. **Negative control seen RED:**
+`expected undefined to be 'svelte-kit sync'`.
+
+**THE ENUMERATION IS PUBLISHED, and it is the one script that mattered.**
+`scripts/audit-feature-coverage.mjs` was untracked and reachable only on the author's machine, while
+`TODO.md` derived its feature counts from it and told every reader to run it after every feature
+lands. It has been re-derived from the tracked v4 bundle as `apps/room/gate/audit-feature-coverage.mjs`
+— hashes verified before a single pattern runs (`40796ca8…bab87524`, 2,891,205 bytes, all three files
+in `sha256sums.txt` match). It extracts four vocabularies and says why each is drawn the way it is:
+`sendServerAdminCommand`, `.send(`, `{cmd:}`, and — as an INTERSECTION — `emit(` ∩ `case":`, because
+`emit` alone matches 240 local bus events and `case` alone matches 333 minified locals.
+
+Today's measurement: **135 wire identifiers, 93 named in our source, 42 not. 8 tabs, 6 named, 2 not.**
+
+`feature-coverage-contract.test.ts` pins the absent NAMES, not the count — wiring one command while
+another quietly stops being mentioned leaves a total unchanged, and the silent direction is the one
+that has already cost this repository three separate discoveries. **Negative control seen RED** by
+adding one absent name to an unrelated source file: `expected [ …39 ] to deeply equal [ …40 ]`.
+
+**Its first run under Vitest reported every gap closed**, which is worth recording because the bug
+was in the measurement rather than the code: the pin file holds all 42 absent names as string
+literals, and the scan was reading `src/**` whole, so a pin of the output satisfied the measurement.
+Test files are excluded now. The rule that settled it is the honest one anyway — a name that appears
+only in a test or a comment is not an implementation.
+
+Of the two tabs, only `recordings` is a gap. `files` is not: the reference uses the id as a VALUE
+(`onMainTabChange` at byte 1,968,370 calls `getSessionFiles()` on it) and this room reaches the same
+behaviour through a typed union with the pane's own remote query. Both are recorded in the pin with
+their reasons, because a bare list of two would read as two gaps.
+
+**THIRTY MANIFEST ENTRIES NAMED FILES NO CLONE HAS.** All thirty verified missing again here, against
+a checkout where `apps/room/scripts/` holds zero files. They are removed, and
+`apps/room/docs/UNPUBLISHED-SCRIPTS.md` records every one so the account survives the removal. Two
+entries stayed because their files are tracked. What is genuinely still lost is the four Chromium
+gates — they drive a browser against unpublished captures and cannot be re-derived from tracked
+bytes, which is the same owner decision TODO row 5 already carries.
+
+`manifest-scripts-contract.test.ts` makes the class impossible to recur, for BOTH apps: every file a
+`package.json` script names must be tracked, answered by `git ls-files` rather than `existsSync`,
+because the file existing on this machine is exactly the property that hid it. **Negative control
+seen RED** by re-adding one removed entry. Its own first draft failed on `./tsconfig.json`, which
+matched as `tsconfig.js` with the `on` left over — the extension boundary is now asserted where the
+pattern says it is.
+
+**Verified:** room 141/141 files, 2,140 tests, 1 skipped · controller 98 files, 1,005 tests · eslint
+and prettier clean on every changed file. **NOT verified here:** 49 of the room's 190 test files are
+evidence-bound and this checkout is missing 13 of the 14 reference-capture roots, so they were
+excluded by design and this run does not cover them — the runner prints that, and it is repeated here
+rather than left in a log.
+
+
 ### 2026-08-26 13:58 EDT — Row 7(a): both "Command send OK." receivers ship, and the guard had no cover
 
 **Runtime impact: YES.** A presenter's pinned sales image now appears over members' chat, and

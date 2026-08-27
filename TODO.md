@@ -61,16 +61,12 @@ be239b2 origin/main` exits 0, so every blob in that tree is reachable from the p
 branch, and a per-file check returned a commit for all 78 and none for zero. Nothing about the
 decision turns on the number, but the row stated it as a measurement.
 
-**Two smaller things fall out of the same eviction, and both are real work:**
-
-- **30 npm script entries in `apps/room/package.json` point at untracked files** — all 30, verified
-  by `git ls-files --error-unmatch` on each. Anybody cloning the repository gets a `package.json`
-  whose scripts cannot run.
-- **`apps/room/scripts/audit-feature-coverage.mjs` cannot be run by a fresh clone** — untracked, and
-  present only on this machine. Corrected 2026-08-23: it is a **31st** untracked script, NOT one of
-  the 30 above; no `package.json` script names it, so "the other 29" was wrong twice over. It matters
-  more than any of them because this file's own enumeration depends on it — see *What the enumeration
-  says* below.
+**Two smaller things fell out of the same eviction and are DONE, 2026-08-27.** The manifest no longer
+advertises what a clone cannot run, and the enumeration is published. What is left of the eviction is
+the owner decision above and nothing else. `apps/room/docs/UNPUBLISHED-SCRIPTS.md` records the thirty
+removed entries so the account survives the removal, and names the one thing still genuinely lost:
+the four Chromium gates, which cannot be re-derived from tracked bytes because they drive a browser
+against unpublished captures. That is the same owner decision as row 5.
 
 **Three baseline lines are stale in the safe direction, recorded so nobody re-reports them as a leak.**
 (It read "Two" until 2026-08-23 while naming three files in the same sentence.)
@@ -186,11 +182,23 @@ Three consequences, all real and none of them papered over in code:
 
 Nothing had ever ENUMERATED the reference's features, so "everything buildable is built" was for a
 long time a statement about what somebody had thought to look for — while two whole presentation-area
-tabs sat in the captured bundle unbuilt. `apps/room/scripts/audit-feature-coverage.mjs` now asks the
+tabs sat in the captured bundle unbuilt. `apps/room/gate/audit-feature-coverage.mjs` now asks the
 bundle directly, and since it was written it has found, three separate times, work nobody knew
-existed. **Run it after every feature lands** — noting that it is untracked and reachable only on the
-author's machine (it is NOT one of the 30 `package.json` entries; no script names it), which is why
-the counts below are behind.
+existed. **Run it after every feature lands.** It moved from the untracked `scripts/` to the
+published `gate/` on 2026-08-27 and was re-derived from the tracked v4 bundle, so a fresh clone can
+reproduce every number it prints; `src/lib/feature-coverage-contract.test.ts` pins the output by NAME
+rather than by count, because wiring one command while another quietly stops being mentioned leaves a
+total unchanged. **Its own first run under Vitest reported every gap closed** — the pin file contains
+the absent names as literals and the scan was reading `src/**` whole, so the measurement was
+satisfied by a pin of its own output. Test files are excluded now, and the rule that settled it is
+the honest one anyway: a name that appears only in a test or a comment is not an implementation.
+
+**What it measures today, from the pinned bundle (sha256 `40796ca8…bab87524`, 2,891,205 bytes):**
+135 wire identifiers in the reference, **93 named in our source, 42 not**; 8 presentation-area tabs,
+**6 named, 2 not** — `recordings`, which is a real gap with a named blocker, and `files`, which is not
+a gap at all (the reference uses the id as a value in `onMainTabChange`; this room reaches the same
+behaviour through a typed union). **An absent identifier is not an absent feature**: the last
+adversarial pass killed 7 of 34 such claims outright and reclassified 9 more.
 
 `docs/decoded/missing-commands-triage.md` — every missing identifier read at every occurrence, then
 each gap claim put through an adversarial pass that killed 8 of 34:
@@ -219,9 +227,9 @@ all shipped 2026-08-15 (`for-all-broadcast.remote.ts:81,142`; `chat-mute.remote.
 `:1039-1048` — so of the **two** presentation-area tabs the audit reported missing, only
 `recordings` is real.
 
-**The action is to re-run `audit-feature-coverage.mjs` and let the document restate its own total** —
-which needs the script tracked first, tying this row to the eviction row above. **And when it is
-re-run, its verdicts need three buckets, not one** — see *What "not built" actually means here*
+**The script is tracked and the re-run is DONE, 2026-08-27** — its current output is above. What is
+still outstanding is the DOCUMENT: `missing-commands-triage.md` must be restated against those 42
+names, and **its verdicts need three buckets, not one** — see *What "not built" actually means here*
 below.
 
 **ITS LINE POINTERS ARE STALE REPO-WIDE.** The document's `ours` column was written before the
