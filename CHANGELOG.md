@@ -33,6 +33,54 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-27 22:52 EDT — The register count CI enforces and the count a human reads are one number
+
+**Runtime impact: NO.** One test's parser, the tally sentence it enforces, and two corrected rows.
+
+`TODO.md` row AI recorded the disagreement and is now deleted rather than struck through: the
+parser computed 68/5/14 while reading the register's status column by eye gave 66/6/15. Both cannot
+be right. **The parser was wrong.**
+
+It scanned every cell of a row for a status word under a "CLOSED wins" rule, so prose in the DETAIL
+cell voted on the status. Rows in this register narrate their own history — `already closed`,
+`Status stays OPEN`, a closure note quoting the wording it replaced — and three rows were being
+counted by a sentence rather than by their status column. Each was read in full before the change
+was kept:
+
+| row | its status cell | what made the old parser disagree |
+| --- | --- | --- |
+| `T1-3` | `WON'T FIX — superseded by T0-5` | the detail cell mentions CLOSED |
+| `T2-22` | `**CLOSED 2026-08-14**` | the same cell carries an older note, *"(Status stays OPEN: the geometry half remains.)"* — history, not status |
+| `T5-25` | `OPEN — DECISION NEEDED (same as T5-24)` | its detail argues the endpoint is built, which is true and is not the gap: the DISPLAY block is blocked on the same owner sentence as `T5-24` |
+
+The parser now finds the status column from **each table's own header**, because the tables disagree
+about where it sits — Tier 0 puts status third of four, Tiers 1/2/5 put it last, and Tier 4 has no
+status column at all, which is why its section heading is still its status.
+
+**Trailing cells are joined where status is the last column, and that is not a shortcut.** Seven
+rows carry unescaped pipes inside prose — `||` in an Angular expression, an IP list
+`localhost|127.0.0.1`, a filter pipe `statXrefs | filter:` — and split into more cells than their
+header has columns. Reading the status by bare index gets a fragment of a code span; reading the
+last cell gets a fragment of the same prose. Without the join, five rows come back UNCLASSIFIED and
+the total silently undercounts by five.
+
+**Corrected count: 66 CLOSED / 6 OPEN / 15 parked / 87 total, nothing unclassified — the same
+numbers as reading the column by eye.** Two independent methods agreeing is the evidence this is
+right, and it is why the tally sentence was moved to match the parser rather than the other way
+round. `TODO.md` §B now names `T5-25` beside `T5-24`, both blocked on the same sentence from the
+owner.
+
+**Negative control seen RED:** flipping one Tier 0 row's status cell to OPEN moved the computed
+count to 65/7 and the test failed on the difference. The register was restored and `git diff` is
+clean — the register itself was not edited by this work.
+
+**Also corrected, measured rather than inherited.** Row AG stated `+page.server.ts` exports NINETEEN
+actions, counting `forceReload`, which had no caller at all. That action was deleted when the command
+shipped, so the count moved with it: it is **EIGHTEEN** — `logout` plus the seventeen still reached
+through dynamic dispatchers. The seventeen are unchanged and remain open work.
+
+**Verified:** `evidence-gap-register-counts.test.ts` 4/4 green, negative-controlled.
+
 ### 2026-08-27 22:20 EDT — A clone can run the suite and re-run the enumeration, for the first time
 
 **Runtime impact: NO.** Manifest, one lifecycle script, one published gate and three contract tests.
