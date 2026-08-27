@@ -265,6 +265,7 @@ export function ensureDatabase() {
     CREATE TABLE IF NOT EXISTS room_state (
       room_short_code TEXT PRIMARY KEY,
       chat_mode TEXT NOT NULL DEFAULT 'g',
+      closed_message TEXT,
       updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS sessions (
@@ -321,6 +322,23 @@ export function ensureDatabase() {
   }
   if (!sharedFileColumns.has('uploaded_by')) {
     sqlite.exec('ALTER TABLE shared_files ADD COLUMN uploaded_by INTEGER REFERENCES users(id)');
+  }
+
+  /*
+    `room_state.closed_message` — what a member is told when the room is closed.
+
+    Guarded rather than assumed, for the reason the whole of this bootstrap is: it is forward-only,
+    and a database created before this column existed has the table without it. `CREATE TABLE IF NOT
+    EXISTS` above will not add a column to a table that already exists, which is exactly the trap
+    this idiom is here for.
+  */
+  const roomStateColumns = new Set(
+    (sqlite.pragma('table_info(room_state)') as Array<{ name: string }>).map(
+      (column) => column.name
+    )
+  );
+  if (!roomStateColumns.has('closed_message')) {
+    sqlite.exec('ALTER TABLE room_state ADD COLUMN closed_message TEXT');
   }
 
   /*

@@ -302,11 +302,19 @@ describe('every dispatched action has exactly one disposition', () => {
     'invalid-restream-link': 'the caller already rejected the URL; this reports why'
   };
 
+  /*
+    `session-save-close-message` LEFT this table on 2026-08-27 — it saves for real now, through
+    `saveCloseMessage`, and its action name is no longer dispatched at all: the editor's text cannot
+    travel on an action STRING, so `ModalHost` calls a receiver instead.
+
+    `admin-notes-password` is the last entry, and its stated blocker is corrected here: the setting is
+    `needPasswordForUserNotes`, not `deleteAlertPW` — the two share only the string "Wrong password!",
+    which occurs nine times in the bundle. It also needs more than the comparison: the Notes tab
+    behind it contains ONLY the prompt, so unlocking it today reveals nothing.
+  */
   const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {
     'admin-notes-password':
-      'alerts "Wrong password!" HARDCODED, never comparing — needs sessData.deleteAlertPW delivered to the room',
-    'session-save-close-message':
-      'alerts "Message Saved" and writes nothing — needs somewhere to save it'
+      'alerts "Wrong password!" HARDCODED, never comparing — needs needPasswordForUserNotes compared on the CONTROLLER, and a notes pane behind it to unlock'
   };
 
   it('a handled branch that only raises a dialog is DECLARED, not silently counted as handled', () => {
@@ -540,8 +548,18 @@ describe('an inert action really does nothing, executed', () => {
       is broken, mis-wired, or silently throwing. If this one does not move, none of the others means
       anything at all.
     */
+    /*
+      IT WAS `session-save-close-message` UNTIL 2026-08-27, when that control was wired for real and
+      stopped being dispatched as an action at all. Re-pointed at another handled action rather than
+      deleted, because a positive control that goes away with the thing it happened to name leaves
+      every assertion below passing against a harness nobody checks.
+
+      `session-lock` is a good replacement for the same reason it was easy to get wrong: it is
+      handled through the `SESSION_LOCK_WRITES` table rather than an `action === '…'` branch, so a
+      harness that could not reach a table would fail here first.
+    */
     const { actions, dialogs } = make();
-    actions.handle('session-save-close-message', {
+    actions.handle('session-lock', {
       id: 5,
       nick: 'Bo',
       emailHash: 'h',
@@ -549,7 +567,7 @@ describe('an inert action really does nothing, executed', () => {
       status: 'online'
     } as never);
     expect(dialogs.alert, 'a handled action must produce its observable effect').toBe(
-      'Message Saved'
+      'Session Locked'
     );
   });
 

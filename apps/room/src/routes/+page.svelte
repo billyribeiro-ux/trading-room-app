@@ -704,7 +704,7 @@
     await invalidateAll();
   }
 
-  
+
   // Server-persisted sizes. These are the ones SSR can see, so they are the source of truth.
   function settingsSplitPair(key: string) {
     return splitPairFromValue(prefs.loaded[key]);

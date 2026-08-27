@@ -645,6 +645,20 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         .from(roomState)
         .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
         .get()?.chatMode ?? 'g',
+    /*
+      What a member is told when the room is closed, so the presenter's editor opens on what is
+      actually stored rather than on an empty box.
+
+      `''` and not `null` for the CLIENT, because a textarea binds to a string; the distinction
+      between "never written" and "cleared" is the column's job and the refusal's, not the editor's.
+      Room state, so it comes from the row — every other reader of this value is on the server.
+    */
+    closedMessage:
+      db
+        .select({ closedMessage: roomState.closedMessage })
+        .from(roomState)
+        .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
+        .get()?.closedMessage ?? '',
     chatMutedTill:
       db
         .select({ expiresAt: chatMutes.expiresAt })

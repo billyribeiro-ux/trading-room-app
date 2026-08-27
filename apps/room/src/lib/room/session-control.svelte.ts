@@ -76,17 +76,11 @@ export class RoomSessionControl {
   handle(action: string): boolean {
     if (handleSessionRoomCommand(action, this.#deps)) return true;
 
-    if (action === 'session-save-close') {
-      this.#savePreference('sessionOpen', false);
-      this.#closeModal();
-      return true;
-    }
-
-    if (action === 'session-save-close-message') {
-      this.#dialogs.alert = 'Message Saved';
-      return true;
-    }
-
+    /*
+      `session-save-close` and `session-save-close-message` LEFT this chain on 2026-08-27, and their
+      removal is the fix: neither could carry the editor's text, because `onUserAction(action, user)`
+      has no third parameter. `CloseSessionPane` calls a receiver instead — see `close-message.ts`.
+    */
     /*
       THE LOCK, as a table rather than three branches — see `SESSION_LOCK_WRITES`. It is the one
       group here that contacts nothing: two preference writes and a captured sentence, with no

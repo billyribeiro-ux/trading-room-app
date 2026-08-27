@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { saveCloseMessageThen } from '#lib/room/close-message.js';
   import type { SvelteSet } from 'svelte/reactivity';
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
@@ -122,6 +123,7 @@
       function — a remote command plus `invalidateAll()` — and belongs to no class here.
       `saveAlertFilter` is `RoomAlertsPane`'s, and that object is NOT a prop of this component, so
       passing it to remove one callback would add one.
+
     */
     changeChatMode,
     saveAlertFilter
@@ -485,6 +487,8 @@
 >
   Conected<i class="fas fa-check"></i>
 </div>
+<!-- The close message takes NO new prop: `data`, `dialogs` and `prefs` are already here. The rule,
+     and the six callbacks deleted under it on 2026-08-18, are in the props docblock above. -->
 <ModalHost
   name={modals.modal}
   mediaIceServers={media.iceServers}
@@ -503,7 +507,10 @@
   canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
   alertSearchFilter={feeds.alertSearchFilter}
   {chatMode}
+  closedMessage={data.closedMessage ?? ''}
   onChatModeChange={(mode) => void changeChatMode(mode)}
+  onSaveCloseMessage={(message, then) =>
+    void saveCloseMessageThen(message, then, { dialogs, savePreference: prefs.save })}
   canUseRTE={composer.canUseRTE}
   rteDraft={composer.rteDraft}
   rteIsEditing={composer.rteIsEditing}

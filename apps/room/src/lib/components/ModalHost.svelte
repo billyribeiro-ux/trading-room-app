@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CloseSessionPane from './CloseSessionPane.svelte';
   import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
   import { ALERT_SEARCH_LIMIT } from '#lib/alert-search-limit.js';
@@ -237,6 +238,18 @@
     chatMode?: ChatMode;
     /** `changeChatMode` — a presenter act that changes the room; `#lib/chat-mode.ts` says why typed. */
     onChatModeChange: (mode: ChatMode) => void;
+    /** What members are told when the room is closed, as stored. The editor opens on this. */
+    closedMessage?: string;
+    /**
+     * Both close-session buttons, as ONE receiver taking what they differ by.
+     *
+     * *" Save Message and Close Session "* and *" Just Save Close Message "* save the same text; one
+     * of them then closes the room. Two props would have been two chances to wire the save to only
+     * one of them — which is exactly what was wrong here until 2026-08-27, when the first wrote
+     * `sessionOpen: false` without the message and the second raised `Message Saved` and wrote
+     * nothing at all. Two buttons offered to save it and neither did.
+     */
+    onSaveCloseMessage?: (message: string, then: 'close' | 'save-only') => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
     /**
@@ -336,6 +349,8 @@
     rteDraft = '',
     rteIsEditing = false,
     chatMode = 'g',
+    closedMessage = '',
+    onSaveCloseMessage,
     onChatModeChange,
     onRteDraftChange,
     onRteSend,
@@ -4146,43 +4161,12 @@
           </div>
         </div>
       </div>
-      <div
-        id="close-session"
-        role="tabpanel"
-        aria-labelledby="close-session-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'close-session',
-            active: sessionControlTab === 'close-session'
-          }
-        ]}
-      >
-        <div class="d-flex justify-content-center">
-          <button
-            type="button"
-            class="btn btn-outline-light mr-2 my-2"
-            onclick={() => onUserAction('session-save-close', targetUser)}
-          >
-            <i class="fas fa-save"></i> Save Message and Close Session
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-light mr-2 my-2"
-            onclick={() => onUserAction('session-save-close-message', targetUser)}
-          >
-            <i class="fas fa-save"></i> Just Save Close Message
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-light mr-2 my-2"
-            onclick={() => onUserAction('session-open', targetUser)}
-          >
-            Open Session
-          </button>
-        </div>
-        <div id="summernoteClosedMsg">undefined</div>
-      </div>
+      <CloseSessionPane
+        active={sessionControlTab === 'close-session'}
+        {closedMessage}
+        onOpenSession={() => onUserAction('session-open', targetUser)}
+        onSave={onSaveCloseMessage}
+      />
       <div
         id="lock-session"
         role="tabpanel"

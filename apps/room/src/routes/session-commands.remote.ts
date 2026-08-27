@@ -1,7 +1,8 @@
 import { command } from '$app/server';
 import { z } from 'zod';
 import { presenterRoom } from '#lib/server/auth.js';
-import { ensureDatabase } from '#lib/server/db/index.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { roomState } from '#lib/server/db/schema.js';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
 
 /*
@@ -172,3 +173,61 @@ export const openSession = command(z.void(), async () => {
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'openSession' } });
 });
+
+/**
+ * `saveCloseMessage` — what a member is told when this room is closed.
+ *
+ * ## Two buttons offered to save it and neither did
+ *
+ * *" Just Save Close Message "* raised `Message Saved` and wrote nothing — its whole handler body was
+ * one alert — and its sibling *" Save Message and Close Session "* only wrote `sessionOpen: false`,
+ * so the message half of its own label was a lie too. Nothing in `apps/room/src` persisted a close
+ * message at all, and `ModalHost.svelte` rendered the literal string `undefined` where the editor
+ * belongs. `TODO.md` row 7(b) and row W both carried it.
+ *
+ * ## What is evidenced, and what is not
+ *
+ * EVIDENCED: the payload key `closedMsg`, the round trip, and the host element the reference binds
+ * into — `#summernoteClosedMsg`, at bundle byte 2154583, a Summernote editor whose content is
+ * `closedTxt`.
+ *
+ * NOT EVIDENCED, and stated rather than papered over: **where the reference's server keeps it.** That
+ * server is not in the capture, so per-session against per-room, and which column, cannot be read out
+ * of anything held here. This room keeps it per ROOM, on `room_state`, because that table is already
+ * keyed that way and a message that reset at the end of every session is one the presenter would
+ * rewrite on every close.
+ *
+ * NOT EVIDENCED EITHER: **where it is SHOWN.** The capture shows the editor, never the reader. This
+ * room shows it on the refusal a closed room gives — `session/+page.server.ts`, in place of its own
+ * "This room is closed." — which is a decision recorded as one. It is also what stops this being
+ * storage nothing reads, which this repository forbids more firmly than it forbids a divergence.
+ *
+ * The message is stored as TEXT and rendered as TEXT. Upstream's host is a rich-text editor and this
+ * room's field is a plain textarea: a close message is delivered inside an HTTP error body, and
+ * sending presenter-authored HTML through that path would be an injection surface bought for
+ * italics. Recorded so nobody "restores" the editor without moving the display first.
+ */
+export const saveCloseMessage = command(
+  z.strictObject({
+    /*
+      Bounded and trimmed, in that order. This is presenter-authored text that ends up in a response
+      body, so it gets a length it cannot exceed rather than being trusted. Empty is ALLOWED and is
+      how a presenter clears it — the refusal then falls back to its own sentence, which is why the
+      column is nullable rather than defaulted to ''.
+    */
+    message: z.string().trim().max(2000)
+  }),
+  async ({ message }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    const now = new Date();
+    db.insert(roomState)
+      .values({ roomShortCode: room, closedMessage: message || null, updatedAt: now })
+      /* One row per room; a second save UPDATES rather than appending a second opinion. */
+      .onConflictDoUpdate({
+        target: roomState.roomShortCode,
+        set: { closedMessage: message || null, updatedAt: now }
+      })
+      .run();
+  }
+);

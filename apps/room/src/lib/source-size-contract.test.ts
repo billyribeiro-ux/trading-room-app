@@ -669,7 +669,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       One line, and it is the whole point of the raise — the five checkboxes now have a way out of
       `ModalHost`, which they did not before.
     */
-    max: 770,
+    /*
+      770 -> 777, 2026-08-27, and the rule directly above says a raise is a conversation. This is that
+      conversation, argued rather than quietly applied — and it is the second exception this file has
+      recorded, after `private-commands.svelte.ts`.
+
+      WHAT THE SEVEN LINES ARE. One import, one `closedMessage` taken off `data`, one callback, and a
+      two-line note saying why neither is a new prop. That is the whole cost of wiring the close
+      message — a feature that had storage, a command and a reader built for it the same day, and
+      whose two buttons had been claiming to save something for as long as they had existed.
+
+      WHY NOT AN EXTRACTION. There is nothing here to extract: seven lines of wiring in a composition
+      root is the root doing its job. The extraction that this change DID make went the other way and
+      is the reason the raise is defensible — `CloseSessionPane.svelte` took 56 lines out of
+      `ModalHost.svelte`, whose ceiling drops from 6022 to 6006 in the same commit. **The pair is 49
+      lines smaller.**
+
+      The alternative was contorting a props list to dodge a number, which this file's own opening
+      calls the tail wagging the dog.
+    */
+    max: 777,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
@@ -834,7 +853,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reader cannot see would only have moved the silent wrong answer from fifty rows to five
       hundred. The `alerts` prop it replaced was DELETED, which paid eight of the forty-one back.
     */
-    max: 6022,
+    max: 6006,
     why: 'every modal in the room, in one component'
   },
   {
@@ -1249,7 +1268,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       NOT changed here, because rewriting the ceiling model under deadline is how a gate ends up
       weaker than it was. Recorded as the owner's call, with the evidence attached.
     */
-    max: 109,
+    max: 103,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
@@ -1336,6 +1355,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/close-message.ts',
+    /*
+      THE TWO CLOSE-SESSION BUTTONS' one shared act, 2026-08-27.
+
+      Small on purpose: a remote command, an ordered pair of effects, and the rule that the close only
+      happens if the save succeeded — because closing a room on a refused save shuts members out
+      behind whatever the previous message said.
+    */
+    max: 49,
+    why: 'saves the close message, then closes only if the save succeeded'
+  },
   {
     file: 'lib/room/for-all-broadcasts.ts',
     /*

@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 03:10 EDT — Two buttons offered to save a close message; now one saves it and a member reads it
+
+**Runtime impact: YES.** A presenter can write what members are told when the room is closed, and a
+member turned away from a closed room is told it.
+
+**Both buttons were lies, in different directions.** *" Just Save Close Message "*'s entire handler
+body was `alert = 'Message Saved'`. *" Save Message and Close Session "* wrote `sessionOpen: false`
+and dropped the message half of its own label. Nothing in `apps/room/src` persisted a close message
+at all, and `ModalHost.svelte` rendered the literal string `undefined` inside the reference's own
+`#summernoteClosedMsg` — an interpolated `undefined` that had reached the DOM as text.
+
+**The whole loop, because the store alone would have been dead storage.** A column nothing consults
+is forbidden here as firmly as a control that does nothing, so this shipped with its reader:
+`room_state.closed_message` (guarded `ALTER TABLE`, since the bootstrap is forward-only),
+`saveCloseMessage`, the editor, and `closedRoomMessage` — which is what `session/[code]` now refuses
+a closed room with, in place of its own fixed sentence.
+
+**Two things are NOT evidenced and are recorded as decisions rather than matches.** WHERE the
+reference's server keeps the message is unknowable — that server is not in the capture, so
+per-session against per-room cannot be read out of anything held here; this room keeps it per room,
+because `room_state` is already keyed that way and a message that reset at the end of every session
+is one the presenter would rewrite on every close. And WHERE it is SHOWN: the capture shows the
+editor and never the reader.
+
+**A textarea, not a rich-text editor, and that is a divergence with a reason.** Upstream's host is
+Summernote. The message is delivered inside an HTTP error body, and sending presenter-authored HTML
+down that path would be an injection surface bought for italics. Whoever restores the editor moves
+the display first.
+
+**The nullable column is load-bearing.** "Never written" and "written then cleared" are different
+rows, and both must fall back — a presenter who has written nothing must not be able to hand a member
+a blank refusal. `saveCloseMessage` normalises a trimmed-empty save to `null` for the same reason.
+
+**The order is the rule: save first, close only if the save succeeded.** Closing a room on the
+strength of a refused save would shut members out behind whatever the previous message said, which is
+worse than a room that stayed open.
+
+**Neither action name is dispatched any more, and that is the fix rather than a tidy-up.**
+`onUserAction(action, user)` has no third parameter, so an action STRING cannot carry the editor's
+text — these two could never have been repaired in place. `CloseSessionPane` calls a receiver, and
+ONE receiver takes what the two buttons differ by: two props would have been two chances to wire the
+save to only one of them, which is exactly what was already wrong.
+
+**`CloseSessionPane.svelte` is a new component and the largest thing this change did.** Wiring three
+missing halves into a 6,000-line file pushed it past its ceiling, and `PHASE-5-DECOMPOSITION.md`
+names a pane as the unit to break `ModalHost` into. **`ModalHost` ends 17 lines SMALLER than it
+started**, and its ceiling drops 6022 → 6006.
+
+**One ceiling was RAISED and it is argued in place, only the second time this file has recorded
+that.** `RoomOverlays.svelte` 770 → 777: an import, one value taken off `data`, one callback and a
+two-line note. Seven lines of wiring in a composition root is the root doing its job, there is
+nothing there to extract, and the pair of files this change touched is **49 lines smaller**. The
+alternative was contorting a props list to dodge a number, which the ratchet's own opening calls the
+tail wagging the dog. `session-control.svelte.ts` went the other way, 109 → 103.
+
+**The close message takes NO new prop on `RoomOverlays` beyond the two, and that is that file's own
+rule:** six callbacks were deleted from its props in 2026-08-18 for being "a second path to something
+already in scope", and `data`, `dialogs` and `prefs` are all already there.
+
+**Five guards caught this change and every one was right.** The disposition contract refused the
+stale `DIALOG_ONLY_ACTIONS` entry AND lost its positive control — which had happened to name the very
+action being fixed, so it was re-pointed at `session-lock` rather than deleted, because a control
+that vanishes with the thing it names leaves every assertion below it passing against a harness
+nobody checks. The page-load snapshot demanded the new key. The enumeration lost `saveCloseMessage`.
+The size ratchet refused twice.
+
+**ESLint caught me breaking this repository's own stated rule.** The editor's draft was `$state` plus
+an `$effect` assigning `closedMessage` into it — the shape `CLAUDE.md` names in as many words:
+*"`$effect` that assigns a value derived from other state → that is `$derived`"*. It is a writable
+`$derived` now. The rule was already written down; the lint is what noticed I had not followed it.
+
+**Negative control seen RED:** `closedRoomMessage` changed to `?? ` on the raw column instead of
+falling back on blank — a member gets an empty refusal, and the case that asserts otherwise failed.
+
+**Verified:** room 148 files / 2,267 tests · `svelte-check` 1,265 files 0/0 · eslint and prettier
+clean. **NOT verified:** no browser has rendered the new pane; its markup is asserted as text.
+
 ### 2026-08-28 02:05 EDT — A hard reset and an opened room now reach the room, not just the presenter
 
 **Runtime impact: YES.** Two buttons that moved one browser now move every browser in the room.

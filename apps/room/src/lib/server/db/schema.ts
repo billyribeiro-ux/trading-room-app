@@ -859,5 +859,24 @@ export const roomState = sqliteTable('room_state', {
    * `changeChatMode(e, i)` and the `'p' == e` / `'d' != e` tests that read them back.
    */
   chatMode: text('chat_mode').notNull().default('g'),
+  /**
+   * What a member is told when the room is closed — the reference's `closedTxt`.
+   *
+   * NULL means "never set", which is different from an empty string: the refusal falls back to its
+   * own sentence rather than showing a member a blank page. The distinction is why this is nullable
+   * rather than `.notNull().default('')`.
+   *
+   * ## Where the reference keeps it is UNKNOWABLE from the capture, and this says so
+   *
+   * The bundle binds `closedTxt` into a Summernote host (`#summernoteClosedMsg`, byte 2154583) and
+   * posts `closedMsg` back, and that is the whole of the evidence: the payload key and the round
+   * trip. Its SERVER is not in the capture, so whether it lives per session or per room, and in
+   * which column, cannot be read out of anything held here.
+   *
+   * Per ROOM is this room's choice and the reason is that `room_state` is already keyed that way —
+   * one row per short code — and a close message that reset every time a session ended would be a
+   * message the presenter has to rewrite on every close. Recorded as a decision, not a match.
+   */
+  closedMessage: text('closed_message'),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 });
