@@ -33,6 +33,40 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-27 23:10 EDT — TODO's two most misleading rows, recounted from the code instead of from themselves
+
+**Runtime impact: NO.** `TODO.md` only. Recorded because the numbers it carried would have sent the
+next person to rebuild what is already shipped.
+
+Both rows had been maintained by arithmetic over their own previous value, which is exactly the
+failure the file warns about in its own opening. Re-measured from `user-action-intent.ts` and every
+branch of `RoomUserActions.handle`:
+
+**Row 4 said "ten inert controls". It is SIX.** `mute-mic`, `mute-camera`, `stop-screens` and
+`restart-screens` left `INERT_ACTIONS` when they were built — they are `PEER_SUBCMDS` entries
+reaching `presenterCommand`, gated by `presenterRoom()` and addressed with `publishToUsers`, so the
+server-side presenter check the row demanded existed already. Of the six left, two are not work at
+all: `disable-private-chat` MATCHES the reference (which renders that button with no click binding),
+and the recording pair is an honest gap whose wire resolves to a server-side recorder this room does
+not have. Three are real: `get-my-token` (evidenced, unbuilt), `debug-log` and
+`upload-profile-picture`.
+
+**Row W said "twelve controls report success and send nothing". It is THREE.** `EXACT_ALERTS` holds
+three keys and two of them are honest — `save-permissions` and `restart-audio` announce real sends,
+and the reference raises both alerts too. The liars are `mute-chat-indefinitely` (needs a controller
+door), `admin-notes-password` (the `onconfirm` takes no parameter, so the typed value is never
+received) and `session-save-close-message` (its entire body is one alert, and its sibling saves no
+message either). Nine of the twelve shipped and are recorded in this file rather than struck through
+there.
+
+**Disposition census, 2026-08-27: 40 dispatched actions, 6 inert, 3 carrying a fixed alert.**
+`user-action-disposition-contract.test.ts` (11 cases, green) is the authority.
+
+Three more claims corrected in place: the "LYING CONTROLS" paragraph still named `remoteRestartAudio`
+as one, which it stopped being when it was wired; the "DEAD CONTROLS" paragraph still read "IT IS
+ELEVEN"; and the defect table still listed `save-permissions` as needing new server code, when
+`permissions.remote.ts` → `writeRoomPermissions` → `/internal/room-permissions` has shipped.
+
 ### 2026-08-27 22:52 EDT — The register count CI enforces and the count a human reads are one number
 
 **Runtime impact: NO.** One test's parser, the tally sentence it enforces, and two corrected rows.
