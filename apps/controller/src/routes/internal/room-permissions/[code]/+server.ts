@@ -5,7 +5,7 @@ import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { PERMISSION_KEYS, savePermissions, type PermissionKey } from '#lib/server/rooms.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
-import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -71,10 +71,11 @@ import type { RequestHandler } from './$types';
  *
  * ## The credential
  *
- * The same bearer MAC over `<code>.<timestamp>` the other internal endpoints take, valid for 60
- * seconds. `internal/room-setting` records the honest caveat that its domain prefix is
- * `config-read:`, so a read capability authorises this write too; that is inherited here rather than
- * re-litigated, and splitting the prefixes remains the one follow-up both endpoints want.
+ * A bearer MAC over `<code>.<timestamp>`, valid for 60 seconds, domain-separated as `config-write:`
+ * and verified by `verifyConfigWriteToken`. **A `config-read:` capability is REFUSED here.** This
+ * used to inherit `internal/room-setting`'s caveat that a read capability authorised the write; the
+ * prefixes were split on 2026-08-27 and the refusal is asserted by
+ * `config-read-cannot-write-contract.test.ts` rather than described here.
  */
 export const POST: RequestHandler = async ({ params, request, url }) => {
   const secret = ROOM_JWT_SECRET;
@@ -84,7 +85,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   }
 
   const presented = request.headers.get('authorization')?.replace(/^Bearer /, '');
-  const verified = verifyConfigReadToken(secret, params.code, presented);
+  const verified = verifyConfigWriteToken(secret, params.code, presented);
   if (!verified.ok) {
     // One status and one message for all three reasons; the reason is for the log, not the caller.
     console.warn('[room-permissions] rejected', { code: params.code, reason: verified.reason });

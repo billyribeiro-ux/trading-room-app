@@ -83,7 +83,13 @@ function readVerifiedBundle() {
   return { text: bytes.toString('utf8'), sha256: actual, bytes: bytes.length };
 }
 
-/** Every capture of `re` over `text`, deduplicated, in first-seen order made deterministic by sort. */
+/**
+ * Every capture of `re` over `text`, deduplicated.
+ *
+ * @param {string} text
+ * @param {RegExp} re
+ * @returns {Set<string>}
+ */
 function matches(text, re) {
   const found = new Set();
   for (const m of text.matchAll(re)) found.add(m[1]);
@@ -101,11 +107,21 @@ const VOCABULARIES = {
   INVOKE: /cmd:"([A-Za-z][A-Za-z0-9_]{2,})"/g
 };
 
+/**
+ * @param {string} bundle
+ * @returns {{ name: string; sources: string[] }[]}
+ */
 export function extractWireVocabulary(bundle) {
+  /** @type {Map<string, Set<string>>} */
   const byName = new Map();
+  /**
+   * @param {string} name
+   * @param {string} source
+   */
   const note = (name, source) => {
-    if (!byName.has(name)) byName.set(name, new Set());
-    byName.get(name).add(source);
+    const sources = byName.get(name) ?? new Set();
+    sources.add(source);
+    byName.set(name, sources);
   };
 
   for (const [source, re] of Object.entries(VOCABULARIES)) {
@@ -122,7 +138,12 @@ export function extractWireVocabulary(bundle) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The presentation-area tab ids, which are the other thing the reference names by string. */
+/**
+ * The presentation-area tab ids, which are the other thing the reference names by string.
+ *
+ * @param {string} bundle
+ * @returns {string[]}
+ */
 export function extractPresentationTabs(bundle) {
   return [...matches(bundle, /presAreaTabs-([A-Za-z][A-Za-z0-9_]*)/g)].sort();
 }
@@ -151,6 +172,7 @@ function roomSource() {
   const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', 'coverage']);
   const IS_TEST = /\.(test|spec)\.(ts|js)$|\.(test|spec)\.svelte\.ts$|\.svelte\.(test|spec)\.ts$/;
   let text = '';
+  /** @param {string} dir */
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (SKIP.has(entry.name)) continue;
@@ -204,7 +226,12 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
     );
     console.log('\nNOT NAMED IN OUR SOURCE — questions to answer by reading, not a list of work:');
     for (const name of absentCommands) {
-      const sources = commands.find((c) => c.name === name).sources.join(',');
+      /*
+        `?? []` rather than a bare access. `absentCommands` is derived from `commands` in the same
+        pass, so the lookup cannot miss — but a printer that throws on a name it just produced would
+        be a report that dies at the point it becomes useful, and the type checker is right to ask.
+      */
+      const sources = (commands.find((c) => c.name === name)?.sources ?? []).join(',');
       console.log(`  ${name.padEnd(28)} ${sources}`);
     }
     for (const name of absentTabs) console.log(`  presAreaTabs-${name.padEnd(15)} TAB`);

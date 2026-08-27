@@ -44,6 +44,16 @@ export const HANDOFF_TTL_SECONDS = 31_104_000;
 /** Seconds a config-read signature is valid for. Same reasoning, different credential. */
 export const CONFIG_READ_TTL_SECONDS = 60;
 
+/**
+ * Seconds a config-WRITE signature is valid for.
+ *
+ * The same sixty, and deliberately not shorter. A shorter window would not make the credential
+ * stronger — it is a MAC over `code.timestamp` either way — and it would make a write fail on clock
+ * skew that a read survives, which is the kind of asymmetry that gets diagnosed as "the ban button
+ * is flaky".
+ */
+export const CONFIG_WRITE_TTL_SECONDS = 60;
+
 export interface HandoffIdentity {
   name: string;
   email: string;
@@ -197,13 +207,58 @@ export function configReadToken(
   return `${nowSeconds}.${signature(secret, `config-read:${shortCode}.${nowSeconds}`)}`;
 }
 
+/**
+ * The server-to-server credential for CHANGING a room's configuration.
+ *
+ * ## Why this exists, and what it fixes
+ *
+ * Until 2026-08-27 there was one prefix. `internal/room-ban`, `internal/room-permissions`,
+ * `internal/room-setting` and `internal/stream-ingest` all MUTATE controller state, and all four
+ * accepted `config-read:` — so a capability minted to read a room's settings also authorised banning
+ * a member from it. Three of those routes said so in their own docblocks, in the same words, and
+ * called splitting the prefixes "the one follow-up all of these endpoints share". Every new door
+ * inherited it, which is how an accepted caveat becomes a permanent one.
+ *
+ * The MAC is not what was weak: both credentials are derived from `ROOM_JWT_SECRET`, and anything
+ * holding that secret can mint either. What was wrong is that the credential did not SAY what it
+ * authorised, so nothing could refuse a read token presented at a write. Domain separation is what
+ * makes the refusal possible, and `config-read-cannot-write-contract.test.ts` is what proves it
+ * happens.
+ *
+ * ## The deployment note, stated because it is a real consequence
+ *
+ * The room mints and the controller verifies, and they are separate deployables. During the deploy
+ * skew of the release that introduces this, a write from the old room to the new controller is
+ * REFUSED — 401, surfaced as a refusal in the presenter's UI, no data written and nothing silently
+ * dropped. That is the direction this repository resolves ambiguity in, and it is why the controller
+ * does NOT accept both prefixes "for a transition": a transition that accepts the old credential is
+ * the current state wearing a deprecation notice.
+ */
+export function configWriteToken(
+  secret: string,
+  shortCode: string,
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): string {
+  return `${nowSeconds}.${signature(secret, `config-write:${shortCode}.${nowSeconds}`)}`;
+}
+
 export type ConfigReadResult = { ok: true } | { ok: false; reason: 'malformed' | 'stale' | 'bad-signature' };
 
-export function verifyConfigReadToken(
+/**
+ * One verifier for both credentials, taking the domain as an argument.
+ *
+ * A second copy of this function differing only in a string literal is how the two would drift — and
+ * the drift that matters here is silent: a write verifier that forgot the freshness check, or
+ * compared with `===` instead of `timingSafeEqual`, would still pass every test that only checks a
+ * good token is accepted. One implementation, two domains, and the domain is the only difference.
+ */
+function verifyDomainToken(
+  domain: 'config-read' | 'config-write',
   secret: string,
   shortCode: string,
   token: string | null | undefined,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  ttlSeconds: number,
+  nowSeconds: number
 ): ConfigReadResult {
   if (!token) return { ok: false, reason: 'malformed' };
 
@@ -221,13 +276,38 @@ export function verifyConfigReadToken(
     caller, which is a small oracle but a free one to avoid. It also keeps the comparison
     constant-time for every rejected request rather than only the ones that get that far.
   */
-  const expected = signature(secret, `config-read:${shortCode}.${issuedAt}`);
+  const expected = signature(secret, `${domain}:${shortCode}.${issuedAt}`);
   const a = Buffer.from(expected);
   const b = Buffer.from(presented);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: 'bad-signature' };
 
   // Symmetric window: a clock skewed either way is a misconfiguration, not a longer grace period.
-  if (Math.abs(nowSeconds - issuedAt) > CONFIG_READ_TTL_SECONDS) return { ok: false, reason: 'stale' };
+  if (Math.abs(nowSeconds - issuedAt) > ttlSeconds) return { ok: false, reason: 'stale' };
 
   return { ok: true };
+}
+
+/** May this caller READ the room's configuration? A write credential is not accepted here. */
+export function verifyConfigReadToken(
+  secret: string,
+  shortCode: string,
+  token: string | null | undefined,
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): ConfigReadResult {
+  return verifyDomainToken('config-read', secret, shortCode, token, CONFIG_READ_TTL_SECONDS, nowSeconds);
+}
+
+/**
+ * May this caller CHANGE the room's configuration?
+ *
+ * A read credential is refused here, which is the whole point of the split, and the refusal is
+ * asserted rather than assumed — see `config-read-cannot-write-contract.test.ts`.
+ */
+export function verifyConfigWriteToken(
+  secret: string,
+  shortCode: string,
+  token: string | null | undefined,
+  nowSeconds: number = Math.floor(Date.now() / 1000)
+): ConfigReadResult {
+  return verifyDomainToken('config-write', secret, shortCode, token, CONFIG_WRITE_TTL_SECONDS, nowSeconds);
 }

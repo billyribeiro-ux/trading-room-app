@@ -424,16 +424,43 @@ export class RoomConfigUnavailable extends Error {
  */
 const TIMEOUT_MS = 2_000;
 
-/** Mirrors `verifyConfigReadToken` on the controller: `<ts>.<hmac("config-read:<code>.<ts>")>`. */
-function configReadToken(secret: string, shortCode: string): string {
+/**
+ * Mirrors the controller's verifiers: `<ts>.<hmac("<domain>:<code>.<ts>")>`.
+ *
+ * ## Two domains, and the difference is not cosmetic
+ *
+ * `config-read:` authorises reading a room's settings. `config-write:` authorises CHANGING them —
+ * banning a member, rewriting the permission set, overwriting a setting, rotating an ingest
+ * credential. Until 2026-08-27 there was one prefix and the four write endpoints accepted it, so a
+ * capability minted to READ also authorised the ban. The controller's `configWriteToken` docblock
+ * carries the full account, including why no "transition period" accepts both.
+ *
+ * The signing itself is shared rather than copied per domain: two implementations differing only in
+ * a string literal is how one of them silently stops matching what the controller expects.
+ */
+function domainToken(
+  domain: 'config-read' | 'config-write',
+  secret: string,
+  shortCode: string
+): string {
   const issuedAt = Math.floor(Date.now() / 1000);
   const signature = createHmac('sha256', secret)
-    .update(`config-read:${shortCode}.${issuedAt}`)
+    .update(`${domain}:${shortCode}.${issuedAt}`)
     .digest('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
   return `${issuedAt}.${signature}`;
+}
+
+/** The capability to READ this room's configuration. Refused by every write endpoint. */
+function configReadToken(secret: string, shortCode: string): string {
+  return domainToken('config-read', secret, shortCode);
+}
+
+/** The capability to CHANGE this room's configuration. Refused by every read endpoint. */
+function configWriteToken(secret: string, shortCode: string): string {
+  return domainToken('config-write', secret, shortCode);
 }
 
 /**
@@ -584,7 +611,7 @@ export async function writeRoomSetting(
     response = await fetch(url, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
         'content-type': 'application/json'
       },
       body: JSON.stringify({ name, value }),
@@ -638,7 +665,7 @@ export async function writeRoomPermissions(
     response = await fetch(url, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
         'content-type': 'application/json'
       },
       body: JSON.stringify({ targetEmail, granted }),
@@ -687,7 +714,7 @@ export async function writeRoomBan(
     response = await fetch(url, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
         'content-type': 'application/json'
       },
       body: JSON.stringify({ targetEmail, banned }),
@@ -764,7 +791,7 @@ export async function requestStreamIngestKey(
     response = await fetch(base, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
         'content-type': 'application/json'
       },
       body: JSON.stringify({ email: memberEmail }),
