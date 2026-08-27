@@ -861,9 +861,9 @@ export function createRoom(deps: RoomDeps) {
       `notes` is initialised, so the forward reference is resolved by then.
     */
     focusSessionNote: (noteId) => notes.focusNote(noteId),
-    // Server-ended connection: read the reason, then reload. Why a reload and not a redirect is on
-    // `#lib/server/live-access.ts` §"What the client does with it".
-    sessionRevoked: (message: string) => dialogs.alertThen(message, () => location.reload()),
+    // Three frames end this page with a sentence: a revoked connection, a hard reset, an opened
+    // room. Why a reload and not a redirect is on `#lib/server/live-access.ts`.
+    alertThenReload: (message: string) => dialogs.alertThen(message, () => location.reload()),
     // THE WHOLE ADDRESSED CHANNEL, whose four callbacks are built where the class that calls them is
     // declared — see `addressedChannelFor`. The stream routes to it rather than owning it.
     privateCommands: addressedChannelFor({

@@ -113,3 +113,62 @@ export const softReset = command(z.void(), async () => {
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'softResetDone' } });
 });
+
+/**
+ * `hardReset` — every client drops its media and RELOADS.
+ *
+ * The heavier sibling of `softReset`, and the difference is what the client does after: a soft reset
+ * rebuilds the media session in place, a hard reset takes the whole page down and back up.
+ *
+ * Receiver, read whole at bundle bytes 2596540-2597340:
+ *
+ * ```js
+ * subscribe("hardReset", () => { disconnectAll(),
+ *   bootbox.alert("The room is being reset by an administrator. Click OK to continue...",
+ *                 () => location.reload()) })
+ * ```
+ *
+ * and the sender frame at byte 1013595 is `case "hardReset": emit("hardReset"), this.disconnect()`
+ * — **emit THEN disconnect**, which is the opposite order to `changeUserPerms` two cases below it.
+ * That asymmetry is upstream's and is reproduced rather than normalised; it reads correctly in both
+ * directions, because a frame that must reach the screen cannot race its own transport being torn
+ * down.
+ *
+ * ## What was actually missing, and it was not the receiver
+ *
+ * `TODO.md` row 10 recorded this as a missing RECEIVER for two sessions running. It is not:
+ * `RoomDialogs.alertThen` has existed since `forceReload` was built, and the four upstream callback
+ * receivers were already transcribed in that file. What was missing is a SENDER — the room's
+ * `session-hard-reset` button wrote a PREFERENCE and told nobody, so every other client sat there
+ * while the presenter's own page reloaded.
+ *
+ * The preference write STAYS. It is what makes the reset survive a client that was not connected to
+ * hear the frame, and it is read by the next page load either way. This adds the half that reaches
+ * the people who ARE connected.
+ */
+export const hardReset = command(z.void(), async () => {
+  ensureDatabase();
+  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'hardReset' } });
+});
+
+/**
+ * `openSession` — the room has been opened; everybody waiting outside may come in.
+ *
+ * ```js
+ * bootbox.alert("The session is now open, click here to reload the page and enter",
+ *               () => location.reload())
+ * ```
+ *
+ * with the sender at byte 1013476, `case "openSession": this.openSession()`.
+ *
+ * **The message is addressed to people who are NOT in the room yet**, which is what makes the reload
+ * the whole point rather than a refresh: a member turned away by `isShutOutByRoomState` is sitting
+ * on a refusal page, and the reload is what re-runs the door check that now says yes. So this frame
+ * is worth sending even though every recipient is about to leave the page.
+ *
+ * Same as `hardReset`: the preference write stays and this is the half that reaches the connected.
+ */
+export const openSession = command(z.void(), async () => {
+  ensureDatabase();
+  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'openSession' } });
+});

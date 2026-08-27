@@ -87,7 +87,7 @@ afterEach(() => {
   (globalThis as { EventSource?: unknown }).EventSource = originalEventSource;
 });
 
-const make = () => {
+const make = (mediaTransport: Record<string, unknown> = {}) => {
   const missed: true[] = [];
   const tabs: string[] = [];
   const played: string[] = [];
@@ -125,7 +125,7 @@ const make = () => {
     // The broadcast receivers the video/YouTube/mp3 commands call, recorded so the dispatch can
     // be asserted to reach the right one.
     broadcasts: { videoStarted: (url: string) => played.push(url) } as never,
-    mediaTransport: {} as never,
+    mediaTransport: mediaTransport as never,
     mtx: {} as never,
     roster: { countArrived: () => {}, rosterArrived: () => {} },
     privateChat: { ingest: () => {} },
@@ -138,7 +138,7 @@ const make = () => {
     focusSessionNote: () => {},
     // Recorded rather than stubbed: the MESSAGE is what a revoked member reads, so a stub would
     // assert the routing and let the reason drift.
-    sessionRevoked: (message: string) => revoked.push(message),
+    alertThenReload: (message: string) => revoked.push(message),
     chatMissedWhileHidden: () => missed.push(true),
     /*
       A REAL `RoomPrivateCommands`, not a stub. The addressing test is now ONE gate inside it, and a
@@ -297,7 +297,7 @@ const hiddenTabStream = (missed: true[]) =>
     restartMediaSession: () => null,
     showTab: () => {},
     focusSessionNote: () => {},
-    sessionRevoked: () => {},
+    alertThenReload: () => {},
     chatMissedWhileHidden: () => missed.push(true),
     privateCommands: new RoomPrivateCommands({
       viewerId: () => 1,
@@ -566,6 +566,44 @@ describe('the two receivers reach the page', () => {
     expect(revoked).toEqual(['signed in elsewhere']);
     expect(played).toEqual([]);
     expect(tabs).toEqual([]);
+  });
+
+  it('a hard reset drops remote media and states the captured sentence', () => {
+    /*
+      `TODO.md` row 10 recorded this as a missing RECEIVER for two sessions. It was not — `alertThen`
+      has existed since `forceReload` was built. What was missing was the SENDER: the presenter's
+      button wrote a preference and reloaded their OWN page, so the reset read as working from the
+      only seat that could see it.
+    */
+    const dropped: true[] = [];
+    const { stream, revoked } = make({ dropRemoteMedia: () => dropped.push(true) });
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data: { cmd: 'hardReset' } })
+    });
+    expect(revoked).toEqual([
+      'The room is being reset by an administrator. Click OK to continue...'
+    ]);
+    /*
+      The MEDIA DROP is asserted beside the message because upstream disconnects before it alerts. A
+      reset that leaves every consumer attached while a modal waits for a click holds the SFU open for
+      exactly as long as nobody is looking at the screen.
+    */
+    expect(dropped).toEqual([true]);
+  });
+
+  it('an opened session states its own captured sentence, and a different one', () => {
+    /*
+      Two frames, two sentences, and they are NOT interchangeable: this one is addressed to people
+      who are not in the room yet — a member sitting on the "This room is closed." refusal, for whom
+      the reload is what re-runs the door check that now says yes.
+    */
+    const { stream, revoked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data: { cmd: 'openSession' } })
+    });
+    expect(revoked).toEqual(['The session is now open, click here to reload the page and enter']);
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {

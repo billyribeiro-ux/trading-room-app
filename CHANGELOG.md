@@ -33,6 +33,67 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 02:05 EDT — A hard reset and an opened room now reach the room, not just the presenter
+
+**Runtime impact: YES.** Two buttons that moved one browser now move every browser in the room.
+
+**What was actually missing was not what `TODO.md` row 10 said for two sessions.** That row recorded
+these as missing RECEIVERS. They were not: `RoomDialogs.alertThen` has existed since `forceReload`
+was built, and all four upstream callback receivers were already transcribed in `dialogs.svelte.ts`.
+The missing half was the SENDER — `session-hard-reset` and `session-open` wrote a preference and told
+nobody, so each read as working from the only seat that could see it, because the presenter's own
+page reloaded.
+
+Both are ordinary broadcasts now. `hardReset` drops remote media before it alerts, because upstream
+disconnects first and a reset that leaves every consumer attached while a modal waits for a click
+holds the SFU open for exactly as long as nobody is looking at the screen. `openSession` does not,
+and its message is addressed to people who are NOT in the room yet — a member sitting on the "This
+room is closed." refusal, for whom the reload is what re-runs the door check that now says yes.
+
+**The preference writes stay.** They are what makes the act survive a client that was not connected
+to hear the frame; the broadcast is the half that reaches the people who were.
+
+`permsChangeReload`, the fourth receiver, stays blocked and is now the only part of that row left:
+`reAuthSessionTok` is confirmed absent from the bundle, so its callback has nowhere to navigate.
+
+**THE SIZE RATCHET REFUSED THIS THREE TIMES AND PRODUCED THREE REAL MODULES.** That is worth
+recording as a pattern rather than as an obstacle: every feature wired into `events.svelte.ts` or
+`session-control.svelte.ts` now hits a ceiling, and each refusal has named a seam that was already
+there.
+
+- **`for-all-broadcasts.ts`** — the eight "For All" receivers. They are the one group on the `cmds`
+  channel that shares a collaborator; everything else routes to a different object each time, which
+  is why the chain stayed a chain and these lifted out. The precedent is `RoomPrivateCommands`,
+  extracted from the same router for the same reason.
+- **`session-room-commands.ts`** — the five session acts that REACH THE SERVER, against the four
+  that write a preference and stop. The seam is real rather than a line-count exercise, and the
+  evidence is that **four of those five spent months on the wrong side of it**: two ran a local
+  `invalidateAll()` while promising a command had gone out, and two wrote a preference and told
+  nobody. Every one of those defects is the same mistake, and they were only visible once the two
+  kinds were named apart.
+- **`session-lock-writes.ts`** — the three lock actions as data. It makes visible what three branches
+  hid: locking writes two preferences and unlocking writes one, because `sessionLockKick` configures
+  the NEXT lock and clearing it would silently change what the presenter's next click does.
+
+Ceilings went DOWN: `events.svelte.ts` 956 → 860, `session-control.svelte.ts` 151 → 109.
+
+**THREE GATES FOLLOWED THE EXTRACTIONS, and one of them had to be taught twice.**
+`for-all-broadcast-contract.test.ts` reads the receivers as TEXT and was re-pointed at the file that
+now owns them — including its branch-boundary probe, which had to change from an eight-space indent
+to two, and getting that wrong would NOT have failed: it would have returned a longer slice that
+happens to contain the right text while every assertion kept passing against the wrong region.
+`user-action-disposition-contract.test.ts` needed both of its scanners taught, and its lock-table
+keys are IMPORTED rather than matched, following the rule that file already recorded for
+`PEER_SUBCMDS`: a regex over a table's text silently matches nothing on a rename, where an import
+fails loudly. That file's own note — a gate that does not follow an extraction *"goes red on the
+refactor and green on the regression"* — has now paid for itself four times.
+
+`feature-coverage-contract.test.ts` lost two names, which is the routine edit it exists for: landing
+a feature removes a name and the diff says which.
+
+**Verified:** room 147 files / 2,249 tests · `svelte-check` 1,261 files 0/0 · eslint and prettier
+clean across the app.
+
 ### 2026-08-28 01:20 EDT — *" Mute Chat indefinately "* sends, and `EXACT_ALERTS` has no liars left in it
 
 **Runtime impact: YES.** A presenter's indefinite mute now silences the member instead of only saying

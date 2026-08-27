@@ -416,7 +416,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
       The CODE backstop is unaffected.
     */
-    max: 956,
+    max: 860,
     why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1249,7 +1249,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       NOT changed here, because rewriting the ceiling model under deadline is how a gate ends up
       weaker than it was. Recorded as the owner's call, with the evidence attached.
     */
-    max: 151,
+    max: 109,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
@@ -1336,6 +1336,46 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/for-all-broadcasts.ts',
+    /*
+      THE EIGHT "FOR ALL" RECEIVERS, extracted 2026-08-27 and capped in the same commit.
+
+      The one group on the `cmds` channel that shares a collaborator: every branch reaches
+      `RoomBroadcasts`, and two also reach `showTab`. Everything else on that channel routes to a
+      different object each time, which is why the chain stayed a chain and these eight lifted out.
+
+      The precedent is `RoomPrivateCommands`, which took the whole addressed channel out of the same
+      router for the same reason.
+    */
+    max: 157,
+    why: 'the room-wide For All receivers; the one cmds group with a shared collaborator'
+  },
+  {
+    file: 'lib/room/session-room-commands.ts',
+    /*
+      THE FIVE SESSION ACTS THAT REACH THE SERVER, extracted 2026-08-27 and capped in the same commit.
+
+      `RoomSessionControl`'s nine actions divide on one question: does anybody outside this browser
+      learn about it. FOUR OF THESE FIVE SPENT MONTHS ON THE WRONG SIDE OF THAT LINE — two ran a
+      local `invalidateAll()` while promising a command had gone out, and two wrote a preference and
+      told nobody — which is the evidence that the seam is real rather than a line-count exercise.
+    */
+    max: 106,
+    why: 'the session acts that send; the four that only write a preference are a table'
+  },
+  {
+    file: 'lib/room/session-lock-writes.ts',
+    /*
+      THE THREE LOCK ACTIONS as what each WRITES and SAYS, 2026-08-27.
+
+      A table rather than three branches, and it makes visible what three branches hid: locking
+      writes two preferences and unlocking writes one. `sessionLockKick` is deliberately not cleared
+      on unlock — it configures the NEXT lock.
+    */
+    max: 44,
+    why: 'the preference writes behind the lock actions, as data'
+  },
   {
     file: 'lib/room/user-action-commands.ts',
     /*

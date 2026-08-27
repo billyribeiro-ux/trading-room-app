@@ -33,6 +33,11 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
  * Each entry is a QUESTION to answer by reading. The answers live in
  * `docs/decoded/missing-commands-triage.md`, and that document — not this list — is the tracker.
  */
+/*
+  `hardReset` and `openSession` LEFT this list on 2026-08-27, when the two broadcast senders they name
+  were built (`session-commands.remote.ts`). That is the routine edit this list exists for: landing a
+  feature removes a name, and the diff says which.
+*/
 const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'alertQAMsg',
   'archiveLogs',
@@ -49,7 +54,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'getMyState',
   'getScheduledAlerts',
   'getSessionNotes',
-  'hardReset',
   'hardResetSession',
   'lockSession',
   'pingPopup',

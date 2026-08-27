@@ -9,6 +9,7 @@ import {
   PEER_SUBCMDS,
   TOAST_ONLY_ACTIONS
 } from './user-action-intent.js';
+import { SESSION_LOCK_WRITES } from './room/session-lock-writes.js';
 
 import { RoomDialogs } from './room/dialogs.svelte.js';
 import { RoomToasts } from './room/toasts.svelte.js';
@@ -103,13 +104,25 @@ function handledActions(): Set<string> {
   // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
   // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
   const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
+  /*
+    `RoomSessionControl` SPLIT AGAIN on 2026-08-27 and the scanner followed it a THIRD time, which is
+    the third payment on the note above. Its nine actions divide on whether anybody outside this
+    browser learns about the act: five reach the server (`session-room-commands.ts`) and three write
+    a preference (`session-lock-writes.ts`, a table rather than branches). Reading only the class
+    would file eight live controls as dispatched into the void.
+
+    The LOCK table is read as text like the rest. Its keys are the action names, so a scan for the
+    string finds them — which is the property that makes a data table safe to move behind this gate,
+    and would not hold if the keys were computed.
+  */
+  const sessionCommands = readFileSync('src/lib/room/session-room-commands.ts', 'utf8');
   const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
   const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
   expect(
     tail,
     "handle()'s alert tail was not found — this scanner would read the whole file and mis-bucket the alert path"
   ).toBeGreaterThan(-1);
-  const dispatchBody = source.slice(0, tail) + session + kicks + chatMute;
+  const dispatchBody = source.slice(0, tail) + session + kicks + chatMute + sessionCommands;
   const literal = [...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]);
 
   /*
@@ -127,7 +140,18 @@ function handledActions(): Set<string> {
     re-introduce the same fragility one level down, and the import fails loudly if the export is
     renamed — where a regex would silently match nothing and quietly under-report again.
   */
-  return new Set([...literal, ...Object.keys(PEER_SUBCMDS)]);
+  /*
+    A FIFTH FORM, and it is the FOURTH one again: `SESSION_LOCK_WRITES` is a table for exactly the
+    reason `PEER_SUBCMDS` is one — three lock actions differing only in which preferences they write.
+    Its keys are IMPORTED for the reason recorded directly above: a regex over the table's text would
+    re-introduce the fragility one level down and would silently match nothing on a rename, while an
+    import fails loudly.
+
+    This is the third extraction this scanner has had to follow, and the second table. The note at
+    the top of the function — a gate that does not follow an extraction "goes red on the refactor and
+    green on the regression" — has now paid for itself four times.
+  */
+  return new Set([...literal, ...Object.keys(PEER_SUBCMDS), ...Object.keys(SESSION_LOCK_WRITES)]);
 }
 
 describe('the dispatch surface is fully enumerated', () => {
@@ -296,9 +320,14 @@ describe('every dispatched action has exactly one disposition', () => {
     // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
     // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
     const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
+    // The 2026-08-27 split of `RoomSessionControl`; the note above about a gate following an
+    // extraction, paid a third time. Both halves are read, or eight live controls read as inert.
+    const sessionCommands = readFileSync('src/lib/room/session-room-commands.ts', 'utf8');
+    const sessionLocks = readFileSync('src/lib/room/session-lock-writes.ts', 'utf8');
     const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
     const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
-    const body = source.slice(0, tail) + session + kicks + chatMute;
+    const body =
+      source.slice(0, tail) + session + kicks + chatMute + sessionCommands + sessionLocks;
 
     /*
       THE MARKER LIST NEEDED A CATALOG HALF, and 2026-08-26 is when it cost something.

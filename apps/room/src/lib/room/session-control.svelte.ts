@@ -1,6 +1,6 @@
-import { refreshRoster, softReset } from '../../routes/session-commands.remote';
-
 import type { RoomDialogs } from './dialogs.svelte.js';
+import { SESSION_LOCK_WRITES } from './session-lock-writes.js';
+import { handleSessionRoomCommand, type SessionRoomCommandDeps } from './session-room-commands.js';
 
 /**
  * WHAT A PRESENTER DOES TO THE SESSION — lock it, open it, reset it, close it.
@@ -56,6 +56,16 @@ export class RoomSessionControl {
   readonly #reload: () => Promise<void>;
   readonly #savePreference: (key: string, value: boolean) => void;
 
+  /** The four collaborators, as one object, so the extracted group takes them without a fifth copy. */
+  get #deps(): SessionRoomCommandDeps {
+    return {
+      dialogs: this.#dialogs,
+      closeModal: this.#closeModal,
+      reload: this.#reload,
+      savePreference: this.#savePreference
+    };
+  }
+
   /**
    * Acts on the session, and reports whether it recognised the action.
    *
@@ -64,56 +74,7 @@ export class RoomSessionControl {
    * does not know.
    */
   handle(action: string): boolean {
-    if (action === 'session-reload-config') {
-      this.#dialogs.confirm('Are you sure you want to reload tge session config?', () => {
-        this.#closeModal();
-        void this.#reload();
-        this.#dialogs.alert = 'Session config reloaded...';
-      });
-      return true;
-    }
-
-    /*
-      IT NOW SENDS, 2026-08-26. This ran `invalidateAll()` — a LOCAL refetch of this presenter's own
-      page — while telling them a command had gone out that "clears the user list" for the room. The
-      wire and the delay it promises are on `refreshRoster` in `session-commands.remote.ts`.
-
-      Alert BEFORE the await, because the reference raises it immediately with nothing waited on. A
-      failure is still surfaced rather than swallowed.
-    */
-    if (action === 'session-refresh-roster') {
-      this.#dialogs.alert =
-        'Command send OK. Please allow 1/2 minute for old entries to get deleted from the list';
-      void refreshRoster().catch(() => (this.#dialogs.alert = 'Command failed.'));
-      return true;
-    }
-
-    /*
-      IT NOW SENDS. `softReset` broadcasts `softResetDone`; every client drops its remote media and
-      rebuilds after up to three seconds of per-client jitter — the "gently" on the button's label.
-      Receiver and measurement in `events.svelte.ts`.
-
-      `#reload()` is GONE rather than kept beside the command: it re-read this presenter's own page,
-      which is not what a media reset does to anybody, including them — the broadcast comes back to
-      the sender like every other room frame.
-    */
-    if (action === 'session-soft-reset') {
-      this.#dialogs.confirm('Are you sure you want to soft reset the room?', () => {
-        this.#closeModal();
-        this.#dialogs.alert = 'Soft reset request sent...';
-        void softReset().catch(() => (this.#dialogs.alert = 'Command failed.'));
-      });
-      return true;
-    }
-
-    if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
-      this.#dialogs.confirm('Are you sure you want to reset the room?', () => {
-        this.#closeModal();
-        this.#savePreference('sessionTokensRevoked', action === 'session-hard-reset-revoke');
-        void this.#reload();
-      });
-      return true;
-    }
+    if (handleSessionRoomCommand(action, this.#deps)) return true;
 
     if (action === 'session-save-close') {
       this.#savePreference('sessionOpen', false);
@@ -126,22 +87,19 @@ export class RoomSessionControl {
       return true;
     }
 
-    if (action === 'session-open') {
-      this.#savePreference('sessionOpen', true);
-      this.#closeModal();
-      return true;
-    }
-
-    if (action === 'session-lock' || action === 'session-lock-kick') {
-      this.#savePreference('sessionLocked', true);
-      this.#savePreference('sessionLockKick', action === 'session-lock-kick');
-      this.#dialogs.alert = 'Session Locked';
-      return true;
-    }
-
-    if (action === 'session-unlock') {
-      this.#savePreference('sessionLocked', false);
-      this.#dialogs.alert = 'Session Unlocked';
+    /*
+      THE LOCK, as a table rather than three branches — see `SESSION_LOCK_WRITES`. It is the one
+      group here that contacts nothing: two preference writes and a captured sentence, with no
+      command, no reload and no modal to close. Keeping it inline made this file grow by four lines
+      every time the room learned a new lock state, which is what pushed it over its ceiling when the
+      hard-reset and open senders landed.
+    */
+    const lock = SESSION_LOCK_WRITES[action];
+    if (lock) {
+      for (const key of Object.keys(lock.preferences)) {
+        this.#savePreference(key, lock.preferences[key]);
+      }
+      this.#dialogs.alert = lock.alert;
       return true;
     }
 
