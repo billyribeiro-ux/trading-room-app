@@ -92,6 +92,13 @@ export default defineConfig({
       which is a different suite pretending to be this one.
     */
     exclude: [...configDefaults.exclude, 'apps/**', 'e2e/**', '**/*.db.test.ts'],
+    /*
+      Mirrors `.svelte-kit/generated/build` into `generated/dev` so Kit's `<sveltekit:generated>`
+      alias — which points at `dev` whenever the Vite command is `serve`, and `vitest run` is —
+      finds the `server.js` that `svelte-kit sync` only ever writes to `build`. The whole account,
+      including the six approaches that did not work, is in the file itself.
+    */
+    globalSetup: ['./vitest.global-setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary', 'lcov'],
