@@ -9,3 +9,11 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - '@sveltejs/kit@2.70.2'
+
+# drizzle-kit 0.31.10 - itself the latest release - still declares the deprecated
+# @esbuild-kit/esm-loader, whose core-utils pins esbuild <=0.24.2, the one advisory
+# (GHSA: dev-server request forwarding, moderate) in this workspace's audit. The pair was
+# folded into tsx upstream and will never be patched, so the nested esbuild alone is
+# overridden to the fixed line; drizzle-kit's own top-level esbuild is already ^0.25.
+overrides:
+  '@esbuild-kit/core-utils>esbuild': '>=0.25.0'
