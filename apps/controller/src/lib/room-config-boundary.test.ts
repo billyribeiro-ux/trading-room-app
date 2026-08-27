@@ -390,7 +390,14 @@ describe('what the room may WRITE back', () => {
       new URL('../routes/internal/room-setting/[code]/+server.ts', import.meta.url),
       'utf8'
     );
-    expect(endpoint).toContain('verifyConfigReadToken(secret, params.code, presented)');
+    /*
+      The WRITE capability since 2026-08-27, and the negative half is asserted beside it: this
+      endpoint used to take `config-read:`, so a capability minted to read a room's settings also
+      authorised writing one. `config-read-cannot-write-contract.test.ts` owns the property; this
+      line is the one that would notice the endpoint quietly going back.
+    */
+    expect(endpoint).toContain('verifyConfigWriteToken(secret, params.code, presented)');
+    expect(endpoint).not.toContain('verifyConfigReadToken(');
     expect(endpoint).toContain('if (!isRoomWritableSetting(name))');
     expect(endpoint).toContain('membership.roomUser.role === 0 || isRoomPresenter(membership.roomUser)');
     expect(endpoint).toContain("error(403, 'Presenters only.')");

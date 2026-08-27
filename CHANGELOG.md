@@ -33,6 +33,227 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-27 23:48 EDT — A capability minted to READ a room can no longer ban somebody from it
+
+**Runtime impact: YES**, at the seam between the two applications. Nothing a member or presenter sees
+changes; what changes is which credential the controller accepts on four endpoints.
+
+**The defect, and it was written down four times before it was fixed.** There was one domain prefix.
+`internal/room-ban`, `internal/room-permissions`, `internal/room-setting` and `internal/stream-ingest`
+all MUTATE controller state — a ban, the five permission checkboxes, a room setting, a rotated ingest
+credential — and all four verified with `verifyConfigReadToken`. So the capability minted to read a
+room's settings also authorised banning a member from that room.
+
+Three of those four said so in their own docblocks, in almost the same words, each calling the split
+*"the one follow-up all of these endpoints share"*, and `TODO.md` row 7 had already named the
+pattern: *"a new door inherits that and must not fix it in isolation."* **That is how an accepted
+caveat becomes a permanent one** — the next endpoint copies the paragraph along with the code.
+
+**What is and is not claimed.** Both credentials are HMACs over `<code>.<timestamp>` derived from the
+same `ROOM_JWT_SECRET`, and anything holding that secret can mint either. This does not put a wall
+between two parties; there is one party, the room. What it fixes is that the credential now SAYS what
+it authorises, so a read token presented at a write can be REFUSED — which nothing could do before.
+Defence in depth and a correctness property of the protocol, not a repair of broken authentication,
+and it is written that way in the code so nobody later reads it as the latter.
+
+**Built.** `configWriteToken` / `verifyConfigWriteToken` on the controller, signing
+`config-write:<code>.<ts>`; `domainToken(domain, …)` on the room, with `configReadToken` and
+`configWriteToken` both delegating to it. **One verifier taking the domain as an argument, not two
+copies** — a second implementation differing only in a string literal is how the freshness check or
+the `timingSafeEqual` comparison goes missing from one of them, and a write verifier that forgot
+either would still pass every test that only checks a good token is accepted.
+
+**The deployment consequence, stated rather than discovered.** The room mints and the controller
+verifies, and they deploy separately. During the skew of this release a write from the old room to
+the new controller is REFUSED — 401, surfaced as a refusal in the presenter's UI, nothing written and
+nothing silently dropped. The controller deliberately does NOT accept both prefixes "for a
+transition": a transition that still accepts the old credential is the current state wearing a
+deprecation notice.
+
+**Two contract tests, one per side of a seam neither side can see.**
+`config-read-cannot-write-contract.test.ts` (controller, 16 cases) proves each verifier refuses the
+other's token, that both are accepted by their own, that the two tokens are DIFFERENT strings for the
+same room and instant — the assertion that fails if a refactor drops the domain from the signed
+material and both tokens silently become one — that a write token for one room does not authorise a
+write to another, and that freshness is enforced on the write credential in both directions. It also
+pins the disposition of every `/internal/*` route by name, `media-auth` included, so adding one means
+deciding visibly which capability it takes.
+
+`config-write-capability-contract.test.ts` (room, 10 cases) pins which credential each of the eight
+callers mints, and counts the Bearer headers so a ninth caller cannot land without a capability
+decision. **The dangerous direction is named there:** a write call minting a read token fails closed
+and loudly; a read call minting a write token succeeds and hands a wider capability to a path that
+never needed it.
+
+**Negative controls, all seen RED:** reverting `room-ban` to the read verifier (route disposition
+failed); dropping the domain from the controller's signed material (three cases failed, including the
+different-strings assertion); pointing `writeRoomBan` back at the read minter (room side failed).
+
+`room-config-boundary.test.ts` pinned the old verifier as text and was migrated with the code rather
+than re-pointed — it now asserts the write verifier is present AND the read one is absent.
+
+**Verified:** controller 95 files / 1,003 tests (5 files, 21 tests skipped) · room 144 files / 2,192
+tests · `svelte-check` 1,537 files 0/0 and 1,251 files 0/0 · eslint and prettier clean.
+
+**Caught by that check and worth recording:** the enumeration gate committed an hour earlier carried
+eight implicit-`any` errors — `svelte-check` type-checks `gate/*.mjs` — and the room's type gate was
+red from the moment it landed. It is typed with JSDoc now, matching `evidence-bound-tests.mjs` beside
+it. The lesson is the repository's own rule, applied to me: run the gate the change touches, not only
+the test for it.
+
+### 2026-08-27 23:10 EDT — TODO's two most misleading rows, recounted from the code instead of from themselves
+
+**Runtime impact: NO.** `TODO.md` only. Recorded because the numbers it carried would have sent the
+next person to rebuild what is already shipped.
+
+Both rows had been maintained by arithmetic over their own previous value, which is exactly the
+failure the file warns about in its own opening. Re-measured from `user-action-intent.ts` and every
+branch of `RoomUserActions.handle`:
+
+**Row 4 said "ten inert controls". It is SIX.** `mute-mic`, `mute-camera`, `stop-screens` and
+`restart-screens` left `INERT_ACTIONS` when they were built — they are `PEER_SUBCMDS` entries
+reaching `presenterCommand`, gated by `presenterRoom()` and addressed with `publishToUsers`, so the
+server-side presenter check the row demanded existed already. Of the six left, two are not work at
+all: `disable-private-chat` MATCHES the reference (which renders that button with no click binding),
+and the recording pair is an honest gap whose wire resolves to a server-side recorder this room does
+not have. Three are real: `get-my-token` (evidenced, unbuilt), `debug-log` and
+`upload-profile-picture`.
+
+**Row W said "twelve controls report success and send nothing". It is THREE.** `EXACT_ALERTS` holds
+three keys and two of them are honest — `save-permissions` and `restart-audio` announce real sends,
+and the reference raises both alerts too. The liars are `mute-chat-indefinitely` (needs a controller
+door), `admin-notes-password` (the `onconfirm` takes no parameter, so the typed value is never
+received) and `session-save-close-message` (its entire body is one alert, and its sibling saves no
+message either). Nine of the twelve shipped and are recorded in this file rather than struck through
+there.
+
+**Disposition census, 2026-08-27: 40 dispatched actions, 6 inert, 3 carrying a fixed alert.**
+`user-action-disposition-contract.test.ts` (11 cases, green) is the authority.
+
+Three more claims corrected in place: the "LYING CONTROLS" paragraph still named `remoteRestartAudio`
+as one, which it stopped being when it was wired; the "DEAD CONTROLS" paragraph still read "IT IS
+ELEVEN"; and the defect table still listed `save-permissions` as needing new server code, when
+`permissions.remote.ts` → `writeRoomPermissions` → `/internal/room-permissions` has shipped.
+
+### 2026-08-27 22:52 EDT — The register count CI enforces and the count a human reads are one number
+
+**Runtime impact: NO.** One test's parser, the tally sentence it enforces, and two corrected rows.
+
+`TODO.md` row AI recorded the disagreement and is now deleted rather than struck through: the
+parser computed 68/5/14 while reading the register's status column by eye gave 66/6/15. Both cannot
+be right. **The parser was wrong.**
+
+It scanned every cell of a row for a status word under a "CLOSED wins" rule, so prose in the DETAIL
+cell voted on the status. Rows in this register narrate their own history — `already closed`,
+`Status stays OPEN`, a closure note quoting the wording it replaced — and three rows were being
+counted by a sentence rather than by their status column. Each was read in full before the change
+was kept:
+
+| row | its status cell | what made the old parser disagree |
+| --- | --- | --- |
+| `T1-3` | `WON'T FIX — superseded by T0-5` | the detail cell mentions CLOSED |
+| `T2-22` | `**CLOSED 2026-08-14**` | the same cell carries an older note, *"(Status stays OPEN: the geometry half remains.)"* — history, not status |
+| `T5-25` | `OPEN — DECISION NEEDED (same as T5-24)` | its detail argues the endpoint is built, which is true and is not the gap: the DISPLAY block is blocked on the same owner sentence as `T5-24` |
+
+The parser now finds the status column from **each table's own header**, because the tables disagree
+about where it sits — Tier 0 puts status third of four, Tiers 1/2/5 put it last, and Tier 4 has no
+status column at all, which is why its section heading is still its status.
+
+**Trailing cells are joined where status is the last column, and that is not a shortcut.** Seven
+rows carry unescaped pipes inside prose — `||` in an Angular expression, an IP list
+`localhost|127.0.0.1`, a filter pipe `statXrefs | filter:` — and split into more cells than their
+header has columns. Reading the status by bare index gets a fragment of a code span; reading the
+last cell gets a fragment of the same prose. Without the join, five rows come back UNCLASSIFIED and
+the total silently undercounts by five.
+
+**Corrected count: 66 CLOSED / 6 OPEN / 15 parked / 87 total, nothing unclassified — the same
+numbers as reading the column by eye.** Two independent methods agreeing is the evidence this is
+right, and it is why the tally sentence was moved to match the parser rather than the other way
+round. `TODO.md` §B now names `T5-25` beside `T5-24`, both blocked on the same sentence from the
+owner.
+
+**Negative control seen RED:** flipping one Tier 0 row's status cell to OPEN moved the computed
+count to 65/7 and the test failed on the difference. The register was restored and `git diff` is
+clean — the register itself was not edited by this work.
+
+**Also corrected, measured rather than inherited.** Row AG stated `+page.server.ts` exports NINETEEN
+actions, counting `forceReload`, which had no caller at all. That action was deleted when the command
+shipped, so the count moved with it: it is **EIGHTEEN** — `logout` plus the seventeen still reached
+through dynamic dispatchers. The seventeen are unchanged and remain open work.
+
+**Verified:** `evidence-gap-register-counts.test.ts` 4/4 green, negative-controlled.
+
+### 2026-08-27 22:20 EDT — A clone can run the suite and re-run the enumeration, for the first time
+
+**Runtime impact: NO.** Manifest, one lifecycle script, one published gate and three contract tests.
+Nothing the site serves changed.
+
+**THE ROOM SUITE DID NOT RUN ON A FRESH CHECKOUT, and it did not fail in a way that said so.**
+Measured in a clean container: `pnpm install`, then `vitest run` in `apps/room` —
+
+    Test Files  17 failed | 124 passed (141)
+         Tests   1 failed | 1902 passed (1903)
+    Cannot find module '<sveltekit:generated>/server.js'
+
+Sixteen of the seventeen collected ZERO tests. The count did not go red, it went missing. One
+`svelte-kit sync` and nothing else: **141 passed (141), 2,140 tests.**
+
+The cause is one line that was never there. `apps/controller/package.json` has carried
+`"prepare": "svelte-kit sync"` since it was created; `apps/room` never has, so nothing generated the
+tree before the tests that need it. CI hid it: `quality.yml` runs `pnpm run check` — which opens with
+`svelte-kit sync` — one step before the step that needs it, so the gate was green on a repository a
+contributor could not run. Pinned by `svelte-kit-sync-pin.test.ts`, which finds the Kit apps by their
+`@sveltejs/kit` dependency rather than by a list of two names. **Negative control seen RED:**
+`expected undefined to be 'svelte-kit sync'`.
+
+**THE ENUMERATION IS PUBLISHED, and it is the one script that mattered.**
+`scripts/audit-feature-coverage.mjs` was untracked and reachable only on the author's machine, while
+`TODO.md` derived its feature counts from it and told every reader to run it after every feature
+lands. It has been re-derived from the tracked v4 bundle as `apps/room/gate/audit-feature-coverage.mjs`
+— hashes verified before a single pattern runs (`40796ca8…bab87524`, 2,891,205 bytes, all three files
+in `sha256sums.txt` match). It extracts four vocabularies and says why each is drawn the way it is:
+`sendServerAdminCommand`, `.send(`, `{cmd:}`, and — as an INTERSECTION — `emit(` ∩ `case":`, because
+`emit` alone matches 240 local bus events and `case` alone matches 333 minified locals.
+
+Today's measurement: **135 wire identifiers, 93 named in our source, 42 not. 8 tabs, 6 named, 2 not.**
+
+`feature-coverage-contract.test.ts` pins the absent NAMES, not the count — wiring one command while
+another quietly stops being mentioned leaves a total unchanged, and the silent direction is the one
+that has already cost this repository three separate discoveries. **Negative control seen RED** by
+adding one absent name to an unrelated source file: `expected [ …39 ] to deeply equal [ …40 ]`.
+
+**Its first run under Vitest reported every gap closed**, which is worth recording because the bug
+was in the measurement rather than the code: the pin file holds all 42 absent names as string
+literals, and the scan was reading `src/**` whole, so a pin of the output satisfied the measurement.
+Test files are excluded now. The rule that settled it is the honest one anyway — a name that appears
+only in a test or a comment is not an implementation.
+
+Of the two tabs, only `recordings` is a gap. `files` is not: the reference uses the id as a VALUE
+(`onMainTabChange` at byte 1,968,370 calls `getSessionFiles()` on it) and this room reaches the same
+behaviour through a typed union with the pane's own remote query. Both are recorded in the pin with
+their reasons, because a bare list of two would read as two gaps.
+
+**THIRTY MANIFEST ENTRIES NAMED FILES NO CLONE HAS.** All thirty verified missing again here, against
+a checkout where `apps/room/scripts/` holds zero files. They are removed, and
+`apps/room/docs/UNPUBLISHED-SCRIPTS.md` records every one so the account survives the removal. Two
+entries stayed because their files are tracked. What is genuinely still lost is the four Chromium
+gates — they drive a browser against unpublished captures and cannot be re-derived from tracked
+bytes, which is the same owner decision TODO row 5 already carries.
+
+`manifest-scripts-contract.test.ts` makes the class impossible to recur, for BOTH apps: every file a
+`package.json` script names must be tracked, answered by `git ls-files` rather than `existsSync`,
+because the file existing on this machine is exactly the property that hid it. **Negative control
+seen RED** by re-adding one removed entry. Its own first draft failed on `./tsconfig.json`, which
+matched as `tsconfig.js` with the `on` left over — the extension boundary is now asserted where the
+pattern says it is.
+
+**Verified:** room 141/141 files, 2,140 tests, 1 skipped · controller 98 files, 1,005 tests · eslint
+and prettier clean on every changed file. **NOT verified here:** 49 of the room's 190 test files are
+evidence-bound and this checkout is missing 13 of the 14 reference-capture roots, so they were
+excluded by design and this run does not cover them — the runner prints that, and it is repeated here
+rather than left in a log.
+
+
 ### 2026-08-26 13:58 EDT — Row 7(a): both "Command send OK." receivers ship, and the guard had no cover
 
 **Runtime impact: YES.** A presenter's pinned sales image now appears over members' chat, and

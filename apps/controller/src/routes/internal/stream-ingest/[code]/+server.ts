@@ -4,7 +4,7 @@ import { ROOM_JWT_SECRET, STREAM_SERVER_MTX } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
-import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
 import { ingestPathFor, mintRoomIngestKey } from '#lib/server/stream-ingest.js';
 import type { RequestHandler } from './$types';
 
@@ -54,7 +54,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
   }
 
   const presented = request.headers.get('authorization')?.replace(/^Bearer /, '');
-  const verified = verifyConfigReadToken(secret, params.code, presented);
+  const verified = verifyConfigWriteToken(secret, params.code, presented);
   if (!verified.ok) {
     console.warn('[stream-ingest] rejected', { code: params.code, reason: verified.reason });
     error(401, 'Unauthorized.');

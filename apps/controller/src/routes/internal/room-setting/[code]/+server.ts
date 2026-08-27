@@ -6,7 +6,7 @@ import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/d
 import { saveSetting } from '#lib/server/rooms.js';
 import { isRoomWritableSetting } from '#lib/room-config.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
-import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -32,15 +32,16 @@ import type { RequestHandler } from './$types';
  *
  * ## Authentication, and what it is not
  *
- * The same credential as the other two internal endpoints: a bearer MAC over `<code>.<timestamp>`,
- * verified by `verifyConfigReadToken`, valid for 60 seconds. Deliberately the existing convention
- * rather than a new one.
+ * A bearer MAC over `<code>.<timestamp>`, verified by `verifyConfigWriteToken`, valid for 60
+ * seconds — the same convention as the sibling endpoints, in its WRITE domain.
  *
- * Recorded honestly: that token's domain prefix is `config-read:`, so a capability minted to READ a
- * room's configuration now also authorises this narrow write. Only the room application holds
- * `ROOM_JWT_SECRET`, and it already holds it for both reads, so this widens no party's reach — but
- * a `config-write:` prefix would be the stricter shape, and splitting the two is a deliberate
- * follow-up rather than something to invent in passing here.
+ * **This is the endpoint that recorded the caveat, and 2026-08-27 is when it was closed.** It read:
+ * the prefix is `config-read:`, so a capability minted to READ a room's configuration also
+ * authorises this write; only the room holds `ROOM_JWT_SECRET` so it widens no party's reach, but a
+ * `config-write:` prefix would be the stricter shape. That reasoning was right on both counts, and
+ * the second half is now built. The point was never that the MAC was weak — it is that the
+ * credential did not SAY what it authorised, so nothing could refuse a read token at a write.
+ * `config-read-cannot-write-contract.test.ts` is what turns the split into a refusal that happens.
  *
  * ## Presenter-gated on THIS side too
  *
@@ -59,7 +60,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   }
 
   const presented = request.headers.get('authorization')?.replace(/^Bearer /, '');
-  const verified = verifyConfigReadToken(secret, params.code, presented);
+  const verified = verifyConfigWriteToken(secret, params.code, presented);
   if (!verified.ok) {
     // One status and one message for all three reasons; the reason is for the log, not the caller.
     console.warn('[room-setting] rejected', { code: params.code, reason: verified.reason });

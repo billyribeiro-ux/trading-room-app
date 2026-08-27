@@ -5,7 +5,7 @@ import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { userOpcodePatch } from '#lib/server/rooms.js';
-import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -58,9 +58,11 @@ import type { RequestHandler } from './$types';
  *
  * ## The credential
  *
- * The same bearer MAC over `<code>.<timestamp>` the sibling endpoints take. It inherits their honest
- * caveat verbatim: the domain prefix is `config-read:`, so a read capability authorises this write
- * too, and splitting the prefixes is the one follow-up all of these endpoints share.
+ * A bearer MAC over `<code>.<timestamp>`, domain-separated as `config-write:` and verified by
+ * `verifyConfigWriteToken`. **A `config-read:` capability is REFUSED here** — this row used to carry
+ * the opposite as an honest caveat, calling the split "the one follow-up all of these endpoints
+ * share", and 2026-08-27 is when it was done. A capability minted to read a room's settings can no
+ * longer ban somebody from it. `config-read-cannot-write-contract.test.ts` asserts the refusal.
  */
 export const POST: RequestHandler = async ({ params, request, url }) => {
   const secret = ROOM_JWT_SECRET;
@@ -70,7 +72,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   }
 
   const presented = request.headers.get('authorization')?.replace(/^Bearer /, '');
-  const verified = verifyConfigReadToken(secret, params.code, presented);
+  const verified = verifyConfigWriteToken(secret, params.code, presented);
   if (!verified.ok) {
     // One status and one message for all three reasons; the reason is for the log, not the caller.
     console.warn('[room-ban] rejected', { code: params.code, reason: verified.reason });
