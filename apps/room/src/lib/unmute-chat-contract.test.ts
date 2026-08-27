@@ -112,11 +112,12 @@ describe('the unmute reaches the server', () => {
     */
     /*
       `muteChat` joined the import on 2026-08-23 when the modal's " Mute Chat for 24hrs " button was
-      wired. Both names are asserted together rather than the line being loosened to a substring:
-      the pair is the point, and an import that quietly lost one of them should fail here.
+      wired, and `muteChatIndefinitely` on 2026-08-27 when the last liar in `EXACT_ALERTS` was.
+      All THREE names are asserted together rather than the line being loosened to a substring: the
+      set is the point, and an import that quietly lost one of them should fail here.
     */
     expect(rootCode).toContain(
-      "import { muteChat, unmuteChat } from '../../routes/chat-mute.remote';"
+      "import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';"
     );
     // The ROOT hands the command in; the CLASS is what calls it. Both ends asserted, because
     // either alone passes with the wire cut.
@@ -148,12 +149,18 @@ describe('the unmute reaches the server', () => {
     expect(start).toBeGreaterThan(-1);
     const body = intentCode.slice(start, intentCode.indexOf('};', start));
     /*
-      The NEIGHBOUR was `'mute-chat-24'` until 2026-08-23, when that button was wired too and left
-      the table for the same reason. `'mute-chat-indefinitely'` takes its place here: it is still a
-      real entry, still honestly listed, and blocked on a controller door rather than on evidence —
-      so it is the live proof that this test is reading a populated table and not an empty slice.
+      THE SENTINEL — a live entry, asserted so that "unmute-chat is absent" is read from a POPULATED
+      table rather than from an empty slice. It has moved twice as the table emptied: `'mute-chat-24'`
+      until 2026-08-23, then `'mute-chat-indefinitely'` until 2026-08-27, when the controller door it
+      was waiting for was built and it left as well.
+
+      `'save-permissions'` now, and it is a different KIND of entry, which is worth knowing before it
+      is moved a third time: the two left in that table are not liars. Each announces a real send, and
+      the reference raises both alerts too. So the table is down to what its docblock says it is —
+      "the fixed alert for an action" — and the next person to empty it will have to delete the
+      sentinel rather than replace it.
     */
-    expect(body).toContain("'mute-chat-indefinitely'");
+    expect(body).toContain("'save-permissions'");
     expect(body).not.toContain("'unmute-chat'");
     expect(body).not.toContain("'mute-chat-24'");
   });

@@ -50,6 +50,10 @@ const WRITERS = [
   'writeRoomSetting',
   'writeRoomPermissions',
   'writeRoomBan',
+  // The indefinite chat mute — opcode 3 on the controller. Added 2026-08-27, and this list is where
+  // the test insisted the capability be decided rather than inherited from whichever call it was
+  // copied from.
+  'writeRoomMute',
   'requestStreamIngestKey'
 ];
 

@@ -1321,7 +1321,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Raised under the same standing "get it done" as the entry above, and reversible on the same
       terms: the peer media commands are a coherent slice.
     */
-    max: 824,
+    max: 780,
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -1336,6 +1336,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/user-action-commands.ts',
+    /*
+      EVERY COMMAND THE USER-ACTION DISPATCHER CAN SEND, extracted 2026-08-27 and capped in the same
+      commit.
+
+      It was declared above the class in `user-actions.svelte.ts` and grew an entry per control as the
+      modal's dead buttons were wired. Extracting it was what the ratchet asked for when wiring the
+      last of them — *" Mute Chat indefinately "* — pushed that file over.
+
+      The number goes DOWN when a control is retired, not up per control wired: a new entry costs one
+      line, and the docblock that explains its payload belongs with the command that reads it.
+    */
+    max: 72,
+    why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
+  },
   {
     file: 'lib/room/cmds-frame.ts',
     /*
@@ -1434,7 +1450,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The cap is where it landed. It goes DOWN if the reasoning ever finds a better home, never up to
       accommodate a fifth half — a fifth half is the signal that something else needs extracting.
     */
-    max: 191,
+    max: 181,
     why: 'the chat mute: two senders, two receivers and the rule that they agree'
   },
   {

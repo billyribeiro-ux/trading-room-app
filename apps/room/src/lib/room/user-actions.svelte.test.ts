@@ -78,6 +78,7 @@ const make = (
   let presenterFails = false;
   /* The five checkboxes as they left the class, and a switch to make the control plane refuse. */
   const permsSent: { targetUserId: number; granted: string[] }[] = [];
+  const indefiniteMutesSent: { targetUserId: number }[] = [];
   let permsFails = false;
 
   const actions = new RoomUserActions<User>({
@@ -91,6 +92,12 @@ const make = (
       editUsername: () => Promise.resolve(null),
       muteChat: (payload: { targetUserId: number }) => (
         mutesSent.push(payload),
+        Promise.resolve(null)
+      ),
+      // Recorded separately from the 24-hour mute: they write two different stores, and a harness
+      // that funnelled both into one list could not tell a fixed control from a mislabelled one.
+      muteChatIndefinitely: (payload: { targetUserId: number }) => (
+        indefiniteMutesSent.push(payload),
         Promise.resolve(null)
       ),
       unmuteChat: () =>
@@ -157,6 +164,7 @@ const make = (
     kicksSent,
     urlsSent,
     mutesSent,
+    indefiniteMutesSent,
     audioRestarts,
     permsSent,
     failPerms: () => (permsFails = true),
@@ -367,6 +375,33 @@ describe('the dispatcher', () => {
     );
   });
 
+  it('mute-chat-indefinitely sends the INDEFINITE command, not the 24-hour one', () => {
+    /*
+      The FOURTH and last entry removed from `EXACT_ALERTS`, and the one that stayed longest for a
+      real reason: the indefinite mute already existed as the controller's opcode 3 and what was
+      missing was a door from the room to it. It raised the capture's "user chat muted" and the
+      member kept posting.
+
+      WHICH command is asserted, not merely that one was sent. Folding this button onto `muteChat`
+      would have been the tempting fix — one line, and every "did it send" assertion would pass —
+      and it would have written a 24-hour row while telling the presenter the mute was indefinite.
+      A control whose label and behaviour disagree is worse than one honestly listed as inert.
+    */
+    const { actions, dialogs, mutesSent, indefiniteMutesSent } = make();
+    actions.handle('mute-chat-indefinitely', TARGET);
+    expect(
+      indefiniteMutesSent,
+      'the indefinite command, to the member the modal is open on'
+    ).toEqual([{ targetUserId: TARGET.id }]);
+    expect(mutesSent, 'and NOT the 24-hour one, which writes a different store').toEqual([]);
+    /*
+      The same wording as its neighbour, and that is the capture's rather than an oversight: upstream
+      `muteChat(e)` alerts once, before the send, whatever `e` is. Two sentences here would be an
+      invention that reads like a fix.
+    */
+    expect(dialogs.alert).toBe('user chat muted');
+  });
+
   it('the three peer commands each send their own subCmd to the named member', () => {
     /*
       These three buttons were DEAD while their command, their receiver and a neighbouring caller
@@ -422,17 +457,26 @@ describe('the dispatcher', () => {
     expect(dialogs.alert).toBe('Audio restart request sent OK');
   });
 
-  it('mute-chat-24 is no longer one of the controls that only talk', () => {
+  it('NEITHER mute is one of the controls that only talk any more', () => {
     /*
-      The structural half. Re-adding the entry to `EXACT_ALERTS` would restore the exact original
+      The structural half. Re-adding either entry to `EXACT_ALERTS` would restore the exact original
       defect — `handle` consults that table last, so an entry there is reached only when no branch
       claimed the action, and the branch above would simply be dead. This is what makes that visible.
+
+      This case asserted the OPPOSITE for the indefinite one until 2026-08-27 — *"it is still
+      honestly listed, it has no door to the controller yet"* — and that was true and is the reason
+      the assertion is migrated with the code rather than deleted. `internal/room-mute` is the door;
+      the entry is gone; a negative assertion that quietly started passing for the wrong reason is
+      the failure mode this repository has met four times.
     */
     expect(TOAST_ONLY_ACTIONS).not.toContain('mute-chat-24');
-    expect(
-      TOAST_ONLY_ACTIONS,
-      'and the indefinite one is still honestly listed — it has no door to the controller yet'
-    ).toContain('mute-chat-indefinitely');
+    expect(TOAST_ONLY_ACTIONS).not.toContain('mute-chat-indefinitely');
+    /*
+      What is LEFT in that table, named so the count cannot drift silently: two entries, and both are
+      honest — each announces a real send, and the reference raises both alerts too. There are no
+      liars left in it.
+    */
+    expect([...TOAST_ONLY_ACTIONS].sort()).toEqual(['restart-audio', 'save-permissions']);
   });
 
   it('surfaces a refused unmute rather than dropping it', async () => {

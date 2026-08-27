@@ -168,6 +168,24 @@ export function roomBanUrl(shortCode: string): string | null {
 }
 
 /**
+ * *" Mute Chat indefinately "* — the reference's own spelling: `POST {control}/internal/room-mute/{shortCode}`.
+ *
+ * A THIRD endpoint rather than a flag on the ban, because it answers a third question — not what a
+ * member may do, and not whether they may be here, but whether they may SPEAK — and it writes a
+ * different opcode.
+ *
+ * It does not belong beside the room's own 24-hour mute either, and that is the part worth knowing
+ * before touching it: the two durations live in two different stores. Twenty-four hours is a row in
+ * the room's SQLite `chat_mutes`; indefinite is `roomUsers.role = 3, muted = true` here. Upstream
+ * they are one command distinguished by `time` (`"24"` / `"0"`, bundle byte 2080089), and that
+ * unification is not available without moving one of the two stores.
+ */
+export function roomMuteUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-mute/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `getRTMPToken`: `POST {control}/internal/stream-ingest/{shortCode}`.
  *
  * The reference reaches this over its admin command channel

@@ -73,7 +73,6 @@ describe('the actions that report success and send nothing', () => {
     expect(userActionAlert('save-permissions')).toBe(
       'Permissions applied, user will reload the page now to apply...'
     );
-    expect(userActionAlert('mute-chat-indefinitely')).toBe('user chat muted');
     expect(userActionAlert('restart-audio')).toBe('Audio restart request sent OK');
   });
 
@@ -83,17 +82,19 @@ describe('the actions that report success and send nothing', () => {
     // And `force-reload` joined it on 2026-08-23, for the same reason. Nor may this one.
     expect(userActionAlert('force-reload')).toBeNull();
     /*
-      `mute-chat-24` is the third, wired the same day. Note what does NOT move with it:
-      `mute-chat-indefinitely` is still in the table above, because "indefinite" is the controller's
-      opcode 3 and the room has no door to it yet. Folding it into the 24-hour mute would be a
-      control whose label and behaviour disagree — worse than one that is honestly listed as inert.
+      `mute-chat-24` is the third, wired the same day — and `mute-chat-indefinitely` is the FOURTH,
+      on 2026-08-27. The note that used to sit here said the indefinite one stays because the room
+      has no door to the controller's opcode 3; `internal/room-mute` is that door. It is still not
+      folded into the 24-hour mute: two stores, two commands, and a control whose label and
+      behaviour disagree would be worse than one honestly listed as inert.
     */
     expect(userActionAlert('mute-chat-24')).toBeNull();
+    expect(userActionAlert('mute-chat-indefinitely')).toBeNull();
     expect(userActionAlert('kick')).toBeNull();
     expect(userActionAlert('nonsense')).toBeNull();
   });
 
-  it('is FOUR, and that number is meant to go DOWN', () => {
+  it('is TWO, and neither of them is a liar any more', () => {
     /*
       Counted on purpose. Each of these is a control that reports success and sends nothing — TODO
       row W — so wiring one up for real is a visible change to this number rather than a quiet edit
@@ -107,8 +108,18 @@ describe('the actions that report success and send nothing', () => {
       4 -> 3 later the same day: `mute-chat-24`, and the same story a third time. A working mute
       already existed — the message context menu's `mute24` — and this button raised the capture's
       own "user chat muted" beside it with nothing joining them. Both doors now call `applyChatMute`.
+
+      3 -> 2 on 2026-08-27: `mute-chat-indefinitely`, and this one was NOT the same story. Its
+      blocker was real — the indefinite mute is the controller's opcode 3 and the room genuinely had
+      no door to it — which is why it outlasted the other three. `internal/room-mute` is the door.
+
+      **THE TWO THAT REMAIN ARE NOT LIARS, and that changes what this number means.**
+      `save-permissions` and `restart-audio` each announce a REAL send, and the reference raises both
+      alerts too. So this is no longer a defect count: the table is down to what its docblock always
+      claimed it was, "the fixed alert for an action". A THIRD entry arriving is now the thing to
+      look at, because it would be the first liar back in the room.
     */
-    expect(TOAST_ONLY_ACTIONS).toHaveLength(3);
+    expect([...TOAST_ONLY_ACTIONS].sort()).toEqual(['restart-audio', 'save-permissions']);
   });
 });
 

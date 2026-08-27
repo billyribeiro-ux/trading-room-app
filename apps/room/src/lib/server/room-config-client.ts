@@ -26,6 +26,7 @@ import {
   roomConfigUrl,
   roomEntryUrl,
   roomBanUrl,
+  roomMuteUrl,
   roomPermissionsUrl,
   roomSettingUrl,
   streamIngestUrl,
@@ -731,6 +732,58 @@ export async function writeRoomBan(
     membership row moved between the authority read and the write — a correct answer about a race,
     not a control plane that is down, and one the presenter should see as "that did not apply".
   */
+  if (response.status === 403 || response.status === 404 || response.status === 409) {
+    throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * The indefinite chat mute: `POST {control}/internal/room-mute/{shortCode}`.
+ *
+ * `writeRoomBan`'s shape exactly, one opcode over. It is separate rather than a flag on that call
+ * because the two answer different questions and write different roles, and because a single
+ * function taking `banned` and `muted` would have a fourth state — both true — that the role column
+ * cannot represent.
+ *
+ * The controller refuses a self-target and refuses the room's owner; see the endpoint for why the
+ * second is stricter than anything the reference states. Refusals are DISTINGUISHED from outages for
+ * the reason `writeRoomPermissions` gives: a 403 is a correct answer that retrying will not change.
+ */
+export async function writeRoomMute(
+  shortCode: string,
+  callerEmail: string,
+  targetEmail: string,
+  muted: boolean
+): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomMuteUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', callerEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ targetEmail, muted }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the write failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  // 409 joins 403 and 404 as a REFUSAL rather than an outage — the membership moved between the
+  // authority read and the write. See `writeRoomBan`.
   if (response.status === 403 || response.status === 404 || response.status === 409) {
     throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
   }

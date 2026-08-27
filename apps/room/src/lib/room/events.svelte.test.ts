@@ -108,7 +108,11 @@ const make = () => {
   const chatNotices: string[] = [];
   const audioReconnects: boolean[] = [];
   const chatMute = new RoomChatMute({
-    commands: { muteChat: () => Promise.resolve(null), unmuteChat: () => Promise.resolve(null) },
+    commands: {
+      muteChat: () => Promise.resolve(null),
+      muteChatIndefinitely: () => Promise.resolve(null),
+      unmuteChat: () => Promise.resolve(null)
+    },
     alert: (message) => chatMuted.push(message),
     notice: (message) => chatNotices.push(message),
     reload: () => Promise.resolve(),
@@ -300,6 +304,7 @@ const hiddenTabStream = (missed: true[]) =>
       chatMute: new RoomChatMute({
         commands: {
           muteChat: () => Promise.resolve(null),
+          muteChatIndefinitely: () => Promise.resolve(null),
           unmuteChat: () => Promise.resolve(null)
         },
         alert: () => {},

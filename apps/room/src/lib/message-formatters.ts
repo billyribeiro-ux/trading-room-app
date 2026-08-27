@@ -106,3 +106,24 @@ export function sameCalendarDay(current: Date, previous?: Date) {
     current.getDate() === previous.getDate()
   );
 }
+
+/**
+ * The sentence a muted member is shown, ASSEMBLED FROM CAPTURED FRAGMENTS rather than composed.
+ *
+ * Upstream renders `bootbox.alert(xe.msg)`, and that `msg` is built by a server which is not in the
+ * capture — so no sentence is guessed here. What crosses the wire is the INSTANT, and the two pieces
+ * of text are the ones this repository did read off the reference: the `Chat Disabled` block in
+ * `AlertChatArea.svelte`, and `formatChatMutedTill`, which is Angular's `EEE @ h:mm a` from the
+ * ` till ` span beside it. The dialog therefore says exactly what the composer will say once the
+ * page reloads, which is the whole point of telling them at all.
+ *
+ * A malformed instant falls back to the bare captured words. The frame carries an ISO string, so
+ * that is possible in a way it would not be with a `Date`, and the alternatives are both worse: an
+ * "Invalid Date" in front of a member, or silence about a mute already in force.
+ */
+export function chatMutedMessage(mutedTill: unknown): string {
+  if (typeof mutedTill !== 'string') return 'Chat Disabled';
+  const till = new Date(mutedTill);
+  if (Number.isNaN(till.getTime())) return 'Chat Disabled';
+  return `Chat Disabled till ${formatChatMutedTill(till)}`;
+}

@@ -119,7 +119,12 @@ describe('config-read and config-write are separate capabilities', () => {
  * so adding one means deciding — in this file, visibly — which capability it takes.
  */
 describe('every internal route verifies the credential its job needs', () => {
-  const WRITES = ['room-ban', 'room-permissions', 'room-setting', 'stream-ingest'];
+  /*
+    `room-mute` joined on 2026-08-27 — the indefinite chat mute, opcode 3. It was written AFTER the
+    read/write split, so it is the first door that never inherited the caveat its three siblings
+    carried; this list is where that was decided rather than copied.
+  */
+  const WRITES = ['room-ban', 'room-mute', 'room-permissions', 'room-setting', 'stream-ingest'];
   const READS = ['room-config', 'room-entry', 'mobile-pin', 'stream-read'];
 
   it.each(WRITES)('%s verifies a WRITE capability', async (route) => {

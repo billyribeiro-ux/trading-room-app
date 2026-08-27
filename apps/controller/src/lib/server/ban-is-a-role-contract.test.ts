@@ -69,4 +69,40 @@ describe('a ban is a role, not a flag', () => {
     expect(source).toContain('.set(userOpcodePatch(banned ? 4 : 2))');
     expect(source).not.toContain('.set({ banned })');
   });
+
+  /*
+    THE MUTE DOOR, added 2026-08-27 and asserted the same way, because it is the same defect waiting
+    to be made twice. `internal/room-mute` writes opcode 3 — the role AND the flag — and a hand-built
+    `.set({ muted })` there would reproduce the ban's original bug exactly: `internal/room-config`
+    answers `muted` off the column, the manage page renders `role === 3`, and the two would disagree
+    depending on which surface somebody looked at.
+
+    It also asserts the UNMUTE lands on opcode 2 rather than on some third value. Role holds one
+    value, so there is nowhere else for it to land, and 2 is the only destination the reference
+    provides.
+  */
+  it('the room-mute endpoint writes through the opcode map too', () => {
+    const source = readFileSync(new URL('../../routes/internal/room-mute/[code]/+server.ts', import.meta.url), 'utf8');
+    expect(source).toContain('.set(userOpcodePatch(muted ? 3 : 2))');
+    expect(source).not.toContain('.set({ muted })');
+  });
+
+  /*
+    The two doors must not drift apart on AUTHORITY either, and this is the assertion that would have
+    caught the mute door being written without one of the ban's four refusals. Each is a decision with
+    a reason recorded at the endpoint; a door that silently dropped one would still pass every test
+    above.
+  */
+  it('the mute door carries every refusal the ban door carries', () => {
+    const mute = readFileSync(new URL('../../routes/internal/room-mute/[code]/+server.ts', import.meta.url), 'utf8');
+    expect(mute, 'the caller must be a presenter of this room').toContain("error(403, 'Presenters only.')");
+    expect(mute, 'the target must be a member of this room').toContain(
+      "error(404, 'That member is not in this room.')"
+    );
+    expect(mute, 'nobody mutes themselves').toContain("error(403, 'You cannot mute yourself.')");
+    expect(mute, "and nobody mutes the room's owner").toContain('error(403, "You cannot mute this room\'s owner.")');
+    expect(mute, 'a suspended account stops writing').toContain('account.status !== ACCOUNT_ACTIVE');
+    expect(mute, 'a lost race is a refusal, not a claimed success').toContain('error(409');
+    expect(mute, 'and it takes a WRITE capability').toContain('verifyConfigWriteToken');
+  });
 });

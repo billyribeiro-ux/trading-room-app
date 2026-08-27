@@ -19,6 +19,7 @@ import {
 } from '#lib/user-action-intent.js';
 
 import { RoomChatMute } from './chat-mute.svelte';
+import type { UserActionCommands } from './user-action-commands';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomKicks } from './kicks.svelte';
 import { RoomManagedUsers } from './managed-users.svelte';
@@ -33,51 +34,6 @@ export interface UserActionSession<User> {
 }
 
 /** The two wire commands this class sends, injected so it needs no route import. */
-export interface UserActionCommands {
-  /**
-   * The three mute sub-commands, as the union the server accepts.
-   *
-   * Typed as `string` first, which pushed the mismatch to the construction site and made it read
-   * as the page's problem. The server re-checks the caller either way; this is about the class
-   * declaring what it can actually send.
-   */
-  presenter: (payload: {
-    subCmd: 'mutemic' | 'mutecam' | 'mutescreens' | 'restartScreen';
-    targetUserId: number;
-  }) => Promise<unknown>;
-  editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
-  /** *" Mute Chat for 24hrs "* — presenter-gated on the server, like its opposite. */
-  muteChat: (payload: { targetUserId: number }) => Promise<unknown>;
-  unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
-  /** A presenter's url to every OTHER browser — the receiver excludes the sender. */
-  sessionSendUrl: (payload: {
-    cmd: 'sendSalesImageToChat' | 'sendUsersToURL';
-    url: string;
-  }) => Promise<unknown>;
-  /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
-  forceReload: (targetUserId: number) => Promise<unknown>;
-  /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */
-  restartAudio: (targetUserId: number) => Promise<unknown>;
-  /**
-   * `kickUser` — removes ONE member. Presenter-gated on the server, like `forceReload`.
-   *
-   * NO `ban` FIELD, deliberately. The reference's payload carries `ban` and `kickAllInstances`; a ban
-   * needs somewhere durable to record that the person may not return, and this room has none. Taking
-   * the flag and dropping it would be the same defect this command was added to fix — see
-   * `presenter-commands.remote.ts`.
-   */
-  kickUser: (payload: { targetUserId: number; message: string }) => Promise<unknown>;
-  /**
-   * `saveCustomPerms` — the five checkboxes, written through to the CONTROLLER.
-   *
-   * The only command here that changes something durable rather than broadcasting; see
-   * `permissions.remote.ts` for why it is a module of one.
-   */
-  savePermissions: (payload: {
-    targetUserId: number;
-    granted: RoomPermissionKey[];
-  }) => Promise<unknown>;
-}
 
 /*
   Everything a presenter or a member can DO to a user, and the selection every one of those acts on.

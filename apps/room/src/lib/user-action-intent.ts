@@ -88,18 +88,21 @@ const EXACT_ALERTS: Readonly<Record<string, string>> = {
     call `applyChatMute`, in `#lib/server/chat-mute.ts`.
   */
   /*
-    `mute-chat-indefinitely` STAYS, and is the one entry here that is honestly blocked rather than
-    merely unbuilt. The reference reaches it with `muteChat("0")` against a " Mute Chat indefinately "
-    label (its own spelling) at bundle byte 2067543, and `"0" >= 0` is true, so it sends
-    `{user, time:0}` down the same command as the 24-hour one.
+    `mute-chat-indefinitely` WAS HERE and is gone, 2026-08-27 — the FOURTH entry ever removed, after
+    `unmute-chat`, `force-reload` and `mute-chat-24`, and the last one that was a liar.
 
-    An indefinite mute ALREADY EXISTS in this system and is already enforced: the controller's opcode
-    3 sets `role = 3, muted = true`, and `refuseIfChatMuted` reads `member.muted` on every send. What
-    is missing is a DOOR from the room to it — the equivalent of `internal/room-ban` for a ban. That
-    is a controller endpoint with its own authority checks, not a line here, so it is recorded rather
-    than faked with a 24-hour mute wearing an "indefinite" label.
+    It stayed longer than the other three because its blocker was real rather than a search that
+    stopped at one directory: an indefinite mute already existed as the controller's opcode 3
+    (`role = 3, muted = true`, enforced by `refuseIfChatMuted` through `member.muted`), and what was
+    missing was a DOOR from the room to it. Faking it with a 24-hour mute wearing an "indefinite"
+    label would have been a control whose label and behaviour disagree, which is worse than one
+    honestly listed here.
+
+    The door is `internal/room-mute/[code]` and the room's half is `muteChatIndefinitely` in
+    `chat-mute.remote.ts`. It is a THIRD command rather than a parameter on the 24-hour one because
+    the two durations live in two different stores — see the endpoint for why, and for the honest gap
+    that the reference's `time` value does not survive that split.
   */
-  'mute-chat-indefinitely': 'user chat muted',
   /*
     `restart-audio` KEEPS ITS ENTRY AND IS NO LONGER A LIAR — 2026-08-23.
 

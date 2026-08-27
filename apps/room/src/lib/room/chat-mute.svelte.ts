@@ -1,6 +1,6 @@
 import { invalidateAll } from '$app/navigation';
 
-import { formatChatMutedTill } from '#lib/message-formatters.js';
+import { chatMutedMessage } from '#lib/message-formatters.js';
 
 /**
  * THE CHAT MUTE, both directions and both ends, in the browser.
@@ -40,28 +40,9 @@ import { formatChatMutedTill } from '#lib/message-formatters.js';
 export interface ChatMuteCommands {
   /** *" Mute Chat for 24hrs "* — presenter-gated on the server, like its opposite. */
   muteChat: (payload: { targetUserId: number }) => Promise<unknown>;
+  /** *" Mute Chat indefinately "* — a separate command; why, on `muteChatIndefinitely`. */
+  muteChatIndefinitely: (payload: { targetUserId: number }) => Promise<unknown>;
   unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
-}
-
-/**
- * The sentence a muted member is shown, ASSEMBLED FROM CAPTURED FRAGMENTS rather than composed.
- *
- * Upstream renders `bootbox.alert(xe.msg)`, and that `msg` is built by a server which is not in the
- * capture — so no sentence is guessed here. What crosses the wire is the INSTANT, and the two pieces
- * of text are the ones this repository did read off the reference: the `Chat Disabled` block in
- * `AlertChatArea.svelte`, and `formatChatMutedTill`, which is Angular's `EEE @ h:mm a` from the
- * ` till ` span beside it. The dialog therefore says exactly what the composer will say once the
- * page reloads, which is the whole point of telling them at all.
- *
- * A malformed instant falls back to the bare captured words. The frame carries an ISO string, so
- * that is possible in a way it would not be with a `Date`, and the alternatives are both worse: an
- * "Invalid Date" in front of a member, or silence about a mute already in force.
- */
-export function chatMutedMessage(mutedTill: unknown): string {
-  if (typeof mutedTill !== 'string') return 'Chat Disabled';
-  const till = new Date(mutedTill);
-  if (Number.isNaN(till.getTime())) return 'Chat Disabled';
-  return `Chat Disabled till ${formatChatMutedTill(till)}`;
 }
 
 export class RoomChatMute {
@@ -117,6 +98,12 @@ export class RoomChatMute {
     await this.#reload();
   }
 
+  /** Silences a member until somebody lifts it — the controller's opcode 3. */
+  async muteIndefinitely(targetUserId: number): Promise<void> {
+    await this.#commands.muteChatIndefinitely({ targetUserId });
+    await this.#reload();
+  }
+
   /** Lifts a member's chat mute — the other half of `mute24`, and the frame `unmuted()` receives. */
   async unmute(targetUserId: number): Promise<void> {
     await this.#commands.unmuteChat({ targetUserId });
@@ -141,13 +128,16 @@ export class RoomChatMute {
       same source with nothing joining them. That table's docblock named this one explicitly:
       *"`mute-chat-24` from this modal does not mute"*.
 
-      *" Mute Chat indefinately "* (the reference's own spelling) is NOT here and is not folded into
-      this one. It is `muteChat("0")` upstream, and an indefinite mute already exists in this system
-      as the controller's opcode 3 — what is missing is a door from the room to it. A control whose
-      label and behaviour disagree is worse than one honestly listed as inert.
+      *" Mute Chat indefinately "* (the reference's own spelling) IS here since 2026-08-27 and is
+      still not folded into the 24-hour one — two stores, two commands; see `muteChatIndefinitely`.
+      BOTH RAISE THE SAME ALERT, which is the capture's: `muteChat(e)` alerts once whatever `e` is.
     */
     if (action === 'mute-chat-24') {
       this.#announceThenSend('user chat muted', () => this.mute(targetUserId));
+      return true;
+    }
+    if (action === 'mute-chat-indefinitely') {
+      this.#announceThenSend('user chat muted', () => this.muteIndefinitely(targetUserId));
       return true;
     }
     if (action === 'unmute-chat') {

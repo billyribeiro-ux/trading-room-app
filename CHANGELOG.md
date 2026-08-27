@@ -33,6 +33,78 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 01:20 EDT — *" Mute Chat indefinately "* sends, and `EXACT_ALERTS` has no liars left in it
+
+**Runtime impact: YES.** A presenter's indefinite mute now silences the member instead of only saying
+so. The member is told, and their composer locks on the next load.
+
+**The last of its kind.** This was the only key left in `EXACT_ALERTS` with no branch anywhere: the
+presenter clicked it, read the capture's own *"user chat muted"*, and the member kept posting. It
+outlasted `unmute-chat`, `force-reload` and `mute-chat-24` — and unlike all three, **its recorded
+blocker was real** rather than a search that stopped at one directory. An indefinite mute already
+existed as the controller's opcode 3 (`role = 3, muted = true`, enforced by `refuseIfChatMuted`
+reading `member.muted`); what was genuinely missing was a door from the room to it.
+
+**`internal/room-mute/[code]` is that door**, and it is `internal/room-ban`'s shape one opcode over —
+target named by EMAIL because ids do not cross the seam, caller must be owner-or-presenter of THIS
+room, a suspended account stops writing, one conditional UPDATE re-scoped by `roomId`, and zero rows
+is a 409 rather than a success nobody performed. It CALLS `userOpcodePatch(3)` rather than mirroring
+it: the ban door next to it shipped once writing the boolean alone and became a member of the class
+it was built to end, because every consumer reads the ROLE.
+
+**Two refusals are deliberate and stricter than the reference: no self-mute, and no muting the
+room's owner.** Opcode 3 overwrites the role, so a muted presenter comes back a participant — the
+same destructive trade `internal/room-ban` records — and a room whose owner can be demoted to a muted
+participant by one of their own presenters is a room that can be taken from its account holder.
+
+**HONEST GAP, inherited rather than introduced: the reference's `time` value does not survive the
+seam.** Upstream both durations are ONE command distinguished by `time` (`"24"` / `"0"`, byte
+2080089). Here they are two commands because they are two STORES — 24 hours is a row in the room's
+SQLite `chat_mutes`, indefinite is `roomUsers.role = 3` on the controller — and a room that later
+wanted six hours could not express it. Recorded at the endpoint because it is invisible from either
+side alone.
+
+**Why it is not folded onto the 24-hour mute**, which was the one-line fix that would have passed
+every "did it send" assertion: it would have written a 24-hour row while telling the presenter the
+mute was indefinite, and a member "muted indefinitely" in SQLite shows as unmuted on the manage page
+where the owner actually administers their room. The test asserts WHICH command is sent, and the
+negative control for it is exactly that wrong fix — seen RED.
+
+**Four existing guards caught this change and every one of them was right**, which is the part worth
+recording:
+
+- `config-write-capability-contract` refused the new `writeRoomMute` until its capability was
+  declared — the ninth Bearer header, exactly what that Bearer count exists for
+- `config-read-cannot-write-contract` refused the new route until its disposition was named
+- `unmute-chat-contract` failed on both its import assertion and its populated-table SENTINEL, which
+  had been `mute-chat-24`, then `mute-chat-indefinitely`, and is now `save-permissions`
+- `source-size-contract` refused twice more
+
+**The ratchet's refusals produced three real improvements rather than three raises.**
+`chatMutedMessage` moved to `message-formatters.ts`, where the formatter it calls already lived.
+`UserActionCommands` now **extends** `ChatMuteCommands` instead of restating its three — they were
+declared twice in two files and stayed in step only because a type error caught each drift after the
+fact, which is precisely how `muteChatIndefinitely` was added here: by failing to compile in three
+places. And that interface moved to `user-action-commands.ts`, because sixty lines of wire-command
+declarations inside a class file is the growth the ratchet exists to stop.
+
+**A stale comment was found by the same work and corrected:** `UserActionCommands.kickUser` still
+said *"NO `ban` FIELD, deliberately … a ban needs somewhere durable and this room has none"*, which
+stopped being true on 2026-08-23 when `internal/room-ban` shipped. The field is declared now and the
+reason the comment gave is kept, because it is still why the field arrived WITH the endpoint rather
+than before it.
+
+**Ceilings ratcheted DOWN, not up:** `user-actions.svelte.ts` 824 → 780, `chat-mute.svelte.ts`
+191 → 181. Two new modules capped at their created size.
+
+**Negative controls seen RED:** the indefinite branch pointed at the 24-hour command; the mute
+endpoint's `.set(userOpcodePatch(muted ? 3 : 2))` replaced with a hand-built `.set({ muted })`.
+
+**Verified:** room 147 files / 2,235 tests · controller 95 files / 1,006 tests · `svelte-check`
+1,258 and 1,539 files at 0/0 · eslint clean both apps · prettier clean both apps. **Also fixed here:**
+`evidence-gap-register-counts.test.ts` had been left unformatted by the 22:52 commit — prettier is
+not in that app's `check`, so nothing caught it until the full gate ran.
+
 ### 2026-08-28 00:35 EDT — Both revenue leaks are closed: a lapsed subscription and a shared login
 
 **Runtime impact: YES**, and it is the first change in this repository whose reference is deliberately
