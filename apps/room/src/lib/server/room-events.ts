@@ -150,6 +150,21 @@ export type RoomEvent =
          * upstream that carries no payload at all. Validated at the page, same as `muser`.
          */
         data?: unknown;
+        /**
+         * `sessionRevoked` — the one command on this channel that is OURS rather than the
+         * reference's, and the only one sent to a single CONNECTION rather than to a room or a user.
+         *
+         * The reference has no equivalent because it never ends a live connection: entitlement is
+         * checked at the door and one login serves any number of devices. Both are deliberate
+         * divergences recorded in `NEW-TODO.md` Part 1, and `live-access.ts` is where the rule lives.
+         *
+         * It is delivered by `sess/[room]/events` writing to its OWN listener, never through
+         * `publishToRoom` or `publishToUsers` — after a newest-wins eviction the revoked connection
+         * and the one that replaced it share a user id, so an addressed publish would revoke both.
+         * The fields are typed here so the client cannot read a message the server does not send.
+         */
+        reason?: 'session-ended' | 'entitlement-lapsed' | 'unconfirmed';
+        message?: string;
       };
     }
   /**

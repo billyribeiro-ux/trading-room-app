@@ -1337,6 +1337,43 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
   {
+    file: 'lib/room/cmds-frame.ts',
+    /*
+      THE `cmds` FRAME AS THE CLIENT READS IT, extracted 2026-08-27 and capped in the same commit.
+
+      It was an inline type literal inside the branch that reads it in `events.svelte.ts`, and it had
+      grown a field per command until it was longer than most of the handlers it serves. That growth
+      is what this ratchet exists to stop, and this is the extraction it asked for rather than the
+      raise it refuses.
+
+      It also has a job the inline version could not do: it is one HALF of a wire whose other half is
+      the `channel: 'cmds'` arm of `RoomEvent`, in a server-only module the client must not import.
+      Two declarations of one contract with nothing joining them — naming this one gives the drift
+      somewhere to be noticed.
+
+      Capped at its created size. A new field per command is what this file is for, so the number
+      moves down only when a command leaves the wire.
+    */
+    max: 59,
+    why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
+  },
+  {
+    file: 'lib/room/addressed-channel.ts',
+    /*
+      THE FOUR CALLBACKS OF THE ADDRESSED CHANNEL, extracted 2026-08-27 and capped in the same commit.
+
+      They were inline in `create-room.svelte.ts`, which put the description of what each command does
+      to the member — the verbatim capture byte for `forceReload`, why a kick shows text rather than
+      swapping the page — in the room's assembly factory rather than beside the class that calls them.
+
+      The move went through `private-commands.svelte.ts` first and was moved out again: appending 45
+      lines to a capped file is moving the problem, not solving it, and the ratchet said so
+      immediately. Its own module is where a thing this size belongs.
+    */
+    max: 46,
+    why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
+  },
+  {
     file: 'lib/room/private-commands.svelte.ts',
     /*
       THE ADDRESSED CHANNEL, created 2026-08-23 and capped in the same commit.

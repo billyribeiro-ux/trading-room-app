@@ -8,6 +8,7 @@ import { playSoundEffect } from '#lib/sound-effects.js';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
 import type { AddressedCommand, RoomPrivateCommands } from './private-commands.svelte';
+import type { CmdsFrame } from './cmds-frame';
 import type { RoomMedia } from './media.svelte';
 import type { RoomMediaTransport } from './media-transport.svelte';
 import type { RoomPrefs } from './prefs.svelte';
@@ -141,6 +142,12 @@ export class RoomEventStream<Entry> {
      */
     chatMissedWhileHidden: () => void;
     /**
+     * This connection has been revoked and the server has already stopped sending. A RECEIVER for
+     * the same reason `showTab` is; the message is the SERVER'S. `#lib/server/live-access.ts`
+     * §"What the client does with it" is the whole account.
+     */
+    sessionRevoked: (message: string) => void;
+    /**
      * Every ADDRESSED command — `#lib/room/private-commands.svelte.ts`.
      *
      * One collaborator rather than three callbacks and a class. The router's job on this channel is
@@ -165,6 +172,7 @@ export class RoomEventStream<Entry> {
     this.#showTab = options.showTab;
     this.#chatMissedWhileHidden = options.chatMissedWhileHidden;
     this.#focusSessionNote = options.focusSessionNote;
+    this.#sessionRevoked = options.sessionRevoked;
     this.#privateCommands = options.privateCommands;
 
     /** Whether the SSE channel is up. The sidebar's "Chat" line reports it. */
@@ -200,6 +208,7 @@ export class RoomEventStream<Entry> {
   readonly #restartMediaSession: () => (() => Promise<void>) | null;
   readonly #showTab: (tab: 'screens' | 'videoplayer') => void;
   readonly #chatMissedWhileHidden: () => void;
+  readonly #sessionRevoked: (message: string) => void;
   readonly #privateCommands: RoomPrivateCommands;
 
   get connected(): boolean {
@@ -266,30 +275,17 @@ export class RoomEventStream<Entry> {
         also why the authority to send it is checked on the server rather than here.
       */
       if (payload.channel === 'cmds') {
-        const command = payload.data as
-          | {
-              cmd?: string;
-              subCmd?: string;
-              targetUserId?: number;
-              recName?: string;
-              /** `giveMicScreen`'s payload: `{give: boolean}`. */
-              give?: boolean;
-              /** `playMP3ForAll`'s payload: `{url}`. Room-wide, so it carries no target. */
-              url?: string;
-              /** `focusOnScreen` — the producer id of the screen to move to. */
-              screenId?: string;
-              /** `focusOnSessionNote` — the note a presenter pulled the room to. */
-              noteId?: number;
-              /**
-               * `mtxStartStream` / `mtxStopStream` carry the stream under `muser` — the reference's
-               * own key (byte 1010826), and the reason `mtx-streams.ts` describes an MTX stream as
-               * "simply another muser". Typed `unknown` because `isMtxStream` is what decides.
-               */
-              muser?: unknown;
-              /** `getSessionMTXMediaState`'s full list. Same reason: validated, not asserted. */
-              data?: unknown;
-            }
-          | undefined;
+        const command = payload.data as CmdsFrame | undefined;
+
+        /*
+          FIRST in this chain, and the placement is load-bearing: anything below it acting on a frame
+          from the same batch would act for a member the server has just revoked. Why, in full:
+          `#lib/server/live-access.ts` §"What the client does with it".
+        */
+        if (command?.cmd === 'sessionRevoked') {
+          this.#sessionRevoked(command.message ?? '');
+          return;
+        }
 
         /*
           The room's media.recording state, for EVERYONE in it. Verbatim:

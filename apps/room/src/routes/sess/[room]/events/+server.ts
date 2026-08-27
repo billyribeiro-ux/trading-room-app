@@ -28,8 +28,14 @@ import {
 import { startMtxReconcile, stopMtxReconcileIfEmpty } from '#lib/server/mtx-reconciler.js';
 import { error } from '@sveltejs/kit';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
-import { hashEmail } from '#lib/server/connection.js';
+import { hashEmail, sessionStillAuthenticates } from '#lib/server/connection.js';
 import { readRoomConfig, type RoomMembership } from '#lib/server/room-config-client.js';
+import { isBannedFromRoom, isShutOutByRoomState } from '#lib/server/room-role.js';
+import {
+  decideLiveAccess,
+  LIVE_ACCESS_CHECK_MS,
+  type EntitlementAnswer
+} from '#lib/server/live-access.js';
 
 /**
  * `GET /sess/{room}/events` - the room's realtime channel.
@@ -76,6 +82,12 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
 
   let unsubscribe: (() => void) | undefined;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
+  /*
+    The live-access poll — the half of `NEW-TODO.md` Part 1 that only an open connection can do.
+    Declared beside the heartbeat because it shares its lifetime exactly, and cleared in the same
+    three places: `teardown`, `cancel`, and a heartbeat write that throws.
+  */
+  let accessCheck: ReturnType<typeof setInterval> | undefined;
 
   /**
    * Tear this connection down and tell the room, exactly once.
@@ -91,6 +103,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
     closed = true;
     unsubscribe?.();
     if (heartbeat) clearInterval(heartbeat);
+    if (accessCheck) clearInterval(accessCheck);
     /*
       After unsubscribing, so the count this reads already excludes this client. One timer per room,
       stopped when the room empties — an idle room must not keep polling MediaMTX forever.
@@ -217,6 +230,90 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
       */
       startMtxReconcile(room);
 
+      /*
+        ── THE LIVE-ACCESS POLL ──────────────────────────────────────────────────────────────────
+        Both halves of `NEW-TODO.md` Part 1 land here, because both are the same hole: this endpoint
+        authenticates ONCE, at connect, and then delivers every alert in the room for as long as the
+        connection lives. A subscription that lapses and a login that is evicted are equally invisible
+        to it. `live-access.ts` carries the reasoning, including why this connection asks about
+        ITSELF rather than being told by whoever revoked it.
+
+        `lastConfirmed` starts NOW because the connect path above already read the membership — that
+        read is the first confirmation, not an assumption, and starting the clock at zero would put
+        every new connection three minutes from its own grace expiry.
+      */
+      let lastConfirmed = Date.now();
+      accessCheck = setInterval(() => {
+        void (async () => {
+          if (closed) return;
+
+          let entitlement: EntitlementAnswer = 'unknown';
+          try {
+            /*
+              A FRESH cache key, and this is the line the whole poll turns on.
+
+              `readRoomConfig` caches per request object, deliberately — a page load and its form
+              actions must not ask the controller three times for one answer. This request object
+              lives for the whole SSE connection, so passing it would serve the connect-time answer
+              back forever and the poll would re-confirm a membership it never re-read. An empty
+              object per check is a key nothing else holds, so each poll is a real call, and the
+              WeakMap entry is collectable the moment it returns.
+            */
+            const config = await readRoomConfig({}, room, user.email);
+            const current = config.member;
+            entitlement =
+              isBannedFromRoom(current) || isShutOutByRoomState(config.room.state, current)
+                ? 'lapsed'
+                : 'entitled';
+          } catch (cause) {
+            /*
+              `unknown`, never `lapsed`. A controller that did not answer has not said no, and
+              collapsing the two would turn one timeout into a room-wide disconnection. The grace
+              window in `live-access.ts` is what bounds the other direction.
+            */
+            console.warn('[events] could not confirm access; grace window applies', cause);
+          }
+
+          const verdict = decideLiveAccess({
+            /*
+              The session read is LOCAL and cannot fail soft: the row is either there or it is not.
+              An account evicted by a newer login loses it here, which is 1.2's half.
+            */
+            sessionAlive: sessionStillAuthenticates(locals.sessionId),
+            entitlement,
+            lastConfirmedAt: lastConfirmed,
+            now: Date.now()
+          });
+
+          if (verdict.live) {
+            if (entitlement === 'entitled') lastConfirmed = Date.now();
+            return;
+          }
+
+          /*
+            Told, then closed, and in that order.
+
+            The frame goes to THIS listener directly rather than through `publishToUsers`: after a
+            newest-wins eviction the evicted connection and the one that replaced it share a user id,
+            so an addressed publish would revoke the login that just succeeded as well.
+
+            `teardown()` immediately after, in the same tick, so nothing else is delivered to a
+            connection that has just been told it is over. The client reloads on dismissal, and the
+            next request has no session to resolve.
+          */
+          send({
+            channel: 'cmds',
+            data: { cmd: 'sessionRevoked', reason: verdict.reason, message: verdict.message }
+          });
+          console.warn('[events] closed a live connection', {
+            room,
+            userId: user.id,
+            reason: verdict.reason
+          });
+          teardown();
+        })();
+      }, LIVE_ACCESS_CHECK_MS);
+
       // Proxies and browsers drop an idle stream. A comment every 25s keeps it open and costs
       // nothing; it is not an event, so no client handler sees it.
       heartbeat = setInterval(() => {
@@ -232,6 +329,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
     cancel() {
       unsubscribe?.();
       if (heartbeat) clearInterval(heartbeat);
+      if (accessCheck) clearInterval(accessCheck);
       // Tell whoever is left. Unsubscribing first means the count already excludes this client.
       publishToRoom(room, {
         channel: 'roster',

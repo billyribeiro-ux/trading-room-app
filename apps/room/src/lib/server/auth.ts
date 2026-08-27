@@ -98,7 +98,8 @@ function setSessionCookie(cookies: Cookies, sessionId: string, remember: boolean
 }
 
 /**
- * Issues a session for an account whose identity has already been established.
+ * Issues a session for an account whose identity has already been established, and **ends every
+ * other session that account holds.**
  *
  * Split out of `login()` so the handoff receiver at `/session` can reuse the cookie policy rather
  * than re-implement it. The two callers differ only in how they came to trust the account: one
@@ -106,6 +107,37 @@ function setSessionCookie(cookies: Cookies, sessionId: string, remember: boolean
  *
  * There is deliberately no credential check inside this function. It is named for what it does,
  * so a future caller cannot mistake it for one that authenticates.
+ *
+ * ## ONE ACCOUNT, ONE ACTIVE SESSION — a deliberate divergence from the original
+ *
+ * **We knowingly do not match the reference here, and this is why.** The original lets one login be
+ * used from many devices at once, so customers share credentials and one subscription serves several
+ * people. This function used to reproduce that exactly: a plain `INSERT` that deleted nothing, with
+ * no per-user session limit anywhere in the room. `NEW-TODO.md` Part 1 records it as one of two
+ * revenue leaks we are fixing rather than porting.
+ *
+ * **Newest login wins.** That is what streaming services do, and it is the self-service shape: the
+ * real subscriber logs in again and evicts whoever they shared the password with, without a support
+ * ticket. Oldest-holds would turn every shared password into one.
+ *
+ * **No exemption, for any role** — owner, presenter and participant alike. Confirmed by the owner on
+ * 2026-08-27 when the alternative was put to them explicitly, so a presenter using a laptop and a
+ * phone in the same room keeps only the newer of the two. Recorded because the cost is real and was
+ * accepted knowingly, not overlooked: relaxing it later means adding a role test HERE, and nowhere
+ * else.
+ *
+ * **Scope is the ACCOUNT, not the account-and-room.** One person cannot hold a session in two rooms
+ * at once either. Same reasoning: per-room would let one shared login serve two rooms simultaneously,
+ * which is the leak wearing a narrower hat.
+ *
+ * ## What the evicted device sees
+ *
+ * Its session row is gone, so its next ordinary request resolves to no user and it is redirected to
+ * signed out — that half needs no new code, because `getSessionUser` already joins on the row. The
+ * half that DID need code is the open realtime stream, which authenticates once at connect and would
+ * otherwise keep delivering alerts to a browser whose session no longer exists: `sess/[room]/events`
+ * re-checks and closes with a stated reason. `session-limit-contract.test.ts` covers this side and
+ * `entitlement-recheck-contract.test.ts` the other.
  */
 export function createSessionFor(
   cookies: Cookies,
@@ -115,9 +147,25 @@ export function createSessionFor(
 ): string {
   const now = new Date();
   const sessionId = randomUUID();
-  db.insert(sessions)
-    .values({ id: sessionId, userId, roomShortCode, createdAt: now, lastSeenAt: now })
-    .run();
+  /*
+    ONE TRANSACTION, and the order inside it is the whole point.
+
+    A delete followed by a separate insert has a window where the account has NO session at all. A
+    request arriving in that window — the same browser's own next request, on a fast connection —
+    resolves to no user and redirects to signed out, so the login that was supposed to succeed
+    presents as a login that failed. `better-sqlite3` transactions are synchronous, so this is one
+    atomic step with no `await` inside it and no lock held across one.
+
+    The delete is FIRST rather than "delete every row except the new one", because the second shape
+    needs the new id to exist before it can be excluded, which is the ordering that has the window.
+  */
+  db.transaction((transaction) => {
+    transaction.delete(sessions).where(eq(sessions.userId, userId)).run();
+    transaction
+      .insert(sessions)
+      .values({ id: sessionId, userId, roomShortCode, createdAt: now, lastSeenAt: now })
+      .run();
+  });
   setSessionCookie(cookies, sessionId, remember);
   return sessionId;
 }

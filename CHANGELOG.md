@@ -33,6 +33,103 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 00:35 EDT — Both revenue leaks are closed: a lapsed subscription and a shared login
+
+**Runtime impact: YES**, and it is the first change in this repository whose reference is deliberately
+NOT the original. `NEW-TODO.md` Part 1 is the record of why: both are flaws the original HAS, and
+matching them costs the owner money every day.
+
+**What was measured before anything was built.** `createSessionFor` (`server/auth.ts`) was a plain
+`INSERT` that deleted nothing, and there was no per-user session limit anywhere in `apps/room` — the
+flaw reproduced exactly. And `sess/[room]/events` authenticates ONCE, at connect, then delivers every
+alert in the room for as long as the connection lives: entry-only entitlement, reproduced exactly.
+
+**The two turned out to be one missing mechanism.** This file predicted it — *"build these two
+together, they share the plumbing"* — and that is what the code does. Both end the same way: an
+already-open connection asks, once a minute, whether it may still receive.
+
+**1.2 — one account, one active session.** The delete and the insert are ONE synchronous
+`better-sqlite3` transaction. Two statements would leave a window with no session at all, and a
+request arriving in it — the same browser's own next request — resolves to nobody and redirects to
+signed out, so a login that succeeded presents as one that failed.
+
+Decisions, all recorded at the code: **newest login wins** (self-service — the real subscriber evicts
+the freeloader without a support ticket); **scope is the account, not the account-and-room** (per-room
+would let one shared login serve two rooms at once, the leak wearing a narrower hat); and **no
+exemption for any role**, put to the owner with the presenter's laptop-and-phone case named
+explicitly and answered *"everything, no exception"*. That last is asserted in a test rather than
+left in a comment, so adding a role check later is a visible policy change.
+
+**1.1 — the live entitlement re-check.** On the SSE stream, which is where this file said it belonged:
+a long-lived per-member connection the server already owns and can therefore close. Token lifetimes
+were NOT shortened — that shrinks the window without making the check live, and degrades everybody to
+half-fix one case.
+
+**The line the whole feature turns on, and it would have passed review.** `readRoomConfig` caches per
+request object, deliberately, so a page load and its form actions do not ask the controller three
+times. The SSE request object lives for the ENTIRE connection — passing it would have served the
+connect-time membership back forever and the re-check would never have re-checked anything, while
+looking exactly right. A fresh `{}` per poll is a key nothing else holds.
+
+**Outage policy: bounded grace, chosen by the owner over both alternatives.** An unreachable
+controller answers `unknown`, never `lapsed`: collapsing the two turns one timeout into a room-wide
+disconnection, a security control that is also an outage amplifier. Three minutes without a CONFIRMED
+answer ends the stream; a definite lapse ends it in under one. A clock that steps backwards does not
+revoke anybody — a negative age is a misconfigured machine, not a stale confirmation.
+
+**A REVOCATION CANNOT BE PUSHED HERE, and the pushed design looks correct.** Two independent reasons,
+both written into `live-access.ts` because the wrong version is the obvious one: `publishToUsers`
+addresses a USER, and after a newest-wins eviction the revoked connection and the one that replaced it
+share a user id, so a push would revoke the login that just succeeded; and the event hub is
+process-local, so a push would silently miss every connection held on another instance — the worst
+failure a revocation can have, because it looks like it worked. A connection that asks about ITSELF
+has neither problem.
+
+**The member is told, and told WHICH.** Three things end a connection and they are not
+interchangeable: signed in elsewhere, access ended, could not confirm. A member who is told the wrong
+one cannot act on it. The strings are OURS and are recorded as invented rather than left to look
+captured — the reference has no equivalent because it never ends a live connection at all.
+`sessionRevoked` is the FIRST branch in the client's command chain, so nothing else in the same batch
+is acted on for a member the server has just revoked.
+
+**Built:** `server/live-access.ts` (the rule, pure — the I/O and the timer stay in the endpoint),
+`sessionStillAuthenticates` in `server/connection.ts` (delegating to `getSessionUser`, so "a session
+is valid" keeps ONE definition, and deliberately not writing `lastSeenAt`: a liveness poll is not
+activity), the poll in `sess/[room]/events/+server.ts`, and the receiver through
+`create-room.svelte.ts`.
+
+**Covered by** `live-access-contract.test.ts` (10 cases, including the three orderings that matter and
+the backwards clock), `session-limit-contract.test.ts` (8, against a REAL database — the ways this
+goes wrong are all about the database: deleting too much, too little, or in the wrong order),
+`entitlement-recheck-contract.test.ts` (7, reading the endpoint, because a `ReadableStream` behind an
+authenticated GET cannot be driven from a unit test and "the endpoint calls the rule at all" is
+exactly the join that shipped broken as `forceReload` and `presenterCommand`), and two new cases in
+`events.svelte.test.ts`.
+
+**Negative controls, all seen RED:** the eviction removed from the transaction (3 cases); the session
+test removed from the rule (2); the fresh cache key swapped back for the request object (1).
+
+**The size ratchet refused the change twice, and both refusals were right.** `events.svelte.ts` and
+`create-room.svelte.ts` went over their ceilings. The explanations moved to the module that owns them,
+and then two real extractions followed rather than a raise: `cmds-frame.ts` (the wire type, which had
+grown a field per command inside the branch that reads it) and `addressed-channel.ts` (the four
+callbacks of the addressed channel, which had put the description of what each command does to a
+member inside the room's assembly factory). The first attempt appended them to
+`private-commands.svelte.ts`, which is itself capped — moving the problem, not solving it, and the
+ratchet said so immediately. Both new modules are capped at their created size in the same commit.
+
+**One assertion in this work failed against my own comment** — it forbade `publishToUsers` in the poll
+and matched the sentence three lines above the code explaining why that function is not used. It
+asserts the CALL form now. Same family as the rule this repository already has about template syntax
+inside comments.
+
+**Verified:** room 147 files / 2,229 tests, 1 skipped · `svelte-check` 1,257 files, 0 errors, 0
+warnings · eslint clean · prettier clean across the whole app. **NOT verified:** no browser has been
+driven — the two-devices and lapsed-subscription paths are covered by unit and contract tests, not by
+an end-to-end run, and there is no Playwright job in CI to add one to yet. **Also not done as the
+standard asks:** the Svelte MCP is not available in this remote environment, so `svelte-autofixer` did
+not run on the two `.svelte.ts` files this touched; `svelte-check` and eslint are what stood in.
+
 ### 2026-08-27 23:48 EDT — A capability minted to READ a room can no longer ban somebody from it
 
 **Runtime impact: YES**, at the seam between the two applications. Nothing a member or presenter sees

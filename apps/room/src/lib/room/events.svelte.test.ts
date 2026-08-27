@@ -98,6 +98,7 @@ const make = () => {
   */
   const reloadAsked: boolean[] = [];
   const kicked: { message: string; closedAlready: boolean }[] = [];
+  const revoked: string[] = [];
   /*
     A REAL `RoomChatMute`, not a stub. The sentence a muted member sees is assembled inside it, so a
     stub here would assert the wiring and let the wording drift — and the wording is the captured
@@ -131,6 +132,9 @@ const make = () => {
     restartMediaSession: () => null,
     showTab: (tab) => tabs.push(tab),
     focusSessionNote: () => {},
+    // Recorded rather than stubbed: the MESSAGE is what a revoked member reads, so a stub would
+    // assert the routing and let the reason drift.
+    sessionRevoked: (message: string) => revoked.push(message),
     chatMissedWhileHidden: () => missed.push(true),
     /*
       A REAL `RoomPrivateCommands`, not a stub. The addressing test is now ONE gate inside it, and a
@@ -159,6 +163,7 @@ const make = () => {
     played,
     reloadAsked,
     kicked,
+    revoked,
     chatMuted,
     chatNotices,
     audioReconnects
@@ -288,6 +293,7 @@ const hiddenTabStream = (missed: true[]) =>
     restartMediaSession: () => null,
     showTab: () => {},
     focusSessionNote: () => {},
+    sessionRevoked: () => {},
     chatMissedWhileHidden: () => missed.push(true),
     privateCommands: new RoomPrivateCommands({
       viewerId: () => 1,
@@ -507,6 +513,54 @@ describe('the two receivers reach the page', () => {
       })
     });
     expect(audioReconnects).toEqual([]);
+  });
+
+  it("a revoked session reaches the receiver with the SERVER's reason", () => {
+    /*
+      `NEW-TODO.md` Part 1, the client half. Both revenue leaks end the same way: the server closes
+      the connection and says why. The MESSAGE is the server's — three different things end a
+      connection and they are not interchangeable, so composing one here would tell some members the
+      wrong thing to do about it.
+    */
+    const { stream, revoked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'cmds',
+        data: {
+          cmd: 'sessionRevoked',
+          reason: 'entitlement-lapsed',
+          message: 'Your access to this room has ended.'
+        }
+      })
+    });
+    expect(revoked).toEqual(['Your access to this room has ended.']);
+  });
+
+  it('acts on NOTHING ELSE in a batch that also revokes', () => {
+    /*
+      The reason `sessionRevoked` is the FIRST branch in the chain rather than one more beside the
+      others. Anything acted on after it would be acted on for a member the server has just decided
+      is not entitled to it — which is the leak this whole feature closes, reopened by ordering.
+
+      Asserted by sending a frame that is BOTH: a real command name and the revocation. A chain that
+      tested `playVideoForAll` first would play the video into a revoked session.
+    */
+    const { stream, revoked, played, tabs } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'cmds',
+        data: {
+          cmd: 'sessionRevoked',
+          message: 'signed in elsewhere',
+          url: 'https://example.test/should-not-play.mp4'
+        }
+      })
+    });
+    expect(revoked).toEqual(['signed in elsewhere']);
+    expect(played).toEqual([]);
+    expect(tabs).toEqual([]);
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {
