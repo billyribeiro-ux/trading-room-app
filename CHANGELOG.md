@@ -33,6 +33,89 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 18:57 UTC — A Svelte conformance sweep, and the gate for the last ungated rune trap
+
+**Runtime impact: NO.** One new contract file. **The sweep found no defects**, and that is the
+result rather than a preamble to one — said plainly because a conformance report that implies
+findings it does not have is worse than no report.
+
+#### What was measured, against the official docs rather than from memory
+
+Every legacy Svelte 4 idiom, across all `.svelte` and `.svelte.ts` sources:
+
+| idiom | found |
+| --- | --- |
+| `export let`, `$:`, `on:event`, `<slot>`, `$$props`, `$$restProps`, `$$slots` | **0** |
+| `<svelte:component>`, `<svelte:fragment>`, `<svelte:self>` | **0** |
+| `createEventDispatcher`, `beforeUpdate`, `afterUpdate`, `accessors` | **0** |
+
+Three raw-grep hits were false positives and were read rather than counted: two CSS selectors
+(`inset bottom/left`, `.mute-unmute-button:hover` matching `on:[a-z]`) and the word "accessors" in a
+prose comment. **The same comment-versus-code confusion that hid `gates.ts` this afternoon**, caught
+this time because the hits were opened instead of tallied.
+
+`{@attach}` is used 116 times against a single `use:` — and that one is `use:enhance`, SvelteKit's
+own progressive-form API, which has no attachment equivalent. Idiomatic, not drift.
+
+#### The rune traps: one already gated, one not
+
+`CLAUDE.md` names two. The first — *"`$state` on an object that only ever changes at the top level →
+`$state.raw`"* — is thoroughly gated by `state-raw-contract.test.ts`, which walks the TypeScript AST,
+counts a `bind:` to a member as a mutation, and tests its own detector in both directions. Nothing to
+add.
+
+The second had no gate at all: *"`$effect` that assigns a value derived from other state → that is
+`$derived`."* It has governed by good intention since it was written.
+
+#### `effect-not-derived-contract.test.ts`
+
+The official wording is unusually direct — *"`$effect` is best considered something of an escape
+hatch… **In particular, avoid using it to synchronise state**"* — and the docs give the exact
+counter-example the gate now refuses.
+
+Why a gate and not a review note: an effect that synchronises state **runs a frame late** (`$derived`
+computes on read; an effect is scheduled, so a same-tick reader sees the previous value), re-runs on
+every dependency the body happened to touch, and is **invisible to every other gate here** —
+`svelte-check` types it fine, `eslint` has no opinion, the suite passes because the value does
+eventually arrive. Silent, late, and right most of the time.
+
+**It flags exactly one shape**: an `$effect` whose body is nothing but assignments, with a call-free
+right-hand side. That is the docs' own example and has no legitimate use. The narrowness is the
+design — a gate with false positives gets suppressed rather than obeyed — and four real shapes in
+this repository are asserted NOT to be flagged: a transition tracker (`PostAlertModal`, where
+`$derived` has no previous value), four guarded resets that seed editable forms (`ModalHost`, where a
+`$derived` would clobber what the user typed), a dependency-declaring imperative call
+(`PresentationArea`), and direct DOM manipulation (`Modal`).
+
+Current corpus: **63 effects across 23 files, zero offenders.** So this is a ratchet, not a fix.
+
+Four negative controls seen RED: the documentation's own counter-example injected into a real
+component, the concise-arrow spelling `$effect(() => (x = y))` injected likewise, the scanner stopped
+from reading `.svelte` script blocks, and the concise-arrow branch removed from the detector — which
+would otherwise have left the tersest spelling of the anti-pattern as the one way through.
+
+#### One unreproduced failure, reported rather than dismissed
+
+The first full-gate run after the negative-control loop reported **1 test failed / 3,041 passed**,
+with the same 3,043 total as every run since. It did not name itself in the captured output, and
+**three consecutive full-gate runs afterwards are green at 185 files / 3,043**. `Modal.svelte` — the
+file those controls mutated and restored — is byte-identical to HEAD.
+
+The most likely cause is my own in-flight mutation of a tracked file racing that run; `Modal.svelte`
+gained four lines under injection, which would breach its entry in the size ratchet. **That is a
+hypothesis, not a finding** — I could not identify the test after the fact. Written down so that if
+it recurs, the next person knows it has been seen once and is not new.
+
+#### Verified
+
+`svelte-check` 0/0 · `eslint` clean in both apps · room `pnpm test` **185 files / 3,043 tests**,
+1 skipped, green three times consecutively.
+
+**Standing caveat unchanged:** the Svelte connector is installed for the org and `enabledInChat:
+false` for this session, so `svelte-autofixer` was not run. The official documentation was read
+directly instead — `$effect`, `$state` and the `.svelte.js` module page are quoted at the gates that
+enforce them.
+
 ### 2026-08-28 18:18 UTC — `.svelte.ts` made to mean what the official docs say it means
 
 **Runtime impact: NO.** Seven modules renamed, their import specifiers rewritten, one dead assignment
