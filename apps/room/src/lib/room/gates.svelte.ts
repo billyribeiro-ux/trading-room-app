@@ -205,6 +205,25 @@ export class RoomGates {
   }
 
   /**
+   * `!sessData.hasSpeechRecognitionDisabled` — may this room caption at all?
+   *
+   * `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0` (byte 1,147,900),
+   * and the consumer that matters is `startSpeechRecognition()` at byte 1,110,427, which returns
+   * early on `!preferences.doSpeechReco || !globals.hasSpeechRecognition`.
+   *
+   * `!== true` rather than `=== false`, because absent means NOT disabled: a room that has never
+   * configured captions has them, which is the reference's default and the only safe reading of a
+   * payload whose unset settings are omitted rather than sent as null.
+   *
+   * `RoomRecording.beginSpeechRecognition` has quoted the capture's own refusal — *"disabled by
+   * preferences or session settings"* — in its docblock since it was written, while gating on the
+   * PREFERENCES half alone. This is the session half.
+   */
+  get speechRecognitionAvailable() {
+    return this.#session().sessData?.hasSpeechRecognitionDisabled !== true;
+  }
+
+  /**
    * `sessData.individualVolumeControls` — "Individual Volume Controls?", the room setting that
    * reveals the per-presenter slider inside the overlay's `room-sound-options`
    * (`bSe`'s `O(6, …sessData.individualVolumeControls ? 6 : -1)`).
@@ -267,6 +286,18 @@ export class RoomGates {
    * inside the handler is the capture's own belt-and-braces and is kept: a `data-bs-toggle` opens
    * the modal whether or not the click handler agrees, so the command must not go out on a room
    * with no app.
+   *
+   * ## The reference's THIRD term is refused, and this is the record of that
+   *
+   * `alwaysShowRoster` crossed to this room on 2026-08-28, and the reference uses it twice. The seed
+   * is built. The second use is a third OR-term on the mobile-app ICON's slot —
+   * `!(ptrMobileAppEnabled || customMobileAppEnabled || alwaysShowRoster) || …` at byte 2,487,668 —
+   * while `getMyPinAndDoInfo` keeps the two-term gate transcribed above (byte 2,529,070).
+   *
+   * The two disagree on purpose upstream: the icon's slot stays occupied so the row does not reflow,
+   * and the command behind it refuses. Reproducing that here would put a button in the navbar that
+   * opens a modal reading `N/A` forever — a control whose only effect is nothing, which this
+   * repository forbids introducing. **The divergence is deliberate and this paragraph is it.**
    */
   get mobileAppAvailable() {
     return (

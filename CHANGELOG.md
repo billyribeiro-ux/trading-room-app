@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 08:35 UTC — Two entitlements whose consumer was already written, and one the reference has that this room refuses
+
+**Runtime impact: YES.** A room that sets *"Always show roster?"* opens with the sidebar out. A room
+that disables speech recognition no longer gets captions from every presenter regardless.
+
+**`hasSpeechRecognitionDisabled` is the sharper of the two, because the code said so.**
+`RoomRecording.beginSpeechRecognition` reproduces the capture's refusal and has quoted its message
+since the method was written:
+
+> *"Speech recognition not started: disabled by preferences or session settings"*
+
+**Two sources named, one implemented.** Upstream at byte 1,110,427 the guard is
+`!preferences.doSpeechReco || !globals.hasSpeechRecognition`, and `hasSpeechRecognition` is
+`!sessData.hasSpeechRecognitionDisabled` (byte 1,147,900). The setting was not on
+`ROOM_VISIBLE_SETTINGS`, so this room could not ask — and an owner who turned captions off got them
+anyway, from every presenter, for everybody in the room.
+
+**Note the negation, and that it is not `h264Enabled`.** That one is `sessData.h264Enabled || !0` and
+therefore unconditionally true and dead. The `!` here makes this one live, and `!== true` rather than
+`=== false` is what makes an absent setting mean *not disabled* — the only safe reading of a payload
+whose unset settings are omitted rather than sent as null.
+
+**The test is behavioural, and it had to be.** `RoomGates.speechRecognitionAvailable` has its own
+test, which proves the PREDICATE — but a predicate nobody asks is exactly the failure being fixed. So
+`speech-reco-entitlement.test.ts` constructs the real `RoomRecording` and observes `console.warn`:
+with every other gate open the method reaches `startSpeechRecognition`, which finds no Web Speech API
+here and reports `onfatal`. **The warning firing means it got past its gates**, and no stub stands
+between the gate and the observation. Its positive control is load-bearing: every other assertion is
+"nothing happened", so without it a stub that stopped satisfying some other gate would leave them all
+passing over a method that never runs.
+
+**`alwaysShowRoster` is a SEED, and the word is the design.** `sessData.alwaysShowRoster &&
+(showSidebar = !0, …)` at bytes 1,499,261 and 2,566,991. `$state`, never `$derived`: a derivation
+would be a lock, and would re-open the sidebar on every five-second invalidate. The navbar's toggle
+still closes it.
+
+**The reference's SECOND use of that flag is refused, and the refusal is at the code.** Byte 2,487,668
+adds it as a third OR-term to the mobile-app ICON's slot while `getMyPinAndDoInfo` keeps the two-term
+gate (2,529,070) — upstream the icon renders and the command behind it declines, so the slot stays
+occupied and the row does not reflow. Reproducing that here would put a button in this navbar that
+opens a modal reading `N/A` forever, which is a control whose only effect is nothing.
+`always-show-roster-contract.test.ts` asserts BOTH halves: that `mobileAppAvailable` still has two
+terms, and that the paragraph explaining why is still in its docblock. **A divergence not written
+down at the code is a divergence somebody "corrects" later.**
+
+**Four negative controls seen RED**: dropping the room half of the captions gate, dropping the
+sidebar seed, widening the mobile-app gate, and removing the setting from the coverage pin.
+
+**Two gates caught my own test.** `slice-anchor-contract` refused the first draft for using `indexOf`
+results as slice bounds without asserting the marker was found — `slice(-1, …)` reads the last
+character rather than failing, so the assertion would have been "the last character does not contain
+`alwaysShowRoster`", which is true and useless. And eslint refused
+`// svelte-ignore state_referenced_locally -- a SEED; …`: Svelte reads everything after the code as
+MORE codes, so `no-unused-svelte-ignore` reported four ignores warning about nothing. Both are
+recorded where the next person will hit them.
+
+**Five ceilings raised, each argued in place**, and every one is the WHY rather than the work: the
+executable change is a thunk, one term in a refusal, and one initialiser.
+
+**Verified:** room 157 files / 2,378 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` regenerates and byte-compares at 76 wired · `svelte-check` 0/0 in both
+apps · eslint and prettier clean.
+
 ### 2026-08-28 03:25 UTC — The question that found eight defects today is now asked automatically
 
 **Runtime impact: NO.** One contract test. It is the instrument, not a fix.

@@ -356,7 +356,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1375 -> 1377 for the buffer preference's two lines and their comment. See the `PresentationArea` entry: a live
       control that could not act is worth one line more than a ceiling.
     */
-    max: 1377,
+    /*
+      1377 -> 1379 for TWO lines: the sidebar seed's `svelte-ignore` and the blank the formatter puts
+      after it. The seed itself replaced the `$state(false)` that was already there.
+
+      The reason was on the directive line for one run — `// svelte-ignore state_referenced_locally
+      -- a SEED; …` — and eslint refused it: Svelte reads everything after the code as MORE codes, so
+      `svelte/no-unused-svelte-ignore` reported four ignores that warn about nothing. Recorded
+      because it is a trap the next person will hit: that directive takes codes and nothing else.
+
+      The transcription and the seed-versus-lock argument live in
+      `always-show-roster-contract.test.ts` rather than here, which is why the page pays two lines
+      and not a paragraph.
+    */
+    max: 1379,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -574,7 +587,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the DEVICE, not of the wire: it starts and stops on the same events the recorder does and
       writes into the caption list rather than onto a producer.
     */
-    max: 341,
+    /*
+      341 -> 358 on 2026-08-28, and the seventeen lines are the WHY rather than the work. The change
+      itself is two: a `speechRecognitionAvailable` thunk and one more term in the refusal.
+
+      What the rest records is the defect. `beginSpeechRecognition` has quoted the capture's own
+      message — "disabled by preferences OR SESSION SETTINGS" — in its docblock since the method was
+      written, while gating on the preferences half alone, because the room setting behind the other
+      half was not on `ROOM_VISIBLE_SETTINGS` and this room could not ask. An owner who turned
+      captions off got them anyway, from every presenter, for everybody. A comment that names two
+      sources beside code that reads one is exactly what this repository's standard is for, and the
+      correction is worth more than the number.
+    */
+    max: 358,
     why: 'MediaRecorder, the preview window, the room-wide broadcast and the two speech calls'
   },
   {
@@ -1754,7 +1779,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       correction is shorter than the sentence it replaced because the reasoning now lives with the
       rule in `room-defaults.ts`. A ceiling going DOWN on a correction is the intended direction.
     */
-    max: 1110,
+    /*
+      1110 -> 1111 for the `speechRecognitionAvailable` thunk handed to `RoomRecording`. Pure wiring,
+      which is what this file is; the thunk is a thunk because `gates` is constructed below it.
+    */
+    max: 1111,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
@@ -1766,7 +1795,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       dependencies down to six. The post-mortem moved to `gates.svelte.test.ts`, beside the test that
       could not have caught the bug, which is also what kept the correction inside this number.
     */
-    max: 390,
+    /*
+      390 -> 421 on 2026-08-28, and the thirty-one lines are two additions with their evidence.
+
+      `speechRecognitionAvailable` is the room half of the captions gate — one expression, with the
+      two byte offsets and the argument for `!== true` rather than `=== false`, because absent means
+      NOT disabled and a payload that omits unset settings makes that the only safe reading.
+
+      The rest is a REFUSAL written down at the gate it would have widened. `alwaysShowRoster` has
+      two uses upstream; the seed is built, and the second — a third OR-term on the mobile-app icon,
+      byte 2,487,668, while the command behind it keeps the two-term gate at 2,529,070 — is declined,
+      because reproducing it would put a button in this navbar that opens a modal reading `N/A`
+      forever. A divergence that is not written down at the code is a divergence somebody
+      "corrects" later, and `always-show-roster-contract.test.ts` asserts that paragraph is still
+      there.
+    */
+    max: 421,
     why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {

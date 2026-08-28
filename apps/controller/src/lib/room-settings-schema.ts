@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 74 of 269 are wired today.
+// nothing in the room reads it yet. 76 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -114,7 +114,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "userJoinAndLeavePopup", section: "settings", type: "checkbox", label: "Popup alert when the user joins/leaves?", help: "If enabled, moderators will get a popup when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideAvatars", section: "settings", type: "checkbox", label: "Hide User Avatars?", help: "If enabled, user avatars will be hidden", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideAppInfo", section: "settings", type: "checkbox", label: "Hide Mobile App Info?", help: "If enabled, mobile app info wiil be hidden", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "alwaysShowRoster", section: "settings", type: "checkbox", label: "Always Show User Roster?", help: "If enabled, user roster will always be visible", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "alwaysShowRoster", section: "settings", type: "checkbox", label: "Always Show User Roster?", help: "If enabled, user roster will always be visible", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "showOnlyUsernames", section: "settings", type: "checkbox", label: "Show Only Usernames in Roster?", help: "If enabled, for regular users it will show only their usernames in roster?", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "allowUsersToChangeUsername", section: "settings", type: "checkbox", label: "Allow Users to Change their Usernames?", help: "If enabled, for regular users it will allow them to change their usernames.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "disableEditingUsername", section: "settings", type: "checkbox", label: "Disable Editing Username", help: "If enabled, it will disable the editing of the username in the login form for regular users", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
@@ -246,7 +246,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "recordingReminder", section: "settings", type: "checkbox", label: "Recording Reminder If Speaking?", help: "If enabled, will show recording reminder popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recsInRoom", section: "settings", type: "checkbox", label: "Show Recordings tab in the room?", help: "If enabled, will show recordings tab in the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "downloadRecordingsDisabled", section: "settings", type: "checkbox", label: "Disable download button for Recordings for users?", help: "If enabled, will disable download button for Recordings for users", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "hasSpeechRecognitionDisabled", section: "settings", type: "checkbox", label: "Disable Closed Captioning?", help: "If enabled, will disable closed captioning for the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasSpeechRecognitionDisabled", section: "settings", type: "checkbox", label: "Disable Closed Captioning?", help: "If enabled, will disable closed captioning for the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "dontShowRecInfoToUsers", section: "settings", type: "checkbox", label: "Hide recordings info for users?", help: "If enabled, will hide recording info for users", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "runawayRecMinutes", section: "settings", type: "number", label: "Minutes of recording inactivity?", help: "Number of minutes to flag a recording if inactive (runaway). Leave at 0 to disable.", helpShape: "muted", helpOutside: false, captured: 5, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "runawayRecAutoKill", section: "settings", type: "checkbox", label: "Auto stop recording if inactive?", help: "If enabled, auto stop inactive recordings", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

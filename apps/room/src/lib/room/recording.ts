@@ -58,6 +58,13 @@ export class RoomRecording {
     prefs: RoomPrefs;
     mediaTransport: RoomMediaTransport;
     isPresenter: () => boolean;
+    /**
+     * `!sessData.hasSpeechRecognitionDisabled` — the ROOM half of the captions gate.
+     *
+     * A thunk, because it is read off the loaded page data and the load is replaced on every
+     * refetch; a boolean captured at construction would be the value the room opened with.
+     */
+    speechRecognitionAvailable: () => boolean;
   }) {
     this.#dialogs = options.dialogs;
     this.#media = options.media;
@@ -65,6 +72,7 @@ export class RoomRecording {
     this.#prefs = options.prefs;
     this.#mediaTransport = options.mediaTransport;
     this.#isPresenter = options.isPresenter;
+    this.#speechRecognitionAvailable = options.speechRecognitionAvailable;
 
     this.#screenRecorder = null;
 
@@ -83,6 +91,7 @@ export class RoomRecording {
   readonly #prefs: RoomPrefs;
   readonly #mediaTransport: RoomMediaTransport;
   readonly #isPresenter: () => boolean;
+  readonly #speechRecognitionAvailable: () => boolean;
 
   /**
    * Records the shared screen to a file on this machine.
@@ -305,12 +314,23 @@ export class RoomRecording {
    * because the server refuses `sendSpeechReco` from a member. `prefs.subtitles` is deliberately NOT a
    * gate: that is the per-viewer overlay preference, and a presenter who hides captions on their own
    * screen should still caption for everybody else.
+   *
+   * ## "OR SESSION SETTINGS" was quoted here and not implemented, until 2026-08-28
+   *
+   * The refusal message above names TWO sources and this method gated on one. Upstream:
+   *
+   *     if (!this.globals.preferences.doSpeechReco || !this.globals.hasSpeechRecognition) return …
+   *
+   * (byte 1,110,427), where `hasSpeechRecognition` is `!sessData.hasSpeechRecognitionDisabled`
+   * (1,147,900). The setting was not on `ROOM_VISIBLE_SETTINGS`, so the room could not ask — and an
+   * owner who turned captions off got them anyway, from every presenter, for everybody.
    */
   beginSpeechRecognition() {
     if (
       this.#stopSpeechReco ||
       !this.#isPresenter() ||
       !this.#prefs.doSpeechReco ||
+      !this.#speechRecognitionAvailable() ||
       !this.#mediaTransport.session
     )
       return;

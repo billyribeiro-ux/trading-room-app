@@ -138,7 +138,8 @@
     defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
   });
 
-  let sidebarOpen = $state(false);
+  // svelte-ignore state_referenced_locally
+  let sidebarOpen = $state(data.sessData?.alwaysShowRoster === true);
   let mobileNavOpen = $state(false);
   // `new-evidence/presenter-tab` captures the bar as rendered: `screens-tab` carries
   // `class="nav-link active"` with `aria-selected="true"`, and `notes-tab` carries

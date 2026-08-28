@@ -13,10 +13,10 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SIXTY-ONE by the room application
+  Eleven consumed by this repository's room-login page, SIXTY-THREE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 74.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 76.
 
   55 -> 58 on 2026-08-28: darkThemeAsDefault, alertSoundOff and alertsChatOnBottom, the three room
   defaults that seed a member's own preferences once. Three clauses of one expression upstream, so
@@ -172,6 +172,9 @@ const EXPECTED_WIRED_SETTINGS = [
   'chatDisabledForTrials',
   /* Added 2026-08-28: the Q and A entitlement on alerts. See `room-config.ts`. */
   'hasQAOnAlerts',
+  /* Added 2026-08-28: the sidebar seed and the captions entitlement. See `room-config.ts`. */
+  'alwaysShowRoster',
+  'hasSpeechRecognitionDisabled',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

@@ -738,7 +738,9 @@ export function createRoom(deps: RoomDeps) {
     menus,
     prefs,
     mediaTransport,
-    isPresenter: () => isPresenter
+    isPresenter: () => isPresenter,
+    // A thunk, and it must be: `gates` is constructed below this line.
+    speechRecognitionAvailable: () => gates.speechRecognitionAvailable
   });
 
   /*

@@ -269,6 +269,17 @@ describe('the allow-list itself', () => {
         entitlement whose prop defaults open is not an entitlement.
       */
       hasQAOnAlerts: 'RoomMessage — the ask-a-question button on an alert, through RoomMessageChrome',
+      /*
+        Both verified in the room before being written here. `alwaysShowRoster` seeds `sidebarOpen`
+        in `+page.svelte`, which `RoomSidebar` and `RoomNavbar` both read; the reference's SECOND use
+        of it — a third OR-term on the mobile-app icon — is deliberately refused, with the reason at
+        `RoomGates.mobileAppAvailable`. `hasSpeechRecognitionDisabled` reaches
+        `RoomGates.speechRecognitionAvailable`, which `RoomRecording.beginSpeechRecognition` asks
+        before starting; its docblock has quoted that half of the capture's refusal since it was
+        written while implementing only the preferences half.
+      */
+      alwaysShowRoster: 'seeds sidebarOpen — the sidebar opens on arrival and can still be closed',
+      hasSpeechRecognitionDisabled: 'RoomGates.speechRecognitionAvailable — the room half of the captions gate',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

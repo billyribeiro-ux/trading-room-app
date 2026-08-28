@@ -452,6 +452,38 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hasQAOnAlerts',
   /*
+    "Always show roster?" — the sidebar opens on arrival and stays open.
+
+      sessData.alwaysShowRoster && (this.showSidebar = !0, this.alwaysShowRoster = !0,
+        setTimeout(() => this.appService.loadRoster(), 500))
+
+    at bundle bytes 1,499,261 and 2,566,991 — the room component and its popout, the same three
+    statements in both. It is a SEED, not a lock: `toggleSideBarUsersCount` still closes the sidebar
+    afterwards, so a member can put it away.
+
+    ONE consumer here and one deliberate refusal. The seed is built. The reference ALSO adds the flag
+    as a third OR-term to the mobile-app icon's slot (byte 2,487,668) so the slot stays occupied when
+    no app is configured — while `getMyPinAndDoInfo` keeps the two-term gate (2,529,070). Reproducing
+    that would put a button in this navbar that opens a modal reading `N/A` forever, which is a
+    control that does nothing; the refusal is recorded at `RoomGates.mobileAppAvailable`.
+  */
+  'alwaysShowRoster',
+  /*
+    "Speech recognition disabled?" — the room half of the captions gate, and NOTE THE NEGATION.
+
+      globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0     byte 1,147,900
+
+    Unlike `h264Enabled`, whose `|| !0` makes it unconditionally true and dead, the `!` here makes
+    this one live: an absent setting leaves recognition ON, which is the right default and is what
+    every unset setting means everywhere else in this payload.
+
+    Three consumers upstream and the first is the one that matters: `startSpeechRecognition()` returns
+    early on `!preferences.doSpeechReco || !globals.hasSpeechRecognition` (byte 1,110,427). This
+    room's `beginSpeechRecognition` has quoted that message — "disabled by preferences or session
+    settings" — in its docblock since it was written while implementing only the PREFERENCES half.
+  */
+  'hasSpeechRecognitionDisabled',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

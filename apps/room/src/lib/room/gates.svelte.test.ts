@@ -268,6 +268,41 @@ describe('the gates themselves answer what the reference says they answer', () =
     expect(gates.recordingTooltip).toBe('Recording to: session-42');
   });
 
+  /*
+    THE CAPTIONS ENTITLEMENT, and the negation that decides the default.
+
+    `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0` (byte 1,147,900).
+    Absent means NOT disabled, so a room that has never configured captions has them — and the
+    `!== true` below is what makes that true for the `undefined` an omitted setting produces.
+
+    The consumer is `RoomRecording.beginSpeechRecognition`, whose docblock quoted the capture's
+    "disabled by preferences or session settings" while gating on preferences alone. An owner who
+    turned captions off got them anyway, from every presenter, for everybody.
+  */
+  it('speechRecognitionAvailable is ON unless the room disabled it', () => {
+    const { gates, state } = make();
+    expect(gates.speechRecognitionAvailable, 'an unset setting must leave captions on').toBe(true);
+
+    state.session = {
+      sessData: { hasSpeechRecognitionDisabled: true },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
+    expect(gates.speechRecognitionAvailable).toBe(false);
+  });
+
+  it('treats a truthy-but-not-true setting as NOT disabling captions', () => {
+    // `=== true` everywhere else on this class, and the negation makes it `!== true` here. A string
+    // off the wire must not switch a feature off any more than it may switch one on.
+    const { gates, state } = make();
+    state.session = {
+      sessData: { hasSpeechRecognitionDisabled: 'yes' },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
+    expect(gates.speechRecognitionAvailable).toBe(true);
+  });
+
   it('tawkAvailable needs the presenter, the room setting AND a configured property id', () => {
     const { gates, state } = make();
     state.session = {

@@ -218,6 +218,20 @@ export interface RoomSessionSettings {
    */
   hasQAOnAlerts?: boolean;
   /**
+   * "Always show roster?" — the sidebar opens on arrival.
+   *
+   * `sessData.alwaysShowRoster && (showSidebar = true, …, loadRoster())` at bundle bytes 1,499,261
+   * and 2,566,991. A SEED, not a lock: the toggle still closes it afterwards.
+   */
+  alwaysShowRoster?: boolean;
+  /**
+   * "Speech recognition disabled?" — the room half of the captions gate, and note the NEGATION.
+   *
+   * `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0`, byte 1,147,900.
+   * Absent leaves recognition on, which is what an absent setting means everywhere in this payload.
+   */
+  hasSpeechRecognitionDisabled?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

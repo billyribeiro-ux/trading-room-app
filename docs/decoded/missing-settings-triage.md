@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **51** as this is written; seven have been answered by building, and the
+2026-08-28 and is at **49** as this is written; nine have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -94,10 +94,8 @@ Ordered by how much of the work is already done.
 | --- | --- | --- |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
 | `hideWebcamForRoom` | 2,489,228 | One term of the navbar webcam control's gate. |
-| `alwaysShowRoster` | 2,487,433 | Two slots in the sidebar swap on it: `showSidebar && !alwaysShowRoster` versus `showSidebar \|\| alwaysShowRoster`. Also one term of the mobile-app link gate at 2,487,743. |
 | `blinkingRec` | 2,477,678 | `ngClass(…, roomState.isRecording && sessData.blinkingRec, isRecordingStarting)` — whether the REC indicator blinks. Our indicator already carries `animated flash`; this is the term that decides. |
 | `autoSwitchToOfftopics` | 1,407,102 | On chat init, switch the channel to `offTopic`. Two consumers, main and extra column (2,359,803), and the extra one is additionally gated on `preferences.extraChatColumn`. |
-| `hasSpeechRecognitionDisabled` | 1,147,841 | `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0`. Note the shape: unlike `h264Enabled` the negation makes this one live. |
 | `name` | see above | `document.title` and the transcript window title. One value, two consumers. |
 | `modMessage` | 2,492,450 | A presenter-visible moderator message bar above the presentation area, with a close button that clears it locally (`closeModMessage`). |
 | `enablePrivateMessageHistory` | 2,068,615 | One row in the user-info modal. |
@@ -174,7 +172,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 
 ---
 
-## The seven already answered
+## The nine already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -185,3 +183,5 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 | `dontShowRecInfoToUsers` | CORRECTED — the gate existed and read a viewer preference nothing writes. | 2026-08-28 |
 | `chatDisabledForTrials` | WIRED — `chatComposerAvailable` now holds all three reasons the composer is off. | 2026-08-28 |
 | `hasQAOnAlerts` | WIRED — the ask-a-question button was gated on a prop defaulting to `true` that nothing passed. | 2026-08-28 |
+| `alwaysShowRoster` | WIRED — the sidebar seed. Its SECOND upstream use, a third term on the mobile-app icon, is refused with the reason at `RoomGates.mobileAppAvailable`. | 2026-08-28 |
+| `hasSpeechRecognitionDisabled` | WIRED — `beginSpeechRecognition` quoted "or session settings" and gated on preferences alone. | 2026-08-28 |
