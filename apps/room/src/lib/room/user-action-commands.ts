@@ -1,4 +1,4 @@
-import type { ChatMuteCommands } from './chat-mute.svelte.js';
+import type { ChatMuteCommands } from './chat-mute.js';
 import type { RoomPermissionKey } from '#lib/permission-keys.js';
 
 /**

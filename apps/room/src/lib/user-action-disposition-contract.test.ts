@@ -93,17 +93,17 @@ function handledActions(): Set<string> {
     repository forbids. A gate that does not follow an extraction is worse than no gate, because it
     goes red on the refactor and green on the regression.
   */
-  const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
+  const session = readFileSync('src/lib/room/session-control.ts', 'utf8');
   /*
     `RoomKicks` joined them on 2026-08-23, when `kick` and `kick-duplicates` moved out under the
     owner's extraction ruling. Adding it here is not bookkeeping: this function's own note says a
     gate that does not follow an extraction "goes red on the refactor and green on the regression",
     and it did exactly that on this move — which is the second time that note has paid for itself.
   */
-  const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+  const kicks = readFileSync('src/lib/room/kicks.ts', 'utf8');
   // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
   // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
-  const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
+  const chatMute = readFileSync('src/lib/room/chat-mute.ts', 'utf8');
   /*
     `RoomSessionControl` SPLIT AGAIN on 2026-08-27 and the scanner followed it a THIRD time, which is
     the third payment on the note above. Its nine actions divide on whether anybody outside this
@@ -323,11 +323,11 @@ describe('every dispatched action has exactly one disposition', () => {
       toasts. The markers are the ways this class acts: a server command, the managed lists, a
       preference, a modal, a rename, a delegate method call, or writing its own selection state.
     */
-    const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
-    const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+    const session = readFileSync('src/lib/room/session-control.ts', 'utf8');
+    const kicks = readFileSync('src/lib/room/kicks.ts', 'utf8');
     // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
     // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
-    const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
+    const chatMute = readFileSync('src/lib/room/chat-mute.ts', 'utf8');
     // The 2026-08-27 split of `RoomSessionControl`; the note above about a gate following an
     // extraction, paid a third time. Both halves are read, or eight live controls read as inert.
     const sessionCommands = readFileSync('src/lib/room/session-room-commands.ts', 'utf8');

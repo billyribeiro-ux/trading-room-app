@@ -67,7 +67,7 @@ describe('the sidebar seed', () => {
     modal reading `N/A` forever.
   */
   it('keeps the mobile-app gate at TWO terms, with the refusal written down', () => {
-    const gates = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    const gates = readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8');
     /*
       Every bound is asserted FOUND before it is used, which `slice-anchor-contract.test.ts` requires
       and which this test needed: `indexOf` returns -1 for a marker that has moved, and

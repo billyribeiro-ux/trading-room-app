@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 18:18 UTC — `.svelte.ts` made to mean what the official docs say it means
+
+**Runtime impact: NO.** Seven modules renamed, their import specifiers rewritten, one dead assignment
+removed, and a new gate. Nothing that ships behaves differently — a rune-free `.svelte.ts` compiles
+identically to the `.ts` it should have been, which is exactly why this needed a test rather than a
+convention.
+
+#### The rule, from the source rather than from habit
+
+> *"These behave like any other `.js` or `.ts` module, except that you can use runes."*
+> — https://svelte.dev/docs/svelte/svelte-js-files
+
+Two stated purposes: reusable reactive logic, and sharing reactive state. That is the whole contract,
+and this repository had already argued it from the other direction — `lib/room/recording.ts` opens
+with *"A plain `.ts`, not `.svelte.ts`, and that is deliberate… Naming it `.svelte.ts` would tell the
+compiler to look for runes and tell a reader the module is reactive."*
+
+**That paragraph governed exactly one file.** Measured today: SEVEN modules in `lib/room/` wore
+`.svelte.ts` and contained no rune at all — `chat-mute`, `gates`, `kicks`, `private-commands`,
+`screen-overlay`, `session-control`, `typing-signal`. Six predated today. The seventh was written
+this afternoon, by an author who had read `recording.ts`'s paragraph and got it wrong anyway. Prose
+in one file does not govern the next one; a test does.
+
+#### `gates` is the one that proves the detector
+
+A hand search over raw text found six of the seven and **missed `gates.ts`**, because that file
+mentions `$derived` four times in its own header — once to say *"GETTERS, not `$derived` class
+fields, and this is the precedent rather than a preference."* So it argues against the rune in prose,
+uses none in code, and wore the extension that advertises them. The gate strips comments before
+matching and caught it on its first run. Same lesson as `gate/evidence-bound-tests.mjs` on 16:41,
+learned again in a different file: **a source-reading test that does not strip comments is measuring
+the wrong text.**
+
+#### The gate, and what it deliberately does not do
+
+`rune-module-extension-contract.test.ts` discovers every `.svelte.ts` under `src/` recursively —
+never a hand-kept list — and requires a rune in each. One direction only: a `.ts` file using a rune
+does not compile, so the toolchain already refuses that, loudly. This test exists for the failure
+that is silent. `SvelteMap` / `SvelteSet` are reactive and are ordinary classes, so a module using
+them still needs no rune and no `.svelte` in its name — asserted, because "reactive" and "uses runes"
+are the same thing in casual speech and are not the same thing here.
+
+Three negative controls seen red: a rune-free `.svelte.ts` reappearing, the detector no longer
+stripping comments, and discovery no longer recursing.
+
+#### One defect shipped this afternoon, found by ESLint
+
+`alert-overlay-layout.ts` carried a dead `current = ''` — reassigned unconditionally two statements
+later, so nothing could observe it. It went out in `c5463d4`, which means **`eslint` was not run
+before that push**, and it should have been. Removed rather than reproduced, on the same footing as
+the dead `r || (r = …)` fallback in `promptForScreenName`: a line that cannot execute is not
+behaviour to match. Both apps now lint clean.
+
+#### Verified
+
+`svelte-check` 0/0 · `eslint` clean in **both** apps · room `pnpm test` **184 files / 3,031 tests**,
+1 skipped · the nine `alert-overlay` controls re-run after the lint fix, all still red on mutation.
+
+**Standing caveat, corrected.** Previous entries said the Svelte MCP is "disconnected". Measured
+today: the connector is **installed for the org and toggled off for this chat** (`enabledInChat:
+false`). That is a setting the owner can flip, not a broken tool — so `svelte-autofixer` remains
+un-run, but the reason is actionable and the official documentation was read directly instead.
+
 ### 2026-08-28 18:07 UTC — `autoRecord` + `dontStopRecOnMicMute`, and a blocker that described the wrong system
 
 **Runtime impact: YES.** In a room with *"Auto Record?"* on, a presenter's recording now starts by

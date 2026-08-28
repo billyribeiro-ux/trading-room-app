@@ -105,7 +105,7 @@ describe('the registry', () => {
 
 const command = readFileSync(new URL('../routes/typing.remote.ts', import.meta.url), 'utf8');
 const events = readFileSync(new URL('./server/room-events.ts', import.meta.url), 'utf8');
-const signal = readFileSync(new URL('./room/typing-signal.svelte.ts', import.meta.url), 'utf8');
+const signal = readFileSync(new URL('./room/typing-signal.ts', import.meta.url), 'utf8');
 const chat = readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8');
 const extra = readFileSync(new URL('./components/ExtraChatPane.svelte', import.meta.url), 'utf8');
 

@@ -3,8 +3,8 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { formatChatMutedTill } from '#lib/message-formatters.js';
-import { RoomChatMute } from './chat-mute.svelte';
-import { RoomPrivateCommands } from './private-commands.svelte';
+import { RoomChatMute } from './chat-mute';
+import { RoomPrivateCommands } from './private-commands';
 import { RoomEventStream } from './events.svelte';
 
 /*

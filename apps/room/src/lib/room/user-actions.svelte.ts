@@ -18,12 +18,12 @@ import {
   userActionAlert
 } from '#lib/user-action-intent.js';
 
-import { RoomChatMute } from './chat-mute.svelte';
+import { RoomChatMute } from './chat-mute';
 import type { UserActionCommands } from './user-action-commands';
 import type { RoomDialogs } from './dialogs.svelte';
-import { RoomKicks } from './kicks.svelte';
+import { RoomKicks } from './kicks';
 import { RoomManagedUsers } from './managed-users.svelte';
-import { RoomSessionControl } from './session-control.svelte';
+import { RoomSessionControl } from './session-control';
 import type { RoomToasts } from './toasts.svelte';
 
 /** The load values every one of these actions reads, taken as a thunk. */

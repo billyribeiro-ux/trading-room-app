@@ -40,11 +40,11 @@ const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url
 const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
 /** `RoomPrivateCommands` — the addressed channel, and the one gate that makes it addressed. */
 const privCmdsCode = readFileSync(
-  new URL('./room/private-commands.svelte.ts', import.meta.url),
+  new URL('./room/private-commands.ts', import.meta.url),
   'utf8'
 );
 /** `RoomChatMute` — the browser half, both directions and both ends, since 2026-08-23. */
-const chatMuteCode = readFileSync(new URL('./room/chat-mute.svelte.ts', import.meta.url), 'utf8');
+const chatMuteCode = readFileSync(new URL('./room/chat-mute.ts', import.meta.url), 'utf8');
 /** `applyChatMute` — the one insert and the one announcement, which both doors call. */
 const muteCode = readFileSync(new URL('./server/chat-mute.ts', import.meta.url), 'utf8');
 /** The message context menu's door, which must no longer hold a copy of the insert. */

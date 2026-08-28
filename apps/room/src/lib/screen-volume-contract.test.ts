@@ -551,7 +551,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
       here. The gate itself, the other four writers and the two this room cannot model are covered
       by `chat-alerts-gates-contract.test.ts`.
     */
-    const GATES = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    const GATES = readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8');
     expect(GATES).toContain('this.viewerOnlyMode ||\n      this.#chatAlertsDetached()');
     expect(SHELL).toContain('{#if !hideChatAlerts}');
   });
@@ -759,7 +759,7 @@ describe('the cluster keeps the captured child order', () => {
     expect(PRESENTATION).toContain('volume={screenVolume}');
     expect(PAGE).toContain('{#snippet screenVolume()}');
     expect(PAGE).toContain('{screenVolume}');
-    const GATES_SOURCE = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    const GATES_SOURCE = readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8');
     expect(GATES_SOURCE).toContain("page.url.searchParams.get('vo') === '1'");
     expect(GATES_SOURCE).toContain("page.url.searchParams.get('vo') === '2'");
     expect(controlMarkup).toContain('{#if viewerOnlyMode}');

@@ -580,7 +580,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       937 -> 955, 2026-08-26 — `sendSalesImageToChat` / `sendUsersToURL`, the two receivers whose senders
       shipped on 2026-08-23. Two dispatch branches, guarded and transcribed.
 
-      Raised on the same grounds recorded at `lib/room/session-control.svelte.ts` in this file: the
+      Raised on the same grounds recorded at `lib/room/session-control.ts` in this file: the
       growth is the captured code and the reason the presenter is EXCLUDED from both frames
       (`isPresenter ||` is a guard, not a truthiness shorthand), which is the single most likely
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
@@ -636,7 +636,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     /*
       291 -> 304, 2026-08-27, and the rule above says a raise is a conversation. This is the third
-      exception this file records, after `private-commands.svelte.ts` and `RoomOverlays.svelte`.
+      exception this file records, after `private-commands.ts` and `RoomOverlays.svelte`.
 
       WHAT THE THIRTEEN LINES ARE: one import and one getter, `searchScopeNotice`. They close a SILENT
       CORRECTNESS GAP — the alerts toolbar filters the fifty rows the page holds while its field is
@@ -884,7 +884,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       takes the browser's sharing indicator down).
 
       THE PAYMENT IS REAL AND IT IS ELSEWHERE. 116 lines of lifecycle went to
-      `lib/room/screen-overlay.svelte.ts`, 253 to `lib/alert-overlay-compositor.ts` and 268 to the
+      `lib/room/screen-overlay.ts`, 253 to `lib/alert-overlay-compositor.ts` and 268 to the
       pure `lib/alert-overlay-layout.ts`, which is the half that carries the tests. Had that gone in
       here — which is how the reference does it, one 400-line method — this file would be past 1,200
       and the geometry would be untestable. The ratchet did its job: it forced the split first.
@@ -956,7 +956,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     /*
       770 -> 777, 2026-08-27, and the rule directly above says a raise is a conversation. This is that
       conversation, argued rather than quietly applied — and it is the second exception this file has
-      recorded, after `private-commands.svelte.ts`.
+      recorded, after `private-commands.ts`.
 
       WHAT THE SEVEN LINES ARE. One import, one `closedMessage` taken off `data`, one callback, and a
       two-line note saying why neither is a new prop. That is the whole cost of wiring the close
@@ -1861,7 +1861,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       445 -> 483, 2026-08-26 — `sendSalesImageToChat` / `sendUsersToURL`, the two receivers whose senders
       shipped on 2026-08-23. Two receiver methods plus the overlay's one-url state.
 
-      Raised on the same grounds recorded at `lib/room/session-control.svelte.ts` in this file: the
+      Raised on the same grounds recorded at `lib/room/session-control.ts` in this file: the
       growth is the captured code and the reason the presenter is EXCLUDED from both frames
       (`isPresenter ||` is a guard, not a truthiness shorthand), which is the single most likely
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
@@ -1993,7 +1993,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/composer.svelte.ts',
     /*
       +20, slice 27: the RTE gate's own docblock, found ORPHANED on `+page.svelte` and swept into
-      `gates.svelte.ts` by the extraction before landing where it belongs. It is the longest of the
+      `gates.ts` by the extraction before landing where it belongs. It is the longest of the
       four because it records a deliberate NARROWING — upstream opens the editor for a member who
       owns a rich message and then refuses their save, so fewer people reach the editor here and
       everyone who reaches it can finish. `chat-rte-gate-contract.test.ts` executes that claim.
@@ -2002,7 +2002,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
-    file: 'lib/room/kicks.svelte.ts',
+    file: 'lib/room/kicks.ts',
     /*
       Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
 
@@ -2043,7 +2043,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the two viewer-local chat lists, muted and followed; localStorage in, localStorage out, no server'
   },
   {
-    file: 'lib/room/session-control.svelte.ts',
+    file: 'lib/room/session-control.ts',
     /*
       Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
 
@@ -2279,7 +2279,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       to the member — the verbatim capture byte for `forceReload`, why a kick shows text rather than
       swapping the page — in the room's assembly factory rather than beside the class that calls them.
 
-      The move went through `private-commands.svelte.ts` first and was moved out again: appending 45
+      The move went through `private-commands.ts` first and was moved out again: appending 45
       lines to a capped file is moving the problem, not solving it, and the ratchet said so
       immediately. Its own module is where a thing this size belongs.
     */
@@ -2287,7 +2287,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
   },
   {
-    file: 'lib/room/private-commands.svelte.ts',
+    file: 'lib/room/private-commands.ts',
     /*
       THE ADDRESSED CHANNEL, created 2026-08-23 and capped in the same commit.
 
@@ -2329,7 +2329,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
-    file: 'lib/room/chat-mute.svelte.ts',
+    file: 'lib/room/chat-mute.ts',
     /*
       THE CHAT MUTE, both directions and both ends, created 2026-08-23 and capped in the same commit.
 
@@ -2370,7 +2370,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'which renderer each pair of surfaces uses; seeded once, then owned by the member'
   },
   {
-    file: 'lib/room/screen-overlay.svelte.ts',
+    file: 'lib/room/screen-overlay.ts',
     /*
       Born capped, 2026-08-28, in the commit that created it, and the cap moved once BEFORE it
       landed: 117 -> 166, for `rekey` and the two-teardown split. Recorded rather than quietly set to
@@ -2512,7 +2512,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the composition root - 37 constructions and their citations, assembly and nothing else'
   },
   {
-    file: 'lib/room/gates.svelte.ts',
+    file: 'lib/room/gates.ts',
     /*
       Held at 390 on 2026-08-28, with the file one line under it. `recordingTooltip` stopped reading
       `prefs.loaded` and started reading `sessData`, which is where the reference reads it — and that
@@ -2539,7 +2539,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {
-    file: 'lib/room/typing-signal.svelte.ts',
+    file: 'lib/room/typing-signal.ts',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE — and, like every `lib/room/*.ts` module, the
       discovery gate would have refused it without one.

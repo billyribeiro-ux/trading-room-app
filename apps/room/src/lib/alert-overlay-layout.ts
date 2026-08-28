@@ -121,10 +121,16 @@ export function wrapOverlayWords(
 
   for (const word of words) {
     if (measure(word) > maxWidth) {
-      if (current) {
-        lines.push(current);
-        current = '';
-      }
+      /*
+        Flush whatever preceded the over-long word, and DO NOT clear the buffer.
+
+        Upstream clears it here and the clear is dead: the next statement but one reassigns `current`
+        from `pieces` unconditionally, so nothing can observe the empty string in between. Dropped
+        rather than reproduced, on the same footing as the dead `r || (r = …)` fallback in
+        `promptForScreenName` — a line that cannot execute is not behaviour to match, and `eslint`'s
+        `no-useless-assignment` is right to refuse it.
+      */
+      if (current) lines.push(current);
       const pieces = breakWord(word);
       for (let index = 0; index < pieces.length - 1; index += 1) lines.push(pieces[index]);
       current = pieces[pieces.length - 1] ?? '';

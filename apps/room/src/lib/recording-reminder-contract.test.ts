@@ -37,11 +37,11 @@ const code = page.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '
 describe('the recording reminder needs the owner AND the runtime flag', () => {
   it('reads the policy from sessData under its own name', () => {
     /*
-      The sixteen view gates moved to `room/gates.svelte.ts` in Phase 5 slice 27, and each became a
+      The sixteen view gates moved to `room/gates.ts` in Phase 5 slice 27, and each became a
       GETTER — a `$derived` class field would initialise before the constructor assigned the thunks
       it reads, which `RoomFiles.filesHidden` paid for.
     */
-    const gatesCode = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    const gatesCode = readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8');
     expect(gatesCode).toContain('return this.#session().sessData?.recordingReminder === true;');
   });
 

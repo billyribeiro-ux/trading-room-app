@@ -35,7 +35,7 @@ import { describe, expect, it } from 'vitest';
   extraction removes things. That was half the mechanism and it went red within one slice of being
   written: slice 27's generator copied every block comment that PRECEDED an extracted declaration,
   which swept up six that belonged to declarations staying behind, and deposited them in
-  `gates.svelte.ts` stacked on top of one another. The prose travelled to a file that had nothing
+  `gates.ts` stacked on top of one another. The prose travelled to a file that had nothing
   to do with it — the mirror image of leaving it behind, and equally invisible to a diff, because
   every one of those lines is an addition to a new file.
 

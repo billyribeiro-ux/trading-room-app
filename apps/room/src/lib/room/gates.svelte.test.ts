@@ -2,7 +2,7 @@
 import { flushSync } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
 
-import { RoomGates } from './gates.svelte';
+import { RoomGates } from './gates';
 
 /*
   `viewerOnlyMode` reads `page.url` from `$app/state`, which is a SvelteKit-owned rune with no

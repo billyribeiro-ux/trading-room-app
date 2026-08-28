@@ -581,7 +581,7 @@ export interface RoomSessionSettings {
    *
    * It crosses because every occurrence is `sessData.<name>`, and because it is not a viewer
    * preference in any sense: one presenter ticking it changes what everybody else sees.
-   * `#lib/room/screen-overlay.svelte.ts` is the gate and the lifecycle;
+   * `#lib/room/screen-overlay.ts` is the gate and the lifecycle;
    * `#lib/alert-overlay-layout.ts` is the geometry, and it is pure.
    */
   alertsOverlayOnScreenshare?: boolean;

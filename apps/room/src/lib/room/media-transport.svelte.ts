@@ -12,7 +12,7 @@ import { RoomLocalCapture } from './local-capture.svelte';
 import type { RoomMedia } from './media.svelte';
 import type { AutoRecordTrigger } from '#lib/auto-record.js';
 
-import type { RoomScreenOverlay } from './screen-overlay.svelte';
+import type { RoomScreenOverlay } from './screen-overlay';
 import type { RoomScreens } from './screens.svelte';
 import type { RoomToasts } from './toasts.svelte';
 import type { RoomVolume } from './volume.svelte';

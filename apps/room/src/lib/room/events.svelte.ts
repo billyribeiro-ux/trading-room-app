@@ -8,7 +8,7 @@ import { formatUserLocation } from '#lib/roster-gates.js';
 import { playSoundEffect } from '#lib/sound-effects.js';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
-import type { AddressedCommand, RoomPrivateCommands } from './private-commands.svelte';
+import type { AddressedCommand, RoomPrivateCommands } from './private-commands';
 import type { CmdsFrame } from './cmds-frame';
 import { handleForAllBroadcast } from './for-all-broadcasts';
 import type { RoomMedia } from './media.svelte';
@@ -28,7 +28,7 @@ interface TypingSink {
  *
  * Structural rather than the class, for the reason `TypingSink` and `PrivateChatSink` are: the
  * router recognises a channel and hands the frame over. What an overlay IS — a canvas, an interval,
- * a producer-id map — is `#lib/room/screen-overlay.svelte.ts`'s business and no import of this file
+ * a producer-id map — is `#lib/room/screen-overlay.ts`'s business and no import of this file
  * should be able to reach it.
  */
 interface ScreenOverlaySink {
@@ -179,7 +179,7 @@ export class RoomEventStream<Entry> {
      */
     alertThenReload: (message: string) => void;
     /**
-     * Every ADDRESSED command — `#lib/room/private-commands.svelte.ts`.
+     * Every ADDRESSED command — `#lib/room/private-commands.ts`.
      *
      * One collaborator rather than three callbacks and a class. The router's job on this channel is
      * to recognise the channel and hand the frame over with a way to close the stream; deciding who
@@ -683,7 +683,7 @@ export class RoomEventStream<Entry> {
 
       /*
         `/privCmdsIn/{uid}-{id}/` — every command addressed to ONE member, in
-        `#lib/room/private-commands.svelte.ts`.
+        `#lib/room/private-commands.ts`.
 
         The whole channel left this router on 2026-08-23, ahead of the receivers `TODO.md` row 9
         still owes. Five channels here carry frames for the room; this one names a person, and the
@@ -745,7 +745,7 @@ export class RoomEventStream<Entry> {
 
       /*
         `alertsOverlayOnScreenshare` — an arriving alert, handed to every screen this peer is sharing
-        so it is burned into the frames the room receives. `#lib/room/screen-overlay.svelte.ts` is
+        so it is burned into the frames the room receives. `#lib/room/screen-overlay.ts` is
         the gate; a room without the setting, or a presenter sharing nothing, fans out to nothing.
 
         BEFORE the own-sender guard below, and that is the whole point rather than an accident of

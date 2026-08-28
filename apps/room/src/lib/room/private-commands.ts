@@ -1,4 +1,4 @@
-import type { RoomChatMute } from './chat-mute.svelte';
+import type { RoomChatMute } from './chat-mute';
 
 /**
  * `/privCmdsIn/{uid}-{id}/` — every command ADDRESSED TO ONE MEMBER.
@@ -135,7 +135,7 @@ export class RoomPrivateCommands {
     }
 
     /*
-      BOTH DIRECTIONS OF THE CHAT MUTE live in `#lib/room/chat-mute.svelte.ts` — the dialog, the
+      BOTH DIRECTIONS OF THE CHAT MUTE live in `#lib/room/chat-mute.ts` — the dialog, the
       toast, the sentence and the `invalidateAll()` that makes either true — together with the
       presenter's two buttons, because that split is how the pair drifted: `unmuteChat` had a real
       command and a real receiver for months while `mute-chat-24` raised the capture's own

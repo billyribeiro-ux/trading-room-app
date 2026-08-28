@@ -44,7 +44,7 @@ import {
     a real screen share would take an afternoon to reproduce by hand.
   * `alert-overlay-compositor.ts` — `drawImage`, `fillText`, an interval and a `captureStream`. Its
     constants are pinned here; its behaviour needs a browser and that is stated, not implied.
-  * `room/screen-overlay.svelte.ts` — the producer-id lifecycle, exercised with a fake compositor.
+  * `room/screen-overlay.ts` — the producer-id lifecycle, exercised with a fake compositor.
 
   WHAT IS NOT VERIFIED, said plainly rather than left to be discovered: no test in this repository
   has seen a composited frame. The geometry is proven against the reference's own constants; that the
@@ -358,7 +358,7 @@ describe('the compositor reproduces the reference numbers', () => {
       Three of them: no `document`, no 2d context or no `captureStream`, and the caller's own check
       on a null return. A share that silently does not start because an overlay could not initialise
       trades the room's primary function for a cosmetic one, so the overlay is the thing that gives
-      way. `screen-overlay.svelte.ts` is the consumer, and it returns the raw stream on null.
+      way. `screen-overlay.ts` is the consumer, and it returns the raw stream on null.
     */
     const source = readFileSync(new URL('./alert-overlay-compositor.ts', import.meta.url), 'utf8');
     expect(source).toContain("if (typeof document === 'undefined') return null;");
@@ -366,7 +366,7 @@ describe('the compositor reproduces the reference numbers', () => {
       "if (!context || typeof canvas.captureStream !== 'function') return null;"
     );
     const consumer = readFileSync(
-      new URL('./room/screen-overlay.svelte.ts', import.meta.url),
+      new URL('./room/screen-overlay.ts', import.meta.url),
       'utf8'
     );
     expect(consumer).toContain('if (!handle) return unwrapped;');
@@ -419,7 +419,7 @@ vi.mock('#lib/alert-overlay-compositor.js', async (importOriginal) => {
   };
 });
 
-const { RoomScreenOverlay } = await import('#lib/room/screen-overlay.svelte.js');
+const { RoomScreenOverlay } = await import('#lib/room/screen-overlay.js');
 
 const rawStream = () => ({ id: 'raw' }) as unknown as MediaStream;
 

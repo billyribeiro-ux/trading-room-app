@@ -106,11 +106,11 @@ import { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
 import { RoomToasts } from '#lib/room/toasts.svelte.js';
 import { RoomFiles } from '#lib/room/files.svelte.js';
 import { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
-import { TypingSignal } from '#lib/room/typing-signal.svelte.js';
+import { TypingSignal } from '#lib/room/typing-signal.js';
 import { RoomComposer } from '#lib/room/composer.svelte.js';
 import { RoomAlertsPane } from '#lib/room/alerts-pane.js';
 import { RoomFeedScroll } from '#lib/room/feed-scroll.js';
-import { RoomGates } from '#lib/room/gates.svelte.js';
+import { RoomGates } from '#lib/room/gates.js';
 import { RoomModals } from '#lib/room/modals.svelte.js';
 import { RoomNotes } from '#lib/room/notes.svelte.js';
 import { RoomFeeds } from '#lib/room/feeds.svelte.js';
@@ -121,7 +121,7 @@ import { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
 import { RoomRecording } from '#lib/room/recording.js';
 import { RoomWindowHandlers } from '#lib/room/window-handlers.js';
 import { RoomWebcams } from '#lib/room/webcams.js';
-import { RoomScreenOverlay } from '#lib/room/screen-overlay.svelte.js';
+import { RoomScreenOverlay } from '#lib/room/screen-overlay.js';
 import { RoomScreens } from '#lib/room/screens.svelte.js';
 import { RoomUserActions } from '#lib/room/user-actions.svelte.js';
 import {
@@ -962,7 +962,7 @@ export function createRoom(deps: RoomDeps) {
   });
 
   /*
-    WHAT THIS VIEWER MAY SEE, in `#lib/room/gates.svelte.ts`.
+    WHAT THIS VIEWER MAY SEE, in `#lib/room/gates.ts`.
 
     Phase 5 slice 27. Sixteen `$derived` predicates answering one question sixteen ways: given this
     room's configuration and this viewer's role, what is on screen.

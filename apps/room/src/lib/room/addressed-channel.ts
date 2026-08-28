@@ -1,5 +1,5 @@
-import { RoomPrivateCommands } from './private-commands.svelte.js';
-import type { RoomChatMute } from './chat-mute.svelte.js';
+import { RoomPrivateCommands } from './private-commands.js';
+import type { RoomChatMute } from './chat-mute.js';
 /**
  * The addressed channel, assembled with the callbacks its four commands actually need.
  *

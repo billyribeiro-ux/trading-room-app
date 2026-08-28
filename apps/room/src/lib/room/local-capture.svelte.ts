@@ -17,7 +17,7 @@ import type { WebcamPresenter } from '#lib/types.js';
 import type { RoomDialogs } from './dialogs.svelte';
 import type { RoomMedia } from './media.svelte';
 import type { TransportSession } from './media-transport.svelte';
-import type { RoomScreenOverlay, WrappedScreen } from './screen-overlay.svelte';
+import type { RoomScreenOverlay, WrappedScreen } from './screen-overlay';
 import type { RoomScreens } from './screens.svelte';
 import type { RoomToasts } from './toasts.svelte';
 
@@ -645,7 +645,7 @@ export class RoomLocalCapture {
             });
       /*
         `alertsOverlayOnScreenshare` — a CANVAS between this capture and the wire, when the room asked
-        for one. `#lib/room/screen-overlay.svelte.ts` decides; this line does not branch, because the
+        for one. `#lib/room/screen-overlay.ts` decides; this line does not branch, because the
         wrapper it returns carries the raw stream unchanged whenever no overlay was created.
 
         The presenter's own preview follows the wrapped stream too, deliberately: a presenter who
