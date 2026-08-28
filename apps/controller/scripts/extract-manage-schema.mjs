@@ -213,6 +213,8 @@ const ROOM_CONSUMED = [
      owner-authored code served to every member. */
   'customFaviconURL',
   'customCSS',
+  /* The owner own iframe in place of the screens pane, added 2026-08-28. See `room-config.ts`. */
+  'customPlayerURL',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -800,6 +802,10 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 91 since 2026-08-28: `customPlayerURL`. Twenty-second find, and the second in a row whose value
+// is a URL the reference hands to a browser without checking it - here through an explicit
+// sanitiser bypass.
+//
 // 90 since 2026-08-28: `customFaviconURL` and `customCSS`. Twentieth and twenty-first finds, and
 // the first pair where crossing one of them means an owner can put CODE in every member browser -
 // so the boundary comment says so at the point somebody decides.
@@ -821,7 +827,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 90 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 91 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

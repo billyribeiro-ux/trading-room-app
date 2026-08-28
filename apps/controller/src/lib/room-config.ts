@@ -678,6 +678,27 @@ export const ROOM_VISIBLE_SETTINGS = [
   'customFaviconURL',
   'customCSS',
   /*
+    "Custom player URL" - an owner OWN iframe INSTEAD of the whole screens pane.
+
+      O(38, sessData.customPlayerURL ? 38 : 39)                       byte 2,017,248
+      eSe: div.d-flex.align-items-start.justify-content-center.w-100.h-100 wrapping an
+           iframe width 100 percent, height 95 percent, allow autoplay, allowfullscreen
+                                                                      byte 1,918,589
+
+    Slot 39 is everything else in that pane INCLUDING the save-data switch, so setting this takes
+    away the tab strip, the panes and the message together. That is the same all-or-nothing shape
+    disableVideo already has one level down, and the reason is the same: a tab strip with no video
+    under it would still be requesting streams.
+
+    THE REFERENCE BYPASSES ITS OWN SANITISER for this value - the binding runs through
+    bypassSecurityTrustResourceUrl. Svelte has no such guard to opt out of, so the room writes the
+    check: http and https only, parsed rather than pattern matched. See `custom-player.ts`, which
+    also records what the check does NOT do, namely bound what the framed page can do once loaded.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'customPlayerURL',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

@@ -332,6 +332,13 @@ export interface RoomSessionSettings {
    */
   customCSS?: string;
   /**
+   * "Custom player URL" — an owner's own iframe INSTEAD of the whole `#screens` pane.
+   *
+   * `O(38, sessData.customPlayerURL ? 38 : 39)` (byte 2,017,248). Checked for scheme in the room by
+   * `customPlayerUrl`; the reference binds it through an explicit sanitiser bypass.
+   */
+  customPlayerURL?: string;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 15:25 UTC — An owner's iframe in place of the whole video surface, and a popup that never opened
+
+**Runtime impact: YES.** A room that sets a **custom player URL** now renders that iframe in the
+`#screens` pane instead of the room's own screenshare. It did nothing before.
+
+**It replaces the WHOLE pane, and that is the part worth getting right.**
+`O(38, sessData.customPlayerURL ? 38 : 39)` at byte 2,017,248, the two children of `div#screens`.
+Slot 39 is not "the videos" — it is `DSe`, which is itself the `preferences.disableVideo` switch
+between *"Video off to preserve data…"* and the real screens UI. So an owner setting this URL takes
+away the tab strip, the panes AND the save-data message together. That is the same all-or-nothing
+shape `disableVideo` already has one level down, for the same reason: a tab strip with no video
+under it would still be requesting streams.
+
+The gate therefore sits **above** the `videoDisabled` branch, not inside it, and a negative control
+that nested it under its neighbour goes red — because nesting is exactly what a later reader would
+"tidy" it into, and the result would be a member who turned video off staring at the save-data
+message while the owner's player was configured.
+
+**The reference explicitly opts OUT of its own sanitiser for this value.** The binding is
+`Ct(2,1, …, "resourceUrl")` — Angular's `bypassSecurityTrustResourceUrl` — so the URL reaches
+`iframe.src` unexamined. Svelte has no such guard to opt out of, which means the check is written
+rather than inherited, and it matters more here than for the tip button: this iframe **loads on
+arrival for every member** rather than waiting for a click. `http:`/`https:` only, parsed. Nine
+rejection cases pinned.
+
+What the check does **not** do is bound what the framed page can do once loaded — that is a CSP
+`frame-src` and an iframe `sandbox` question, and it is recorded as a known absence rather than left
+to read as a guarantee.
+
+**`openLoginLink` is DECIDED, and the answer is NOT A GAP.** Its triage row said *"decide whether to
+reproduce it before building"*:
+
+```js
+sessData.openLoginLink && window.open(sessData.openLoginLink, "_blank",
+  "resizable=yes,top=0,left=0,width=800,height=400")
+```
+
+It runs during component **initialisation**, not from a click, and the options string is exactly the
+popup shape browsers block without a user gesture — with no check of the `null` return, so a blocked
+open is silent. And the statement is in **both** chat components, so a member with the extra chat
+column gets it twice. Building it faithfully ships a blocked popup; building it "safely" as a
+clickable link invents a control the capture does not have. A test asserts the room opens no window
+on load, so the decision cannot be reversed by reading the settings list alone.
+
+**Four negative controls seen RED**, including the nesting one and one that adds `openLoginLink`.
+
+**An assertion matched its own explanation for the FIFTH time**, and this one was new in kind: the
+refusal stripped `<!-- -->` but the prop's JSDoc — `/** */`, in the same `.svelte` file — names the
+setting. A `.svelte` file has both comment syntaxes; strip both or strip neither, and the shared
+helper now does.
+
+**`PresentationArea` 883 → 910 is the most any single setting has cost that file**, and its entry
+says why: what it replaces is the entire rest of the pane, so the comment has to carry the
+above-not-inside rule that the negative control proved matters.
+
+**Verified:** room 168 files / 2,661 tests (1 skipped) · controller 96 files / 1,013 tests (5
+skipped) · `schema:verify` at **91 wired** · both room gates and the six controller verifiers green ·
+`svelte-check` 0/0 across 1,298 files · eslint and prettier clean.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+`PresentationArea.svelte`.
+
 ### 2026-08-28 14:45 UTC — Following one person turned off every chat sound, and a third kind of answer
 
 **Runtime impact: YES.** A room that lists members under *"Play chat message sound for"* now plays a

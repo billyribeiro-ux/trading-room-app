@@ -180,6 +180,11 @@
     screenVolume: Snippet;
 
     // ── #streams ───────────────────────────────────────────────────────────────
+    /**
+     * `sessData.customPlayerURL`, already checked — an owner's own iframe INSTEAD of the whole
+     * screens pane. `null` for a room that set none or set something unusable.
+     */
+    customPlayerSrc: string | null;
     hideStreams: boolean;
     /** `sessData.modMessage` — the presenter-only bar. Empty means no bar, which is the usual case. */
     modMessage: string;
@@ -289,6 +294,7 @@
     mediaTransport,
     volume,
     screenVolume,
+    customPlayerSrc,
     hideStreams,
     modMessage,
     bufferSizeLevel,
@@ -447,7 +453,28 @@
                       That is the point: a tab strip with no video under it would still be
                       requesting streams.
                     -->
-          {#if videoDisabled}
+          <!--
+            `O(38, sessData.customPlayerURL ? 38 : 39)` — byte 2,017,248, the two children of
+            `div#screens`. Slot 38 is `eSe` (byte 1,918,589) with consts 21 and 68; slot 39 is
+            everything below, INCLUDING the save-data switch above. An owner who sets this URL
+            replaces the WHOLE pane, which is deliberate and is the same all-or-nothing shape
+            `disableVideo` has one level down: a tab strip with no video under it would still be
+            requesting streams. `custom-player.ts` carries the argument and the URL check.
+          -->
+          {#if customPlayerSrc}
+            <div class="d-flex align-items-start justify-content-center w-100 h-100">
+              <iframe
+                src={customPlayerSrc}
+                title="Custom player"
+                width="100%"
+                height="95%"
+                scrolling="no"
+                frameborder="no"
+                allow="autoplay"
+                allowfullscreen
+              ></iframe>
+            </div>
+          {:else if videoDisabled}
             <h3 class="text-center mt-4">Video off to preserve data...</h3>
           {:else}
             <!--

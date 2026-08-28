@@ -9,8 +9,8 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **35** as this is written; twenty-three have been answered by building, and the
-CHANGELOG entries for each say what.
+2026-08-28 and is at **34** as this is written; twenty-four have been answered by building, one more
+is answered NOT A GAP, and the CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
 assumed.
@@ -63,6 +63,30 @@ and would be presenter-only here.
 | `h264Enabled` | Byte 1,073,226: `this.forceH264 = this.globals.sessData.h264Enabled \|\| !0`. `!0` is `true`, so the expression is unconditionally true and **the setting has no effect upstream at all**. Wiring it here would be inventing a behaviour the reference does not have. |
 | `advancedSearchAlerts` | Byte 2,043,017: `O(6, sessData.advancedSearchAlerts && "56ba547185ae93560d186ea8" == sessData.ownerdID ? 6 : -1)`. The feature is gated on **one hard-coded owner id**. It is not a room setting, it is a customer-specific branch. |
 | `smallerImagePreview` | Byte 1,436,548 is a room default with a latch, the same shape as the three built on 2026-08-28 — it seeds `preferences.defaultImagePreview` / `smallImagePreview` once. But `smallImagePreview` was closed by evidence on 2026-08-14: its only effect is the class `chat-uploaded-img-sm`, which **has no rule in any of the 52 stylesheets this repository holds**. See `settings-preference-wiring-contract.test.ts`. A default that seeds a preference that styles nothing is not a feature to reproduce. |
+
+---
+
+**`openLoginLink` — DECIDED 2026-08-28 and it is NOT A GAP.** The row used to say *"a popup on page
+load; decide whether to reproduce it before building"*, and the decision is: no.
+
+```js
+sessData.openLoginLink &&
+  window.open(sessData.openLoginLink, "_blank", "resizable=yes,top=0,left=0,width=800,height=400")
+```
+
+Bytes 1,437,913 and 2,384,175 — the same statement at the end of BOTH chat components' init, beside
+`chatEnabled` and `webinarMode`. Two things make it a defect rather than a feature:
+
+* It runs during component INITIALISATION, not from a click, and the options string it passes is
+  exactly the popup shape browsers block without a user gesture. The reference does not check
+  `window.open`'s `null` return, so a blocked open is silent — there is no fallback and no message.
+* Because the statement is in both chat components, a member with the extra chat column enabled
+  gets it **twice**.
+
+Building it faithfully would ship a blocked popup and a browser warning bar; building it "safely" —
+as a link the member can click — would be inventing a control the capture does not have.
+`custom-player-contract.test.ts` asserts the room opens no window on load, so this decision cannot be
+quietly reversed by somebody reading the settings list alone.
 
 ---
 
@@ -193,12 +217,10 @@ than quoting this paragraph.
 | `chatTabsWithBadges` | 1,007,480 | Badge-gated extra chat channels. A JSON list — the schema's help text carries the shape — and `registerForExtraChannels` subscribes only to the channels whose badges the member holds. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
-| `customPlayerURL` | 1,918,564 | An iframe in the screens pane, chosen over the normal content at byte 2,017,223. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
 | `altChatRender` | 1,349,151 / 1,434,685 / 2,047,129 (six sites) | **CORRECTED AND RESIZED 2026-08-28 — read the six occurrences, not the one.** Three behaviours, not one: it hides avatars on chat and Q&A messages (`hideAvatar = altChatRender && (chat \|\| isQAMsg) \|\| hideAvatars`), and it FORCES `displayMode = "c"` on **four** surfaces — main chat, extra chat, alerts and the Q&A modal — writing that over the viewer's own stored preference. **This room has no compact display mode at all**, so the setting's main half needs the mode itself built first, on four surfaces, with its picker. Building only the avatar third would give an owner who ticks it hidden avatars and no compact layout, which is not what the setting means. **TRAP FOR WHOEVER BUILDS IT:** `sessData.chatMode` and `preferences.chatMode` are DIFFERENT things sharing a key — the first is the room's mode (`"p"` presenters-only, `"d"` disabled, byte 1,003,622), the second is this per-viewer display mode (`"c"`, byte 1,434,808). Writing `"c"` into the room's `room_state.chat_mode` would corrupt the room's chat policy. |
 | `linkedRoomAlerts` | 2,139,184 | One row of the alert composer, cross-posting to a linked room. |
 | `hasAlertScheduler` | 1,009,745 | Already tracked in `TODO.md` with its own section — three commands and a server-side scheduler. |
-| `openLoginLink` | 1,437,888 | `window.open(sessData.openLoginLink, "_blank", "resizable=yes,top=0,left=0,width=800,height=400")` on chat init. **A popup on page load**; decide whether to reproduce it before building. |
 
 ---
 
@@ -216,7 +238,7 @@ than quoting this paragraph.
 
 ---
 
-## The twenty-three already answered
+## The twenty-four already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -240,6 +262,7 @@ than quoting this paragraph.
 | `showOnlyUsernames` | BUILT — `rosterRowIsFull`. The row's own advice paid off: `e` is the ROW, so the setting reduces MEMBER rows and leaves presenters in full, for every viewer. The obvious reading was the exact inverse. | 2026-08-28 |
 | `tipMeBtnEnabled` + `tipMeBtnUrl` + `tipMeBtnTxt` | BUILT — `tipButtonFor`, one conjunction feeding both captured render sites. The URL is checked for `http:`/`https:` here, which the reference does not do. | 2026-08-28 |
 | `customFaviconURL` + `customCSS` | BUILT — `RoomBranding`. The upstream `indexOf("https")` check that decides link-versus-inline is a substring test and is fixed by parsing: ordinary CSS mentioning an https URL was being set as a stylesheet href, and a plain `http://` stylesheet was being injected as CSS text. Both failures were silent. | 2026-08-28 |
+| `customPlayerURL` | BUILT — `PresentationArea`'s `#screens` pane. It replaces the WHOLE pane including the save-data switch, and the URL is scheme-checked here: the reference binds it through `bypassSecurityTrustResourceUrl`, i.e. it explicitly opts out of its own sanitiser. | 2026-08-28 |
 
 ---
 

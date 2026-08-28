@@ -342,6 +342,12 @@ describe('the allow-list itself', () => {
       */
       customFaviconURL: 'RoomBranding — the room’s own favicon, replacing the shell’s',
       customCSS: 'RoomBranding — owner-authored CSS, linked or inlined as a text node',
+      /*
+        Verified in the room before being written here. It replaces the entire screens pane, so the
+        consumer named is the pane rather than a helper — that is what a reader of this table needs
+        to know first about a setting that can remove the room's whole video surface.
+      */
+      customPlayerURL: 'PresentationArea #screens — an owner iframe instead of the whole pane',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

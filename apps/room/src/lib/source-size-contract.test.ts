@@ -449,7 +449,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       declarations on the sidebar and a three-way condition in two places — and the reference itself
       computes them into one field precisely once.
     */
-    max: 1369,
+    /*
+      1369 -> 1371, 2026-08-28. Two lines: the `customPlayerUrl` import and the checked prop at the
+      `PresentationArea` call site.
+
+      THE CHECK IS ON THE PAGE and not in the component, which is the shape every other owner URL in
+      this room now has — `tipButtonFor` and `customFaviconHref` are resolved here too. A component
+      that received the raw setting would be a second place the scheme could be forgotten, and this
+      one governs whether the room shows any video at all.
+    */
+    max: 1371,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1085,7 +1094,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       behind before anybody noticed. A type is a contract; a restatement of one is a second contract
       that agrees today.
     */
-    max: 883,
+    /*
+      883 -> 910, 2026-08-28, for `customPlayerURL`: a documented prop, its destructure, the eight
+      captured iframe attributes and their wrapper, and an eight-line citation.
+
+      TWENTY-SEVEN LINES FOR ONE SETTING is the most any single setting has cost this file, and the
+      reason is what it replaces: slot 39 upstream is the ENTIRE rest of this pane, including the
+      save-data switch. So the comment has to say that the gate belongs ABOVE `videoDisabled` rather
+      than inside it — which is exactly the mutation a negative control turned red, and exactly what
+      a future reader would otherwise "tidy" by nesting it with its neighbour.
+    */
+    max: 910,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {

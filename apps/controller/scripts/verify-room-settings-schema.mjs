@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY-SEVEN by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY-EIGHT by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 90.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 91.
+
+  77 -> 78 on 2026-08-28: customPlayerURL, which replaces the room's whole screens pane with an
+  owner-supplied iframe. Checked in the room for scheme, which the reference explicitly is not — its
+  binding runs through `bypassSecurityTrustResourceUrl`.
 
   75 -> 77 on 2026-08-28: customFaviconURL and customCSS. They cross together because the reference
   applies them on the same line, and the second is the first setting on this list whose value is
@@ -219,6 +223,8 @@ const EXPECTED_WIRED_SETTINGS = [
   /* Added 2026-08-28: the room own favicon and stylesheet. */
   'customFaviconURL',
   'customCSS',
+  /* Added 2026-08-28: the owner own iframe in place of the screens pane. */
+  'customPlayerURL',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

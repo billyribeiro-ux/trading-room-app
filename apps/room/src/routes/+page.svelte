@@ -24,6 +24,7 @@
     rosterRowIsFull
   } from '#lib/roster-gates.js';
   import { tipButtonFor } from '#lib/tip-button.js';
+  import { customPlayerUrl } from '#lib/custom-player.js';
                           import { createRoom } from '#lib/room/create-room.svelte.js';
                         import { setAutoplayAttribute, setWebcamAudioAttributes } from '#lib/room/webcams.js';
         import { buildMessageChrome, type RoomMessageChrome } from '#lib/room-message-chrome.js';
@@ -1186,6 +1187,7 @@
               videoDisabled={prefs.videoDisabled}
               volume={roomVolume.volume}
               {screenVolume}
+              customPlayerSrc={customPlayerUrl(data.sessData?.customPlayerURL)}
               hideStreams={gates.streamsHidden}
               modMessage={data.sessData?.modMessage ?? ''}
               bufferSizeLevel={prefs.bufferSizeLevel}

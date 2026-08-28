@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 90 of 269 are wired today.
+// nothing in the room reads it yet. 91 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -281,7 +281,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "h264Enabled", section: "settings", type: "checkbox", label: "Use h264 codec?", help: null, helpShape: null, helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "vp9Enabled", section: "settings", type: "checkbox", label: "Use VP9 codec?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hqVideo", section: "settings", type: "checkbox", label: "Use HQ Video?", help: "Experimental better vid quality on vp8", helpShape: "bare", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "customPlayerURL", section: "settings", type: "text", label: "Custom Player URL", help: "If set, it will always show an iframe with this url in the screens section", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "customPlayerURL", section: "settings", type: "text", label: "Custom Player URL", help: "If set, it will always show an iframe with this url in the screens section", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "iframeSSOTFix", section: "settings", type: "checkbox", label: "Iframe Cookie Fix?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "autoResetSession", section: "settings", type: "checkbox", label: "Autoreset sess at 12am?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "doNotAutoSoftReset", section: "settings", type: "checkbox", label: "Don't Soft reset at 12am?", help: "Enable this to prevent media server soft reset each night...", helpShape: "bare", helpOutside: true, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
