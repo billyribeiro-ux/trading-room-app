@@ -381,7 +381,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       collapse its five `gates.*` settings and these two, and that is the shape to reach for if this
       number climbs again. Two props do not justify it today.
     */
-    max: 1380,
+    /*
+      1380 -> 1390, 2026-08-28, and this raise OWES THE NOTE ABOVE AN ANSWER, because that note named
+      the navbar builder as the thing to reach for the next time this number climbed. This is the
+      next time. The builder was measured rather than assumed, and it was not built:
+
+      Seven values would move - five `gates.*` and the two `sessData` reads - and they cross exactly
+      ONE component. `buildMessageChrome` paid because sixteen values crossed THREE, so each was
+      declared, destructured and forwarded three times over; the saving there was structural and it
+      found six unfed props on the way. Here the saving is six lines on this file against changing
+      the prop surface of the largest navbar in the room and re-pointing every read inside it. That
+      is a worse trade than the raise, and pretending otherwise would be an extraction invented to
+      satisfy a number - the exact thing the `PresentationArea` entry refused twice.
+
+      So the debt is RE-STATED WITH A THRESHOLD instead of promised again: the navbar builder is
+      worth doing when a SECOND component needs these values, or when the navbar's settings pass
+      ten. Neither holds today. A promise with no trigger is how a note gets re-broken every time.
+
+      WHAT THE TEN LINES ARE: `<svelte:head>` with the room's own name in it - three lines of
+      markup, four of comment and the blank the formatter puts after - plus `modMessage` reaching
+      `PresentationArea`. `name` and `modMessage` are the twelfth and thirteenth settings answered by
+      building rather than by triage. The transcriptions are NOT here and NOT on the page: they are
+      in `moderator-message-contract.test.ts`, following the roster seed three entries up, which is
+      why the title costs four comment lines instead of a paragraph.
+    */
+    max: 1390,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -894,8 +918,40 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       now reach `StreamingView`, which has drawn a Buffer dropdown since it was written and could
       never change anything — the prop was never passed, so every click called `undefined?.()`.
     */
-    max: 874,
+    /*
+      874 -> 880 on 2026-08-28 for the moderator bar: an import, a documented prop, its destructure,
+      a one-line citation and the call site. Six lines, and four of them are the cost of a child
+      component existing at all rather than anything this file decides.
+
+      The bar is HERE and not on the page because the capture puts it here - `$4e` renders inside
+      this split area, before `app-presentationarea` - and because `isPresenter` is already a prop
+      here, so the gate's second term costs nothing to reach. The markup, the five consts, the byte
+      offsets and the argument for not persisting its dismissal are all in `ModeratorMessage.svelte`
+      and its contract file, which is why six lines land here and not twenty.
+    */
+    max: 880,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
+  },
+  {
+    file: 'lib/components/ModeratorMessage.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, for the reason `WebcamStrip` and `MainTabStrip`
+      both give: components are a hand-kept list here, and a new one that ships without a number is
+      exactly how `PresentationArea` went uncapped for a whole phase.
+
+      74 lines, of which the markup and the props are TWELVE. The rest is the transcription - the
+      template function, its five resolved consts, the gate expression with its byte offset, and the
+      two paragraphs that will stop the next reader from "improving" the dismissal into a saved
+      preference. That ratio is correct for this file and is not slack to grow into: the component
+      renders one bar, reads two props and writes one boolean.
+
+      If this number climbs, the thing to check is whether the bar has started deciding WHO sees it.
+      It must not: the gate is a conjunction of a value and a ROLE, both handed to it already
+      decided, and a member seeing a moderator's private note is the failure this file exists to
+      prevent.
+    */
+    max: 74,
+    why: 'the presenter-only moderator bar - twelve lines of component, the rest is the citation'
   },
   {
     file: 'lib/components/MainTabStrip.svelte',

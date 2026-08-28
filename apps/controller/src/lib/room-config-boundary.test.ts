@@ -297,6 +297,14 @@ describe('the allow-list itself', () => {
       */
       autoSwitchToOfftopics: 'RoomChat — the main chat column opens on the off-topic channel',
       styckyNonTradeAlert: 'PostAlertModal — the Non-Trade checkbox starts ticked on every open',
+      /*
+        Both verified in the room before being written here. `name` becomes the document title
+        through `+page.svelte`'s `<svelte:head>`, which is what a page's head is for;
+        `ModeratorMessage.svelte` draws the presenter-only bar with the reference's three captured
+        classes, all of which have real rules in `captured-runtime-components.css`.
+      */
+      name: 'the browser tab — <svelte:head><title> on the room page',
+      modMessage: 'ModeratorMessage — a presenter-only bar above the presentation area',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

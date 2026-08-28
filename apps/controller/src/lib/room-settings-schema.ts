@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 80 of 269 are wired today.
+// nothing in the room reads it yet. 82 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -74,7 +74,7 @@ export interface RoomSettingDef {
 }
 
 export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
-  { name: "name", section: "room-form", type: "text", label: "Room Title", help: null, helpShape: null, helpOutside: false, captured: "Room 3627", capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "name", section: "room-form", type: "text", label: "Room Title", help: null, helpShape: null, helpOutside: false, captured: "Room 3627", capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "webinarDate", section: "room-form", type: "combodate", label: "Date:", help: null, helpShape: null, helpOutside: false, captured: "07/25/2026 @ 05:25 PM", capturedIsDisplayOnly: true, group: null, wired: false },
   { name: "authMode", section: "room-form", type: "select", label: "Authorization Mode", help: null, helpShape: null, helpOutside: false, captured: "Open - Anyone with the room link can join with their email & name", capturedIsDisplayOnly: true, group: null, wired: false },
   { name: "ssoHost", section: "sso-setup", type: "text", label: "SSO Host", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
@@ -211,7 +211,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "apiSecret", section: "settings", type: "textarea", label: "API secret", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "slackPostURL", section: "settings", type: "textarea", label: "Slack post URL secret", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "diasableFCMAlerts", section: "settings", type: "checkbox", label: "Disable PUSH Alerts?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "modMessage", section: "settings", type: "textarea", label: "Moderator Message:", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "modMessage", section: "settings", type: "textarea", label: "Moderator Message:", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "positionsIframeUrl", section: "settings", type: "textarea", label: "Positions Iframe Url", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "positionsIframe", section: "settings", type: "checkbox", label: "Enable positions iframe?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "tipMeBtnEnabled", section: "settings", type: "checkbox", label: "Enable Tip Me Button?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

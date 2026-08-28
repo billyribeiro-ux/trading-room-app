@@ -264,6 +264,23 @@ export interface RoomSessionSettings {
    */
   styckyNonTradeAlert?: boolean;
   /**
+   * "Room Title" — the room's own name, and the browser tab.
+   *
+   * `globals.sessionName = r.name` (byte 1,149,312), then
+   * `titleService.setTitle(globals.sessionName)` (2,594,952). Two further consumers are recorded as
+   * gaps rather than approximated: the transcript window's `&name=` parameter, and the private-chat
+   * notification flasher that alternates the tab between `"<sender> messaged you - <room>"` and the
+   * room name.
+   */
+  name?: string;
+  /**
+   * "Moderator message" — a bar only the PRESENTER sees, above the presentation area.
+   *
+   * `O(2, e.modMessage && globals.isPresenter ? 2 : -1)` (byte 2,493,284). Dismissed locally and not
+   * persisted, exactly as `closeModMessage()` does it (2,532,005).
+   */
+  modMessage?: string;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

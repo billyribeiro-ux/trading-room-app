@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **45** as this is written; thirteen have been answered by building, and the
+2026-08-28 and is at **43** as this is written; fifteen have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -72,8 +72,14 @@ and would be presenter-only here.
 `ObjectUnsubscribedError`, Angular's own `t.name` reflection at byte 11,833.
 
 The real read is one line: `globals.sessionName = r.name` in `loadSessionData`, feeding
-`document.title` and the transcript window's `&name=` parameter. **That one IS a small real gap**
-and is listed under WIRE below. The count is not evidence of anything.
+`document.title` and the transcript window's `&name=` parameter. **That one WAS a small real gap and
+is now built** — `<svelte:head>` in `routes/+page.svelte`, answered 2026-08-28 — so this row is the
+clearest case this document has for its own rule: a row's read count says nothing about its size.
+`name` sat near the top of the list and cost three lines of markup.
+
+The transcript window's `&name=` parameter is the half that is **not** built — see the section at the
+end of this document, which is where a setting's remaining consumers go once the setting itself has
+been answered.
 
 `description` has the same problem in smaller form (`TransportError.description` at byte 1,034,567,
 a new-feature popup's `o.description` at 1,164,735) around one real read at byte 1,179,600 — the
@@ -93,8 +99,6 @@ Ordered by how much of the work is already done.
 | setting | byte | what is missing |
 | --- | --- | --- |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
-| `name` | see above | `document.title` and the transcript window title. One value, two consumers. |
-| `modMessage` | 2,492,450 | A presenter-visible moderator message bar above the presentation area, with a close button that clears it locally (`closeModMessage`). |
 | `enablePrivateMessageHistory` | 2,068,615 | One row in the user-info modal. |
 | `simplifiedEditor` | 1,468,478 | Picks `"forecolor"` versus `"color"` in the note editor's toolbar config. One string. |
 | `recsInRoom` | 2,016,810 | `archivesAvailableTo() && sessData.recsInRoom` gates the Recordings tab AND its pane. **Wire it only with the tab** — see BLOCKED. |
@@ -168,7 +172,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 
 ---
 
-## The thirteen already answered
+## The fifteen already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -185,3 +189,22 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 | `blinkingRec` | WIRED — `breathing-rec`, which unlike `smallImagePreview`'s class has a real keyframe rule. | 2026-08-28 |
 | `autoSwitchToOfftopics` | WIRED — a SEED on `RoomChat`'s main column; the extra column already defaults there. | 2026-08-28 |
 | `styckyNonTradeAlert` | WIRED — re-applied on EVERY modal open, which is what sticky means. | 2026-08-28 |
+| `name` | WIRED — the document title, `<svelte:head>` on the room page. Two further consumers stay unbuilt and are listed in the last section. | 2026-08-28 |
+| `modMessage` | WIRED — `ModeratorMessage.svelte`, presenter-only, dismissed locally exactly as upstream dismisses it. | 2026-08-28 |
+
+---
+
+## Consumers still unbuilt behind an ANSWERED setting
+
+A row leaves the WIRE table when the setting is read, not when every use of it upstream has been
+reproduced. **That is the gap this section exists to stop from disappearing**: `name` reads as done
+in the answered table and in `setting-coverage-contract.test.ts`, and two of its consumers are not
+built. Nothing else would say so.
+
+| consumer | byte | what is missing |
+| --- | --- | --- |
+| transcript window title (`name`) | 1,958,716 and 2,532,633 | `openTranscript` passes the room name as a `&name=` query parameter to the transcript popup. Blocked with the transcript window itself, which this room does not open. |
+| private-chat tab flasher (`name`) | 2,207,601 | On an unread private message the title alternates between `"<sender> messaged you - <room>"` and the room name on a timer, and stops on focus. Needs the private-message unread signal, not the title. |
+
+`moderator-message-contract.test.ts` asserts that neither has quietly appeared on the page, so adding
+one without deleting its row here fails a test rather than going unrecorded.

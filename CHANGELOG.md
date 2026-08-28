@@ -33,6 +33,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 09:35 UTC — A browser tab that never said which room, and a moderator's private note nobody saw
+
+**Runtime impact: YES.** The document title is now the room's own name — every tab read `PTRChat`
+before, so a member with three rooms open could not tell them apart. And a room that sets a
+**Moderator Message** now shows it, to presenters only, above the presentation area; it showed to
+nobody at all before.
+
+**Two settings, one commit, because they are the same finding.** `name` and `modMessage` were both on
+`setting-coverage-contract.test.ts`'s list of what the reference reads and this room does not, and
+both were one consumer away from working. They are the twelfth and thirteenth rows to leave that list
+by being **answered by building** rather than by triage.
+
+**`name` is the enumeration artefact that mattered anyway.** It sat near the top of the list on read
+count, and that count was almost entirely `this.name` on unrelated error classes — the exact reason
+the list's docblock now says to rank a row by what it turns out to be and never by the number beside
+it. Its one real read is `globals.sessionName = r.name` (byte 1,149,312) into
+`titleService.setTitle` on `globalsLoaded` (2,594,952). Three lines of `<svelte:head>`.
+
+**The fallback is a deliberate divergence and is asserted so it cannot drift back.** The reference
+falls back to its own brand string `"PTR Session"` (byte 977,053); a room with no configured name
+should read as **this** product, not as the one it was reconstructed from. `pageCode` in the contract
+strips comments before that refusal, because the first draft of the assertion matched the sentence
+explaining why the string is not used — **the second time today** an assertion has matched its own
+explanation, after `publishToUsers`.
+
+**`modMessage` is presenter-only, and the gate is a conjunction.** `O(2, e.modMessage &&
+globals.isPresenter ? 2 : -1)` at byte 2,493,284, fed by `sessData.modMessage` (2,498,699). Either
+half failing alone is a different bug — a member reading a moderator's private note, or a presenter
+never seeing it — so **both refusals have their own test and both were seen red**.
+
+**Its dismissal is local, and that is reproduced rather than improved.** `closeModMessage() {
+this.modMessage = "" }` (byte 2,532,005) clears the component's own field and persists nothing, so
+the bar returns on the next load. Persisting it would need a preference the reference does not have,
+and inventing one would be inventing a decision. The contract asserts the component contains neither
+`save(` nor `prefs`.
+
+**Two consumers are NOT built, and they are named rather than left to look finished** — the
+transcript window's `&name=` parameter (bytes 1,958,716 and 2,532,633) and the private-chat tab
+flasher that alternates the title with `"<sender> messaged you - <room>"` (2,207,601). Both are rows
+in `docs/decoded/missing-settings-triage.md`, and an assertion here goes red if either is added
+without updating that document.
+
+**Five negative controls seen RED**, each on the assertion that guards it: the title binding replaced
+by a constant, the call site removed from `PresentationArea`, the page's supply blanked, and each
+half of the two-term gate dropped in turn.
+
+**Two ceilings raised, and one of them owed an answer.** `routes/+page.svelte` 1380 → 1390 — and that
+entry had already pre-committed to a navbar chrome builder "the next time this number climbs". This
+was the next time, so the builder was **measured rather than assumed**: seven values would move and
+they cross exactly one component, where `buildMessageChrome` paid because sixteen crossed three. Six
+lines saved against restructuring the prop surface of the room's largest navbar is a worse trade than
+the raise, so the debt is **re-stated with a threshold** — a second consumer, or ten navbar settings
+— instead of promised again. A promise with no trigger is how a note gets re-broken every time.
+`PresentationArea` 874 → 880 for the import, the prop and the call site; `ModeratorMessage.svelte`
+capped at 74 **in the commit that created it**, which is the rule `PresentationArea` paid for.
+
+**Neither comment duplicates the other.** Following the roster seed, the transcriptions live in
+`moderator-message-contract.test.ts` and the component header; the page and the call site carry a
+citation and a pointer. Both were written long first and cut to that shape deliberately — the four
+page comment lines and the one-line call-site citation are what is left after removing text that
+already existed somewhere with a test attached to it.
+
+**Not verified:** the Svelte MCP was disconnected for this change, so **`svelte-autofixer` could not
+be run** on the new component or on the two it touches. `svelte-check`, eslint and prettier all pass;
+they are not a substitute and this is recorded rather than glossed.
+
+**Verified:** room 159 files / 2,405 tests (1 skipped, 49 evidence-bound files excluded on this
+checkout by design) · controller 95 files / 1,006 tests (5 skipped) · `schema:verify` byte-compares
+at **82 wired** · room `privacy:verify` and `schema:verify` green · controller `evidence:verify`,
+`breakpoints:verify`, `fonts:verify`, `privacy:verify`, `backend:provenance:verify` and
+`backend:migrations:verify` green · `svelte-check` 0 errors / 0 warnings across 1,282 files · eslint
+and prettier clean.
+
 ### 2026-08-28 09:15 UTC — Two seeds, and where a seed is applied is the whole feature
 
 **Runtime impact: YES.** A room that sets *"Auto switch to off-topic?"* opens its main chat column on

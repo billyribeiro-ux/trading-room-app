@@ -74,8 +74,14 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * - **NOT A GAP** — `h264Enabled` is `sessData.h264Enabled || !0`, unconditionally true upstream;
  *   `advancedSearchAlerts` is gated on one hard-coded owner id; `smallerImagePreview` seeds a
  *   preference whose only effect is a class with no rule in any of the 52 stylesheets we hold.
- * - **ENUMERATION ARTEFACT** — `name`'s read count is almost entirely `this.name` on unrelated error
- *   classes. Its one real read is a real gap; the number is not evidence of anything.
+ * - **ENUMERATION ARTEFACT** — a read count is not a size. `name` sat near the top of this list with
+ *   a count that was almost entirely `this.name` on unrelated error classes; its ONE real read was a
+ *   document title, and building it took two lines. Rank this list by what a row turns out to be,
+ *   never by the number beside it.
+ *
+ * Rows leave this list by being ANSWERED, and thirteen have: the newest are `name` (the browser tab,
+ * `<svelte:head>` in `routes/+page.svelte`) and `modMessage` (the presenter-only bar,
+ * `lib/components/ModeratorMessage.svelte`), both on 2026-08-28 with their own contract file.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -94,7 +100,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'copyTrades',
   'enableDiscord',
   'hasAlertScheduler',
-  'name',
   'playChatMessageSoundFor',
   'tipMeBtnUrl',
   'alertsOverlayOnScreenshare',
@@ -117,7 +122,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'h264Enabled',
   'linkedRoomAlerts',
   'modAdminLoginList',
-  'modMessage',
   'showOnlyUsernames',
   'simplifiedEditor',
   'tipMeBtnEnabled',

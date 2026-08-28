@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **189** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **187** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**45 of the 189 are read by the reference's OWN room client**, as `sessData.<name>`.
+**43 of the 187 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Thirteen have already left the list, on the day it was written.** It opened at 202 unwired and 58
-questions; both numbers have moved eleven times since.
+**Fifteen have already left the list, on the day it was written.** It opened at 202 unwired and 58
+questions; both numbers have moved thirteen times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -243,9 +243,11 @@ classes of answer are not work at all:
   unconditionally true upstream and the setting does nothing at all. `advancedSearchAlerts` is gated
   on one hard-coded owner id. `smallerImagePreview` seeds a preference whose only effect is a class
   with no rule in any of the 52 stylesheets this repository holds.
-- **ENUMERATION ARTEFACT — one count is noise.** `name` matches `this.name` on unrelated error
-  classes throughout the bundle. Its one real read — `globals.sessionName = r.name`, feeding
-  `document.title` — is a real gap; the number is not evidence of anything.
+- **ENUMERATION ARTEFACT — one count is noise, and it is the rule this list needs most.** `name`
+  matches `this.name` on unrelated error classes throughout the bundle and so sat near the TOP of
+  the list. Its one real read — `globals.sessionName = r.name`, feeding `document.title` — was a
+  real gap and took three lines of `<svelte:head>` to close on 2026-08-28. **Rank a row by what it
+  turns out to be, never by the number beside it.**
 
 Two of the WIRE rows — `chatDisabledForTrials` and `hasQAOnAlerts` — landed the same day, and one
 row was CORRECTED out of WIRE into FEATURE by reading it properly rather than by re-reading the
@@ -255,7 +257,12 @@ flag would light a control that cannot act. The remainder split into **12 WIRE**
 here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
 size in the triage document.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 45 by NAME and asserts separately that the seven
+**WIRE is down to FOUR**, all four named with what each needs: `isNewIndicatorOn` (wants a supply for
+`msg.isNew` before it is wired), `enablePrivateMessageHistory` (one row of the user-info modal),
+`simplifiedEditor` (one string in the note editor's toolbar config) and `recsInRoom` (BLOCKED — wire
+it with the Recordings tab, never before it).
+
+`src/lib/setting-coverage-contract.test.ts` pins the 43 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10, a

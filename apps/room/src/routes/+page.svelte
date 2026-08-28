@@ -926,6 +926,15 @@
   onbeforeunload={() => windowHandlers.beforeUnload()}
 />
 
+<!--
+  The browser tab — `globals.sessionName = r.name`, byte 1,149,312. The fallback is deliberately this
+  product's name rather than the reference's default; both citations and the argument for diverging
+  are in `moderator-message-contract.test.ts`, which is also what goes red if it drifts back.
+-->
+<svelte:head>
+  <title>{data.sessData?.name?.trim() || 'PTRChat'}</title>
+</svelte:head>
+
 <app-root ng-version="17.3.12">
   <router-outlet></router-outlet>
   <!--
@@ -1197,6 +1206,7 @@
               volume={roomVolume.volume}
               {screenVolume}
               hideStreams={gates.streamsHidden}
+              modMessage={data.sessData?.modMessage ?? ''}
               bufferSizeLevel={prefs.bufferSizeLevel}
               onBufferSizeChange={(level) => prefs.save('bufferSizeLevel', level)}
               hideNotes={gates.notesHidden}

@@ -43,6 +43,7 @@
   import DayTradeAlertsPane from '#lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import FilesPane from '#lib/components/FilesPane.svelte';
   import MainTabStrip from '#lib/components/MainTabStrip.svelte';
+  import ModeratorMessage from '#lib/components/ModeratorMessage.svelte';
   import NotesPane from '#lib/components/notes/NotesPane.svelte';
   import ScreenPane from '#lib/components/ScreenPane.svelte';
   import ScreenTabs from '#lib/components/ScreenTabs.svelte';
@@ -179,6 +180,8 @@
 
     // ── #streams ───────────────────────────────────────────────────────────────
     hideStreams: boolean;
+    /** `sessData.modMessage` — the presenter-only bar. Empty means no bar, which is the usual case. */
+    modMessage: string;
     /** `preferences.bufferSizeLevel` and its writer — the streaming view's hls.js buffer control. */
     bufferSizeLevel: number;
     onBufferSizeChange: (level: number) => void;
@@ -285,6 +288,7 @@
     volume,
     screenVolume,
     hideStreams,
+    modMessage,
     bufferSizeLevel,
     onBufferSizeChange,
     hideNotes,
@@ -363,6 +367,8 @@
     static `app-presenter-cams` the template appears to hold, and why the ids carry the presenter
     suffix — went WITH the markup they explain.
   -->
+  <!-- `$4e`, rendered inside this same split area before `app-presentationarea` (byte 2,493,284). -->
+  <ModeratorMessage message={modMessage} {isPresenter} />
   <WebcamStrip
     visible={previewWindowsVisible}
     presenters={mediaTransport.webcamPresenters}

@@ -532,6 +532,41 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'styckyNonTradeAlert',
   /*
+    "Room Title" — the room's own name, and the document title.
+
+      globals.sessionName = r.name                                   byte 1,149,312
+      this.titleService.setTitle(this.appService.globals.sessionName)  byte 2,594,952
+
+    The name reaches three places upstream: the browser tab, the transcript window's `&name=`
+    parameter, and the private-chat notification flasher that alternates the tab between
+    `"<sender> messaged you - <room>"` and the room name. The tab is built here; the other two are
+    recorded as gaps rather than approximated.
+
+    NOTE THE ENUMERATION ARTEFACT. `gate/audit-setting-coverage.mjs` reports a high read count for
+    this name and almost all of it is noise — the bundle is full of unrelated `this.name` on
+    `UnsubscriptionError`, `ObjectUnsubscribedError` and Angular's own reflection. The single real
+    read is the assignment above. `docs/decoded/missing-settings-triage.md` records why the number is
+    not evidence of anything.
+  */
+  'name',
+  /*
+    "Moderator message" — a bar only the PRESENTER sees, above the presentation area.
+
+      O(2, e.modMessage && globals.isPresenter ? 2 : -1)              byte 2,493,284
+      this.modMessage = this.appService.globals.sessData.modMessage    byte 2,498,699
+      closeModMessage() { this.modMessage = "" }                       byte 2,532,005
+
+    Dismissed LOCALLY and not persisted — the reference clears its own field and writes nothing back,
+    so the bar returns on the next load. That is reproduced rather than improved: a dismissal that
+    outlived the page would need a preference the reference does not have, and inventing one would be
+    inventing a decision.
+
+    Its three classes — `mod-msg-container`, `mod-msg-btn`, `mod-msg` — all carry real rules in
+    `captured-runtime-components.css`, which is the check `blinkingRec` passed and
+    `smallerImagePreview` failed.
+  */
+  'modMessage',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

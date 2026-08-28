@@ -192,6 +192,10 @@ const ROOM_CONSUMED = [
      reference spelling of the second, which is kept because the controller stores that name. */
   'autoSwitchToOfftopics',
   'styckyNonTradeAlert',
+  /* The room title and the presenter-only moderator bar, added 2026-08-28. See `room-config.ts`;
+     the first has an enumeration artefact recorded against its read count. */
+  'name',
+  'modMessage',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -775,9 +779,13 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // where the reference re-applies them — the channel at chat init, the checkbox on every modal open.
 // Tenth and eleventh finds of the settings enumeration.
 //
+// 82 since 2026-08-28: `name` and `modMessage`. The room's own title finally reaches the browser
+// tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
+// enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 80 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 82 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );
