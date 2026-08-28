@@ -1,6 +1,8 @@
 import { DEFAULT_ALERT_DELIVERY_PREFERENCES } from '#lib/alert-delivery.js';
 import { mirrorPreferenceToLocalStorage } from '#lib/dead-preference-keys.js';
 
+import { streamBufferLevel } from './stream-buffer.js';
+
 /*
   Every preference this VIEWER owns, and the one write path that persists them.
 
@@ -100,6 +102,7 @@ export class RoomPrefs {
   #soundChecks;
   #pushToTalk;
   #videoDisabled;
+  #bufferSizeLevel;
 
   constructor(settingsJson: string | null | undefined, hooks: RoomPrefsHooks) {
     this.#hooks = hooks;
@@ -396,6 +399,9 @@ export class RoomPrefs {
      * room today to an empty pane and no idea why.
      */
     this.#videoDisabled = $state(false);
+    /* The HLS buffer size, clamped by `stream-buffer.ts` — the module that owns the three levels,
+       their names and why a blob value outside them is refused rather than coerced. */
+    this.#bufferSizeLevel = $state(streamBufferLevel(loadedSettings.bufferSizeLevel));
   }
 
   /** The decoded settings blob, for the reads that are not preferences. */
@@ -519,6 +525,10 @@ export class RoomPrefs {
     return this.#videoDisabled;
   }
 
+  get bufferSizeLevel() {
+    return this.#bufferSizeLevel;
+  }
+
   save(key: string, value: unknown) {
     // Mirror into the decoded snapshot so anything that resolves a preference later in the same
     // session (the split sizes, for instance) sees the write instead of the value the page was
@@ -532,6 +542,10 @@ export class RoomPrefs {
       HERE because this is where they ran: after the snapshot, before the boolean cases.
     */
     this.#hooks.onSideEffect?.(key, value);
+
+    /* The one NUMERIC preference, and it is clamped on the way in for the same reason it is clamped
+       on the way out: the value reaches hls.js as a buffer length. */
+    if (key === 'bufferSizeLevel') this.#bufferSizeLevel = streamBufferLevel(value);
 
     if (typeof value === 'boolean') {
       if (key === 'alertSoundOn') {

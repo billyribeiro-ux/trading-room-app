@@ -1194,6 +1194,8 @@
               volume={roomVolume.volume}
               {screenVolume}
               hideStreams={gates.streamsHidden}
+              bufferSizeLevel={prefs.bufferSizeLevel}
+              onBufferSizeChange={(level) => prefs.save('bufferSizeLevel', level)}
               hideNotes={gates.notesHidden}
               {streamServerMTX}
               {mtxToken}

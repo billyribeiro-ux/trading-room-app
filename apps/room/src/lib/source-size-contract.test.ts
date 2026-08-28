@@ -352,7 +352,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       sat on `RoomMessage` unfed with their values already on the wire: nothing compared the type to
       the construction. Two stray `$derived` consts feeding that object went with it.
     */
-    max: 1375,
+    /*
+      1375 -> 1377 for the buffer preference's two lines and their comment. See the `PresentationArea` entry: a live
+      control that could not act is worth one line more than a ceiling.
+    */
+    max: 1377,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -830,8 +834,46 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and it takes this ceiling far below where it started. It was not bundled here because a
       275-line extraction riding along with a settings fix is two changes wearing one diff.
     */
-    max: 1123,
+    /*
+      1123 -> 867 on 2026-08-28. THE DEBT ABOVE IS PAID, and by the change it named: `ul#mainTabs`
+      is `MainTabStrip.svelte` now — 282 lines out, one call site and its citation back in.
+
+      `main-tab-strip-contract.test.ts` renders the PARENT, so the safety net that was already in
+      place went on proving the strip end to end across the move without being touched. That is what
+      made a 282-line extraction a small change rather than a leap: the thing that could break was
+      already asserted before the first line moved.
+
+      What is left here is what the header always claimed the file was — the WIRING between a tab
+      strip and seven panes. If this number climbs again the question is whether a pane has started
+      deciding something rather than rendering it.
+    */
+    /*
+      867 -> 874 the same day, and it is worth six lines: `bufferSizeLevel` and `onBufferSizeChange`
+      now reach `StreamingView`, which has drawn a Buffer dropdown since it was written and could
+      never change anything — the prop was never passed, so every click called `undefined?.()`.
+    */
+    max: 874,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
+  },
+  {
+    file: 'lib/components/MainTabStrip.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, like `WebcamStrip` below and for the reason its
+      entry gives: a new component that ships without a number here is how `PresentationArea` went
+      uncapped for a whole phase.
+
+      372 lines by this file's count, and roughly a quarter of that is comment: the strip is eight `<li>` elements and
+      every one carries the byte offset of the gate it reproduces. The single most important thing
+      in the file is the distinction between `{#if}` for an ENTITLEMENT and `hidden` for a MODE or a
+      room SETTING — swapping them is invisible to every source-text instrument here and leaks what
+      a room has paid for, which is why `main-tab-strip-contract.test.ts` renders rather than greps.
+
+      If this number climbs, the thing to check is whether the strip has started DECIDING something.
+      Every gate it draws arrives already decided; it writes exactly one value, `mainTab`, and that
+      is what a tab strip is.
+    */
+    max: 372,
+    why: 'ul#mainTabs - eight tabs, two dropdowns, and a byte citation on every gate'
   },
   {
     file: 'lib/components/WebcamStrip.svelte',
@@ -1027,6 +1069,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: "the poll modal's four fields; the first of the room state classes"
   },
   {
+    file: 'lib/room/stream-buffer.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE.
+
+      Sixty-nine lines for a clamp, a default and three names, and the ratio is the point: the
+      executable part is six lines and the rest is why the clamp is stricter than the reference's own
+      `|| 3`. The value reaches hls.js as a buffer length out of a JSON blob a member's row carries,
+      so `"2"` and `7` are refused rather than coerced — a divergence, and one that is asserted in
+      `stream-buffer.test.ts` so it cannot be quietly removed.
+
+      If this number climbs, the question is whether hls.js CONFIGURATION has started arriving here.
+      It should not: this module answers what level and what it is called, and `StreamingView` owns
+      what a level does to a player.
+    */
+    max: 70,
+    why: 'the three buffer levels, their names, and the clamp that is stricter than upstream'
+  },
+  {
     file: 'lib/room/room-defaults.ts',
     /*
       Created 2026-08-28 and capped in the same commit, at the size it landed.
@@ -1202,7 +1262,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       seeding it on would drag a reader out of the history they are scrolled up into. This class held
       the field and the comparison and did not hold the reason until now.
     */
-    max: 621,
+    /*
+      621 -> 635 on 2026-08-28, ARGUED rather than absorbed, for the first NUMERIC preference this
+      class holds. `bufferSizeLevel` had to become real state here because `#loaded` is a plain
+      object — reading the blob through `prefs.loaded` would never re-render the control that sets
+      it, which is the trap `RoomGates.recordingTooltip` fell into with a different key.
+
+      Fourteen lines: a field, a seeded `$state`, a getter, one save branch and the two comments
+      saying why each is clamped. The RULE is not here — `stream-buffer.ts` owns the three levels,
+      their names and why a blob value outside them is refused rather than coerced, with its own
+      test — so what this file gained is a value, not a decision.
+    */
+    max: 635,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {

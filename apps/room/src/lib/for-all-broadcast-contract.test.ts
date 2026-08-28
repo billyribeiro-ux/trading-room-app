@@ -474,16 +474,24 @@ describe('the client receives, so it reaches another browser', () => {
   });
 
   it('the member’s tab and pane carry the captured gate, not `isPresenter` alone', () => {
-    // Without the `hideVideoPlayer` term a member is moved to a tab that renders nothing.
-    const paneCode = readFileSync(
+    /*
+      Without the `hideVideoPlayer` term a member is moved to a tab that renders nothing.
+
+      `broadcasts.hideVideoPlayer` since 2026-08-18 — the flag is read off the object that owns it
+      rather than off a prop the page copied out of it. Still BOTH halves, and since 2026-08-28 they
+      live in two files: the TAB went to `MainTabStrip.svelte` with the rest of `ul#mainTabs`, and
+      the PANE stayed with its siblings. This used to count two occurrences in one file and would
+      have passed with both halves in either one; naming a file per half is what it meant all along.
+    */
+    const GATE = '{#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}';
+    const occurrences = (source: string) => source.split(GATE).length - 1;
+    const strip = readFileSync(new URL('./components/MainTabStrip.svelte', import.meta.url), 'utf8');
+    const panes = readFileSync(
       new URL('./components/PresentationArea.svelte', import.meta.url),
       'utf8'
     );
-    // `broadcasts.hideVideoPlayer` since 2026-08-18 — the flag is read off the object that owns it
-    // rather than off a prop the page copied out of it. Still BOTH places: the tab and the pane.
-    expect(
-      paneCode.split('{#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}').length - 1
-    ).toBe(2);
+    expect(occurrences(strip), 'the video-player TAB lost its gate').toBe(1);
+    expect(occurrences(panes), 'the video-player PANE lost its gate').toBe(1);
   });
 
   it('the stop cancels an armed play sent by ANOTHER presenter', () => {

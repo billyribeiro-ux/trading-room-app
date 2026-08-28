@@ -25,6 +25,7 @@
   import { onDestroy } from 'svelte';
   import type Hls from 'hls.js';
   import { mtxPlaylistUrl, type MtxStream } from '#lib/mtx-streams.js';
+  import { streamBufferLevel, streamBufferName } from '#lib/room/stream-buffer.js';
 
   interface Props {
     /** The stream to play. `muser` upstream — the same payload key every media command uses. */
@@ -42,9 +43,15 @@
     audioVolume: number;
     /** `preferences.doNotDisturbOn` — mutes on attach without changing the stored volume. */
     doNotDisturbOn: boolean;
-    /** `preferences.bufferSizeLevel`: 1 Normal, 2 Increased, 3 Maximum. Upstream defaults to 3. */
+    /**
+     * `preferences.bufferSizeLevel`: 1 Normal, 2 Increased, 3 Maximum. Upstream defaults to 3.
+     *
+     * PASSED SINCE 2026-08-28. Before that neither this nor `onBufferSizeChange` was supplied by any
+     * call site, so the dropdown below read Maximum forever and clicking an entry called
+     * `undefined?.()` — a live control whose only possible effect was nothing at all.
+     */
     bufferSizeLevel?: number;
-    /** `appService.setPreference('bufferSizeLevel', e)`. */
+    /** `appService.setPreference('bufferSizeLevel', e)` — persists AND reloads the stream. */
     onBufferSizeChange?: (level: number) => void;
   }
 
@@ -91,9 +98,9 @@
   const videoSrc = $derived(mtxPlaylistUrl(muser, streamServerMTX, mtxToken));
 
   /** `getBufferSizeName()`, lines 267-277. */
-  const bufferSizeName = $derived(
-    bufferSizeLevel === 2 ? 'Increased' : bufferSizeLevel === 3 ? 'Maximum' : 'Normal'
-  );
+  /* The three names live with the clamp in `stream-buffer.ts`; this file used to spell them out and
+     `RoomPrefs` would have been the second copy. */
+  const bufferSizeName = $derived(streamBufferName(streamBufferLevel(bufferSizeLevel)));
 
   /**
    * `getHlsConfig()`, lines 50-111, every number transcribed.

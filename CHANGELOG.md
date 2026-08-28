@@ -33,6 +33,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 03:10 UTC — The named debt is paid, and the Buffer dropdown it made room for could never change anything
+
+**Runtime impact: YES.** The streaming view's Buffer control works. Until this commit clicking
+Normal or Increased did nothing at all — not even change the label.
+
+**`MainTabStrip.svelte` exists, and it is the extraction this repository wrote down as a debt.**
+When `PresentationArea`'s ceiling was raised for the `hideNotes` gate the note named its own
+follow-up in those words: *"a focused change with a safety net already in place"*. 282 lines out,
+one call site and its citation back in. **`PresentationArea` falls 1,123 → 874** — the ceiling had
+never been below 1,115.
+
+The safety net is `main-tab-strip-contract.test.ts`, a contract test that has been named after this
+component since before it existed and which renders the PARENT — so it went on proving the strip end
+to end across the move **without being touched**. That is what turns a 282-line extraction into a
+small change: the thing that could break was already asserted before the first line moved.
+
+**One contract did go red, and it was right to.** `for-all-broadcast-contract` counted the video
+player's gate twice in one file; the tab half is now in the strip. It reads both files and requires
+one occurrence in each, which is what "the tab AND the pane carry the gate" meant all along — the
+old form would have passed with both halves in either one.
+
+**What the headroom was spent on: a live control that could not act.** `StreamingView` has drawn a
+Buffer: Normal / Increased / Maximum dropdown since it was written. `bufferSizeLevel` and
+`onBufferSizeChange` were declared props that **no call site passed**, so the label read Maximum
+forever, every click called `undefined?.()`, and the hls.js config always used 3. Found by the same
+sweep that found the six message gates — which of a component's props does nobody supply.
+
+**The rule went into `stream-buffer.ts` rather than into either consumer**, because otherwise it is
+written twice: `StreamingView` needs the NAME for its label and the LEVEL for its config, and
+`RoomPrefs` needs the level to hold and to seed. The clamp is **stricter than upstream's own
+`|| 3`** — `"2"` and `7` survive that guard and are refused here, because the value reaches hls.js
+as a buffer length out of a JSON blob a member's row carries, and a buffer of seven is not a
+preference any control can produce. The divergence is asserted, not just described.
+
+**`bufferSizeLevel` is the first NUMERIC preference `RoomPrefs` holds**, and it had to become real
+`$state`: `#loaded` is a plain object, so a control reading the blob would never re-render after its
+own write — the trap `RoomGates.recordingTooltip` fell into this morning with a different key. The
+test for that lives in `prefs.svelte.test.ts`, and it exists because **deleting the save branch left
+the entire suite green** until it did. **Four negative controls seen RED** across the clamp, the save
+branch, the seeding and the page's supply.
+
+**Three ceilings raised, each argued in place, against one paid down by 249 lines.**
+`PresentationArea` 867 → 874, `+page.svelte` 1,375 → 1,377, `prefs.svelte.ts` 621 → 635 — and
+`PresentationArea` 1,123 → 867 before them. The raises are recorded where the numbers are, with the
+defect each bought.
+
+**Verified:** room 154 files / 2,362 tests (1 skipped) · `svelte-check` 0/0 · eslint and prettier
+clean.
+
 ### 2026-08-28 02:50 UTC — Six props on every message, values already on the wire, nothing passing them
 
 **Runtime impact: YES.** In a room that allows member private messaging, members get the Private

@@ -113,6 +113,38 @@ describe('save() is the only way in, and it does all three things', () => {
     expect(prefs.soundChecks['alert-donot-disturb']).toBe(false);
   });
 
+  /*
+    THE ONE NUMERIC PREFERENCE, and it needs a test here rather than only in `stream-buffer.test.ts`.
+
+    That file proves the CLAMP. This proves the value is real state that a save moves — which is the
+    half that was missing, and the reason the control could not work. Deleting the save branch left
+    the whole suite green until this test existed.
+
+    It also has to be `$state` rather than a read through `prefs.loaded`: `#loaded` is a plain
+    object, so a control reading the blob would never re-render after its own write. That is the trap
+    `RoomGates.recordingTooltip` fell into with a different key, and the assertion below is what
+    would catch it here.
+  */
+  it('holds the buffer level as state a save moves, clamped on the way in', () => {
+    const { prefs } = make('{}');
+    expect(prefs.bufferSizeLevel, 'upstream defaults to Maximum').toBe(3);
+
+    prefs.save('bufferSizeLevel', 1);
+    expect(prefs.bufferSizeLevel).toBe(1);
+    prefs.save('bufferSizeLevel', 2);
+    expect(prefs.bufferSizeLevel).toBe(2);
+
+    // A value no control can produce falls back rather than reaching hls.js as a buffer length.
+    prefs.save('bufferSizeLevel', 7);
+    expect(prefs.bufferSizeLevel).toBe(3);
+  });
+
+  it('seeds the buffer level from the settings blob', () => {
+    expect(make('{"bufferSizeLevel":2}').prefs.bufferSizeLevel).toBe(2);
+    // …and refuses a blob that carries something the control cannot have written.
+    expect(make('{"bufferSizeLevel":"2"}').prefs.bufferSizeLevel).toBe(3);
+  });
+
   it('hands the two non-preference keys back instead of owning them', () => {
     /*
       `chatStyle` writes the room's chat rendering and `roomSplitDir` re-seeds the split geometry.
