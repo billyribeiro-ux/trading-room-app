@@ -33,6 +33,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 03:25 UTC — The question that found eight defects today is now asked automatically
+
+**Runtime impact: NO.** One contract test. It is the instrument, not a fix.
+
+**Which of a component's props does no call site supply?** Nothing had ever asked. Asked by hand
+this afternoon it found eight live defects in one sweep — an entitlement defaulting open, four
+values that collapsed the private-message rule to presenter-only, avatars shown in rooms that hide
+them, a Show To All entry a limited presenter kept, and a dropdown whose every click called
+`undefined?.()`. **Every one of those values already existed in this room.** None was a missing
+feature; all were a value that never arrived.
+
+That failure is invisible from every other direction. A prop with a default silently becomes the
+default. Nothing throws, `svelte-check` is content, eslint is content, and a render test that does
+not pass it renders the default and agrees with itself.
+
+**A prop counts as supplied two ways, and the second is what makes this precise.** Named at a call
+site — `{prop}`, `prop={…}`, `bind:prop`, a bare boolean attribute, or `{#snippet prop()}` — or
+declared by a TYPE that is spread there. `{...messageChrome}` feeds exactly the fields
+`RoomMessageChrome` declares, so the spread's type is resolved and its fields count. **Treating any
+spread as feeding everything would have hidden all six message gates**, which were fed by nothing
+while that spread sat at the call site.
+
+**Four drafts, and each one taught the matcher something**, which is worth recording because each
+was a false positive that would have made the gate noise somebody switches off:
+
+1. Matching prop names anywhere in a call-site FILE — a name in a docblock counted as a supply.
+   Fixed by scanning the TAG body, bounded by the first `>` outside braces.
+2. Snippet props (`children`, `footer`, `header`, `beforeBody`, `controls`, `trailingRule`) are
+   written between the tags, never as `prop={…}`. Six false positives.
+3. `children` is supplied by writing anything between the tags — no mention of the name at all.
+4. A bare boolean attribute IS `prop={true}`. `PresenterMuteRows.trailingRule`,
+   `Modal.closedAriaHidden` and `Modal.footerOutsideContent` are all passed that way.
+
+**The exemption table is the reviewable act.** Seven props are deliberately unsupplied and each
+entry carries the reason, checked against the bundle: four are unbuilt features with their blockers
+named, and three are props the reference has no writer for either — `StreamTabs.lockedScreenId` is
+the one the sweep found that a person had not, and it is the third field of a lock feature whose
+badge and menu label read two DIFFERENT ids eight lines apart in the same update block.
+
+**The table cleans itself, which is the half that matters more.** A second assertion fails if an
+exempted prop is actually supplied — because then the reason beside it is a false statement in a
+contract file, and the next reader takes it for a live decision. Three of the five entries in the
+first draft were exactly that, and this assertion is what would have caught them without a person
+noticing.
+
+**One matcher, used by both callers.** The stale-exemption check needed the same five spellings, and
+a matcher written twice is a matcher that answers two different questions after the next edit —
+which is the failure this whole file exists to catch. **Two negative controls seen RED**: removing
+one real prop from one call site, and breaking the spread resolver by renaming a chrome field.
+
+**Verified:** room 155 files / 2,368 tests (1 skipped) · `svelte-check` 0/0 · eslint and prettier
+clean.
+
 ### 2026-08-28 03:10 UTC — The named debt is paid, and the Buffer dropdown it made room for could never change anything
 
 **Runtime impact: YES.** The streaming view's Buffer control works. Until this commit clicking
