@@ -257,6 +257,12 @@ flag would light a control that cannot act. The remainder split into **12 WIRE**
 here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
 size in the triage document.
 
+**The ceiling catalog is now DISCOVERED for components as well as modules** (2026-08-28). It was a
+hand-kept list at **12 of 48**, and the four found uncapped by accident in two days were the visible
+part: `AlertChatArea` (1,113) and `RoomMessage` (949) had never had one either. Adding an entry is
+now how a component is ADMITTED, not how it gets covered. Three files are named as their own
+outstanding work rather than swept: `AlertChatArea`, `RoomMessage` and `RoomNavbar`.
+
 **WIRE is down to ONE**, and it is `recsInRoom`, which is BLOCKED anyway — wire it with the
 Recordings tab, never before it. The section opened with twelve.
 

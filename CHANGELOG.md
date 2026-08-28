@@ -33,6 +33,58 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 12:50 UTC — Three quarters of the components had no ceiling, and the list was the reason
+
+**Runtime impact: NO.** One test file. It is here because the previous entry named this as the
+highest-value item outstanding, and a named debt that is not paid is a promise.
+
+**The measurement.** `lib/room/*.ts` modules are DISCOVERED — a module cannot exist without a
+ceiling, because the gate reads the directory. Components were a hand-kept list, and the list was
+**12 of 48**. Three quarters of this application's components had no ceiling at all, including
+`AlertChatArea` at **1,113** lines and `RoomMessage` at **949** — the second and fourth largest
+Svelte files in the repository. Every Phase 5 slice that pushed work into any of them was uncapped,
+which is exactly the growth this file exists to stop.
+
+**Four had been found in two days by accident** — `NoteEditor` (1,546), `NotesPane`,
+`PrivateChatPanel`, `RoomSidebar` — each discovered by happening to touch it. That is not four
+oversights; it is a mechanism failing, and finding them one at a time would have taken as long as the
+components lasted.
+
+**`every component is discovered and capped` now enforces what components have needed all along.**
+Adding an entry by hand is no longer how a component gets covered; it is how a component gets
+ADMITTED. Three assertions: every `.svelte` under `lib/components/` has a ceiling, every component
+ceiling still has a file, and the enumeration found something.
+
+**RECURSIVE, and that is asserted rather than assumed.** `notes/`, `swing-alerts/` and
+`day-trade-alerts/` hold six components between them. A non-recursive `readdirSync` would have
+declared victory while leaving them exactly as uncovered as before — **a gate that reports success
+over the thing it does not look at is worse than no gate** — so one assertion requires a nested path
+in the enumeration, and a negative control that stops the recursion was seen RED.
+
+**The reverse direction is checked too**, which the room-module block does not need: a deleted module
+leaves a broken import, but a deleted component leaves a ceiling entry that can never fail. A ceiling
+that cannot fail is precisely what `SLACK` exists to prevent.
+
+**Thirty-six entries arrive at MEASURED size, not at an argued one**, which is `PresentationArea`'s
+own rule — *"the number's job is to stop the next 200 lines, not to pass judgement on the existing
+1,181"*. Thirty-six invented targets would be thirty-six numbers nobody could defend, and the first
+one that failed would be raised on the grounds that it was arbitrary. These are floors to descend
+from.
+
+**And the sweep deliberately refactors nothing.** Three files are named in place as their own work:
+`AlertChatArea` (the extraction `buildMessageChrome` has been pointing at since it was written),
+`RoomMessage` (the component that type exists to serve) and `RoomNavbar` — **still the one component
+in the repository with neither a mount nor an SSR render test**, which `todo-next.md` has carried for
+weeks. A sweep that also refactored would be impossible to review.
+
+**Four negative controls seen RED:** a new uncapped component at the top level, a new uncapped
+component inside a subdirectory, a ceiling whose file does not exist, and the recursion removed.
+
+**Verified:** room 164 files / **2,588** tests (1 skipped; 75 more than before this change, which is
+the thirty-six new ceilings and their backstops) · `svelte-check` 0/0 across 1,290 files · eslint and
+prettier clean. No controller or runtime file changed, so the controller suite and the verifier chain
+were not re-run.
+
 ### 2026-08-28 12:25 UTC — One feature spelled as three settings, and a link the reference does not check
 
 **Runtime impact: YES.** A room that configures a **tip button** now draws one, at both of the

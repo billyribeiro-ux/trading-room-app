@@ -2106,6 +2106,219 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/trade-alerts.svelte.ts',
     max: 337,
     why: 'ONE class, two instances; 9 of its 14 declaration pairs were byte-identical before the merge'
+  },
+  /*
+    ── THE SWEEP, 2026-08-28: THIRTY-SIX COMPONENTS THAT HAD NEVER BEEN CAPPED ────────────────────
+
+    Four components were found uncapped in two days — `NoteEditor` at 1,546, `NotesPane`,
+    `PrivateChatPanel` and `RoomSidebar` — each discovered by happening to touch it. The fourth
+    entry said that was not four oversights but a mechanism failing, and named the fix. This is it.
+
+    THE MEASUREMENT THAT MADE THE CASE. `lib/room/*.ts` modules are DISCOVERED by the block near the
+    foot of this file, so a module cannot exist without a ceiling. Components were a hand-kept list,
+    and the list was **12 of 48**. Three quarters of this application's components had no ceiling at
+    all, including `AlertChatArea` at 1,113 lines and `RoomMessage` at 949 — the second and fourth
+    largest Svelte files in the repository. Every Phase 5 slice that pushed work into any of them was
+    uncapped, which is exactly the growth this file exists to stop.
+
+    `every component is discovered and capped` now enforces the same rule components have needed all
+    along: a `.svelte` file under `lib/components/` cannot be added without saying what too big means
+    for it. Adding an entry by hand is no longer how a component gets covered; it is how a component
+    gets ADMITTED.
+
+    WHY THIRTY-SIX ENTRIES ARRIVE AT MEASURED SIZE AND NOT AT AN ARGUED ONE. Each is what the file
+    measures today, which is `PresentationArea`'s own rule — "the number's job is to stop the next
+    200 lines, not to pass judgement on the existing 1,181". Thirty-six invented targets would be
+    thirty-six numbers nobody could defend, and the first one that failed would be raised on the
+    grounds that it was arbitrary, which is how a ratchet dies. These are floors to descend from.
+
+    WHAT THIS SWEEP IS NOT. It is not a claim that any of these files is the right size. The three
+    worth naming are `AlertChatArea` (1,113 — the alerts/chat column, and the extraction the
+    `buildMessageChrome` note has been pointing at since it was written), `RoomMessage` (949 — the
+    component that type exists to serve) and `RoomNavbar` (922 — still the ONE component in the
+    repository with neither a mount nor an SSR render test, which `todo-next.md` has carried for
+    weeks). Each of those is its own change with its own evidence, and none is bundled here: a sweep
+    that also refactored would be impossible to review.
+  */
+  {
+    file: 'lib/components/AlertChatArea.svelte',
+    max: 1113,
+    why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
+  },
+  {
+    file: 'lib/components/AttachDepsProbe.svelte',
+    max: 39,
+    why: 'a probe: proves {@attach} re-runs on dependency change, and nothing else'
+  },
+  {
+    file: 'lib/components/BindThisProbe.svelte',
+    max: 42,
+    why: 'a probe: proves bind:this resolves before the effect reads it'
+  },
+  {
+    file: 'lib/components/BootboxDialog.svelte',
+    max: 132,
+    why: 'the dialog primitive this repository uses in place of bootbox'
+  },
+  {
+    file: 'lib/components/CloseSessionPane.svelte',
+    max: 105,
+    why: 'the session-control close pane'
+  },
+  {
+    file: 'lib/components/CompactMessageRow.svelte',
+    max: 78,
+    why: 'app-st-compactmessage - one private-message row, shared by the panel and the modal'
+  },
+  {
+    file: 'lib/components/EmojiPicker.svelte',
+    max: 703,
+    why: 'the emoji chooser and its captured category strip'
+  },
+  {
+    file: 'lib/components/ExtraChatPane.svelte',
+    max: 543,
+    why: 'the second chat column; thirteen of its props are message chrome passed through'
+  },
+  {
+    file: 'lib/components/FilesPane.svelte',
+    max: 557,
+    why: 'the Files tab - the list, the sort bar and the upload control'
+  },
+  {
+    file: 'lib/components/GifConfirmDialog.svelte',
+    max: 50,
+    why: 'the one confirmation between picking a GIF and posting it'
+  },
+  {
+    file: 'lib/components/GiphyPicker.svelte',
+    max: 153,
+    why: 'the GIF search grid'
+  },
+  {
+    file: 'lib/components/ImageUploadDialog.svelte',
+    max: 126,
+    why: 'the composer image dialog, instantiated per feature rather than shared'
+  },
+  {
+    file: 'lib/components/Modal.svelte',
+    max: 158,
+    why: 'the modal shell every captured modal is rendered through'
+  },
+  {
+    file: 'lib/components/PollPanel.svelte',
+    max: 825,
+    why: 'the poll UI - author, vote and results in one captured component'
+  },
+  {
+    file: 'lib/components/PostAlertModal.svelte',
+    max: 494,
+    why: 'the alert composer and its per-open resets'
+  },
+  {
+    file: 'lib/components/PresenterMuteRows.svelte',
+    max: 143,
+    why: 'the per-presenter volume and mute rows'
+  },
+  {
+    file: 'lib/components/RichTextEditor.svelte',
+    max: 192,
+    why: 'the chat RTE, gated on three flags rather than one'
+  },
+  {
+    file: 'lib/components/RoomMessage.svelte',
+    max: 949,
+    why: 'one message, thirty-five props, and the file the chrome type exists to serve'
+  },
+  {
+    file: 'lib/components/RoomNavbar.svelte',
+    max: 922,
+    why: 'the top bar - the one component with neither a mount nor an SSR render test'
+  },
+  {
+    file: 'lib/components/ScreenPane.svelte',
+    max: 441,
+    why: 'the screenshare pane and its zoom/stack controls'
+  },
+  {
+    file: 'lib/components/ScreenTabs.svelte',
+    max: 295,
+    why: 'the screenshare tab strip'
+  },
+  {
+    file: 'lib/components/ScreenVolumeControl.svelte',
+    max: 197,
+    why: 'the per-screen volume slider'
+  },
+  {
+    file: 'lib/components/ScreenZoomControls.svelte',
+    max: 237,
+    why: 'the zoom and pan controls over a shared screen'
+  },
+  {
+    file: 'lib/components/SettingOption.svelte',
+    max: 71,
+    why: 'one labelled setting row in the session-control modal'
+  },
+  {
+    file: 'lib/components/SpeechRecoOverlay.svelte',
+    max: 254,
+    why: 'the captions overlay and its transcript controls'
+  },
+  {
+    file: 'lib/components/StreamTabs.svelte',
+    max: 306,
+    why: 'the stream tab strip, including two fields upstream never writes'
+  },
+  {
+    file: 'lib/components/StreamingView.svelte',
+    max: 561,
+    why: 'the hls.js player, its buffer control and the quality picker'
+  },
+  {
+    file: 'lib/components/ToastHost.svelte',
+    max: 65,
+    why: 'the toast container'
+  },
+  {
+    file: 'lib/components/ToggleRow.svelte',
+    max: 94,
+    why: 'one labelled switch, used across the settings surfaces'
+  },
+  {
+    file: 'lib/components/VideoPlayer.svelte',
+    max: 414,
+    why: 'the video-only player'
+  },
+  {
+    file: 'lib/components/YoutubePlayerOverlay.svelte',
+    max: 62,
+    why: 'the YouTube-for-all overlay'
+  },
+  {
+    file: 'lib/components/day-trade-alerts/DayTradeAlertForm.svelte',
+    max: 357,
+    why: 'the day-trade alert composer form'
+  },
+  {
+    file: 'lib/components/day-trade-alerts/DayTradeAlertsPane.svelte',
+    max: 583,
+    why: 'the day-trade alerts tab'
+  },
+  {
+    file: 'lib/components/notes/NoteTabContent.svelte',
+    max: 151,
+    why: 'one note tab and its read-only view'
+  },
+  {
+    file: 'lib/components/swing-alerts/SwingAlertForm.svelte',
+    max: 327,
+    why: 'the swing alert composer form'
+  },
+  {
+    file: 'lib/components/swing-alerts/SwingAlertsPane.svelte',
+    max: 538,
+    why: 'the swing alerts tab'
   }
 ];
 
@@ -2194,6 +2407,74 @@ const codeLineCount = (file: string) => {
 const roomModules = readdirSync(new URL('lib/room/', SOURCE))
   .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
   .map((name) => `lib/room/${name}`);
+
+/*
+  COMPONENTS ARE DISCOVERED TOO, added 2026-08-28, and the delay is the finding.
+
+  The block below has discovered `lib/room/*.ts` since gate 0b, on the reasoning its own comment
+  gives: a hand-kept list means the nineteenth slice creates a file, nobody adds the row, and the cap
+  that was the whole point quietly does not exist. **Components were exactly that hand-kept list, and
+  it failed exactly that way.** Four were found uncapped in two days by happening to touch them, and
+  the measurement that prompted this found the real number: 12 of 48.
+
+  RECURSIVE, because components nest. `notes/`, `swing-alerts/` and `day-trade-alerts/` hold six
+  between them, and a non-recursive `readdirSync` would have declared victory while leaving them
+  exactly as uncovered as before — a gate that reports success over the thing it does not look at is
+  worse than no gate.
+
+  `.svelte` only. A `.ts` beside a component (`carousel.ts`, `note-gates.ts`, `safe-html.ts`) is a
+  module, and modules are capped by their own rule or not at all; sweeping them in here would be this
+  gate quietly claiming a jurisdiction nobody argued for.
+*/
+function svelteFilesUnder(dir: string): string[] {
+  const found: string[] = [];
+  for (const item of readdirSync(new URL(dir, SOURCE), { withFileTypes: true })) {
+    if (item.isDirectory()) found.push(...svelteFilesUnder(`${dir}${item.name}/`));
+    else if (item.name.endsWith('.svelte')) found.push(`${dir}${item.name}`);
+  }
+  return found;
+}
+
+const componentFiles = svelteFilesUnder('lib/components/').sort();
+
+describe('every component is discovered and capped', () => {
+  it('found the components it is meant to cap', () => {
+    /*
+      The vacuity guard, and it earns its place here more than anywhere else in this file: the whole
+      point of this block is that nobody has to remember to list a component, so an enumeration that
+      silently returned nothing would restore precisely the failure it was written to end — and
+      would do it while reporting green.
+    */
+    expect(componentFiles.length).toBeGreaterThan(40);
+    // …and it reaches into the subdirectories, which a non-recursive read would not.
+    expect(componentFiles.filter((file) => file.split('/').length > 3).length).toBeGreaterThan(0);
+  });
+
+  it('every component on disk has a declared ceiling', () => {
+    const capped = new Set(CEILINGS.map((entry) => entry.file));
+    const uncapped = componentFiles.filter((file) => !capped.has(file));
+    expect(
+      uncapped,
+      `${uncapped.join(', ')} exists under lib/components/ with no ceiling. A component cannot be added without saying what too big means for it — that is what four components found uncapped in two days, and 36 found uncapped by one measurement, cost. Add an entry to CEILINGS at the size it actually lands, with a why that says what the component IS.`
+    ).toEqual([]);
+  });
+
+  it('and every declared component ceiling still has a file', () => {
+    /*
+      The other direction, which the room-module block does not need because a deleted module leaves
+      its import broken. A deleted component leaves a ceiling entry that can never fail, and a
+      ceiling that cannot fail is the thing `SLACK` and this file exist to prevent.
+    */
+    const onDisk = new Set(componentFiles);
+    const stale = CEILINGS.map((entry) => entry.file)
+      .filter((file) => file.startsWith('lib/components/'))
+      .filter((file) => !onDisk.has(file));
+    expect(
+      stale,
+      `${stale.join(', ')} has a ceiling but no file. Remove the entry — a ceiling on a file that does not exist is a test that cannot fail.`
+    ).toEqual([]);
+  });
+});
 
 describe('every room module is discovered and capped', () => {
   it('found the modules it is meant to cap', () => {
