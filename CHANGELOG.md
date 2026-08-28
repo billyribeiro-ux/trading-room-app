@@ -33,6 +33,43 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 06:10 EDT — The last component with no render cover, and two comments that had gone false
+
+**Runtime impact: NO.** One render test, two corrected comments, two `TODO.md` rows closed.
+
+**`RoomNavbar` was the only component in this repository with neither a mount nor an SSR render
+test.** Row AE tracked that count through three corrections before it settled on a single name, and
+this is it. Nineteen test files render a component; none rendered this one.
+
+**What it asserts is the navbar's own stated rule:** *"Broadcast controls — recording, SoundCloud,
+microphone, screen sharing, webcam and session control — drive what the room sends to everyone, so
+they are presenter-only."* That is one `{#if isPresenter}` around six controls. Deleting it, or
+widening it to a truthiness test on something a member also has, puts a recording button and a
+Session Control entry in every member's navbar. A search of every test file for `dropdownRecording`
+or `onopensessioncontrol` returned the component and nothing else.
+
+**Stated because it should not be over-read: the server is the gate that matters.** `presenterRoom()`
+refuses each of those commands, so this is not the last line of defence and is not asserted as one.
+It is the standard this repository sets ABOVE the refusal — a control whose only outcome is a 403 is
+a control that lied about what the member may do.
+
+Four assertions and two controls: the six markers absent for a member, present for a presenter (so a
+renamed or deleted control cannot satisfy every `not.toContain` while being simply gone), a positive
+control that the navbar renders at all, and the block asserted as a DIFFERENCE in length rather than
+a list of six markers that would go stale the moment a seventh control is added. **Negative control
+seen RED on three cases** by widening the gate to `{#if true}`.
+
+**Row AF's two comments are corrected, which is all that row had left.** `chat-plain-text.ts` still
+said the server's own `body` derivation *"has NOT been read, so the count is not asserted here"* — it
+was read on 2026-08-17 and there are TWO copies, not three: `sendMessage`, `editMessage` and the
+client's optimistic copy all call the same function. And `chat-html.ts` carried no note saying its
+inline copy stays separate deliberately; it does now, with the reason — merging them would tie a
+REFUSAL rule to a RENDERING rule, so changing how `body` reads for a member would silently change
+which messages the room accepts.
+
+**Verified:** room 151 files / 2,287 tests · `svelte-check` 1,270 files 0/0 · eslint and prettier
+clean.
+
 ### 2026-08-28 05:40 EDT — The second question nothing had asked: which SETTINGS the reference reads
 
 **Runtime impact: NO.** One published gate, one contract test, one TODO section.

@@ -22,12 +22,21 @@
  * `&amp;` reads correctly as typed and decoding it would be the start of an escaping round-trip
  * nobody asked for.
  *
- * `isEmptyChatHtml` in `#lib/server/chat-html.ts` runs the identical three steps to answer a
- * different question — whether a sanitised message is empty. That is a second copy, and the server's
- * own `body` derivation on the message-send path is very likely a third; it has NOT been read, so
- * the count is not asserted here. Recorded as **`TODO.md` row AF** rather than merged on a guess:
- * the two that were read have different jobs, and proving they must stay identical needs the
- * authoritative one read end to end first.
+ * ## THERE ARE TWO COPIES, NOT THREE — read 2026-08-17, corrected here 2026-08-28
+ *
+ * This paragraph said the server's own `body` derivation was *"very likely a third"* and that it
+ * *"has NOT been read, so the count is not asserted here"*. It has been read, and it is not a third
+ * copy: `sendMessage` calls THIS function (`chat-messages.remote.ts`), `editMessage` calls it
+ * (`message-actions.remote.ts`), and the client's optimistic copy calls it (`composer.svelte.ts`).
+ * One function, three consumers, which cannot disagree.
+ *
+ * The MEDIUM severity `TODO.md` row AF carried — a silent divergence between what a sender sees and
+ * what the room stores — does not apply, and the row is closed.
+ *
+ * The only other copy is `isEmptyChatHtml` in `#lib/server/chat-html.ts`, which runs the identical
+ * three steps to answer a DIFFERENT question: whether a sanitised message is empty. It stays
+ * separate deliberately — see its own note — and `chat-rich-text-contract.test.ts:123-132` pins both
+ * sides against drift.
  */
 export function stripHtmlToText(html: string): string {
   return html

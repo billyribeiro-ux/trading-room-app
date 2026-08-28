@@ -86,6 +86,24 @@ const EMPTY_EDITOR_OUTPUT = new Set(['', '<p><br></p>', '<br>', '<p></p>']);
  * `<script>x</script>` into nothing, and a message whose entire content was disallowed must not
  * post as an empty bubble.
  */
+/*
+   THE INLINE COPY STAYS SEPARATE, DELIBERATELY — the other half of row AF's own "write it down in
+   BOTH places", added 2026-08-28.
+
+   The three steps below are the same three `stripHtmlToText` runs, and the temptation is to call it
+   and delete them. They answer DIFFERENT questions, and the difference is why the duplication is
+   correct rather than an oversight:
+
+     `stripHtmlToText`  produces the `body` a reader SEES — a value that is stored, searched and
+                        rendered as text.
+     this function      decides whether a sanitised message is EMPTY — a value nobody ever sees,
+                        used once, to refuse a send.
+
+   Merging them would tie a refusal rule to a rendering rule, so a change to how `body` reads for a
+   member — decoding one more entity, say — would silently change which messages the room accepts.
+   `chat-rich-text-contract.test.ts:123-132` pins both sides so the two cannot drift apart WITHOUT
+   anybody noticing, which is the guarantee that makes keeping them separate safe.
+*/
 export function isEmptyChatHtml(sanitized: string): boolean {
   const trimmed = sanitized.trim();
   if (EMPTY_EDITOR_OUTPUT.has(trimmed)) return true;
