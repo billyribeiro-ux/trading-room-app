@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **47** as this is written; eleven have been answered by building, and the
+2026-08-28 and is at **45** as this is written; thirteen have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -93,12 +93,10 @@ Ordered by how much of the work is already done.
 | setting | byte | what is missing |
 | --- | --- | --- |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
-| `autoSwitchToOfftopics` | 1,407,102 | On chat init, switch the channel to `offTopic`. Two consumers, main and extra column (2,359,803), and the extra one is additionally gated on `preferences.extraChatColumn`. |
 | `name` | see above | `document.title` and the transcript window title. One value, two consumers. |
 | `modMessage` | 2,492,450 | A presenter-visible moderator message bar above the presentation area, with a close button that clears it locally (`closeModMessage`). |
 | `enablePrivateMessageHistory` | 2,068,615 | One row in the user-info modal. |
 | `simplifiedEditor` | 1,468,478 | Picks `"forecolor"` versus `"color"` in the note editor's toolbar config. One string. |
-| `styckyNonTradeAlert` | 2,124,407 | Seeds the alert composer's `nonTradeAlert` checkbox. |
 | `recsInRoom` | 2,016,810 | `archivesAvailableTo() && sessData.recsInRoom` gates the Recordings tab AND its pane. **Wire it only with the tab** — see BLOCKED. |
 
 ---
@@ -170,7 +168,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 
 ---
 
-## The eleven already answered
+## The thirteen already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -185,3 +183,5 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 | `hasSpeechRecognitionDisabled` | WIRED — `beginSpeechRecognition` quoted "or session settings" and gated on preferences alone. | 2026-08-28 |
 | `hideWebcamForRoom` | WIRED — the fifth term of the webcam control's gate, and the only one this room could not evaluate. | 2026-08-28 |
 | `blinkingRec` | WIRED — `breathing-rec`, which unlike `smallImagePreview`'s class has a real keyframe rule. | 2026-08-28 |
+| `autoSwitchToOfftopics` | WIRED — a SEED on `RoomChat`'s main column; the extra column already defaults there. | 2026-08-28 |
+| `styckyNonTradeAlert` | WIRED — re-applied on EVERY modal open, which is what sticky means. | 2026-08-28 |

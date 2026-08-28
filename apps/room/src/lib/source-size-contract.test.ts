@@ -772,7 +772,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The alternative was contorting a props list to dodge a number, which this file's own opening
       calls the tail wagging the dog.
     */
-    max: 777,
+    /*
+      777 -> 778 for ONE line: `stickyNonTradeAlert` reaching `ModalHost` and the alert composer
+      behind it. This component already holds `data`, so the value is read here rather than crossing
+      the page — which is why the page paid nothing for this one.
+    */
+    max: 778,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
@@ -996,7 +1001,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reader cannot see would only have moved the silent wrong answer from fifty rows to five
       hundred. The `alerts` prop it replaced was DELETED, which paid eight of the forty-one back.
     */
-    max: 6006,
+    /*
+      6006 -> 6010 for the `stickyNonTradeAlert` pass-through: a typed prop, its docblock, its
+      default in the destructuring, and one line at the call site. Four lines to carry one boolean
+      through a component that exists to carry things through, which is what this file's own note
+      calls the cost of `ModalHost` being 85 props wide.
+    */
+    max: 6010,
     why: 'every modal in the room, in one component'
   },
   {
@@ -1052,7 +1063,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/chat.svelte.ts',
-    max: 179,
+    /*
+      179 -> 194 on 2026-08-28 for the off-topic SEED, and fourteen of the fifteen lines are why.
+
+      The executable change is one statement in the constructor. What the rest records is that this
+      is a SEED and not a lock — a VALUE rather than a thunk, read once exactly as `ngOnInit` reads
+      it once, because a derivation would re-switch the member's column on every invalidate — and
+      that the extra column's identical clause upstream is a no-op in both applications, since that
+      column already defaults to off-topic. Without the second half somebody wires it twice.
+    */
+    max: 194,
     why: 'the two chat columns and the mention routing that reads three of their fields at once'
   },
   {
@@ -1795,7 +1815,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1110 -> 1111 for the `speechRecognitionAvailable` thunk handed to `RoomRecording`. Pure wiring,
       which is what this file is; the thunk is a thunk because `gates` is constructed below it.
     */
-    max: 1111,
+    /*
+      1111 -> 1114 for the off-topic seed: `new RoomChat({ … })` went from one line to four when the
+      second argument arrived and the formatter reflowed it. Pure wiring, which is what this file is.
+    */
+    max: 1114,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

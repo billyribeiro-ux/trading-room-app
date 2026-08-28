@@ -508,6 +508,30 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'blinkingRec',
   /*
+    "Auto switch to off-topic?" — the MAIN chat column opens on the off-topic channel.
+
+      ngOnInit: sessData.autoSwitchToOfftopics && (this.channel = "offTopic",
+        this.appEventBus.emit("switchChatChannel", this.channel))              byte 1,407,102
+
+    A SEED, like `alwaysShowRoster`: the channel tabs still switch back. The EXTRA column has the
+    same clause at 2,359,803, additionally gated on `preferences.extraChatColumn` — and it is a
+    no-op there in both applications, because that column already defaults to off-topic.
+  */
+  'autoSwitchToOfftopics',
+  /*
+    "Sticky non-trade alert?" — the alert composer's Non-Trade checkbox starts ticked.
+
+      this.nonTradeAlert = sessData.styckyNonTradeAlert || !1                  byte 2,124,407
+
+    `styckyNonTradeAlert` is the reference's own spelling and is kept: the name has to match what
+    the controller stores, and correcting it here would silently stop reading the setting an owner
+    has already configured.
+
+    It is re-applied on EVERY open of the modal, which is what "sticky" means — the reference sets it
+    inside `doAlertsModal`, beside the other per-open resets, not once at construction.
+  */
+  'styckyNonTradeAlert',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

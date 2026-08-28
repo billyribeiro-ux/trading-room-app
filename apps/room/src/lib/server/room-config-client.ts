@@ -248,6 +248,22 @@ export interface RoomSessionSettings {
    */
   blinkingRec?: boolean;
   /**
+   * "Auto switch to off-topic?" — the MAIN chat column opens on the off-topic channel.
+   *
+   * `sessData.autoSwitchToOfftopics && (this.channel = "offTopic", …)` at byte 1,407,102. A seed:
+   * the channel tabs still switch back. The extra column has the same clause and it is a no-op
+   * there in both applications, because that column already defaults to off-topic.
+   */
+  autoSwitchToOfftopics?: boolean;
+  /**
+   * "Sticky non-trade alert?" — the alert composer's Non-Trade checkbox starts ticked.
+   *
+   * `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1`, byte 2,124,407, inside
+   * `doAlertsModal` — so it is re-applied on EVERY open, which is what sticky means. The reference's
+   * spelling is kept: the name has to match what the controller stores.
+   */
+  styckyNonTradeAlert?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

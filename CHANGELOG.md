@@ -33,6 +33,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 09:15 UTC — Two seeds, and where a seed is applied is the whole feature
+
+**Runtime impact: YES.** A room that sets *"Auto switch to off-topic?"* opens its main chat column on
+that channel. A room that sets *"Sticky non-trade alert?"* gives the composer's Non-Trade checkbox
+back on every open. Neither did anything before.
+
+**`styckyNonTradeAlert` is the instructive one, and it is about PLACE.** The reference sets
+`this.nonTradeAlert = sessData.styckyNonTradeAlert || !1` at byte 2,124,407 — *inside*
+`doAlertsModal`, beside that method's other per-open resets. Seeding the field once at construction
+would make it sticky for the first alert of a session and never again; a presenter who unticks the
+box for one alert must get it back on the next, and **that is what sticky means here**. It goes in
+`beginOpenState`, which an `$effect` calls on every transition to open.
+
+The declaration stays `$state(false)`. Seeding it there as well captured the prop's initial value —
+`state_referenced_locally` said so — and bought nothing, because the modal is never read before it
+opens.
+
+**The reference's spelling is kept.** `styckyNonTradeAlert` is what the controller stores; correcting
+it here would silently stop reading a setting owners have already configured.
+
+**`autoSwitchToOfftopics` is a SEED and not a lock**, the same shape as `alwaysShowRoster` this
+morning: a VALUE read once in the constructor, exactly as `ngOnInit` reads it once, because a
+derivation would re-switch the member's column on every five-second invalidate. Its second upstream
+consumer — the extra column, gated on `preferences.extraChatColumn` — is a **no-op in both
+applications**, because that column already defaults to off-topic. That is asserted rather than
+assumed, so nobody wires the setting a second time into a column that is already there.
+
+**Neither cost the page a line.** `RoomOverlays` already holds `data`, so the composer's value is
+read there; `RoomChat` is constructed inside `createRoom`, which holds it too. After four
+`+page.svelte` raises today, that is worth noting: the page grows when a value has nowhere else to be
+read, and both of these had somewhere.
+
+**Three negative controls seen RED** — the per-open reset, the `RoomOverlays` supply, and the channel
+seed. The sticky contract is a source assertion by argument, not by convenience: the seed runs in an
+`$effect`, which never runs during SSR, and a mount would cost a jsdom and twelve collaborators to
+observe one boolean. What can regress is the CHAIN and the PLACE, and both are exactly what a source
+assertion sees — the setting reaching `RoomOverlays` and stopping there would look identical from
+inside the composer.
+
+**Four ceilings raised, each argued in place**, and in every case the executable change is one or two
+statements: `chat.svelte.ts` 179 → 194 is fourteen lines of why a seed is a value and why the extra
+column needs nothing, and `ModalHost` 6,006 → 6,010 is four lines to carry one boolean through a
+component that exists to carry things through.
+
+**Verified:** room 158 files / 2,392 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` byte-compares at 80 wired · `svelte-check` 0/0 · eslint and prettier clean.
+
 ### 2026-08-28 08:55 UTC — A webcam control an owner could not remove, and a REC badge that never breathed
 
 **Runtime impact: YES.** *"Hide webcam for room?"* removes the webcam control. *"Blinking REC?"* makes

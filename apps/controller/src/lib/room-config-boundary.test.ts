@@ -289,6 +289,14 @@ describe('the allow-list itself', () => {
       */
       hideWebcamForRoom: 'RoomNavbar — the webcam control disappears for the whole room',
       blinkingRec: 'RoomNavbar — the REC badge breathes while recording',
+      /*
+        Both verified in the room before being written here, and both are SEEDS re-applied where the
+        reference re-applies them: `autoSwitchToOfftopics` seeds `RoomChat`'s main-column channel at
+        construction, and `styckyNonTradeAlert` re-ticks the composer's Non-Trade box on EVERY open
+        of the modal, which is what sticky means and where `doAlertsModal` puts it.
+      */
+      autoSwitchToOfftopics: 'RoomChat — the main chat column opens on the off-topic channel',
+      styckyNonTradeAlert: 'PostAlertModal — the Non-Trade checkbox starts ticked on every open',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

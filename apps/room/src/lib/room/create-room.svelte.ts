@@ -309,7 +309,10 @@ export function createRoom(deps: RoomDeps) {
     the value as of construction, so turning the second column on mid-session would leave every
     mention routing to the main composer.
   */
-  const chat = new RoomChat({ extraColumnEnabled: () => prefs.extraChatColumn });
+  const chat = new RoomChat({
+    extraColumnEnabled: () => prefs.extraChatColumn,
+    autoSwitchToOffTopic: data.sessData?.autoSwitchToOfftopics === true
+  });
 
   /*
     The room's media STATE, in `#lib/room/media.svelte.ts`.

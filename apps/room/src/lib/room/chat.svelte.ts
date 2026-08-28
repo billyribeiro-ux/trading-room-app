@@ -59,6 +59,13 @@ export type ChatComposerId = 'textAreaTxt' | 'textAreaTxtExtra';
 export const EXTRA_COMPOSER: ChatComposerId = 'textAreaTxtExtra';
 
 export class RoomChat {
+  /**
+   * The MAIN column's channel.
+   *
+   * `'main'` unless the room says otherwise: `sessData.autoSwitchToOfftopics && (this.channel =
+   * "offTopic", …)` in `ngOnInit`, byte 1,407,102. A SEED and not a lock — the channel tabs still
+   * switch back, and writing it as a derivation would re-switch the column on every invalidate.
+   */
   #tab = $state<ChatTab>('main');
   /** `this.channel = 'offTopic'` in `app-extra-chat` — the extra column has its own channel. */
   #extraTab = $state<ChatTab>('off-topic');
@@ -76,8 +83,16 @@ export class RoomChat {
    * the settings modal mid-session — at which point every mention would keep routing to the main
    * composer because this class was still holding `false`.
    */
-  constructor(sources: { extraColumnEnabled: () => boolean }) {
+  constructor(sources: {
+    extraColumnEnabled: () => boolean;
+    /**
+     * `sessData.autoSwitchToOfftopics` — a VALUE, not a thunk, and that is the difference between a
+     * seed and a lock. It is read once, here, exactly as the reference reads it once in `ngOnInit`.
+     */
+    autoSwitchToOffTopic?: boolean;
+  }) {
     this.#extraColumnEnabled = sources.extraColumnEnabled;
+    if (sources.autoSwitchToOffTopic) this.#tab = 'off-topic';
   }
 
   get tab(): ChatTab {

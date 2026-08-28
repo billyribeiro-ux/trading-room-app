@@ -18,9 +18,27 @@
     onalert: (message: string) => void;
     onpost: (submission: PostAlertSubmission) => Promise<boolean>;
     onpastepost: (submission: PastedImageSubmission) => Promise<boolean>;
+    /**
+     * "Sticky non-trade alert?" — whether the Non-Trade checkbox starts ticked, on every open.
+     *
+     * `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1` inside `doAlertsModal`, byte
+     * 2,124,407. It defaults `false` rather than being required, because `ModalHost` is rendered by
+     * tests that predate this prop and a composer that starts un-ticked is the state every one of
+     * them was written against.
+     */
+    stickyNonTradeAlert?: boolean;
   }
 
-  let { open, tab, onclose, ontab, onalert, onpost, onpastepost }: Props = $props();
+  let {
+    open,
+    tab,
+    onclose,
+    ontab,
+    onalert,
+    onpost,
+    onpastepost,
+    stickyNonTradeAlert = false
+  }: Props = $props();
 
   let alertText = $state('');
   let alertUrl = $state('');
@@ -33,6 +51,10 @@
   let keepOpen = $state(false);
   let postOnX = $state(false);
   let dontPush = $state(false);
+  /* `false` here and seeded in `beginOpenState`, which the `$effect` below runs on every transition
+     to open — including the first. Seeding the declaration too would capture the prop's initial
+     value, which is what `state_referenced_locally` warns about, and would buy nothing: the modal
+     is never read before it opens. */
   let nonTradeAlert = $state(false);
   let legalDisclosure = $state(false);
   let legalDisclosureText = $state(POST_ALERT_LEGAL_DISCLOSURE);
@@ -55,10 +77,18 @@
     if (fileInput) fileInput.value = '';
   }
 
+  /*
+    Every open, not once at construction — which is what "sticky" means.
+
+    `doAlertsModal` sets `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1` beside its other
+    per-open resets (byte 2,124,407), so a presenter who unticks the box for one alert gets it back
+    on the next. Seeding only the initial `$state` would make it sticky for the first alert of a
+    session and never again.
+  */
   function beginOpenState() {
     clearInputFields();
     postOnX = false;
-    nonTradeAlert = false;
+    nonTradeAlert = stickyNonTradeAlert;
   }
 
   function selectTab(next: AlertTab, event: MouseEvent) {

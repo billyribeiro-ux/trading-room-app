@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **191** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **189** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**47 of the 191 are read by the reference's OWN room client**, as `sessData.<name>`.
+**45 of the 189 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Eleven have already left the list, on the day it was written.** It opened at 202 unwired and 58
-questions; both numbers have moved nine times since.
+**Thirteen have already left the list, on the day it was written.** It opened at 202 unwired and 58
+questions; both numbers have moved eleven times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -255,7 +255,7 @@ flag would light a control that cannot act. The remainder split into **12 WIRE**
 here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
 size in the triage document.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 47 by NAME and asserts separately that the seven
+`src/lib/setting-coverage-contract.test.ts` pins the 45 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10, a

@@ -98,7 +98,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'playChatMessageSoundFor',
   'tipMeBtnUrl',
   'alertsOverlayOnScreenshare',
-  'autoSwitchToOfftopics',
   'customCSS',
   'customFaviconURL',
   'customPlayerURL',
@@ -121,7 +120,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'modMessage',
   'showOnlyUsernames',
   'simplifiedEditor',
-  'styckyNonTradeAlert',
   'tipMeBtnEnabled',
   'twillioApiSID',
   'usersCanDeleteOwnMsgs'

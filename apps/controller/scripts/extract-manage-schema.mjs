@@ -188,6 +188,10 @@ const ROOM_CONSUMED = [
   /* The webcam OFF switch and the breathing REC badge, added 2026-08-28. See `room-config.ts`. */
   'hideWebcamForRoom',
   'blinkingRec',
+  /* The off-topic channel SEED and the sticky non-trade checkbox, added 2026-08-28. Note the
+     reference spelling of the second, which is kept because the controller stores that name. */
+  'autoSwitchToOfftopics',
+  'styckyNonTradeAlert',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -767,9 +771,13 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // 78 since 2026-08-28: `hideWebcamForRoom` and `blinkingRec`. Both are one term of a gate this room
 // already draws. Eighth and ninth finds of the settings enumeration.
 //
+// 80 since 2026-08-28: `autoSwitchToOfftopics` and `styckyNonTradeAlert`. Two SEEDS, both re-applied
+// where the reference re-applies them — the channel at chat init, the checkbox on every modal open.
+// Tenth and eleventh finds of the settings enumeration.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 78 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 80 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

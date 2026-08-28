@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 78 of 269 are wired today.
+// nothing in the room reads it yet. 80 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -162,7 +162,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "autoCloseTime", section: "settings", type: "textarea", label: "Auto Close Room Time", help: "Time in Military EST to automatically CLOSE the room. i.e. 18:30", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "ignoreAutoOpenCloseOnWeekend", section: "settings", type: "checkbox", label: "Ignore Auto Open & Close On Weekend", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "alertSoundOff", section: "settings", type: "checkbox", label: "Alerts Sound Off?", help: "Turn off alert cash register sound by default. Members can always turn it on", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "styckyNonTradeAlert", section: "settings", type: "checkbox", label: "Sticky Non-Trade Alerts?", help: "If enabled, the non-trade alert checkbox in the alert entry will be ON by default", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "styckyNonTradeAlert", section: "settings", type: "checkbox", label: "Sticky Non-Trade Alerts?", help: "If enabled, the non-trade alert checkbox in the alert entry will be ON by default", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "fileAccessCaseByCase", section: "settings", type: "checkbox", label: "Shared Files Access Case/Case?", help: "Allow access to the shared drive on a case/case basis", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "isChatOnlyRoom", section: "settings", type: "checkbox", label: "Chat Only Room?", help: "The room will be only text based chat/alerts, no audio/video", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "chatAutoClear", section: "settings", type: "checkbox", label: "Auto Clear Chat?", help: "Chat will clear at 11:45PM EST / 10:45PM Central.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
@@ -226,7 +226,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "chatFloodDisabled", section: "settings", type: "checkbox", label: "Disable Chat Flood?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "privMessageHugePopup", section: "settings", type: "checkbox", label: "Huge Priv Msg Alert?", help: "Some user can't see the private messages, this makes a HUGE popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hasChannelTabs", section: "settings", type: "checkbox", label: "OffTopic Channels/Tabs", help: "This setting adds an OffTopic, channel tabs next to general chat", helpShape: "plain", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "autoSwitchToOfftopics", section: "settings", type: "checkbox", label: "Auto switch to OffTopic Channels/Tabs?", help: "Auto Switch to OffTopic tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "autoSwitchToOfftopics", section: "settings", type: "checkbox", label: "Auto switch to OffTopic Channels/Tabs?", help: "Auto Switch to OffTopic tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasAdminOnlyChannel", section: "settings", type: "checkbox", label: "Admin Channels/Tabs", help: "This setting adds an admin/presenter dedicated chat tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "extraAdminChannels", section: "settings", type: "textarea", label: "Extra Admin Channels", help: "Comma separated list of extra admin channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "extraRegChannels", section: "settings", type: "textarea", label: "Extra Regular Channels", help: "Comma separated list of extra regular (anyone can post) channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

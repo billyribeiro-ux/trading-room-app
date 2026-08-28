@@ -76,6 +76,8 @@
     mediaIceServers?: RTCIceServer[];
     settingsTab: SettingsTab;
     alertTab: AlertTab;
+    /** "Sticky non-trade alert?" — passed through to the composer, which re-applies it per open. */
+    stickyNonTradeAlert?: boolean;
     theme: Theme;
     roomSplitDir: 'ltr' | 'ttb' | 'rtl' | 'btt';
     sessionControlInitialTab:
@@ -285,6 +287,7 @@
     mediaIceServers = [],
     settingsTab,
     alertTab,
+    stickyNonTradeAlert = false,
     theme,
     roomSplitDir,
     sessionControlInitialTab,
@@ -3936,6 +3939,7 @@
     onalert={onAlert}
     onpost={onPostAlert}
     onpastepost={onPastePostAlert}
+    {stickyNonTradeAlert}
   />
 </app-post-alert-modal>
 <app-poll-modal id="pollModalCompHolder" class="pollModalHolder" bind:this={pollPanelHost}>
