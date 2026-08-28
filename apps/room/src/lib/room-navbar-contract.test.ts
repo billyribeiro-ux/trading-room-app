@@ -50,27 +50,36 @@ type Stub = Record<string, unknown>;
  * `menus.*` and `roster.*` are enumerated from its own markup. A stub that is missing one throws
  * during render rather than passing quietly, which is what makes this list self-checking.
  */
+/**
+ * The media facade, hoisted out of `props()` so a test can vary ONE member of it.
+ *
+ * Spreading it — `{ ...MEDIA, roomRecording: true }` — is what lets the two room-setting cases below
+ * change recording state without restating twenty fields, and restating them is how a stub drifts
+ * from the component it stands in for.
+ */
+const MEDIA: Stub = {
+  anyoneTalking: false,
+  camLaunching: false,
+  camMuted: true,
+  micLaunching: false,
+  micMuted: true,
+  recPreviewOpen: false,
+  recordedHasAudio: false,
+  recordedUrl: null,
+  recording: false,
+  recordingPaused: false,
+  recordingReminder: false,
+  roomRecording: false,
+  roomRecordingPaused: false,
+  roomRecordingStarting: false,
+  screenSharing: false,
+  soundCloudPlaying: false,
+  talking: []
+};
+
 function props(overrides: Stub = {}): Stub {
   const noop = () => {};
-  const media: Stub = {
-    anyoneTalking: false,
-    camLaunching: false,
-    camMuted: true,
-    micLaunching: false,
-    micMuted: true,
-    recPreviewOpen: false,
-    recordedHasAudio: false,
-    recordedUrl: null,
-    recording: false,
-    recordingPaused: false,
-    recordingReminder: false,
-    roomRecording: false,
-    roomRecordingPaused: false,
-    roomRecordingStarting: false,
-    screenSharing: false,
-    soundCloudPlaying: false,
-    talking: []
-  };
+  const media: Stub = { ...MEDIA };
   const menus: Stub = {
     recording: false,
     screen: false,
@@ -116,6 +125,8 @@ function props(overrides: Stub = {}): Stub {
     onstopsoundcloudforme: noop,
     ontogglemicrophone: noop,
     ontogglewebcam: noop,
+    hideWebcamForRoom: false,
+    blinkingRec: false,
     onpromptforscreenname: noop,
     onstopscreensharing: noop,
     onopensessioncontrol: noop,
@@ -136,6 +147,55 @@ function props(overrides: Stub = {}): Stub {
 
 const html = (overrides: Stub = {}) =>
   render(RoomNavbar as never, { props: props(overrides) as never }).body;
+
+/**
+ * TWO ROOM SETTINGS THE NAVBAR DRAWS, and each is one term of a gate it already had.
+ *
+ * `hideWebcamForRoom` is the fifth term of the webcam control's condition (byte 2,489,228) and the
+ * only one this room could not evaluate for itself — the other four are facts it already holds about
+ * the viewer and their devices. `blinkingRec` gates `breathing-rec` (byte 2,477,678), a class with a
+ * real `50% { opacity: 0 }` keyframe in `captured-runtime-components.css`, unlike
+ * `smallImagePreview`'s class which styles nothing anywhere and is answered as NOT A GAP.
+ *
+ * BOTH DIRECTIONS on each, because a gate that refuses everybody is as wrong as one that refuses
+ * nobody — and for a room-wide OFF switch the first is the likelier mistake.
+ */
+describe('the two room settings the navbar reads', () => {
+  it('draws the webcam control when the room has not hidden it', () => {
+    expect(html({ isPresenter: true })).toContain('startStopWebCam');
+  });
+
+  it('removes it for the whole room when the owner says to', () => {
+    expect(html({ isPresenter: true, hideWebcamForRoom: true })).not.toContain('startStopWebCam');
+  });
+
+  /*
+    DIVERGENCE, and this is the test that records it.
+
+    The reference's condition is `hideWebcamForRoom || !(isPresenter || user.hasCam ||
+    isLimitedPresenter) || isNonPresenterAdmin || camLaunching`, so upstream a MEMBER WITH A CAMERA
+    sees the control. This navbar puts the whole broadcast block behind `{#if isPresenter}` — the
+    rule its own header states and the rest of this file asserts — so a member never sees it here,
+    camera or not.
+
+    That divergence predates this setting and is not changed by it. What is asserted is that the two
+    gates are INDEPENDENT: the room setting removes the control from a presenter, who is the only
+    viewer this room ever showed it to. Asserting the member case as the reference has it would be
+    asserting a room this repository does not build.
+  */
+  it('is a separate gate from the presenter block, which is this room’s own rule', () => {
+    expect(html({ isPresenter: false })).not.toContain('startStopWebCam');
+    expect(html({ isPresenter: true })).toContain('startStopWebCam');
+  });
+
+  it('breathes the REC badge only when the room asked for it', () => {
+    const recording = { ...MEDIA, roomRecording: true, roomRecordingPaused: false };
+    expect(html({ media: recording, blinkingRec: true })).toContain('breathing-rec');
+    expect(html({ media: recording, blinkingRec: false })).not.toContain('breathing-rec');
+    // …and the badge itself is there either way, so the refusal above is not "nothing rendered".
+    expect(html({ media: recording, blinkingRec: false })).toContain('[ REC ]');
+  });
+});
 
 describe("the navbar's broadcast controls are presenter-only", () => {
   it('renders at all for a member — the positive control', () => {

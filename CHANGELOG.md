@@ -33,6 +33,58 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 08:55 UTC — A webcam control an owner could not remove, and a REC badge that never breathed
+
+**Runtime impact: YES.** *"Hide webcam for room?"* removes the webcam control. *"Blinking REC?"* makes
+the recording badge breathe. Both did nothing before.
+
+**Each is ONE term of a gate this navbar already draws**, and in both cases the term this room could
+not evaluate:
+
+- `hideWebcamForRoom` is the fifth of five in `O(27, sessData.hideWebcamForRoom || !(isPresenter ||
+  user.hasCam || isLimitedPresenter) || isNonPresenterAdmin || camLaunching ? -1 : 27)` (byte
+  2,489,228). The other four are facts the room already holds about the viewer and their devices.
+- `blinkingRec` binds `breathing-rec` through `iPe = (t, n) => ({'breathing-rec': t,
+  recIndicatorStart: n})` with `roomState.isRecording && sessData.blinkingRec` (byte 2,477,678).
+
+**`breathing-rec` was checked before wiring, and that check is the whole difference between this and
+`smallerImagePreview`.** That one is a room default with a latch — the same shape as the three built
+this morning — and it is answered NOT A GAP because the preference it seeds only applies
+`chat-uploaded-img-sm`, a class with no rule in any of the 52 stylesheets this repository holds.
+`breathing-rec` has a real `50% { opacity: 0 }` keyframe at `captured-runtime-components.css:4281`.
+**A class with somewhere to land is a feature; a class with nowhere to land is a defect to decline.**
+
+**One divergence recorded rather than reproduced.** Upstream a MEMBER WITH A CAMERA sees the webcam
+control — `!(isPresenter || user.hasCam || isLimitedPresenter)`. This navbar puts the whole broadcast
+block behind `{#if isPresenter}`, which is its own stated rule and what the rest of its contract
+asserts. That divergence predates this setting and is not changed by it; the test says so in those
+words, and asserts the two gates are INDEPENDENT rather than asserting a room this repository does
+not build.
+
+**A second divergence, on where the class lands.** The reference puts `breathing-rec` on the
+recording `ul` through a class map that also carries `recIndicatorStart`. This navbar renders one
+`li` per recording state and carries `recIndicatorStart` on the starting one, so the class lands on
+the `[ REC ]` item instead of its container — the same element breathing, one level down, because
+that is where this room's structure puts it.
+
+**Both directions asserted on both settings**, and the positive half is not a formality: the REC
+badge must still be there with the blink off, or "does not contain `breathing-rec`" would pass over a
+badge that had simply stopped rendering. **Two negative controls seen RED.**
+
+**The navbar's media stub was hoisted out of its props factory** so a test can vary one member of it
+by spreading. Restating twenty fields to change one is how a stub drifts from the component it stands
+in for.
+
+**Fourth `+page.svelte` raise of the day, and the pattern is named rather than repeated silently.**
+Every one has been a room setting travelling from `data.sessData` to a component. The structural
+answer already exists and was applied where it paid — `buildMessageChrome` took twenty-two such lines
+out in one move and the page fell 1,387 → 1,375. A second builder for the navbar would collapse its
+five `gates.*` settings and these two; two props do not justify it today, and the ceiling note says
+so at the number.
+
+**Verified:** room 157 files / 2,382 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` byte-compares at 78 wired · `svelte-check` 0/0 · eslint and prettier clean.
+
 ### 2026-08-28 08:35 UTC — Two entitlements whose consumer was already written, and one the reference has that this room refuses
 
 **Runtime impact: YES.** A room that sets *"Always show roster?"* opens with the sidebar out. A room

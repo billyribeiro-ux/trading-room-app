@@ -232,6 +232,22 @@ export interface RoomSessionSettings {
    */
   hasSpeechRecognitionDisabled?: boolean;
   /**
+   * "Hide webcam for room?" — the webcam control disappears for everybody.
+   *
+   * The FIFTH term of `O(27, sessData.hideWebcamForRoom || !(isPresenter || user.hasCam ||
+   * isLimitedPresenter) || isNonPresenterAdmin || camLaunching ? -1 : 27)`, byte 2,489,228, and the
+   * only one this room could not evaluate for itself.
+   */
+  hideWebcamForRoom?: boolean;
+  /**
+   * "Blinking REC?" — whether the recording badge breathes.
+   *
+   * `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })` bound with
+   * `roomState.isRecording && sessData.blinkingRec`, byte 2,477,678. `breathing-rec` carries a real
+   * `50% { opacity: 0 }` keyframe in `captured-runtime-components.css`.
+   */
+  blinkingRec?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

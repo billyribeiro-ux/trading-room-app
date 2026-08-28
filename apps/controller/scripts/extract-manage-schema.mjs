@@ -185,6 +185,9 @@ const ROOM_CONSUMED = [
      one refusal that comes with the first and for the negation that makes the second live. */
   'alwaysShowRoster',
   'hasSpeechRecognitionDisabled',
+  /* The webcam OFF switch and the breathing REC badge, added 2026-08-28. See `room-config.ts`. */
+  'hideWebcamForRoom',
+  'blinkingRec',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -761,9 +764,12 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // quoted the capture's "disabled by preferences OR SESSION SETTINGS" while gating on preferences
 // alone. Sixth and seventh finds of the settings enumeration.
 //
+// 78 since 2026-08-28: `hideWebcamForRoom` and `blinkingRec`. Both are one term of a gate this room
+// already draws. Eighth and ninth finds of the settings enumeration.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 76 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 78 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

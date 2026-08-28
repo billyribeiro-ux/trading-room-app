@@ -369,7 +369,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `always-show-roster-contract.test.ts` rather than here, which is why the page pays two lines
       and not a paragraph.
     */
-    max: 1379,
+    /*
+      1379 -> 1380 for `hideWebcamForRoom` and `blinkingRec` reaching `RoomNavbar` — two values
+      forwarded, one line net after the formatter.
+
+      FOURTH raise of the day on this file, and the pattern is worth naming rather than repeating
+      silently: every one has been a room setting travelling from `data.sessData` to a component,
+      and each costs the page a line whatever the destination does with it. The structural answer
+      already exists and was applied where it paid — `buildMessageChrome` took twenty-two such lines
+      out in one move, and the page fell 1,387 -> 1,375. A second such builder for the navbar would
+      collapse its five `gates.*` settings and these two, and that is the shape to reach for if this
+      number climbs again. Two props do not justify it today.
+    */
+    max: 1380,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

@@ -280,6 +280,15 @@ describe('the allow-list itself', () => {
       */
       alwaysShowRoster: 'seeds sidebarOpen — the sidebar opens on arrival and can still be closed',
       hasSpeechRecognitionDisabled: 'RoomGates.speechRecognitionAvailable — the room half of the captions gate',
+      /*
+        Both verified in the navbar before being written here. `hideWebcamForRoom` is the fifth term
+        of the webcam control's `{#if}`, and the only one this room could not evaluate — the other
+        four are facts it already holds about the viewer and their devices. `blinkingRec` gates the
+        `breathing-rec` class, which unlike `smallImagePreview`'s dead class has a real keyframe rule
+        in `captured-runtime-components.css`.
+      */
+      hideWebcamForRoom: 'RoomNavbar — the webcam control disappears for the whole room',
+      blinkingRec: 'RoomNavbar — the REC badge breathes while recording',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

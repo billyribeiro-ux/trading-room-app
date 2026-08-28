@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 76 of 269 are wired today.
+// nothing in the room reads it yet. 78 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -238,10 +238,10 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "additionalBadWordsList", section: "settings", type: "text", label: "Extra Bad list", help: "Comma separated list of additional bad words you want to filter", helpShape: "bare", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "simplifiedEditor", section: "settings", type: "checkbox", label: "Simplified Note Editor?", help: "If enabled, the Note Editor will be simplified.", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "audioMeterDisabled", section: "settings", type: "checkbox", label: "Disable Audio Meter?", help: "Turn this on to disable the audio level meter next to the presenter name when they are talking", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "hideWebcamForRoom", section: "settings", type: "checkbox", label: "Hide WebCam in the room?", help: "If enabled, WebCam will be hidden in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hideWebcamForRoom", section: "settings", type: "checkbox", label: "Hide WebCam in the room?", help: "If enabled, WebCam will be hidden in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recordChat", section: "settings", type: "checkbox", label: "Record alerts and chat?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "autoRecord", section: "settings", type: "checkbox", label: "Auto record presenters?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "blinkingRec", section: "settings", type: "checkbox", label: "Blinking [REC]?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "blinkingRec", section: "settings", type: "checkbox", label: "Blinking [REC]?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideRecs", section: "settings", type: "checkbox", label: "Hide Recordings?", help: "If enabled, recordings will be hidden in archives", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recordingReminder", section: "settings", type: "checkbox", label: "Recording Reminder If Speaking?", help: "If enabled, will show recording reminder popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recsInRoom", section: "settings", type: "checkbox", label: "Show Recordings tab in the room?", help: "If enabled, will show recordings tab in the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

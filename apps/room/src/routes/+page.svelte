@@ -1003,6 +1003,8 @@
           onstopsoundcloudforme={() => broadcasts.stopSoundCloudForMe()}
           ontogglemicrophone={() => void mediaTransport.toggleMicrophone()}
           ontogglewebcam={() => void mediaTransport.toggleWebcam()}
+          hideWebcamForRoom={data.sessData?.hideWebcamForRoom === true}
+          blinkingRec={data.sessData?.blinkingRec === true}
           onpromptforscreenname={(source) => void mediaTransport.promptForScreenName(source)}
           onstopscreensharing={() => void mediaTransport.stopScreenSharing()}
           onopensessioncontrol={(tab) => modals.openSessionControl(tab)}

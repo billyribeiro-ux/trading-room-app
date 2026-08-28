@@ -114,6 +114,21 @@
     onstopsoundcloudforme: () => void;
     ontogglemicrophone: () => void;
     ontogglewebcam: () => void;
+    /**
+     * "Hide webcam for room?" — the fifth term of the webcam control's gate, and the only one this
+     * room could not evaluate: the other four are facts about the viewer and their devices.
+     */
+    hideWebcamForRoom: boolean;
+    /**
+     * "Blinking REC?" — whether the recording badge breathes while recording.
+     *
+     * DIVERGENCE, recorded rather than absorbed: the reference binds `breathing-rec` through a class
+     * MAP on the recording `ul` (`iPe`, byte 2,477,678), alongside `recIndicatorStart`. This navbar
+     * renders one `li` per recording state and carries `recIndicatorStart` as a class on the
+     * starting one, so the class lands on the `[ REC ]` item instead of its container. Same element
+     * breathing, one level down, because that is where this room's structure puts it.
+     */
+    blinkingRec: boolean;
     onpromptforscreenname: (source: 'screen' | 'camera') => void;
     onstopscreensharing: () => void;
     /**
@@ -173,6 +188,8 @@
     onstopsoundcloudforme,
     ontogglemicrophone,
     ontogglewebcam,
+    hideWebcamForRoom,
+    blinkingRec,
     onpromptforscreenname,
     onstopscreensharing,
     onopensessioncontrol,
@@ -312,7 +329,7 @@
           <a>[ REC PAUSED]</a>
         </li>
       {:else if media.roomRecording}
-        <li class="nav-item recIndicator animated fadeIn">
+        <li class={['nav-item recIndicator animated fadeIn', { 'breathing-rec': blinkingRec }]}>
           <!-- svelte-ignore a11y_missing_attribute -->
           <a title={recordingTooltip}>[ REC ]</a>
         </li>
@@ -599,7 +616,7 @@
             {/if}
           </ul>
         </li>
-        {#if !media.camLaunching}
+        {#if !media.camLaunching && !hideWebcamForRoom}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <li title="Start / Stop WebCam" class="nav-item" onclick={ontogglewebcam}>

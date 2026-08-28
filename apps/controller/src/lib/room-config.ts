@@ -484,6 +484,30 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hasSpeechRecognitionDisabled',
   /*
+    "Hide webcam for room?" — the webcam control disappears for everybody.
+
+      O(27, sessData.hideWebcamForRoom
+            || !(isPresenter || user.hasCam || isLimitedPresenter)
+            || isNonPresenterAdmin || mediaService.camLaunching ? -1 : 27)      byte 2,489,228
+
+    ONE term of five, and the only one this room could not evaluate. It is a room-wide OFF switch
+    rather than a per-viewer capability, which is why it belongs on this list: the others are facts
+    the room already holds about the viewer and their devices.
+  */
+  'hideWebcamForRoom',
+  /*
+    "Blinking REC?" — whether the recording badge breathes.
+
+      z('ngClass', Kn(6, iPe, roomState.isRecording && sessData.blinkingRec, isRecordingStarting))
+      iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })                byte 2,477,678
+
+    `breathing-rec` is a REAL class with a real rule — a `50% { opacity: 0 }` keyframe, carried in
+    `captured-runtime-components.css:4281`. Unlike `smallImagePreview`, whose class styles nothing in
+    any of the 52 stylesheets and which is therefore answered as NOT A GAP, this one has somewhere
+    to land.
+  */
+  'blinkingRec',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:
