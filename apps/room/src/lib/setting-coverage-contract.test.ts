@@ -88,7 +88,9 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * `customFaviconURL` + `customCSS` (`RoomBranding`) and `customPlayerURL` (`PresentationArea`'s
  * `#screens` pane) and `copyTrades` (the click-to-copy order marker, `copy-trades.ts`), all on
  * 2026-08-28, plus `positionsIframe` + `positionsIframeUrl` (ONE feature, `PresentationArea`), each
- * with its own contract file.
+ * with its own contract file — and `usersCanDeleteOwnMsgs`, which crossed to CLOSE a hole rather
+ * than to draw a control: the delete endpoint already let a member remove their own message without
+ * asking whether the room allowed it.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -120,8 +122,7 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'h264Enabled',
   'linkedRoomAlerts',
   'modAdminLoginList',
-  'twillioApiSID',
-  'usersCanDeleteOwnMsgs'
+  'twillioApiSID'
 ];
 
 /*

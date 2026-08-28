@@ -357,6 +357,14 @@ export interface RoomSessionSettings {
   /** See {@link RoomSessionSettings.positionsIframe}. Scheme-checked by `positionsIframeSrc`. */
   positionsIframeUrl?: string;
   /**
+   * "Users can delete own messages?" — a MEMBER removing their own chat message or alert.
+   *
+   * `canDeleteOwnMessage(msg)` at byte 1,158,799, whose first term is this setting and whose second
+   * is `hash === msg.avt || xrefID === msg.uid`. Enforced on the SERVER in
+   * `routes/message-actions.remote.ts`; the menu entry is the convenience.
+   */
+  usersCanDeleteOwnMsgs?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

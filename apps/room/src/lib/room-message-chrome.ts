@@ -123,6 +123,16 @@ export type RoomMessageChrome = {
    * handed to each of them separately is a room setting one of them will stop being handed.
    */
   readonly copyTrades: boolean;
+  /**
+   * "Users can delete own messages?" — the first term of `canDeleteOwnMessage` (byte 1,158,799).
+   *
+   * NAMED FOR THE PROP IT FEEDS, not for the setting it comes from. The chrome is applied with
+   * `{...messageChrome}`, so a field whose name does not match the prop feeds nothing and says
+   * nothing — which is the failure this whole type was written to end. The other two terms of that
+   * gate are per MESSAGE and per VIEWER, and `RoomMessage` computes both; only the room's half is
+   * here.
+   */
+  readonly allowDeleteOwnMessage: boolean;
 };
 
 /**
@@ -146,6 +156,7 @@ export interface MessageChromeSettings {
   readonly disablePMForTrials?: boolean;
   readonly hideAvatars?: boolean;
   readonly copyTrades?: boolean;
+  readonly usersCanDeleteOwnMsgs?: boolean;
 }
 
 export interface MessageChromeSources {
@@ -220,6 +231,7 @@ export function buildMessageChrome(sources: MessageChromeSources): RoomMessageCh
     userToPresenterPrivateMessaging: settings?.userToPresenterPM === true,
     disablePrivateMessagingForTrials: settings?.disablePMForTrials === true,
     hideAvatars: settings?.hideAvatars === true,
-    copyTrades: settings?.copyTrades === true
+    copyTrades: settings?.copyTrades === true,
+    allowDeleteOwnMessage: settings?.usersCanDeleteOwnMsgs === true
   };
 }

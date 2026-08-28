@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, EIGHTY-ONE by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-TWO by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 94.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 95.
+
+  81 -> 82 on 2026-08-28: usersCanDeleteOwnMsgs. The first setting on this list that crosses to CLOSE
+  a hole rather than to draw a control — the room's delete endpoint already permitted a member to
+  remove their own message and never asked whether the room allowed it.
 
   79 -> 81 on 2026-08-28: positionsIframe and positionsIframeUrl — ONE feature. The second pair here
   whose gate is a conjunction, after the tip button, and they cross together for the same reason: the
@@ -239,6 +243,8 @@ const EXPECTED_WIRED_SETTINGS = [
   /* Added 2026-08-28: the positions panel and its URL. */
   'positionsIframe',
   'positionsIframeUrl',
+  /* Added 2026-08-28: member self-delete, enforced on the server. */
+  'usersCanDeleteOwnMsgs',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

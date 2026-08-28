@@ -221,6 +221,9 @@ const ROOM_CONSUMED = [
      `room-config.ts`. */
   'positionsIframe',
   'positionsIframeUrl',
+  /* Member self-delete, added 2026-08-28. It crosses to CLOSE a hole, not to draw a control -
+     see `room-config.ts`. */
+  'usersCanDeleteOwnMsgs',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -808,6 +811,10 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 95 since 2026-08-28: `usersCanDeleteOwnMsgs`. Twenty-sixth find, and the first that crosses to
+// CLOSE something: the room server was already letting a member delete their own message without
+// asking whether the room allowed it.
+//
 // 94 since 2026-08-28: `positionsIframe` and `positionsIframeUrl`. Twenty-fourth and twenty-fifth
 // finds, and the second pair on this list whose gate is a conjunction - so they cross together,
 // like the tip button trio, and the room conjoins them once.
@@ -840,7 +847,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 94 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 95 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

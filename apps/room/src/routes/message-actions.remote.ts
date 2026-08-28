@@ -8,6 +8,7 @@ import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/
 import { capturedRoomItem } from '#lib/server/captured-room.js';
 import { isEmptyChatHtml, sanitizeChatHtml } from '#lib/server/chat-html.js';
 import { hashEmail } from '#lib/server/connection.js';
+import { readRoomConfig } from '#lib/server/room-config-client.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
@@ -176,6 +177,30 @@ export const messageAction = command(messageActionArgs, async (args) => {
     toggleReaction(parseReactions(source), key, emoji, hashEmail(user.email));
 
   if (args.operation === 'delete') {
+    /*
+      ── "Users can delete own messages?" ────────────────────────────────────────────────────────
+
+      THE THREE BRANCHES BELOW ALREADY LET A MEMBER DELETE THEIR OWN — `!isPresenter && senderId !==
+      user.id` is a 403, so `senderId === user.id` walks straight through — and **none of them asked
+      the room whether that was allowed.** The setting exists upstream for exactly this
+      (`canDeleteOwnMessage`, bundle byte 1,158,799, whose FIRST term is
+      `globals.sessData.usersCanDeleteOwnMsgs`), and an owner who left it off got members deleting
+      their own messages anyway by calling this endpoint.
+
+      The room's menu did not offer the control — `allowDeleteOwnMessage` defaults `false` and
+      nothing fed it — so the gap was invisible from the UI. That is precisely why the check belongs
+      HERE: a control nobody can see is not a control nobody can reach.
+
+      A PRESENTER IS UNAFFECTED. The setting governs a MEMBER deleting their own; a presenter
+      removing anything is a different authority and is not conditioned on it upstream either.
+    */
+    if (!isPresenter) {
+      const config = await readRoomConfig(locals, room, user.email);
+      if (config.settings?.usersCanDeleteOwnMsgs !== true) {
+        error(403, 'Not yours to delete.');
+      }
+    }
+
     /*
       Captured items carry negative ids and live in the fixture, not in a table, so there is no row
       to delete. Record the deletion instead. Same authorisation rule as a real delete — a presenter

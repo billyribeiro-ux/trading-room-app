@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 94 of 269 are wired today.
+// nothing in the room reads it yet. 95 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -143,7 +143,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "usersPublicReply", section: "settings", type: "checkbox", label: "User Public Reply?", help: "If enabled, regular user will be able to do reply", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "chatDisabledForTrials", section: "settings", type: "checkbox", label: "Chat Disabled For Trials?", help: "If its set, auto disable the chat (chat disabed) if they are trials", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "disablePMForTrials", section: "settings", type: "checkbox", label: "Disable PM For Trials?", help: "If enabled, trial users will not be able to send private messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "usersCanDeleteOwnMsgs", section: "settings", type: "checkbox", label: "Users Can Delete Own Messages?", help: "If enabled, regular users can delete their own messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "usersCanDeleteOwnMsgs", section: "settings", type: "checkbox", label: "Users Can Delete Own Messages?", help: "If enabled, regular users can delete their own messages", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "smallerImagePreview", section: "settings", type: "checkbox", label: "Smaller image previews?", help: "If enabled, the room will have smaller image previews in the chats", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideNotes", section: "settings", type: "checkbox", label: "Hide Notes Section?", help: "If enabled, the room will not have the notes tab", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideFiles", section: "settings", type: "checkbox", label: "Hide Files Section?", help: "If enabled, the room will not have the files tab", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },

@@ -33,6 +33,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 17:40 UTC — Members could delete their own messages in rooms that had not allowed it
+
+**Runtime impact: YES, and it is a permission fix.** `messageAction`'s delete branch let a MEMBER
+remove their own chat message or alert **in any room, whatever the owner had configured**. It now
+refuses unless the room enabled *"Users can delete own messages?"*.
+
+**The guard was the right shape with the wrong number of terms.** It read *"a presenter may remove
+anything, anyone else only what is theirs"* — so `senderId === user.id` walked straight through on
+all three item kinds (chat, alert, captured). Upstream's `canDeleteOwnMessage` (byte 1,158,799) tests
+`sessData.usersCanDeleteOwnMsgs` **first**:
+
+```js
+canDeleteOwnMessage(e) {
+  if (!globals.sessData.usersCanDeleteOwnMsgs || !e) return !1;
+  const i = this.getCurrentUserEmailHash(), o = globals.user?.userXrefID;
+  return i && i === e.avt || o && o === e.uid
+}
+```
+
+**Nothing in the UI showed it.** `allowDeleteOwnMessage` on `RoomMessage` defaults `false` and
+nothing fed it, so the menu entry never rendered — the room looked as though the capability did not
+exist. **A control nobody can see is not a control nobody can reach**, which is exactly why the check
+belongs on the server and not only in the markup.
+
+**The triage row's own caveat was FALSE, and that is what unblocked this.** It said the setting
+*"needs the `userDeleteChatMsg` command, which is on the command list as absent"*. The command is
+absent under that NAME; the capability is not. `messageAction`'s delete operation has implemented a
+member self-delete since it was written. Reading it rather than trusting the row is the whole
+difference between "blocked on a missing command" and "a permission hole open for weeks".
+
+**A presenter is unaffected**, and there is an assertion for it: removing anything is a different
+authority and upstream does not condition it on this setting either.
+
+**Two negative controls stayed GREEN and each found a real gap.** Loosening `!== true` to
+`=== false` passed everything, because every test set the value explicitly — and the case that
+matters is a room that never configured it at all, where `undefined === false` is false and the
+delete goes through. A six-value table covers it now. The chrome's own `=== true` was likewise
+unasserted; both settings added today are on the gate table with it.
+
+**The chrome field is named for the PROP it feeds, not for the setting it comes from.** The chrome is
+applied with `{...messageChrome}`, so a field whose name does not match the prop feeds nothing and
+says nothing — which is the failure that type was written to end.
+
+**Verified:** room 170 files / 2,729 tests (1 skipped) · controller 96 files / 1,013 tests (5
+skipped) · `schema:verify` at **95 wired** · both room gates and the controller verifier chain green ·
+`svelte-check` 0/0 across 1,304 files · eslint clean.
+
 ### 2026-08-28 16:55 UTC — A positions panel, and a background timer that must not run
 
 **Runtime impact: YES.** A room that configures a **positions page** now gets a Show/Hide Positions

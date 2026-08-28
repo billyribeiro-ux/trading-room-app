@@ -357,6 +357,13 @@ describe('the allow-list itself', () => {
       positionsIframe: 'PresentationArea — the Show/Hide Positions buttons and the panel they open',
       positionsIframeUrl:
         'PresentationArea — the Show/Hide Positions buttons and the panel they open',
+      /*
+        Verified in the room before being written here, and the consumer named is the SERVER one:
+        `messageAction`'s delete branch refuses a non-presenter unless the room enabled it. The menu
+        entry reads the same setting through the chrome, but a markup gate is not what stops a direct
+        call — and in this case the markup gate was defaulting off while the endpoint was open.
+      */
+      usersCanDeleteOwnMsgs: 'messageAction delete — refuses a member self-delete unless enabled',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

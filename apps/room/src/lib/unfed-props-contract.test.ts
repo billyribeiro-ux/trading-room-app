@@ -164,9 +164,6 @@ function spreadFields(site: { source: string }): Set<string> {
  */
 const DELIBERATELY_UNSUPPLIED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'lib/components/RoomMessage.svelte': {
-    allowDeleteOwnMessage:
-      'needs `usersCanDeleteOwnMsgs` (unwired) AND a `userDeleteChatMsg` command that does not ' +
-      'exist. Feeding it would put a Delete entry on a member’s own message that cannot delete it.',
     enableQaReactions:
       'gates reactions on the entries of the Q&A THREAD — `isQAMsg` is the modal’s own flag, bundle ' +
       'byte 2,334,347, not a property of a message. That thread renders with `onaction={() => {}}`, ' +

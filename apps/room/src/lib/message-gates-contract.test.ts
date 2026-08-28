@@ -47,7 +47,19 @@ const GATES = [
   { prop: 'userPrivateMessaging', setting: 'userPM', via: 'behavior' },
   { prop: 'userToPresenterPrivateMessaging', setting: 'userToPresenterPM', via: 'behavior' },
   { prop: 'disablePrivateMessagingForTrials', setting: 'disablePMForTrials', via: 'behavior' },
-  { prop: 'hideAvatars', setting: 'hideAvatars', via: 'template' }
+  { prop: 'hideAvatars', setting: 'hideAvatars', via: 'template' },
+  /*
+    Added 2026-08-28. `copyTrades` gates the click-to-copy order marker on an ALERT body;
+    `allowDeleteOwnMessage` is the ROOM's half of `canDeleteOwnMessage` (byte 1,158,799) and is
+    named for the PROP it feeds rather than for the setting it comes from — the chrome is applied
+    with `{...messageChrome}`, so a field whose name does not match the prop feeds nothing.
+
+    That second one crossed to CLOSE a hole rather than to draw a control: the delete endpoint was
+    already letting a member remove their own message without asking whether the room allowed it,
+    and the menu entry it feeds had been defaulting off the whole time, so nothing showed the gap.
+  */
+  { prop: 'copyTrades', setting: 'copyTrades', via: 'template' },
+  { prop: 'allowDeleteOwnMessage', setting: 'usersCanDeleteOwnMsgs', via: 'behavior' }
 ] as const;
 
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');

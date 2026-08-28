@@ -741,6 +741,29 @@ export const ROOM_VISIBLE_SETTINGS = [
   'positionsIframe',
   'positionsIframeUrl',
   /*
+    "Users can delete own messages?" - a MEMBER removing their own chat message or alert.
+
+      canDeleteOwnMessage(e) {
+        if (!globals.sessData.usersCanDeleteOwnMsgs || !e) return !1;
+        const i = this.getCurrentUserEmailHash(), o = globals.user?.userXrefID;
+        return i && i === e.avt || o && o === e.uid
+      }                                                                        byte 1,158,799
+
+      O(8, !e.isP && e.canDeleteOwnMsg ? 8 : -1)     the menu entry            byte 1,335,129
+
+    THIS ONE CROSSES TO CLOSE A HOLE RATHER THAN TO DRAW A CONTROL. The room server already let a
+    member delete their own message - the authorisation rule there is "a presenter may remove
+    anything, anyone else only what is theirs" - and it never asked whether the room allowed it. The
+    menu entry was unfed and defaulted off, so nothing in the UI showed the gap, which is exactly why
+    a control nobody can see is not a control nobody can reach.
+
+    A presenter is unaffected: removing anything is a different authority and is not conditioned on
+    this setting upstream either.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'usersCanDeleteOwnMsgs',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

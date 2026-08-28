@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { alerts, chatMutes, messages, users, type User } from '#lib/server/db/schema.js';
@@ -39,6 +39,33 @@ import { parseReactions } from '#lib/server/reactions.js';
       `targetUserId` on the wrong operation are compile errors before they are runtime ones. Where a
       test still needs to prove the runtime refuses them, it casts, and says so.
 */
+/*
+  THE ROOM'S OWN SETTINGS, stubbed — and `usersCanDeleteOwnMsgs` is why this mock exists at all.
+
+  The delete branch asks the control plane whether a MEMBER may remove their own message, so every
+  self-delete assertion below depends on it. It is a mutable object rather than a literal because the
+  refusal case has to flip it: pinning it `true` would hide the "the room did not allow it" branch,
+  and pinning it `false` would hide every other delete test behind a 403.
+*/
+const roomSettings: Record<string, unknown> = { usersCanDeleteOwnMsgs: true };
+
+vi.mock('#lib/server/room-config-client.js', () => ({
+  RoomConfigUnavailable: class RoomConfigUnavailable extends Error {},
+  readRoomConfig: async (_request: unknown, shortCode: string) => ({
+    room: {
+      shortCode,
+      name: `Room ${shortCode}`,
+      state: 'open',
+      logoUrl: null,
+      publicId: null,
+      maxUsers: 0
+    },
+    settings: roomSettings,
+    locked: [],
+    member: null
+  })
+}));
+
 const { messageAction } = await import('../routes/message-actions.remote');
 
 type Args = Parameters<typeof messageAction>[0];
@@ -150,6 +177,86 @@ describe('delete', () => {
       act(bystander, { operation: 'delete', kind: 'chat', id: message.id })
     ).rejects.toMatchObject({ status: 403 });
     expect(db.select().from(messages).all()).toHaveLength(1);
+  });
+
+  /*
+    ── "Users can delete own messages?" ──────────────────────────────────────────────────────────
+
+    THIS ENDPOINT LET A MEMBER DELETE THEIR OWN MESSAGE IN ANY ROOM until 2026-08-28, whatever the
+    owner had configured. The guard was "a presenter may remove anything, anyone else only what is
+    theirs", which is the right shape and the wrong number of terms: upstream's
+    `canDeleteOwnMessage` (byte 1,158,799) tests `sessData.usersCanDeleteOwnMsgs` FIRST.
+
+    Nothing in the UI showed it, because `allowDeleteOwnMessage` on `RoomMessage` defaults `false`
+    and nothing fed it — so the menu entry never rendered. A control nobody can see is not a control
+    nobody can reach, and that is the whole reason the check is on the server.
+  */
+  it('refuses a member deleting their OWN message when the room did not allow it', async () => {
+    roomSettings.usersCanDeleteOwnMsgs = false;
+    try {
+      const own = newMessage(author);
+      await expect(
+        act(author, { operation: 'delete', kind: 'chat', id: own.id })
+      ).rejects.toMatchObject({ status: 403 });
+      expect(db.select().from(messages).all(), 'the row survived').toHaveLength(1);
+    } finally {
+      roomSettings.usersCanDeleteOwnMsgs = true;
+    }
+  });
+
+  it('refuses the same for an ALERT, which is the other half of the branch', async () => {
+    roomSettings.usersCanDeleteOwnMsgs = false;
+    try {
+      const own = newAlert(author);
+      await expect(
+        act(author, { operation: 'delete', kind: 'alert', id: own.id })
+      ).rejects.toMatchObject({ status: 403 });
+      expect(db.select().from(alerts).all()).toHaveLength(1);
+    } finally {
+      roomSettings.usersCanDeleteOwnMsgs = true;
+    }
+  });
+
+  /*
+    FAILS CLOSED, and this test exists because a negative control stayed GREEN without it.
+
+    Loosening `!== true` to `=== false` passed every assertion above, because both of them set the
+    setting explicitly. **The case that matters is a room that never configured it at all** — the
+    common one — where `undefined === false` is false and the delete goes through. `sessData` is JSON
+    over an internal HTTP hop, so the same reasoning covers a string `"false"` and a `0`.
+  */
+  it.each([undefined, 'false', 'true', 0, 1, {}])(
+    'refuses a member self-delete when the setting is %o rather than a real true',
+    async (value) => {
+      roomSettings.usersCanDeleteOwnMsgs = value;
+      try {
+        const own = newMessage(author);
+        await expect(
+          act(author, { operation: 'delete', kind: 'chat', id: own.id })
+        ).rejects.toMatchObject({ status: 403 });
+        expect(db.select().from(messages).all()).toHaveLength(1);
+      } finally {
+        roomSettings.usersCanDeleteOwnMsgs = true;
+      }
+    }
+  );
+
+  /*
+    A PRESENTER IS UNAFFECTED, and this is the assertion that keeps the fix from becoming a
+    regression. The setting governs a MEMBER removing their own; removing anything is a different
+    authority and upstream does not condition it on this either.
+  */
+  it('still lets a presenter delete anything with the setting OFF', async () => {
+    roomSettings.usersCanDeleteOwnMsgs = false;
+    try {
+      const theirs = newMessage(author);
+      await expect(
+        act(presenter, { operation: 'delete', kind: 'chat', id: theirs.id })
+      ).resolves.toBeUndefined();
+      expect(db.select().from(messages).all()).toHaveLength(0);
+    } finally {
+      roomSettings.usersCanDeleteOwnMsgs = true;
+    }
   });
 
   it('is a 404 for an id that does not exist, and a 400 for one that is not a number', async () => {
