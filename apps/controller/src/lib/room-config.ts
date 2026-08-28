@@ -403,6 +403,24 @@ export const ROOM_VISIBLE_SETTINGS = [
   'alertSoundOff',
   'alertsChatOnBottom',
   /*
+    "Don't show recording info to users" — the room half of the [ REC ] tooltip.
+
+    `RoomNavbar.svelte` has carried the correct transcription in a comment since it was written,
+    read at bundle byte 2,474,213:
+
+      ngbTooltip = (sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName
+        ? "" : "Recording to: " + decodedRecName()
+
+    and `RoomGates.recordingTooltip` implemented that shape against `prefs.loaded` — a per-VIEWER
+    preference key that nothing in this room has ever written. So the owner switch did nothing and
+    every member saw the recording FILE NAME, which is the one thing the setting exists to hide.
+    The comment was right and the code was reading the wrong side of the boundary; found by
+    `gate/audit-setting-coverage.mjs` on 2026-08-28.
+
+    Not a credential and not inferable: the owner decides whether members see the file name.
+  */
+  'dontShowRecInfoToUsers',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

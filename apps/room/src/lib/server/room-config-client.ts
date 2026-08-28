@@ -191,6 +191,15 @@ export interface RoomSessionSettings {
   /** See {@link RoomSessionSettings.darkThemeAsDefault} — seeds `roomSplitDir = 'btt'`. */
   alertsChatOnBottom?: boolean;
   /**
+   * "Don't show recording info to users" — the ROOM half of the REC-indicator tooltip.
+   *
+   * `(sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName` blanks the tooltip
+   * (bundle byte 2,474,213). `RoomGates.recordingTooltip` implemented that shape against a viewer
+   * PREFERENCE of the same name until 2026-08-28 — a key nothing writes — so the owner switch did
+   * nothing and every member saw the recording file name.
+   */
+  dontShowRecInfoToUsers?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

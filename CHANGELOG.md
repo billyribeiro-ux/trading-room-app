@@ -33,6 +33,61 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 01:52 UTC — A room setting implemented against a preference: every member saw the recording file name
+
+**Runtime impact: YES.** *"Don't show recording info to users"* now works. Until this commit it did
+nothing in any room, and every member saw the recording FILE NAME in the REC-indicator tooltip.
+
+**The enumeration's third find, and the first that was never a missing feature.** The gate existed.
+`RoomNavbar.svelte:305` has carried the correct transcription in a comment since it was written:
+
+```js
+ngbTooltip = (sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName
+  ? "" : "Recording to: " + decodedRecName()
+```
+
+`RoomGates.recordingTooltip` implemented exactly that shape — against
+`prefs.loaded.dontShowRecInfoToUsers`, a per-VIEWER preference key that nothing in this room has
+ever written. The value was `undefined` everywhere, so `hideFromUsers` was always false.
+
+**Every gate this repository has passed over it, and that is the part worth recording.**
+
+- It compiled, and `svelte-check` was clean — the read is valid TypeScript against a `Record`.
+- The docblock beside it explained the behaviour *wrongly and confidently*: `dontShowRecInfoToUsers`
+  *"is not captured in our session data, so it is read defensively"*. It IS in the bundle, at byte
+  2,474,213; what it was not on is `ROOM_VISIBLE_SETTINGS`, which is a different fact with a
+  different fix.
+- **Its own test passed**, because the helper handed the flag in through `prefs.loaded` — the same
+  wrong source the code read. A test that supplies the code's own mistake is not a test of the rule;
+  it is a mirror. The helper no longer takes the flag at all: the only way to set it now is on the
+  session, where it lives.
+- A comment and an implementation sat four hundred lines apart saying different things, and nothing
+  compares those two.
+
+`gate/audit-setting-coverage.mjs` found it by asking the pinned bundle which settings the reference
+reads that this room does not. Nothing else could have: a room setting implemented against a
+preference looks identical to a working one from every direction except that one.
+
+**One collaborator left with it.** That read was `RoomGates`'s only use of `RoomPrefs`, so the
+dependency is gone from the constructor, from `create-room.svelte.ts` and from the test helper —
+seven injected dependencies down to six. A collaborator injected for one wrong read is not a
+collaborator. **Negative control seen RED**: forcing the flag to `false` fails the corrected test.
+
+**Four pins moved together** (wired 71 → 72), and **two more tooling traps are now recorded at the
+code.** Comments inside `ROOM_CONSUMED` and `EXPECTED_WIRED_SETTINGS` may contain neither an
+apostrophe nor a closing square bracket: both lists are extracted with a single-quote regex bounded
+by the first closing bracket, so one apostrophe swallows the list and one bracket truncates it. Each
+has now cost a run — and the first draft of the warning about the bracket contained the bracket.
+
+**Ratchet: held, not raised.** `gates.svelte.ts` stays at 390 with the file one line under it. The
+correction's post-mortem is in `gates.svelte.test.ts` instead of the docblock, which is the better
+home anyway: it belongs beside the test that could not have caught the bug. That entry's `why` also
+said "sixteen view gates" against eighteen, and now says eighteen.
+
+**Verified:** room 152 files / 2,306 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` regenerates and byte-compares at 72 wired · `svelte-check` 0/0 in both
+apps · eslint and prettier clean.
+
 ### 2026-08-28 01:40 UTC — Three room settings that were one feature, and a latch that keeps a default from becoming an override
 
 **Runtime impact: YES.** A room that sets *"Set Dark Theme As Default?"*, its alert-sound default,

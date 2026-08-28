@@ -13,14 +13,17 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FIFTY-EIGHT by the room application
+  Eleven consumed by this repository's room-login page, FIFTY-NINE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 71.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 72.
 
   55 -> 58 on 2026-08-28: darkThemeAsDefault, alertSoundOff and alertsChatOnBottom, the three room
   defaults that seed a member's own preferences once. Three clauses of one expression upstream, so
   they crossed together; the latch that keeps a default from becoming an override lives in the room.
+
+  58 -> 59 on 2026-08-28: dontShowRecInfoToUsers, the room half of the [ REC ] tooltip. A correction
+  rather than a feature — the gate existed and read a viewer preference nothing writes.
 
   54 -> 55 on 2026-08-28: hideNotes, the Notes tab's gate. Its two siblings `hideFiles` and
   `hideRecs` crossed on 2026-08-14 and this one did not; the settings enumeration found it, not a
@@ -160,6 +163,11 @@ const EXPECTED_WIRED_SETTINGS = [
   'darkThemeAsDefault',
   'alertSoundOff',
   'alertsChatOnBottom',
+  /* Added 2026-08-28: the room half of the REC-indicator tooltip, which was reading a viewer
+     preference nothing writes. See `room-config.ts`. No apostrophe and no closing square bracket in
+     comments inside this array — `sso-boundary.test.ts` extracts these names the same way
+     `room-config-boundary.test.ts` extracts the generator list, and either character breaks it. */
+  'dontShowRecInfoToUsers',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

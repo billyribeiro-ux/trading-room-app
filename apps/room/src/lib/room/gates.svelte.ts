@@ -12,7 +12,6 @@ import { tawkSupportAvailable } from '#lib/tawk-support.js';
 import type { PageData } from '../../routes/$types';
 
 import type { RoomMedia } from './media.svelte';
-import type { RoomPrefs } from './prefs.svelte';
 
 /**
  * What the eighteen predicates read off the loaded page data.
@@ -36,8 +35,9 @@ type RosterSession = Parameters<typeof rosterBlockVisible>[1];
  *
  * **They are one module because they answer one question**, asked eighteen ways: given this room's
  * configuration and this viewer's role, what is on screen. Every one reads `data` and most read
- * nothing else; none of them writes anything. That is the tightest seam left on the page — seven
- * collaborators across 388 lines, and not a single field shared with it.
+ * nothing else; none of them writes anything. That is the tightest seam left on the page — SIX
+ * collaborators across 389 lines, and not a single field shared with it. It was seven until
+ * `recordingTooltip` stopped reading a preference it should never have been reading.
  *
  * **GETTERS, not `$derived` class fields, and this is the precedent rather than a preference.** A
  * derived field initialises in DECLARATION ORDER, before the constructor has assigned the thunks it
@@ -51,7 +51,6 @@ type RosterSession = Parameters<typeof rosterBlockVisible>[1];
  * own, and every one of these is a gate on what a member may see.
  */
 export class RoomGates {
-  readonly #prefs: RoomPrefs;
   readonly #media: RoomMedia;
   readonly #session: () => GatesSession;
   readonly #isPresenter: () => boolean;
@@ -60,7 +59,6 @@ export class RoomGates {
   readonly #chatAlertsDetached: () => boolean;
 
   constructor(options: {
-    prefs: RoomPrefs;
     media: RoomMedia;
     /** The loaded page data, through a thunk because the load replaces it on every refetch. */
     session: () => GatesSession;
@@ -71,7 +69,6 @@ export class RoomGates {
     /** Whether the alerts column has been detached into its own window. */
     chatAlertsDetached: () => boolean;
   }) {
-    this.#prefs = options.prefs;
     this.#media = options.media;
     this.#session = options.session;
     this.#isPresenter = options.isPresenter;
@@ -119,13 +116,17 @@ export class RoomGates {
   }
 
   /**
-   * `'Recording to: ' + decodedRecName()`, suppressed for non-presenters when the session says so.
+   * `'Recording to: ' + decodedRecName()`, suppressed for non-presenters when the ROOM says so —
+   * `(sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName` at bundle byte
+   * 2,474,213, transcribed in full in a comment at `RoomNavbar.svelte:305`.
    *
-   * `dontShowRecInfoToUsers` is not captured in our session data, so it is read defensively and
-   * treated as off when absent - the capture's default is to SHOW the name.
+   * It read that flag off `prefs.loaded` until 2026-08-28, a per-VIEWER key nothing in this room
+   * writes, so every member saw the recording FILE NAME whatever the owner ticked. That was also
+   * this class's only use of `RoomPrefs`, which is why the dependency left the constructor with it.
+   * The post-mortem is in `gates.svelte.test.ts`, at the test that could not have caught it.
    */
   get recordingTooltip() {
-    const hideFromUsers = this.#prefs.loaded.dontShowRecInfoToUsers === true;
+    const hideFromUsers = this.#session().sessData?.dontShowRecInfoToUsers === true;
     if ((hideFromUsers && !this.#isPresenter()) || !this.#media.roomRecordingName) return '';
     return `Recording to: ${decodeURIComponent(this.#media.roomRecordingName)}`;
   }

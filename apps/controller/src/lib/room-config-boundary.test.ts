@@ -245,6 +245,14 @@ describe('the allow-list itself', () => {
       darkThemeAsDefault: 'applyRoomDefaults() — seeds the dark theme once, then latches',
       alertSoundOff: 'applyRoomDefaults() — seeds alertSoundOn=false once, then latches',
       alertsChatOnBottom: 'applyRoomDefaults() — seeds roomSplitDir=btt once, then latches',
+      /*
+        Verified in the room before being written here: `RoomGates.recordingTooltip` returns the
+        empty string — no tooltip — when this setting is on and the viewer is not a presenter, and
+        `RoomNavbar.svelte:305` binds that value to the [ REC ] indicator. The gate already existed;
+        what changed on 2026-08-28 is WHICH SIDE it reads. It was `prefs.loaded`, a viewer
+        preference nothing in this room writes, so the owner switch did nothing at all.
+      */
+      dontShowRecInfoToUsers: 'RoomGates.recordingTooltip — blanks the [ REC ] tooltip for members',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

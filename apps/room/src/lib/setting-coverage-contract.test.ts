@@ -46,6 +46,14 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * a small owner preference; read together they are three consecutive clauses of one expression, a
  * per-viewer latch, and the rule that a default must never become an override. The list is what put
  * the three names next to each other. `#lib/room/room-defaults.ts`.
+ *
+ * **`dontShowRecInfoToUsers` left third, and it was never a missing feature at all.** The gate was
+ * built, and `RoomNavbar.svelte` carried the correct transcription in a comment — but
+ * `RoomGates.recordingTooltip` read it off `prefs.loaded` instead of `sessData`, a viewer
+ * preference nothing writes. It compiled, it type-checked, and its own test passed because the test
+ * handed it the same wrong source the code read. **Nothing but this list could have found it**: a
+ * room setting implemented against a preference looks identical to a working one from every
+ * direction except the one that asks the bundle what the reference reads.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -89,7 +97,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'backupClusterID',
   'banIPList',
   'blinkingRec',
-  'dontShowRecInfoToUsers',
   'enablePrivateMessageHistory',
   'h264Enabled',
   'hideWebcamForRoom',

@@ -912,7 +912,6 @@ export function createRoom(deps: RoomDeps) {
     The RULES stay in `#lib/*-gates.ts` with their own tests. This asks them.
   */
   const gates = new RoomGates({
-    prefs,
     media,
     session: () => data,
     isPresenter: () => isPresenter,

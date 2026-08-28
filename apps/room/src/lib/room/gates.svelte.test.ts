@@ -85,9 +85,8 @@ class Sources {
 }
 
 /** The class under test, wired to those five the way `+page.svelte` wires it. */
-const gatesOver = (state: Sources, dontShowRecInfoToUsers = false) =>
+const gatesOver = (state: Sources) =>
   new RoomGates({
-    prefs: { loaded: { dontShowRecInfoToUsers } } as never,
     media: {
       get roomRecordingName() {
         return state.recordingName;
@@ -224,12 +223,48 @@ describe('the gates themselves answer what the reference says they answer', () =
     expect(gates.mobileAppAvailable).toBe(true);
   });
 
-  it('recordingTooltip is suppressed for a member when the room says to hide it', () => {
-    const { state } = make();
-    const gates = gatesOver(state, true);
+  /*
+    THE SETTING IS READ OFF `sessData`, and that is the whole point of this test since 2026-08-28.
+
+    ## The post-mortem, kept here because this is the test that could not have caught it
+
+    `dontShowRecInfoToUsers` is a ROOM setting — `(sessData.dontShowRecInfoToUsers && !isPresenter)
+    || !roomState.recName` blanks the tooltip, bundle byte 2,474,213, and `RoomNavbar.svelte:305`
+    has carried that transcription in a comment since it was written. `RoomGates.recordingTooltip`
+    implemented exactly that shape against `prefs.loaded.dontShowRecInfoToUsers`: a per-VIEWER
+    preference key that nothing in this room has ever written.
+
+    So the value was `undefined` in every room, the owner switch did nothing, and every member saw
+    the recording FILE NAME — the one thing the setting exists to hide.
+
+    **Every gate in this repository passed over it.** It compiled. `svelte-check` was clean. The
+    docblock beside it explained, wrongly, that the setting *"is not captured in our session data"*.
+    And THIS TEST passed, because the helper handed the flag in through `prefs.loaded` — the same
+    wrong source the code read. A test that supplies the code's own mistake is not a test of the
+    rule; it is a mirror. That is the failure mode to watch for here, and it is why the helper no
+    longer takes the flag at all: the only way to set it now is on the session, where it lives.
+
+    It was found by `gate/audit-setting-coverage.mjs`, which asks the pinned bundle which settings
+    the reference reads that this room does not. Nothing else could have: a room setting implemented
+    against a preference looks identical to a working one from every direction except that one.
+  */
+  it('recordingTooltip is suppressed for a member when the ROOM says to hide it', () => {
+    const { gates, state } = make();
+    state.session = {
+      sessData: { dontShowRecInfoToUsers: true },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
     state.recordingName = 'session-42';
     expect(gates.recordingTooltip).toBe('');
     state.isPresenter = true;
+    expect(gates.recordingTooltip).toBe('Recording to: session-42');
+  });
+
+  /* The negative control's positive twin: with the room setting OFF, a member sees the name. */
+  it('leaves the tooltip alone for a member when the room does not hide it', () => {
+    const { gates, state } = make();
+    state.recordingName = 'session-42';
     expect(gates.recordingTooltip).toBe('Recording to: session-42');
   });
 

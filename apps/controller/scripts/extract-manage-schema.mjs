@@ -159,9 +159,7 @@ const ROOM_CONSUMED = [
   'hideFiles',
   'hideMobileCredentials',
   /* The gate on the Notes tab. Added 2026-08-28 — the note at the foot of this file says why it
-     arrived two weeks after its two siblings, `hideFiles` and `hideRecs`, which crossed together.
-     NO APOSTROPHES IN THIS BLOCK: `room-config-boundary.test.ts` reads these names with a
-     single-quote regex, so one in prose swallows the list. It cost a run to learn. */
+     arrived two weeks after its two siblings, `hideFiles` and `hideRecs`, which crossed together. */
   'hideNotes',
   /* The three ROOM DEFAULTS, added 2026-08-28 and crossing together because upstream they are three
      consecutive clauses of one expression. See the foot of this file and `room-config.ts`.
@@ -169,6 +167,14 @@ const ROOM_CONSUMED = [
   'darkThemeAsDefault',
   'alertSoundOff',
   'alertsChatOnBottom',
+  /* The room half of the REC-indicator tooltip, added 2026-08-28. It was implemented against a
+     viewer PREFERENCE that nothing writes, so the owner switch did nothing.
+     TWO CHARACTERS ARE FORBIDDEN IN COMMENTS INSIDE THIS ARRAY, and both have cost a run:
+     an apostrophe, and a closing square bracket. `room-config-boundary.test.ts` extracts these
+     names with a single-quote regex bounded by the first closing bracket, so one apostrophe
+     swallows the list and one bracket truncates it. The first draft of THIS warning contained the
+     bracket it warns about. */
+  'dontShowRecInfoToUsers',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -727,9 +733,14 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // fact about that member and not about the room. `#lib/room/room-defaults.ts` holds the rule and
 // `room-defaults.test.ts` holds the negative controls. Second find of the settings enumeration.
 //
+// 72 since 2026-08-28: `dontShowRecInfoToUsers`. Not a new feature — a CORRECTION. The room already
+// had the gate, transcribed correctly in a comment in `RoomNavbar.svelte` and implemented against
+// `prefs.loaded`, a viewer preference nothing has ever written. The owner switch did nothing and
+// every member saw the recording file name. Third find of the settings enumeration.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 71 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 72 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

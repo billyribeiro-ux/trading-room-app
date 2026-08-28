@@ -1673,8 +1673,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/gates.svelte.ts',
+    /*
+      Held at 390 on 2026-08-28, with the file one line under it. `recordingTooltip` stopped reading
+      `prefs.loaded` and started reading `sessData`, which is where the reference reads it — and that
+      was this class's ONLY use of `RoomPrefs`, so the collaborator went with it: seven injected
+      dependencies down to six. The post-mortem moved to `gates.svelte.test.ts`, beside the test that
+      could not have caught the bug, which is also what kept the correction inside this number.
+    */
     max: 390,
-    why: 'the sixteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
+    why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',

@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 71 of 269 are wired today.
+// nothing in the room reads it yet. 72 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -247,7 +247,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "recsInRoom", section: "settings", type: "checkbox", label: "Show Recordings tab in the room?", help: "If enabled, will show recordings tab in the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "downloadRecordingsDisabled", section: "settings", type: "checkbox", label: "Disable download button for Recordings for users?", help: "If enabled, will disable download button for Recordings for users", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hasSpeechRecognitionDisabled", section: "settings", type: "checkbox", label: "Disable Closed Captioning?", help: "If enabled, will disable closed captioning for the room", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "dontShowRecInfoToUsers", section: "settings", type: "checkbox", label: "Hide recordings info for users?", help: "If enabled, will hide recording info for users", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "dontShowRecInfoToUsers", section: "settings", type: "checkbox", label: "Hide recordings info for users?", help: "If enabled, will hide recording info for users", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "runawayRecMinutes", section: "settings", type: "number", label: "Minutes of recording inactivity?", help: "Number of minutes to flag a recording if inactive (runaway). Leave at 0 to disable.", helpShape: "muted", helpOutside: false, captured: 5, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "runawayRecAutoKill", section: "settings", type: "checkbox", label: "Auto stop recording if inactive?", help: "If enabled, auto stop inactive recordings", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "runawayRecPostURL", section: "settings", type: "textarea", label: "Slack url to post", help: "If set, it will post to this slack url when a recording is flagged as inactive (runaway)", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
