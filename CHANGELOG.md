@@ -33,6 +33,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 02:50 UTC — Six props on every message, values already on the wire, nothing passing them
+
+**Runtime impact: YES.** In a room that allows member private messaging, members get the Private
+Message entry on a message. An owner who hides avatars gets them hidden. A member handed mic and
+screen no longer keeps the Show To All entry that gate exists to take away.
+
+**Found by asking a question nothing had asked: which of `RoomMessage`'s thirty-five props does no
+call site supply?** Ten. Four are genuinely unbuilt features. **Six had their values sitting in this
+room already** — `userPM`, `userToPresenterPM`, `disablePMForTrials` and `hideAvatars` have been on
+`ROOM_VISIBLE_SETTINGS` for weeks, and `user.isFT` and `media.limitedPresenter` are facts the page
+has always held.
+
+**What each absence did:**
+
+- **The private-message trio plus the trial flag.** `sourceMessageBehavior.privateMessage` is
+  `(viewerIsPresenter || userPrivateMessaging || (userToPresenterPrivateMessaging && isAdminMessage))
+  && !(currentUserIsTrial && disablePrivateMessagingForTrials)` — a byte-accurate transcription of
+  the reference at 1,348,236. With all four absent it collapses to `viewerIsPresenter`, so **the
+  kebab's Private Message entry was presenter-only in every room** — while the chat header's PM
+  button (`RoomGates.showPmButton`) and the roster kebab (`canShowRosterPrivateChat`) read the same
+  three settings from their own copies of the rule and offered it to members. **Three
+  implementations, one unfed, and the disagreement was invisible because each looked right alone.**
+  The three are kept, because upstream has three and they are genuinely different rules — byte
+  2,036,265 omits `userToPresenterPM` entirely and 2,073,550 tests `perms === 'a' || hasAdminChat`.
+- **`hideAvatars`** — an owner who hid avatars got them anyway on every message.
+- **`viewerIsLimitedPresenter`** — `showToAll` is `viewerIsPresenter && !viewerIsLimitedPresenter`,
+  and the whole point of `media-elevation.ts` is that a media elevation is not a role.
+
+**The chrome is now BUILT by the module that declares it.** `buildMessageChrome` in
+`room-message-chrome.ts` takes the room's own objects and returns the twenty-two fields. That is not
+tidying: "which settings does a message read" is that module's question, and keeping the type in one
+file and the construction in another is exactly why six props could sit unfed for weeks — **nothing
+compared the two.** `+page.svelte` fell 1,387 → 1,375 and the ceiling went down with it.
+
+**The contract was re-anchored, not re-pointed.** `message-gates-contract.test.ts` has now been
+corrected twice in one day: it pinned the page's `const` spelling, then the page's inline reads, and
+both went red on legitimate refactors. Each assertion now sits in the file that owns the thing it
+checks — the reads in the builder, the fields on the type, the call in the page — which is the shape
+that stops the next honest change from failing it for the wrong reason. Gates carry a `via` marker
+because two of the nine gate ELEMENTS in the template rather than menu entries, and pretending they
+pass through `sourceMessageBehavior` would make the test lie about where their rule lives.
+
+**Seven negative controls seen RED**, one per newly-fed value plus the page's own supply of the
+elevation.
+
+**Verified:** room 153 files / 2,347 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `svelte-check` 0/0 · eslint and prettier clean.
+
+**Named and not done:** the four remaining unfed props are features, not wires —
+`allowDeleteOwnMessage` needs `usersCanDeleteOwnMsgs` and a delete command that does not exist,
+`showNewIndicator` needs `isNewIndicatorOn` and a supply for `item.isNew`, and `enableQaReactions`
+with `isQaMessage` need a Q&A thread whose menu acts at all. All four are in the settings triage.
+
 ### 2026-08-28 02:30 UTC — An entitlement that defaulted OPEN, a triage row that was wrong, and a gate that recommended corrupting itself
 
 **Runtime impact: YES.** The ask-a-question button on an alert now appears only in rooms that have

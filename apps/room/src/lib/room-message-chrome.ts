@@ -79,4 +79,138 @@ export type RoomMessageChrome = {
   readonly hasQaOnAlerts: boolean;
   readonly enableEditMessage: boolean;
   readonly enableEditAlerts: boolean;
+
+  /*
+    ── FIVE MORE THE MESSAGE NEVER RECEIVED, added 2026-08-28 ──────────────────────────────────────
+
+    Every one of these was already a prop on `RoomMessage`, already fed into `sourceMessageBehavior`,
+    and already had its value crossing the boundary — `userPM`, `userToPresenterPM`,
+    `disablePMForTrials` and `hideAvatars` have been on `ROOM_VISIBLE_SETTINGS` for weeks, and
+    `user.isFT` and `media.limitedPresenter` are facts this room has always held. **Nothing passed
+    them.** They were found by asking which of `RoomMessage`'s thirty-five props no call site
+    supplies, which is a question nothing had asked.
+
+    What each one being absent actually did:
+
+      userPrivateMessaging               `privateMessage` collapsed to `viewerIsPresenter`, so the
+      userToPresenterPrivateMessaging    kebab's Private Message entry was PRESENTER-ONLY in every
+      disablePrivateMessagingForTrials   room — while the chat header's PM button and the roster
+      currentUserIsTrial                 kebab, which read the same three settings from their own
+                                         copies of the rule, offered it to members. Three
+                                         implementations, one of them unfed, and the disagreement
+                                         was invisible because each looked right on its own.
+
+      hideAvatars                        an owner who hid avatars got them anyway on every message.
+
+      viewerIsLimitedPresenter           `showToAll` is `viewerIsPresenter && !viewerIsLimited`, so a
+                                         member handed mic and screen by `giveMicScreen` kept the
+                                         Show To All entry that gate exists to take away.
+
+    They are on the CHROME and not per call site for the reason the whole type exists, and the three
+    PM values travel together because `sourceMessageBehavior` needs all three to evaluate one rule:
+    handing it two of them would produce a confident wrong answer rather than an error.
+  */
+  readonly userPrivateMessaging: boolean;
+  readonly userToPresenterPrivateMessaging: boolean;
+  readonly disablePrivateMessagingForTrials: boolean;
+  readonly currentUserIsTrial: boolean;
+  readonly hideAvatars: boolean;
+  readonly viewerIsLimitedPresenter: boolean;
 };
+
+/**
+ * The settings a message reads, as they arrive from `internal/room-config/[code]`.
+ *
+ * Declared structurally rather than importing `RoomSessionSettings`, and that is deliberate: this
+ * module is shared client code and that type lives behind `$lib/server`. Listing the eleven keys is
+ * also the more honest shape — it says on its face exactly which settings a message depends on, and
+ * a twelfth cannot be added without appearing here.
+ */
+export interface MessageChromeSettings {
+  readonly showBadgesToPresentersOnly?: boolean;
+  readonly disableStarYears?: boolean;
+  readonly usersPublicReply?: boolean;
+  readonly enableReactions?: boolean;
+  readonly hasQAOnAlerts?: boolean;
+  readonly enableEditMessage?: boolean;
+  readonly enableEditAlerts?: boolean;
+  readonly userPM?: boolean;
+  readonly userToPresenterPM?: boolean;
+  readonly disablePMForTrials?: boolean;
+  readonly hideAvatars?: boolean;
+}
+
+export interface MessageChromeSources {
+  /** The viewer, from the load. `role` decides presenter status; `isFT` is the trial flag. */
+  readonly user: {
+    readonly id: number;
+    readonly emailHash: string;
+    readonly displayName: string;
+    readonly role?: string;
+    readonly isFT?: boolean;
+  };
+  /** The room's settings, or absent — every read below treats absent as off. */
+  readonly sessData: MessageChromeSettings | null | undefined;
+  readonly theme: Theme;
+  readonly chatStyle: FollowChatStyle;
+  /** This viewer's own two message preferences. */
+  readonly chatGif: boolean;
+  readonly chatBadges: boolean;
+  /**
+   * The two rules that live on `RoomGates` rather than being re-read here.
+   *
+   * `enableBadges` is the first term of a four-term gate and `presenterMessagesOnTheRight` is the
+   * second; both are transcribed, cited and tested there. Reading `sessData` for them again would
+   * put a second copy of a rule in the file whose whole job is to stop copies.
+   */
+  readonly enableBadges: boolean;
+  readonly presenterMessagesOnTheRight: boolean;
+  /** `media.limitedPresenter` — the elevation, which is NOT the role. See the note above. */
+  readonly viewerIsLimitedPresenter: boolean;
+}
+
+/**
+ * Build the chrome from the room's own objects.
+ *
+ * ## Why this is a function and not twenty-two lines on the page
+ *
+ * It was twenty-two lines in `+page.svelte`, and every one of them was `data.sessData?.x === true`
+ * or a field lifted off an object the page already had. That is not a decision the PAGE is making —
+ * it is the answer to "which settings does a message read", which is the question this module
+ * exists to answer. Keeping the list here means a new message setting is one edit in one file
+ * instead of a type here and a field there, and it is why five props could sit on the component
+ * unfed for weeks: the type and the construction were in different files and nothing compared them.
+ *
+ * `=== true` on every setting, and that is the fail-closed rule this repository applies everywhere:
+ * `sessData` is JSON off the wire, so a string `"false"`, a `0` or a stray object must not switch a
+ * capability on. Four of these unlock an action a member can take on somebody else's message.
+ */
+export function buildMessageChrome(sources: MessageChromeSources): RoomMessageChrome {
+  const settings = sources.sessData;
+  return {
+    currentUserId: sources.user.id,
+    currentUserEmailHash: sources.user.emailHash,
+    currentUserName: sources.user.displayName,
+    // The ROLE, never the media elevation — see the note at the top of this file.
+    viewerIsPresenter: sources.user.role === 'staff' || sources.user.role === 'admin',
+    viewerIsLimitedPresenter: sources.viewerIsLimitedPresenter,
+    currentUserIsTrial: sources.user.isFT === true,
+    theme: sources.theme,
+    chatStyle: sources.chatStyle,
+    chatGif: sources.chatGif,
+    chatBadges: sources.chatBadges,
+    enableBadges: sources.enableBadges,
+    presenterMessagesOnTheRight: sources.presenterMessagesOnTheRight,
+    showBadgesToPresentersOnly: settings?.showBadgesToPresentersOnly === true,
+    disableStarYears: settings?.disableStarYears === true,
+    usersPublicReply: settings?.usersPublicReply === true,
+    enableReactions: settings?.enableReactions === true,
+    hasQaOnAlerts: settings?.hasQAOnAlerts === true,
+    enableEditMessage: settings?.enableEditMessage === true,
+    enableEditAlerts: settings?.enableEditAlerts === true,
+    userPrivateMessaging: settings?.userPM === true,
+    userToPresenterPrivateMessaging: settings?.userToPresenterPM === true,
+    disablePrivateMessagingForTrials: settings?.disablePMForTrials === true,
+    hideAvatars: settings?.hideAvatars === true
+  };
+}

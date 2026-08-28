@@ -24,7 +24,7 @@
   } from '#lib/roster-gates.js';
                           import { createRoom } from '#lib/room/create-room.svelte.js';
                         import { setAutoplayAttribute, setWebcamAudioAttributes } from '#lib/room/webcams.js';
-        import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+        import { buildMessageChrome, type RoomMessageChrome } from '#lib/room-message-chrome.js';
   import { EXTRA_COMPOSER } from '#lib/room/chat.svelte.js';
     import { createTawkRuntime } from '#lib/tawk-runtime.js';
     import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
@@ -237,8 +237,6 @@
   // svelte-ignore state_referenced_locally
   let theme: Theme = $state(data.settings?.theme === 'dark' ? 'dark' : 'light');
 
-  const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
-  const disableStarYears = $derived(data.sessData?.disableStarYears === true);
 
   /*
     THE FRESHNESS POLL AND THE VISIBILITY RULES, in `#lib/room/refresh.svelte.ts`.
@@ -535,39 +533,29 @@
   // it does not survive a reload.
 
   /*
-    FIVE gates `RoomMessage.svelte` implemented and never received, and each was a prop the page did
-    not pass. Four of them defaulted to false, so public reply, reactions and both edit entries were
-    unreachable in every room however the owner configured it; `hasQaOnAlerts` defaulted to TRUE, so
-    the ask-a-question button appeared in every room whether or not one had bought Q&A. Every
-    occurrence of all five in the bundle is `sessData.` dotted onto the name, so they are per-room
-    policy and absent means off. Edit is TWO settings because upstream gates the chat log and the
-    alerts log apart, and collapsing them would let a room that allows editing alerts allow chat.
+    The chrome every message shares — built by `room-message-chrome.ts` from the objects the page
+    already holds, rather than assembled here field by field.
 
-    They are read INLINE below rather than through a `$derived` each: a `const` whose only reader is
-    one field is a name for nothing, and five signals inside an object that is already `$derived`
-    recompute independently to feed one that recomputes anyway. `room-message-chrome.ts` says why the
-    seventeen travel together at all.
+    It was twenty-two lines of `data.sessData?.x === true` in this file, and that is not a decision
+    the page makes: it is the answer to "which settings does a message read", which is that module's
+    entire job. Keeping the list beside the type is also what stops the failure that produced this
+    change — SIX props sat on `RoomMessage`, fed into `sourceMessageBehavior`, with their values
+    already crossing the boundary, and nothing passed them, because the type and the construction
+    lived in different files and nothing compared them.
   */
-  const messageChrome: RoomMessageChrome = $derived({
-    currentUserId: data.user.id,
-    currentUserEmailHash: data.user.emailHash,
-    currentUserName: data.user.displayName,
-    // The ROLE, not `isPresenter`. See `media-elevation.ts` and the module's own note.
-    viewerIsPresenter: data.user.role === 'staff' || data.user.role === 'admin',
-    theme,
-    chatStyle: globalChatStyle,
-    chatGif: prefs.chatGif,
-    chatBadges: prefs.chatBadges,
-    enableBadges: gates.enableBadges,
-    showBadgesToPresentersOnly,
-    disableStarYears,
-    presenterMessagesOnTheRight: gates.presenterMessagesOnTheRight,
-    usersPublicReply: data.sessData?.usersPublicReply === true,
-    enableReactions: data.sessData?.enableReactions === true,
-    hasQaOnAlerts: data.sessData?.hasQAOnAlerts === true,
-    enableEditMessage: data.sessData?.enableEditMessage === true,
-    enableEditAlerts: data.sessData?.enableEditAlerts === true
-  });
+  const messageChrome: RoomMessageChrome = $derived(
+    buildMessageChrome({
+      user: data.user,
+      sessData: data.sessData,
+      theme,
+      chatStyle: globalChatStyle,
+      chatGif: prefs.chatGif,
+      chatBadges: prefs.chatBadges,
+      enableBadges: gates.enableBadges,
+      presenterMessagesOnTheRight: gates.presenterMessagesOnTheRight,
+      viewerIsLimitedPresenter: media.limitedPresenter
+    })
+  );
 
   /**
    * Is the Alert Filter configured for this room at all?

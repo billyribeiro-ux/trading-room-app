@@ -344,7 +344,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       already `$derived`, recomputing independently to feed one that recomputes anyway. The two
       docblocks that explained those five separately are now one, because they were one subject.
     */
-    max: 1387,
+    /*
+      1387 -> 1375 on 2026-08-28, and this one is an EXTRACTION rather than a trim. The
+      twenty-two-line `messageChrome` object left for `buildMessageChrome` in
+      `room-message-chrome.ts`, beside the type it satisfies. "Which settings does a message read"
+      was never the page's question, and keeping the answer in two files is exactly why six props
+      sat on `RoomMessage` unfed with their values already on the wire: nothing compared the type to
+      the construction. Two stray `$derived` consts feeding that object went with it.
+    */
+    max: 1375,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
