@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **53** as this is written; five have been answered by building, and the
+2026-08-28 and is at **52** as this is written; six have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -30,7 +30,7 @@ assumed.
 
 ## NEVER — credentials the reference ships to every browser
 
-Six, and the shape is identical in all of them: a password is sent to the client and compared IN THE
+Seven, and the shape is identical in all of them: a password is sent to the client and compared IN THE
 CLIENT with `bootbox.prompt`. Anyone with a devtools console reads the value out of `sessData` and
 skips the prompt entirely, so upstream these gates protect nothing.
 
@@ -93,7 +93,6 @@ Ordered by how much of the work is already done.
 | setting | byte | what is missing |
 | --- | --- | --- |
 | `enableQAReactions` | 1,335,445 | Our reaction gate is `enableReactions` alone. The reference's is `enableReactions && logType === 'chat' \|\| enableQAReactions && logType === 'alerts' && isQAMsg` — **an OR, not an AND**. Reactions on Q&A alerts are a separate entitlement, and this room currently offers none. |
-| `chatDisabledForTrials` | 1,437,810 | `user.isFT && sessData.chatDisabledForTrials → chatEnabled = false`. This room has `chatComposerEnabled(chatMode) && selfMutedUntil === null` and no trial term, so a room that disables trial chat gets a working composer for trials. A policy gap, not a cosmetic one. |
 | `hasQAOnAlerts` | 1,339,784 | Gates the "ask a question" affordance on a non-Q&A alert, and gates `updateAlertMsg`'s whole Q&A branch at byte 1,408,769. We have Q&A alerts; we do not have the entitlement that turns them on. |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
 | `hideWebcamForRoom` | 2,489,228 | One term of the navbar webcam control's gate. |
@@ -148,7 +147,7 @@ Ordered by how much of the work is already done.
 
 ---
 
-## The five already answered
+## The six already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -157,3 +156,4 @@ Ordered by how much of the work is already done.
 | `alertSoundOff` | WIRED — same module. | 2026-08-28 |
 | `alertsChatOnBottom` | WIRED — same module. | 2026-08-28 |
 | `dontShowRecInfoToUsers` | CORRECTED — the gate existed and read a viewer preference nothing writes. | 2026-08-28 |
+| `chatDisabledForTrials` | WIRED — `chatComposerAvailable` now holds all three reasons the composer is off. | 2026-08-28 |

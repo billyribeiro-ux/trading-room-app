@@ -421,6 +421,21 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'dontShowRecInfoToUsers',
   /*
+    "Chat disabled for trials?" — the THIRD reason the reference turns the composer off.
+
+      globals.user.isFT && sessData.chatDisabledForTrials && (this.chatEnabled = !1)
+
+    at bundle byte 1,437,810, the last of three assignments to one flag. This room had the other two
+    — the chat mode and this viewer's own mute — and no term for the owner policy, so a room that
+    had turned trial chat off served every trial a working composer. Wired 2026-08-28 with
+    `chatComposerAvailable`, which now holds all three in one place because splitting them is how
+    one goes missing.
+
+    Not a credential. It is policy about a CLASS of member, which is exactly the kind of thing that
+    belongs on this list: the room knows who is on a trial, and only the owner knows the policy.
+  */
+  'chatDisabledForTrials',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

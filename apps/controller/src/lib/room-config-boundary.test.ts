@@ -253,6 +253,14 @@ describe('the allow-list itself', () => {
         preference nothing in this room writes, so the owner switch did nothing at all.
       */
       dontShowRecInfoToUsers: 'RoomGates.recordingTooltip — blanks the [ REC ] tooltip for members',
+      /*
+        Verified in the room before being written here: `chatComposerAvailable` in
+        `#lib/chat-mode.js` takes it as one of four inputs and `+page.svelte` passes
+        `data.sessData?.chatDisabledForTrials === true` into the `chatEnabled` derivation that gates
+        every composer in the room. It is the third of the reference's three reasons; this room had
+        the other two and no term for the owner policy.
+      */
+      chatDisabledForTrials: 'chatComposerAvailable() — the third reason the composer is off',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

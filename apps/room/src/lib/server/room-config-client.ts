@@ -200,6 +200,15 @@ export interface RoomSessionSettings {
    */
   dontShowRecInfoToUsers?: boolean;
   /**
+   * "Chat disabled for trials?" — the THIRD reason the reference turns the chat composer off.
+   *
+   * `globals.user.isFT && sessData.chatDisabledForTrials && (this.chatEnabled = !1)`, bundle byte
+   * 1,437,810. This room had the chat MODE and this viewer's own MUTE and no term for the owner
+   * policy, so a room that had turned trial chat off served every trial a working composer.
+   * `chatComposerAvailable` in `#lib/chat-mode.js` now holds all three.
+   */
+  chatDisabledForTrials?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

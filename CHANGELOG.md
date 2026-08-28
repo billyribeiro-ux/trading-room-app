@@ -33,6 +33,51 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 02:20 UTC — A room that turned chat off for trials served every trial a working composer
+
+**Runtime impact: YES.** *"Chat disabled for trials?"* now turns the composer off for free-trial
+members. Until this commit it did nothing.
+
+**The reference turns the composer off for three reasons and this room implemented two.** Three
+assignments to one flag, ending at bundle byte 1,437,810:
+
+```js
+this.chatEnabled = "d" != chatMode
+… isMuted && (this.chatEnabled = !1, …chatMutedTill…)
+globals.user.isFT && sessData.chatDisabledForTrials && (this.chatEnabled = !1)
+```
+
+The MODE is the room's rule and applies to everyone. The MUTE is this viewer's own. The third is the
+owner's policy about a CLASS of member — and it was missing, because `chatDisabledForTrials` was not
+on `ROOM_VISIBLE_SETTINGS` and nothing here asked for it.
+
+**All three now live in one function, `chatComposerAvailable`, and that is the actual fix.** They
+were two terms inlined in a `$derived` on the page; adding a third to an expression is how the
+fourth goes missing next time. Written as a conjunction rather than as three assignments, with the
+reason recorded: the order carries no meaning because every term can only turn the composer OFF and
+none can turn it back on.
+
+**Six truth-table cases, and the two that matter most are a pair**: a trial in a room that disables
+trial chat is refused, AND a non-trial in the same room is not. A gate that refuses everybody is as
+wrong as one that refuses nobody, and here it is the likelier mistake — `isFreeTrial` is false for
+most of a room. **Two negative controls seen RED**: dropping the trial term fails the first, and
+widening it to the room setting alone fails the second.
+
+**A text pin went red and was rewritten rather than re-pointed.** `chat-mode-contract.test.ts`
+asserted the page's derivation line verbatim, and it fired the moment the third reason arrived —
+exactly when somebody should look. What it could not do is say why, or notice a term quietly
+vanishing from a rewritten expression that still parsed. It now asks for the three inputs BY NAME,
+which is the half a unit test cannot see: the rule and its truth table live in `chat-mode.ts` and
+its test; this file guards that the page still feeds it all three. **Negative control seen RED** by
+replacing the passed setting with `false`.
+
+**Four pins moved together** (wired 72 → 73), and both trackers restate their own numbers: the
+coverage pin is at 52 and `missing-settings-triage.md` moves this row out of WIRE into the answered
+table, leaving 14 WIRE, 17 FEATURE and 6 BLOCKED.
+
+**Verified:** room 152 files / 2,314 tests (1 skipped) · `schema:verify` regenerates and
+byte-compares at 73 wired · `svelte-check` 0/0 · eslint and prettier clean.
+
 ### 2026-08-28 02:05 UTC — All 53 remaining settings read and triaged, and two more client-side passwords found
 
 **Runtime impact: NO.** One new document, one strengthened guard, two corrected counts.

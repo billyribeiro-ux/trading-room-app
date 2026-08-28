@@ -70,9 +70,48 @@ export function chatModeConfirmPrompt(mode: ChatMode): string {
   return `Are you sure you want to change the chat mode to ${label}`;
 }
 
-/** `this.chatEnabled = 'd' != e` — whether the composer is offered at all. */
+/** `this.chatEnabled = 'd' != e` — the ROOM's rule, and the first of three. */
 export function chatComposerEnabled(mode: ChatMode): boolean {
   return mode !== 'd';
+}
+
+/**
+ * Whether this viewer may type at all — the THREE reasons the reference turns the composer off.
+ *
+ * Upstream they are three assignments to one flag, in this order (bytes 1,437,5xx–1,437,830):
+ *
+ * ```js
+ * this.chatEnabled = "d" != chatMode
+ * … isMuted && (this.chatEnabled = !1, …chatMutedTill…)
+ * globals.user.isFT && sessData.chatDisabledForTrials && (this.chatEnabled = !1)
+ * ```
+ *
+ * Written as a conjunction here rather than as three assignments, because the ORDER carries no
+ * meaning — every one of them can only turn the composer OFF, and none can turn it back on. What
+ * would carry meaning is an early return, and there is none.
+ *
+ * ## The three are three different people, which is why they are one function
+ *
+ * The MODE is the room's rule and applies to everyone. The MUTE is this viewer's own, enforced on
+ * the server long before it was ever shown — which is why a muted member used to press send and
+ * watch nothing happen. And the TRIAL rule is the owner's policy about a class of member: a room
+ * that has turned trial chat off got a working composer for every trial until 2026-08-28, because
+ * `chatDisabledForTrials` was not on `ROOM_VISIBLE_SETTINGS` and nothing here asked.
+ *
+ * Splitting them across three places is how one of them ends up missing, and it is what happened.
+ */
+export function chatComposerAvailable(input: {
+  mode: ChatMode;
+  /** `chatMutedTill` as a date, or null. Not a boolean, because the caller already has the date. */
+  mutedUntil: Date | null;
+  /** `globals.user.isFT` — is this viewer on a free trial? */
+  isFreeTrial: boolean;
+  /** `sessData.chatDisabledForTrials` — has the owner turned chat off for trials? */
+  chatDisabledForTrials: boolean;
+}): boolean {
+  if (!chatComposerEnabled(input.mode)) return false;
+  if (input.mutedUntil !== null) return false;
+  return !(input.isFreeTrial && input.chatDisabledForTrials);
 }
 
 /** `this.webinarMode = 'p' == e`. */

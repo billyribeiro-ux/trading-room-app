@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **197** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **196** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**53 of the 197 are read by the reference's OWN room client**, as `sessData.<name>`.
+**52 of the 196 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Five have already left the list, on the day it was written.** It opened at 202 unwired and 58
-questions; both numbers have moved three times since.
+**Six have already left the list, on the day it was written.** It opened at 202 unwired and 58
+questions; both numbers have moved four times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -228,7 +228,7 @@ questions; both numbers have moved three times since.
   wrong source the code read. Every member in every room saw the recording file name the owner had
   asked to hide. **Nothing but this list could have found it.**
 
-**All 53 have now been READ and triaged**, and the answers are in
+**All 53 were READ and triaged on 2026-08-28**, and the answers are in
 `docs/decoded/missing-settings-triage.md` — that document, not the pinned list, is the tracker. Three
 classes of answer are not work at all:
 
@@ -247,10 +247,10 @@ classes of answer are not work at all:
   classes throughout the bundle. Its one real read — `globals.sessionName = r.name`, feeding
   `document.title` — is a real gap; the number is not evidence of anything.
 
-The remainder split into **15 WIRE** (the surface exists here and is missing a term), **17 FEATURE**
+One of the WIRE rows — `chatDisabledForTrials` — landed the same day; the remainder split into **14 WIRE** (the surface exists here and is missing a term), **17 FEATURE**
 and **6 BLOCKED**, each with its byte offset and its size in the triage document.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 53 by NAME and asserts separately that the five
+`src/lib/setting-coverage-contract.test.ts` pins the 52 by NAME and asserts separately that the five
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10),

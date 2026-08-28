@@ -1,6 +1,6 @@
 <script lang="ts">
   import {
-    chatComposerEnabled,
+    chatComposerAvailable,
     isChatMode,
     isWebinarMode,
     type ChatMode
@@ -507,16 +507,16 @@
   /** `this.webinarMode = 'p' == e`. */
   const webinarMode = $derived(isWebinarMode(chatMode));
 
-  /**
-   * Whether this viewer may type at all — the two reasons the reference replaces the composer with
-   * its `Chat Disabled` block, in one place.
-   *
-   * `'d' != chatMode` is the room's rule and applies to everyone; the mute is this viewer's own.
-   * The mute was enforced on the server long before it was ever shown, which is why a muted member
-   * used to press send and watch nothing happen at all.
-   */
+  /** The THREE reasons the composer is off are in `chatComposerAvailable`, with the transcription. */
   const selfMutedUntil = $derived(data.chatMutedTill ? new Date(data.chatMutedTill) : null);
-  const chatEnabled = $derived(chatComposerEnabled(chatMode) && selfMutedUntil === null);
+  const chatEnabled = $derived(
+    chatComposerAvailable({
+      mode: chatMode,
+      mutedUntil: selfMutedUntil,
+      isFreeTrial: data.user.isFT === true,
+      chatDisabledForTrials: data.sessData?.chatDisabledForTrials === true
+    })
+  );
   const giphyApiKey = PUBLIC_PTR_GIPHY_API_KEY ?? '';
 
   /**

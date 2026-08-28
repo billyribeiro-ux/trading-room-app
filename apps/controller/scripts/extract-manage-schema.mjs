@@ -175,6 +175,9 @@ const ROOM_CONSUMED = [
      swallows the list and one bracket truncates it. The first draft of THIS warning contained the
      bracket it warns about. */
   'dontShowRecInfoToUsers',
+  /* The third reason the composer is off. Added 2026-08-28: the room had the chat mode and the
+     viewer mute and no owner policy, so trials could chat in a room that had turned that off. */
+  'chatDisabledForTrials',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -738,9 +741,12 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // `prefs.loaded`, a viewer preference nothing has ever written. The owner switch did nothing and
 // every member saw the recording file name. Third find of the settings enumeration.
 //
+// 73 since 2026-08-28: `chatDisabledForTrials`, the third of three reasons the reference turns the
+// chat composer off. This room had the other two. Fourth find of the settings enumeration.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 72 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 73 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

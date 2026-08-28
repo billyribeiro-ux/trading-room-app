@@ -101,7 +101,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'alertsOverlayOnScreenshare',
   'alwaysShowRoster',
   'autoSwitchToOfftopics',
-  'chatDisabledForTrials',
   'customCSS',
   'customFaviconURL',
   'customPlayerURL',
