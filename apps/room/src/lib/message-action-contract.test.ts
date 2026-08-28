@@ -412,7 +412,7 @@ describe('presenter-only operations', () => {
 
     const attempts: Args[] = [
       { operation: 'markAnswered', kind: 'chat', id: message.id },
-      { operation: 'mute24', kind: 'chat', id: message.id, targetUserId: author.id },
+      { operation: 'mute24', targetUserId: author.id },
       { operation: 'showMsgToAll', kind: 'chat', id: message.id }
     ];
 
@@ -430,14 +430,8 @@ describe('presenter-only operations', () => {
   });
 
   it('mutes for 24 hours, to the minute', async () => {
-    const message = newMessage(author);
     const before = Date.now();
-    await act(presenter, {
-      operation: 'mute24',
-      kind: 'chat',
-      id: message.id,
-      targetUserId: author.id
-    });
+    await act(presenter, { operation: 'mute24', targetUserId: author.id });
 
     const mute = db.select().from(chatMutes).all()[0];
     expect(mute.targetUserId).toBe(author.id);
@@ -451,10 +445,9 @@ describe('presenter-only operations', () => {
 
   it('refuses a mute against an id that cannot be a user', async () => {
     // NEW: `Number.isInteger` let 0 and negatives through to insert a row against nobody.
-    const message = newMessage(author);
     for (const targetUserId of [0, -1]) {
       await expectSchemaRefusal(
-        act(presenter, { operation: 'mute24', kind: 'chat', id: message.id, targetUserId }),
+        act(presenter, { operation: 'mute24', targetUserId }),
         String(targetUserId)
       );
     }
@@ -509,5 +502,27 @@ describe('presenter-only operations', () => {
       } as unknown as Args)
     );
     expect(db.select().from(messages).all()).toHaveLength(1);
+  });
+
+  it('refuses a `kind` or an `id` on mute24, which acts on a USER and not on a row', async () => {
+    /*
+      The other direction of the same rule, and it went the other way on 2026-08-28: `mute24` USED to
+      carry `{ kind, id }` and read neither. The Q&A thread is what made that cost something — a
+      question is neither an alert nor a chat message, so muting its author through the shared shape
+      meant labelling a question id as one of the two, and the day anything started reading `id` that
+      would have muted against the wrong table.
+    */
+    const message = newMessage(author);
+    for (const extra of [{ kind: 'chat' }, { id: message.id }]) {
+      await expectSchemaRefusal(
+        act(presenter, {
+          operation: 'mute24',
+          targetUserId: author.id,
+          ...extra
+        } as unknown as Args),
+        JSON.stringify(extra)
+      );
+    }
+    expect(db.select().from(chatMutes).all()).toHaveLength(0);
   });
 });

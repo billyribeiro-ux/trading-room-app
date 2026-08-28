@@ -164,13 +164,13 @@ function spreadFields(site: { source: string }): Set<string> {
  */
 const DELIBERATELY_UNSUPPLIED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'lib/components/RoomMessage.svelte': {
-    enableQaReactions:
-      'gates reactions on the entries of the Q&A THREAD — `isQAMsg` is the modal’s own flag, bundle ' +
-      'byte 2,334,347, not a property of a message. That thread renders with `onaction={() => {}}`, ' +
-      'so the control it would light cannot act. Tracked as a FEATURE in the settings triage.',
-    isQaMessage:
-      'the other half of the same thread work. It is an input the Q&A modal sets, and ours passes ' +
-      '`kind="chat"` where the reference passes `logType="alerts"`.',
+    /*
+      `enableQaReactions` and `isQaMessage` were BOTH exempt here until 2026-08-28, on the reason the
+      entries gave: the Q&A thread rendered with `onaction={() => {}}`, so anything they lit could
+      not act. Both are supplied now — the thread has two commands behind it — and the entries are
+      deleted rather than reworded, which is what this list means by a prop stopping being a
+      decision. `qa-thread-contract.test.ts`.
+    */
     showNewIndicator:
       'needs `isNewIndicatorOn` (unwired) AND a supply for `item.isNew`, which no feed populates. ' +
       'A presenter-only marker with no data behind it is a marker that never shows.'

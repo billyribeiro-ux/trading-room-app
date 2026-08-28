@@ -19,7 +19,8 @@ import type { RoomToasts } from './toasts.svelte';
 /** The one wire command every operation here goes through. */
 export type MessageOperation =
   | { kind: 'alert' | 'chat'; id: number; operation: 'delete' | 'markAnswered' | 'showMsgToAll' }
-  | { kind: 'alert' | 'chat'; id: number; operation: 'mute24'; targetUserId: number }
+  /* No coordinate: it mutes a USER. See the union member in `message-actions.remote.ts`. */
+  | { operation: 'mute24'; targetUserId: number }
   | {
       kind: 'alert' | 'chat';
       id: number;
@@ -77,6 +78,12 @@ export class RoomMessageActions {
   readonly #session: () => { user: { id: number; role: string; emailHash: string } };
   readonly #sendOperation: (payload: MessageOperation) => Promise<unknown>;
   readonly #askQuestion: (payload: { body: string; alertId: number }) => Promise<void>;
+  readonly #reactToQuestion: (payload: {
+    questionId: number;
+    reactionKey: string;
+    reactionEmoji: string;
+  }) => Promise<void>;
+  readonly #deleteQuestion: (payload: { questionId: number }) => Promise<void>;
   readonly #replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
   readonly #openModal: (name: Exclude<ModalName, null>) => void;
   readonly #closeMessageMenu: () => void;
@@ -98,6 +105,19 @@ export class RoomMessageActions {
     session: () => { user: { id: number; role: string; emailHash: string } };
     sendOperation: (payload: MessageOperation) => Promise<unknown>;
     askQuestion: (payload: { body: string; alertId: number }) => Promise<void>;
+    /**
+     * The two commands that act on a Q&A THREAD ENTRY, which is a question and not a message.
+     *
+     * Separate from `sendOperation` because they address a different thing: `alert_questions` rows
+     * have their own ids and their own room column, and `messageAction`'s `{ kind, id }` target has
+     * no third value that would mean "question". See `routes/alert-questions.remote.ts`.
+     */
+    reactToQuestion: (payload: {
+      questionId: number;
+      reactionKey: string;
+      reactionEmoji: string;
+    }) => Promise<void>;
+    deleteQuestion: (payload: { questionId: number }) => Promise<void>;
     replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
     closeMessageMenu: () => void;
@@ -119,6 +139,8 @@ export class RoomMessageActions {
     this.#session = options.session;
     this.#sendOperation = options.sendOperation;
     this.#askQuestion = options.askQuestion;
+    this.#reactToQuestion = options.reactToQuestion;
+    this.#deleteQuestion = options.deleteQuestion;
     this.#replyMessage = options.replyMessage;
     this.#openModal = options.openModal;
     this.#closeMessageMenu = options.closeMessageMenu;
@@ -166,28 +188,36 @@ export class RoomMessageActions {
   async #runOperation(
     kind: 'alert' | 'chat',
     item: MessageActionItem,
-    operation: 'delete' | 'markAnswered' | 'mute24' | 'showMsgToAll'
+    operation: 'delete' | 'markAnswered' | 'showMsgToAll'
   ) {
     /*
-      `targetUserId` rides ONLY on `mute24` now. The action took it on every operation and read it on
-      one, so a delete carried a field nothing looked at; `z.discriminatedUnion` refuses it on the
-      other three, which is what makes the shape honest.
+      `mute24` left this helper on 2026-08-28 and took its `targetUserId` with it: it is the one
+      operation that does not act on the row, and the coordinate it was carrying was never read. The
+      Q&A thread is what made that visible — a question is neither an alert nor a chat message, so
+      muting its author through here meant labelling a question id as one of the two.
 
       A rejection is the refusal. The old `response.ok` reported "the request arrived" and not "the
       operation happened" — SvelteKit put a `fail` in the BODY with a 200 status — so anything
       undoing an optimistic update had to read the result itself.
     */
     try {
-      await this.#sendOperation(
-        operation === 'mute24'
-          ? { kind, id: item.id, operation, targetUserId: item.senderId }
-          : { kind, id: item.id, operation }
-      );
+      await this.#sendOperation({ kind, id: item.id, operation });
     } catch (cause) {
       this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'That did not work.';
       return false;
     }
     if (operation === 'delete' || operation === 'markAnswered') await this.#onChanged();
+    return true;
+  }
+
+  /** `mute24` — the one operation with no row coordinate. */
+  async #muteSenderFor24Hours(item: MessageActionItem) {
+    try {
+      await this.#sendOperation({ operation: 'mute24', targetUserId: item.senderId });
+    } catch (cause) {
+      this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'That did not work.';
+      return false;
+    }
     return true;
   }
 
@@ -291,16 +321,46 @@ export class RoomMessageActions {
     this.#focusComposer();
   }
 
+  /**
+   * @param surface Which list the row was clicked in.
+   *
+   * `'log'` is the alerts or chat column; `'qa'` is `AlertQaModal`'s thread, where the row
+   * is an `alert_questions` entry rendered as `kind="alert"` because that is what the reference does
+   * (`this.isQAMsg = !0, this.logType = "alerts"`, bundle byte 2,334,347).
+   *
+   * TWO branches read it — `delete` and `reaction` — because those are the two that WRITE, and a
+   * question is addressed by its own id rather than by `{ kind, id }`. Everything else acts on the
+   * SENDER or on the text, which is the same act from either surface, and is deliberately shared:
+   * a second dispatcher for the thread would be five copies of a rule to keep in step.
+   *
+   * `mention` is NOT here. It belongs to whichever composer is on screen, and the thread's composer
+   * lives inside the modal — so `AlertQaModal` handles that one itself and forwards the rest, exactly
+   * as the reference routes `doQAMention` to a subscriber inside its own modal.
+   */
   handle(
     kind: 'alert' | 'chat',
     action: MessageAction,
     item: MessageActionItem,
     payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload,
     /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
-    fromExtraColumn = false
+    fromExtraColumn = false,
+    surface: 'log' | 'qa' = 'log'
   ) {
-    if (action !== 'reaction') this.#closeMessageMenu();
-    this.#selectedMessage = item;
+    /*
+      NEITHER OF THESE MAY RUN FOR A Q&A ENTRY, and both would have been silent corruption.
+
+      `#selectedMessage` is the ALERT the Q&A thread belongs to — `sendAlertQuestion` sends its id as
+      the `alertId`, and `AlertQaModal` renders it as the thread's header. Overwriting it with the
+      question that was clicked would have repointed the composer at a row in the wrong table, and
+      swapped the header for one of its own replies.
+
+      `#closeMessageMenu` closes the LOG's open menu. The thread keeps its own open row in
+      `AlertQaModal`, which closes it before forwarding.
+    */
+    if (surface !== 'qa') {
+      if (action !== 'reaction') this.#closeMessageMenu();
+      this.#selectedMessage = item;
+    }
     this.#selectUser({
       id: item.senderId,
       nick: item.senderName,
@@ -353,6 +413,19 @@ export class RoomMessageActions {
     if (action === 'delete') {
       const event = payload instanceof MouseEvent ? payload : undefined;
       const deleteMessage = () => {
+        /*
+          A Q&A entry is a row in `alert_questions` and has no captured-fixture twin — `askQuestion`
+          writes a real row even when the alert it hangs off is a fixture — so there is no optimistic
+          overlay to patch and nothing to put back. The refetch is the update.
+        */
+        if (surface === 'qa') {
+          void this.#deleteQuestion({ questionId: item.id })
+            .then(() => this.#onChanged())
+            .catch((cause: unknown) => {
+              this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'That did not work.';
+            });
+          return;
+        }
         // Captured items used to stop here, hidden in this browser's memory and nowhere else - so
         // a presenter deleting an alert watched it vanish while every member kept being served it
         // from the fixture on every poll, forever. The local hide stays as the optimistic update,
@@ -391,7 +464,7 @@ export class RoomMessageActions {
         message: 'Are you sure you want to mute this user for 24 hours?',
         onconfirm: () => {
           this.#dialogs.confirmation = null;
-          void this.#runOperation(kind, item, 'mute24').then((success) => {
+          void this.#muteSenderFor24Hours(item).then((success) => {
             if (success) this.#dialogs.alert = 'User chat muted.';
           });
         }
@@ -477,6 +550,28 @@ export class RoomMessageActions {
       };
     }
     if (action === 'reaction' && payload && !(payload instanceof MouseEvent) && 'key' in payload) {
+      /*
+        Same divergence as the delete above, and the same reason: a question is addressed by its own
+        id. The reference cannot do that — `manageChatReactions(this.isQAMsg ? this.qaMsgID :
+        this.msg._id, …, this.msgIndex)` sends the PARENT alert and an ORDINAL, because its thread
+        entries live inside the alert document and have no identity. An ordinal moves when a
+        neighbour is deleted; an id does not.
+      */
+      if (surface === 'qa') {
+        const reactionPayload = payload;
+        void this.#reactToQuestion({
+          questionId: item.id,
+          reactionKey: reactionPayload.key,
+          reactionEmoji: reactionPayload.emoji
+        })
+          .then(() => this.#onChanged())
+          .catch((cause: unknown) => {
+            this.#dialogs.alert = isHttpError(cause)
+              ? cause.body.message
+              : 'That reaction did not save.';
+          });
+        return;
+      }
       // Optimistic locally so the pill responds under the cursor, then persisted. The server does
       // the same toggle against the stored override, so it - not this browser - decides the result.
       const previousReactions = item.evidenceKey ? structuredClone(item.reactions ?? {}) : null;

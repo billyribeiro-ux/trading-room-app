@@ -181,14 +181,43 @@ export const alertQuestions = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     alertId: integer('alert_id').notNull(),
+    /*
+      The room, held on the row rather than derived from `alerts`.
+
+      REVERSES the argument in `alert-log.ts`, which held that the inner join to `alerts` applied
+      the tenancy term for free. It does — for alerts that have a row. CAPTURED alerts carry
+      negative ids and live in the fixture; `askQuestion` accepts them and writes the question, and
+      the join then dropped every such row on the way back out. The write path accepted what the
+      read path could not see, and those rows had no room anchor at all, so two rooms serving the
+      same captured alert would have shared them the moment anything did read them.
+
+      `.notNull()` with NO default, for the reason `shared_files.roomShortCode` gives: Drizzle then
+      makes it a required field and a forgotten insert fails to COMPILE. The SQLite column carries a
+      '' default only because ALTER TABLE ADD COLUMN demands one.
+    */
+    roomShortCode: text('room_short_code').notNull(),
     senderId: integer('sender_id')
       .notNull()
       .references(() => users.id),
     body: text('body').notNull(),
     answeredAt: integer('answered_at', { mode: 'timestamp' }),
+    /*
+      Reactions on ONE question, keyed exactly as `messages.reactions_json` and `alerts.reactions_json`
+      are, and read through the same `parseReactions` / `toggleReaction` pair.
+
+      The reference keeps them on the alert and addresses them by ORDINAL — see the note in
+      `db/index.ts`. A column on the row the reaction belongs to cannot be moved onto its neighbour
+      by a concurrent delete.
+    */
+    reactionsJson: text('reactions_json').notNull().default('{}'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
   },
-  (table) => [index('alert_questions_alert_created_idx').on(table.alertId, table.createdAt)]
+  (table) => [
+    index('alert_questions_alert_created_idx').on(table.alertId, table.createdAt),
+    // The load reads one room's questions for a page of alert ids; the room is the leading term
+    // because it is the one predicate every read of this table carries.
+    index('alert_questions_room_alert_idx').on(table.roomShortCode, table.alertId)
+  ]
 );
 
 export const sharedFiles = sqliteTable('shared_files', {

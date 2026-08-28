@@ -9,6 +9,7 @@
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
   import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
   import ImageUploadDialog from '#lib/components/ImageUploadDialog.svelte';
@@ -102,6 +103,7 @@
 
     // Page state this layer renders from. Only these two are written back.
     isPresenter,
+    messageChrome,
     unreadQaAlertIds,
     modals,
     chatMode,
@@ -150,6 +152,14 @@
     userActions: RoomUserActions<PageData['connectedUsers'][number]>;
     /** Resolved on the SERVER from `data.user.role`. Read here only to decide who gets a toast. */
     isPresenter: boolean;
+    /**
+     * The chrome every rendered message shares, built ONCE on the page.
+     *
+     * Passed straight through to `ModalHost`, which spreads it onto each Q&A thread entry. It is a
+     * prop rather than rebuilt here for the reason `room-message-chrome.ts` exists at all: a second
+     * construction is a second answer to which settings a message reads.
+     */
+    messageChrome: RoomMessageChrome;
     /**
      * The page's INSTANCE, not a copy — `RoomFeeds` reads it for the badge and `RoomModals`
      * clears it, so a second set would be a second answer to which alerts are unread.
@@ -569,6 +579,9 @@
   onReplySend={messageActions.sendReplyMessage}
   onQuestionSend={messageActions.sendAlertQuestion}
   alertQuestions={data.alertQuestions}
+  {messageChrome}
+  onQaAction={(action, item, payload) =>
+    messageActions.handle('alert', action, item, payload, false, 'qa')}
   onMentionUser={(name) => messageActions.mention(name)}
   onPrivateChat={(user) => {
     userActions.selectedMessageUser = user;

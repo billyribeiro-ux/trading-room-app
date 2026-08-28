@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **173** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **172** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**29 of the 173 are read by the reference's OWN room client**, as `sessData.<name>`.
+**28 of the 172 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Twenty-eight have already left the list, on the day it was written.** It opened at 202 unwired and
-58 questions; both numbers have moved twenty-three times since.
+**Twenty-nine have already left the list, on the day it was written.** It opened at 202 unwired and
+58 questions; both numbers have moved twenty-four times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -252,10 +252,14 @@ classes of answer are not work at all:
 Two of the WIRE rows — `chatDisabledForTrials` and `hasQAOnAlerts` — landed the same day, and one
 row was CORRECTED out of WIRE into FEATURE by reading it properly rather than by re-reading the
 first pass: `enableQAReactions` gates reactions on the entries of the Q&A THREAD (`isQAMsg` is the
-modal's own flag, not a property of a message), and that thread's menu is inert here, so wiring the
-flag would light a control that cannot act. The remainder split into **12 WIRE** (the surface exists
-here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
-size in the triage document.
+modal's own flag, not a property of a message), and that thread's menu was inert here, so wiring the
+flag would have lit a control that cannot act. **It was BUILT on 2026-08-28**, and the correction
+still under-called it: it needed two commands addressing a question by its own row id, two columns on
+`alert_questions`, and the thread extracted into `AlertQaModal.svelte` because the size ratchet
+refused the raise. It also found a silent data loss — every question ever asked on a CAPTURED alert
+was written and never read back. The remainder split into **12 WIRE** (the surface exists here and is
+missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its size in the
+triage document.
 
 **The ceiling catalog is now DISCOVERED for components as well as modules** (2026-08-28). It was a
 hand-kept list at **12 of 48**, and the four found uncapped by accident in two days were the visible
@@ -309,14 +313,13 @@ reproduces the decision — foreground-only colour — and `resolveNoteSurfaceGa
 words which part of that is evidenced and which part is this repository's call. A setting wired
 without that distinction written down would read, later, as a transcription.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 29 by NAME and asserts separately that the seven
+`src/lib/setting-coverage-contract.test.ts` pins the 28 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
-The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10, a
-feature), `positionsIframe` (7), `altChatRender` (6) and `smallerImagePreview` (6, answered as NOT A
-GAP). **Read count is not priority** — it is how many times the reference mentions a name, and the
-two biggest numbers on this list are respectively a credential we refuse and a defect we decline to
-reproduce.
+The largest by read count are `deleteAlertPW` (12, a credential), `altChatRender` (6) and
+`smallerImagePreview` (6, answered as NOT A GAP). **Read count is not priority** — it is how many
+times the reference mentions a name, and the biggest number on this list is a credential we refuse.
+`enableQAReactions` was second at 10 and is built; `positionsIframe` was fourth at 7 and is built.
 
 ---
 

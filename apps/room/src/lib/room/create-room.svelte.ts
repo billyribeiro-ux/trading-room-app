@@ -85,7 +85,7 @@ import { savePreference as savePreferenceCommand } from '../../routes/user-setti
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
-import { askQuestion } from '../../routes/alert-questions.remote';
+import { askQuestion, deleteQuestion, reactToQuestion } from '../../routes/alert-questions.remote';
 import { postAlert as postAlertCommand } from '../../routes/post-alert.remote';
 import { messageAction } from '../../routes/message-actions.remote';
 
@@ -719,6 +719,8 @@ export function createRoom(deps: RoomDeps) {
     session: () => data,
     sendOperation: (payload) => messageAction(payload),
     askQuestion: (payload) => askQuestion(payload),
+    reactToQuestion: (payload) => reactToQuestion(payload),
+    deleteQuestion: (payload) => deleteQuestion(payload),
     replyMessage: (payload) => replyMessage(payload),
     openModal: (name) => modals.open(name),
     closeMessageMenu: () => menus.openMessageMenu(null),

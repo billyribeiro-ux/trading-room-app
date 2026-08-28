@@ -55,6 +55,27 @@ export interface SourceMessageBehavior {
  * Direct transcription of the app-st-message conditions in the decoded bundle.
  * Concrete captured DOM menus are applied separately because the supplied
  * capture does not expose the session values behind every feature flag.
+ *
+ * ## THREE ENTRIES DIVERGE INSIDE THE Q&A THREAD, and the divergence is deliberate
+ *
+ * `isQaMessage` means one thing upstream: this row is being drawn inside the Q&A thread modal. Its
+ * own constructor sets `this.isQAMsg = !0, this.logType = "alerts"` (bundle byte 2,334,347) and
+ * passes both to every entry (2,332,907). So a Q&A entry is rendered with `kind === 'alert'`, and
+ * three menu entries turn ON as a side effect of that: `showToAll` (`isP && !isLimitedPresenter`),
+ * `openAlertReport` (`isP && "alerts" === logType`) and `edit` (`enableEditAlerts && "alerts" ===
+ * logType && isP` — byte 1,348,838, with no `isQAMsg` term anywhere in it).
+ *
+ * **All three are dead upstream.** Every one of them addresses `this.msg._id`, and a Q&A entry has
+ * no `_id`: that is exactly why the two things the reference CAN do to a thread entry address it
+ * some other way — `manageChatReactions(this.isQAMsg ? this.qaMsgID : this.msg._id, …, msgIndex)`
+ * (1,354,136) and `deleteQAAlert({qaMsgID, msgIndex})` (1,159,097) both send the PARENT ALERT's id
+ * and the entry's ordinal. A control that cannot name the thing it acts on is a control whose only
+ * effect is changing its own label, and this repository refuses those by name.
+ *
+ * So they are suppressed here rather than drawn. The remaining seven all act on a question:
+ * `deleteMessage` and `react` through the two commands in `alert-questions.remote.ts`, `muteMessage`
+ * / `openUserInfo` / `privateMessage` through the sender, `mention` into the thread's own composer
+ * (the reference has a `doQAMention` subscription for exactly that), and `copy` on the text.
  */
 export function sourceMessageBehavior(input: SourceMessageBehaviorInput): SourceMessageBehavior {
   return {
@@ -62,8 +83,9 @@ export function sourceMessageBehavior(input: SourceMessageBehaviorInput): Source
     muteMessage: input.viewerIsPresenter && !input.isAdminMessage,
     openUserInfo: true,
     mention: true,
-    showToAll: input.viewerIsPresenter && !input.viewerIsLimitedPresenter,
-    openAlertReport: input.viewerIsPresenter && input.kind === 'alert',
+    // `&& !isQaMessage` on this and the two below: see the DIVERGENCE section in the docblock.
+    showToAll: input.viewerIsPresenter && !input.viewerIsLimitedPresenter && !input.isQaMessage,
+    openAlertReport: input.viewerIsPresenter && input.kind === 'alert' && !input.isQaMessage,
     publicReply:
       input.kind === 'chat' &&
       !input.isOwnMessage &&
@@ -76,7 +98,10 @@ export function sourceMessageBehavior(input: SourceMessageBehaviorInput): Source
       (input.enableEditMessage &&
         input.kind === 'chat' &&
         (input.isOwnMessage || (input.viewerIsPresenter && !input.isAdminMessage))) ||
-      (input.enableEditAlerts && input.kind === 'alert' && input.viewerIsPresenter),
+      (input.enableEditAlerts &&
+        input.kind === 'alert' &&
+        input.viewerIsPresenter &&
+        !input.isQaMessage),
     copy: input.kind === 'alert',
     privateMessage:
       (input.viewerIsPresenter ||

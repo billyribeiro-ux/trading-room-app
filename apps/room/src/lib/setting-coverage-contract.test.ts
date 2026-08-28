@@ -6,10 +6,16 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  *
  * ## What this pins, and why it is names
  *
- * `room-settings-schema.ts` declares 269 settings and marks 202 of them `wired: false` — nothing in
+ * `room-settings-schema.ts` declares 269 settings and marks most of them `wired: false` — nothing in
  * this room reads them. That number alone says nothing, because most were never meant to reach a
- * room. The answerable question is narrower: which of the 202 does the reference's own room client
- * read? Fifty-eight, measured against the pinned v4 bundle.
+ * room. The answerable question is narrower: which of the unwired ones does the reference's own room
+ * client read? It was FIFTY-EIGHT when this file was written, measured against the pinned v4 bundle,
+ * and the list below is what is left.
+ *
+ * NO COUNTS IN THIS PARAGRAPH ANY MORE, corrected 2026-08-28. It said "202" twice and "fifty-eight"
+ * once, in the present tense, and all three were stale within a day — the numbers move every time a
+ * setting is wired, and prose beside a list it counts is the copy nobody updates. The LIST is the
+ * fact, which is the same argument this file already makes for pinning names rather than a total.
  *
  * Pinned by NAME rather than by count, for the reason the command audit gives about itself: wiring
  * one setting while another quietly stops being read leaves the total unchanged, and the silent
@@ -92,10 +98,18 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * than to draw a control: the delete endpoint already let a member remove their own message without
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
+ *
+ * `enableQAReactions` left last, and it is the clearest case yet for READING a row before sizing it.
+ * It was filed as a one-line wire because `sourceMessageBehavior.react` already carried the rule
+ * verbatim — and that rule could never evaluate true, because the Q&A thread rendered its entries as
+ * `kind="chat"` behind `onaction={() => {}}`. What the setting needed underneath it was a thread
+ * whose menu ACTS: two commands, a column to hold a reaction, and a room column on
+ * `alert_questions` — which turned up a second defect on the way, questions asked on a CAPTURED
+ * alert being written by one command and dropped by the read that should have returned them.
+ * `qa-thread-contract.test.ts`.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
-  'enableQAReactions',
   'altChatRender',
   'smallerImagePreview',
   'allRoomsWelcomeMatPW',

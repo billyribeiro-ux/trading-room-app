@@ -21,9 +21,20 @@ import type { FollowChatStyle, Theme } from '#lib/types.js';
  * * **`followedStyle`** — per message, looked up from the sender's hash.
  * * **`alertLabels`** — the alerts column only. Putting it here would hand a chat message a parsed
  *   label table it never reads.
- * * **the Q&A modal's subset.** `ModalHost` renders Q&A entries with FOUR of these and no badges,
- *   no reactions and no edit controls. Spreading the full chrome there would silently turn those on
- *   inside a modal that has never shown them, so it is left spelling its four.
+ *
+ * ## THE Q&A THREAD USED TO BE ON THAT LIST, and taking it off was the right call
+ *
+ * This entry read: *"the Q&A modal's subset. `ModalHost` renders Q&A entries with FOUR of these and
+ * no badges, no reactions and no edit controls. Spreading the full chrome there would silently turn
+ * those on inside a modal that has never shown them, so it is left spelling its four."*
+ *
+ * That was correct while the thread was INERT — it rendered `kind="chat"` behind an `onaction` that
+ * did nothing, so anything the chrome switched on would have been a control that could not act. The
+ * thread acts now (`AlertQaModal.svelte`), and it renders `kind="alert"` because that is what the
+ * reference does, so the full chrome is exactly what makes its menu the menu the reference draws.
+ *
+ * `alertLabels` stays out, and there it is the REFERENCE's own choice rather than ours: the body
+ * pipe receives `e.isQAMsg ? null : alertLabels`, so a hash inside a question stays text.
  *
  * ## A `$derived` object rather than sixteen getters, and the trade
  *
@@ -67,6 +78,15 @@ export type RoomMessageChrome = {
   readonly presenterMessagesOnTheRight: boolean;
   readonly usersPublicReply: boolean;
   readonly enableReactions: boolean;
+  /**
+   * "Enable QA Reactions?" — the second half of ONE rule, and the half that could never be true.
+   *
+   * `sourceMessageBehavior.react` has read both since it was written: reactions on chat when
+   * `enableReactions`, reactions on an alert row drawn INSIDE the Q&A thread when this one. The
+   * thread rendered its rows as `kind="chat"` behind a handler that did nothing, so the second
+   * clause was unreachable no matter what the owner ticked.
+   */
+  readonly enableQaReactions: boolean;
   /**
    * "Q&A on alerts?" — whether an alert carries the ask-a-question button at all.
    *
@@ -139,15 +159,20 @@ export type RoomMessageChrome = {
  * The settings a message reads, as they arrive from `internal/room-config/[code]`.
  *
  * Declared structurally rather than importing `RoomSessionSettings`, and that is deliberate: this
- * module is shared client code and that type lives behind `$lib/server`. Listing the eleven keys is
+ * module is shared client code and that type lives behind `$lib/server`. Listing the keys out is
  * also the more honest shape — it says on its face exactly which settings a message depends on, and
- * a twelfth cannot be added without appearing here.
+ * one more cannot be added without appearing here.
+ *
+ * It said "the eleven keys" and "a twelfth" until 2026-08-28, when there were fourteen. A count in
+ * prose beside the list it counts is a second copy of the same fact, and it is the copy nobody
+ * updates; the list is the fact.
  */
 export interface MessageChromeSettings {
   readonly showBadgesToPresentersOnly?: boolean;
   readonly disableStarYears?: boolean;
   readonly usersPublicReply?: boolean;
   readonly enableReactions?: boolean;
+  readonly enableQAReactions?: boolean;
   readonly hasQAOnAlerts?: boolean;
   readonly enableEditMessage?: boolean;
   readonly enableEditAlerts?: boolean;
@@ -224,6 +249,7 @@ export function buildMessageChrome(sources: MessageChromeSources): RoomMessageCh
     disableStarYears: settings?.disableStarYears === true,
     usersPublicReply: settings?.usersPublicReply === true,
     enableReactions: settings?.enableReactions === true,
+    enableQaReactions: settings?.enableQAReactions === true,
     hasQaOnAlerts: settings?.hasQAOnAlerts === true,
     enableEditMessage: settings?.enableEditMessage === true,
     enableEditAlerts: settings?.enableEditAlerts === true,

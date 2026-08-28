@@ -472,7 +472,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than duplication — each column reads its OWN channel, so a shared prop would put the extra
       column's typists under the main column's composer.
     */
-    max: 1382,
+    /*
+      1382 -> 1383, 2026-08-28. ONE line: `messageChrome` reaching `RoomOverlays`, and through it the
+      Q&A thread's entries.
+
+      One line and not five, because the chrome is already built here for the alerts column — that
+      is the whole reason `room-message-chrome.ts` exists, and the alternative was a second
+      construction inside the overlay layer, which is a second answer to which settings a message
+      reads.
+    */
+    max: 1383,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -900,8 +909,43 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       site as well as in its module, because this is the file somebody reads while wondering what
       the room does to a member's page.
     */
-    max: 796,
+    /*
+      796 -> 809, 2026-08-28, for the Q&A thread's menu: `messageChrome` arriving as a prop with its
+      docblock, and the `onQaAction` line that forwards a thread entry's action to the dispatcher
+      that owns it.
+
+      THE PROP IS PASSED THROUGH RATHER THAN BUILT, which is the whole argument for the raise. The
+      page already derives one `RoomMessageChrome` and the alerts column already receives it;
+      building a second here would be a second answer to which settings a message reads, and
+      `room-message-chrome.ts` exists because that question had four answers once.
+
+      What this component paid for was NOT paid by the page — `+page.svelte` is one line wider and
+      sits exactly on its ceiling. It was paid by `ModalHost.svelte`, which drops 164 lines in the
+      same commit: the Q&A modal it used to hold is `AlertQaModal.svelte` now, and that extraction is
+      what made room for the feature in the first place.
+    */
+    max: 809,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
+  },
+  {
+    file: 'lib/components/AlertQaModal.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is the rule this list learned the hard way.
+
+      It is `app-alert-qa-modal` — the Q&A thread on one alert — taken out of `ModalHost.svelte` on
+      2026-08-28 because that file's ceiling refused the raise the thread's new menu needed. 166
+      lines left the host and 348 arrived here, and the difference is the two docblocks the
+      extraction made it possible to write: what a thread ENTRY is (an alert that knows it is inside
+      this modal, which is the reference's own `isQAMsg = !0, logType = "alerts"`), and which two of
+      its menu actions this component keeps rather than forwarding.
+
+      If this number climbs, the thing to check is whether it has started DECIDING anything. It must
+      not: every authority question a thread entry raises — who may delete one, whether the room
+      allows a reaction — is answered on the server, and the two menu actions handled here are the
+      composer insert and its own open row. Both are this component's state and nothing else's.
+    */
+    max: 348,
+    why: 'app-alert-qa-modal - the Q&A thread on one alert, its composer and its own open menu row'
   },
   {
     file: 'lib/components/RemoteAudioSinks.svelte',
@@ -1307,7 +1351,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       That is the standard this file exists to protect. A two-word fix with no recorded WHY is the
       one that gets "simplified" back into the bug.
     */
-    max: 6126,
+    /*
+      6126 -> 5960, 2026-08-28, and it is a DROP of 166 — the largest this file has taken, and the
+      first one this ceiling caused rather than recorded.
+
+      The Q&A thread grew a menu that acts, which is what `enableQAReactions` needed underneath it,
+      and the raise was refused. So the thread left: `AlertQaModal.svelte` holds the modal, its three
+      pieces of state, its two derived timestamps and the three functions that were only ever its
+      own. Nothing else in here read any of them.
+
+      That is what this ratchet is for, stated as an outcome rather than as a rule: the answer to a
+      file outgrowing its ceiling is to take a self-contained piece out of it. The next candidate has
+      not changed and is named two entries up — the user-info modal.
+    */
+    max: 5960,
     why: 'every modal in the room, in one component'
   },
   {
@@ -1321,7 +1378,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       it — a list of member email ADDRESSES — deliberately does not cross at all. Four lines here
       buy that; a reader who has to follow two files to find out is a reader who will not.
     */
-    max: 1589,
+    /*
+      1589 -> 1601, 2026-08-28. Eleven lines, and ten of them are a comment on one array.
+
+      `loadQuestionsForAlerts` used to be handed `alertRows` alone. `askQuestion` accepts a NEGATIVE
+      alert id — it resolves the captured fixture and writes a real question row, deliberately, with
+      its own comment saying so — so a captured alert can have questions and none of them were ever
+      in that list. A member asked, was told nothing, and watched the thread go on saying "There are
+      no questions."
+
+      The fix is two spread elements. The paragraph beside them is what stops the fixture half being
+      dropped again by somebody tidying a list that looks redundant, which is exactly how it was
+      absent in the first place.
+    */
+    max: 1601,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
@@ -1681,7 +1751,38 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       TOAST differs for the same reason — "Copied to clipboard." would leave a member unsure which
       of the two they got.
     */
-    max: 495,
+    /*
+      495 -> 590, 2026-08-28, and it is the largest raise this entry has taken. Argued rather than
+      applied, because the rule above says a raise is a conversation.
+
+      WHAT THE NINETY-FOUR LINES ARE, and only about twenty-five are code:
+
+        * two constructor dependencies for the Q&A thread's commands, with the docblock saying why
+          they are separate from `sendOperation` — an `alert_questions` row is addressed by its own
+          id, and `messageAction`'s `{ kind, id }` target has no third value that would mean
+          "question";
+        * two branches in the dispatcher, each with the citation for the divergence it makes: the
+          reference sends the PARENT alert plus an ORDINAL, because its thread entries live inside
+          the alert document and have no identity of their own, and an ordinal moves when a
+          neighbour is deleted;
+        * `#muteSenderFor24Hours`, which is `mute24` leaving `#runOperation` — it is the one
+          operation that does not act on the row, and the `{ kind, id }` it was carrying was never
+          read;
+        * a guard on `#selectedMessage` and the paragraph explaining what it prevents, which is the
+          most important thing in the diff: that field holds the ALERT whose thread is open, and
+          `sendAlertQuestion` sends its id as the `alertId`. Overwriting it with the question that
+          was clicked would have repointed the composer at a row in the wrong table.
+
+      WHY NOT AN EXTRACTION. The alternative was a second dispatcher for the thread, and five of the
+      seven actions a thread entry offers are the SAME act as in the log — they work on the sender or
+      on the text. Two dispatchers would be five copies of a rule to keep in step, which is the
+      failure this class was assembled to end. The `surface` parameter is the smaller change and its
+      docblock says exactly which two branches read it.
+
+      What paid for it, in the same commit: `ModalHost.svelte` drops 166 lines, and `RoomMessage`'s
+      two unfed-prop exemptions are deleted rather than reworded.
+    */
+    max: 590,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -2167,7 +2268,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       parameter, because each owns its own debounce timer and announce flag — a shared timer would
       let the extra column's keystrokes keep the main column's announcement alive.
     */
-    max: 1139,
+    /*
+      1,139 -> 1,141, 2026-08-28. Two lines, and both are construction: `reactToQuestion` and
+      `deleteQuestion` join `askQuestion` on the existing import line, and each is handed to
+      `RoomMessageActions` as a dependency.
+
+      The composition root grows by construction whenever a slice gains a collaborator. That is what
+      a composition root is for, and it is the smallest form that growth takes: two hand-offs and an
+      import that was already there.
+    */
+    max: 1141,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

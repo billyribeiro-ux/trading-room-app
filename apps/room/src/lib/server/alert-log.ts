@@ -202,16 +202,34 @@ export function searchAlertLog(
  * Both consumers are satisfied by that scope: the per-alert question counts the page derives, and the
  * list the Q&A modal reads — which is only ever opened FROM one of these alerts.
  *
- * Captured alerts carry NEGATIVE ids and have no rows in this table at all; the page reads their
- * fixture count instead. So they are correctly absent from `alertIds`.
+ * ## CAPTURED ALERTS ARE INCLUDED NOW, and the paragraph that said otherwise was WRONG
  *
- * ## The room filter stays, beside the id list
+ * It read: *"Captured alerts carry NEGATIVE ids and have no rows in this table at all; the page reads
+ * their fixture count instead. So they are correctly absent from `alertIds`."* The first clause is
+ * false. `askQuestion` resolves a negative alert id through `capturedRoomItem` and **writes the
+ * question row**, deliberately and with its own comment saying so. What had no row was the ALERT.
  *
- * SCOPED TO THIS ROOM — added 2026-08-14, and it was a cross-tenant leak until then.
- * `alert_questions` is the one room-owned table with NO `room_short_code` column: it reaches its room
- * through `alert_id`. This read had no filter of any kind, so every browser in every room received
- * every alert question in the deployment. What the client chose to RENDER was never the point; the
- * data had already crossed.
+ * The consequence, measured 2026-08-28: a member could ask a question on a captured alert, be told
+ * nothing, and watch the thread go on saying "There are no questions." forever. The inner join to
+ * `alerts` below dropped every one of those rows, because there was no alert row to join to.
+ *
+ * ## The room filter now reads the question's OWN column, and that reverses a decision
+ *
+ * SCOPED TO THIS ROOM — added 2026-08-14, and it was a cross-tenant leak until then. Every browser
+ * in every room received every alert question in the deployment. What the client chose to RENDER was
+ * never the point; the data had already crossed.
+ *
+ * The fix then was an inner join to `alerts`, and this file argued the column was therefore
+ * unnecessary — *"adding `room_short_code` to the table would denormalise a fact this schema already
+ * derives"*. **It does not derive it for every row.** For a question on a captured alert the fact is
+ * not in the database at all, so the join was not applying a tenancy term to those rows: it was
+ * discarding them, and had anything ever read them without it, two rooms serving the same captured
+ * alert would have shared their questions.
+ *
+ * So the column exists (`db/index.ts` carries the backfill and the reasoning), the join is gone, and
+ * the tenancy term is a predicate on the row itself. Rows written before the column stay `''` unless
+ * their alert had a row to backfill from — `''` matches no room, so they are exactly as invisible as
+ * they have always been.
  *
  * The ids passed in come from a room-scoped read, so they are already this room's — and the tenancy
  * term still belongs in the statement that reads the rows. An id list is not a substitute for it.
@@ -230,6 +248,7 @@ export function loadQuestionsForAlerts(roomShortCode: string, alertIds: readonly
         body: alertQuestions.body,
         answeredAt: alertQuestions.answeredAt,
         createdAt: alertQuestions.createdAt,
+        reactionsJson: alertQuestions.reactionsJson,
         senderName: users.displayName,
         senderEmail: users.email,
         senderAvatarUrl: users.avatarUrl,
@@ -241,21 +260,29 @@ export function loadQuestionsForAlerts(roomShortCode: string, alertIds: readonly
         senderRole: users.role
       })
       .from(alertQuestions)
-      /*
-      Joining through `alerts` applies the room the same way every other read here does. The
-      alternative — adding `room_short_code` to the table — would denormalise a fact this schema
-      already derives, and would need a backfill this join makes unnecessary.
-    */
-      .innerJoin(alerts, eq(alerts.id, alertQuestions.alertId))
       .innerJoin(users, eq(alertQuestions.senderId, users.id))
+      /*
+        The room is read off the question row. See the docblock: the join to `alerts` that used to
+        supply it also dropped every question asked on a captured alert.
+      */
       .where(
-        and(eq(alerts.roomShortCode, roomShortCode), inArray(alertQuestions.alertId, alertIds))
+        and(
+          eq(alertQuestions.roomShortCode, roomShortCode),
+          inArray(alertQuestions.alertId, alertIds)
+        )
       )
       .orderBy(asc(alertQuestions.createdAt), asc(alertQuestions.id))
       .all()
-      .map(({ senderEmail, ...question }) => ({
+      .map(({ senderEmail, reactionsJson, ...question }) => ({
         ...question,
-        senderEmailHash: hashEmail(senderEmail)
+        senderEmailHash: hashEmail(senderEmail),
+        /*
+          Parsed HERE, exactly as `loadAlertPage` and `loadNewestChatPages` parse theirs, and never
+          shipped raw: `parseReactions` validates rather than casts, and it lives behind
+          `$lib/server` so that the validator cannot be skipped by a client that finds the column
+          more convenient. The Q&A thread then renders the same shape every other message does.
+        */
+        reactions: parseReactions(reactionsJson)
       }))
   );
 }

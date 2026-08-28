@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **29** as this is written; twenty-eight have been answered by building, one more
+2026-08-28 and is at **28** as this is written; twenty-nine have been answered by building, one more
 is answered NOT A GAP, and the CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -156,6 +156,25 @@ reference does, and only then does the entitlement have something to gate. That 
 the `kind` change alone moves five entries in and out of that thread's menu — `publicReply`,
 `markAnswered`, `copy`, `openAlertReport` and `edit` all branch on it.
 
+**BUILT 2026-08-28**, and the size the row should have carried is worth stating, because the
+correction above still under-called it. What it needed:
+
+- two commands, `reactToQuestion` and `deleteQuestion`, addressing a question **by its own row id**
+  — the reference cannot, and sends the parent alert plus an ORDINAL instead (1,354,136 / 1,159,097),
+  which is a race the moment a neighbour is deleted;
+- `reactions_json` on `alert_questions`, because a reaction belongs to the row it is on;
+- `room_short_code` on the same table, which **reversed a decision this repository had written
+  down** and fixed a silent data loss — see the DEFECTS section below;
+- the thread extracted to `AlertQaModal.svelte`, because the size ratchet refused the raise.
+
+**Three of the five entries that turn on with `kind` are NOT drawn**, and this is the part the
+correction got wrong in the other direction. `showToAll`, `openAlertReport` and `edit` all address
+`this.msg._id`, and a Q&A entry has no `_id` — which is precisely why the two things the reference
+CAN do to one address it by alert-plus-ordinal. They are dead upstream, so drawing them here would
+ship three controls whose only effect is changing their own labels. `message-behavior.ts` carries
+the suppression and its evidence; `qa-thread-contract.test.ts` asserts each one is offered on a
+plain alert and refused inside the thread.
+
 **`enablePrivateMessageHistory` was filed as WIRE — "One row in the user-info modal" — and it is a
 FEATURE.** Corrected 2026-08-28, and the shape of the mistake is the same as the one above: a gate
 whose SURFACE exists and whose ACTION does not.
@@ -205,11 +224,41 @@ than quoting this paragraph.
 
 ---
 
+## DEFECTS this triage found in OUR code, not in the reference
+
+A setting is a question about the reference, and answering one keeps turning up something wrong on
+this side. Recorded here because the CHANGELOG is chronological and this is the list somebody wants
+when deciding what to read next.
+
+**A question asked on a CAPTURED alert was written and never read back.** Found 2026-08-28 while
+building `enableQAReactions`. `askQuestion` resolves a negative alert id through the fixture and
+writes a real `alert_questions` row — deliberately, with its own comment saying so — and
+`loadQuestionsForAlerts` dropped every one of them, because it reached its room by joining `alerts`
+and a fixture alert has no row to join to. `+page.server.ts` did not pass their ids either. A member
+asked, was told nothing, and watched the thread go on saying *"There are no questions."*
+
+`alert-log.ts` had argued in writing that a `room_short_code` column *"would denormalise a fact this
+schema already derives"*. It does not derive it for every row, and those rows had **no room anchor at
+all** — two rooms serving the same captured alert would have shared their questions the moment
+anything did read them. The column is the anchor now, and the reversal is recorded where the old
+argument was. The same missing term was in the answered-sweep and the recount, both keyed on
+`alertId` alone; real alert ids are globally unique, which is exactly why the hole was invisible.
+
+**`mute24` carried a row coordinate it never read.** Same day, same feature. The shared `{ kind, id }`
+target rode on the mute operation and the branch used neither — it mutes a USER. Harmless until the
+Q&A thread needed it: a question is neither an alert nor a chat message, so muting its author through
+the shared shape meant labelling a question id as one of the two, and the day anything started
+reading `id` it would have acted on the wrong table.
+
+**Two badges leaked another member's billing status.** Found earlier the same day while checking
+`isNewIndicatorOn`; recorded in the CORRECTED section above.
+
+---
+
 ## FEATURE — genuinely unbuilt
 
 | setting | byte | size |
 | --- | --- | --- |
-| `enableQAReactions` | 1,335,445 | Reactions on the entries of the Q&A thread. See CORRECTED above — the rule is already written in `message-behavior.ts`; what is missing is a Q&A thread whose menu acts at all. |
 | `chatTabsWithBadges` | 1,007,480 | Badge-gated extra chat channels. A JSON list — the schema's help text carries the shape — and `registerForExtraChannels` subscribes only to the channels whose badges the member holds. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
@@ -234,7 +283,7 @@ than quoting this paragraph.
 
 ---
 
-## The twenty-eight already answered
+## The twenty-nine already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -262,6 +311,7 @@ than quoting this paragraph.
 | `copyTrades` | BUILT — `copy-trades.ts` plus a `trade` segment on `RoomMessage`. Alerts only, as upstream gates it. Divergence: the reference's two `String.replace` calls take string patterns, so it makes only the FIRST order in a message copyable; the room splits every balanced pair. | 2026-08-28 |
 | `positionsIframe` + `positionsIframeUrl` | BUILT — `PositionsContainer` and `PositionsControls`, wired at nodes 3 and 5 of the presentation split area. ONE feature, two settings, conjoined once on the page. The thirty-second reload is behind a SECOND per-viewer gate, ANDed, so a member who never opens the panel has no background timer. | 2026-08-28 |
 | `usersCanDeleteOwnMsgs` | **BUILT, and it closed a hole.** The row's caveat — *"needs the `userDeleteChatMsg` command, which is absent"* — was FALSE: `messageAction`'s delete branch already let a member remove their own message, on all three item kinds, and never asked whether the room allowed it. The setting is now checked on the SERVER from the control plane, and the menu entry it feeds was defaulting off the whole time so nothing showed the gap. | 2026-08-28 |
+| `enableQAReactions` | **BUILT, and it was filed as a one-line WIRE twice over.** The rule was already transcribed and could never evaluate true — the Q&A thread rendered `kind="chat"` behind an inert handler. It needed two commands addressing a question by its own row id, two columns on `alert_questions`, and the thread extracted to its own component. Three menu entries that turn on with `kind="alert"` are deliberately NOT drawn: they address an `_id` a thread entry does not have, and are dead upstream. | 2026-08-28 |
 | `hasTypingIndicator` | BUILT — `lib/server/typing.ts` (an in-memory registry swept on read), `setTyping`, `publishTypingToRoom`, `TypingSignal` and the indicator in both columns. It gates the SEND as well as the display. The animated dots are deliberately NOT drawn: neither `app-typing-indicator-dots` nor `.typing-indicator` has a rule in any stylesheet we hold. | 2026-08-28 |
 
 ---

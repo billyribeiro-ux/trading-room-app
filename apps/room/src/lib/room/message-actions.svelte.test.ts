@@ -44,6 +44,12 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
   const toasts = new RoomToasts();
   const chat = new RoomChat({ extraColumnEnabled: () => true });
   const sent: unknown[] = [];
+  /*
+    The Q&A thread's two commands land here rather than in `sent`, and keeping them apart is the
+    assertion: `messageAction` must NEVER be called for a thread entry. A question id sent to that
+    endpoint would be read as an alert or a chat id and act on the wrong table.
+  */
+  const questionSends: Record<string, unknown>[] = [];
   const patches: [string, EvidencePatch][] = [];
   const opened: string[] = [];
   const selected: (ModalTargetUser | null)[] = [];
@@ -81,6 +87,14 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
         ? Promise.reject(new Error('refused'))
         : (sent.push(payload), Promise.resolve(null)),
     askQuestion: () => Promise.resolve(),
+    reactToQuestion: (payload) =>
+      options.refuse
+        ? Promise.reject(new Error('refused'))
+        : (questionSends.push({ command: 'reactToQuestion', ...payload }), Promise.resolve()),
+    deleteQuestion: (payload) =>
+      options.refuse
+        ? Promise.reject(new Error('refused'))
+        : (questionSends.push({ command: 'deleteQuestion', ...payload }), Promise.resolve()),
     replyMessage: () => Promise.resolve(),
     openModal: (name) => opened.push(name),
     closeMessageMenu: () => {},
@@ -99,6 +113,7 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
     toasts,
     composer,
     sent,
+    questionSends,
     patches,
     opened,
     selected,
@@ -169,16 +184,21 @@ describe('the confirmations, and what happens without them', () => {
     expect(dialogs.confirmation, 'and asks nothing').toBeNull();
   });
 
-  it('carries targetUserId on mute24 and on NOTHING else', async () => {
+  it('sends mute24 with the USER and no row coordinate at all', async () => {
     /*
-      `z.discriminatedUnion` refuses it on the other three. The action used to take it on every
-      operation and read it on one, so a delete carried a field nothing looked at.
+      `z.discriminatedUnion` refuses `targetUserId` on the other operations. It used to be taken on
+      every one and read on one, so a delete carried a field nothing looked at.
+
+      AND THE REVERSE, since 2026-08-28: `mute24` no longer carries `kind` or `id` either. It acts on
+      a USER; the row that was clicked is only how the viewer named them. The Q&A thread is what made
+      that matter — a question is neither an alert nor a chat message, so muting its author through
+      the shared shape meant labelling a question id as one of the two.
     */
     const { actions, dialogs, sent } = make();
     actions.handle('chat', 'mute', item());
     dialogs.confirmation?.onconfirm();
     await vi.waitFor(() => expect(sent).toHaveLength(1));
-    expect(sent[0]).toEqual({ kind: 'chat', id: 3, operation: 'mute24', targetUserId: 2 });
+    expect(sent[0]).toEqual({ operation: 'mute24', targetUserId: 2 });
 
     actions.handle('chat', 'show-all', item());
     await vi.waitFor(() => expect(sent).toHaveLength(2));

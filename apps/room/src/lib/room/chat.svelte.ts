@@ -1,3 +1,4 @@
+import { appendMention } from '#lib/mention-insert.js';
 import type { ChatTab } from '#lib/types.js';
 
 /*
@@ -224,17 +225,16 @@ export class RoomChat {
    * Returns true when the MAIN composer was written to, which is the page's cue to focus it and put
    * the caret at the end. The extra column gets no such treatment upstream either.
    *
-   * The extra column's insert is upstream's own and differs by a space:
-   * `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`. Both forms are reproduced exactly —
-   * a leading space only when there is already something typed, and a trailing space always, so the
-   * next word does not run into the name.
+   * The insert itself moved to `#lib/mention-insert.ts` on 2026-08-28, when the Q&A thread became a
+   * third receiver of it. The rule — a leading space only when something is already typed, a
+   * trailing space always — is stated there, once.
    */
   mention(name: string, toExtraColumn: boolean): boolean {
     if (toExtraColumn) {
-      this.#extraComposer += `${this.#extraComposer ? ' ' : ''}@${name} `;
+      this.#extraComposer = appendMention(this.#extraComposer, name);
       return false;
     }
-    this.#composer += `${this.#composer ? ' ' : ''}@${name} `;
+    this.#composer = appendMention(this.#composer, name);
     return true;
   }
 

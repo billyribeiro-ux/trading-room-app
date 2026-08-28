@@ -373,7 +373,7 @@ library, 126 API PostgreSQL integration across ten binaries, 9 release-attestor,
 112 media library, and 11 media binary. Compilation was never the claim worth
 making; this is. Its `pnpm quality` also passed: lint and formatting,
 zero-error/zero-warning Svelte diagnostics,
-all quality-gate source contracts and the fail-closed runtime HTTP contract, 1027
+all quality-gate source contracts and the fail-closed runtime HTTP contract, 1034
 Vitest tests, 20 Playwright tests across Chromium, Firefox, WebKit, and responsive
 Chromium with flaky-test rejection enabled, and the Vercel production build.
 The count rose from 116 to 129 when reCAPTCHA gained the server-side verification it

@@ -13,10 +13,15 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, EIGHTY-THREE by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-FOUR by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 96.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 97.
+
+  83 -> 84 on 2026-08-28: enableQAReactions. A CORRECTION rather than a new gate — the rule was
+  already transcribed in `message-behavior.ts` and could never evaluate true, because the Q&A thread
+  rendered its rows as chat behind an `onaction` that did nothing. Decided on the server too:
+  `reactToQuestion` refuses when the room did not enable it.
 
   82 -> 83 on 2026-08-28: hasTypingIndicator. It gates the SEND as well as the display — a room
   without it must not have members broadcasting their keystroke state to each other, which a
@@ -327,6 +332,7 @@ const EXPECTED_WIRED_SETTINGS = [
   'alertLabels',
   'usersPublicReply',
   'enableReactions',
+  'enableQAReactions',
   'enableEditMessage',
   'enableEditAlerts',
   'recordingReminder'

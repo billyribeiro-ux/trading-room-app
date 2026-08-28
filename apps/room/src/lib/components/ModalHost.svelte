@@ -2,11 +2,10 @@
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
-  import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
+  import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
   import { ALERT_SEARCH_LIMIT } from '#lib/alert-search-limit.js';
   import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
-  import { alertDateFormatter } from '#lib/message-formatters.js';
   import {
     CONNECTIVITY_ROWS,
     connectivityGlyph,
@@ -21,19 +20,25 @@
     ActivePoll,
     FollowChatStyle,
     ManagedChatUser,
+    MessageAction,
+    MessageActionItem,
+    MessageReactionPayload,
+    MessageReactions,
     ModalName,
     ModalTargetUser,
     SavedPoll,
     SettingsTab,
-    Theme
+    Theme,
+    TradeCopyPayload
   } from '#lib/types.js';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import AlertQaModal from './AlertQaModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
   import PostAlertModal from './PostAlertModal.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
-  import RoomMessage from './RoomMessage.svelte';
   import { chatModeConfirmPrompt, type ChatMode } from '#lib/chat-mode.js';
   import { refusalMessage, refusalOrTransportMessage } from '#lib/refusal-message.js';
   import { uploadFile } from '../../routes/files-pane.remote';
@@ -143,7 +148,40 @@
       senderEmailHash: string;
       senderAvatarUrl: string;
       senderRole: string;
+      /**
+       * The row's own reactions, validated on the SERVER by `parseReactions` before they travel —
+       * the same shape and the same route every other rendered message takes.
+       */
+      reactions: MessageReactions;
     }[];
+    /**
+     * The chrome every rendered message shares, spread onto each Q&A entry.
+     *
+     * THIS REVERSES A DECISION recorded in `room-message-chrome.ts`, which said the thread was
+     * "left spelling its four" because spreading the full chrome "would silently turn those on
+     * inside a modal that has never shown them". That was right while the thread was inert: it
+     * rendered `kind="chat"` with an `onaction` that did nothing, so anything the chrome switched on
+     * would have been a control that could not act.
+     *
+     * The thread acts now, and it renders `kind="alert"` because that is what the reference does
+     * (`this.isQAMsg = !0, this.logType = "alerts"`). Spreading is what makes its menu the menu the
+     * reference draws, minus the three entries that are dead upstream — `message-behavior.ts` names
+     * them and says why.
+     *
+     * `alertLabels` is deliberately NOT passed, and that is the reference's own choice: the body
+     * pipe receives `e.isQAMsg ? null : alertLabels` (bundle byte 1,331,700), so a hash inside a
+     * question stays text.
+     */
+    messageChrome: RoomMessageChrome;
+    /**
+     * What a Q&A entry's menu asks for. `mention` never arrives here — this component owns the
+     * thread's composer, so it inserts that one itself.
+     */
+    onQaAction: (
+      action: MessageAction,
+      item: MessageActionItem,
+      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+    ) => void;
     onMentionUser: (name: string) => void;
     onPrivateChat: (user: ModalTargetUser) => void;
     onFollowToggle: (user: ModalTargetUser) => void;
@@ -347,6 +385,8 @@
     onReplySend,
     onQuestionSend,
     alertQuestions = [],
+    messageChrome,
+    onQaAction,
     onMentionUser,
     onPrivateChat,
     onFollowToggle,
@@ -558,42 +598,6 @@
   });
   let replyComposer = $state('');
   let replyEmojiOpen = $state(false);
-  let qaComposer = $state('');
-  let qaEmojiOpen = $state(false);
-  let qaMenuQuestionId = $state<number | null>(null);
-  const qaQuestions = $derived(
-    alertQuestions.filter((question) => question.alertId === targetMessage?.id)
-  );
-  const qaTimeFormatter = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  // Captured alerts carry the timestamp exactly as it was rendered; database rows are formatted.
-  /*
-    The tooltip beside the visible time, which the reference BINDS rather than writes:
-    `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))` against a visible `hh:mm a`. Angular's
-    `date:'short'` for en-US is `M/d/yy, h:mm a`, which is exactly what `alertDateFormatter` already
-    produces — reused rather than re-derived, because a second formatter for the same shape is how
-    two of them drift apart.
-
-    Empty when there is no timestamp to format: `ngbTooltipWith` renders nothing for an empty string,
-    which matches a reference binding that evaluates to nothing.
-  */
-  const qaAlertTooltip = $derived.by(() => {
-    if (!targetMessage) return '';
-    return 'createdAt' in targetMessage && targetMessage.createdAt
-      ? alertDateFormatter.format(new Date(targetMessage.createdAt as string | Date))
-      : '';
-  });
-  const qaAlertTimestamp = $derived.by(() => {
-    if (!targetMessage) return '';
-    if ('evidenceTimestampText' in targetMessage && targetMessage.evidenceTimestampText) {
-      return targetMessage.evidenceTimestampText;
-    }
-    return 'createdAt' in targetMessage && targetMessage.createdAt
-      ? qaTimeFormatter.format(new Date(targetMessage.createdAt as string | Date))
-      : '';
-  });
   let youtubeURL = $state('');
   let ytVideoList = $state<Array<{ title: string; url: string }>>([]);
   let youtubePromptOpen = $state(false);
@@ -1829,27 +1833,6 @@
       replyEmojiOpen = false;
       onclose();
     }
-  }
-
-  async function sendQuestion() {
-    const body = qaComposer.trim();
-    if (!body) return;
-    if (await onQuestionSend(body)) {
-      qaComposer = '';
-      qaEmojiOpen = false;
-    }
-  }
-
-  // Mirrors the reply composer: Enter sends, Shift+Enter is ignored, Alt+Enter inserts a newline.
-  // The captured textarea had no handler at all, so pressing Enter did nothing.
-  function handleQaKeydown(event: KeyboardEvent) {
-    if (event.key !== 'Enter') return;
-    // Shift+Enter and Alt+Enter insert a line break: fall through so the textarea does it
-    // natively, which puts the break at the caret and keeps undo history intact. Calling
-    // preventDefault() before this check swallowed the keystroke and produced no newline at all.
-    if (event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    void sendQuestion();
   }
 
   // Same defect as the Q&A composer had, and the same fix: preventDefault() ran before the
@@ -4875,165 +4858,16 @@
     {/snippet}
   </Modal>
 </app-reply-modal>
-<app-alert-qa-modal>
-  <Modal
-    id="alertQAModal"
-    open={name === 'qa'}
-    ariaLabelledby="alertQALabel"
-    rootClass="fade modal"
-    rootRole={null}
-    rootAttributes={{ 'data-keyboard': 'false', 'data-backdrop': 'static' }}
-    dialogRole={null}
-    {onclose}
-    headerClass="align-items-start"
-    footerClass="flex-nowrap"
-    bodyStyle="max-height: 70vh;"
-  >
-    {#snippet header()}
-      <div class="flex-fill">
-        <h5 id="alertQALabel" class="modal-title">Q&amp;A for Alert:</h5>
-        <div class="admin-alert mt-2">
-          <div
-            {...{ clas: 'd-flex flex-column  align-items-center w-100' } as Record<string, string>}
-          >
-            <div class="mr-1 d-flex flex-row-reverse">
-              <div
-                class="d-flex flex-row-reverse justify-content-center align-items-start flex-nowrap mt-1"
-              >
-                <div class="avatar pl-1">
-                  <img
-                    alt="qaMsg.avt"
-                    src={targetMessage?.senderAvatarUrl ??
-                      'https://secure.gravatar.com/avatar/?d=mm&s=50'}
-                    loading="lazy"
-                    width="50"
-                    height="50"
-                  />
-                </div>
-              </div>
-              <div class="w-100">
-                <div class="d-flex justify-content-between align-items-center w-100">
-                  <span
-                    {...{ placement: 'top' } as Record<string, string>}
-                    {@attach ngbTooltipWith(qaAlertTooltip)}
-                    class="created-at mr-2">{qaAlertTimestamp}</span
-                  >
-                  <div class="d-flex align-items-center justify-content-between flex-nowrap">
-                    <strong class="username mx-1">{targetMessage?.senderName ?? ''}</strong>
-                  </div>
-                </div>
-                <div class="msg-left text-formated preText ml-2 mr-2 p-0">
-                  {targetMessage?.body ?? ''}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/snippet}
-    {#if qaQuestions.length === 0}
-      <div class="my-2">There are no questions.</div>
-    {:else}
-      <!--
-        The captured modal body renders each question through the same <app-st-message> component
-        the room uses, as `msg-box pb-1 msg-box-adm` in its reversed layout - not a bespoke list.
-      -->
-      {#each qaQuestions as question (question.id)}
-        <RoomMessage
-          item={{
-            id: question.id,
-            senderId: question.senderId,
-            senderName: question.senderName,
-            senderEmailHash: question.senderEmailHash,
-            senderAvatarUrl: question.senderAvatarUrl,
-            body: question.body,
-            createdAt: new Date(question.createdAt),
-            // Follows the sender, not the viewer. The captured reader-side modal renders another
-            // reader's question as plain `msg-box pb-1` in the forward layout and the presenter's
-            // answer as `msg-box pb-1 msg-box-adm` reversed; the compiled source picks its toast
-            // wording the same way (`const f = s.isA ? 'answer' : 'question'`). Hardcoding true
-            // made every entry, including a reader's own question, render as a presenter's.
-            isAdmin: question.senderRole === 'staff' || question.senderRole === 'admin',
-            // The captured question body carries `questionColor`. RoomMessage otherwise infers that
-            // from the text containing a "?", which would drop the colour for a question phrased
-            // without one - and inside this modal every entry is a question by definition.
-            evidenceQuestion: true
-          }}
-          kind="chat"
-          currentUserId={currentUser.id}
-          currentUserEmailHash={currentUser.emailHash}
-          viewerIsPresenter={isPresenter}
-          {theme}
-          menuOpen={qaMenuQuestionId === question.id}
-          showDateSeparator={false}
-          ontoggle={(id) => (qaMenuQuestionId = qaMenuQuestionId === id ? null : id)}
-          onaction={() => {}}
-        />
-      {/each}
-    {/if}
-    {#snippet footer()}
-      <div id="textAreaHolder" class="d-flex align-items-center textSendDiv flex-fill">
-        <div class="flex-fill d-flex mx-0">
-          <div class="px-0 flex-fill">
-            <textarea
-              name="txt-area"
-              id="textAreaQATxt"
-              rows="1"
-              spellcheck="true"
-              class="txt-area form-control border-0"
-              placeholder={isPresenter ? 'Type your answer here...' : 'Type your question here...'}
-              bind:value={qaComposer}
-              onkeydown={handleQaKeydown}></textarea>
-          </div>
-          <div
-            class="justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol"
-          >
-            <span
-              {...{
-                placement: 'auto',
-                container: 'body',
-                autoclose: 'outside',
-                popoverclass: 'popOverDiv'
-              } as Record<string, string>}
-              class="textAreaBtns"
-              aria-describedby={qaEmojiOpen ? 'ngb-popover-qa-emoji' : undefined}
-              onclick={() => (qaEmojiOpen = !qaEmojiOpen)}
-            >
-              <i
-                {...{ placement: 'left', ngbtooltip: 'Add Emojis' } as Record<string, string>}
-                {@attach ngbTooltip}
-                class="far fa-smile"
-              ></i>
-            </span>
-            {#if qaEmojiOpen}
-              <EmojiPicker
-                popoverId="ngb-popover-qa-emoji"
-                onselect={(glyph) => (qaComposer += glyph)}
-              />
-            {/if}
-            <!--
-              The compiled component gates this node on `canPostImages`
-              (`O(23, o.canPostImages ? 23 : -1)` in app-alert-qa-modal.full.js), which is why the
-              captured reader-side footer carries only the emoji button.
-            -->
-            {#if isPresenter}
-              <span class="textAreaBtns">
-                <i
-                  {...{
-                    ngbtooltip: 'Upload an Image',
-                    placement: 'left'
-                  } as Record<string, string>}
-                  {@attach ngbTooltip}
-                  class="fas fa-image"
-                ></i>
-              </span>
-            {/if}
-          </div>
-        </div>
-      </div>
-    {/snippet}
-  </Modal>
-</app-alert-qa-modal>
+<AlertQaModal
+  open={name === 'qa'}
+  {targetMessage}
+  {alertQuestions}
+  {messageChrome}
+  {isPresenter}
+  {onclose}
+  {onQuestionSend}
+  {onQaAction}
+/>
 <app-muted-users-modal>
   <Modal
     id="mutedUsersModal"

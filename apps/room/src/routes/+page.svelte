@@ -1314,6 +1314,7 @@
       {media}
       {mediaTransport}
       {messageActions}
+      {messageChrome}
       {polls}
       {prefs}
       {privateChat}

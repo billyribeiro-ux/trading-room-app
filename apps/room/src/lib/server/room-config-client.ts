@@ -548,6 +548,15 @@ export interface RoomSessionSettings {
    */
   usersPublicReply?: boolean;
   enableReactions?: boolean;
+  /**
+   * "Enable QA Reactions?" — the SAME control, on the Q&A thread rather than on chat.
+   *
+   * The reference states both halves as one expression (bundle byte 1,335,445), which is why they
+   * are two settings and one rule: `sourceMessageBehavior.react`. Read by `buildMessageChrome` for
+   * the menu and by `reactToQuestion` for the write, because a gate that only removes a menu entry
+   * is not a gate.
+   */
+  enableQAReactions?: boolean;
   /** Chat and alerts are gated SEPARATELY upstream, which is why this is not one setting. */
   enableEditMessage?: boolean;
   enableEditAlerts?: boolean;

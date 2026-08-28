@@ -342,6 +342,16 @@ const ROOM_CONSUMED = [
   'enableReactions',
   'enableEditMessage',
   'enableEditAlerts',
+  /* "Enable QA Reactions?" - the same control on the Q and A thread.
+
+     One expression upstream at byte 1,335,445: reactions render when enableReactions and the log is
+     chat, OR when enableQAReactions and the log is alerts and the row sits inside the Q and A
+     thread. message-behavior.ts already transcribed it; the second half could never be true here
+     because the thread rendered its rows as chat behind a handler that did nothing.
+
+     Decided on the server as well as drawn: reactToQuestion refuses when the room did not enable
+     it. */
+  'enableQAReactions',
   /* "Recording Reminder If Speaking?" - the room POLICY term of the reminder banner.
 
      Two different values share this name upstream and only one is a setting. The gate at bundle
@@ -814,6 +824,13 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 97 since 2026-08-28: `enableQAReactions`. Twenty-eighth find, and the second CORRECTION of the
+// enumeration after `dontShowRecInfoToUsers`: the rule was already written in `message-behavior.ts`
+// and could never evaluate true, because the Q and A thread passed `kind="chat"` and an `onaction`
+// that did nothing. Wiring the flag alone would have lit a control that cannot act, so the thread
+// got a real handler, its entries got a stable id to react to, and the load stopped silently
+// dropping every question ever asked on a captured alert.
+//
 // 96 since 2026-08-28: `hasTypingIndicator`. Twenty-seventh find, and the first whose room half
 // needed a server-side registry of its own - ephemeral, in memory, swept on read.
 //
@@ -853,7 +870,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 96 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 97 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

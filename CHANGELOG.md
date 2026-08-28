@@ -33,6 +33,103 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 19:32 UTC — The Q&A thread acts, and `enableQAReactions` finally has something to gate
+
+**Runtime impact: YES.** The Q&A thread on an alert had a kebab menu on every entry and
+`onaction={() => {}}` behind it: nothing any of those entries offered could happen. It works now —
+delete, react, user info, mention, private chat, mute, copy — and the room setting *"Enable QA
+Reactions?"* gates the reaction on the server as well as in the menu. Two live defects were fixed on
+the way, one of them a silent data loss.
+
+#### The row was filed as a one-line wire and it was a feature
+
+`missing-settings-triage.md` had `enableQAReactions` under WIRE, on the reading that
+`sourceMessageBehavior.react` already implements the reference's rule verbatim:
+
+```
+enableReactions && "chat" === logType || enableQAReactions && "alerts" === logType && isQAMsg
+                                                                            (bundle byte 1,335,445)
+```
+
+That much was true. What the first pass did not ask is what `isQAMsg` MEANS. It is not a property of
+a message: byte 2,334,347 is the Q&A modal's own constructor — `this.isQAMsg = !0, this.logType =
+"alerts"` — and 2,332,907 is that modal passing both to every entry. **It means "this row is being
+drawn inside the Q&A thread"**, and our thread passed `kind="chat"` with an inert handler, so the
+rule's second clause could never evaluate true no matter what an owner ticked. Wiring the flag alone
+would have lit a control that cannot act.
+
+#### What was built
+
+* **`routes/alert-questions.remote.ts`** gains `reactToQuestion` and `deleteQuestion`. Both address
+  a question **by its own row id**, and the reference cannot: `manageChatReactions(this.isQAMsg ?
+  this.qaMsgID : this.msg._id, …, this.msgIndex)` (1,354,136) and `deleteQAAlert({qaMsgID,
+  msgIndex})` (1,159,097) both send the PARENT alert plus an ORDINAL, because upstream thread entries
+  live inside the alert document and have no identity. An ordinal is a race — delete the second
+  question while somebody reacts to the third and the reaction lands on what is now the third.
+  Recorded as a deliberate divergence at the code and in the schema.
+* **`alert_questions` gains `reactions_json`** — a reaction belongs to the row it is on — and
+  **`room_short_code`**, which reverses an argument this repository had written down (below).
+* **`AlertQaModal.svelte`**, new. The thread left `ModalHost.svelte` because the size ratchet refused
+  the raise its handler needed, which is what that ratchet is for. `ModalHost` drops **166 lines**.
+* **`message-behavior.ts`** suppresses three menu entries inside the thread — `showToAll`,
+  `openAlertReport` and `edit` — that turn on purely because the thread renders as `logType="alerts"`
+  and that each act on `this.msg._id`, which a thread entry does not have. **They are dead upstream**;
+  drawing them would be shipping a control whose only effect is changing its own label.
+* **`mention` never leaves the modal**, exactly as upstream routes it (`doQAMention`), because the
+  composer it writes into is the thread's own. The insert itself is now one function,
+  `#lib/mention-insert.ts`, shared by all three composers — it would otherwise have been a third
+  copy.
+
+#### DEFECT: a question asked on a captured alert was written and never read back
+
+`askQuestion` accepts a NEGATIVE alert id — it resolves the fixture through `capturedRoomItem` and
+writes a real row, deliberately, with its own comment saying so. `loadQuestionsForAlerts` then
+dropped every one of those rows, because it reached its room by joining `alerts` and a fixture alert
+has no row to join to; `+page.server.ts` did not pass their ids either. **A member asked a question
+on a captured alert, was told nothing, and watched the thread go on saying "There are no questions."**
+
+`alert-log.ts` had argued in writing that the column was unnecessary — *"adding `room_short_code` to
+the table would denormalise a fact this schema already derives"*. It does not derive it for every
+row. Worse, those rows had **no room anchor at all**, so two rooms serving the same captured alert
+would have shared their questions the moment anything did read them. The column is the anchor now,
+backfilled from `alerts` where a row exists; the reversal and its reason are recorded in place.
+
+The same missing term was in `askQuestion`'s answered-sweep and its recount, both keyed on `alertId`
+alone. Real alert ids are globally unique, which is exactly why the hole was invisible.
+
+#### `mute24` stopped carrying a coordinate it never read
+
+The shared `{ kind, id }` target rode on `mute24` and the branch read neither — it mutes a USER. The
+Q&A thread is what made that cost something: a question is neither an alert nor a chat message, so
+muting its author through the shared shape meant labelling a question id as one of the two, and the
+day anything started reading `id` it would have acted on the wrong table. `mute24` now takes
+`targetUserId` and nothing else, and the schema refuses the other two.
+
+#### Verified
+
+* **Eleven negative controls, each seen RED**: the `!isQaMessage` term removed from `showToAll`; the
+  server entitlement removed; `!== true` weakened to `=== false`; the room predicate removed from the
+  question resolver; the `usersCanDeleteOwnMsgs` check removed from the delete; the chrome reading
+  the setting as truthy; the thread reverted to `kind="chat"`; the `alerts` join restored to the
+  questions read; the room term removed from the answer sweep, from the recount, and from the
+  question insert.
+* One assertion in the new file was **caught not failing** — it drove the answered-sweep with a hand
+  written `UPDATE` instead of the command, so it asserted nothing. Rewritten to call `askQuestion`,
+  then seen red.
+* One expectation in it was **measured wrong and corrected**: two consecutive mentions produce
+  `@ana  @bo `, with two spaces, because upstream's trailing space is unconditional and its leading
+  space only asks whether anything is there. Asserted as it is rather than smoothed over.
+* Room: `pnpm test` green — 172 files / 2,797 tests, 1 skipped. Controller: 96 files / 1,013 passed,
+  21 skipped (1,034 total), and every gate script in its `test` chain except `runtime:http`, which
+  needs a PostgreSQL this container does not run (`ECONNREFUSED 127.0.0.1:5432`). `svelte-check` 0
+  errors in both. `eslint` clean in both. `schema:verify`: **97 wired**.
+* **A pre-existing gate failure fixed on the way**: the controller's four documented Vitest totals
+  said 1027 tests / 100 files and the suite ran 1034 / 101. Confirmed pre-existing by stashing this
+  work and re-running the verifier on `HEAD`; the four sites are corrected.
+* **NOT verified:** the Svelte MCP is disconnected in this session, so `svelte-autofixer` could not
+  be run on `AlertQaModal.svelte`, `ModalHost.svelte`, `RoomOverlays.svelte` or `+page.svelte`.
+  Nothing was mounted in a browser; the thread's rendering is asserted as source, not as pixels.
+
 ### 2026-08-28 18:40 UTC — The typing indicator, and a gate that governs the send rather than the view
 
 **Runtime impact: YES.** A room with *"Typing indicator"* on now shows who is typing, above each chat

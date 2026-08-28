@@ -270,6 +270,17 @@ describe('the allow-list itself', () => {
       */
       hasQAOnAlerts: 'RoomMessage — the ask-a-question button on an alert, through RoomMessageChrome',
       /*
+        TWO consumers, and naming only the first would have been the mistake this whole map exists to
+        prevent. `message-behavior.ts` already carried the rule — reactions on a row drawn inside the
+        Q&A thread — and it could never evaluate true, because that thread passed `kind="chat"` and
+        an `onaction` that did nothing. The gate on the SERVER is the one that makes the setting
+        binding: `reactToQuestion` reads the room's own configuration and refuses when it is off, so
+        an owner who left it off gets a room where the reaction cannot be recorded, not one where the
+        button is merely hidden.
+      */
+      enableQAReactions:
+        'RoomMessageChrome — reactions inside the Q&A thread — and reactToQuestion, which refuses when the room has it off',
+      /*
         Both verified in the room before being written here. `alwaysShowRoster` seeds `sidebarOpen`
         in `+page.svelte`, which `RoomSidebar` and `RoomNavbar` both read; the reference's SECOND use
         of it — a third OR-term on the mobile-app icon — is deliberately refused, with the reason at
@@ -311,8 +322,7 @@ describe('the allow-list itself', () => {
         module that resolves it is also where the honest gap lives: the Summernote build that turns
         the reference's two button names into DOM is not in the capture.
       */
-      simplifiedEditor:
-        'resolveNoteSurfaceGates — foreground-only colour on the NoteEditor toolbar',
+      simplifiedEditor: 'resolveNoteSurfaceGates — foreground-only colour on the NoteEditor toolbar',
       /*
         Verified in the room before being written here, and the consumer named is the SERVER one on
         purpose: `loadPeerPrivateMessageHistory` refuses before it selects a row. The button in the
@@ -355,8 +365,7 @@ describe('the allow-list itself', () => {
         `PresentationArea` conjoins them once before anything downstream sees either.
       */
       positionsIframe: 'PresentationArea — the Show/Hide Positions buttons and the panel they open',
-      positionsIframeUrl:
-        'PresentationArea — the Show/Hide Positions buttons and the panel they open',
+      positionsIframeUrl: 'PresentationArea — the Show/Hide Positions buttons and the panel they open',
       /*
         Verified in the room before being written here, and the consumer named is the SERVER one:
         `messageAction`'s delete branch refuses a non-presenter unless the room enabled it. The menu

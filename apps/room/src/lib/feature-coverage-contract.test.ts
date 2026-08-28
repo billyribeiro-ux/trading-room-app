@@ -37,15 +37,20 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   `hardReset`, `openSession` and `saveCloseMessage` LEFT this list on 2026-08-27, when the three
   commands they name were built in `session-commands.remote.ts`. That is the routine edit this list
   exists for: landing a feature removes a name, and the diff says which.
+
+  `chatReactions` and `deleteQAAlertMsg` left on 2026-08-28 with the Q&A thread. Both are cited at
+  the code that replaces them — `reactToQuestion` and `deleteQuestion` in
+  `routes/alert-questions.remote.ts` — and BOTH cites are there to record a divergence rather than a
+  transcription: the reference addresses a thread entry by its parent alert plus an ORDINAL, because
+  its entries live inside the alert document and have no id. Ours have one. So these two names leave
+  the list because the feature landed, and the citation beside each says exactly how it differs.
 */
 const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'alertQAMsg',
   'archiveLogs',
   'callScreeen',
-  'chatReactions',
   'deleteAlertMsg',
   'deleteChatMsg',
-  'deleteQAAlertMsg',
   'demux',
   'doShowMsgToAll',
   'forceStopScreen',

@@ -955,6 +955,24 @@ export const ROOM_VISIBLE_SETTINGS = [
   'enableEditMessage',
   'enableEditAlerts',
   /*
+    "Enable QA Reactions?" — the SAME control on a different surface, and a fifth setting of the
+    shape above.
+
+    The rule is one expression upstream (bundle byte 1,335,445): reactions render when
+    enableReactions and the log is chat, OR when enableQAReactions and the log is alerts and the row
+    is being drawn inside the Q and A thread. `message-behavior.ts` has carried that transcription
+    since it was written, and the second half could never be true here, because the thread rendered
+    its rows as chat with a handler that did nothing.
+
+    It crosses for the reason the four above do: every occurrence in the reference is sessData dotted
+    onto the name, so it is per-room policy and nothing the room can infer. And it is DECIDED ON THE
+    SERVER as well as drawn — reactToQuestion refuses when the room did not enable it, because a gate
+    that only removes a menu entry is not a gate.
+
+    Read by `room-message-chrome.ts` and by `routes/alert-questions.remote.ts`.
+  */
+  'enableQAReactions',
+  /*
     "Recording Reminder If Speaking?" - the POLICY half of the reminder banner.
 
     TWO values share this name upstream and only one of them is a setting. The gate at bundle byte

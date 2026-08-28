@@ -483,10 +483,22 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     reasoning, because the module that owns how alerts are PAGED is the one that owns what bounds
     their questions.
   */
-  const questionRows = loadQuestionsForAlerts(
-    requireRoomShortCode(locals),
-    alertRows.map((alert) => alert.id)
-  );
+  const questionRows = loadQuestionsForAlerts(requireRoomShortCode(locals), [
+    /*
+      CAPTURED ALERT IDS TRAVEL TOO, added 2026-08-28.
+
+      `askQuestion` accepts a negative alert id — it resolves the fixture through `capturedRoomItem`
+      and writes a real row — so a captured alert can have questions. This list used to hold only
+      `alertRows`, and `loadQuestionsForAlerts` used to reach its room by joining `alerts`, so those
+      rows were dropped twice over: absent from the id list, and unjoinable if they had been in it.
+      A member asking a question on a captured alert got no error and an empty thread.
+
+      Filtered by `isVisible` for the same reason the merge below is: an alert hidden in this room
+      does not get to bring its questions back.
+    */
+    ...capturedRoom.alerts.filter(isVisible).map((alert) => alert.id),
+    ...alertRows.map((alert) => alert.id)
+  ]);
 
   // The Q&A button has three states and `alert_questions.answered_at` is the only source of truth
   // for which one an alert is in. Deriving them here means the button cannot disagree with the

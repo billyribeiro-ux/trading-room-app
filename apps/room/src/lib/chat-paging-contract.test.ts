@@ -109,7 +109,16 @@ describe('the read is bounded', () => {
     // The load hands the alert page's ids to the module that owns alert paging, and reads nothing
     // from `alert_questions` itself any more.
     expect(serverCode).toContain('loadQuestionsForAlerts(');
-    expect(serverCode).toContain('alertRows.map((alert) => alert.id)');
+    expect(serverCode).toContain('...alertRows.map((alert) => alert.id)');
+    /*
+      AND THE CAPTURED ALERTS' IDS, added 2026-08-28. `askQuestion` accepts a negative alert id and
+      writes a real row; this list used to hold only `alertRows`, so those rows were never read back
+      and the thread said "There are no questions." forever. Bounded exactly as before — one page of
+      alerts, fixture included, and nothing else.
+    */
+    expect(serverCode).toContain(
+      '...capturedRoom.alerts.filter(isVisible).map((alert) => alert.id)'
+    );
     expect(serverCode, 'the page must not query that table directly').not.toContain(
       '.from(alertQuestions)'
     );
@@ -128,9 +137,19 @@ describe('the read is bounded', () => {
     // The bound itself: the alert id list.
     expect(read).toContain('inArray(alertQuestions.alertId, alertIds)');
 
-    // The tenancy term stays IN the statement beside the id list. An id list is not a substitute:
-    // this read was a cross-tenant leak until 2026-08-14 and the filter is why it is not one now.
-    expect(read).toContain('eq(alerts.roomShortCode, roomShortCode)');
+    /*
+      The tenancy term stays IN the statement beside the id list. An id list is not a substitute:
+      this read was a cross-tenant leak until 2026-08-14 and the filter is why it is not one now.
+
+      IT READS THE QUESTION'S OWN COLUMN since 2026-08-28, not a join to `alerts`. The join supplied
+      the room for free and dropped every question asked on a CAPTURED alert while doing it, because
+      a fixture alert has no row to join to. `alert-log.ts` carries the reversal and its reasoning;
+      the assertion below is the shape that matters — a room predicate on the rows being read.
+    */
+    expect(read).toContain('eq(alertQuestions.roomShortCode, roomShortCode)');
+    expect(read, 'the join that dropped captured questions is gone').not.toContain(
+      'innerJoin(alerts'
+    );
   });
 
   it('asks nothing at all when the page holds no alerts', () => {

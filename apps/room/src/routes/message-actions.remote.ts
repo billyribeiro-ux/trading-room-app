@@ -74,9 +74,15 @@ const messageActionArgs = z.discriminatedUnion('operation', [
   z.strictObject({ operation: z.literal('delete'), ...target }),
   z.strictObject({ operation: z.literal('markAnswered'), ...target }),
   z.strictObject({ operation: z.literal('showMsgToAll'), ...target }),
+  /*
+    NO `kind` AND NO `id`. The branch reads neither — it mutes a USER, and the row that was clicked
+    is only how the viewer named them. Carrying the target anyway invited the lie the Q&A thread
+    would have had to tell on 2026-08-28: a question is neither an alert nor a chat message, so
+    muting its author meant sending a question id under one of two labels that do not describe it.
+    A field nothing reads is a field the next reader will start reading.
+  */
   z.strictObject({
     operation: z.literal('mute24'),
-    ...target,
     targetUserId: z.number().int().positive()
   }),
   z.strictObject({
@@ -107,6 +113,26 @@ export const messageAction = command(messageActionArgs, async (args) => {
   const user = requireUser(locals);
   const room = requireRoomShortCode(locals);
   const isPresenter = isPresenterRole(user.role);
+  /*
+    `mute24` carries neither coordinate — see its member of the union above — so the two are read
+    from the five operations that do. It is handled before anything below touches them.
+  */
+  if (args.operation === 'mute24') {
+    if (!isPresenter) error(403, 'Presenters only.');
+    /*
+      The insert used to be written out here. It moved to `applyChatMute` when the user modal's
+      " Mute Chat for 24hrs " button was wired, because that is a SECOND door onto the same act and a
+      second copy of a rule is how a ban that enforced nothing shipped earlier the same day:
+      `internal/room-ban` hand-copied a mapping instead of calling it and wrote the wrong half.
+
+      What moving it bought beyond deduplication: the member is now TOLD. This branch wrote the row
+      and announced nothing, so somebody muted mid-conversation kept an enabled composer until their
+      next page load. `unmuteChat` in `chat-mute.remote.ts` is still the other half.
+    */
+    applyChatMute(room, args.targetUserId, user.id);
+    return;
+  }
+
   const { kind, id } = args;
 
   /*
@@ -381,21 +407,6 @@ export const messageAction = command(messageActionArgs, async (args) => {
       .set({ answered: true })
       .where(and(eq(messages.roomShortCode, room), eq(messages.id, id)))
       .run();
-    return;
-  }
-
-  if (args.operation === 'mute24') {
-    /*
-      The insert used to be written out here. It moved to `applyChatMute` when the user modal's
-      " Mute Chat for 24hrs " button was wired, because that is a SECOND door onto the same act and a
-      second copy of a rule is how a ban that enforced nothing shipped earlier the same day:
-      `internal/room-ban` hand-copied a mapping instead of calling it and wrote the wrong half.
-
-      What moving it bought beyond deduplication: the member is now TOLD. This branch wrote the row
-      and announced nothing, so somebody muted mid-conversation kept an enabled composer until their
-      next page load. `unmuteChat` in `chat-mute.remote.ts` is still the other half.
-    */
-    applyChatMute(room, args.targetUserId, user.id);
     return;
   }
 
