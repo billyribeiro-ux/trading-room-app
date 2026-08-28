@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 11:50 UTC — A setting whose obvious reading is its exact inverse
+
+**Runtime impact: YES.** A room that sets *"Show only usernames?"* now draws **member** roster rows
+as an icon and a name, and leaves **presenter** rows in full. It did nothing before.
+
+**The triage row said "read the two slots before building — the difference is the point", and it was
+right.** Byte 2,035,670, the only occurrence in the bundle:
+
+```js
+O(1, !this.appService.globals.sessData.showOnlyUsernames || e.isP ? 1 : 2)
+```
+
+Slot 1 is `w2e` — twenty-one nodes: avatar, badges, kebab, years, location. Slot 2 is `T2e`, four
+nodes: `<i class="fas fa-user m-1">` and the nick, keeping both handlers.
+
+**`e` IS THE ROW, NOT THE VIEWER.** It is the `$implicit` of the roster's iteration, so a room with
+this on reduces the rows of MEMBERS and leaves PRESENTERS in full — for everybody, including other
+members. The obvious reading — *members see only usernames* — is the exact inverse, and would have
+produced a room where a presenter could not see their own members' avatars while members saw
+everything. That is why `rosterRowIsFull` takes **no viewer argument at all**, and why a test asserts
+its arity.
+
+**Every render test draws BOTH kinds of row and asserts on the difference.** A test that rendered one
+member and found no avatar would pass just as well under the inverted reading, so each one checks
+that exactly one of the two rows kept its avatar — and that it is the presenter's.
+
+**Four negative controls seen RED, and two more were added because they stayed GREEN first time.**
+The inverted reading and the stripped handlers went red immediately. Loosening
+`showOnlyUsernames !== true` to `!showOnlyUsernames` did not — nothing asserted the strict form. Nor
+did replacing the page's `rowIsFull={…}` with `() => true`, because the render supplies its own
+predicate: the unfed-prop failure class for the third time this session.
+
+**Those tests went in a capture-free file, and that placement is the lesson.** They belonged in
+`roster-gates.test.ts` beside the predicate — and that file is **evidence-bound**, excluded on every
+checkout but one. Tests written there run for their author and silently do not run for CI. That has
+already happened once in this repository, to the `hasQaOnAlerts` assertions, so
+`roster-row-shape-contract.test.ts` reads no capture and says why at the top.
+
+**An assertion matched its own explanation for the THIRD time today**, after `publishToUsers` and
+`PTR Session`: the sidebar's byte citation names `showOnlyUsernames`, and the refusal
+*"the sidebar must never read the setting itself"* matched the comment saying which setting is being
+drawn. Comments are stripped before every `not.toContain` here now.
+
+**The page pays one line**, 1366 → 1367, and the entry names why the roster gates are the one family
+on that page still right to grow line by line: each is a separately named predicate at the call site,
+and collapsing them into an object would save four lines and lose exactly the property that makes
+them reviewable.
+
+**Verified:** room 163 files / 2,481 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` byte-compares at **85 wired** · both room gates and the six controller
+verifiers green · `svelte-check` 0/0 across 1,288 files · eslint clean · prettier clean on every file
+this change touches.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+`RoomSidebar.svelte`.
+
 ### 2026-08-28 11:20 UTC — A billing status any member could read, found by checking a caveat
 
 **Runtime impact: YES.** The `Trial` and `New` badges in the user-info modal are presenter-only now.

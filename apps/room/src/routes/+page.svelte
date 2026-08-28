@@ -20,7 +20,8 @@
   import {
     rosterRowClass,
     rosterRowVisible,
-    locationVisibleTo
+    locationVisibleTo,
+    rosterRowIsFull
   } from '#lib/roster-gates.js';
                           import { createRoom } from '#lib/room/create-room.svelte.js';
                         import { setAutoplayAttribute, setWebcamAudioAttributes } from '#lib/room/webcams.js';
@@ -1053,6 +1054,7 @@
           {rowVisible}
           {rosterRowClass}
           locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
+          rowIsFull={(entry) => rosterRowIsFull(entry, rosterSession)}
           canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
           mobileAppAvailable={gates.mobileAppAvailable}
           benzingaVisible={gates.benzingaVisible}

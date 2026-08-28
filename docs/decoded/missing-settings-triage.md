@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **41** as this is written; seventeen have been answered by building, and the
+2026-08-28 and is at **40** as this is written; eighteen have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -197,7 +197,6 @@ than quoting this paragraph.
 | `customFaviconURL` | 2,594,973 | `changeFavicon(...)`, on the same line as `customCSS`. |
 | `customPlayerURL` | 1,918,564 | An iframe in the screens pane, chosen over the normal content at byte 2,017,223. |
 | `playChatMessageSoundFor` | 1,431,925 | A list of hashed senders whose messages play a sound for this viewer. |
-| `showOnlyUsernames` | 2,035,645 | `!sessData.showOnlyUsernames \|\| e.isP` picks between two renderings of a roster entry. Read the two slots before building — the difference is the point. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
 | `altChatRender` | 1,349,126 | Forces `displayMode = "c"`, persists it as the `chatMode` preference, and hides avatars for chat and Q&A messages. |
 | `linkedRoomAlerts` | 2,139,184 | One row of the alert composer, cross-posting to a linked room. |
@@ -220,7 +219,7 @@ than quoting this paragraph.
 
 ---
 
-## The seventeen already answered
+## The eighteen already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -241,6 +240,7 @@ than quoting this paragraph.
 | `modMessage` | WIRED — `ModeratorMessage.svelte`, presenter-only, dismissed locally exactly as upstream dismisses it. | 2026-08-28 |
 | `simplifiedEditor` | WIRED — a field of `NoteSurfaceGates`; the note toolbar's colour control becomes foreground-only. The first row whose downstream VENDOR is absent from the capture, so the decision is reproduced and the unevidenced part is named. | 2026-08-28 |
 | `enablePrivateMessageHistory` | BUILT — corrected out of WIRE first: the button was one row, and the modal it opens was a spinner with no fetch. `getAllUserPM` now exists, bounded, and refuses on the server. | 2026-08-28 |
+| `showOnlyUsernames` | BUILT — `rosterRowIsFull`. The row's own advice paid off: `e` is the ROW, so the setting reduces MEMBER rows and leaves presenters in full, for every viewer. The obvious reading was the exact inverse. | 2026-08-28 |
 
 ---
 

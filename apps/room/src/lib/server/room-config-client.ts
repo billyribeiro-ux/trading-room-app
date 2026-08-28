@@ -299,6 +299,13 @@ export interface RoomSessionSettings {
    */
   enablePrivateMessageHistory?: boolean;
   /**
+   * "Show only usernames?" — presenters draw in full, members as an icon and a name.
+   *
+   * `O(1, !sessData.showOnlyUsernames || e.isP ? 1 : 2)` (byte 2,035,670), where `e` is the ROW.
+   * See `rosterRowIsFull` for why that distinction is the whole setting.
+   */
+  showOnlyUsernames?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

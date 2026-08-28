@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 84 of 269 are wired today.
+// nothing in the room reads it yet. 85 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -115,7 +115,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "hideAvatars", section: "settings", type: "checkbox", label: "Hide User Avatars?", help: "If enabled, user avatars will be hidden", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideAppInfo", section: "settings", type: "checkbox", label: "Hide Mobile App Info?", help: "If enabled, mobile app info wiil be hidden", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "alwaysShowRoster", section: "settings", type: "checkbox", label: "Always Show User Roster?", help: "If enabled, user roster will always be visible", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "showOnlyUsernames", section: "settings", type: "checkbox", label: "Show Only Usernames in Roster?", help: "If enabled, for regular users it will show only their usernames in roster?", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "showOnlyUsernames", section: "settings", type: "checkbox", label: "Show Only Usernames in Roster?", help: "If enabled, for regular users it will show only their usernames in roster?", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "allowUsersToChangeUsername", section: "settings", type: "checkbox", label: "Allow Users to Change their Usernames?", help: "If enabled, for regular users it will allow them to change their usernames.", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "disableEditingUsername", section: "settings", type: "checkbox", label: "Disable Editing Username", help: "If enabled, it will disable the editing of the username in the login form for regular users", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "usernameInstructions", section: "settings", type: "textarea", label: "Username Instructions", help: "Instructions how user can edit his username", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },

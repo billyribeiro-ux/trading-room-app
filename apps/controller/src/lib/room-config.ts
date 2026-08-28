@@ -614,6 +614,22 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'enablePrivateMessageHistory',
   /*
+    "Show only usernames?" - which SHAPE a roster row draws in.
+
+      O(1, !this.appService.globals.sessData.showOnlyUsernames || e.isP ? 1 : 2)   byte 2,035,670
+
+    Slot 1 is the full row - avatar, badges, kebab, years, location. Slot 2 is four nodes: a
+    fa-user icon and the nick, keeping both handlers.
+
+    READ WHICH `e` THIS IS. It is the roster iterations own row, not the viewer, so a room with this
+    on draws PRESENTERS in full and MEMBERS as bare names, for everybody. The obvious reading -
+    members see only usernames - is the exact inverse and would have produced a room where
+    presenters lose their members avatars. That is why the predicate takes no viewer at all.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'showOnlyUsernames',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

@@ -97,6 +97,14 @@
       home for the room's authority model.
     */
     locationVisible: (entry: Entry) => boolean;
+    /**
+     * "Show only usernames?" — whether this row draws in full or as an icon and a name.
+     *
+     * Per ROW and not per viewer: `rosterRowIsFull` carries the transcription and the reason that
+     * distinction is the whole setting. Resolved on the page like every other roster gate, so this
+     * component renders a decision rather than making one.
+     */
+    rowIsFull: (entry: Entry) => boolean;
     canOpenRosterPrivateChat: (entry: Entry) => boolean;
     mobileAppAvailable: boolean;
     benzingaVisible: boolean;
@@ -144,6 +152,7 @@
     rowVisible,
     rosterRowClass,
     locationVisible,
+    rowIsFull,
     canOpenRosterPrivateChat,
     mobileAppAvailable,
     benzingaVisible,
@@ -597,87 +606,110 @@
                       {#if rowVisible(user)}
                         <div class="room-roster-container">
                           <div class={rosterRowClass(user)}>
-                            <div class="media">
-                              <!-- svelte-ignore a11y_click_events_have_key_events -->
-                              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                              <img
-                                class="rosterImg mr-3"
-                                alt={user.displayName}
-                                src={user.avatarUrl}
-                                onclick={() => onopenrosteruserinfo(user)}
-                              />
-                              <div class="media-body">
-                                <div class="mt-0 mb-0 nickName d-inline">
-                                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                  <span
-                                    onclick={() => onmentionrosteruser(user)}
-                                    ondblclick={() => onopenrosteruserinfo(user)}
-                                    >{user.displayName}</span
-                                  >
-                                  <div class="d-inline-block align-baseline mr-1"></div>
-                                  <!-- svelte-ignore a11y_interactive_supports_focus -->
-                                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                  <a
-                                    role="button"
-                                    id="dropdownMenuLink"
-                                    data-bs-toggle="dropdown"
-                                    aria-haspopup="true"
-                                    aria-expanded={menus.userId === user.id}
-                                    class="msgMenu dropright d-inline-block float-right"
-                                    onclick={(event) => {
-                                      event.stopPropagation();
-                                      onselectuser(user.id);
-                                      menus.toggleUserMenu(user.id);
-                                    }}>⠇</a
-                                  >
-                                  <div
-                                    aria-labelledby="dropdownMenuLink"
-                                    class={menus.userId === user.id
-                                      ? 'dropdown-menu users-dropdown-options show'
-                                      : 'dropdown-menu users-dropdown-options'}
-                                    data-bs-popper={menus.userId === user.id ? 'static' : undefined}
-                                    style={menus.userId === user.id ? 'display: block;' : undefined}
-                                  >
-                                    <!-- svelte-ignore a11y_missing_attribute -->
+                            <!--
+                              `O(1, !sessData.showOnlyUsernames || e.isP ? 1 : 2)` — byte 2,035,670.
+                              Slot 1 is the full row; slot 2 is `T2e`, four nodes, below. `e` is the
+                              ROW: a room with this on draws presenters in full and members as bare
+                              names, to everybody. See `rosterRowIsFull`.
+                            -->
+                            {#if !rowIsFull(user)}
+                              <div class="media">
+                                <i class="fas fa-user m-1"></i>
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <span
+                                  onclick={() => onmentionrosteruser(user)}
+                                  ondblclick={() => onopenrosteruserinfo(user)}
+                                  >{user.displayName}</span
+                                >
+                              </div>
+                            {:else}
+                              <div class="media">
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                                <img
+                                  class="rosterImg mr-3"
+                                  alt={user.displayName}
+                                  src={user.avatarUrl}
+                                  onclick={() => onopenrosteruserinfo(user)}
+                                />
+                                <div class="media-body">
+                                  <div class="mt-0 mb-0 nickName d-inline">
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <a
-                                      class="dropdown-item"
-                                      onclick={() => onopenrosteruserinfo(user)}
-                                      ><i class="fas fa-user"></i>&nbsp;&nbsp;User Info</a
-                                    >
-                                    <!-- svelte-ignore a11y_missing_attribute -->
-                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                                    <a
-                                      class="dropdown-item"
+                                    <span
                                       onclick={() => onmentionrosteruser(user)}
-                                      ><i class="fas fa-reply"></i>&nbsp;&nbsp;Mention / Reply</a
+                                      ondblclick={() => onopenrosteruserinfo(user)}
+                                      >{user.displayName}</span
                                     >
-                                    {#if canOpenRosterPrivateChat(user)}
+                                    <div class="d-inline-block align-baseline mr-1"></div>
+                                    <!-- svelte-ignore a11y_interactive_supports_focus -->
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <a
+                                      role="button"
+                                      id="dropdownMenuLink"
+                                      data-bs-toggle="dropdown"
+                                      aria-haspopup="true"
+                                      aria-expanded={menus.userId === user.id}
+                                      class="msgMenu dropright d-inline-block float-right"
+                                      onclick={(event) => {
+                                        event.stopPropagation();
+                                        onselectuser(user.id);
+                                        menus.toggleUserMenu(user.id);
+                                      }}>⠇</a
+                                    >
+                                    <div
+                                      aria-labelledby="dropdownMenuLink"
+                                      class={menus.userId === user.id
+                                        ? 'dropdown-menu users-dropdown-options show'
+                                        : 'dropdown-menu users-dropdown-options'}
+                                      data-bs-popper={menus.userId === user.id
+                                        ? 'static'
+                                        : undefined}
+                                      style={menus.userId === user.id
+                                        ? 'display: block;'
+                                        : undefined}
+                                    >
                                       <!-- svelte-ignore a11y_missing_attribute -->
                                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                                       <!-- svelte-ignore a11y_no_static_element_interactions -->
                                       <a
                                         class="dropdown-item"
-                                        onclick={() => onopenrosterprivatechat(user)}
-                                        ><i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat
-                                      </a>
-                                    {/if}
+                                        onclick={() => onopenrosteruserinfo(user)}
+                                        ><i class="fas fa-user"></i>&nbsp;&nbsp;User Info</a
+                                      >
+                                      <!-- svelte-ignore a11y_missing_attribute -->
+                                      <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                      <a
+                                        class="dropdown-item"
+                                        onclick={() => onmentionrosteruser(user)}
+                                        ><i class="fas fa-reply"></i>&nbsp;&nbsp;Mention / Reply</a
+                                      >
+                                      {#if canOpenRosterPrivateChat(user)}
+                                        <!-- svelte-ignore a11y_missing_attribute -->
+                                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                        <a
+                                          class="dropdown-item"
+                                          onclick={() => onopenrosterprivatechat(user)}
+                                          ><i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat
+                                        </a>
+                                      {/if}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <!--
+                                <!--
                                 `<p class="userLocation">`, a sibling of `.nickName` inside
                                 `.media-body`. Presenter-only: the reference gates it on
                                 `globals.isPresenter && entry.privData`, so a member never
                                 sees anyone's city — see `locationVisibleTo`.
                               -->
-                              {#if locationVisible(user)}
-                                <p class="userLocation">{user.locStr}</p>
-                              {/if}
-                            </div>
+                                {#if locationVisible(user)}
+                                  <p class="userLocation">{user.locStr}</p>
+                                {/if}
+                              </div>
+                            {/if}
                           </div>
                         </div>
                       {/if}

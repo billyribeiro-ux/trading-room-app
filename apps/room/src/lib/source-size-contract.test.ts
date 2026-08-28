@@ -429,7 +429,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       moving to the thing that owns it — `buildMessageChrome`, `resolveNoteSurfaceGates`, and now the
       row. None was an extraction invented to satisfy a number, and that is why each one stuck.
     */
-    max: 1366,
+    /*
+      1366 -> 1367, 2026-08-28. ONE line: `rowIsFull={(entry) => rosterRowIsFull(entry, rosterSession)}`
+      at the sidebar call site, beside the four roster gates already resolved there.
+
+      Recorded rather than absorbed, because the standing rule is that every raise is a conversation
+      however small — and because this one has a shape worth naming: the roster's gates are the ONE
+      family on this page that has grown line by line and is still right to. Each is a predicate in
+      `roster-gates.ts` with its own test, resolved once here from `rosterSession` and handed down.
+      Collapsing them into an object would save four lines and lose the property that makes them
+      safe, which is that each is separately named at the point a reviewer reads the call site.
+    */
+    max: 1367,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

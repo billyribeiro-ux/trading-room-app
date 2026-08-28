@@ -12,6 +12,8 @@ export interface RosterSessionFlags {
   rosterVisibleToViewers?: boolean;
   onlyPresentersVisibleToViewers?: boolean;
   rosterCountVisibleToViewers?: boolean;
+  /** "Show only usernames?" — see {@link rosterRowIsFull}. */
+  showOnlyUsernames?: boolean;
   showArchivesToUsers?: boolean;
   showArchivesToSpecificPresenters?: string[] | null;
 }
@@ -121,6 +123,50 @@ export function rosterRowClass(entry: RosterEntryFlags): string {
   if (!entry.isP) classes.push('regUser');
   if (entry.isP || entry.hasAdminChat) classes.push('presUser');
   return classes.join(' ');
+}
+
+/**
+ * "Show only usernames?" — whether a roster row draws in FULL or reduced to an icon and a name.
+ *
+ * ## The transcription
+ *
+ * Bundle byte 2,035,670, and it is the only occurrence of the setting in the whole file:
+ *
+ * ```js
+ * O(1, !this.appService.globals.sessData.showOnlyUsernames || e.isP ? 1 : 2)
+ * ```
+ *
+ * Slot 1 is `w2e`, twenty-one nodes and eight bindings — the avatar, the badges, the kebab menu,
+ * the mention control, the years and the location. Slot 2 is `T2e`, four nodes and one binding:
+ *
+ * ```html
+ * <div class="media">
+ *   <i class="fas fa-user m-1"></i>
+ *   <span (click)="doMention(nick)" (dblclick)="doUserInfo(...)">{{ nick }}</span>
+ * </div>
+ * ```
+ *
+ * ## `e` IS THE ROW, NOT THE VIEWER, and that is the whole setting
+ *
+ * The obvious reading — "members see only usernames" — is wrong, and it is wrong in the direction
+ * that matters. `e` is the `$implicit` of the roster's `{#each}`, so `e.isP` asks whether the row
+ * BEING DRAWN belongs to a presenter. A room with this on renders **presenters in full and members
+ * as bare names**, to everybody including other members.
+ *
+ * So it is a setting about who is worth showing, not about who is allowed to look — which is why it
+ * takes no viewer argument at all. Reading it the other way would have produced a room where
+ * presenters could not see their own members' avatars and members could see everything, i.e. the
+ * exact inverse. The triage row for this setting said "read the two slots before building — the
+ * difference is the point", and this is the difference.
+ *
+ * ## What the reduced row keeps
+ *
+ * Both handlers. `doMention` on click and `doUserInfo` on double click survive into slot 2, so a
+ * presenter can still open a reduced row's info card. Only the CHROME goes.
+ */
+export function rosterRowIsFull(entry: RosterEntryFlags, session: RosterSessionFlags): boolean {
+  // `=== true`, fail-closed: absent means the room never set it, so every row draws in full.
+  return session.showOnlyUsernames !== true || entry.isP === true;
 }
 
 /**

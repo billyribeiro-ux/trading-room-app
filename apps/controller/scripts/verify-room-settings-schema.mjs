@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY-ONE by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY-TWO by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 84.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 85.
+
+  71 -> 72 on 2026-08-28: showOnlyUsernames, which decides the SHAPE of a roster row. It joins the
+  other roster gates in `roster-gates.ts` rather than being an inline condition, for the reason that
+  module's header gives: these are the predicates that decide what one member sees of another.
 
   70 -> 71 on 2026-08-28: enablePrivateMessageHistory. The first setting to cross that widens a READ
   rather than a rendering — a presenter sees one member's private conversations with everybody — so
@@ -198,6 +202,8 @@ const EXPECTED_WIRED_SETTINGS = [
   'simplifiedEditor',
   /* Added 2026-08-28: the moderation read behind the user-info modal. */
   'enablePrivateMessageHistory',
+  /* Added 2026-08-28: which shape a roster row draws in. */
+  'showOnlyUsernames',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

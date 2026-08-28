@@ -320,6 +320,12 @@ describe('the allow-list itself', () => {
       */
       enablePrivateMessageHistory:
         'loadPeerPrivateMessageHistory — refuses the getAllUserPM read unless the room enabled it',
+      /*
+        Verified in the room before being written here. `rosterRowIsFull` sits with the other roster
+        predicates rather than as an `{#if}` in the sidebar, because those are the functions that
+        decide what one member sees of another and they are tested as such.
+      */
+      showOnlyUsernames: 'rosterRowIsFull — which shape a roster row draws in',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

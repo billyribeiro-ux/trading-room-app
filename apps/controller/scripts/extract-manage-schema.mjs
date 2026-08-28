@@ -203,6 +203,8 @@ const ROOM_CONSUMED = [
   /* The moderation read behind the user-info modal, added 2026-08-28. It crosses so the SERVER can
      refuse; see `room-config.ts`. */
   'enablePrivateMessageHistory',
+  /* The roster row SHAPE, added 2026-08-28. Per row, not per viewer; see `room-config.ts`. */
+  'showOnlyUsernames',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -790,6 +792,9 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 85 since 2026-08-28: `showOnlyUsernames`. The sixteenth find, and the one whose obvious reading
+// was the exact inverse of what the bundle does - the gate reads the ROW, not the viewer.
+//
 // 84 since 2026-08-28: `enablePrivateMessageHistory`. The fifteenth find, and the only one so far
 // that widens what a presenter may READ rather than what the room DRAWS - so it is checked on the
 // server, from the control plane, before a row is selected.
@@ -800,7 +805,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 84 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 85 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );
