@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **177** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **175** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**33 of the 177 are read by the reference's OWN room client**, as `sessData.<name>`.
+**31 of the 175 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Twenty-five have already left the list, on the day it was written.** It opened at 202 unwired and
-58 questions; both numbers have moved twenty times since.
+**Twenty-six have already left the list, on the day it was written.** It opened at 202 unwired and
+58 questions; both numbers have moved twenty-one times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -309,7 +309,7 @@ reproduces the decision — foreground-only colour — and `resolveNoteSurfaceGa
 words which part of that is evidenced and which part is this repository's call. A setting wired
 without that distinction written down would read, later, as a transcription.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 33 by NAME and asserts separately that the seven
+`src/lib/setting-coverage-contract.test.ts` pins the 31 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10, a

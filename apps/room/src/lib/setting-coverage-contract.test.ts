@@ -87,19 +87,18 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * per row, never per viewer), the `tipMeBtn*` trio (ONE feature, `tipButtonFor`) and
  * `customFaviconURL` + `customCSS` (`RoomBranding`) and `customPlayerURL` (`PresentationArea`'s
  * `#screens` pane) and `copyTrades` (the click-to-copy order marker, `copy-trades.ts`), all on
- * 2026-08-28 and each with its own contract file.
+ * 2026-08-28, plus `positionsIframe` + `positionsIframeUrl` (ONE feature, `PresentationArea`), each
+ * with its own contract file.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
   'enableQAReactions',
-  'positionsIframe',
   'altChatRender',
   'smallerImagePreview',
   'allRoomsWelcomeMatPW',
   'autoRecord',
   'isNewIndicatorOn',
   'openLoginLink',
-  'positionsIframeUrl',
   'authMode',
   'chatTabsWithBadges',
   'enableDiscord',

@@ -347,6 +347,16 @@ export interface RoomSessionSettings {
    */
   copyTrades?: boolean;
   /**
+   * "Positions iframe" and its URL — ONE feature, two settings, and the gate is their conjunction.
+   *
+   * `O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)` (byte 2,493,364) draws
+   * the Show/Hide Positions buttons; `app-positions-container` (2,329,246) is the panel they open,
+   * refreshed every thirty seconds when the viewer's own `updatePositionsIframe` preference is on.
+   */
+  positionsIframe?: boolean;
+  /** See {@link RoomSessionSettings.positionsIframe}. Scheme-checked by `positionsIframeSrc`. */
+  positionsIframeUrl?: string;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

@@ -44,6 +44,8 @@
   import FilesPane from '#lib/components/FilesPane.svelte';
   import MainTabStrip from '#lib/components/MainTabStrip.svelte';
   import ModeratorMessage from '#lib/components/ModeratorMessage.svelte';
+  import PositionsContainer from '#lib/components/PositionsContainer.svelte';
+  import PositionsControls from '#lib/components/PositionsControls.svelte';
   import NotesPane from '#lib/components/notes/NotesPane.svelte';
   import type { NoteSurfaceGates } from '#lib/components/notes/note-gates.js';
   import ScreenPane from '#lib/components/ScreenPane.svelte';
@@ -185,6 +187,15 @@
      * screens pane. `null` for a room that set none or set something unusable.
      */
     customPlayerSrc: string | null;
+    /**
+     * "Positions iframe" — `sessData.positionsIframe && sessData.positionsIframeUrl`, already
+     * conjoined. False means the room configured no positions page and the buttons do not render.
+     */
+    positionsAvailable: boolean;
+    /** `sessData.positionsIframeUrl`, raw. `PositionsContainer` checks it. */
+    positionsIframeUrl?: string;
+    /** `preferences.updatePositionsIframe` — the viewer's thirty-second refresh switch. */
+    positionsAutoRefresh: boolean;
     hideStreams: boolean;
     /** `sessData.modMessage` — the presenter-only bar. Empty means no bar, which is the usual case. */
     modMessage: string;
@@ -295,6 +306,9 @@
     volume,
     screenVolume,
     customPlayerSrc,
+    positionsAvailable,
+    positionsIframeUrl,
+    positionsAutoRefresh,
     hideStreams,
     modMessage,
     bufferSizeLevel,
@@ -316,6 +330,13 @@
     openModal,
     setAutoplayAttribute
   }: Props = $props();
+
+  /*
+    `globals.showPositions`, local. See the citation at the container's call site for why a flag with
+    three readers in one column is not a room-level store.
+  */
+  let showPositions = $state(false);
+  let positionsPanel = $state<{ reload: () => void } | null>(null);
 
   /*
     THE SFU SPATIAL LAYER FOLLOWS THE SELECTED TAB.
@@ -377,6 +398,20 @@
   -->
   <!-- `$4e`, rendered inside this same split area before `app-presentationarea` (byte 2,493,284). -->
   <ModeratorMessage message={modMessage} {isPresenter} />
+  <!--
+    `O(3, globals.showPositions ? 3 : -1)` — `app-positions-container` is node 3 of the presentation
+    split area, between the moderator bar and the area itself, and the buttons are node 5 AFTER it
+    (byte 2,493,364). `showPositions` is local because upstream's `globals.showPositions` has exactly
+    three readers and all three are in this column: the container's gate, the button's gate and the
+    toggle. A room-level store for a flag nobody else reads would be a wider thing than the feature.
+  -->
+  {#if positionsAvailable && showPositions}
+    <PositionsContainer
+      url={positionsIframeUrl}
+      autoRefresh={positionsAutoRefresh}
+      bind:this={positionsPanel}
+    />
+  {/if}
   <WebcamStrip
     visible={previewWindowsVisible}
     presenters={mediaTransport.webcamPresenters}
@@ -906,4 +941,17 @@
       ></audio>
     </div>
   </app-presentationarea>
+  <!--
+    NODE 5 of the split area, AFTER `app-presentationarea` — `W4e` at byte 2,492,892, gated on
+    `O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)` (2,493,364). The
+    conjunction arrives already made as `positionsAvailable`, because two settings that only ever
+    mean anything together should not be two props a call site can get half right.
+  -->
+  {#if positionsAvailable}
+    <PositionsControls
+      {showPositions}
+      ontoggle={() => (showPositions = !showPositions)}
+      onrefresh={() => positionsPanel?.reload()}
+    />
+  {/if}
 </as-split-area>

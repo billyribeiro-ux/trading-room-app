@@ -458,7 +458,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that received the raw setting would be a second place the scheme could be forgotten, and this
       one governs whether the room shows any video at all.
     */
-    max: 1371,
+    /*
+      1371 -> 1375, 2026-08-28. Four lines: the `positionsIframe` conjunction, the raw URL and the
+      viewer's refresh preference, at the `PresentationArea` call site.
+
+      THE CONJUNCTION IS MADE HERE and the component receives one boolean, which is the same shape
+      `tipButtonFor` takes for its three settings. Two settings that only ever mean anything together
+      should not be two props a call site can get half right.
+    */
+    max: 1375,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1104,7 +1112,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than inside it — which is exactly the mutation a negative control turned red, and exactly what
       a future reader would otherwise "tidy" by nesting it with its neighbour.
     */
-    max: 910,
+    /*
+      910 -> 958, 2026-08-28, for the positions panel: three props, the local toggle and the panel
+      reference, two call sites and their two citations.
+
+      NODE 3 AND NODE 5, and the split is why this is forty-eight lines rather than fifteen. Upstream
+      puts the container BETWEEN the moderator bar and `app-presentationarea`, and the buttons AFTER
+      it — so the two halves of one feature sit at opposite ends of this file, and each end needs the
+      citation that says the other exists. The alternative was one component holding both, which
+      would have had to render into two places.
+
+      The markup itself is `PositionsContainer` and `PositionsControls`; what lives here is the
+      wiring and the local `showPositions`, which is local because upstream's `globals.showPositions`
+      has exactly three readers and all three are in this column.
+    */
+    max: 958,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -2279,6 +2301,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/components/PostAlertModal.svelte',
     max: 494,
     why: 'the alert composer and its per-open resets'
+  },
+  {
+    file: 'lib/components/PositionsContainer.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — named by the discovery gate, not remembered.
+
+      75 lines for two elements, and the bulk is the timer's reasoning: why the stamp is `$state` and
+      not a `$derived` over `Date.now()` (a derivation would re-fetch the owner's page on every
+      unrelated invalidate, and this page invalidates every five seconds), and why the refresh is a
+      conjunction of two gates rather than one.
+
+      If this number climbs, the thing to check is whether it has started deciding WHETHER to show —
+      it is mounted behind that gate and only ever decides WHEN to reload.
+    */
+    max: 75,
+    why: 'app-positions-container - an owner iframe and its thirty-second reload'
+  },
+  {
+    file: 'lib/components/PositionsControls.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, beside its sibling above.
+
+      Two buttons whose only state is their label. The manual refresh is a prop callback rather than
+      state here, because the container owns the stamp and a button that owned it would be a second
+      thing deciding when an owner's page is fetched.
+    */
+    max: 45,
+    why: 'the Show/Hide Positions toggle and the manual reload beside it'
   },
   {
     file: 'lib/components/PresenterMuteRows.svelte',

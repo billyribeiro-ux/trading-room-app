@@ -349,6 +349,14 @@ describe('the allow-list itself', () => {
       */
       customPlayerURL: 'PresentationArea #screens — an owner iframe instead of the whole pane',
       copyTrades: 'buildMessageChrome — the click-to-copy order marker on an ALERT body',
+      /*
+        Verified in the room before being written here. Both name the SAME consumer, which is the
+        honest entry for a conjunction: the switch and the URL only ever mean anything together, and
+        `PresentationArea` conjoins them once before anything downstream sees either.
+      */
+      positionsIframe: 'PresentationArea — the Show/Hide Positions buttons and the panel they open',
+      positionsIframeUrl:
+        'PresentationArea — the Show/Hide Positions buttons and the panel they open',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY-NINE by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-ONE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 92.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 94.
+
+  79 -> 81 on 2026-08-28: positionsIframe and positionsIframeUrl — ONE feature. The second pair here
+  whose gate is a conjunction, after the tip button, and they cross together for the same reason: the
+  switch without a URL draws a button that opens an empty panel.
 
   78 -> 79 on 2026-08-28: copyTrades, which turns a bracketed order inside an ALERT into one click
   to copy. It reaches the message through `buildMessageChrome` rather than per call site, because
@@ -232,6 +236,9 @@ const EXPECTED_WIRED_SETTINGS = [
   'customPlayerURL',
   /* Added 2026-08-28: the click-to-copy order marker in an alert. */
   'copyTrades',
+  /* Added 2026-08-28: the positions panel and its URL. */
+  'positionsIframe',
+  'positionsIframeUrl',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

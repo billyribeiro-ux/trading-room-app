@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 92 of 269 are wired today.
+// nothing in the room reads it yet. 94 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -212,8 +212,8 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "slackPostURL", section: "settings", type: "textarea", label: "Slack post URL secret", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "diasableFCMAlerts", section: "settings", type: "checkbox", label: "Disable PUSH Alerts?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "modMessage", section: "settings", type: "textarea", label: "Moderator Message:", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "positionsIframeUrl", section: "settings", type: "textarea", label: "Positions Iframe Url", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "positionsIframe", section: "settings", type: "checkbox", label: "Enable positions iframe?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "positionsIframeUrl", section: "settings", type: "textarea", label: "Positions Iframe Url", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "positionsIframe", section: "settings", type: "checkbox", label: "Enable positions iframe?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "tipMeBtnEnabled", section: "settings", type: "checkbox", label: "Enable Tip Me Button?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "tipMeBtnTxt", section: "settings", type: "textarea", label: "Tip Me Button Text", help: null, helpShape: null, helpOutside: false, captured: "Tip Me?", capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "tipMeBtnUrl", section: "settings", type: "textarea", label: "Tip Me Button Url", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },

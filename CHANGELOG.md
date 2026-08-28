@@ -33,6 +33,61 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 16:55 UTC — A positions panel, and a background timer that must not run
+
+**Runtime impact: YES.** A room that configures a **positions page** now gets a Show/Hide Positions
+button beside the presentation area and the panel it opens, reloading every thirty seconds for
+members who asked for that. None of it existed before.
+
+**ONE feature, two settings, and they cross together.**
+`O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)` — the switch without a URL
+draws a button that opens an empty panel. The room conjoins them once, on the page, and the component
+receives one boolean. Same shape the tip button trio takes.
+
+**Nodes 3 and 5, and the split is why this is forty-eight lines in `PresentationArea` rather than
+fifteen.** Upstream puts `app-positions-container` BETWEEN the moderator bar and
+`app-presentationarea`, and the buttons AFTER it (byte 2,493,364). So the two halves of one feature
+sit at opposite ends of that file, each needing the citation that says the other exists — and the
+ORDER is asserted, because it is the one thing a reader moving code around would not know to
+preserve. A control that turns a panel off, rendered above the panel, is a different layout.
+
+**THE CACHE-BUST IS THE FEATURE, not decoration.** An iframe whose `src` does not change is not
+re-fetched, so `t=<now>` is the only reason a reload reloads. The separator rule is the reference's
+own and is right: an owner URL that already carries a query needs `&`. It is concatenated onto the
+ORIGINAL string rather than built through `URL.searchParams`, which would re-encode the whole query
+and hand back something different from what the owner pasted.
+
+**The timer is behind TWO gates, ANDed, and that is the part worth naming.**
+`preferences.updatePositionsIframe && globals.showPositions` — `updatePositionsIframeChanged`
+re-evaluates exactly that pair (byte 2,329,586). **A member who has never opened the panel must not
+have a background timer fetching an owner's page every thirty seconds**, which is why it is a named
+predicate with a four-row truth table rather than an inline `&&`.
+
+**And the stamp is `$state`, not a `$derived` over `Date.now()`.** A derivation reading the clock
+recomputes whenever anything read beside it changes — and this page invalidates every five seconds —
+so the room would re-fetch the owner's page twelve times a minute forever. Written once on mount,
+then only by the timer or the manual button.
+
+**Scheme-checked, and the reference again is not**: this binding is another
+`bypassSecurityTrustResourceUrl`, the third of the day.
+
+**Six negative controls seen RED**, including the conjunction turned into an OR and the buttons moved
+above the panel.
+
+**Two components capped in the commit that created them**, named by the discovery gate rather than
+remembered — the second time that gate has done its job since it was built this morning.
+
+**One assertion was OVERREACH and was measured as such.** It said `PresentationArea` never sees
+`sessData`; the component legitimately reads `data.sessData.overlayUserIdOnScreenshare` for a
+different feature. Narrowed to the two names the claim is actually about, with the reason recorded.
+
+**Verified:** room 170 files / 2,712 tests (1 skipped) · controller 96 files / 1,013 tests (5
+skipped) · `schema:verify` at **94 wired** · both room gates and the six controller verifiers green ·
+`svelte-check` 0/0 across 1,304 files · eslint and prettier clean.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+the three `.svelte` files.
+
 ### 2026-08-28 16:10 UTC — A copyable order inside an alert, and a checkbox that would have sent a flag nothing reads
 
 **Runtime impact: YES.** A room with **Copy trades** on turns `[{( … )}]` inside an **alert** into a

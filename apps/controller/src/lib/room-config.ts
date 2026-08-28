@@ -718,6 +718,29 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'copyTrades',
   /*
+    "Positions iframe" and its URL - ONE feature spelled as two settings, crossing together.
+
+      O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)   byte 2,493,364
+      app-positions-container, refreshed every 30 seconds                      byte 2,329,246
+      loadPositionsContainer appends t=Date.now with the right separator       byte 2,330,000
+
+    A CONJUNCTION like the tip button, and it crosses as a pair for the same reason: the switch
+    without a URL draws a button that opens an empty panel. The room conjoins them once, on the
+    page, and the component receives one boolean.
+
+    THE TIMER IS BEHIND A SECOND, PER-VIEWER GATE - preferences.updatePositionsIframe - and the two
+    are ANDed. A member who never opens the panel must not have a background timer fetching an owner
+    page every thirty seconds, which is why the room half names that conjunction as a predicate
+    rather than writing it inline.
+
+    Scheme-checked in the room, which the reference is not: this binding is another
+    bypassSecurityTrustResourceUrl.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'positionsIframe',
+  'positionsIframeUrl',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:
