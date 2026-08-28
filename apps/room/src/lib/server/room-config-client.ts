@@ -306,6 +306,19 @@ export interface RoomSessionSettings {
    */
   showOnlyUsernames?: boolean;
   /**
+   * The "tip me" button — ONE feature, three settings, and the gate is the conjunction of all three.
+   *
+   * `isTipEnabled = tipMeBtnEnabled && tipMeBtnUrl && tipMeBtnTxt` (byte 2,509,187), drawn at two
+   * sites in the sidebar and opened with `window.open(tipMeBtnUrl, "_blank")` (2,531,907). They
+   * cross together because one without the others draws a nameless or inert button; `tipButtonFor`
+   * holds the rule and the URL scheme check.
+   */
+  tipMeBtnEnabled?: boolean;
+  /** See {@link RoomSessionSettings.tipMeBtnEnabled}. `http:`/`https:` only, checked in the room. */
+  tipMeBtnUrl?: string;
+  /** See {@link RoomSessionSettings.tipMeBtnEnabled}. The label AND the `title` attribute. */
+  tipMeBtnTxt?: string;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

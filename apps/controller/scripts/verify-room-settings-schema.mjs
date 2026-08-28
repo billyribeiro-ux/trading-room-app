@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY-TWO by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 85.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 88.
+
+  72 -> 75 on 2026-08-28: tipMeBtnEnabled, tipMeBtnUrl and tipMeBtnTxt — ONE feature. They cross as
+  a group because the gate is their conjunction, and a settings list that lets them cross separately
+  is a list that will one day let two of the three across.
 
   71 -> 72 on 2026-08-28: showOnlyUsernames, which decides the SHAPE of a roster row. It joins the
   other roster gates in `roster-gates.ts` rather than being an inline condition, for the reason that
@@ -204,6 +208,10 @@ const EXPECTED_WIRED_SETTINGS = [
   'enablePrivateMessageHistory',
   /* Added 2026-08-28: which shape a roster row draws in. */
   'showOnlyUsernames',
+  /* Added 2026-08-28: the tip button. Three settings, one conjunction. */
+  'tipMeBtnEnabled',
+  'tipMeBtnUrl',
+  'tipMeBtnTxt',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

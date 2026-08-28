@@ -83,8 +83,9 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * `<svelte:head>` in `routes/+page.svelte`), `modMessage` (the presenter-only bar,
  * `lib/components/ModeratorMessage.svelte`), `simplifiedEditor` (foreground-only colour on the note
  * toolbar, `resolveNoteSurfaceGates`), `enablePrivateMessageHistory` (the moderation read behind the
- * user-info modal, refused on the SERVER) and `showOnlyUsernames` (which SHAPE a roster row draws
- * in — per row, never per viewer), all on 2026-08-28 and each with its own contract file.
+ * user-info modal, refused on the SERVER), `showOnlyUsernames` (which SHAPE a roster row draws in —
+ * per row, never per viewer) and the `tipMeBtn*` trio (ONE feature, `tipButtonFor`), all on
+ * 2026-08-28 and each with its own contract file.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -92,7 +93,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'positionsIframe',
   'altChatRender',
   'smallerImagePreview',
-  'tipMeBtnTxt',
   'allRoomsWelcomeMatPW',
   'autoRecord',
   'isNewIndicatorOn',
@@ -104,7 +104,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'enableDiscord',
   'hasAlertScheduler',
   'playChatMessageSoundFor',
-  'tipMeBtnUrl',
   'alertsOverlayOnScreenshare',
   'customCSS',
   'customFaviconURL',
@@ -124,7 +123,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'h264Enabled',
   'linkedRoomAlerts',
   'modAdminLoginList',
-  'tipMeBtnEnabled',
   'twillioApiSID',
   'usersCanDeleteOwnMsgs'
 ];

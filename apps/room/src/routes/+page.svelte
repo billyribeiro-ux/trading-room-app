@@ -23,6 +23,7 @@
     locationVisibleTo,
     rosterRowIsFull
   } from '#lib/roster-gates.js';
+  import { tipButtonFor } from '#lib/tip-button.js';
                           import { createRoom } from '#lib/room/create-room.svelte.js';
                         import { setAutoplayAttribute, setWebcamAudioAttributes } from '#lib/room/webcams.js';
         import { buildMessageChrome, type RoomMessageChrome } from '#lib/room-message-chrome.js';
@@ -1055,6 +1056,7 @@
           {rosterRowClass}
           locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
           rowIsFull={(entry) => rosterRowIsFull(entry, rosterSession)}
+          tip={tipButtonFor(data.sessData)}
           canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
           mobileAppAvailable={gates.mobileAppAvailable}
           benzingaVisible={gates.benzingaVisible}

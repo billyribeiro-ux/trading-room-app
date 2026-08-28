@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **40** as this is written; eighteen have been answered by building, and the
+2026-08-28 and is at **37** as this is written; twenty-one have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -188,7 +188,6 @@ than quoting this paragraph.
 | `hasTypingIndicator` | 1,437,143 | A whole feature: `refreshTypingStatus`, `updateLastTypedTime`, a 5,000 ms `typingDelayMillis` debounce, `usersTyping` / `usersTypingCnt`, a wire round trip, and the display slot `O(22, showTyping && usersTypingCnt > 0 ? 22 : -1)`. Two copies upstream, main and extra column. |
 | `usersCanDeleteOwnMsgs` | 1,158,826 | `canDeleteOwnMessage(msg)` — own email hash or own uid, gated on the setting. Needs the `userDeleteChatMsg` command, which is on the command list as absent. |
 | `copyTrades` | 1,414,899 | Rewrites `[{( … )}]` inside an alert body into a `span.tradeColor` with a generated id, and swaps the whole message component (byte 1,419,422 picks between two templates on it). |
-| `tipMeBtnEnabled` + `tipMeBtnUrl` + `tipMeBtnTxt` | 2,509,208 / 2,509,258 / 2,466,801 | **One feature, three settings**, and the gate is the conjunction of all three: `isTipEnabled = tipMeBtnEnabled && tipMeBtnUrl && tipMeBtnTxt`. The text is both the `title` attribute and the label; the click is `window.open(tipMeBtnUrl, "_blank")`. |
 | `positionsIframe` + `positionsIframeUrl` | 2,285,266 | A positions pane with its own refresh loop (`startIframeRefresh` / `stopIframeRefresh`, byte 2,329,124) driven by a `updatePositionsIframe` preference. Two settings, one pane, three render sites. |
 | `chatTabsWithBadges` | 1,007,480 | Badge-gated extra chat channels. A JSON list — the schema's help text carries the shape — and `registerForExtraChannels` subscribes only to the channels whose badges the member holds. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
@@ -198,7 +197,7 @@ than quoting this paragraph.
 | `customPlayerURL` | 1,918,564 | An iframe in the screens pane, chosen over the normal content at byte 2,017,223. |
 | `playChatMessageSoundFor` | 1,431,925 | A list of hashed senders whose messages play a sound for this viewer. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
-| `altChatRender` | 1,349,126 | Forces `displayMode = "c"`, persists it as the `chatMode` preference, and hides avatars for chat and Q&A messages. |
+| `altChatRender` | 1,349,151 / 1,434,685 / 2,047,129 (six sites) | **CORRECTED AND RESIZED 2026-08-28 — read the six occurrences, not the one.** Three behaviours, not one: it hides avatars on chat and Q&A messages (`hideAvatar = altChatRender && (chat \|\| isQAMsg) \|\| hideAvatars`), and it FORCES `displayMode = "c"` on **four** surfaces — main chat, extra chat, alerts and the Q&A modal — writing that over the viewer's own stored preference. **This room has no compact display mode at all**, so the setting's main half needs the mode itself built first, on four surfaces, with its picker. Building only the avatar third would give an owner who ticks it hidden avatars and no compact layout, which is not what the setting means. **TRAP FOR WHOEVER BUILDS IT:** `sessData.chatMode` and `preferences.chatMode` are DIFFERENT things sharing a key — the first is the room's mode (`"p"` presenters-only, `"d"` disabled, byte 1,003,622), the second is this per-viewer display mode (`"c"`, byte 1,434,808). Writing `"c"` into the room's `room_state.chat_mode` would corrupt the room's chat policy. |
 | `linkedRoomAlerts` | 2,139,184 | One row of the alert composer, cross-posting to a linked room. |
 | `hasAlertScheduler` | 1,009,745 | Already tracked in `TODO.md` with its own section — three commands and a server-side scheduler. |
 | `openLoginLink` | 1,437,888 | `window.open(sessData.openLoginLink, "_blank", "resizable=yes,top=0,left=0,width=800,height=400")` on chat init. **A popup on page load**; decide whether to reproduce it before building. |
@@ -219,7 +218,7 @@ than quoting this paragraph.
 
 ---
 
-## The eighteen already answered
+## The twenty-one already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -241,6 +240,7 @@ than quoting this paragraph.
 | `simplifiedEditor` | WIRED — a field of `NoteSurfaceGates`; the note toolbar's colour control becomes foreground-only. The first row whose downstream VENDOR is absent from the capture, so the decision is reproduced and the unevidenced part is named. | 2026-08-28 |
 | `enablePrivateMessageHistory` | BUILT — corrected out of WIRE first: the button was one row, and the modal it opens was a spinner with no fetch. `getAllUserPM` now exists, bounded, and refuses on the server. | 2026-08-28 |
 | `showOnlyUsernames` | BUILT — `rosterRowIsFull`. The row's own advice paid off: `e` is the ROW, so the setting reduces MEMBER rows and leaves presenters in full, for every viewer. The obvious reading was the exact inverse. | 2026-08-28 |
+| `tipMeBtnEnabled` + `tipMeBtnUrl` + `tipMeBtnTxt` | BUILT — `tipButtonFor`, one conjunction feeding both captured render sites. The URL is checked for `http:`/`https:` here, which the reference does not do. | 2026-08-28 |
 
 ---
 

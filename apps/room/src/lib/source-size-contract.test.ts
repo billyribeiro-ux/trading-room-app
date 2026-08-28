@@ -440,7 +440,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Collapsing them into an object would save four lines and lose the property that makes them
       safe, which is that each is separately named at the point a reviewer reads the call site.
     */
-    max: 1367,
+    /*
+      1367 -> 1369, 2026-08-28. Two lines: the `tipButtonFor` import and `tip={tipButtonFor(data.sessData)}`
+      at the sidebar call site.
+
+      ONE line for THREE settings, and that is the argument for resolving the conjunction in a module
+      rather than in the markup. Spelled separately this would have been three props here, three
+      declarations on the sidebar and a three-way condition in two places — and the reference itself
+      computes them into one field precisely once.
+    */
+    max: 1369,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -920,6 +929,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 396,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
+  },
+  {
+    file: 'lib/components/RoomSidebar.svelte',
+    /*
+      CAPPED 2026-08-28, having been uncapped — the FOURTH component found without a ceiling in two
+      days, after `NoteEditor`, `NotesPane` and `PrivateChatPanel`. Four in two days is not four
+      oversights; it is the hand-kept list failing as a mechanism, and it is recorded here so that
+      the next person reads a pattern rather than a coincidence.
+
+      **The structural fix is known and is not this commit**: `lib/room/*.svelte.ts` modules are
+      discovered and capped automatically by gate 0b, and components are not. Extending that
+      discovery to `lib/components/**` would end this class of miss permanently, and would arrive
+      with a list of every remaining uncapped component rather than one more entry typed by hand.
+
+      778 lines: the roster, its search, the app-info block, the connectivity rows, Benzinga and now
+      the tip button. Every gate it draws arrives already decided — `rowVisible`, `rowIsFull`,
+      `benzingaVisible`, `tip` — and if this number climbs the thing to check is whether one of them
+      has started being computed here instead.
+    */
+    max: 778,
+    why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
     file: 'lib/components/RoomShell.svelte',

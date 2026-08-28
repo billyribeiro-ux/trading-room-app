@@ -92,6 +92,8 @@ const render = (options: {
   */
   onMention?: (name: string) => void;
   onUserInfo?: (name: string) => void;
+  /** The "tip me" button, already resolved. Absent means the room has not configured one. */
+  tip?: { visible: boolean; label: string; url: string };
 }) => {
   const roster = new RoomRoster<Entry>({
     seed: () => options.people,
@@ -128,6 +130,7 @@ const render = (options: {
       rosterRowClass,
       locationVisible: (row: Entry) => locationVisibleTo(viewer, row),
       rowIsFull: (row: Entry) => rosterRowIsFull(row, session),
+      tip: options.tip ?? { visible: false, label: '', url: '' },
       canOpenRosterPrivateChat: () => true,
       mobileAppAvailable: true,
       benzingaVisible: false,
@@ -343,5 +346,41 @@ describe('the roster row shape', () => {
     name?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     flushSync();
     expect(opened).toEqual(['Member']);
+  });
+});
+
+/*
+  The tip button RENDERS, at both sites, and this is a mount rather than a source assertion for the
+  reason the sidebar's other tests give: what can regress is whether the markup comes out, and a
+  `toContain` on the file proves only that somebody typed it.
+
+  Two sites is the assertion. The reference draws this button twice — once in the app-info block and
+  once beside Benzinga — and a change that lost one of them would leave every source assertion in
+  `tip-button-contract.test.ts` passing.
+*/
+describe('the tip button', () => {
+  const tip = { visible: true, label: 'Buy me a coffee', url: 'https://tip.test/me' };
+
+  it('draws at BOTH sites when the room configured one', () => {
+    const root = render({ isPresenter: false, people: [], tip });
+    const buttons = root.querySelectorAll('i.fas.fa-dollar-sign');
+    expect(buttons, 'the reference draws this button twice').toHaveLength(2);
+    for (const node of root.querySelectorAll('span.ms-1')) {
+      expect(node.textContent).toBe('Buy me a coffee');
+    }
+  });
+
+  it('draws at neither site when it did not', () => {
+    const root = render({ isPresenter: false, people: [] });
+    expect(root.querySelectorAll('i.fas.fa-dollar-sign')).toHaveLength(0);
+  });
+
+  it('carries the destination and the label as a title on both', () => {
+    const root = render({ isPresenter: false, people: [], tip });
+    const link = root.querySelector<HTMLAnchorElement>('a.btn.btn-primary');
+    expect(link?.getAttribute('href')).toBe('https://tip.test/me');
+    // `rel` on a `target="_blank"` link, which upstream's clickable `<li>` had no need of.
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(root.querySelectorAll('[title="Buy me a coffee"]')).toHaveLength(2);
   });
 });

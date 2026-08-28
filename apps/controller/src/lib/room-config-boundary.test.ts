@@ -326,6 +326,15 @@ describe('the allow-list itself', () => {
         decide what one member sees of another and they are tested as such.
       */
       showOnlyUsernames: 'rosterRowIsFull — which shape a roster row draws in',
+      /*
+        Verified in the room before being written here. All three name the SAME consumer, which is
+        the honest entry: `tipButtonFor` is where the conjunction lives, and none of the three has a
+        reader of its own. A row here that named three different consumers would be describing three
+        gates the reference does not have.
+      */
+      tipMeBtnEnabled: 'tipButtonFor — the tip button, all three settings or none',
+      tipMeBtnUrl: 'tipButtonFor — the tip button, all three settings or none',
+      tipMeBtnTxt: 'tipButtonFor — the tip button, all three settings or none',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

@@ -33,6 +33,78 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 12:25 UTC — One feature spelled as three settings, and a link the reference does not check
+
+**Runtime impact: YES.** A room that configures a **tip button** now draws one, at both of the
+captured sites, opening the owner's link in a new tab. Three settings were crossing nothing before.
+
+**The gate is a CONJUNCTION, and that is why the three travel together.** Byte 2,509,187:
+
+```js
+this.isTipEnabled = sessData.tipMeBtnEnabled && sessData.tipMeBtnUrl && sessData.tipMeBtnTxt;
+```
+
+The switch alone draws a button with no label and no destination; a URL with no text draws a
+nameless one. Upstream computes the three into ONE field in its constructor and both render sites
+read that field, so `tipButtonFor` does the same and the markup never sees the three settings
+separately. The boundary lists all three against the same consumer, which is the honest entry —
+naming three would describe three gates the reference does not have.
+
+**Drawn twice, which is the reference's own shape:** slot 13 in the sidebar's app-info block
+(`btn btn-primary btn-sm`) and slot 14 immediately before Benzinga
+(`d-flex align-items-center btn btn-primary btn-sm`). The label binds to the `title` attribute AND
+the text at both, which is upstream's doubling and not a slip. A mount test asserts **two**
+dollar-sign icons, because a change that lost one site would leave every source assertion passing.
+
+**The URL is CHECKED, and that is this room's decision rather than a transcription.**
+`doTipToUser()` opens whatever is stored (byte 2,531,907). A `javascript:` URL there executes in
+every member's page with the room's origin, and an owner-facing settings form is not where that
+guarantee should come from — so `tipButtonFor` parses with `new URL` and refuses anything but
+`http:`/`https:`, handing back an empty url so a call site cannot open something the function
+rejected. Eight rejection cases are pinned, including the leading-whitespace and mixed-case forms a
+regex would miss. No legitimate tip destination is affected.
+
+**One accessibility divergence, asserted so it cannot be "corrected" back.** Upstream binds the
+second site's click to the `<li>` (const 139 carries `3,"click"`), which is neither focusable nor
+keyboard-reachable. Ours is an `<a>` with `rel="noopener noreferrer"`; the classes and the nesting
+are unchanged.
+
+**Seven negative controls seen RED**, including the URL check removed, the switch loosened, the
+conjunction losing its label term, a rejected URL still handed back, and one render site dropped —
+that last one against the mount, which is the only instrument that could see it.
+
+**`altChatRender` was corrected and RESIZED in the triage rather than built**, because reading its
+six occurrences rather than the one says it is three behaviours, not one. It hides avatars on chat
+and Q&A messages, and it forces `displayMode = "c"` on **four** surfaces — main chat, extra chat,
+alerts and the Q&A modal — writing over the viewer's own stored preference. **This room has no
+compact display mode at all**, so its main half needs that mode built first; building only the
+avatar third would give an owner hidden avatars and no compact layout, which is not what the setting
+means.
+
+**And it carries a trap now written down:** `sessData.chatMode` and `preferences.chatMode` are
+different things sharing a key. The first is the ROOM's mode — `"p"` presenters-only, `"d"` disabled
+(byte 1,003,622) — and the second is the per-viewer display mode whose value is `"c"` (1,434,808).
+Writing `"c"` into this room's `room_state.chat_mode` would corrupt the room's chat policy.
+
+**`RoomSidebar` was UNCAPPED and is capped at 778 — the fourth component in two days**, after
+`NoteEditor`, `NotesPane` and `PrivateChatPanel`. Four is not four oversights; it is the hand-kept
+list failing as a mechanism, and the entry says so and names the structural fix: gate 0b discovers
+and caps `lib/room/*.svelte.ts` automatically and components are not discovered. **That is now the
+highest-value item outstanding on the ratchet**, and it is deliberately not bundled here, because it
+should arrive with a list of every remaining uncapped component rather than one more hand-typed
+entry.
+
+**The page pays two lines for three settings**, 1367 → 1369, which is the argument for the module in
+one number.
+
+**Verified:** room 164 files / 2,513 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` byte-compares at **88 wired** · both room gates and the six controller
+verifiers green · `svelte-check` 0/0 across 1,290 files · eslint clean · prettier clean on every file
+this change touches.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+`RoomSidebar.svelte`.
+
 ### 2026-08-28 11:50 UTC — A setting whose obvious reading is its exact inverse
 
 **Runtime impact: YES.** A room that sets *"Show only usernames?"* now draws **member** roster rows

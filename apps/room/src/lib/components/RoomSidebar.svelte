@@ -2,6 +2,7 @@
   lang="ts"
   generics="Entry extends { id: number; displayName: string; avatarUrl: string; locStr?: string | null; isP?: boolean; isFT?: boolean }"
 >
+  import type { TipButton } from '#lib/tip-button.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomRoster, RosterMember } from '#lib/room/roster.svelte.js';
   import type { RosterSessionFlags } from '#lib/roster-gates.js';
@@ -105,6 +106,12 @@
      * component renders a decision rather than making one.
      */
     rowIsFull: (entry: Entry) => boolean;
+    /**
+     * The "tip me" button, already resolved. `tipButtonFor` holds the three-way gate and the
+     * URL check; this component renders two sites from one answer, exactly as the reference reads
+     * one `isTipEnabled` field at both of its.
+     */
+    tip: TipButton;
     canOpenRosterPrivateChat: (entry: Entry) => boolean;
     mobileAppAvailable: boolean;
     benzingaVisible: boolean;
@@ -153,6 +160,7 @@
     rosterRowClass,
     locationVisible,
     rowIsFull,
+    tip,
     canOpenRosterPrivateChat,
     mobileAppAvailable,
     benzingaVisible,
@@ -214,6 +222,24 @@
               a room that has no app hides the button, and a trial account is shut out of it
               unless the room says trials may have the app.
             -->
+          <!--
+            `H(13, aPe, 5, 2, "p")` with `O(13, isTipEnabled ? 13 : -1)`, consts 34/35/36:
+            `["type","button",1,"btn","btn-primary","btn-sm",3,"click","title"]`,
+            `[1,"fas","fa-dollar-sign"]`, `[1,"ms-1"]`. The label is bound to BOTH the `title`
+            attribute and the text, which is upstream's own doubling and not a mistake here.
+          -->
+          {#if tip.visible}
+            <p>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                title={tip.label}
+                onclick={() => window.open(tip.url, '_blank', 'noopener,noreferrer')}
+              >
+                <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
+              </button>
+            </p>
+          {/if}
           {#if !session?.hideAppInfo}
             <p>
               {#if mobileAppAvailable}
@@ -333,6 +359,31 @@
             (`/assets/images/benzinga-logo.png`) is not in this repository, so the icon form
             is what an unconfigured room gets - not a broken `<img>`.
           -->
+        <!--
+          `H(14, APe, 5, 2, "li", 139)` with `O(14, isTipEnabled ? 14 : -1)`, immediately before the
+          Benzinga slot. Consts 139/140: `[1,"nav-item",3,"click","title"]` and
+          `[1,"d-flex","align-items-center","btn","btn-primary","btn-sm"]`.
+
+          THE SAME BUTTON TWICE is the reference's own shape, and both sites read the one
+          `isTipEnabled` field rather than re-evaluating the three settings. Ours read `tip.visible`
+          for the same reason.
+
+          The interactive element is the `<a>` and not the `<li>`. Upstream binds the click to the
+          `li`, which is not focusable and not reachable by keyboard; reproducing that would ship a
+          control a keyboard user cannot press. The classes and the nesting are unchanged.
+        -->
+        {#if tip.visible}
+          <li class="nav-item" title={tip.label}>
+            <a
+              href={tip.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="d-flex align-items-center btn btn-primary btn-sm"
+            >
+              <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
+            </a>
+          </li>
+        {/if}
         {#if benzingaVisible}
           <li class="nav-item py-0">
             <a

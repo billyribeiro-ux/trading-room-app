@@ -630,6 +630,29 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'showOnlyUsernames',
   /*
+    The "tip me" button - ONE feature spelled as three settings, crossing together.
+
+      isTipEnabled = sessData.tipMeBtnEnabled && sessData.tipMeBtnUrl && sessData.tipMeBtnTxt
+                                                                            byte 2,509,187
+      doTipToUser() { sessData.tipMeBtnUrl && window.open(sessData.tipMeBtnUrl, "_blank") }
+                                                                            byte 2,531,907
+
+    A CONJUNCTION, not three gates. The switch alone draws a button with no label and no
+    destination; a URL with no text draws a nameless one. Upstream computes the three into one field
+    in its constructor and both render sites read that field, so `tipButtonFor` in the room does the
+    same and the markup never sees the three settings separately.
+
+    THE URL IS CHECKED IN THE ROOM, not trusted. The reference opens whatever is stored; this room
+    refuses anything that is not http or https, because a javascript URL there would run in every
+    member page with the room origin and a settings form is not where that guarantee should come
+    from. Recorded as a divergence at `tip-button.ts`; no legitimate tip destination is affected.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'tipMeBtnEnabled',
+  'tipMeBtnUrl',
+  'tipMeBtnTxt',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:
