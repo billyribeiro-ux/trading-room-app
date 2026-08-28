@@ -567,6 +567,33 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'modMessage',
   /*
+    "Simplified Note Editor?" - which of the two Summernote colour buttons the note toolbar gets.
+
+      this.isSimplifiedEditor = this.appService.globals.sessData.simplifiedEditor
+        ? "forecolor"
+        : "color"                                                     byte 1,468,503
+      the toolbar group at the same object spends it as: color, then a one-member array
+      holding `this.isSimplifiedEditor`
+
+    ONE OCCURRENCE IN THE WHOLE BUNDLE, and it was read rather than searched for and assumed. The
+    value is not a boolean anywhere downstream: it is a STRING naming a toolbar button, and the only
+    thing the reference does with the setting is choose between those two names.
+
+    WHAT THE CAPTURE DOES NOT CONTAIN, stated because the next reader will look for it: Summernote
+    itself. The vendor that turns `"forecolor"` and `"color"` into DOM is a separate bundle we do not
+    hold, so the exact markup each name produces is NOT evidenced here. What IS evidenced is in
+    `styles.ee2a710065b60389.css`: `.note-color-all .note-dropdown-menu { min-width: 337px }` beside
+    `.note-color .note-dropdown-menu .note-palette { width: 160px }` and a
+    a `.note-palette:first-child` rule. Two 160px palettes side by side in a 337px menu, and an
+    `-all` suffix that means nothing unless a not-all case exists. The decision taken from that, and
+    its reasoning, is at `apps/room/src/lib/components/notes/note-gates.ts`.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK. The boundary test parses this array
+    with a single-quote regex bounded by the first closing bracket, so either one truncates the whole
+    list silently. Both traps have now been hit here; the first draft of this comment hit the second.
+  */
+  'simplifiedEditor',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

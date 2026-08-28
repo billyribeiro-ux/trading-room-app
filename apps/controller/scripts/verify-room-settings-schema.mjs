@@ -13,10 +13,15 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SIXTY-NINE by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 82.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 83.
+
+  69 -> 70 on 2026-08-28: simplifiedEditor, which picks one of two Summernote toolbar button names
+  for the note editor's colour control. The FIRST setting to cross whose downstream vendor is not in
+  the capture at all, so what crosses is the decision and not a transcription of markup; the room
+  records that distinction at `notes/note-gates.ts` rather than letting it read as evidenced.
 
   55 -> 58 on 2026-08-28: darkThemeAsDefault, alertSoundOff and alertsChatOnBottom, the three room
   defaults that seed a member's own preferences once. Three clauses of one expression upstream, so
@@ -184,6 +189,9 @@ const EXPECTED_WIRED_SETTINGS = [
   /* Added 2026-08-28: the room title and the presenter-only moderator bar. */
   'name',
   'modMessage',
+  /* Added 2026-08-28: the note editor colour button. NO APOSTROPHES IN THIS BLOCK - the parser that
+     reads this list is a single-quote regex, and one closes the string. */
+  'simplifiedEditor',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

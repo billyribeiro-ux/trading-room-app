@@ -18,6 +18,8 @@ describe('NoteEditor evidence contract', () => {
         onUploadImages: async () => [],
         onVersionHistoryOpenChange: () => undefined,
         showVersionHistory: false,
+        // The full colour control; `simplified-note-editor-contract.test.ts` covers the other shape.
+        simplifiedEditor: false,
         versions: []
       }
     }).body;

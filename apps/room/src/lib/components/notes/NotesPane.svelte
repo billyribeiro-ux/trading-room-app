@@ -52,6 +52,8 @@
     readonly onSave: (noteId: number, contentHtml: string) => void | Promise<void>;
     readonly onSetWelcomeMat: (noteId: number, allRooms: boolean) => void | Promise<void>;
     readonly onUploadImages: (files: readonly File[]) => Promise<readonly string[]>;
+    /** `noteGates.simplifiedEditor` - passed through untouched; the editor draws the toolbar. */
+    readonly simplifiedEditor: boolean;
   }
 
   let {
@@ -69,7 +71,8 @@
     onRestoreVersion,
     onSave,
     onSetWelcomeMat,
-    onUploadImages
+    onUploadImages,
+    simplifiedEditor
   }: Props = $props();
 
   const componentId = $props.id();
@@ -372,6 +375,7 @@
               {onUploadImages}
               onVersionHistoryOpenChange={(open) => (showVersionHistory = open)}
               {showVersionHistory}
+              {simplifiedEditor}
               versions={activeVersions}
             />
           {/key}

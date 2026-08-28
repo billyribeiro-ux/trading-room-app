@@ -33,6 +33,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 10:10 UTC — A setting whose vendor is not in the capture, and what that changes
+
+**Runtime impact: YES.** A room that ticks *"Simplified Note Editor?"* gets a note toolbar whose
+colour control is foreground only — one palette instead of two. It did nothing before.
+
+**This is the fourteenth setting answered by building, and the first of a new kind.** Every previous
+one was matched against captured markup. This one cannot be: the reference spends it at byte
+1,468,503, and it spends it choosing a STRING —
+
+```js
+this.isSimplifiedEditor = sessData.simplifiedEditor ? "forecolor" : "color"
+```
+
+— which it hands to Summernote as the only member of the toolbar's colour group. **Summernote is not
+in the capture.** The vendor that turns those two names into DOM is a separate bundle this repository
+does not hold, so the markup each one produces is unevidenced, and saying so is most of the work.
+
+**What the held evidence DOES decide**, from `styles.ee2a710065b60389.css`: two 160px palettes side
+by side inside a 337px `note-color-all` menu, a `:first-child` rule that means nothing with one
+palette, and an `-all` suffix that means nothing without a not-all case. With a button literally
+named `forecolor`, that settles the shape — foreground only, one palette, no `note-color-all`.
+
+**One decision was taken beyond the evidence, and it is labelled as a decision rather than buried.**
+The quick swatch beside the dropdown applies a BACKGROUND colour in the full control. With the
+background palette gone it would be the only background affordance left in a toolbar that can no
+longer undo it, so it applies the text colour instead. `resolveNoteSurfaceGates` says in as many
+words that this is the repository's call and not a transcription.
+
+**It cost the page nothing — it PAID the page.** `noteGates` already crossed to `PresentationArea`
+whole, so the setting is a third field on `NoteSurfaceGates` rather than a fourth prop. And the
+six-line object literal that built it on the page went with it: `resolveNoteSurfaceGates` now
+declares `NoteSurfaceSources` structurally and takes `data`. **Which facts a surface depends on is
+that surface's question**, which is `buildMessageChrome`'s argument at one third the size.
+`routes/+page.svelte` **1390 → 1387**, and `PresentationArea` 880 → 883 for the wire and for
+replacing its inline copy of the gates type with the imported one — **the pair is net zero.**
+
+**Six negative controls seen RED, and the third round of them is the finding.** The first three
+(`note-color-all` unconditional, the swatch always a background chip, the gate moved onto the wrong
+palette) went red immediately. **The fourth stayed GREEN**: replacing `{simplifiedEditor}` in
+`NotesPane` with a literal `false` — cutting the wire at its last hop — passed all seven assertions,
+because every one of them rendered `NoteEditor` directly with the prop handed to it. That is the
+unfed-prop failure this repository found six times over on `RoomMessage`, reproduced deliberately.
+A chain block was added and all three hops now fail on their own.
+
+**Two components were capped that had no ceiling at all.** `NoteEditor.svelte` is **1,546 lines** —
+the second-largest Svelte file in the repository after the page — and was uncapped, which is exactly
+what `PresentationArea`'s entry says happens when a hand-kept list is kept by hand. `NotesPane` at
+447 went in beside it. Both at what they measure today, with the toolbar named as the extraction and
+deliberately not bundled with a settings wire.
+
+**The apostrophe and the bracket, both again.** `ROOM_VISIBLE_SETTINGS` is parsed by a single-quote
+regex bounded by the first closing bracket, and the first draft of this change hit **both** traps —
+`["color", [ … ]]` quoted in a comment, and three separate `editor's`/`Summernote's` apostrophes
+across the three pinned files. Each silently truncated the list to gibberish rather than failing
+loudly. The warning now sits inside the block it guards, phrased so it does not contain either
+character.
+
+**Verified:** room 160 files / 2,432 tests (1 skipped; 49 evidence-bound files excluded on this
+checkout by design) · controller 95 files / 1,006 tests (5 skipped) · `schema:verify` byte-compares
+at **83 wired** · both room gates and the six controller verifiers green · `svelte-check` 0/0 across
+1,283 files · eslint clean · prettier clean on every file this change touches.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+the four `.svelte` files. Recorded rather than glossed; `svelte-check` is not a substitute for it.
+
 ### 2026-08-28 09:35 UTC — A browser tab that never said which room, and a moderator's private note nobody saw
 
 **Runtime impact: YES.** The document title is now the room's own name — every tab read `PTRChat`

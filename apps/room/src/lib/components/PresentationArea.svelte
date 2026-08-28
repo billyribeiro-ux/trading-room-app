@@ -45,6 +45,7 @@
   import MainTabStrip from '#lib/components/MainTabStrip.svelte';
   import ModeratorMessage from '#lib/components/ModeratorMessage.svelte';
   import NotesPane from '#lib/components/notes/NotesPane.svelte';
+  import type { NoteSurfaceGates } from '#lib/components/notes/note-gates.js';
   import ScreenPane from '#lib/components/ScreenPane.svelte';
   import ScreenTabs from '#lib/components/ScreenTabs.svelte';
   import WebcamStrip from '#lib/components/WebcamStrip.svelte';
@@ -194,7 +195,8 @@
     toggleLockStreamMtx: (streamId: string) => void;
 
     // ── #notes ─────────────────────────────────────────────────────────────────
-    noteGates: { surfaceVisible: boolean; editorMounted: boolean };
+    /* The type, imported rather than restated - a second spelling of a shape is a second shape. */
+    noteGates: NoteSurfaceGates;
     giphyApiKey: string;
     /**
      * The notes surface, whole — `#lib/room/notes.svelte.ts`.
@@ -666,6 +668,7 @@
           {#if noteGates.surfaceVisible}
             <NotesPane
               canEdit={noteGates.editorMounted}
+              simplifiedEditor={noteGates.simplifiedEditor}
               focusedNoteId={notes.focusedNoteId}
               onBringEveryone={(noteId) => notes.bringEveryoneTo(noteId)}
               {giphyApiKey}

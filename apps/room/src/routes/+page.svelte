@@ -467,12 +467,9 @@
     return rosterRowVisible(rosterViewer, rosterSession, entry);
   }
 
-  const noteGates = $derived(
-    resolveNoteSurfaceGates({
-      canEditNotes: data.canEditNotes,
-      notesEnabled: data.notesEnabled
-    })
-  );
+  // `data` satisfies `NoteSurfaceSources` structurally; which of its fields the notes surface reads
+  // is that module's question, not the page's. See `buildMessageChrome` for the same move.
+  const noteGates = $derived(resolveNoteSurfaceGates(data));
   const pollIsActive = $derived(data.activePoll !== null);
   /**
    * `(this.isPresenter || this.appService.globals.sessData.userUploads) && (this.canPostImages = !0)`

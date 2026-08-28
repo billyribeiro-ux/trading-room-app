@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **43** as this is written; fifteen have been answered by building, and the
+2026-08-28 and is at **42** as this is written; sixteen have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -100,7 +100,6 @@ Ordered by how much of the work is already done.
 | --- | --- | --- |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
 | `enablePrivateMessageHistory` | 2,068,615 | One row in the user-info modal. |
-| `simplifiedEditor` | 1,468,478 | Picks `"forecolor"` versus `"color"` in the note editor's toolbar config. One string. |
 | `recsInRoom` | 2,016,810 | `archivesAvailableTo() && sessData.recsInRoom` gates the Recordings tab AND its pane. **Wire it only with the tab** — see BLOCKED. |
 
 ---
@@ -172,7 +171,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 
 ---
 
-## The fifteen already answered
+## The sixteen already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -191,6 +190,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 | `styckyNonTradeAlert` | WIRED — re-applied on EVERY modal open, which is what sticky means. | 2026-08-28 |
 | `name` | WIRED — the document title, `<svelte:head>` on the room page. Two further consumers stay unbuilt and are listed in the last section. | 2026-08-28 |
 | `modMessage` | WIRED — `ModeratorMessage.svelte`, presenter-only, dismissed locally exactly as upstream dismisses it. | 2026-08-28 |
+| `simplifiedEditor` | WIRED — a field of `NoteSurfaceGates`; the note toolbar's colour control becomes foreground-only. The first row whose downstream VENDOR is absent from the capture, so the decision is reproduced and the unevidenced part is named. | 2026-08-28 |
 
 ---
 

@@ -281,6 +281,15 @@ export interface RoomSessionSettings {
    */
   modMessage?: string;
   /**
+   * "Simplified Note Editor?" — foreground-only colour on the note editor's toolbar.
+   *
+   * `this.isSimplifiedEditor = sessData.simplifiedEditor ? "forecolor" : "color"` (byte 1,468,503),
+   * spent as the single member of the toolbar's `["color", [...]]` group. The reference turns those
+   * two names into markup inside Summernote, which is NOT in the capture — see
+   * `#lib/components/notes/note-gates.ts` for what that means the room can and cannot claim.
+   */
+  simplifiedEditor?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

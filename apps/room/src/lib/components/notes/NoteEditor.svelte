@@ -60,6 +60,12 @@
     */
     readonly onVersionHistoryOpenChange: (open: boolean) => void;
     readonly showVersionHistory: boolean;
+    /*
+      "Simplified Note Editor?" - foreground-only colour. `resolveNoteSurfaceGates` holds the
+      transcription, what the capture does and does not evidence, and the one decision taken beyond
+      it; this component only draws the two shapes.
+    */
+    readonly simplifiedEditor: boolean;
     readonly versions: readonly NoteVersion[];
   }
 
@@ -76,6 +82,7 @@
     onUploadImages,
     onVersionHistoryOpenChange,
     showVersionHistory,
+    simplifiedEditor,
     versions
   }: Props = $props();
 
@@ -842,17 +849,32 @@
         </div>
       </div>
 
+      <!--
+        TWO SHAPES, and which one is drawn is the whole of `simplifiedEditor`. See
+        `resolveNoteSurfaceGates` for the byte offset, for what the capture does NOT contain, and for
+        the one decision taken beyond the evidence.
+
+        `{#if}` and not `hidden`: the reference emits DIFFERENT markup for the two cases - a
+        different Summernote button name - rather than hiding one of them. `MainTabStrip`'s rule
+        applies to a tab whose markup exists either way; this is not that.
+      -->
       <div class="note-btn-group note-color">
-        <div class="note-btn-group note-color note-color-all">
+        <div class={['note-btn-group', 'note-color', { 'note-color-all': !simplifiedEditor }]}>
           <button
             type="button"
             class="note-btn note-current-color-button"
             aria-label="Recent Color"
             onclick={() =>
-              command((instance) => instance.chain().focus().setBackgroundColor('#FFFF00').run())}
+              command((instance) =>
+                simplifiedEditor
+                  ? instance.chain().focus().setColor('#FFFF00').run()
+                  : instance.chain().focus().setBackgroundColor('#FFFF00').run()
+              )}
             ><i
               class="note-icon-font note-recent-color"
-              style="background-color:#FFFF00;color:#000000;"
+              style={simplifiedEditor
+                ? 'background-color:#FFFFFF;color:#FFFF00;'
+                : 'background-color:#FFFF00;color:#000000;'}
             ></i></button
           >
           <button
@@ -864,50 +886,56 @@
           >
           {#if openMenu === 'color'}
             <div class="note-dropdown-menu" role="list">
-              <div class="note-palette">
-                <div class="note-palette-title">Background Color</div>
-                <button
-                  type="button"
-                  class="note-color-reset btn btn-light btn-default"
-                  onclick={() =>
-                    command((instance) => instance.chain().focus().unsetBackgroundColor().run())}
-                  >Transparent</button
-                >
-                <div class="note-holder">
-                  <div class="note-color-palette">
-                    {#each paletteRows as row (row[0])}
-                      <div class="note-color-row">
-                        {#each row as color (color)}
-                          <button
-                            type="button"
-                            class="note-btn note-color-btn"
-                            style:background-color={color}
-                            aria-label={`Background ${color}`}
-                            onclick={() =>
-                              command((instance) =>
-                                instance.chain().focus().setBackgroundColor(color).run()
-                              )}
-                          ></button>
-                        {/each}
-                      </div>
-                    {/each}
+              {#if !simplifiedEditor}
+                <div class="note-palette">
+                  <div class="note-palette-title">Background Color</div>
+                  <button
+                    type="button"
+                    class="note-color-reset btn btn-light btn-default"
+                    onclick={() =>
+                      command((instance) => instance.chain().focus().unsetBackgroundColor().run())}
+                    >Transparent</button
+                  >
+                  <div class="note-holder">
+                    <div class="note-color-palette">
+                      {#each paletteRows as row (row[0])}
+                        <div class="note-color-row">
+                          {#each row as color (color)}
+                            <button
+                              type="button"
+                              class="note-btn note-color-btn"
+                              style:background-color={color}
+                              aria-label={`Background ${color}`}
+                              onclick={() =>
+                                command((instance) =>
+                                  instance.chain().focus().setBackgroundColor(color).run()
+                                )}
+                            ></button>
+                          {/each}
+                        </div>
+                      {/each}
+                    </div>
                   </div>
+                  <label class="note-color-select btn btn-light btn-default">
+                    Select
+                    <input
+                      id={`${componentId}-background-color`}
+                      name="noteBackgroundColor"
+                      class="note-btn note-color-select-btn"
+                      type="color"
+                      value="#FFFF00"
+                      onchange={(event) =>
+                        command((instance) =>
+                          instance
+                            .chain()
+                            .focus()
+                            .setBackgroundColor(event.currentTarget.value)
+                            .run()
+                        )}
+                    />
+                  </label>
                 </div>
-                <label class="note-color-select btn btn-light btn-default">
-                  Select
-                  <input
-                    id={`${componentId}-background-color`}
-                    name="noteBackgroundColor"
-                    class="note-btn note-color-select-btn"
-                    type="color"
-                    value="#FFFF00"
-                    onchange={(event) =>
-                      command((instance) =>
-                        instance.chain().focus().setBackgroundColor(event.currentTarget.value).run()
-                      )}
-                  />
-                </label>
-              </div>
+              {/if}
               <div class="note-palette">
                 <div class="note-palette-title">Text Color</div>
                 <button

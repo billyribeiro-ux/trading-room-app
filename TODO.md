@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **187** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **186** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**43 of the 187 are read by the reference's OWN room client**, as `sessData.<name>`.
+**42 of the 186 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Fifteen have already left the list, on the day it was written.** It opened at 202 unwired and 58
-questions; both numbers have moved thirteen times since.
+**Sixteen have already left the list, on the day it was written.** It opened at 202 unwired and 58
+questions; both numbers have moved fourteen times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -257,12 +257,18 @@ flag would light a control that cannot act. The remainder split into **12 WIRE**
 here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
 size in the triage document.
 
-**WIRE is down to FOUR**, all four named with what each needs: `isNewIndicatorOn` (wants a supply for
-`msg.isNew` before it is wired), `enablePrivateMessageHistory` (one row of the user-info modal),
-`simplifiedEditor` (one string in the note editor's toolbar config) and `recsInRoom` (BLOCKED — wire
-it with the Recordings tab, never before it).
+**WIRE is down to THREE**, each named with what it needs: `isNewIndicatorOn` (wants a supply for
+`msg.isNew` before it is wired), `enablePrivateMessageHistory` (one row of the user-info modal) and
+`recsInRoom` (BLOCKED — wire it with the Recordings tab, never before it).
 
-`src/lib/setting-coverage-contract.test.ts` pins the 43 by NAME and asserts separately that the seven
+`simplifiedEditor` left WIRE on 2026-08-28 and is worth a line of its own, because it is the first
+setting to cross whose DOWNSTREAM VENDOR is absent from the capture. The reference spends it choosing
+between two Summernote button names and Summernote is not in the bundle we hold, so the room
+reproduces the decision — foreground-only colour — and `resolveNoteSurfaceGates` states in as many
+words which part of that is evidenced and which part is this repository's call. A setting wired
+without that distinction written down would read, later, as a transcription.
+
+`src/lib/setting-coverage-contract.test.ts` pins the 42 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10, a

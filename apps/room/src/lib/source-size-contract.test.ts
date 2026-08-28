@@ -405,7 +405,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in `moderator-message-contract.test.ts`, following the roster seed three entries up, which is
       why the title costs four comment lines instead of a paragraph.
     */
-    max: 1390,
+    /*
+      1390 -> 1387, 2026-08-28, and this one goes DOWN, which is the direction this file prefers.
+
+      `noteGates` was built on the page from a six-line object literal naming which fields of `data`
+      the notes surface reads. That was never the PAGE's question. `resolveNoteSurfaceGates` now
+      declares `NoteSurfaceSources` structurally and takes `data` itself, so the construction is one
+      line and a third field could be added to the notes surface without the page hearing about it.
+
+      Precedent and argument are `buildMessageChrome`'s, three entries up: which facts a surface
+      depends on belongs beside that surface, and a page that lists them is a page that will be
+      edited every time the list changes. It paid for the `simplifiedEditor` wire outright.
+    */
+    max: 1387,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -819,6 +831,42 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the hidden <audio> sink per remote peer - six lines of markup, the rest is why'
   },
   {
+    file: 'lib/components/notes/NoteEditor.svelte',
+    /*
+      CAPPED 2026-08-28, having been UNCAPPED at 1,546 lines — the second-largest Svelte file in the
+      repository after the page itself, and the exact failure `PresentationArea` below records in
+      its own entry: components are a hand-kept list, and a hand-kept list is how a file this size
+      goes a whole phase with nothing objecting. Found by touching it for a one-boolean wire.
+
+      Set at what it measures TODAY rather than at something aspirational, which is what that entry
+      argues for: the number's job is to stop the next 200 lines, not to pass judgement on the
+      existing 1,546. Most of the file is the toolbar — a dozen button groups, each transcribed
+      against captured markup — and the obvious extraction is the toolbar itself, which would take
+      this well under half. That is a real change with a real safety net (`note-editor-render`,
+      `note-version-history` and `simplified-note-editor-contract` all render it) and it is not
+      bundled with a settings wire.
+
+      If this number climbs, the thing to check is whether the editor has started DECIDING something.
+      It should not: `simplifiedEditor` arrives already resolved, and `resolveNoteSurfaceGates` is
+      where that kind of question is answered.
+    */
+    max: 1546,
+    why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
+  },
+  {
+    file: 'lib/components/notes/NotesPane.svelte',
+    /*
+      CAPPED 2026-08-28 alongside `NoteEditor` above, and for the same reason: it was uncapped.
+
+      It owns the tab strip, the rename and delete dialogs, and the version-restore confirmation —
+      the note actions that are NOT authoring. Everything it hands the editor it passes through
+      untouched, `simplifiedEditor` included. If this number climbs, the thing to check is whether a
+      prop has started being transformed on the way through rather than forwarded.
+    */
+    max: 447,
+    why: 'the note tab strip and the three confirmations; everything else passes through'
+  },
+  {
     file: 'lib/components/RoomShell.svelte',
     /*
       Created 2026-08-17 (S4+S8), and capped IN THE SAME COMMIT — which is the lesson S5 paid for
@@ -929,7 +977,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       offsets and the argument for not persisting its dismissal are all in `ModeratorMessage.svelte`
       and its contract file, which is why six lines land here and not twenty.
     */
-    max: 880,
+    /*
+      880 -> 883, 2026-08-28, and THE PAIR IS NET ZERO: `routes/+page.svelte` falls 1390 -> 1387 in
+      the same commit, so the three lines moved rather than appeared.
+
+      Two of them are `simplifiedEditor` reaching `NotesPane`. The third replaced this file's inline
+      `{ surfaceVisible: boolean; editorMounted: boolean }` with the imported `NoteSurfaceGates` —
+      the same shape was written out in two files, and the second copy had already fallen a field
+      behind before anybody noticed. A type is a contract; a restatement of one is a second contract
+      that agrees today.
+    */
+    max: 883,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {

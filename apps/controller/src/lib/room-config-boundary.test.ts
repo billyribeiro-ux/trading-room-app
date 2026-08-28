@@ -305,6 +305,14 @@ describe('the allow-list itself', () => {
       */
       name: 'the browser tab — <svelte:head><title> on the room page',
       modMessage: 'ModeratorMessage — a presenter-only bar above the presentation area',
+      /*
+        Verified in the room before being written here. It is a field of `NoteSurfaceGates` rather
+        than a fourth prop, because `noteGates` already crosses to `PresentationArea` whole — and the
+        module that resolves it is also where the honest gap lives: the Summernote build that turns
+        the reference's two button names into DOM is not in the capture.
+      */
+      simplifiedEditor:
+        'resolveNoteSurfaceGates — foreground-only colour on the NoteEditor toolbar',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',
