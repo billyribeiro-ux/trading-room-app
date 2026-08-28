@@ -16,7 +16,12 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
   Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 100.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 102.
+
+  87 -> 89 on 2026-08-28: autoRecord and dontStopRecOnMicMute. ONE feature and two settings, crossing
+  together because the second is inert without the first - autoRecord gates the stop as well as both
+  starts. Filed BLOCKED on a server-side recorder that this room deliberately does not have and does
+  not need: it records in the browser, so the settings had something to drive all along.
 
   86 -> 87 on 2026-08-28: alertsOverlayOnScreenshare. The first on this list that changes the BYTES
   ON THE WIRE rather than the DOM: a canvas is spliced between the display capture and the producer,
@@ -343,6 +348,8 @@ const EXPECTED_WIRED_SETTINGS = [
   */
   'alertLabels',
   'alertsOverlayOnScreenshare',
+  'autoRecord',
+  'dontStopRecOnMicMute',
   'altChatRender',
   'chatTabsWithBadges',
   'usersPublicReply',

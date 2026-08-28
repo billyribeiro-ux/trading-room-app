@@ -33,6 +33,82 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 18:07 UTC — `autoRecord` + `dontStopRecOnMicMute`, and a blocker that described the wrong system
+
+**Runtime impact: YES.** In a room with *"Auto Record?"* on, a presenter's recording now starts by
+itself when they open their microphone while sharing a screen, or begin sharing one with the mic
+already open — and stops when they mute, unless *"Do not stop recording on mic mute?"* is set or
+somebody else still has an open microphone. Rooms with `autoRecord` off are unchanged in every
+respect, including the mute path.
+
+#### The blocker described the reference, not this room
+
+The triage row read *"A server-side recorder, which does not exist. Same blocker `start-recording` /
+`stop-recording` carry."* The first sentence is true of the reference. Its `startRecLocal` event is a
+misnomer: it reaches `mediaSoupService.startRec`, which is
+`socket.emit("cmd", {cmd: "startRecord", muser, mp4})` — an opcode to a recorder on the SFU. The
+second sentence is the error, because `start-recording` / `stop-recording` are the REMOTE commands
+(one presenter telling another browser to record) and these two settings are not.
+
+**This room already records in the browser.** `lib/room/recording.ts` has built a `MediaRecorder`
+over the shared screen plus the presenter's microphone since it was written, as a deliberate
+divergence with the reason at the method. The settings had a recorder to drive all along. Fourth
+inherited blocker in one session to dissolve on re-measurement, after the Rust one, `altChatRender`
+and `alertsOverlayOnScreenshare`.
+
+#### Four read sites, transcribed rather than inferred from the names
+
+| byte | site | what it says |
+| --- | --- | --- |
+| 1,116,794 | the `micMuted` gui subscriber | `isRecording && micMuted && autoRecord && !dontStopRecOnMicMute && talkingUsers.length <= 1` → stop |
+| 1,121,427 | the `startScreenSharing` subscriber | `!isRecording && !micMuted && autoRecord` → `handleAutoRecordStart` |
+| 1,125,863 | the `startTalking` subscriber, own user | `autoRecord && handleAutoRecordStart(r)` |
+| 1,127,013 | `handleAutoRecordStart` | mic path needs `screenSharingUsers[0]`; screen path needs `!micMuted` |
+
+**`autoRecord` gates the STOP as well as both starts**, so `dontStopRecOnMicMute` decides nothing on
+its own — which is why the two cross the boundary together, and why presenting them as independent
+controls would mislead an owner.
+
+**`talkingUsers.length <= 1` counts the muting user.** Upstream's subscriber runs on a gui event that
+precedes the server's `stopTalking` round trip, so the person muting is still in the array; the bound
+means "nobody ELSE has an open mic", which is what its own else branch says — *"not stopping rec as
+others are speaking"*. This room removes the user locally and synchronously, so the trigger is raised
+**before** `stopTalking` rather than after it. Off by one there stops a recording on top of whoever
+is still speaking, and a contract assertion holds the order because swapping those two lines leaves
+every type check and every other test green.
+
+#### Two divergences, written at the code
+
+* **Only this peer's own share is auto-recorded.** Upstream's screenshare trigger fires for any
+  member starting one, because its server can record any of them. A `MediaRecorder` here is fed from
+  this browser's own capture.
+* **The start is guarded on not already recording.** Upstream's mic path is not — its server dedupes
+  a repeated `startRecord` and even offers an `override` confirmation for the second. A second
+  `MediaRecorder` over the same stream here would orphan the first and lose every chunk it had.
+
+#### Shape
+
+The decision is a pure `lib/auto-record.ts` — one function, three triggers, seven inputs — because
+the two settings interact and an interaction split across three call sites is one that gets
+half-changed. `RoomRecording.autoRecord()` reads the live state and calls one of its own two methods.
+`RoomLocalCapture` reports the three moments and decides nothing: upstream reacts to them on two
+event buses, and naming them at the three places they actually happen is easier to follow and
+impossible to subscribe to twice.
+
+#### Verified
+
+`svelte-check` 0/0. `auto-record-contract.test.ts` 17 passing, with **six negative controls seen RED**
+and the tree restored green after each: `autoRecord` not read on the stop path, the talking bound
+counting others only, `dontStopRecOnMicMute` ignored, a silent share starting a recording, a second
+recorder allowed over the first, and the `micClosed` trigger moved after `stopTalking`. Room
+`pnpm test` **183 files / 3,025 tests, 1 skipped**. Controller schema regenerated at **102 wired /
+269 declared**, `verify-room-settings-schema` green. Four ceilings raised and each argued in place
+(`recording.ts` 358 → 406, `local-capture.svelte.ts` 925 → 957, `media-transport.svelte.ts` 1357 →
+1359, `create-room.svelte.ts` 1160 → 1174).
+
+**Not verified: a recording produced by either trigger in a real browser.** Both need a screen picker
+and a live SFU. What is proven is the rule and the wiring order.
+
 ### 2026-08-28 17:45 UTC — `alertsOverlayOnScreenshare`: alerts burned into the outgoing screen capture
 
 **Runtime impact: YES.** In a room with *"Alerts over screenshare?"* on, a presenter's shared screen

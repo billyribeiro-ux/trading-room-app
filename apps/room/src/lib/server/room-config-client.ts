@@ -586,6 +586,21 @@ export interface RoomSessionSettings {
    */
   alertsOverlayOnScreenshare?: boolean;
   /**
+   * "Auto Record?" and "Do not stop recording on mic mute?" — a recording that starts and stops on
+   * its own.
+   *
+   * ONE feature and two settings, and they cross together because the second is inert without the
+   * first: every one of `autoRecord`'s three read sites is a gate on the stop as well as on the
+   * start, so a room with `autoRecord` off never auto-stops either. `#lib/auto-record.ts` holds all
+   * four bundle citations, the `talkingUsers.length <= 1` ordering trap, and the two divergences
+   * this room's browser-side recorder forces.
+   *
+   * Both cross because every occurrence in the reference is `sessData.<name>` — per-room policy,
+   * nothing a browser can infer.
+   */
+  autoRecord?: boolean;
+  dontStopRecOnMicMute?: boolean;
+  /**
    * Four per-room gates that `RoomMessage.svelte` already implements.
    *
    * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.

@@ -278,6 +278,24 @@ building around it. This section stays separate from BLOCKED because these
 are features with a known size, not questions with an unknown answer: what to build is understood in
 every case, and only the means to verify it is missing.
 
+**`autoRecord` + `dontStopRecOnMicMute` LEFT THIS SECTION ON 2026-08-28, and their row described the
+wrong system.** It read "a server-side recorder, which does not exist. Same blocker `start-recording`
+/ `stop-recording` carry." The first sentence is a true statement about the REFERENCE: its
+`startRecLocal` event is a misnomer that reaches `mediaSoupService.startRec`, which is
+`socket.emit("cmd", {cmd: "startRecord", muser, mp4})` — an opcode to a recorder on the SFU. The
+second sentence is where it goes wrong, because `start-recording` / `stop-recording` are the REMOTE
+commands (one presenter telling another browser to record) and these two settings are not. This room
+records in the BROWSER with `MediaRecorder`, a divergence `lib/room/recording.ts` made deliberately
+and documented at the method, so the settings had a recorder to drive all along.
+
+Two divergences follow and are written at the code rather than left to be found: only this peer's own
+share can be auto-recorded (upstream's server can record any member's), and the start is guarded on
+not already recording (upstream's mic path is not, because its server dedupes a repeated
+`startRecord` and even offers an `override` confirmation; a second `MediaRecorder` here would orphan
+the first and lose its chunks). Six negative controls seen red, including the ordering one — the stop
+is gated on `talkingUsers.length <= 1`, which counts the muting user, so the trigger is raised BEFORE
+this room removes them from the list.
+
 **`alertsOverlayOnScreenshare` LEFT THIS SECTION ON 2026-08-28, and its row was wrong rather than
 stale.** It read "a human at a screen picker", and that is still true of exactly one thing: nothing
 in this repository can look at a composited frame, and the contract test says so in its own header
@@ -293,13 +311,11 @@ controls were seen red. That is the second inherited blocker in one day to disso
 | row | what it needs, measured |
 | --- | --- |
 | `enableDiscord` | A Discord application registration. Owner's call — there is nothing to link to. |
-| `autoRecord` + `dontStopRecOnMicMute` | A server-side recorder, which does not exist. Same blocker `start-recording` / `stop-recording` carry. |
 | `hasAlertScheduler` | A scheduler process in `services/api`, and the crate's TEST targets cannot be built here. **The Rust position is narrower than it has been written down as, measured today:** `cargo check -p tradingroom-api --features testing` and `cargo clippy … -- -D warnings` are both GREEN in this container. What fails is `cargo test`, because the crate dev-depends on `tradingroom-media` for one contract test, that pulls `mediasoup-sys`, and its build script fetches `libsrtp` from GitHub where the egress proxy answers **403**. So a `services/api` change can be compiled and linted here and cannot be unit-tested — and a timer that writes to a multi-tenant fintech database is not something to ship on a compile. |
 
 | setting | byte | size |
 | --- | --- | --- |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
-| `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
 | `hasAlertScheduler` | 1,009,745 | Already tracked in `TODO.md` with its own section — three commands and a server-side scheduler. |
 
 ---

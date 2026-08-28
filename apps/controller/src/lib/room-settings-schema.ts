@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 100 of 269 are wired today.
+// nothing in the room reads it yet. 102 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -240,7 +240,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "audioMeterDisabled", section: "settings", type: "checkbox", label: "Disable Audio Meter?", help: "Turn this on to disable the audio level meter next to the presenter name when they are talking", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideWebcamForRoom", section: "settings", type: "checkbox", label: "Hide WebCam in the room?", help: "If enabled, WebCam will be hidden in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recordChat", section: "settings", type: "checkbox", label: "Record alerts and chat?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "autoRecord", section: "settings", type: "checkbox", label: "Auto record presenters?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "autoRecord", section: "settings", type: "checkbox", label: "Auto record presenters?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "blinkingRec", section: "settings", type: "checkbox", label: "Blinking [REC]?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideRecs", section: "settings", type: "checkbox", label: "Hide Recordings?", help: "If enabled, recordings will be hidden in archives", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "recordingReminder", section: "settings", type: "checkbox", label: "Recording Reminder If Speaking?", help: "If enabled, will show recording reminder popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
@@ -254,7 +254,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "stickyGiveMicAndCam", section: "settings", type: "checkbox", label: "Sticky give Mic/Cam?", help: "If enabled, when a presenter gives mic/cam, the setting will stick", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "overlayUserIdOnScreenshare", section: "settings", type: "checkbox", label: "Overlay userID on screenshare?", help: "If enabled, it will overlay userID on screenshare", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "regUserCanPresent", section: "settings", type: "checkbox", label: "Auto give Mic/Screen to Users?", help: "If enabled, ALL regular users will have mic/screenshare in the room. ***** CAREFULL ******", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "dontStopRecOnMicMute", section: "settings", type: "checkbox", label: "Don't stop on mute?", help: "Don't auto stop the rec on mic mute", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "dontStopRecOnMicMute", section: "settings", type: "checkbox", label: "Don't stop on mute?", help: "Don't auto stop the rec on mic mute", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "individualVolumeControls", section: "settings", type: "checkbox", label: "Individual Volume Controls?", help: "Individual volume controls for each Presenter", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "remote_recording", section: "settings", type: "checkbox", label: "NEW recording procedure?", help: "new experimental serverside rec control, more reliable?", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "saveRecsToS3", section: "settings", type: "checkbox", label: "Save Recs to AWS S3", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

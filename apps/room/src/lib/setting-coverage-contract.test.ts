@@ -99,7 +99,16 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `alertsOverlayOnScreenshare` left last, and it is the first row whose disposition in the triage
+ * `autoRecord` and `dontStopRecOnMicMute` left last, together, and they are the THIRD blocker in one
+ * session to describe the wrong system. The row read "a server-side recorder, which does not exist",
+ * which is a true statement about the reference and an irrelevant one here: upstream's `startRecLocal`
+ * event is a misnomer that reaches `socket.emit("cmd", {cmd: "startRecord"})`, an opcode to a recorder
+ * on the SFU, and this room deliberately records in the BROWSER instead. The settings had something
+ * to drive all along. Two divergences follow from that and are written at the code: only this peer's
+ * own share can be auto-recorded, and the start is guarded on not already recording, because a second
+ * `MediaRecorder` would orphan the first and lose its chunks. `auto-record-contract.test.ts`.
+ *
+ * `alertsOverlayOnScreenshare` left before them, and it is the first row whose disposition in the triage
  * was WRONG rather than merely stale. It was filed as blocked on "a human at a screen picker", and
  * that is true of the only thing it blocks: nothing here can look at a composited frame. But the
  * risk in this feature is not the canvas, it is the WRAPPING — the reference packs the first line
@@ -137,7 +146,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
   'smallerImagePreview',
   'allRoomsWelcomeMatPW',
-  'autoRecord',
   'isNewIndicatorOn',
   'openLoginLink',
   'authMode',
@@ -145,7 +153,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'hasAlertScheduler',
   'playChatMessageSoundFor',
   'description',
-  'dontStopRecOnMicMute',
   'isLocked',
   'needPasswordForUserNotes',
   'obsStreamKey',

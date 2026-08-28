@@ -1,3 +1,4 @@
+import { autoRecordAction, type AutoRecordTrigger } from '#lib/auto-record.js';
 import { startSpeechRecognition } from '#lib/media/speech-reco.js';
 import { chooseRecordingOptions } from '#lib/recording-codec.js';
 
@@ -65,6 +66,16 @@ export class RoomRecording {
      * refetch; a boolean captured at construction would be the value the room opened with.
      */
     speechRecognitionAvailable: () => boolean;
+    /**
+     * `sessData.autoRecord` and `sessData.dontStopRecOnMicMute` — the two settings that start and
+     * stop a recording without being asked. `#lib/auto-record.ts` holds the rules and the citations.
+     *
+     * A thunk for the reason `speechRecognitionAvailable` is one: both are read off the loaded page
+     * data and the load is replaced on every refetch, so a value captured at construction would be
+     * whatever the room opened with. An owner un-ticking `autoRecord` mid-session must take effect
+     * on the next mute, not on the next reload.
+     */
+    autoRecordSettings: () => { autoRecord: boolean; dontStopRecOnMicMute: boolean };
   }) {
     this.#dialogs = options.dialogs;
     this.#media = options.media;
@@ -73,6 +84,7 @@ export class RoomRecording {
     this.#mediaTransport = options.mediaTransport;
     this.#isPresenter = options.isPresenter;
     this.#speechRecognitionAvailable = options.speechRecognitionAvailable;
+    this.#autoRecordSettings = options.autoRecordSettings;
 
     this.#screenRecorder = null;
 
@@ -92,6 +104,7 @@ export class RoomRecording {
   readonly #mediaTransport: RoomMediaTransport;
   readonly #isPresenter: () => boolean;
   readonly #speechRecognitionAvailable: () => boolean;
+  readonly #autoRecordSettings: () => { autoRecord: boolean; dontStopRecOnMicMute: boolean };
 
   /**
    * Records the shared screen to a file on this machine.
@@ -176,6 +189,41 @@ export class RoomRecording {
     this.#media.recordingPaused = false;
     this.#media.recordingReminder = true;
     this.#menus.set('recording', false);
+  }
+
+  /**
+   * `autoRecord` / `dontStopRecOnMicMute` — a recording that starts and stops on its own.
+   *
+   * The DECISION is `#lib/auto-record.ts`, which holds all four bundle citations and the two
+   * divergences this room's browser-side recorder forces. What is here is the reading of live state
+   * and the two calls, because the state lives on `RoomMedia` and the recorder is this class.
+   *
+   * It is called from the capture rather than observed, and that is the one shape decision worth
+   * recording: upstream reacts to `micMuted`, `startTalking` and `startScreenSharing` on two event
+   * buses, and this room has no bus. Three explicit calls from `RoomLocalCapture` are the same three
+   * events named at the three places they actually happen, which is easier to follow and impossible
+   * to subscribe to twice.
+   *
+   * @param trigger which of the three moments this is.
+   */
+  autoRecord(trigger: AutoRecordTrigger): void {
+    const settings = this.#autoRecordSettings();
+    const action = autoRecordAction({
+      trigger,
+      autoRecord: settings.autoRecord,
+      dontStopRecOnMicMute: settings.dontStopRecOnMicMute,
+      recording: this.#media.recording,
+      micMuted: this.#media.micMuted,
+      sharingScreen: this.#media.screenSharing,
+      /*
+        READ BEFORE THE CALLER REMOVES ITSELF, which is why `micClosed` is raised ahead of
+        `stopTalking` at its call site rather than after it. Upstream's `<= 1` counts the muting user,
+        because its own subscriber runs before the server's `stopTalking` round trip comes back.
+      */
+      talkingCount: this.#media.talking.length
+    });
+    if (action === 'start') this.startRecording();
+    else if (action === 'stop') this.stopRecording();
   }
 
   stopRecording() {

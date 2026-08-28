@@ -356,6 +356,17 @@ const ROOM_CONSUMED = [
      Every occurrence in the bundle is sessData dotted onto the name, and the compositor at byte
      1,099,577 reads it as the gate on whether the wrap happens at all. */
   'alertsOverlayOnScreenshare',
+  /* "Auto Record?" and "Do not stop recording on mic mute?" - ONE feature, two settings.
+
+     They cross together because the second is inert without the first: autoRecord is read at three
+     sites (bytes 1,116,794 / 1,121,427 / 1,125,863) and gates the STOP as well as both starts, so a
+     room with it off never auto-stops on a mute whatever the second says.
+
+     A recording starts when this presenter opens their microphone while sharing a screen, or begins
+     sharing one with their microphone already open, and stops when they mute unless the second
+     setting is on or somebody else still has an open mic. */
+  'autoRecord',
+  'dontStopRecOnMicMute',
   /* Four gates that RoomMessage.svelte already implements and no room could switch on.
 
      Every occurrence of all four in the reference bundle is sessData dotted onto the name, so they
@@ -914,9 +925,17 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // is pure and unit-tested against a stub text measurer; its plumbing half fails OPEN, because a
 // share that does not start is a worse outcome than a share without its overlay.
 //
+// 102 since 2026-08-28: `autoRecord` and `dontStopRecOnMicMute`. Thirty-second and thirty-third
+// finds, and the second BLOCKER on this list to be wrong rather than stale: the row said "a
+// server-side recorder, which does not exist", which is true of the reference and irrelevant here.
+// This room already records in the BROWSER, deliberately and with the reason recorded, so the two
+// settings had a recorder to drive all along. What the reading did change is the scope, and it is
+// written down: only this peer's own share can be auto-recorded, and the start is guarded on not
+// already recording because a second MediaRecorder would orphan the first.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 100 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 102 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

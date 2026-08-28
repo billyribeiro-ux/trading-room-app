@@ -333,11 +333,18 @@ narrowings are in place and `evidence-partition.test.ts` pins 42.
 day. The guard was never off. That is the SECOND inherited blocker to dissolve on re-measurement in
 one session, after the Rust one below — **re-measure a blocker before building around it.**
 
-**THE SETTINGS ENUMERATION IS DOWN TO THREE UNBUILT FEATURES, and every one is blocked on something
-outside this repository** — measured 2026-08-28, not inherited. `enableDiscord` needs a
-Discord application registration; `autoRecord`/`dontStopRecOnMicMute` need the server-side recorder
-that `start-recording` is also waiting for; `hasAlertScheduler` needs a scheduler process in
-`services/api`. `altChatRender` was the fifth and is BUILT.
+**THE SETTINGS ENUMERATION IS DOWN TO TWO UNBUILT FEATURES** — measured 2026-08-28, not inherited.
+`enableDiscord` needs a Discord application registration, which is the owner's call because there is
+nothing to link to; `hasAlertScheduler` needs a scheduler process in `services/api`. `altChatRender`
+was the fifth and is BUILT.
+
+**`autoRecord` + `dontStopRecOnMicMute` are BUILT, and their blocker described the wrong system.** It
+read "a server-side recorder, which does not exist", which is true of the REFERENCE — its
+`startRecLocal` is a misnomer reaching `socket.emit("cmd", {cmd: "startRecord"})` — and irrelevant
+here, because this room records in the browser with `MediaRecorder`, deliberately and with the reason
+already at the method. Two divergences are written at the code: only this peer's own share is
+auto-recorded, and the start is guarded on not already recording. FOURTH inherited blocker to
+dissolve on re-measurement in one session.
 
 **`alertsOverlayOnScreenshare` was the fourth, and it is BUILT — its blocker was WRONG, not merely
 stale.** The row read "a human at a screen picker", which remains true of the one thing it blocks:

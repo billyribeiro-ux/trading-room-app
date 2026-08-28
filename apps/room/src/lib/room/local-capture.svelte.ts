@@ -9,6 +9,7 @@ import {
   mediaCaptureErrorMessage,
   permissionForCapture
 } from '#lib/media-capture-error.js';
+import type { AutoRecordTrigger } from '#lib/auto-record.js';
 import type { MediaSession } from '#lib/media/session.js';
 import type { SignallingClient } from '#lib/media/signalling.js';
 import type { WebcamPresenter } from '#lib/types.js';
@@ -141,6 +142,7 @@ export class RoomLocalCapture {
   readonly #beginSpeech: () => void;
   readonly #endSpeech: () => void;
   readonly #stopRecording: () => void;
+  readonly #autoRecord: (trigger: AutoRecordTrigger) => void;
   readonly #checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
   readonly #closeScreenMenu: () => void;
   readonly #videoDeviceId: () => string | undefined;
@@ -167,6 +169,15 @@ export class RoomLocalCapture {
     beginSpeech: () => void;
     endSpeech: () => void;
     stopRecording: () => void;
+    /**
+     * `autoRecord` / `dontStopRecOnMicMute` — this class REPORTS the three moments and decides
+     * nothing.
+     *
+     * `RoomRecording.autoRecord` reads the live state and applies `#lib/auto-record.ts`. Upstream
+     * reacts to `micMuted`, `startTalking` and `startScreenSharing` on two event buses; this room
+     * has no bus, so the three events are named at the three places they happen.
+     */
+    autoRecord: (trigger: AutoRecordTrigger) => void;
     checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
     closeScreenMenu: () => void;
     videoDeviceId: () => string | undefined;
@@ -184,6 +195,7 @@ export class RoomLocalCapture {
     this.#beginSpeech = options.beginSpeech;
     this.#endSpeech = options.endSpeech;
     this.#stopRecording = options.stopRecording;
+    this.#autoRecord = options.autoRecord;
     this.#checkPermissionState = options.checkPermissionState;
     this.#closeScreenMenu = options.closeScreenMenu;
     this.#videoDeviceId = options.videoDeviceId;
@@ -360,6 +372,8 @@ export class RoomLocalCapture {
         userID: this.#session().user.id,
         mediaValue: { name: this.#session().user.displayName }
       });
+      // `autoRecord` — upstream's `startTalking` subscriber, for our own user id.
+      this.#autoRecord('micOpened');
       this.#beginSpeech();
     } catch (error) {
       if (retryCount === 0) {
@@ -405,6 +419,17 @@ export class RoomLocalCapture {
       stopStream(this.#microphoneStream);
       this.#microphoneStream = null;
       this.#media.micMuted = true;
+      /*
+        BEFORE `stopTalking`, and the order is the rule rather than a preference.
+
+        `autoRecord`'s stop is gated on `talkingUsers.length <= 1` — "nobody ELSE has an open mic" —
+        and upstream evaluates that with the muting user still in the array, because its subscriber
+        runs on a gui event that precedes the server's `stopTalking` round trip. This room removes
+        the user locally and synchronously, so calling this afterwards would count one fewer and
+        stop the recording while somebody else is still speaking. `#lib/auto-record.ts` says the same
+        thing at the field it belongs to.
+      */
+      this.#autoRecord('micClosed');
       this.#media.stopTalking(this.#session().user.id);
       this.#endSpeech();
       return;
@@ -692,6 +717,13 @@ export class RoomLocalCapture {
           // Ending the capture - the browser's own "Stop sharing" bar - closes THIS screen only,
           // not every screen this presenter is sharing.
           track.addEventListener('ended', () => this.stopLocalScreen(producer.id), { once: true });
+          /*
+            `autoRecord` — upstream's `startScreenSharing` subscriber, narrowed to OUR OWN share.
+
+            After the produce, not before it: upstream reacts to a share that reached the room, and a
+            recording of a share nobody can see is the one outcome worse than no recording at all.
+          */
+          this.#autoRecord('screenShared');
         } catch (error) {
           /*
             The local preview still works; only the sharing half failed, and saying so beats a

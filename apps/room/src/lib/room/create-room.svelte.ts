@@ -651,6 +651,11 @@ export function createRoom(deps: RoomDeps) {
     beginSpeech: () => recording.beginSpeechRecognition(),
     endSpeech: () => recording.endSpeechRecognition(),
     stopRecording: () => recording.stopRecording(),
+    /*
+      `autoRecord` / `dontStopRecOnMicMute`. A thunk for the same reason `stopRecording` is one:
+      `recording` is constructed below this line.
+    */
+    autoRecord: (trigger) => recording.autoRecord(trigger),
     showScreensTab: () => deps.setMainTab('screens'),
     checkPermissionState: (kind, userAgent) => checkPermissionState(kind, userAgent),
     isPresenter: () => isPresenter,
@@ -765,7 +770,16 @@ export function createRoom(deps: RoomDeps) {
     mediaTransport,
     isPresenter: () => isPresenter,
     // A thunk, and it must be: `gates` is constructed below this line.
-    speechRecognitionAvailable: () => gates.speechRecognitionAvailable
+    speechRecognitionAvailable: () => gates.speechRecognitionAvailable,
+    /*
+      `=== true` on both, which is the fail-closed read every optional control-plane field takes
+      here: a room-config response that omitted them must record nothing automatically rather than
+      start a recording nobody asked for.
+    */
+    autoRecordSettings: () => ({
+      autoRecord: data.sessData?.autoRecord === true,
+      dontStopRecOnMicMute: data.sessData?.dontStopRecOnMicMute === true
+    })
   });
 
   /*

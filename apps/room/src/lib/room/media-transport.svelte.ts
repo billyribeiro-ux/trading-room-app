@@ -10,6 +10,8 @@ import type { WebcamPresenter } from '#lib/types.js';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomLocalCapture } from './local-capture.svelte';
 import type { RoomMedia } from './media.svelte';
+import type { AutoRecordTrigger } from '#lib/auto-record.js';
+
 import type { RoomScreenOverlay } from './screen-overlay.svelte';
 import type { RoomScreens } from './screens.svelte';
 import type { RoomToasts } from './toasts.svelte';
@@ -147,6 +149,11 @@ export class RoomMediaTransport {
     endSpeech: () => void;
     /** Stopping a screen share stops the recording riding on it. */
     stopRecording: () => void;
+    /*
+      PASSED THROUGH like `overlay`: `autoRecord` belongs to the recorder and this class never reads
+      it. `stopRecording` above is held because this class calls it itself; this one it does not.
+    */
+    autoRecord: (trigger: AutoRecordTrigger) => void;
     /** `mainTab = 'screens'` — the tab strip is the page's. */
     showScreensTab: () => void;
     /** Takes the permission KIND and the user agent, and always answers with a sentence. */
@@ -358,6 +365,7 @@ export class RoomMediaTransport {
       beginSpeech: () => this.#beginSpeech(),
       endSpeech: () => this.#endSpeech(),
       stopRecording: () => this.#stopRecording(),
+      autoRecord: options.autoRecord,
       checkPermissionState: (kind, agent) => this.#checkPermissionState(kind, agent),
       closeScreenMenu: () => this.#closeScreenMenu(),
       videoDeviceId: () => this.#videoDeviceId(),

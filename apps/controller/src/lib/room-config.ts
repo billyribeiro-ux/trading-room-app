@@ -990,6 +990,24 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'alertsOverlayOnScreenshare',
   /*
+    "Auto Record?" and "Do not stop recording on mic mute?" — ONE feature, two settings.
+
+    They cross together because the second is inert without the first. `autoRecord` is read at three
+    sites (bundle bytes 1,116,794 / 1,121,427 / 1,125,863) and is a gate on the STOP as well as on
+    both starts, so a room with it off never auto-stops on a mute no matter what the second says.
+    Crossing one without the other would give an owner a control whose effect depends on a value
+    they cannot see.
+
+    The rules: a recording starts when this presenter opens their microphone while sharing a screen,
+    or begins sharing one with their microphone already open; and it stops when they mute, unless
+    dontStopRecOnMicMute is set or somebody else still has an open mic.
+
+    Both are sessData dotted onto the name at every occurrence: per-room policy, nothing a browser
+    can infer. Read by `#lib/auto-record.ts` and `#lib/room/recording.ts`.
+  */
+  'autoRecord',
+  'dontStopRecOnMicMute',
+  /*
     FOUR gates the room already implemented and could never switch on.
 
     `RoomMessage.svelte` has carried all four props since it was written, each defaulting false,

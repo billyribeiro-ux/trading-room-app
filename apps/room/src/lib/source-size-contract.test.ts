@@ -753,8 +753,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       sources beside code that reads one is exactly what this repository's standard is for, and the
       correction is worth more than the number.
     */
-    max: 358,
-    why: 'MediaRecorder, the preview window, the room-wide broadcast and the two speech calls'
+    /*
+      RAISED 358 -> 406 on 2026-08-28, for `autoRecord` and `dontStopRecOnMicMute`, argued in place.
+
+      Almost all of it is `autoRecord()`, which reads five pieces of live state and calls one of two
+      methods. The DECISION is not here — `#lib/auto-record.ts` holds all four bundle citations, the
+      `talkingUsers.length <= 1` ordering trap and the two divergences a browser-side recorder
+      forces — and that split is the reason this raise is small: the rule that is easy to get wrong
+      is pure and tested, and what is left is the reading of state that only this class can see.
+
+      It goes DOWN if the preview window ever leaves for a module of its own, which is the next real
+      extraction here. It does not go up again.
+    */
+    max: 406,
+    why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
     file: 'lib/room/media-transport.svelte.ts',
@@ -817,7 +829,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What did NOT change is the public surface. Every accessor the page, `RoomRecording`,
       `RoomEventStream` and eleven contract tests read is still on this class and now delegates.
     */
-    max: 1357,
+    /*
+      1357 -> 1359 on 2026-08-28: the `autoRecord` pass-through and its citation. Two lines, and this
+      class reads neither of them — see the note at the option itself for why it is passed rather
+      than held.
+    */
+    max: 1359,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -881,10 +898,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       — a failed produce and a reconnect both need a real SFU — so what stands in their place is the
       paragraph at each site saying what it protects.
 
+      RAISED AGAIN, 925 -> 957 on 2026-08-28, for `autoRecord`, and the shape of that raise is the
+      argument for it: THIS CLASS DECIDES NOTHING. It reports three moments — a microphone opened, a
+      microphone closed, a screen shared — and `RoomRecording` applies `#lib/auto-record.ts` to them.
+      Twenty-four of the thirty-two lines are the paragraph at the `micClosed` call site explaining
+      why it is raised BEFORE `stopTalking` and not after: upstream's `talkingUsers.length <= 1`
+      counts the muting user, and this room removes them synchronously, so the two orders differ by
+      one and the wrong one stops a recording while somebody else is still speaking. That is exactly
+      the class of subtlety this repository's standard says never to shorten.
+
       It goes DOWN if `startScreenSharing`'s constraint transcription ever moves to the media module
       that owns constraints. It does not go up again.
     */
-    max: 925,
+    max: 957,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -2476,8 +2502,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       file can construct it. The lines beyond the construction itself say why the setting is read
       through a thunk and why the read is `=== true`, which is the fail-closed rule this repository
       applies to every optional field arriving from the control plane.
+
+      1160 -> 1174 on 2026-08-28: the `autoRecord` thunk into `RoomRecording` and the pass-through
+      into the transport, both with the same `=== true` and the same reason — a room-config response
+      that omitted the pair must record nothing automatically rather than start a recording nobody
+      asked for.
     */
-    max: 1160,
+    max: 1174,
     why: 'the composition root - 37 constructions and their citations, assembly and nothing else'
   },
   {

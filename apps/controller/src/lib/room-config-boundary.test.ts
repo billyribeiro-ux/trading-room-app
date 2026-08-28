@@ -297,6 +297,13 @@ describe('the allow-list itself', () => {
         lifecycle; the SSE router feeds it each arriving alert, including this presenter's own, which
         is the one frame the router must not skip on the own-sender guard.
       */
+      /*
+        ONE feature, two names. `autoRecord` is the gate on the stop as well as on both starts, so
+        `dontStopRecOnMicMute` decides nothing on its own — which is why they are listed as one
+        consumer rather than two.
+      */
+      autoRecord: 'autoRecordAction decides all three moments, and RoomRecording applies it',
+      dontStopRecOnMicMute: 'autoRecordAction reads it on the stop path, and only when autoRecord is on',
       alertsOverlayOnScreenshare:
         'RoomScreenOverlay wraps the display capture with it, and the SSE router feeds every arriving alert to it',
       altChatRender: 'RoomDisplayModes seeds the compact mode from it, and hideMessageAvatar reads it as one term',

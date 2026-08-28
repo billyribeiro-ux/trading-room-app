@@ -52,7 +52,9 @@ function recordingWith(speechRecognitionAvailable: boolean) {
       signalling: null
     } as never,
     isPresenter: () => true,
-    speechRecognitionAvailable: () => speechRecognitionAvailable
+    speechRecognitionAvailable: () => speechRecognitionAvailable,
+    // Off, so nothing in this file's subject can be reached through the auto-record path.
+    autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false })
   });
 }
 
@@ -94,7 +96,8 @@ describe('beginSpeechRecognition asks the room, not only the viewer', () => {
         signalling: null
       } as never,
       isPresenter: () => true,
-      speechRecognitionAvailable: () => true
+      speechRecognitionAvailable: () => true,
+      autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false })
     });
     recording.beginSpeechRecognition();
     expect(warn).not.toHaveBeenCalled();
@@ -116,7 +119,8 @@ describe('beginSpeechRecognition asks the room, not only the viewer', () => {
         signalling: null
       } as never,
       isPresenter: () => false,
-      speechRecognitionAvailable: () => true
+      speechRecognitionAvailable: () => true,
+      autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false })
     });
     recording.beginSpeechRecognition();
     expect(warn).not.toHaveBeenCalled();
