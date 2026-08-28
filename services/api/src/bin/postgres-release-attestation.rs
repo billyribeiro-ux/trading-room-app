@@ -41,6 +41,42 @@ const CONNECTION_IDENTITY_QUERY: &str = "SELECT current_setting('server_version_
 const EXPECTED_POLICY_EXPRESSION: &str =
     "(enterprise_id = (NULLIF(current_setting('app.enterprise_id'::text, true), ''::text))::uuid)";
 
+/*
+   EVERY reviewed tenant predicate, for the check that reads every policy rather than one table.
+
+   ## Why this exists beside the constant above
+
+   `EXPECTED_POLICY_EXPRESSION` is asserted against `public.room_events` and nothing else. That was
+   right for what it was built for — `room_events` is the table the room's realtime durability plan
+   leans on — but it left the tenant boundary of the other twenty-one tables attested only by their
+   ROLE, never by their PREDICATE.
+
+   Measured against a database built from the shipped chain on 2026-08-28: 25 tables in `public`, 22
+   with row-level security FORCED, 22 policies, and exactly TWO distinct `USING` expressions between
+   them. A policy hand-widened to `USING (true)` on any of the twenty-one survives `0009` untouched —
+   the migration retargets the ROLE and never inspects the predicate — and reached this attestation
+   without being read. That is the hole this closes.
+
+   The second entry is `private_messages`, which narrows the tenant predicate FURTHER by member. It is
+   listed rather than special-cased so that "the reviewed set" is one list a reviewer can read, and so
+   that a third shape appearing is a diff rather than a silent pass.
+*/
+const REVIEWED_TENANT_PREDICATES: &[&str] = &[
+    EXPECTED_POLICY_EXPRESSION,
+    /*
+       ONE UNBROKEN LINE, and that is not a formatting preference.
+
+       Written first with Rust string-continuation escapes so it would wrap at the margin, and the
+       compiled binary came out carrying `AND      ((current_setting` — six spaces where PostgreSQL
+       renders one. Caught by comparing the constant IN THE BUILT BINARY against `pg_policies.qual`
+       on a live database rather than by reading it, which is the only way a whitespace difference
+       inside a 260-character predicate was ever going to be noticed. Shipped, it would have refused
+       `private_messages` on every release — an attestation failing on a correct database, which is
+       the failure mode that gets an attestation switched off.
+    */
+    "((enterprise_id = (current_setting('app.enterprise_id'::text, true))::uuid) AND ((current_setting('app.member_id'::text, true) = ''::text) OR ((sender_member_id)::text = current_setting('app.member_id'::text, true)) OR ((recipient_member_id)::text = current_setting('app.member_id'::text, true))))",
+];
+
 const TABLE_PRIVILEGE_TYPES: &[&str] = &[
     "SELECT",
     "INSERT",
@@ -137,12 +173,31 @@ enum Command {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AttestationError {
     code: &'static str,
-    message: &'static str,
+    /*
+       `Cow`, since 2026-08-28, and `new` is still a `const fn` over a `&'static str`.
+
+       Every message here was a literal, which is right for a check that asserts ONE thing about ONE
+       object. The tenant-policy sweep asserts the same thing about twenty-two, and an attestation
+       that reports "a policy is wrong" over twenty-two tables is one somebody has to reproduce by
+       hand before they can act on it. `Cow::Borrowed` costs the existing callers nothing.
+    */
+    message: std::borrow::Cow<'static, str>,
 }
 
 impl AttestationError {
     const fn new(code: &'static str, message: &'static str) -> Self {
-        Self { code, message }
+        Self {
+            code,
+            message: std::borrow::Cow::Borrowed(message),
+        }
+    }
+
+    /// For a failure that has to name WHICH object failed. See the `message` field.
+    fn owned(code: &'static str, message: String) -> Self {
+        Self {
+            code,
+            message: std::borrow::Cow::Owned(message),
+        }
     }
 }
 
@@ -165,6 +220,12 @@ struct AttestationEvidence {
     runtime_role: RuntimeRoleEvidence,
     migration_ledger: MigrationLedgerEvidence,
     room_events: RoomEventsEvidence,
+    /*
+       REPORTED, not merely checked. A boundary that is verified and not recorded leaves the release
+       evidence saying nothing about twenty-one of the twenty-two tenant tables, which is how the gap
+       this closes went unnoticed in the first place.
+    */
+    tenant_policies: TenantPolicyEvidence,
     effective_acl: AclEvidence,
     listen_capability: ListenEvidence,
 }
@@ -374,6 +435,7 @@ struct OwnerSnapshot {
     role: OwnerRoleEvidence,
     migration_ledger: MigrationLedgerEvidence,
     room_events: RoomEventsEvidence,
+    tenant_policies: TenantPolicyEvidence,
 }
 
 struct RuntimeSnapshot {
@@ -524,6 +586,7 @@ async fn collect_evidence() -> Result<AttestationEvidence, AttestationError> {
         runtime_role: runtime_snapshot.role,
         migration_ledger: owner_snapshot.migration_ledger,
         room_events: owner_snapshot.room_events,
+        tenant_policies: owner_snapshot.tenant_policies,
         effective_acl: runtime_snapshot.effective_acl,
         listen_capability,
     })
@@ -639,6 +702,12 @@ async fn collect_owner_snapshot(
     let role = validate_owner_role(&role_row)?;
     let migration_ledger = query_and_validate_migrations(&mut transaction).await?;
     let room_events = query_and_validate_room_events(&mut transaction).await?;
+    /*
+       EVERY OTHER TENANT POLICY, in the same read-only transaction so both checks see one snapshot.
+       `room_events` keeps its own dedicated check: it is asserted down to its policy NAME, which the
+       sweep deliberately does not do for the other twenty-one.
+    */
+    let tenant_policies = query_and_validate_tenant_policies(&mut transaction).await?;
 
     transaction.commit().await.map_err(|_| {
         AttestationError::new(
@@ -653,6 +722,7 @@ async fn collect_owner_snapshot(
         role,
         migration_ledger,
         room_events,
+        tenant_policies,
     })
 }
 
@@ -1134,6 +1204,191 @@ async fn query_and_validate_room_events(
             with_check_expression: with_check_expression.to_owned(),
         },
     })
+}
+
+/// One row of `pg_policies`, for the sweep that reads every tenant policy rather than one table.
+#[derive(Debug, sqlx::FromRow)]
+struct TenantPolicyRow {
+    table_name: String,
+    name: String,
+    permissive: String,
+    command: String,
+    roles: Vec<String>,
+    using_expression: Option<String>,
+    with_check_expression: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct TenantPolicyEvidence {
+    /// Tables in `public` with row-level security FORCED — the ones a tenant boundary applies to.
+    forced_relations: i64,
+    /// Policies found across those tables. Equal counts is the 1:1 this asserts.
+    policies: i64,
+    /// Every reviewed predicate actually observed, so the evidence names what was accepted.
+    distinct_using_expressions: Vec<String>,
+}
+
+/*
+   EVERY TENANT POLICY, READ AND COMPARED — not just `public.room_events`.
+
+   ## The hole this closes, measured rather than argued
+
+   `query_and_validate_room_events` above asserts one table's policy down to its `USING` expression.
+   Nothing asserted the other twenty-one. `0009` retargets each policy's ROLE and never looks at its
+   predicate, which is correct for what that migration does and leaves a gap here: a policy
+   hand-widened to `USING (true)` on any table but `room_events` passes the migration, passes its
+   parity assertion, and passed this attestation.
+
+   Reproduced on 2026-08-28 against a database built from the shipped chain: widening
+   `alert_media`'s tenant policy to `USING (true)`, then running `0009`, left the widened predicate in
+   place with `0` residual references to the baseline role — the migration reporting success over a
+   table with no tenant boundary at all.
+
+   On a multi-tenant fintech application that is the failure mode the whole kernel exists to prevent:
+   one tenant reading another tenant's rows.
+
+   ## What is asserted, and why each part
+
+   1. **One policy per forced relation.** A table with RLS forced and NO policy returns nothing to the
+      runtime role, which fails closed and loudly; a table with TWO is a boundary somebody widened by
+      addition. The counts are compared rather than each table being named, so a table added later is
+      covered on the day it is added rather than on the day somebody remembers this list.
+   2. **Exactly one role, and it is the runtime login.** The same rule `room_events` already carries,
+      applied to all of them. `0009` originally APPENDED the new role beside the old one on every
+      policy, and the single-role check on one table is what caught it — on CI, on main, after the
+      migration had passed its own parity check. Twenty-one tables were relying on that one table's
+      check to notice.
+   3. **The predicate is one of the reviewed set.** This is the part that was missing entirely. See
+      `REVIEWED_TENANT_PREDICATES`.
+   4. **`WITH CHECK` is absent or reviewed too.** A policy that reads narrowly and writes wide lets a
+      tenant INSERT rows into another tenant, which no SELECT-side check would ever notice.
+
+   The failure names the offending table, because an attestation that says only "a policy is wrong"
+   over twenty-two tables is one somebody has to reproduce by hand before they can act on it.
+*/
+async fn query_and_validate_tenant_policies(
+    connection: &mut PgConnection,
+) -> Result<TenantPolicyEvidence, AttestationError> {
+    let rows: Vec<TenantPolicyRow> = sqlx::query_as(
+        "SELECT policy.tablename::text AS table_name, \
+                policy.policyname::text AS name, \
+                policy.permissive::text AS permissive, \
+                policy.cmd::text AS command, \
+                ARRAY( \
+                    SELECT policy_role::text \
+                    FROM unnest(policy.roles) AS policy_role \
+                    ORDER BY policy_role::text \
+                )::text[] AS roles, \
+                policy.qual::text AS using_expression, \
+                policy.with_check::text AS with_check_expression \
+         FROM pg_catalog.pg_policies AS policy \
+         WHERE policy.schemaname = 'public' \
+         ORDER BY policy.tablename, policy.policyname",
+    )
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(|_| {
+        AttestationError::new(
+            "tenant_policy_query_failed",
+            "could not inspect the public schema tenant policies",
+        )
+    })?;
+
+    let forced_relations: i64 = sqlx::query_scalar(
+        "SELECT count(*) \
+           FROM pg_catalog.pg_class AS relation \
+           JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace \
+          WHERE namespace.nspname = 'public' \
+            AND relation.relkind = 'r' \
+            AND relation.relrowsecurity \
+            AND relation.relforcerowsecurity",
+    )
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(|_| {
+        AttestationError::new(
+            "tenant_policy_query_failed",
+            "could not count the public schema relations with forced row-level security",
+        )
+    })?;
+
+    validate_tenant_policies(&rows, forced_relations)?;
+
+    let mut distinct_using_expressions: Vec<String> = rows
+        .iter()
+        .filter_map(|row| row.using_expression.clone())
+        .collect();
+    distinct_using_expressions.sort();
+    distinct_using_expressions.dedup();
+
+    Ok(TenantPolicyEvidence {
+        forced_relations,
+        policies: i64::try_from(rows.len()).unwrap_or(i64::MAX),
+        distinct_using_expressions,
+    })
+}
+
+/*
+   THE RULE, separated from the two queries that feed it.
+
+   Pure, and for the reason `validate_runtime_role` and `validate_identity` above are pure: the
+   assertions are what a reviewer needs to be able to exercise, and the attestation binary needs a
+   live PostgreSQL of a specific major version to run at all. A rule reachable only by standing one
+   up is a rule nobody re-checks.
+*/
+fn validate_tenant_policies(
+    rows: &[TenantPolicyRow],
+    forced_relations: i64,
+) -> Result<(), AttestationError> {
+    let policies = i64::try_from(rows.len()).unwrap_or(i64::MAX);
+    if policies != forced_relations {
+        return Err(AttestationError::new(
+            "tenant_policy_count_mismatch",
+            "every public relation with forced row-level security must carry exactly one tenant policy",
+        ));
+    }
+
+    for row in rows {
+        let targets_runtime_role_only = matches!(row.roles.as_slice(), [only]
+            if runtime_role_name_is_expected(only));
+        if !targets_runtime_role_only {
+            return Err(tenant_policy_mismatch(&row.table_name, &row.name));
+        }
+
+        if row.permissive != "PERMISSIVE" || row.command != "ALL" {
+            return Err(tenant_policy_mismatch(&row.table_name, &row.name));
+        }
+
+        let Some(using_expression) = row.using_expression.as_deref() else {
+            return Err(tenant_policy_mismatch(&row.table_name, &row.name));
+        };
+        if !REVIEWED_TENANT_PREDICATES.contains(&using_expression) {
+            return Err(tenant_policy_mismatch(&row.table_name, &row.name));
+        }
+
+        /*
+           `WITH CHECK` absent means PostgreSQL applies the `USING` expression to writes as well,
+           which is the shape twenty-one of these have and is exactly as narrow. A present one is
+           compared, because a policy that reads narrowly and writes wide is a cross-tenant INSERT.
+        */
+        if let Some(with_check) = row.with_check_expression.as_deref()
+            && !REVIEWED_TENANT_PREDICATES.contains(&with_check)
+        {
+            return Err(tenant_policy_mismatch(&row.table_name, &row.name));
+        }
+    }
+
+    Ok(())
+}
+
+/// Names the table, because an attestation over twenty-two of them has to say which one.
+fn tenant_policy_mismatch(table_name: &str, policy_name: &str) -> AttestationError {
+    AttestationError::owned(
+        "tenant_policy_mismatch",
+        format!(
+            "policy {policy_name} on public.{table_name} is not the reviewed tenant policy targeted only to the runtime role"
+        ),
+    )
 }
 
 const fn room_events_policy_mismatch() -> AttestationError {
@@ -2346,5 +2601,115 @@ mod tests {
                 endpoint_requirement: "direct_or_session_affine_not_transaction_pooled",
             },
         }
+    }
+
+    /*
+       THE TENANT-POLICY SWEEP.
+
+       Every case here is a state a real database reached or could reach, and the first is the one
+       that motivated the whole check: `alert_media`'s policy was hand-widened to `USING (true)`,
+       `0009` was run, and it reported success with zero residual references to the baseline role —
+       the migration retargets the ROLE and never inspects the predicate. Nothing downstream read it
+       either, because the only predicate assertion in this binary was against `public.room_events`.
+
+       The predicates are the ones measured off a database built from the shipped chain on
+       2026-08-28: 25 tables, 22 with row-level security forced, 22 policies, two distinct `USING`
+       expressions.
+    */
+    fn tenant_policy(table: &str, using: &str) -> TenantPolicyRow {
+        TenantPolicyRow {
+            table_name: table.to_owned(),
+            name: "tenant_isolation".to_owned(),
+            permissive: "PERMISSIVE".to_owned(),
+            command: "ALL".to_owned(),
+            roles: vec![EXPECTED_RUNTIME_ROLE.to_owned()],
+            using_expression: Some(using.to_owned()),
+            with_check_expression: None,
+        }
+    }
+
+    #[test]
+    fn accepts_the_reviewed_tenant_predicates() {
+        let rows = vec![
+            tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION),
+            tenant_policy("private_messages", REVIEWED_TENANT_PREDICATES[1]),
+        ];
+        assert!(validate_tenant_policies(&rows, 2).is_ok());
+    }
+
+    #[test]
+    fn refuses_a_predicate_widened_to_true() {
+        // The hole. Before this check, this state passed `0009` and passed this binary.
+        let rows = vec![tenant_policy("alert_media", "true")];
+        let error =
+            validate_tenant_policies(&rows, 1).expect_err("a widened predicate must refuse");
+        assert_eq!(error.code, "tenant_policy_mismatch");
+        assert!(
+            error.message.contains("alert_media"),
+            "the failure must name the table: {}",
+            error.message
+        );
+    }
+
+    #[test]
+    fn refuses_a_policy_naming_two_roles() {
+        /*
+           `0009` originally APPENDED the runtime role beside the baseline one on every policy, and
+           the single-role assertion on `room_events` is what caught it — on CI, on main, after the
+           migration had passed its own parity check. Twenty-one tables were relying on that one
+           table's check to notice.
+        */
+        let mut row = tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION);
+        row.roles = vec!["ptr_clone_app".to_owned(), EXPECTED_RUNTIME_ROLE.to_owned()];
+        let error = validate_tenant_policies(&[row], 1).expect_err("two roles must refuse");
+        assert_eq!(error.code, "tenant_policy_mismatch");
+    }
+
+    #[test]
+    fn refuses_a_forced_relation_with_no_policy() {
+        // A table with row-level security forced and no policy returns nothing to the runtime role.
+        // It fails closed, but it fails closed SILENTLY, and the counts are what make it visible.
+        let rows = vec![tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION)];
+        let error = validate_tenant_policies(&rows, 2).expect_err("a missing policy must refuse");
+        assert_eq!(error.code, "tenant_policy_count_mismatch");
+    }
+
+    #[test]
+    fn refuses_a_second_policy_on_one_relation() {
+        // A boundary widened by ADDITION rather than by edit: PERMISSIVE policies are ORed.
+        let rows = vec![
+            tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION),
+            tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION),
+        ];
+        let error = validate_tenant_policies(&rows, 1).expect_err("a second policy must refuse");
+        assert_eq!(error.code, "tenant_policy_count_mismatch");
+    }
+
+    #[test]
+    fn refuses_a_narrow_read_with_a_wide_write() {
+        /*
+           The case a SELECT-side check can never see: the policy reads within the tenant and writes
+           anywhere, so a tenant can INSERT rows attributed to another.
+        */
+        let mut row = tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION);
+        row.with_check_expression = Some("true".to_owned());
+        let error = validate_tenant_policies(&[row], 1).expect_err("a wide WITH CHECK must refuse");
+        assert_eq!(error.code, "tenant_policy_mismatch");
+    }
+
+    #[test]
+    fn refuses_a_restrictive_or_command_scoped_policy() {
+        /*
+           A RESTRICTIVE policy is ANDed rather than ORed and a command-scoped one leaves the other
+           commands unguarded. Neither is what the reviewed twenty-two are, so neither passes
+           unreviewed.
+        */
+        let mut permissive = tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION);
+        permissive.permissive = "RESTRICTIVE".to_owned();
+        assert!(validate_tenant_policies(&[permissive], 1).is_err());
+
+        let mut scoped = tenant_policy("alerts", EXPECTED_POLICY_EXPRESSION);
+        scoped.command = "SELECT".to_owned();
+        assert!(validate_tenant_policies(&[scoped], 1).is_err());
     }
 }

@@ -166,10 +166,30 @@ const DIVERGED_FROM_IMPORT = new Map([
 
     The posture checks are unchanged and apply to whichever name is present, so a cluster
     mid-transition is held to exactly the same standard.
+
+    RE-PINNED 2026-08-28, and the reason is a gap this file's own subject had.
+
+    This binary asserted the tenant PREDICATE of exactly one table, `public.room_events`. The other
+    twenty-one tenant tables were attested only by the ROLE their policy targets. `0009` retargets
+    that role and never inspects a predicate — correctly, that is not its job — so a policy
+    hand-widened to `USING (true)` on any of the twenty-one passed the migration, passed the
+    migration's own parity assertion, and passed this attestation.
+
+    Reproduced against a live PostgreSQL 16 built from the shipped chain: widening `alert_media` to
+    `USING (true)`, then running `0009`, left the widened predicate in place while the migration
+    reported `0` residual references to the baseline role. On a multi-tenant fintech application that
+    is one tenant reading another tenant's rows, and nothing in the release evidence mentioned it.
+
+    `query_and_validate_tenant_policies` now reads every policy in `public` and asserts four things:
+    one policy per relation with row-level security forced, exactly one role and it is the runtime
+    login, a `USING` expression from the reviewed set, and a `WITH CHECK` that is absent or reviewed.
+    The rule is split into a pure `validate_tenant_policies` so it can be exercised without standing
+    up a PostgreSQL 17 cluster, with seven unit tests, and the evidence it returns is reported rather
+    than merely checked.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    'fb39c4f0116511d9a9c5094e824efe4d869423a3de0e4d2e22397a37dea6fe2b'
+    '542c4e136a0d08dfa18ab4211bda7d5e31b70ec546e27a62330515da512c2bf1'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test

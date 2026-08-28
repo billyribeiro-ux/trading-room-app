@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 05:05 EDT — Twenty-one tenant tables were attested by their ROLE and never by their PREDICATE
+
+**Runtime impact: NO** to what the site serves; **YES** to what a release is allowed to attest.
+`services/**` and the provenance pin.
+
+**Found by doing TODO row 3** — *"prove the chain against a database that predates `0009`"* — which
+had never been done because every verification so far built the cluster from scratch. PostgreSQL 16
+was stood up here, `0001`-`0008` applied, the cluster aged by hand, then `0009` run against it.
+
+**The retarget works, and the row's claim about it is TRUE.** All 22 policies moved off
+`ptr_clone_app` with `0` residual references, and a policy hand-widened to name BOTH roles was
+repaired to name the runtime role alone — which is the specific repair the row credited it with.
+
+**What it does not do is look at the PREDICATE, and nothing downstream did either.** Widening
+`alert_media`'s tenant policy to `USING (true)` and then running `0009` left the widened predicate
+in place while the migration reported success with zero residuals. `postgres-release-attestation`
+then attested the cluster, because its only predicate assertion was against `public.room_events`.
+
+**On a multi-tenant fintech application that is one tenant reading another tenant's rows**, passing
+every gate, with the release evidence saying nothing about twenty-one of the twenty-two tenant tables.
+
+**Closed by `query_and_validate_tenant_policies`**, which reads every policy in `public` and asserts
+four things: one policy per relation with row-level security FORCED (none missing, none added
+beside), exactly one role and it is the runtime login, a `USING` expression from the reviewed set,
+and a `WITH CHECK` that is absent or reviewed — because a policy that reads narrowly and writes wide
+is a cross-tenant INSERT no SELECT-side check would notice. The failure names the offending table:
+an attestation that says "a policy is wrong" over twenty-two tables is one somebody has to reproduce
+by hand before they can act on it.
+
+**The reviewed set is two predicates, not one, and that was measured rather than assumed:** 25 tables
+in `public`, 22 with row-level security forced, 22 policies, exactly two distinct `USING`
+expressions. `private_messages` narrows the tenant predicate further by member; it is listed rather
+than special-cased so a third shape appearing is a diff rather than a silent pass.
+
+**A defect in this very change was caught by comparing the COMPILED BINARY against the database.**
+The second predicate was written with Rust string-continuation escapes so it would wrap at the
+margin, and came out carrying `AND      ((current_setting` — six spaces where PostgreSQL renders
+one. Reading it would never have found that inside a 260-character expression. Shipped, it would
+have refused `private_messages` on every release: an attestation failing on a correct database,
+which is the failure mode that gets an attestation switched off. The constant is now one unbroken
+line and is verified byte-identical, through `strings` on the built binary.
+
+`AttestationError` gained an owned message (`Cow`) so a failure over twenty-two tables can name one;
+`new` is still a `const fn` over a `&'static str` and every existing caller is untouched.
+
+**Verified, and the limits stated plainly.** The invariant was run as SQL against both databases: the
+correct one reports `0` violations on every clause; the aged one — which passed `0009` — reports **1
+policy outside the reviewed set, `alert_media -> true`**. The binary compiles, `cargo clippy --bin
+postgres-release-attestation -- -D warnings` is clean, `cargo fmt` applied, and the provenance
+verifier passes with the file re-pinned (98 imported, 24 diverged).
+
+**NOT verified here, and it is not a small caveat: the seven new unit tests have not been RUN.**
+`cargo test` for `tradingroom-api` cannot build in this environment — `mediasoup-sys` fetches
+`libsrtp` from GitHub and the egress proxy returns 403, which the proxy documentation says to report
+rather than work around. It fails identically on a clean tree, so it is environmental and
+pre-existing. The tests need CI, or a machine that can reach that source. The attestation binary
+itself also refuses to run here at all: it requires PostgreSQL major 17 and this container has 16.
+
 ### 2026-08-28 03:55 EDT — The alerts toolbar search stops answering for a log it never read
 
 **Runtime impact: YES**, one sentence: when a full page of alerts is loaded and a term is typed, the
