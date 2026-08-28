@@ -224,6 +224,9 @@ const ROOM_CONSUMED = [
   /* Member self-delete, added 2026-08-28. It crosses to CLOSE a hole, not to draw a control -
      see `room-config.ts`. */
   'usersCanDeleteOwnMsgs',
+  /* The typing indicator, added 2026-08-28. It gates the SEND as well as the display; see
+     `room-config.ts`. */
+  'hasTypingIndicator',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -811,6 +814,9 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 96 since 2026-08-28: `hasTypingIndicator`. Twenty-seventh find, and the first whose room half
+// needed a server-side registry of its own - ephemeral, in memory, swept on read.
+//
 // 95 since 2026-08-28: `usersCanDeleteOwnMsgs`. Twenty-sixth find, and the first that crosses to
 // CLOSE something: the room server was already letting a member delete their own message without
 // asking whether the room allowed it.
@@ -847,7 +853,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 95 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 96 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

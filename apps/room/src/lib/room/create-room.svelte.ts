@@ -106,6 +106,7 @@ import { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
 import { RoomToasts } from '#lib/room/toasts.svelte.js';
 import { RoomFiles } from '#lib/room/files.svelte.js';
 import { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
+import { TypingSignal } from '#lib/room/typing-signal.svelte.js';
 import { RoomComposer } from '#lib/room/composer.svelte.js';
 import { RoomAlertsPane } from '#lib/room/alerts-pane.js';
 import { RoomFeedScroll } from '#lib/room/feed-scroll.js';
@@ -848,6 +849,24 @@ export function createRoom(deps: RoomDeps) {
     does not define the rebuild until `onMount` has run, and a `giveMicScreen` frame can arrive
     before that. Passing the value would capture `null` forever.
   */
+  /*
+    The two typing signals, one per composer. Separate instances rather than one with a parameter,
+    because each owns its own debounce timer and `amITyping` flag — a shared timer would let the
+    extra column's keystrokes keep the main column's announcement alive.
+  */
+  const typing = {
+    main: new TypingSignal({
+      channel: () => chat.tab,
+      announce: () => chat.announceTyping('main'),
+      clear: () => chat.clearTypingAnnouncement('main')
+    }),
+    extra: new TypingSignal({
+      channel: () => chat.extraTab,
+      announce: () => chat.announceTyping('extra'),
+      clear: () => chat.clearTypingAnnouncement('extra')
+    })
+  };
+
   const roomEvents = new RoomEventStream<PageData['connectedUsers'][number]>({
     prefs,
     toasts,
@@ -857,6 +876,8 @@ export function createRoom(deps: RoomDeps) {
     mtx,
     roster,
     privateChat,
+    /* The chat columns, for `typingUpdated`. Constructed above, so it is a value and not a thunk. */
+    chat,
     userActions,
     session: () => data,
     isPresenter: () => isPresenter,
@@ -1074,6 +1095,8 @@ export function createRoom(deps: RoomDeps) {
     roomVolume,
     roster,
     chat,
+    /** The two typing signals, one per composer. See `TypingSignal`. */
+    typing,
     media,
     split,
     polls,

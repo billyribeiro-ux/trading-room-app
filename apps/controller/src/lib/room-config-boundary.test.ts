@@ -364,6 +364,7 @@ describe('the allow-list itself', () => {
         call — and in this case the markup gate was defaulting off while the endpoint was open.
       */
       usersCanDeleteOwnMsgs: 'messageAction delete — refuses a member self-delete unless enabled',
+      hasTypingIndicator: 'setTyping — refuses to record or broadcast unless the room enabled it',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

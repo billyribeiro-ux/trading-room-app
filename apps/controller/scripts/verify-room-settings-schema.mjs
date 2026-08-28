@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, EIGHTY-TWO by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-THREE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 95.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 96.
+
+  82 -> 83 on 2026-08-28: hasTypingIndicator. It gates the SEND as well as the display — a room
+  without it must not have members broadcasting their keystroke state to each other, which a
+  display-only gate would leave happening.
 
   81 -> 82 on 2026-08-28: usersCanDeleteOwnMsgs. The first setting on this list that crosses to CLOSE
   a hole rather than to draw a control — the room's delete endpoint already permitted a member to
@@ -245,6 +249,8 @@ const EXPECTED_WIRED_SETTINGS = [
   'positionsIframeUrl',
   /* Added 2026-08-28: member self-delete, enforced on the server. */
   'usersCanDeleteOwnMsgs',
+  /* Added 2026-08-28: the typing indicator, which gates the send too. */
+  'hasTypingIndicator',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

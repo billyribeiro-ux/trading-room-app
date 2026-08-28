@@ -145,6 +145,10 @@ const render = (over: {
     onmessageaction: noop,
     onprivatechat: noop,
     onexpandcomposer: noop,
+    /* The typing indicator. Empty typists reads the same as nobody typing, which is the default. */
+    ontyped: noop,
+    onstoppedtyping: noop,
+    typists: [],
     onsend: noop,
     onimageupload: noop,
     onrte: noop,

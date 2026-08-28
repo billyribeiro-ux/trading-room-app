@@ -90,7 +90,8 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * 2026-08-28, plus `positionsIframe` + `positionsIframeUrl` (ONE feature, `PresentationArea`), each
  * with its own contract file — and `usersCanDeleteOwnMsgs`, which crossed to CLOSE a hole rather
  * than to draw a control: the delete endpoint already let a member remove their own message without
- * asking whether the room allowed it.
+ * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
+ * as well as the display.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -109,7 +110,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'alertsOverlayOnScreenshare',
   'description',
   'dontStopRecOnMicMute',
-  'hasTypingIndicator',
   'isLocked',
   'needPasswordForUserNotes',
   'obsStreamKey',

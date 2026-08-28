@@ -117,6 +117,12 @@
     onaction: (action: MessageAction, message: RoomMessageItem, event?: MessageActionEvent) => void;
     /** `onTextareaFocus(e, 'textAreaTxtExtra')` — reports which composer the viewer is in. */
     onfocus: () => void;
+    /** One keystroke here — `updateLastTypedTime()`. This column has its OWN signal and channel. */
+    ontyped: (value: string) => void;
+    /** `!i.is(":focus")` — one of the three `notyping` conditions. */
+    onstoppedtyping: () => void;
+    /** The names typing in THIS column's channel, already excluding this viewer. */
+    typists: readonly string[];
     onsend: () => void;
     onscroll: (scroller: HTMLElement) => void;
     /**
@@ -166,6 +172,9 @@
     onmenutoggle,
     onaction,
     onfocus,
+    ontyped,
+    onstoppedtyping,
+    typists,
     onsend,
     onscroll,
     follow,
@@ -407,6 +416,19 @@
     {/if}
 
     <!-- `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`. -->
+    <!--
+      `O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)` at byte 2,400,312 — the extra column's
+      own copy of the indicator, and it reads its OWN channel. Same markup and the same omission as
+      the main column's; see `AlertChatArea.svelte` for why the animated dots are not reproduced.
+    -->
+    {#if typists.length > 0}
+      <div>
+        <div class="d-flex align-items-center typing-indicator-container">
+          <strong class="users-count me-1">[{typists.length}]</strong>
+          <span class="users-typing"><em class="mx-1">{typists.join(',')}</em></span>
+        </div>
+      </div>
+    {/if}
     {#if !chatEnabled}
       <div class="chatDisabled d-flex align-items-center">
         <h5 class="pl-3">
@@ -434,6 +456,8 @@
               class="txt-area form-control border-0"
               bind:value={composer}
               {onfocus}
+              oninput={(event) => ontyped(event.currentTarget.value)}
+              onblur={onstoppedtyping}
               onkeydown={submitOnEnter}></textarea>
           </div>
           <div

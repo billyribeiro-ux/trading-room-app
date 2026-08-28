@@ -74,6 +74,26 @@ export class RoomChat {
   /** `globals.chatInputFocus` — which composer the viewer last typed in. */
   #focus = $state<ChatComposerId>('textAreaTxt');
 
+  /*
+    ── WHO IS TYPING, per column ──────────────────────────────────────────────────────────────────
+
+    `usersTyping` is a joined STRING upstream (`s += o[a].n`, byte 1,433,553) and `usersTypingCnt`
+    its length; the display reads both. Here the names arrive as an array and the count is `.length`,
+    because a string that has to be split to be counted is two representations of one fact.
+
+    PER COLUMN, and that is the reason there are two of each. The frame carries the channel it
+    belongs to, and the two columns show different channels — a single field would put the extra
+    column's typists under the main column's composer the moment the two channels differed.
+
+    `$state.raw`: the array is REPLACED by every frame and never edited, so a deep proxy would cost
+    on every read and buy nothing.
+  */
+  #typists = $state.raw<readonly string[]>([]);
+  #extraTypists = $state.raw<readonly string[]>([]);
+
+  /** `amITyping` — so a burst sends ONE `typing`, not one per keystroke. Per composer. */
+  #announced = { main: false, extra: false };
+
   readonly #extraColumnEnabled: () => boolean = () => false;
 
   /**
@@ -97,6 +117,52 @@ export class RoomChat {
 
   get tab(): ChatTab {
     return this.#tab;
+  }
+
+  /** The names typing in the MAIN column's channel, already excluding this viewer. */
+  get typists(): readonly string[] {
+    return this.#typists;
+  }
+
+  /** The same for the extra column. */
+  get extraTypists(): readonly string[] {
+    return this.#extraTypists;
+  }
+
+  /**
+   * One `typing` frame off the wire — `typingUpdated` upstream.
+   *
+   * Routed by CHANNEL rather than by column, because that is what the frame carries and because the
+   * two columns can show the same channel: a frame for `main` while both columns are on `main` has
+   * to land in both, and matching on the channel is what makes that fall out rather than needing a
+   * rule.
+   */
+  typingUpdated(chatChannel: string, names: readonly string[]): void {
+    /*
+      NO MAPPING. `CHAT_CHANNELS` in `#lib/server/chat-log.ts` is `['main', 'off-topic']` — this
+      room's wire names ARE its `ChatTab` values, so a translation function here would be a second
+      spelling of a fact that is already one. (The reference's own names differ — `offTopic` — and
+      that difference is the boundary's, not this class's.)
+    */
+    if (this.#tab === chatChannel) this.#typists = names;
+    if (this.#extraTab === chatChannel) this.#extraTypists = names;
+  }
+
+  /**
+   * Whether this composer has already told the room it is typing.
+   *
+   * `amITyping` upstream, and it is what turns a burst of keystrokes into ONE frame. The caller
+   * announces only on a `false`; the debounce that clears it lives with the timer.
+   */
+  announceTyping(composer: 'main' | 'extra'): boolean {
+    if (this.#announced[composer]) return false;
+    this.#announced[composer] = true;
+    return true;
+  }
+
+  /** Clears the flag so the next burst announces again. Called when `notyping` is sent. */
+  clearTypingAnnouncement(composer: 'main' | 'extra'): void {
+    this.#announced[composer] = false;
   }
 
   set tab(next: ChatTab) {

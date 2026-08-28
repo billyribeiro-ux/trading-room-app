@@ -197,6 +197,15 @@
     ) => void;
     onprivatechat: () => void;
     onexpandcomposer: (element: HTMLTextAreaElement | undefined) => void;
+    /** One keystroke in the main composer — `updateLastTypedTime()`. */
+    ontyped: (value: string) => void;
+    /** `!i.is(":focus")` — one of the reference's three `notyping` conditions. */
+    onstoppedtyping: () => void;
+    /**
+     * "Typing indicator" — the names currently typing in this column's channel, already excluding
+     * this viewer. Empty when the room has not enabled it, which reads the same as nobody typing.
+     */
+    typists: readonly string[];
     onsend: () => Promise<void>;
     onimageupload: () => void;
     onrte: () => void;
@@ -249,6 +258,9 @@
     onmessageaction,
     onprivatechat,
     onexpandcomposer,
+    ontyped,
+    onstoppedtyping,
+    typists,
     onsend,
     onimageupload,
     onrte,
@@ -833,6 +845,38 @@
             </div>
           {/if}
           <!--
+            `O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)` — byte 1,454,281, a SIBLING of
+            the composer switch below and therefore above whichever half of it renders. Consts 58,
+            59, 60 and 61:
+
+              <div><div class="d-flex align-items-center typing-indicator-container">
+                <strong class="users-count me-1">[{{ usersTypingCnt }}]</strong>
+                <app-typing-indicator-dots></app-typing-indicator-dots>
+                <span class="users-typing"><em class="mx-1">{{ usersTyping }}</em></span>
+              </div></div>
+
+            THE ANIMATED DOTS ARE NOT REPRODUCED, and that is a measurement rather than a shortcut.
+            `app-typing-indicator-dots` is three empty spans whose whole appearance is CSS, and
+            neither `app-typing-indicator-dots` nor its `.typing-indicator` class has a single rule
+            in any stylesheet this repository holds — the same check `smallerImagePreview` failed and
+            `blinkingRec` passed. Emitting three empty spans that style to nothing would be markup
+            with no consumer; inventing the animation would be inventing a design. The three classes
+            that DO have rules — `typing-indicator-container`, `users-count`, `users-typing` — are
+            all here.
+
+            The COUNT is `typists.length` rather than a second field: a joined string that has to be
+            split to be counted is two representations of one fact, and upstream carries both only
+            because its receiver builds the string first.
+          -->
+          {#if typists.length > 0}
+            <div>
+              <div class="d-flex align-items-center typing-indicator-container">
+                <strong class="users-count me-1">[{typists.length}]</strong>
+                <span class="users-typing"><em class="mx-1">{typists.join(',')}</em></span>
+              </div>
+            </div>
+          {/if}
+          <!--
                       `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or the
                       captured Chat Disabled block. Two reasons reach the same block: the room is in
                       mode `d`, which applies to everyone, and this viewer is muted, which does not.
@@ -869,7 +913,15 @@
                     {@attach captureComposerElement}
                     bind:value={chat.composer}
                     onfocus={() => chat.focused('textAreaTxt')}
-                    oninput={(event) => onexpandcomposer(event.currentTarget)}
+                    oninput={(event) => {
+                      onexpandcomposer(event.currentTarget);
+                      /*
+                        `updateLastTypedTime()` — one `typing` per burst, then `notyping` after five
+                        seconds of silence. The signal owns the debounce; this only reports the key.
+                      */
+                      ontyped(event.currentTarget.value);
+                    }}
+                    onblur={onstoppedtyping}
                     onkeydown={(event) => {
                       if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();

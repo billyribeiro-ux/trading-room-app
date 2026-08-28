@@ -764,6 +764,23 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'usersCanDeleteOwnMsgs',
   /*
+    "Typing indicator" - who is typing, per chat channel.
+
+      this.showTyping = this.appService.globals.sessData.hasTypingIndicator     byte 1,437,168
+      O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)   the display slot  byte 1,454,281
+      updateLastTypedTime sends typing once per burst                           byte 1,435,993
+      refreshTypingStatus sends notyping on empty, blur or 5 seconds idle       byte 1,435,666
+
+    TWO FRAMES PER BURST, not one per keystroke, which is what makes broadcasting it affordable.
+
+    IT GATES THE SEND AS WELL AS THE DISPLAY. A room that has not bought this must not have members
+    broadcasting their keystroke state to each other, so `setTyping` checks it on the server before
+    it records anything. A display-only gate would leave the traffic flowing and only hide it.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'hasTypingIndicator',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

@@ -71,6 +71,21 @@ const AUDIENCE: Record<string, 'room' | 'addressed'> = {
     `addressed` would wrongly forbid the rest.
   */
   cmds: 'room',
+  /*
+    `room`, and the classification is worth its paragraph because the frame is not identical for
+    everybody who gets it.
+
+    WHO IS TYPING IN A CHANNEL IS THE ROOM'S BUSINESS — that is what an indicator above a shared
+    composer means, and every member of the channel is entitled to it. What differs per recipient is
+    one NAME: `publishTypingToRoom` removes the reader's own, because the frame that would tell you
+    about your own keystrokes is the one you just sent.
+
+    That is a REDACTION, not an addressing rule, and the distinction is the same one `roster` makes
+    two lines up: `publishRosterToRoom` also builds a frame per listener and also removes fields
+    (`locStr`, `email`) that recipient may not see. Both are `room`, because the AUDIENCE is the
+    room; `addressed` would say this frame concerns one person, and it does not.
+  */
+  typing: 'room',
   // Named for what they are, and both were being broadcast until 2026-08-19.
   privChat: 'addressed',
   privCmds: 'addressed'

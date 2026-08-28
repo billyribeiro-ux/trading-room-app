@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 18:40 UTC — The typing indicator, and a gate that governs the send rather than the view
+
+**Runtime impact: YES.** A room with *"Typing indicator"* on now shows who is typing, above each chat
+composer, per channel. None of it existed.
+
+**Two frames per burst, not one per keystroke, and that is what makes it affordable.**
+`updateLastTypedTime()` (byte 1,435,993) announces only on the FIRST key —
+`if (!this.amITyping)` — and `refreshTypingStatus` (1,435,666) sends `notyping` when the box empties,
+loses focus, or five seconds pass. A member typing a paragraph produces exactly two frames.
+
+**The entitlement gates the SEND, not only the display.** `showTyping = sessData.hasTypingIndicator`
+governs whether the indicator renders; `setTyping` refuses to record or fan out anything at all
+without it. **A display-only gate would leave every member of a room that never bought the feature
+broadcasting their keystroke state to each other — hidden, but happening.**
+
+**Never your own name, and it is removed on the SERVER.** `publishTypingToRoom` builds one frame per
+listener, exactly as `publishRosterToRoom` does — the reader's own name never reaches their wire,
+rather than every client filtering itself out and one of them forgetting. The channel is classified
+`room` in the audience contract with a paragraph on why: **the audience is the room and the
+difference is a redaction**, which is the same distinction `roster` already makes.
+
+**Per channel and per column.** The frame carries the channel it belongs to and the two columns can
+show different ones, so there are two typist lists and two signals. Routing by CHANNEL rather than by
+column is what makes a frame land in both when they happen to show the same one, without needing a
+rule for it.
+
+**A registry in memory, and the trade is stated.** Every other piece of room state here is a row;
+this one is not. It is worthless one keystroke later and changes more often than anything the
+database holds — a write per burst per member would be the highest-frequency write in the
+application, for a value whose lifetime is five seconds. **A restart forgets who was typing, which is
+correct**: after a restart nobody is typing. The sweep is on READ, with a TTL of twice the client's
+own delay, because a background interval per room would be a timer outliving every listener.
+
+**The animated dots are NOT drawn, and that is a measurement.**
+`app-typing-indicator-dots` is three empty spans whose entire appearance is CSS, and neither it nor
+its `.typing-indicator` class has a rule in **any** stylesheet this repository holds — the check
+`smallerImagePreview` failed and `blinkingRec` passed. The three classes that DO have rules
+(`typing-indicator-container`, `users-count`, `users-typing`) are all there.
+
+**Seven negative controls seen RED**, including the self-exclusion removed, the channels collapsed
+into one bucket, the entitlement gate removed and the debounce turned into stacked timers.
+
+**Three repo gates caught this without being asked**, which is what they are for: the unbound-method
+map refused a new `lib/room/` class, the module-discovery gate refused it without a ceiling, and the
+channel-audience contract refused a new `RoomEvent` member until somebody said who may read it.
+
+**One gap in the ratchet is now named rather than worked around:** the ceiling catalog covers
+`lib/room/*` and `lib/components/**` and nothing under `lib/server/`, so `lib/server/typing.ts` has
+no ceiling. That is the same gap components had until this morning.
+
+**Verified:** room 171 files / 2,757 tests (1 skipped) · controller 96 files / 1,013 tests (5
+skipped) · `schema:verify` at **96 wired** · both room gates and the controller verifier chain green ·
+`svelte-check` 0/0 across 1,308 files · eslint clean.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+the two `.svelte` files. And **no two-browser test was run** — the round trip is asserted at each of
+its four seams (registry, command, fan-out, receiver) and not end to end through a live SSE stream.
+
 ### 2026-08-28 17:40 UTC — Members could delete their own messages in rooms that had not allowed it
 
 **Runtime impact: YES, and it is a permission fix.** `messageAction`'s delete branch let a MEMBER

@@ -64,6 +64,8 @@ const renderArea = (over: {
       canPostImages: over.canPostImages ?? true,
       canUseRTE: over.canUseRTE ?? true,
       giphyApiKey: '',
+      /* The typing indicator. Empty typists reads the same as nobody typing. */
+      typists: [],
       showMessageOptions: false,
       visibleAlerts: [],
       visibleChatMessages: [],

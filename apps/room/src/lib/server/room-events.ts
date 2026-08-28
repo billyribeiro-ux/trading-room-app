@@ -39,6 +39,7 @@
 import { isMentionOf } from '../mention';
 
 import type { PrivateChatMessage } from './private-chat';
+import { typistsIn } from './typing';
 
 export type RoomEvent =
   /** `/sess/{id}/alerts/` - the capture pushes the alert row and emits `alertMsg`. */
@@ -59,6 +60,19 @@ export type RoomEvent =
    * body never leaves the process.
    */
   | { channel: 'chat'; data: unknown; isMention?: boolean }
+  /**
+   * `typingUpdated` — who is typing in one chat channel, right now.
+   *
+   * Upstream this arrives as a map of every channel at once (`e[this.channel]`, byte 1,433,553) and
+   * each chat component picks its own out. This publishes ONE channel per frame, because the
+   * recipient set is the same either way and a per-channel frame is the smaller thing to send.
+   *
+   * **The names are already filtered for the recipient**, which is why this is published with
+   * `publishTypingToRoom` rather than `publishToRoom`: a viewer must never be shown their own name,
+   * and doing it once on the server beats every client filtering itself out and one of them
+   * forgetting. That is the same argument `publishChatToRoom` makes for `isMention` above.
+   */
+  | { channel: 'typing'; data: { chatChannel: string; names: string[] } }
   /**
    * `/sess/{id}/cmds/` - the room's command channel.
    *
@@ -687,4 +701,30 @@ export function publishToUsers(room: string, userIds: readonly number[], event: 
 /** Listener count, for tests and for proving fan-out actually happened. */
 export function roomSubscriberCount(room: string): number {
   return subscribers.get(room)?.size ?? 0;
+}
+
+/**
+ * Fan a typing update out, deciding per recipient which names they see.
+ *
+ * One frame per listener, because the answer differs per listener: their own name is removed. The
+ * shape follows `publishRosterToRoom` directly — same reason, same structure.
+ */
+export function publishTypingToRoom(room: string, chatChannel: string): void {
+  const listeners = subscribers.get(room);
+  if (!listeners) return;
+  for (const [listener, context] of listeners) {
+    try {
+      listener({
+        channel: 'typing',
+        /*
+          `context` is the listener's own `RosterUser`, or null for a subscriber that joined before
+          one was known. A null context gets the UNFILTERED list, which is correct rather than a
+          shortcut: it has no identity to remove, and `-1` matches no real user id.
+        */
+        data: { chatChannel, names: typistsIn(room, chatChannel, context?.id ?? -1) }
+      });
+    } catch (error) {
+      console.error('[room-events] typing subscriber failed', error);
+    }
+  }
 }

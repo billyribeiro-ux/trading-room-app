@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 95 of 269 are wired today.
+// nothing in the room reads it yet. 96 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -129,7 +129,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "copyTrades", section: "settings", type: "checkbox", label: "Copy Trades?", help: "If enabled, users can copy trades by clicking on them", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "disableCopy", section: "settings", type: "checkbox", label: "Disable Copy?", help: "If enabled, it will disable right-click to prevent selecting and copying all text", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "claimNickName", section: "settings", type: "checkbox", label: "Claim Nickname?", help: "If enabled, users can claim a nickname", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "hasTypingIndicator", section: "settings", type: "checkbox", label: "Show typing indicator ?", help: "Show if somebody is typing in the room or PM", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasTypingIndicator", section: "settings", type: "checkbox", label: "Show typing indicator ?", help: "Show if somebody is typing in the room or PM", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "presenterMsgsOnTheRight", section: "settings", type: "checkbox", label: "Presenter chat messages on the right?", help: "If enabled, renders presenter chat messages on the right", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "altChatRender", section: "settings", type: "checkbox", label: "Alt Chat Render?", help: "If enabled, renders chat sans avatars, and compact mode", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "altRoomRender", section: "settings", type: "checkbox", label: "Alt Room Render?", help: "If enabled, renders simplified alerts/chat", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

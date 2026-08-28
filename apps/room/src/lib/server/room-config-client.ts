@@ -365,6 +365,13 @@ export interface RoomSessionSettings {
    */
   usersCanDeleteOwnMsgs?: boolean;
   /**
+   * "Typing indicator" — `showTyping = sessData.hasTypingIndicator` (byte 1,437,168).
+   *
+   * Gates the display AND the send: `setTyping` refuses on the server, so a room without it does not
+   * have members broadcasting their keystroke state to each other either.
+   */
+  hasTypingIndicator?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

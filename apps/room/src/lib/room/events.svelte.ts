@@ -18,6 +18,11 @@ import type { PrivateChatMessage } from './private-chat.svelte';
 import type { RoomToasts } from './toasts.svelte';
 
 /** What the stream reads off the loaded page data. Narrow on purpose: it consults, never owns. */
+/** The one method a typing frame needs. Narrow on purpose: this stream does not own the columns. */
+interface TypingSink {
+  typingUpdated(chatChannel: string, names: readonly string[]): void;
+}
+
 interface EventStreamSession {
   room: { shortCode: string };
   user: { id: number };
@@ -121,6 +126,8 @@ export class RoomEventStream<Entry> {
     mtx: MtxStreamTabs;
     roster: RosterSink<Entry>;
     privateChat: PrivateChatSink;
+    /** See `#chat`. Optional so existing constructions are unchanged. */
+    chat?: TypingSink;
     userActions: FollowStyleSource;
     /** The loaded page data, through a thunk because the load can replace it. */
     session: () => EventStreamSession;
@@ -174,6 +181,7 @@ export class RoomEventStream<Entry> {
     this.#mtx = options.mtx;
     this.#roster = options.roster;
     this.#privateChat = options.privateChat;
+    this.#chat = options.chat;
     this.#userActions = options.userActions;
     this.#session = options.session;
     this.#isPresenter = options.isPresenter;
@@ -211,6 +219,15 @@ export class RoomEventStream<Entry> {
   readonly #mtx: MtxStreamTabs;
   readonly #roster: RosterSink<Entry>;
   readonly #privateChat: PrivateChatSink;
+  /**
+   * The chat columns, for `typingUpdated` and nothing else.
+   *
+   * OPTIONAL, because `RoomChat` is constructed after this stream in `createRoom` and because every
+   * test in `events.svelte.test.ts` builds this class without one. A typing frame arriving before
+   * the columns exist is a frame with nowhere to land, which is the correct outcome and not an
+   * error — nobody is looking at a column that has not been made yet.
+   */
+  readonly #chat: TypingSink | undefined;
   readonly #userActions: FollowStyleSource;
   readonly #session: () => EventStreamSession;
   readonly #isPresenter: () => boolean;
@@ -673,6 +690,24 @@ export class RoomEventStream<Entry> {
 
         The message travels with the event, so nothing has to refetch a thread to learn one line.
       */
+      /*
+        `typingUpdated` — who is typing in one chat channel. The server has already removed this
+        viewer's own name, so nothing here filters; the frame is the answer.
+
+        Handled BEFORE the `senderId` guard below, because a typing frame has no sender: it is a
+        per-recipient snapshot rather than somebody's message, and the guard that stops a member
+        refetching on their own post would drop every one of these that happened to carry no id.
+      */
+      if (payload.channel === 'typing') {
+        const frame = payload.data as
+          | { chatChannel?: string; names?: readonly string[] }
+          | undefined;
+        if (typeof frame?.chatChannel === 'string') {
+          this.#chat?.typingUpdated(frame.chatChannel, frame.names ?? []);
+        }
+        return;
+      }
+
       if (payload.channel === 'privChat') {
         const priv = payload.data as
           { toUserId?: number; message?: PrivateChatMessage } | undefined;

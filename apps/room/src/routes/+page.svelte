@@ -78,6 +78,7 @@
     roomVolume,
     roster,
     chat,
+    typing,
     media,
     split,
     polls,
@@ -1144,6 +1145,9 @@
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
               onexpandcomposer={autoExpandComposer}
+              ontyped={(value) => typing.main.typed(value)}
+              onstoppedtyping={() => typing.main.stop()}
+              typists={chat.typists}
               onsend={() => composer.send()}
               onimageupload={() => composer.openImageUpload()}
               onrte={() => composer.openRTE()}
@@ -1248,6 +1252,9 @@
                 onaction={(action, message, event) =>
                   messageActions.handle('chat', action, message, event, true)}
                 onfocus={() => chat.focused(EXTRA_COMPOSER)}
+                ontyped={(value) => typing.extra.typed(value)}
+                onstoppedtyping={() => typing.extra.stop()}
+                typists={chat.extraTypists}
                 onsend={() => void composer.sendExtra()}
                 onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
                 follow={extraChatFollow}

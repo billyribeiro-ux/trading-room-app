@@ -466,7 +466,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `tipButtonFor` takes for its three settings. Two settings that only ever mean anything together
       should not be two props a call site can get half right.
     */
-    max: 1375,
+    /*
+      1375 -> 1382, 2026-08-28 — the typing indicator. Seven lines: `typing` on the `createRoom` destructure and three props at each of the two chat
+      call sites. Two columns means two of everything at this level, and that is the feature rather
+      than duplication — each column reads its OWN channel, so a shared prop would put the extra
+      column's typists under the main column's composer.
+    */
+    max: 1382,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -553,7 +559,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
       The CODE backstop is unaffected.
     */
-    max: 860,
+    /*
+      860 -> 892, 2026-08-28 — the typing indicator. The `typing` dispatch branch, the `TypingSink` type and the optional collaborator. It is handled
+      BEFORE the `senderId` guard, and the comment says why: a typing frame has no sender — it is a
+      per-recipient snapshot rather than somebody's message — so the guard that stops a member
+      refetching on their own post would have dropped every one of them.
+    */
+    max: 892,
     why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1369,7 +1381,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that the extra column's identical clause upstream is a no-op in both applications, since that
       column already defaults to off-topic. Without the second half somebody wires it twice.
     */
-    max: 194,
+    /*
+      194 -> 260, 2026-08-28 — the typing indicator. Two typist lists, two `amITyping` flags, `typingUpdated` and the two announce helpers. PER
+      COLUMN, which is why there are two of each: the frame carries the channel it belongs to and
+      the two columns can show different ones. Routing by channel rather than by column is what
+      makes a frame land in BOTH when they happen to show the same one, without needing a rule.
+    */
+    max: 260,
     why: 'the two chat columns and the mention routing that reads three of their fields at once'
   },
   {
@@ -2144,7 +2162,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       entry on the private-chat command bag. This file is the composition root, so a new command on
       an existing class costs exactly the wiring and nothing else — which is what it is for.
     */
-    max: 1116,
+    /*
+      1116 -> 1139, 2026-08-28 — the typing indicator. The two `TypingSignal` instances and their wiring. Separate instances rather than one with a
+      parameter, because each owns its own debounce timer and announce flag — a shared timer would
+      let the extra column's keystrokes keep the main column's announcement alive.
+    */
+    max: 1139,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {
@@ -2173,6 +2196,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 421,
     why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
+  },
+  {
+    file: 'lib/room/typing-signal.svelte.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — and, like every `lib/room/*.ts` module, the
+      discovery gate would have refused it without one.
+
+      100 lines for a debounce, and the bulk is why it is a debounce: every keystroke REPLACES the
+      pending timeout, which is what makes "five seconds since the last key" fall out rather than
+      needing the timestamp comparison the reference also carries. Two frames per burst is the whole
+      reason broadcasting this is affordable at all.
+
+      NOTE WHAT IS NOT CAPPED HERE. `lib/server/typing.ts` is the other half and has no entry,
+      because this catalog covers `lib/room/*` and `lib/components/**` and nothing under
+      `lib/server/`. That is a real gap in the ratchet — the same one components had until this
+      morning — and it is named rather than quietly worked around.
+    */
+    max: 100,
+    why: 'the send half of the typing indicator - a debounce that produces two frames per burst'
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',
@@ -2229,7 +2271,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this from recurring — this file had its own copy of that union, and a fourth payload would
       otherwise have to be added here too.
     */
-    max: 1114,
+    /*
+      1114 -> 1165, 2026-08-28 — the typing indicator. The indicator's markup, three props and the two composer handlers. Most of the growth is the
+      citation for what is NOT drawn: `app-typing-indicator-dots` and its `.typing-indicator` class
+      have no rule in any stylesheet this repository holds, so emitting three empty spans would be
+      markup with no consumer — the check `smallerImagePreview` failed.
+    */
+    max: 1165,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -2264,7 +2312,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ExtraChatPane.svelte',
-    max: 543,
+    /*
+      543 -> 567, 2026-08-28 — the typing indicator. The extra column's own copy of the indicator and its two handlers. Its OWN channel, which is the
+      whole reason it is a second copy rather than a shared one.
+    */
+    max: 567,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

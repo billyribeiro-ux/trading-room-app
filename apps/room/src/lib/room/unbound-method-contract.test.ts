@@ -29,6 +29,7 @@ import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control.svelte';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
+import { TypingSignal } from './typing-signal.svelte';
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomLogPages } from './log-pages.svelte';
 import { RoomMedia } from './media.svelte';
@@ -103,6 +104,16 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   sessionControl: RoomSessionControl,
   userActions: RoomUserActions,
   gates: RoomGates,
+  /*
+    Added 2026-08-28 with the typing indicator, and it was the completeness check below that asked
+    for it rather than anybody remembering — which is the whole reason that check exists.
+
+    TWO of them, one per composer, so the map name is the shape of the export rather than a single
+    instance. `typed` and `stop` are both passed as `(value) => typing.main.typed(value)` at their
+    call sites and never bare, which is what this file is guarding against.
+  */
+  'typing.main': TypingSignal,
+  'typing.extra': TypingSignal,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole
