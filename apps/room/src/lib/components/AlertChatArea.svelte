@@ -112,6 +112,12 @@
 
     /** Both logs arrive already filtered, searched and paged. This pane never decides visibility. */
     visibleAlerts: RoomMessageItem[];
+    /**
+     * The toolbar search's scope, when it is narrower than the log — see
+     * `#lib/alert-toolbar-search-scope.js`. `null` when there is nothing to say, which is most of
+     * the time; a notice that is always there is one nobody reads.
+     */
+    searchScopeNotice: string | null;
     visibleChatMessages: RoomMessageItem[];
     /** The alerts column ONLY — a chat message must not get a parsed label. See the chrome file. */
     alertLabels: readonly AlertLabel[];
@@ -220,6 +226,7 @@
     giphyApiKey,
     showMessageOptions = $bindable(false),
     visibleAlerts,
+    searchScopeNotice,
     visibleChatMessages,
     alertLabels,
     messageChrome,
@@ -637,6 +644,19 @@
                         {/if}
                       {/if}
                     </div>
+                    <!--
+                      THE SEARCH'S SCOPE, said out loud. Not captured — the reference's toolbar sends
+                      `doChatLogSearch` to a server and has nothing to warn about; ours filters the
+                      alerts the page holds. `alert-toolbar-search-scope.ts` carries the whole
+                      account, including why this is the resolution rather than a round trip on
+                      Enter.
+
+                      `role="status"` so a screen reader is told the answer narrowed, which is the
+                      one thing a sighted reader gets from the sentence appearing where it was not.
+                    -->
+                    {#if searchScopeNotice}
+                      <small class="form-text text-muted" role="status">{searchScopeNotice}</small>
+                    {/if}
                   </div>
                 </div>
               </form>

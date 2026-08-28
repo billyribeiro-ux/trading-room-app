@@ -704,7 +704,6 @@
     await invalidateAll();
   }
 
-
   // Server-persisted sizes. These are the ones SSR can see, so they are the source of truth.
   function settingsSplitPair(key: string) {
     return splitPairFromValue(prefs.loaded[key]);
@@ -1159,6 +1158,7 @@
               {giphyApiKey}
               bind:showMessageOptions
               visibleAlerts={feeds.visibleAlerts}
+              searchScopeNotice={alertsPane.searchScopeNotice}
               visibleChatMessages={feeds.visibleChat}
               alertLabels={gates.alertLabels}
               {messageChrome}

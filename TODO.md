@@ -303,10 +303,17 @@ removing its entry, and a placeholder reason — each red on its own assertion. 
 to-do list with evidence attached, not a suppression file: the work is still open.**
 
 **3. SILENT CORRECTNESS GAPS — it works, but not the way the reference works, and nothing says so.**
-`doChatLogSearch`: the input is ported verbatim down to the dangling `aria-describedby`
-(`AlertChatArea.svelte:580-599`), but `alerts.svelte.ts:271-275` filters `item.body` and
-`item.senderName` locally with `includes()`. Upstream it is a SERVER search. Search for an old
-message and you get nothing, with no indication the server was never asked.
+`doChatLogSearch` was the example and **the ALERTS half is closed, 2026-08-27, by the second of the
+two resolutions the defect table offered: the limit is VISIBLE.** The toolbar still filters the rows
+the page holds — it is a live filter, not a round trip — but it now says so, and points at the
+Advanced Search modal, which has queried the database since 2026-08-23 and reports its own
+truncation. `alert-toolbar-search-scope.ts` carries the rule and records that the sentence is ours.
+
+**The CHAT half is a missing FEATURE, not a broken one, and that is the correction:** this room has no
+chat search input at all. Upstream's `doSearchSubmit` (byte 1439114) sends
+`{searchTerm, channel, type:"chat", del}`, and the same command with `del:true` DELETES what it
+matches — gated on `deleteAlertPW`, which is the setting row 2 was originally confused about. Building
+the search would mean deciding about the delete too.
 
 **4. HONEST PARTIALS — half built, and the code documents the limit.** These are fine and must not be
 lumped in with the above. `forceStopScreen` is the example: `screens.stop()` really stops one of your
@@ -371,7 +378,7 @@ blocked on a decision or on hardware**; they are simply not built yet. Ordered b
 | --- | --- | --- |
 | **`save-permissions`** (HIGH) | **FIXED — and this row's verdict was right about the shape and wrong about the state** | It said the room has no write path to the controller. It has one: `permissions.remote.ts` → `writeRoomPermissions` → `POST /internal/room-permissions/<code>`, gated by `presenterRoom()`, with the five keys taken from `ROOM_PERMISSION_KEYS` rather than from the client. The alert stays in `EXACT_ALERTS` because the reference raises it too — an announcement over a real send, not a liar |
 | **`session-refresh-roster` / `session-soft-reset`** | **FIXED 2026-08-26 — and this row's verdict was wrong** | It said the honest fix was to correct the message. Decided without locating the senders; both are captured and both are ordinary server commands. Built as `session-commands.remote.ts`. See row 3 |
-| **`doChatLogSearch`** (MEDIUM) | needs new server code | The input never reaches the server, and the set it filters is only the newest 50 rows. Either a real search endpoint, or make the limit VISIBLE — a silent wrong answer is worse than an honest one |
+| **`doChatLogSearch`** (MEDIUM) | **the ALERTS half is DONE, 2026-08-27** | Resolved the second way this row offered: the limit is visible. A real endpoint already existed one click away in Advanced Search, so a second search path over one table was the wrong half to build. What is left is the CHAT search, which this room does not have at all — a missing feature rather than a silent one, and it carries a delete-by-search on the same command |
 | **`admin-notes-password`** (LOW) | needs new server code | The typed value IS delivered and the handler throws it away — `user-actions.svelte.ts:674-684`. **The setting this row named was wrong**: it is `needPasswordForUserNotes`, not `deleteAlertPW`. See row 2 |
 | **`kick-duplicates`** (MEDIUM) | **NOT fixable without inventing** | The reference's own implementation was read in the capture, both arms confirmed. The positive arm needs a kick the room cannot perform. Recorded, not guessed |
 

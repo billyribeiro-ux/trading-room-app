@@ -33,6 +33,60 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 03:55 EDT — The alerts toolbar search stops answering for a log it never read
+
+**Runtime impact: YES**, one sentence: when a full page of alerts is loaded and a term is typed, the
+toolbar now says what it searched.
+
+**The gap.** `TODO.md` filed this under SILENT CORRECTNESS GAPS — *"it works, but not the way the
+reference works, and nothing says so"*. The field is ported verbatim from the capture, down to its
+dangling `aria-describedby`. What it does is not: upstream sends `doChatLogSearch` to a SERVER, and
+ours filters the fifty rows the page holds. A reader searching for something from last week got an
+empty list and no indication the log was never asked.
+
+**Resolved the SECOND way the defect table offered — make the limit visible — and the reason is that
+the first way already exists.** The Advanced Search modal has queried the database since 2026-08-23
+and reports its own truncation at `ALERT_SEARCH_LIMIT`. Rebuilding that behind the toolbar would be a
+second search path over one table, and it would change what the toolbar IS: a live filter that
+narrows as you type, no round trip, no spinner. So the toolbar keeps being a filter and stops
+pretending to be a search.
+
+**Three conditions, and each rules out a case where the notice would be noise.** No term: nothing is
+being answered partially. Fewer alerts loaded than a page: the reader IS looking at the whole log, and
+a notice there would read as boilerplate. And deliberately NOT conditioned on whether anything
+matched — a search that found three results out of fifty rows is exactly as partial as one that found
+none, and warning only on the empty case would teach readers that results mean completeness, which is
+a worse lie than the one being fixed.
+
+**It moved once during the work, and the move fixed a wrong NUMBER as well as a ceiling.** Written
+into `RoomFeeds` first, where the count available was the raw loaded list — which includes alerts the
+viewer's own trader filter hides and the search never sees, so the notice would have named a number
+larger than anything reachable. `RoomAlertsPane` holds the term and `feeds.searchableAlerts`, which is
+the set the toolbar actually filters, and is the only class holding both.
+
+**The CHAT half is a missing FEATURE, not a broken one, and the record is corrected to say so.** This
+room has no chat search input at all. Reading the reference: `doSearchSubmit` at byte 1439114 sends
+`{searchTerm, channel, type:"chat", del}`, and the SAME command with `del:true` DELETES what it
+matches — gated on `deleteAlertPW`, which is the setting TODO row 2 spent a correction disentangling.
+Building the search means deciding about the delete, so it is recorded rather than started.
+
+**The orphan gate caught a real mistake.** The first insertion landed between `searchableAlerts`'s
+docblock and the code it explains, leaving that docblock describing something else.
+`orphaned-comment-contract.test.ts` failed on exactly that.
+
+**One ceiling RAISED and argued in place** — `alerts-pane.ts` 291 → 304, the third exception this file
+records. Thirteen lines: an import and a getter, closing a correctness gap, where the rule itself is
+already extracted to `alert-toolbar-search-scope.ts` and what remains is the two values it needs.
+`+page.svelte` needed one line and gave it back by collapsing a double blank line, so its ceiling is
+untouched.
+
+**Negative control seen RED:** an extra upper bound added to the notice's conditions, so a room with
+more than 100 alerts loaded stopped warning — the case asserting that a search which FOUND something
+still warns went red.
+
+**Verified:** room 149 files / 2,276 tests · `svelte-check` 1,267 files 0/0 · eslint and prettier
+clean. **NOT verified:** no browser has rendered the notice; its markup is asserted as text.
+
 ### 2026-08-28 03:10 EDT — Two buttons offered to save a close message; now one saves it and a member reads it
 
 **Runtime impact: YES.** A presenter can write what members are told when the room is closed, and a

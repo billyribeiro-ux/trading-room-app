@@ -440,7 +440,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       exists - they hold what the alerts ARE and which of them are visible. This holds the
       actions, and reads both.
     */
-    max: 291,
+    /*
+      291 -> 304, 2026-08-27, and the rule above says a raise is a conversation. This is the third
+      exception this file records, after `private-commands.svelte.ts` and `RoomOverlays.svelte`.
+
+      WHAT THE THIRTEEN LINES ARE: one import and one getter, `searchScopeNotice`. They close a SILENT
+      CORRECTNESS GAP — the alerts toolbar filters the fifty rows the page holds while its field is
+      ported verbatim from a reference that sends `doChatLogSearch` to a server, so a reader searching
+      for last week got an empty list and no indication the log was never asked.
+
+      WHY IT LANDED HERE rather than anywhere cheaper. It needs two things at once: the search term,
+      which is `RoomAlerts`'s, and the set the toolbar actually filters, which is
+      `feeds.searchableAlerts`. This class is the only one holding both. It was written into
+      `feeds.svelte.ts` first, where the count available was the RAW loaded list — which includes
+      alerts the viewer's own trader filter hides, so the notice would have named a number larger
+      than anything the search could reach. The move fixed a wrong number as well as a ceiling.
+
+      WHY NOT AN EXTRACTION: the rule already IS extracted. `alert-toolbar-search-scope.ts` is the
+      pure decision with the whole account on it, and what remains here is the two values it needs.
+      Extracting a getter that reads two private fields would mean handing both out.
+    */
+    max: 304,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
