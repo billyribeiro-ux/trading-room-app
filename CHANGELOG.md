@@ -33,6 +33,41 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 05:40 EDT — The second question nothing had asked: which SETTINGS the reference reads
+
+**Runtime impact: NO.** One published gate, one contract test, one TODO section.
+
+`audit-feature-coverage.mjs` asks the bundle what the reference SENDS. Nothing asked what it READS.
+`audit-setting-coverage.mjs` does, and the answer is a surface nobody had enumerated.
+
+`room-settings-schema.ts` declares **269** settings and marks **202** `wired: false` — nothing in
+this room reads them. That number on its own says nothing, which is presumably why it sat unexamined:
+most of the 202 were never meant to reach a room. The narrower question is answerable, and the answer
+is **58 of the 202 are read by the reference's own room client** as `sessData.<name>`.
+
+**`sessData.<name>` and nothing looser, deliberately.** The bare setting name over-matches badly in a
+2.9 MB bundle — `name`, `description` and `isLocked` are settings AND ordinary identifiers — and a
+count that over-matches turns the list into noise nobody reads, which is what the command audit
+records about its own patterns.
+
+**FIVE of the 58 are credentials the reference ships to every member's browser**, and they are called
+out in the gate, in the contract test, and in `TODO.md`: `deleteAlertPW`, `banIPList`, `obsStreamKey`,
+`twillioApiSID`, `modAdminLoginList`. This room refuses to send those — `room-config-boundary.test.ts`
+asserts no room-visible setting reads like a credential, and `internal/room-entry` is the shape used
+instead, where the credential stays on the controller and the question travels. **Wiring one of them
+would be a regression wearing an enumeration's clothes**, so the contract test asserts they are STILL
+on the list: a name leaving it means the room started reading it.
+
+Pinned by NAME rather than count, for the reason the command audit gives about itself — wiring one
+setting while another quietly stops being read leaves a total unchanged, and the silent direction is
+the one that has cost this repository three separate discoveries.
+
+**Negative control seen RED:** renaming one schema entry moved it off the measured list and the pin
+failed on the difference.
+
+**Verified:** room 150 files / 2,280 tests · `svelte-check` 1,269 files 0/0 · eslint and prettier
+clean.
+
 ### 2026-08-28 05:05 EDT — Twenty-one tenant tables were attested by their ROLE and never by their PREDICATE
 
 **Runtime impact: NO** to what the site serves; **YES** to what a release is allowed to attest.
