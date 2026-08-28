@@ -203,25 +203,33 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **201** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **198** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**57 of the 201 are read by the reference's OWN room client**, as `sessData.<name>`.
+**54 of the 198 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**One has already left the list.** `hideNotes` was 202/58 when this section was written and is wired
-as of 2026-08-28 — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not
-while its two siblings `hideFiles` and `hideRecs` did. That is the enumeration doing the only thing
-it was built to do, and it did it within hours.
+**Four have already left the list, on the day it was written.** It opened at 202 unwired and 58
+questions; both numbers have moved twice since.
 
-**They are 57 questions, not 57 gaps, and here that warning is sharper than usual.** FIVE of them are
+- `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
+  its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
+  the tab it gates was always built.
+- `darkThemeAsDefault`, `alertSoundOff`, `alertsChatOnBottom` — **one feature, not three settings.**
+  Read alone, each is a small owner preference; read together they are three consecutive clauses of
+  one expression in the reference (bytes 1,149,414 / 1,149,637 / 1,149,866), each paired with a
+  per-viewer LATCH so that a room default seeds a member's preference once and never overrides it
+  afterwards. `#lib/room/room-defaults.ts`. **The list is what put the three names next to each
+  other**; asked one at a time, the shape is invisible.
+
+**They are 54 questions, not 54 gaps, and here that warning is sharper than usual.** FIVE of them are
 credentials the reference ships to every member's browser — `deleteAlertPW`, `banIPList`,
 `obsStreamKey`, `twillioApiSID`, `modAdminLoginList` — and this room refuses to, which is what
 `room-config-boundary.test.ts` enforces and what `internal/room-entry` exists to replace. **Wiring one
 of those is a regression wearing an enumeration's clothes.** Others are honoured under another
 mechanism; only the rest are unbuilt.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 57 by NAME and asserts separately that the five
+`src/lib/setting-coverage-contract.test.ts` pins the 54 by NAME and asserts separately that the five
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10),

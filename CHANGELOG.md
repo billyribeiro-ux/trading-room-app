@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 01:40 UTC — Three room settings that were one feature, and a latch that keeps a default from becoming an override
+
+**Runtime impact: YES.** A room that sets *"Set Dark Theme As Default?"*, its alert-sound default,
+or *"alerts and chat on the bottom"* now applies each to a member the FIRST time they arrive, and
+never again. Until this commit all three did nothing at all.
+
+**The second thing the settings enumeration found, and it is a different KIND of find from the
+first.** `hideNotes` was a gap somebody could have spotted if they had thought to look. This one
+could not be: asked one setting at a time, `darkThemeAsDefault`, `alertSoundOff` and
+`alertsChatOnBottom` read as three unrelated owner preferences. They are three consecutive clauses
+of ONE expression in `loadSessionData`, and the thing that makes them a feature — the latch — is
+not visible in any one of them. **The list is what put the three names next to each other.**
+
+**The reference, read from the pinned v4 bundle** (bytes 1,149,414 / 1,149,637 / 1,149,866),
+transcribed in the order it runs:
+
+```js
+sessData.darkThemeAsDefault && !preferences.defaultDarkTheme && (
+  preferences.theme = "darkTheme", setPreference("defaultDarkTheme", !0), emit("switchTheme", …)),
+sessData.alertSoundOff && !preferences.defaultAlertSoundOff && (
+  preferences.alertSoundOn = !1, setPreference("defaultAlertSoundOff", !0), setPreference("alertSoundOn", !1)),
+sessData.alertsChatOnBottom && !preferences.defaultAlertsChatOnBottom && (
+  preferences.roomSplitDir = "btt", setPreference("defaultAlertsChatOnBottom", !0), …, emit("manageRoomLayout"))
+```
+
+**THE LATCH IS THE DESIGN.** A room default decides what a member sees the first time and must never
+override what they chose afterwards. Without it, a room with `alertSoundOff` re-silences a member's
+alerts on every page load while their own switch reads "on" — which presents as a broken settings
+modal, with nothing pointing at the room setting actually doing it. The latch keys are the
+REFERENCE's own names, and that is load-bearing rather than sentimental: a member arriving from the
+original application already carries `defaultDarkTheme` in their blob, and renaming it would apply
+every default to them a second time.
+
+**Where the latch lives is the one architectural decision here.** In the ROOM, not the controller.
+Which member has already been given a default is a fact about that member's preference blob; the
+controller only knows what the owner asked for. So `internal/room-config/[code]` sends the three
+settings and the room owns the once-ness.
+
+**Two divergences, both recorded at the code rather than absorbed:**
+
+1. **Where the theme is stored.** Upstream writes `preferences.theme` into the same blob as the two
+   latches; this room keeps the theme in its own `user_settings.theme` column through `saveTheme`,
+   which predates this by weeks. So `dark-theme` applies through a different writer, and
+   `RoomDefaultWriters` takes two functions rather than one specifically so that asymmetry is
+   visible instead of hidden behind a fake `savePreference('theme', …)`.
+2. **An upstream DEFECT we decline to reproduce.** `darkThemeAsDefault` has two more readers, at
+   bytes 2,283,697 and 2,283,872 — the settings modal's theme radios, whose `checked` expressions
+   each carry a second term. Work the four combinations: a viewer who has ever entered a
+   dark-default room carries `defaultDarkTheme` forever, and in every OTHER room the Light radio
+   evaluates `light && (false || false)` and renders UNCHECKED while the theme genuinely is light. A
+   radio group with nothing selected for a preference that is set. `ModalHost.svelte:2825,2837`
+   check the theme alone, which is the question a radio asks.
+
+**`decideRoomDefaults` is pure and `applyRoomDefaults` takes its writers as arguments**, same split
+as `media-elevation.ts`, `alert-filter.ts` and `live-access.ts`. **Three negative controls seen
+RED**: dropping the latch check fails 5 tests, writing the latch BEFORE the default fails 2, and
+renaming one latch key fails 6.
+
+**One comment went false and is corrected.** `create-room.svelte.ts` said the `roomSplitDir`
+side-effect branch was *"only reached on a deliberate user action, never on a page load"*.
+`applyRoomDefaults` reaches it from `onMount` — that IS the `manageRoomLayout` the reference emits
+on the same line — so the comment now says so. A comment claiming a branch is unreachable on load is
+exactly what stops the next reader looking at it when the layout moves on a load.
+
+**Four pins moved together again** (wired 68 → 71): `ROOM_CONSUMED` and the generator's tripwire, the
+generated schema header, the verifier's third copy of the wired set and its prose (55 → 58 room
+consumers), and a named consumer each in `room-config-boundary.test.ts`.
+
+**Ratchet: two ceilings DOWN, one new, no raise.** `+page.svelte` 1395 → 1390 — thirteen surplus
+blank lines removed from inside `<script>`, debris from earlier extractions that nothing was
+collapsing because the file is deliberately in `.prettierignore`; whitespace only, inside the script
+block, so the pixel-diff reason for that exclusion does not apply. `create-room.svelte.ts` 1114 →
+1110, because the corrected comment is shorter than the sentence it replaced. `room-defaults.ts`
+capped at 191 in the same commit that created it, with what growth would and would not be legitimate
+written into the entry.
+
+**Verified:** room 151 files / 2,305 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` regenerates and byte-compares: *268 extracted + 1 reviewed deviation =
+269 total; 71 wired* · `svelte-check` 0/0 in both apps · eslint and prettier clean.
+
+**Not verified, and named:** nobody has entered a room with these settings on. The evidence is the
+bundle, the writes are asserted in order against it, and the room's own preference path
+(`RoomPrefs.save` → mirror → side effect → persist) is the same one every other preference uses. Two
+browsers on a live room is the check this cannot do here.
+
 ### 2026-08-28 01:25 UTC — The Svelte MCP became available mid-session, so the three files it had not seen went through it
 
 **Runtime impact: NO.** Four comments, one docblock moved, one stale count corrected. No behaviour.

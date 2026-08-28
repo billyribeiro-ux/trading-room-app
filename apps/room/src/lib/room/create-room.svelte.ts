@@ -266,8 +266,9 @@ export function createRoom(deps: RoomDeps) {
       /*
             Applies the sizes the server rendered with, alongside the new direction. Each arrangement has
             its own pair of preference keys, so this brings back the geometry last chosen for THAT
-            arrangement rather than reinterpreting a width as a height. Only reached on a deliberate user
-            action, never on a page load.
+            arrangement rather than reinterpreting a width as a height. It said "never on a page load"
+            until 2026-08-28, when `applyRoomDefaults` began writing `roomSplitDir` from `onMount` for
+            a room that sets `alertsChatOnBottom` — once per viewer, latched, and the correct path.
           */
       if (key === 'roomSplitDir' && isRoomSplitDir(value)) {
         split.setDirection(value, settingsSplitPair);

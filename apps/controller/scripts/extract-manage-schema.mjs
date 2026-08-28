@@ -163,6 +163,12 @@ const ROOM_CONSUMED = [
      NO APOSTROPHES IN THIS BLOCK: `room-config-boundary.test.ts` reads these names with a
      single-quote regex, so one in prose swallows the list. It cost a run to learn. */
   'hideNotes',
+  /* The three ROOM DEFAULTS, added 2026-08-28 and crossing together because upstream they are three
+     consecutive clauses of one expression. See the foot of this file and `room-config.ts`.
+     NO APOSTROPHES IN THIS BLOCK. */
+  'darkThemeAsDefault',
+  'alertSoundOff',
+  'alertsChatOnBottom',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -714,9 +720,16 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // feature work would ever have reached this flag. An owner who ticked *"Hide Notes Section?"* got a
 // room that still showed the tab, silently, for two weeks.
 //
+// 71 since 2026-08-28: `darkThemeAsDefault`, `alertSoundOff` and `alertsChatOnBottom` joined
+// together, three clauses of one expression in the reference at bytes 1,149,414 / 1,149,637 /
+// 1,149,866. Each seeds a per-viewer preference ONCE and latches itself so it never becomes an
+// override; the latch lives in the room, because which member has already been given a default is a
+// fact about that member and not about the room. `#lib/room/room-defaults.ts` holds the rule and
+// `room-defaults.test.ts` holds the negative controls. Second find of the settings enumeration.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 68 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 71 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

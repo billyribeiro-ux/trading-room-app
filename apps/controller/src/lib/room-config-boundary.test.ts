@@ -235,6 +235,16 @@ describe('the allow-list itself', () => {
         and for the same reason: hiding one of the two leaves a tab that opens onto nothing.
       */
       hideNotes: 'RoomGates.notesHidden — hides the Notes tab AND the notes pane together',
+      /*
+        The three ROOM DEFAULTS share ONE consumer, and that is the honest way to name them: they
+        are three clauses of one expression upstream and one loop in `applyRoomDefaults` here.
+        Verified in the room before being written, as the note above requires — `+page.svelte` calls
+        it inside `onMount`, and `room-defaults.test.ts` asserts the six writes the loop makes in
+        the order the reference makes them.
+      */
+      darkThemeAsDefault: 'applyRoomDefaults() — seeds the dark theme once, then latches',
+      alertSoundOff: 'applyRoomDefaults() — seeds alertSoundOn=false once, then latches',
+      alertsChatOnBottom: 'applyRoomDefaults() — seeds roomSplitDir=btt once, then latches',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

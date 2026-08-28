@@ -175,6 +175,22 @@ export interface RoomSessionSettings {
    */
   hideNotes?: boolean;
   /**
+   * THE THREE ROOM DEFAULTS — settings that seed a NEW member's own preferences once and then stop.
+   *
+   * Three clauses of one expression in the reference's `loadSessionData`, bytes 1,149,414 /
+   * 1,149,637 / 1,149,866, so they arrive together. Each is paired with a latch preference that
+   * records this viewer has already had it, which is what makes it a default rather than an
+   * override: without the latch, a room with `alertSoundOff` would re-silence a member's alerts on
+   * every page load and their own switch would look broken.
+   *
+   * The rule, the latches and the two recorded divergences are in `#lib/room/room-defaults.js`.
+   */
+  darkThemeAsDefault?: boolean;
+  /** See {@link RoomSessionSettings.darkThemeAsDefault} — seeds `alertSoundOn = false`. */
+  alertSoundOff?: boolean;
+  /** See {@link RoomSessionSettings.darkThemeAsDefault} — seeds `roomSplitDir = 'btt'`. */
+  alertsChatOnBottom?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

@@ -329,7 +329,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines than the proxied declarations took. Not a saving worth chasing - recorded because a
       ceiling that moves for a reason nobody wrote down is the thing this file exists to prevent.
     */
-    max: 1395,
+    /*
+      1395 -> 1390 on 2026-08-28, and it is worth saying what those five lines were because they are
+      not code. Thirteen SURPLUS BLANK LINES were removed from inside `<script>` — debris left by
+      earlier extractions, in a file that `.prettierignore` deliberately excludes so nothing was
+      collapsing them — and eight went back as the `applyRoomDefaults` call and its note. Whitespace
+      only, and inside the script block, so the pixel-diff reason this file is unformatted does not
+      apply: no text node moved.
+    */
+    max: 1390,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1004,6 +1012,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: "the poll modal's four fields; the first of the room state classes"
   },
   {
+    file: 'lib/room/room-defaults.ts',
+    /*
+      Created 2026-08-28 and capped in the same commit, at the size it landed.
+
+      191 lines for three rules, one decision function and one loop — and the ratio is the point
+      rather than an embarrassment. The executable part is under thirty lines; the rest is the
+      transcription of the three clauses it reproduces, the argument for why a latch cannot be a
+      derivation, and the two divergences: where this room stores a theme, and the settings-modal
+      radio expression upstream gets wrong that we decline to reproduce.
+
+      If this number climbs, the question to ask is whether a FOURTH room default arrived — that is
+      growth this module is for, and it costs about four lines plus its evidence — or whether
+      something that applies preferences generally has been folded in, which belongs with `RoomPrefs`
+      instead. The one thing it must never grow into is a place that decides WHICH members get a
+      default; that is the latch, and the latch is a fact about a member's own blob.
+    */
+    max: 191,
+    why: 'the three room defaults, their latches, and the transcription that earns them'
+  },
+  {
     file: 'lib/room/refresh.svelte.ts',
     /*
       Created 2026-08-18 and capped in the same commit. The five-second `invalidate` poll, the two
@@ -1634,7 +1662,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       root grows by construction whenever a receiver is built — the trade the extraction commit
       before this one bought sixty-two lines of headroom in `events.svelte.ts` to make.
     */
-    max: 1114,
+    /*
+      1114 -> 1110 on 2026-08-28. No code moved: the `roomSplitDir` side-effect comment said the
+      branch was "never [reached] on a page load", `applyRoomDefaults` made that false, and the
+      correction is shorter than the sentence it replaced because the reasoning now lives with the
+      rule in `room-defaults.ts`. A ceiling going DOWN on a correction is the intended direction.
+    */
+    max: 1110,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

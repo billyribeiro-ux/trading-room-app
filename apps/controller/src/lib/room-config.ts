@@ -366,6 +366,43 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hideNotes',
   /*
+    THE THREE ROOM DEFAULTS — the settings that seed a new member's own preferences ONCE.
+
+    They cross together because upstream they ARE one thing: three consecutive clauses of a single
+    expression in `loadSessionData`, bytes 1,149,414 / 1,149,637 / 1,149,866 of the pinned v4
+    bundle. Each has the same three parts — the room setting below, a per-viewer LATCH preference,
+    and a write:
+
+      darkThemeAsDefault && !preferences.defaultDarkTheme
+        -> preferences.theme = "darkTheme",  setPreference("defaultDarkTheme", true)
+      alertSoundOff && !preferences.defaultAlertSoundOff
+        -> preferences.alertSoundOn = false, setPreference("defaultAlertSoundOff", true)
+      alertsChatOnBottom && !preferences.defaultAlertsChatOnBottom
+        -> preferences.roomSplitDir = "btt", setPreference("defaultAlertsChatOnBottom", true)
+
+    **The latch is why these are DEFAULTS and not overrides**, and it is the reason they belong on
+    this list rather than being folded into anything the controller decides. Which member has
+    already been given the room's default is a fact about that member's preference blob, which lives
+    on the room side; the controller only knows what the OWNER asked for. Send the setting, let the
+    room own the once-ness — `#lib/room/room-defaults.ts` and its test.
+
+    Found by `gate/audit-setting-coverage.mjs` on 2026-08-28, in the same pass that found
+    `hideNotes`. Not credentials, not policy the room could infer.
+
+    ONE THING THIS DOES NOT CHANGE, stated because the next reader will wonder. `classify()` above
+    calls `darkThemeAsDefault` a `default` (it matches `AsDefault$`) and the other two `room-only`
+    (they match neither pattern), even though the evidence says all three are defaults a member may
+    override. That disagreement is real and it is also inert: `resolveRoomConfig` treats `default`
+    and `room-only` identically unless the name is in `USER_OVERRIDABLE`, and neither of the two has
+    a `UserPreferences` key to be overridden BY — the preferences they seed (`alertSoundOn`,
+    `roomSplitDir`) live in the room's own blob, not in the controller's six-field model. Widening
+    the pattern or the map would be adding a branch nothing reaches, which this repository treats as
+    a defect in its own right. The once-ness lives in the room, where the latch is.
+  */
+  'darkThemeAsDefault',
+  'alertSoundOff',
+  'alertsChatOnBottom',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

@@ -39,6 +39,13 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * `ROOM_VISIBLE_SETTINGS` was written, applied by the reference the same way, and nobody had noticed
  * the trio was a pair. An owner who ticked "Hide Notes Section?" got a room that still showed the
  * tab.
+ *
+ * **`darkThemeAsDefault`, `alertSoundOff` and `alertsChatOnBottom` left together**, on the same day,
+ * and they are the second thing this list is for: not a gap somebody had missed, but a FEATURE that
+ * was invisible as long as the question was asked one setting at a time. Read in isolation each is
+ * a small owner preference; read together they are three consecutive clauses of one expression, a
+ * per-viewer latch, and the rule that a default must never become an override. The list is what put
+ * the three names next to each other. `#lib/room/room-defaults.ts`.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -55,7 +62,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'authMode',
   'chatTabsWithBadges',
   'copyTrades',
-  'darkThemeAsDefault',
   'enableDiscord',
   'hasAlertScheduler',
   'hasQAOnAlerts',
@@ -80,8 +86,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'recsInRoom',
   'restreamToURL',
   'advancedSearchAlerts',
-  'alertsChatOnBottom',
-  'alertSoundOff',
   'backupClusterID',
   'banIPList',
   'blinkingRec',

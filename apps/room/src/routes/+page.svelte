@@ -29,6 +29,7 @@
     import { createTawkRuntime } from '#lib/tawk-runtime.js';
     import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
   import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
+  import { applyRoomDefaults } from '#lib/room/room-defaults.js';
   import { splitPairFromValue } from '#lib/room/split.svelte.js';
   import { defaultChatStyleForTheme, defaultFollowChatStyle } from '#lib/chat-style.js';
   import { shouldDisableSelection } from '#lib/room-key-gates.js';
@@ -52,7 +53,6 @@
   import { initializeSoundEffects, setSoundEffectsVolume, unloadSoundEffects } from '#lib/sound-effects.js';
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
-
 
   let { data }: PageProps = $props();
 
@@ -237,11 +237,9 @@
   // svelte-ignore state_referenced_locally
   let theme: Theme = $state(data.settings?.theme === 'dark' ? 'dark' : 'light');
 
-  
   const showBadgesToPresentersOnly = $derived(data.sessData?.showBadgesToPresentersOnly === true);
   const disableStarYears = $derived(data.sessData?.disableStarYears === true);
 
-  
   /*
     THE FRESHNESS POLL AND THE VISIBILITY RULES, in `#lib/room/refresh.svelte.ts`.
 
@@ -259,9 +257,6 @@
     refreshAll: () => invalidateAll()
   });
 
-  
-
-  
   /* RAW: `mergeGlobalChatStyle` replaces it whole; `ModalHost` spread-copies before binding, so no
      one writes through this reference. Read by `messageChrome`, i.e. on every rendered message. */
   // svelte-ignore state_referenced_locally
@@ -293,8 +288,7 @@
 
   let previewWindowsVisible = $state(true);
   let showMessageOptions = $state(false);
-  
-  
+
   /**
    * `hidePresentation` — `(chatOnlyMode || sessData.isChatOnlyRoom)` sets it, gating the
    * presentation column at `O(3, e.hidePresentation ? -1 : 3)`
@@ -306,7 +300,6 @@
    * carrying a second copy of the screens.
    */
   const hidePresentation = $derived(chatOnlyMode || data.sessData?.isChatOnlyRoom === true);
-  
 
   /**
    * Closed captions.
@@ -335,7 +328,6 @@
    * to two lines a second per speaker. The overlay only shows what fits its 60vh scroll area.
    */
   const CAPTION_HISTORY_LIMIT = 500;
-  
 
   /**
    * Whether anyone in the room currently has their microphone open.
@@ -354,7 +346,6 @@
    * is open. Pausing between sentences must not flip it back to " ( No one is speaking )".
    */
 
-  
   let mainElement: HTMLElement | undefined;
   let alertChatElement: HTMLElement | undefined;
   let composerElement: HTMLTextAreaElement | undefined;
@@ -381,7 +372,7 @@
    * the same two terms and folding `!isPresenter` in here would hide that they are one rule.
    */
   const disableCopy = $derived(data.sessData?.disableCopy === true);
-  
+
   /*
     `document.body.classList.add('noselect')` — `ngAfterViewInit`, `app-room.full.js:2227-2229`,
     behind the same `!isPresenter && sessData.disableCopy` the keystroke and right-click gates use.
@@ -607,7 +598,6 @@
     if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';
   });
 
-
   /*
     THE TAWK WIDGET, in `#lib/tawk-runtime.ts`.
 
@@ -645,7 +635,6 @@
     };
   }
 
-  
   /**
    * The private-chat toolbar's "Don't Disturb" button. `app-privchat`'s `setDND()` flips the one
    * global flag and nothing else - no persistence call, unlike its neighbours which end in
@@ -670,7 +659,6 @@
     };
   }
 
-  
   /* ── The chat rich text editor ────────────────────────────────────────────────────────────────
      The editor lives in `ModalHost`; its session lives here, because the composer hands work to it
      and the send hands work back to the same code path an ordinary message uses. */
@@ -733,6 +721,13 @@
     setSoundEffectsVolume(roomVolume.volume / 100);
     userActions.loadManaged();
     promoteLegacySplitSizes(settingsSplitPair, (key, value) => prefs.save(key, value));
+    // The room's three "default for a new member" settings, applied ONCE per viewer and latched.
+    // `room-defaults.ts` holds the transcription, the latch, the divergences, and why it is called
+    // from here rather than from `createRoom`.
+    applyRoomDefaults(
+      { sessData: data.sessData ?? {}, loaded: prefs.loaded },
+      { setTheme: (next) => modals.setTheme(next), savePreference: (key, value) => prefs.save(key, value) }
+    );
 
     /*
      * Connect to the media server.

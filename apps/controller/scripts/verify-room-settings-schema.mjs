@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FIFTY-FIVE by the room application
+  Eleven consumed by this repository's room-login page, FIFTY-EIGHT by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 68.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 71.
+
+  55 -> 58 on 2026-08-28: darkThemeAsDefault, alertSoundOff and alertsChatOnBottom, the three room
+  defaults that seed a member's own preferences once. Three clauses of one expression upstream, so
+  they crossed together; the latch that keeps a default from becoming an override lives in the room.
 
   54 -> 55 on 2026-08-28: hideNotes, the Notes tab's gate. Its two siblings `hideFiles` and
   `hideRecs` crossed on 2026-08-14 and this one did not; the settings enumeration found it, not a
@@ -145,6 +149,17 @@ const EXPECTED_WIRED_SETTINGS = [
   'hideFiles',
   'hideMobileCredentials',
   'hideNotes',
+  /*
+    Added 2026-08-28: the three ROOM DEFAULTS, which cross together because upstream they are three
+    consecutive clauses of one expression in `loadSessionData` (bytes 1,149,414 / 1,149,637 /
+    1,149,866). Each seeds a per-viewer preference the FIRST time a member arrives and latches
+    itself so it never becomes an override. The latch lives in the room — which member has already
+    been given a default is a fact about that member, not about the room — in
+    `apps/room/src/lib/room/room-defaults.ts`, with its negative controls beside it.
+  */
+  'darkThemeAsDefault',
+  'alertSoundOff',
+  'alertsChatOnBottom',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',
