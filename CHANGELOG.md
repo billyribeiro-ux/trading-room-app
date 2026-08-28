@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 00:55 UTC — *"Hide Notes Section?"* did nothing, and the enumeration that found it was hours old
+
+**Runtime impact: YES.** An owner who ticks *"Hide Notes Section?"* now gets a room with no Notes
+tab and no notes pane. Until this commit they got a room that showed both.
+
+**Stamped in UTC.** The entries above this one are labelled EDT but carry the container clock's UTC
+reading, so their times run ahead of this one. They are not being rewritten — a timestamp corrected
+after the fact is worth less than a wrong one that is explained, and every one of them still points
+at the right commit.
+
+**This is the first thing the settings enumeration found, and it is the exact class of defect it was
+written for.** `hideFiles` and `hideRecs` crossed the room boundary on 2026-08-14 with the panes they
+gate. `hideNotes` did not, and nothing anywhere could have noticed: the Notes tab has been built
+since the beginning, so no feature work would ever have arrived at this flag and asked whether the
+setting that hides it was being read. It took an enumeration that asks the reference what it READS,
+rather than a person asking what is missing.
+
+**The reference, read not recalled** — the pinned v4 bundle (`main.d1d09071be31f1ba.js`, SHA-256
+`40796ca8…`), three sites:
+
+- byte 1,955,694 — `this.hideNotes = sessData.hideNotes || globals.viewerOnlyMode`. The setting is
+  ORed with viewer-only mode, so a viewer-only room hides notes whatever the owner ticked.
+- byte 2,016,630 — `z('hidden', o.hideNotes)` on the notes `li`, the TAB.
+- byte 2,017,506 — the same on the pane.
+
+Both, or neither. Hiding the tab alone leaves a pane nothing can reach; hiding the pane alone leaves
+a tab that opens onto nothing. `RoomGates.notesHidden` reproduces the OR, and `PresentationArea`
+binds the one value to both — the same pair-or-nothing shape `filesSectionHidden()` already had.
+
+**`hideStreams` MOVED in the same change, and that is not drive-by tidying.** It was a `$derived` in
+`+page.svelte`; with `notesHidden` landing beside it the two read as one subject — *which panes this
+room does not have* — split across two files. It is now `RoomGates.streamsHidden`, next to its twin.
+
+**Four pins moved together, which is the point of having four.** The generated schema is not
+hand-maintained: `scripts/extract-manage-schema.mjs` owns `ROOM_CONSUMED` and asserts its own wired
+count (67 → 68), `room-settings-schema.ts` states the total in its header, `verify-room-settings-
+schema.mjs` carries the third copy of the wired set, and `room-config-boundary.test.ts` demands a
+named CONSUMER for every allow-listed setting. Editing the generated file alone fails three of them.
+**Negative control not staged — it happened**: the first run of the controller suite after the
+hand-edit failed 5 tests across those pins, which is the whole mechanism working unprompted.
+
+**One tooling trap recorded at the code:** the boundary test reads `ROOM_CONSUMED` with a
+single-quote regex, so an apostrophe in a comment inside that block swallows the entire list. The
+first version of the new comment said *"The Notes tab's own gate"* and the test reported 52 entries
+of `",\n  "`. The block now carries a NO APOSTROPHES warning; it cost one run to learn.
+
+**Removed from `setting-coverage-contract.test.ts`**, hours after that list was written — 58 → 57,
+and the pin records that it is the first removal. `TODO.md`'s settings section restates its own
+numbers (202/58 → 201/57) rather than keeping a count that a reader would have to re-derive.
+
+**One argued ceiling raise, and it names the debt it borrows against.** `PresentationArea.svelte`
+1115 → 1123 for the two bindings and their comments; `+page.svelte` ratcheted DOWN 1406 → 1395 by the
+`hideStreams` move. The raise is recorded in place with the extraction it defers —
+`MainTabStrip.svelte` out of `PresentationArea.svelte`, 275 lines already covered by
+`main-tab-strip-contract.test.ts`.
+
+**Verified:** room 151 files / 2,287 tests · controller 95 files / 1,006 tests (5 skipped) ·
+`svelte-check` 0 errors 0 warnings in both apps. **Not run:** the Rust suite and the `.db.test.ts`
+suites, for the reasons standing in this file since 2026-08-27 — `mediasoup-sys` fetches libsrtp
+from GitHub and the agent proxy returns 403, and `initdb` refuses to run as root in this container.
+Neither is touched by this change.
+
 ### 2026-08-28 06:10 EDT — The last component with no render cover, and two comments that had gone false
 
 **Runtime impact: NO.** One render test, two corrected comments, two `TODO.md` rows closed.

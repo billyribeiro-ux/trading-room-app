@@ -226,6 +226,15 @@ describe('the allow-list itself', () => {
         two buttons at :8643 and :8652. Neither is a name on a list with nothing behind it.
       */
       hideFiles: 'filesSectionHidden() — hides the Files tab AND the #files pane together',
+      /*
+        Verified in the room before being written here, like its neighbours: `RoomGates.notesHidden`
+        ORs it with viewer-only mode exactly as the reference does
+        (`this.hideNotes = sessData.hideNotes || globals.viewerOnlyMode`, bundle byte 1,955,694), the
+        page passes it at `src/routes/+page.svelte:1217`, and `PresentationArea.svelte` binds it to
+        the Notes TAB and the Notes PANE together — the same pair-or-nothing shape `hideFiles` has,
+        and for the same reason: hiding one of the two leaves a tab that opens onto nothing.
+      */
+      hideNotes: 'RoomGates.notesHidden — hides the Notes tab AND the notes pane together',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

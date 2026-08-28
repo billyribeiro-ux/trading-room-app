@@ -33,6 +33,12 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * Remove a name when the room genuinely reads the setting — which is what wiring it does, and what
  * flips `wired` to `true` in the schema this reads. **Adding one is a conversation**: it means a
  * setting the room used to read no longer is.
+ *
+ * **`hideNotes` was the first removal, hours after the list was written**, and it is the case this
+ * enumeration was built to find: `hideFiles` and `hideStreams` had crossed to the room since
+ * `ROOM_VISIBLE_SETTINGS` was written, applied by the reference the same way, and nobody had noticed
+ * the trio was a pair. An owner who ticked "Hide Notes Section?" got a room that still showed the
+ * tab.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -67,7 +73,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'dontStopRecOnMicMute',
   'hasSpeechRecognitionDisabled',
   'hasTypingIndicator',
-  'hideNotes',
   'isLocked',
   'needPasswordForUserNotes',
   'obsStreamKey',

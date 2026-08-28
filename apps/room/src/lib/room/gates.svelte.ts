@@ -151,6 +151,59 @@ export class RoomGates {
   }
 
   /**
+   * `hideStreams` — the streams tab's own `hidden`, moved here 2026-08-28 to sit with its sibling.
+   *
+   * ```js
+   * this.hideStreams = !this.appService.globals.sessData.useMediaMTX
+   * ```
+   * (`app-presentationarea.full.js:2293`), applied to BOTH the `#streams-tab` `li` (`:5357`) and the
+   * `#streams` pane (`:5388-5391`) — the same value twice, so the tab and its content can never
+   * disagree.
+   *
+   * **Note the NEGATION and the default that falls out of it.** The setting says the feature is ON;
+   * the flag says the tab is HIDDEN. A room with no MediaMTX sends no `useMediaMTX` at all,
+   * `!undefined` is true, and the tab stays hidden — which is right, and is why this is not written
+   * as an `=== false` check.
+   *
+   * It was a `$derived` in the page until `notesHidden` arrived beside it and the two read as one
+   * subject: which main tabs this room does not show. A gate on what a member may see belongs with
+   * the other gates.
+   */
+  get streamsHidden() {
+    return this.#session().sessData?.useMediaMTX !== true;
+  }
+
+  /**
+   * `hideNotes` — "Hide Notes Section?", ORed with viewer-only mode, exactly as the reference does.
+   *
+   * ```js
+   * this.hideNotes = this.appService.globals.sessData.hideNotes || this.appService.globals.viewerOnlyMode
+   * ```
+   * (bundle byte 1955694), applied as `z('hidden', o.hideNotes)` to BOTH the notes `li` (2016630)
+   * and the notes pane (2017506) — the same value twice, so the tab and its content can never
+   * disagree.
+   *
+   * ## Why it is composed HERE and not sent composed
+   *
+   * `ROOM_VISIBLE_SETTINGS` sends the SETTING and not the OR. The room already knows whether it is
+   * in viewer-only mode — it is the `vo` query parameter, read three lines up — so folding it in on
+   * the controller would be the control plane answering a question this side answers better, and it
+   * would make the value sent depend on how the member arrived. The reference composes it in the
+   * room too.
+   *
+   * ## Found by ENUMERATION
+   *
+   * `hideFiles` and `hideStreams` have crossed since `ROOM_VISIBLE_SETTINGS` was written and are
+   * applied the same way; `hideNotes` was not on that list, so an owner who ticked the box got a
+   * room that still showed the tab. Nobody noticed the trio was a pair until
+   * `gate/audit-setting-coverage.mjs` asked the bundle which settings the reference reads that this
+   * room does not.
+   */
+  get notesHidden() {
+    return this.#session().sessData?.hideNotes === true || this.viewerOnlyMode;
+  }
+
+  /**
    * `sessData.individualVolumeControls` — "Individual Volume Controls?", the room setting that
    * reveals the per-presenter slider inside the overlay's `room-sound-options`
    * (`bSe`'s `O(6, …sessData.individualVolumeControls ? 6 : -1)`).

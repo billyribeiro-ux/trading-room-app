@@ -178,6 +178,8 @@
 
     // ── #streams ───────────────────────────────────────────────────────────────
     hideStreams: boolean;
+    /** "Hide Notes Section?" ORed with viewer-only mode — see `RoomGates.notesHidden`. */
+    hideNotes: boolean;
     streamServerMTX: string;
     mtxToken: string;
     selectStreamTabByUser: (streamId: string) => void;
@@ -279,6 +281,7 @@
     volume,
     screenVolume,
     hideStreams,
+    hideNotes,
     streamServerMTX,
     mtxToken,
     selectStreamTabByUser,
@@ -435,7 +438,9 @@
             </div>
           </a>
         </li>
-        <li role="presentation" class="nav-item">
+        <!-- `z('hidden', o.hideNotes)` (byte 2016630), the binding `hideStreams` carries above.
+             HIDDEN, not absent: a setting and a mode, where an entitlement gets `{#if}`. -->
+        <li role="presentation" class="nav-item" hidden={hideNotes}>
           <a
             id="notes-tab"
             class={['nav-link presAreaTabs-notes', { active: mainTab === 'notes' }]}
@@ -892,11 +897,14 @@
             </div>
           {/if}
         </div>
+        <!-- The PANE takes the same `hidden` as its tab (byte 2017506). Both, or a hidden tab
+             whose pane is still active leaves notes on screen nobody can navigate away from. -->
         <div
           id="notes"
           class={mainTab === 'notes' ? 'tab-pane active show' : 'tab-pane'}
           role="tabpanel"
           aria-labelledby="notes-tab"
+          hidden={hideNotes}
         >
           {#if noteGates.surfaceVisible}
             <NotesPane

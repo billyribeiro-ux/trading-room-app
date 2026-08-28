@@ -337,6 +337,35 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hideChatAlerts',
   /*
+    "Hide Notes Section?" — the THIRD of a trio whose other two have been on this list since it was
+    written, and the one that was missed.
+
+    `hideFiles` and `hideStreams` both cross, and both are applied by the reference the same way: a
+    `hidden` binding on the tab's `li` AND on the pane, so the tab and its content can never
+    disagree. `hideNotes` is applied identically —
+
+      this.hideNotes = sessData.hideNotes || globals.viewerOnlyMode          byte 1955694
+      z('hidden', o.hideNotes)   on the notes `li`                          byte 2016630
+      ('hidden', o.hideNotes)    on the notes pane                          byte 2017506
+
+    — and it was not on this list, so an owner who ticked "Hide Notes Section?" on the Manage page
+    got a room that still rendered the Notes tab. Configurable and inert, which is the specific
+    defect this file's neighbours call dead scaffolding.
+
+    FOUND BY ENUMERATION, not by looking: `gate/audit-setting-coverage.mjs` asks the pinned bundle
+    which settings the reference reads in its own browser that this room does not, and `hideNotes`
+    came back on that list beside 57 others. Nobody had noticed the trio was a pair.
+
+    Not a credential, and not a policy the room could infer: a per-room preference an owner ticks,
+    and the room is where the tab is drawn.
+
+    **The `|| viewerOnlyMode` half is NOT sent**, and that is deliberate rather than an omission: the
+    room already knows whether it is in viewer-only mode, so ORing it here would be the control plane
+    answering a question the room answers better. The room composes the two, exactly as it already
+    does for the reference's `hideFiles || videoOnlyMode`.
+  */
+  'hideNotes',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FIFTY-FOUR by the room application
+  Eleven consumed by this repository's room-login page, FIFTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 67.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 68.
+
+  54 -> 55 on 2026-08-28: hideNotes, the Notes tab's gate. Its two siblings `hideFiles` and
+  `hideRecs` crossed on 2026-08-14 and this one did not; the settings enumeration found it, not a
+  feature. See the note at the foot of the generator.
 
   53 -> 54 on 2026-08-15: recordingReminder, the POLICY half of the reminder banner. The name is
   shared upstream by a room setting and a local runtime flag, and the gate at bundle byte 2,477,770
@@ -140,6 +144,7 @@ const EXPECTED_WIRED_SETTINGS = [
   'hideChatLog',
   'hideFiles',
   'hideMobileCredentials',
+  'hideNotes',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

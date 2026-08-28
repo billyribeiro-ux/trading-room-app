@@ -167,6 +167,14 @@ export interface RoomSessionSettings {
    */
   hideChatAlerts?: boolean;
   /**
+   * "Hide Notes Section?" — the room-wide half of the notes tab's `hidden` binding.
+   *
+   * The THIRD of the trio with `hideFiles` and `hideStreams`, and the one that was missing from
+   * `ROOM_VISIBLE_SETTINGS` until 2026-08-28. Composed with viewer-only mode by `RoomGates.notesHidden`,
+   * which is where the reference composes it too (bundle byte 1955694).
+   */
+  hideNotes?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

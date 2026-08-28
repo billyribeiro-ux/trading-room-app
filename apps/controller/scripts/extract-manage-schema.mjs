@@ -158,6 +158,11 @@ const ROOM_CONSUMED = [
   'hideChatLog',
   'hideFiles',
   'hideMobileCredentials',
+  /* The gate on the Notes tab. Added 2026-08-28 — the note at the foot of this file says why it
+     arrived two weeks after its two siblings, `hideFiles` and `hideRecs`, which crossed together.
+     NO APOSTROPHES IN THIS BLOCK: `room-config-boundary.test.ts` reads these names with a
+     single-quote regex, so one in prose swallows the list. It cost a run to learn. */
+  'hideNotes',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -701,9 +706,17 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // truthy, so a room that configures no list has no entry point and no modal, and the room cannot
 // decide that for itself.
 //
+// 68 since 2026-08-28: `hideNotes` joined ROOM_CONSUMED, and it is the first entry added by the
+// SETTINGS ENUMERATION (`apps/room/gate/audit-setting-coverage.mjs`) rather than by somebody
+// building a feature and noticing a flag it needed. That is the whole reason the enumeration was
+// written: `hideFiles` and `hideRecs` crossed on 2026-08-14 with the panes they gate, `hideNotes`
+// did not, and nothing anywhere could see the omission — the Notes tab has always been built, so no
+// feature work would ever have reached this flag. An owner who ticked *"Hide Notes Section?"* got a
+// room that still showed the tab, silently, for two weeks.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 67 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 68 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

@@ -329,7 +329,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines than the proxied declarations took. Not a saving worth chasing - recorded because a
       ceiling that moves for a reason nobody wrote down is the thing this file exists to prevent.
     */
-    max: 1406,
+    max: 1395,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -786,7 +786,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       alternative on offer was an extraction invented to satisfy a number, which is the thing
       this file exists to prevent.
     */
-    max: 1115,
+    /*
+      1115 -> 1123, 2026-08-28. The rule above says a raise is a conversation; this is the fourth and
+      last exception this file records, and unlike the other three it names its own undoing.
+
+      WHAT THE EIGHT LINES ARE: the `hideNotes` prop, and the two `hidden` bindings the reference
+      applies — one on the notes `li` (bundle byte 2016630) and one on the notes pane (2017506) —
+      with the citation for each. `hideFiles` and `hideStreams` have carried exactly this shape here
+      since the component was written; `hideNotes` was the third of that trio and had no gate at all,
+      so an owner who ticked "Hide Notes Section?" got a room that still showed the tab.
+
+      THE PAIR IS SMALLER. `routes/+page.svelte` drops 1406 -> 1395 in the same commit, because
+      `hideStreams` moved out of it and into `RoomGates` to sit beside the `notesHidden` this change
+      added. Two tab-hiding gates in two places was the thing worth fixing.
+
+      THE FOLLOW-UP THIS RAISE IS BORROWING AGAINST, named so it is a debt and not a shrug: the
+      `<ul id="mainTabs">` strip is 275 lines of this file and is already covered end to end by
+      `main-tab-strip-contract.test.ts` — a contract test named after a component that does not exist
+      yet. Extracting `MainTabStrip.svelte` is a focused change with a safety net already in place,
+      and it takes this ceiling far below where it started. It was not bundled here because a
+      275-line extraction riding along with a settings fix is two changes wearing one diff.
+    */
+    max: 1123,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {

@@ -153,18 +153,6 @@
    * rather than being left behind as a comment about something that is no longer in this file.
    */
 
-  /*
-    `this.hideStreams = !this.appService.globals.sessData.useMediaMTX`
-    (`app-presentationarea.full.js:2293`), applied to BOTH the `#streams-tab` `li` (`:5357`) and the
-    `#streams` pane (`:5388-5391`) — the same value, twice, so the tab and its content can never
-    disagree.
-
-    Note the NEGATION and the default that falls out of it. The setting says the feature is ON; the
-    flag says the tab is HIDDEN. A room with no MediaMTX sends no `useMediaMTX` at all, `!undefined`
-    is true, and the tab stays hidden — which is right, and is why this is not written as an
-    `=== false` check.
-  */
-  const hideStreams = $derived(!data.sessData.useMediaMTX);
 
   /*
     The playback credential, from `/internal/stream-read/{code}` at load time.
@@ -1225,7 +1213,8 @@
               videoDisabled={prefs.videoDisabled}
               volume={roomVolume.volume}
               {screenVolume}
-              {hideStreams}
+              hideStreams={gates.streamsHidden}
+              hideNotes={gates.notesHidden}
               {streamServerMTX}
               {mtxToken}
               selectStreamTabByUser={(streamId) => mtx.selectByUser(streamId)}
