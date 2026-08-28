@@ -535,23 +535,19 @@
   // it does not survive a reload.
 
   /*
-    Four gates `RoomMessage.svelte` has implemented since it was written and never received.
+    FIVE gates `RoomMessage.svelte` implemented and never received, and each was a prop the page did
+    not pass. Four of them defaulted to false, so public reply, reactions and both edit entries were
+    unreachable in every room however the owner configured it; `hasQaOnAlerts` defaulted to TRUE, so
+    the ask-a-question button appeared in every room whether or not one had bought Q&A. Every
+    occurrence of all five in the bundle is `sessData.` dotted onto the name, so they are per-room
+    policy and absent means off. Edit is TWO settings because upstream gates the chat log and the
+    alerts log apart, and collapsing them would let a room that allows editing alerts allow chat.
 
-    Each was a prop defaulting false that this page did not pass, so public reply, reactions and
-    both edit entries were unreachable in every room however the owner configured it. Every
-    occurrence of all four in the reference bundle is `sessData.` dotted onto the name, so they
-    are per-room policy and absent means off rather than "decide locally".
-
-    Edit is TWO settings because upstream gates the chat log and the alerts log apart, and
-    `sourceMessageBehavior` already picks between them on `kind`. Collapsing them would let a
-    room that allows editing alerts also allow editing chat.
+    They are read INLINE below rather than through a `$derived` each: a `const` whose only reader is
+    one field is a name for nothing, and five signals inside an object that is already `$derived`
+    recompute independently to feed one that recomputes anyway. `room-message-chrome.ts` says why the
+    seventeen travel together at all.
   */
-  const usersPublicReply = $derived(data.sessData?.usersPublicReply === true);
-  const enableReactions = $derived(data.sessData?.enableReactions === true);
-  const enableEditMessage = $derived(data.sessData?.enableEditMessage === true);
-  const enableEditAlerts = $derived(data.sessData?.enableEditAlerts === true);
-
-  /** The sixteen props every message in this room shares. `room-message-chrome.ts` says why. */
   const messageChrome: RoomMessageChrome = $derived({
     currentUserId: data.user.id,
     currentUserEmailHash: data.user.emailHash,
@@ -566,10 +562,11 @@
     showBadgesToPresentersOnly,
     disableStarYears,
     presenterMessagesOnTheRight: gates.presenterMessagesOnTheRight,
-    usersPublicReply,
-    enableReactions,
-    enableEditMessage,
-    enableEditAlerts
+    usersPublicReply: data.sessData?.usersPublicReply === true,
+    enableReactions: data.sessData?.enableReactions === true,
+    hasQaOnAlerts: data.sessData?.hasQAOnAlerts === true,
+    enableEditMessage: data.sessData?.enableEditMessage === true,
+    enableEditAlerts: data.sessData?.enableEditAlerts === true
   });
 
   /**

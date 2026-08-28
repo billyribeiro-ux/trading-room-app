@@ -337,7 +337,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       only, and inside the script block, so the pixel-diff reason this file is unformatted does not
       apply: no text node moved.
     */
-    max: 1390,
+    /*
+      1390 -> 1387 on 2026-08-28. `hasQaOnAlerts` arrived on the message chrome (+2) and five
+      single-use `$derived` consts went inline in the object that reads them (-5): each was a name
+      whose only reader was one field below it, and each was its own signal inside an object that is
+      already `$derived`, recomputing independently to feed one that recomputes anyway. The two
+      docblocks that explained those five separately are now one, because they were one subject.
+    */
+    max: 1387,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {

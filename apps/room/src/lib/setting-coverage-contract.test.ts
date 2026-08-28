@@ -94,7 +94,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'copyTrades',
   'enableDiscord',
   'hasAlertScheduler',
-  'hasQAOnAlerts',
   'name',
   'playChatMessageSoundFor',
   'tipMeBtnUrl',

@@ -436,6 +436,22 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'chatDisabledForTrials',
   /*
+    "Q&A on alerts?" — the entitlement behind the ask-a-question button on every alert.
+
+      O(1, !e.isQAMsg && sessData.hasQAOnAlerts ? 1 : -1)          byte 1,339,784
+      if ("alerts" != this.logType || !sessData.hasQAOnAlerts) return;   byte 1,408,769
+
+    `RoomMessage.svelte` has drawn that button since it was written, gated on a prop that
+    **defaulted to `true` and was never passed** — so the affordance appeared on every alert in every
+    room, bought or not, and pressing it opened the Q&A modal. An entitlement that defaults open is
+    not an entitlement; this list is what closes it.
+
+    The second reader has no counterpart here and that is recorded rather than approximated: the
+    reference re-checks the flag inside `updateAlertMsg`, and this room has no such receiver — the
+    Q&A counters arrive through the feed and the `unreadQa` set.
+  */
+  'hasQAOnAlerts',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

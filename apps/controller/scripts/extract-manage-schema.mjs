@@ -178,6 +178,9 @@ const ROOM_CONSUMED = [
   /* The third reason the composer is off. Added 2026-08-28: the room had the chat mode and the
      viewer mute and no owner policy, so trials could chat in a room that had turned that off. */
   'chatDisabledForTrials',
+  /* The Q and A entitlement on alerts, added 2026-08-28. The button was drawn on every alert in
+     every room, gated on a prop that defaulted to true and was never passed. */
+  'hasQAOnAlerts',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -744,9 +747,14 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // 73 since 2026-08-28: `chatDisabledForTrials`, the third of three reasons the reference turns the
 // chat composer off. This room had the other two. Fourth find of the settings enumeration.
 //
+// 74 since 2026-08-28: `hasQAOnAlerts`. The ask-a-question button on every alert was gated on a
+// component prop defaulting to TRUE that nothing passed, so the entitlement defaulted open. Fifth
+// find of the settings enumeration, and the second of the same shape as `dontShowRecInfoToUsers`:
+// the surface was built, and the value never reached it.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 73 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 74 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

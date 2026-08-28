@@ -209,6 +209,15 @@ export interface RoomSessionSettings {
    */
   chatDisabledForTrials?: boolean;
   /**
+   * "Q&A on alerts?" — the entitlement behind the ask-a-question button on an alert.
+   *
+   * `O(1, !isQAMsg && sessData.hasQAOnAlerts ? 1 : -1)` at bundle byte 1,339,784, which is
+   * `RoomMessage.svelte:774` here. That button has been drawn since the component was written,
+   * gated on a prop that **defaulted to `true` and was never passed**, so it appeared on every alert
+   * in every room whether or not the owner had bought Q&A.
+   */
+  hasQAOnAlerts?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

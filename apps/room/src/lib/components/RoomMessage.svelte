@@ -111,7 +111,7 @@
     enableReactions = false,
     enableQaReactions = false,
     isQaMessage = false,
-    hasQaOnAlerts = true,
+    hasQaOnAlerts = false,
     enableEditMessage = false,
     enableEditAlerts = false,
     hideAvatars = false,

@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **196** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **195** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**52 of the 196 are read by the reference's OWN room client**, as `sessData.<name>`.
+**51 of the 195 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Six have already left the list, on the day it was written.** It opened at 202 unwired and 58
-questions; both numbers have moved four times since.
+**Seven have already left the list, on the day it was written.** It opened at 202 unwired and 58
+questions; both numbers have moved five times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -247,14 +247,22 @@ classes of answer are not work at all:
   classes throughout the bundle. Its one real read — `globals.sessionName = r.name`, feeding
   `document.title` — is a real gap; the number is not evidence of anything.
 
-One of the WIRE rows — `chatDisabledForTrials` — landed the same day; the remainder split into **14 WIRE** (the surface exists here and is missing a term), **17 FEATURE**
-and **6 BLOCKED**, each with its byte offset and its size in the triage document.
+Two of the WIRE rows — `chatDisabledForTrials` and `hasQAOnAlerts` — landed the same day, and one
+row was CORRECTED out of WIRE into FEATURE by reading it properly rather than by re-reading the
+first pass: `enableQAReactions` gates reactions on the entries of the Q&A THREAD (`isQAMsg` is the
+modal's own flag, not a property of a message), and that thread's menu is inert here, so wiring the
+flag would light a control that cannot act. The remainder split into **12 WIRE** (the surface exists
+here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
+size in the triage document.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 52 by NAME and asserts separately that the five
+`src/lib/setting-coverage-contract.test.ts` pins the 51 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
-The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10),
-`positionsIframe` (7), `altChatRender` (6) and `smallerImagePreview` (6).
+The largest by read count are `deleteAlertPW` (12, a credential), `enableQAReactions` (10, a
+feature), `positionsIframe` (7), `altChatRender` (6) and `smallerImagePreview` (6, answered as NOT A
+GAP). **Read count is not priority** — it is how many times the reference mentions a name, and the
+two biggest numbers on this list are respectively a credential we refuse and a defect we decline to
+reproduce.
 
 ---
 

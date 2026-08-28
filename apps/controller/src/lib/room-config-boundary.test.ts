@@ -261,6 +261,14 @@ describe('the allow-list itself', () => {
         the other two and no term for the owner policy.
       */
       chatDisabledForTrials: 'chatComposerAvailable() — the third reason the composer is off',
+      /*
+        Verified in the room before being written here: `RoomMessage.svelte:774` gates the
+        ask-a-question button on `!isQaMessage && hasQaOnAlerts`, and that prop now arrives on
+        `RoomMessageChrome` — ONE derivation on the page, spread into the three call sites that
+        render a message. Its default also changed from `true` to `false` in the same commit: an
+        entitlement whose prop defaults open is not an entitlement.
+      */
+      hasQAOnAlerts: 'RoomMessage — the ask-a-question button on an alert, through RoomMessageChrome',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

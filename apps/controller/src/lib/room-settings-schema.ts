@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 73 of 269 are wired today.
+// nothing in the room reads it yet. 74 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -124,7 +124,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "userToPresenterPM", section: "settings", type: "checkbox", label: "User PM presenters?", help: "If enabled, users can Private msg presenters", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "playChatMessageSoundFor", section: "settings", type: "textarea", label: "Chat Message Sound For Emails:", help: "Coma separated list of emails to play sound on the new chat message", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "alertsChatOnBottom", section: "settings", type: "checkbox", label: "Alerts/Chat on bottom?", help: "If enabled, the alerts and chat will be bellow the screenshare area", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "hasQAOnAlerts", section: "settings", type: "checkbox", label: "Q&A on Alerts?", help: "If enabled, users can ask questions on Alerts and have a disscussion in context", helpShape: "muted", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasQAOnAlerts", section: "settings", type: "checkbox", label: "Q&A on Alerts?", help: "If enabled, users can ask questions on Alerts and have a disscussion in context", helpShape: "muted", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "alertsOverlayOnScreenshare", section: "settings", type: "checkbox", label: "Alerts over screenshare?", help: "If enabled, alerts will appear over the screenshare in recordings", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "copyTrades", section: "settings", type: "checkbox", label: "Copy Trades?", help: "If enabled, users can copy trades by clicking on them", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "disableCopy", section: "settings", type: "checkbox", label: "Disable Copy?", help: "If enabled, it will disable right-click to prevent selecting and copying all text", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },

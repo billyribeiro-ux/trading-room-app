@@ -33,6 +33,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 02:30 UTC — An entitlement that defaulted OPEN, a triage row that was wrong, and a gate that recommended corrupting itself
+
+**Runtime impact: YES.** The ask-a-question button on an alert now appears only in rooms that have
+bought Q&A on alerts. Until this commit it appeared in every room, and pressing it opened the modal.
+
+**`hasQaOnAlerts` was a prop that defaulted to `true` and nothing passed it.** Its four neighbours on
+`RoomMessage` — `usersPublicReply`, `enableReactions`, `enableEditMessage`, `enableEditAlerts` —
+defaulted `false` and were fixed weeks ago as a group; this one failed the other way and was not in
+that group, so it survived. **A gate that defaults open is not a gate**, and the failure is worse
+than its siblings': a control that does nothing gets reported, and a control that works looks
+correct.
+
+The reference's gate, both terms, at bundle byte 1,339,784:
+`O(1, !e.isQAMsg && e.appService.globals.sessData.hasQAOnAlerts ? 1 : -1)`.
+
+**The value travels on `RoomMessageChrome`**, which is the one place three components read a
+message's room settings from — one derivation, one field, three spreads, nothing duplicated. The
+default is `false` now, and that matters rather than being tidiness: `ModalHost`'s Q&A thread renders
+`RoomMessage` WITHOUT the chrome, so the default is exactly what a call site gets when it forgets.
+
+**Its first test silently did not run, and that is recorded at the code.** The assertions went into
+`room-message-render.test.ts`, which is evidence-bound — `gate/evidence-bound-tests.mjs` excludes it
+wherever the capture roots are absent, which is every clone but the author's. They live in
+`qa-entitlement-contract.test.ts` now, reading no capture at all. **Then the room's privacy gate
+refused the file** for carrying the owner's real name, copied from the fixture next door; the
+placeholder is what the refusal named. Two gates caught two different mistakes in one file, in
+sequence, which is what they are for. **Two negative controls seen RED**: restoring the `true`
+default fails the fail-closed case, and deleting the gate fails the positive one.
+
+**One row of the triage document written two hours ago was WRONG, and reading fixed it.**
+`enableQAReactions` was filed as WIRE because `sourceMessageBehavior.react` already implements the
+reference's expression exactly and only the supply looked missing. That skipped a question: what does
+`isQAMsg` mean? Byte 2,334,347 is the Q&A modal's own constructor — `this.isQAMsg = !0, this.logType
+= "alerts"` — so **it means "this row is inside the Q&A thread"**, not "this alert has questions".
+Our thread renders with `kind="chat"` and `onaction={() => {}}`: the menu there is inert. Wiring the
+flag would light a reaction control that cannot act. It is a FEATURE, the correction is written into
+the document as its own section, and the first pass's reasoning is kept so the mistake is legible.
+
+**The message-gates contract was rewritten onto the WIRE rather than re-pointed.** It pinned the
+literal line `const <gate> = $derived(data.sessData?.<gate> === true);` and went red when five
+single-use consts were inlined. The spelling was never the contract: what matters is that the value
+comes off `sessData`, compares `=== true`, and reaches the chrome. It asserts those three now, gates
+are `{prop, setting}` pairs because `hasQAOnAlerts` is spelled differently on the wire than in this
+repository, and `hasQaOnAlerts` gets its own case for the template gate because it is NOT a menu
+entry and pretending it goes through `sourceMessageBehavior` would make the test lie.
+
+**`gate/verify-privacy-boundary.mjs` was recommending an action that would have corrupted its own
+baseline.** It reported 81 baselined findings "gone — run `--update` to shrink the baseline". They
+are not gone: they are inside the thirteen gitignored capture roots that resolve only on the machine
+that took them. Running `--update` from a clone would shrink the baseline to what a clone can see,
+and the next run on the owner's machine would report those 81 as **NEW personal data entering the
+repository** — a gate that fails on untouched captures is a gate that gets switched off. It now
+distinguishes gone-because-redacted from gone-because-absent and refuses to recommend `--update` in
+the second case, reusing `missingEvidenceRoots()` rather than keeping a second copy of the list.
+
+**Ratchet DOWN again, 1390 → 1387.** `hasQaOnAlerts` added two lines to `+page.svelte` and five
+single-use `$derived` consts went inline in the object that was their only reader — each was a name
+for nothing, and each was its own signal inside an object that is already `$derived`, recomputing
+independently to feed one that recomputes anyway. Two docblocks explaining those five separately
+became one, because they were one subject.
+
+**Verified:** room 153 files / 2,322 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` regenerates and byte-compares at 74 wired · documented totals verified ·
+`svelte-check` 0/0 in both apps · eslint and prettier clean.
+
 ### 2026-08-28 02:20 UTC — A room that turned chat off for trials served every trial a working composer
 
 **Runtime impact: YES.** *"Chat disabled for trials?"* now turns the composer off for free-trial

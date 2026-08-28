@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **52** as this is written; six have been answered by building, and the
+2026-08-28 and is at **51** as this is written; seven have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -92,8 +92,6 @@ Ordered by how much of the work is already done.
 
 | setting | byte | what is missing |
 | --- | --- | --- |
-| `enableQAReactions` | 1,335,445 | Our reaction gate is `enableReactions` alone. The reference's is `enableReactions && logType === 'chat' \|\| enableQAReactions && logType === 'alerts' && isQAMsg` — **an OR, not an AND**. Reactions on Q&A alerts are a separate entitlement, and this room currently offers none. |
-| `hasQAOnAlerts` | 1,339,784 | Gates the "ask a question" affordance on a non-Q&A alert, and gates `updateAlertMsg`'s whole Q&A branch at byte 1,408,769. We have Q&A alerts; we do not have the entitlement that turns them on. |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
 | `hideWebcamForRoom` | 2,489,228 | One term of the navbar webcam control's gate. |
 | `alwaysShowRoster` | 2,487,433 | Two slots in the sidebar swap on it: `showSidebar && !alwaysShowRoster` versus `showSidebar \|\| alwaysShowRoster`. Also one term of the mobile-app link gate at 2,487,743. |
@@ -109,10 +107,39 @@ Ordered by how much of the work is already done.
 
 ---
 
+## CORRECTED — one row of this document was wrong, and reading fixed it
+
+**`enableQAReactions` was filed as WIRE on the first pass and it is a FEATURE.** The correction is
+recorded rather than quietly swapped, because the reasoning is the useful part.
+
+The first pass read the gate — `enableReactions && logType === 'chat' || enableQAReactions &&
+logType === 'alerts' && isQAMsg` — saw that `sourceMessageBehavior.react` in `message-behavior.ts`
+**already implements it exactly**, and concluded that only the supply was missing. That much is
+true. What it did not do is ask what `isQAMsg` MEANS.
+
+It is not a property of a message. Byte 2,334,347 is the Q&A modal's own constructor —
+`this.isQAMsg = !0, this.logType = "alerts"` — and byte 2,332,907 is that modal rendering its thread
+with `("isQAMsg", o.isQAMsg)("qaMsgID", o.qaMsg._id)`. **`isQAMsg` means "this row is being rendered
+inside the Q&A thread modal"**, and `enableQAReactions` therefore gates reactions on the entries of
+that thread.
+
+This room's Q&A thread does render `RoomMessage` — `ModalHost.svelte:4873` — but it passes
+`kind="chat"` where the reference passes `logType="alerts"`, and `onaction={() => {}}`: **the menu
+in that modal is inert.** Wiring the flag would light a reaction control that cannot act, which is
+the "control whose only effect is changing its own label" this repository forbids by name.
+
+So the work is: give the Q&A thread a real `onaction`, pass `kind="alert"` and `isQaMessage` as the
+reference does, and only then does the entitlement have something to gate. That is a feature, and
+the `kind` change alone moves five entries in and out of that thread's menu — `publicReply`,
+`markAnswered`, `copy`, `openAlertReport` and `edit` all branch on it.
+
+---
+
 ## FEATURE — genuinely unbuilt
 
 | setting | byte | size |
 | --- | --- | --- |
+| `enableQAReactions` | 1,335,445 | Reactions on the entries of the Q&A thread. See CORRECTED above — the rule is already written in `message-behavior.ts`; what is missing is a Q&A thread whose menu acts at all. |
 | `hasTypingIndicator` | 1,437,143 | A whole feature: `refreshTypingStatus`, `updateLastTypedTime`, a 5,000 ms `typingDelayMillis` debounce, `usersTyping` / `usersTypingCnt`, a wire round trip, and the display slot `O(22, showTyping && usersTypingCnt > 0 ? 22 : -1)`. Two copies upstream, main and extra column. |
 | `usersCanDeleteOwnMsgs` | 1,158,826 | `canDeleteOwnMessage(msg)` — own email hash or own uid, gated on the setting. Needs the `userDeleteChatMsg` command, which is on the command list as absent. |
 | `copyTrades` | 1,414,899 | Rewrites `[{( … )}]` inside an alert body into a `span.tradeColor` with a generated id, and swaps the whole message component (byte 1,419,422 picks between two templates on it). |
@@ -147,7 +174,7 @@ Ordered by how much of the work is already done.
 
 ---
 
-## The six already answered
+## The seven already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -157,3 +184,4 @@ Ordered by how much of the work is already done.
 | `alertsChatOnBottom` | WIRED — same module. | 2026-08-28 |
 | `dontShowRecInfoToUsers` | CORRECTED — the gate existed and read a viewer preference nothing writes. | 2026-08-28 |
 | `chatDisabledForTrials` | WIRED — `chatComposerAvailable` now holds all three reasons the composer is off. | 2026-08-28 |
+| `hasQAOnAlerts` | WIRED — the ask-a-question button was gated on a prop defaulting to `true` that nothing passed. | 2026-08-28 |

@@ -67,6 +67,16 @@ export type RoomMessageChrome = {
   readonly presenterMessagesOnTheRight: boolean;
   readonly usersPublicReply: boolean;
   readonly enableReactions: boolean;
+  /**
+   * "Q&A on alerts?" — whether an alert carries the ask-a-question button at all.
+   *
+   * On the CHROME rather than passed per call site, for the reason this whole type exists: three
+   * components render a message, and a room setting handed to each of them separately is a room
+   * setting one of them will stop being handed. `RoomMessage` declares it with a `false` default
+   * now; before 2026-08-28 it defaulted to `true` and nothing passed it, which is how an
+   * entitlement ended up on in every room.
+   */
+  readonly hasQaOnAlerts: boolean;
   readonly enableEditMessage: boolean;
   readonly enableEditAlerts: boolean;
 };
