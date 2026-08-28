@@ -200,6 +200,9 @@ const ROOM_CONSUMED = [
      that renders the two button names it chooses between is NOT in the capture. See
      `room-config.ts` for what the held evidence does and does not decide. */
   'simplifiedEditor',
+  /* The moderation read behind the user-info modal, added 2026-08-28. It crosses so the SERVER can
+     refuse; see `room-config.ts`. */
+  'enablePrivateMessageHistory',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -787,13 +790,17 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 84 since 2026-08-28: `enablePrivateMessageHistory`. The fifteenth find, and the only one so far
+// that widens what a presenter may READ rather than what the room DRAWS - so it is checked on the
+// server, from the control plane, before a row is selected.
+//
 // 83 since 2026-08-28: `simplifiedEditor`. The fourteenth find, and the first whose downstream
 // vendor is absent from the capture — so the room reproduces the DECISION (foreground-only colour)
 // and records that the reference's exact markup for it is unevidenced.
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 83 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 84 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

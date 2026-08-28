@@ -574,6 +574,14 @@
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}
   targetUser={userActions.target}
+  privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
+  onShowPrivateMessages={(user) => {
+    modals.open('all-private');
+    void privateChat.showPeerHistory(user.id);
+  }}
+  peerHistory={privateChat.peerHistory}
+  peerHistoryLoading={privateChat.peerHistoryLoading}
+  peerHistoryError={privateChat.peerHistoryError}
   mutedUsers={userActions.mutedUsers}
   followedUsers={userActions.followedUsers}
   targetMessage={messageActions.selected}

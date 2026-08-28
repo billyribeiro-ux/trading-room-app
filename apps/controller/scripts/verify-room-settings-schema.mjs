@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY-ONE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 83.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 84.
+
+  70 -> 71 on 2026-08-28: enablePrivateMessageHistory. The first setting to cross that widens a READ
+  rather than a rendering — a presenter sees one member's private conversations with everybody — so
+  the room checks it on the SERVER, from the control plane, before selecting a row.
 
   69 -> 70 on 2026-08-28: simplifiedEditor, which picks one of two Summernote toolbar button names
   for the note editor's colour control. The FIRST setting to cross whose downstream vendor is not in
@@ -192,6 +196,8 @@ const EXPECTED_WIRED_SETTINGS = [
   /* Added 2026-08-28: the note editor colour button. NO APOSTROPHES IN THIS BLOCK - the parser that
      reads this list is a single-quote regex, and one closes the string. */
   'simplifiedEditor',
+  /* Added 2026-08-28: the moderation read behind the user-info modal. */
+  'enablePrivateMessageHistory',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

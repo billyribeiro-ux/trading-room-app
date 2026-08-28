@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 83 of 269 are wired today.
+// nothing in the room reads it yet. 84 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -108,7 +108,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "rosterCountVisibleToViewers", section: "settings", type: "checkbox", label: "Show Roster Count?", help: "If enabled, the roster count will still be visible to users, even if the roster is not", helpShape: "muted", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "simUserCount", section: "settings", type: "number", label: "Simulated Count?", help: "A number from 0 to 5000. You can add \"simulated users\" to the total user count shown in the room. the roster list will be hidden if you enable this feature", helpShape: "muted", helpOutside: false, captured: 0, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "userPM", section: "settings", type: "checkbox", label: "User PMs?", help: "If enabled, users can Private msg each other", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "enablePrivateMessageHistory", section: "settings", type: "checkbox", label: "Enable Private Message History?", help: "If enabled, can load users private message history", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "enablePrivateMessageHistory", section: "settings", type: "checkbox", label: "Enable Private Message History?", help: "If enabled, can load users private message history", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "dingOnNewMessage", section: "settings", type: "checkbox", label: "Sound alert when a new message is posted?", help: "If enabled, it will play a sound when a new message is posted", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "beepOnUserJoin", section: "settings", type: "checkbox", label: "Sound when the user joins/leaves?", help: "If enabled, moderators will hear a sound when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "userJoinAndLeavePopup", section: "settings", type: "checkbox", label: "Popup alert when the user joins/leaves?", help: "If enabled, moderators will get a popup when users join/leave", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },

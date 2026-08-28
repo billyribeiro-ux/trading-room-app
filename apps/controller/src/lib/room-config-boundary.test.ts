@@ -313,6 +313,13 @@ describe('the allow-list itself', () => {
       */
       simplifiedEditor:
         'resolveNoteSurfaceGates — foreground-only colour on the NoteEditor toolbar',
+      /*
+        Verified in the room before being written here, and the consumer named is the SERVER one on
+        purpose: `loadPeerPrivateMessageHistory` refuses before it selects a row. The button in the
+        user-info modal reads the same setting, but a markup gate is not what stops a direct call.
+      */
+      enablePrivateMessageHistory:
+        'loadPeerPrivateMessageHistory — refuses the getAllUserPM read unless the room enabled it',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

@@ -2,14 +2,21 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import {
+  isPresenterRole,
+  presenterRoom,
+  requireRoomShortCode,
+  requireUser
+} from '#lib/server/auth.js';
 import { MAX_CHAT_LOG_PAGE } from '#lib/server/chat-log.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
 import { refuseIfChatMuted } from '#lib/server/chat-mute.js';
+import { readRoomConfig } from '#lib/server/room-config-client.js';
 import {
   deleteThread,
   insertPrivateMessage,
+  loadPeerHistory,
   loadThread,
   searchThread
 } from '#lib/server/private-chat.js';
@@ -218,5 +225,60 @@ export const deletePrivateChatLog = command(
       channel: 'privChat',
       data: { toUserId: peer, fromUserId: user.id }
     });
+  }
+);
+
+/**
+ * `getAllUserPM {peerID}` — a member's whole private history in this room, for a MODERATOR.
+ *
+ * The reference reaches this from a button in the user-info modal, gated on
+ * `sessData.enablePrivateMessageHistory` (slot 102, bundle byte 2,068,640), whose click is
+ * `showPrivateMessages()` → `guiEventBus.emit("doUserPMModal", {peerID, nick})` → the modal's
+ * `loadLogs()` → `invokeAdminCmd("getAllUserPM", {peerID})` (2,417,900).
+ *
+ * ## Both gates are decided HERE, and neither is taken from the client
+ *
+ * **The role.** `presenterRoom()` — the 2026-08-07 escalation rule. The reference calls this through
+ * `invokeAdminCmd`, so the authority is the server's upstream too; what would be new is trusting the
+ * caller for it.
+ *
+ * **The entitlement.** `enablePrivateMessageHistory` is a ROOM SETTING and is therefore read from
+ * the control plane, not from the request and not from the page's copy of `sessData`. A room that
+ * has not bought private-message history does not hand one out because a presenter posted to the
+ * endpoint directly. The markup gate is a convenience for the person clicking; this is the gate.
+ *
+ * `=== true`, fail-closed, like every other read of that setting: absent means off.
+ *
+ * ## This is the widest read in the module and it is deliberate
+ *
+ * A presenter sees the peer's conversations with EVERYBODY, not their own thread with the peer.
+ * That is what the reference's button does and what the setting is named for; it is stated plainly
+ * here so that nobody later reads `loadPeerHistory` as a thread read and widens something else to
+ * match. The bound (`MAX_PEER_HISTORY`, newest kept) and the reason for it are at that function.
+ */
+export const loadPeerPrivateMessageHistory = command(
+  z.strictObject({ peerId }),
+  async ({ peerId: peer }) => {
+    ensureDatabase();
+
+    const room = presenterRoom();
+    const { locals } = getRequestEvent();
+    const user = requireUser(locals);
+
+    const config = await readRoomConfig(locals, room, user.email);
+    if (config.settings?.enablePrivateMessageHistory !== true) {
+      error(403, 'Private message history is not enabled for this room.');
+    }
+
+    const peerRow = db.select().from(users).where(eq(users.id, peer)).get();
+    if (!peerRow) error(404, 'No such user.');
+
+    const { messages, truncated } = loadPeerHistory(room, peer);
+    /*
+      The nick travels back with the answer rather than being taken from the request: the modal's
+      header shows it (`userData.nick`, template `OMe`), and a caller that supplied its own would be
+      choosing what label a moderator sees over somebody else's private messages.
+    */
+    return { nick: peerRow.displayName, messages, truncated };
   }
 );

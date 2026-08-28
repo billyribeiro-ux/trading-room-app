@@ -1,5 +1,7 @@
 import { isHttpError } from '@sveltejs/kit';
 
+import { formatCompactTime } from '#lib/compact-message-time.js';
+
 import {
   canShowRosterPrivateChat,
   resolveRosterPrivateChatStart
@@ -68,7 +70,24 @@ export interface PrivateChatCommands {
   }) => Promise<PrivateChatMessage[]>;
   send: (payload: { peerId: number; body: string }) => Promise<unknown>;
   deleteLog: (payload: { peerId: number }) => Promise<unknown>;
+  /**
+   * `getAllUserPM {peerID}` - one member's whole private history, for a moderator.
+   *
+   * NOT `loadLog`. That one is scoped to the thread the caller is a party to; this one spans every
+   * conversation the peer had. Two commands on the wire upstream, two here, and deliberately not
+   * one with a flag - a flag is how the narrow read gets widened by a caller that passes `true`.
+   */
+  loadPeerHistory: (payload: {
+    peerId: number;
+  }) => Promise<{ nick: string; messages: PrivateChatMessage[]; truncated: boolean }>;
 }
+
+/** What the all-user private-message modal is showing, or why it is not. */
+export type PeerHistory = {
+  readonly nick: string;
+  readonly messages: readonly PrivateChatMessage[];
+  readonly truncated: boolean;
+};
 
 /** The two preferences the arrival sound reads. */
 export interface PrivateChatPrefs {
@@ -133,6 +152,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   #peerProfiles: PrivateChatTab[];
   #peerId: number | null;
   #draft;
+  #peerHistory: PeerHistory | null;
+  #peerHistoryLoading;
+  #peerHistoryError: string | null;
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -200,6 +222,21 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#peerId = $state<number | null>(null);
 
     this.#draft = $state('');
+
+    /*
+      THE MODERATION READ, and its three fields are separate on purpose.
+
+      `$state.raw` because the answer is REPLACED wholesale on every open and never edited in place -
+      a deep proxy over a list of up to 500 messages would cost on every read and buy nothing.
+
+      Loading and error are their own fields rather than variants of the value, because the modal
+      shows a spinner over the PREVIOUS answer if they are collapsed: `null` would mean both "not
+      asked yet" and "asked again", and a moderator would see the last member's messages under a
+      spinner labelled with the new one.
+    */
+    this.#peerHistory = $state.raw<PeerHistory | null>(null);
+    this.#peerHistoryLoading = $state(false);
+    this.#peerHistoryError = $state<string | null>(null);
   }
 
   get open() {
@@ -337,13 +374,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     if (this.#peerId === peerId) this.scrollToBottom();
   }
 
-  /** `app-st-compactmessage` shows a short local time against each row. */
+  /** Delegates to `formatCompactTime`, which is where that transcription lives now. */
   formatTime(at: number) {
-    return new Date(at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    return formatCompactTime(at);
   }
 
   /** `scrollPCLogToBottom` - the scroller's own handler, which also re-runs after a tick. */
@@ -450,6 +483,54 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   show() {
     if (this.#viewerOnlyMode()) return;
     this.#open = true;
+  }
+
+  get peerHistory(): PeerHistory | null {
+    return this.#peerHistory;
+  }
+
+  get peerHistoryLoading() {
+    return this.#peerHistoryLoading;
+  }
+
+  get peerHistoryError(): string | null {
+    return this.#peerHistoryError;
+  }
+
+  /**
+   * `showPrivateMessages()` - the user-info modal's button, gated on the room setting.
+   *
+   * Upstream this emits `doUserPMModal` on the GUI event bus and a separate component subscribes,
+   * clears, and fetches (bundle bytes 2,087,336 and 2,417,900). There is no bus here and there does
+   * not need to be: the modal and the fetch are both this class's, so the event is a method call.
+   * What IS reproduced is the ORDER - clear first, then load - because the alternative shows the
+   * previous member's private messages under the new member's name while the request is in flight.
+   *
+   * The entitlement is NOT checked here. `loadPeerPrivateMessageHistory` refuses on the server from
+   * the control plane, which is the only check that means anything; the button that calls this is
+   * already gated so a member never sees it, and re-deciding it here would be a third copy of a rule
+   * whose authoritative copy is the one on the server.
+   */
+  async showPeerHistory(peerId: number): Promise<void> {
+    this.#peerHistory = null;
+    this.#peerHistoryError = null;
+    this.#peerHistoryLoading = true;
+    try {
+      const answer = await this.#commands.loadPeerHistory({ peerId });
+      this.#peerHistory = answer;
+    } catch (cause) {
+      /*
+        The server's own message when it has one - `isHttpError` is how every other refusal in this
+        file is surfaced, and the two that can arrive here ("Presenters only." and the room not
+        having the setting) are both worth reading rather than replacing with a generic failure.
+      */
+      this.#peerHistoryError = isHttpError(cause)
+        ? cause.body.message
+        : 'Could not load private messages.';
+    } finally {
+      // `finally`, so a refusal cannot leave the modal spinning forever.
+      this.#peerHistoryLoading = false;
+    }
   }
 
   /**

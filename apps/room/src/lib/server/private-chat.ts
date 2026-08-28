@@ -89,6 +89,71 @@ export function loadThread(
     );
 }
 
+/**
+ * `getAllUserPM {peerID}` - EVERY private message one member sent or received in this room.
+ *
+ * ## What this is, and why it is bounded where the thread reads are not
+ *
+ * The reference reaches this through `invokeAdminCmd("getAllUserPM", {peerID})` (bundle byte
+ * 2,417,900), from a button in the user-info modal gated on `sessData.enablePrivateMessageHistory`.
+ * It is a MODERATION read: a presenter looking at one member sees that member's private
+ * conversations with everybody, not the presenter's own thread with them.
+ *
+ * That makes it the widest read in this module by a distance, and it is the only one with a hard
+ * cap. `loadThread` is bounded because it pages; this one has no page in the reference at all - the
+ * modal asks once and renders the answer. Unbounded, it is a SELECT whose cost grows with every
+ * message a busy member ever sent, executed synchronously on a click. `MAX_PEER_HISTORY` is the
+ * bound, newest first, and the caller is told when the answer was cut so the modal can say so
+ * rather than quietly presenting a truncated history as complete.
+ *
+ * ## The recipient is read from the ROW here, not computed
+ *
+ * `loadThread` computes `recvdID` from the pair because it knows both parties. This read spans many
+ * conversations, so there is no "other party" to infer - `message.recipientId` is the answer and is
+ * used directly. Computing it from the peer would be wrong for exactly the rows that matter: a
+ * message from the peer to a third member would come back addressed to the peer.
+ *
+ * ## Authority is NOT decided here
+ *
+ * This function answers what it is asked. `getPeerPrivateMessageHistory` in
+ * `routes/private-chat.remote.ts` is where the role is checked, on the server, from the session -
+ * see the note there for why the entitlement is checked there too and not only in the markup.
+ */
+export const MAX_PEER_HISTORY = 500;
+
+export function loadPeerHistory(
+  room: string,
+  peerId: number
+): { messages: PrivateChatMessage[]; truncated: boolean } {
+  const rows = db
+    .select({ message: privateMessages, sender: users })
+    .from(privateMessages)
+    .innerJoin(users, eq(users.id, privateMessages.senderId))
+    .where(
+      and(
+        eq(privateMessages.roomShortCode, room),
+        or(eq(privateMessages.senderId, peerId), eq(privateMessages.recipientId, peerId))
+      )
+    )
+    /*
+      Newest first, then reversed - so a member with more than `MAX_PEER_HISTORY` messages loses the
+      OLDEST rather than the newest. A moderator looking at a member is looking at what they did
+      recently; cutting from the other end would answer the question with the least useful half.
+    */
+    .orderBy(desc(privateMessages.createdAt), desc(privateMessages.id))
+    .limit(MAX_PEER_HISTORY + 1)
+    .all();
+
+  const truncated = rows.length > MAX_PEER_HISTORY;
+  return {
+    messages: rows
+      .slice(0, MAX_PEER_HISTORY)
+      .reverse()
+      .map(({ message, sender }) => toMessage(message, sender, message.recipientId)),
+    truncated
+  };
+}
+
 /** `doPCLogSearch` - within one thread, never across every conversation. */
 export function searchThread(
   room: string,

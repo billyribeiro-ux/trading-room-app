@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **42** as this is written; sixteen have been answered by building, and the
+2026-08-28 and is at **41** as this is written; seventeen have been answered by building, and the
 CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -99,12 +99,11 @@ Ordered by how much of the work is already done.
 | setting | byte | what is missing |
 | --- | --- | --- |
 | `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
-| `enablePrivateMessageHistory` | 2,068,615 | One row in the user-info modal. |
 | `recsInRoom` | 2,016,810 | `archivesAvailableTo() && sessData.recsInRoom` gates the Recordings tab AND its pane. **Wire it only with the tab** — see BLOCKED. |
 
 ---
 
-## CORRECTED — one row of this document was wrong, and reading fixed it
+## CORRECTED — two rows of this document were wrong, and reading fixed them
 
 **`enableQAReactions` was filed as WIRE on the first pass and it is a FEATURE.** The correction is
 recorded rather than quietly swapped, because the reasoning is the useful part.
@@ -129,6 +128,38 @@ So the work is: give the Q&A thread a real `onaction`, pass `kind="alert"` and `
 reference does, and only then does the entitlement have something to gate. That is a feature, and
 the `kind` change alone moves five entries in and out of that thread's menu — `publicReply`,
 `markAnswered`, `copy`, `openAlertReport` and `edit` all branch on it.
+
+**`enablePrivateMessageHistory` was filed as WIRE — "One row in the user-info modal" — and it is a
+FEATURE.** Corrected 2026-08-28, and the shape of the mistake is the same as the one above: a gate
+whose SURFACE exists and whose ACTION does not.
+
+The button really is one row, and it really does exist to be gated. What it opens did not. The chain,
+read end to end this time:
+
+```
+O(102, sessData.enablePrivateMessageHistory ? 102 : -1)                         byte 2,068,640
+hTe: <button data-bs-target="#all-user-pm-modal">
+       <i class="icon fas fa-comment"></i> Show private messages </button>
+showPrivateMessages(): guiEventBus.emit("doUserPMModal", {peerID, nick})        byte 2,087,336
+the modal: subscribe -> clearData() -> loadLogs()
+           -> invokeAdminCmd("getAllUserPM", {peerID})                          byte 2,417,900
+```
+
+**`#all-user-pm-modal` in this room was a permanent `Loading...` spinner.** No fetch, no list, no
+empty state — and, measured, nothing in the repository that could open it: `'all-private'` occurred
+exactly twice, as the modal's own `open=` and as a member of the union in `types.ts`.
+`getAllUserPM` was on `feature-coverage-contract.test.ts`'s list of commands absent from our source,
+which is where the first pass should have looked before writing "one row".
+
+**BUILT 2026-08-28**, and it is worth saying what it needed, because that is the size the row should
+have carried: a bounded repository read (`loadPeerHistory`), a remote command that decides BOTH the
+role and the entitlement on the server from the control plane, three fields of modal state, the
+modal's two captured branches plus two the reference does not have (a refusal and a truncation
+notice), and the row markup extracted to `CompactMessageRow.svelte` so it was not transcribed twice.
+
+**It is the widest read in the room.** A presenter sees the member's private conversations with
+everybody, not the thread they share with the presenter — which is what the setting is named for and
+why the entitlement is checked where a client cannot reach it.
 
 ---
 
@@ -171,7 +202,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 
 ---
 
-## The sixteen already answered
+## The seventeen already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -191,6 +222,7 @@ the `kind` change alone moves five entries in and out of that thread's menu — 
 | `name` | WIRED — the document title, `<svelte:head>` on the room page. Two further consumers stay unbuilt and are listed in the last section. | 2026-08-28 |
 | `modMessage` | WIRED — `ModeratorMessage.svelte`, presenter-only, dismissed locally exactly as upstream dismisses it. | 2026-08-28 |
 | `simplifiedEditor` | WIRED — a field of `NoteSurfaceGates`; the note toolbar's colour control becomes foreground-only. The first row whose downstream VENDOR is absent from the capture, so the decision is reproduced and the unevidenced part is named. | 2026-08-28 |
+| `enablePrivateMessageHistory` | BUILT — corrected out of WIRE first: the button was one row, and the modal it opens was a spinner with no fetch. `getAllUserPM` now exists, bounded, and refuses on the server. | 2026-08-28 |
 
 ---
 

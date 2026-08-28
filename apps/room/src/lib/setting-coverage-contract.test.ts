@@ -81,8 +81,10 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  *
  * Rows leave this list by being ANSWERED, and thirteen have: the newest are `name` (the browser tab,
  * `<svelte:head>` in `routes/+page.svelte`), `modMessage` (the presenter-only bar,
- * `lib/components/ModeratorMessage.svelte`) and `simplifiedEditor` (foreground-only colour on the
- * note toolbar, `resolveNoteSurfaceGates`), all on 2026-08-28 and each with its own contract file.
+ * `lib/components/ModeratorMessage.svelte`), `simplifiedEditor` (foreground-only colour on the note
+ * toolbar, `resolveNoteSurfaceGates`) and `enablePrivateMessageHistory` (the moderation read behind
+ * the user-info modal, refused on the SERVER), all on 2026-08-28 and each with its own contract
+ * file.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -119,7 +121,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'advancedSearchAlerts',
   'backupClusterID',
   'banIPList',
-  'enablePrivateMessageHistory',
   'h264Enabled',
   'linkedRoomAlerts',
   'modAdminLoginList',

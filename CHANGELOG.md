@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 10:55 UTC — A triage row that said "one row", and the modal behind it that was a spinner
+
+**Runtime impact: YES.** A room that enables *"Private message history?"* gives presenters a
+**Show private messages** button in the user-info modal, and the modal it opens now actually loads a
+member's private-message history. Before this, the button did not exist and the modal was a
+permanent `Loading...` spinner that nothing could open.
+
+**The finding is the triage row, and it is the second one corrected the same way.**
+`missing-settings-triage.md` filed `enablePrivateMessageHistory` under WIRE — *"One row in the
+user-info modal."* The button is one row. What it opens was not built: `#all-user-pm-modal` had no
+fetch, no list, no empty state, and — measured — nothing in the repository that could open it.
+`'all-private'` occurred **exactly twice**: the modal's own `open=` and the union member in
+`types.ts`. `getAllUserPM` was already on `feature-coverage-contract.test.ts`'s list of commands
+absent from our source, which is where the first pass should have looked before writing "one row".
+
+That is the same shape as `enableQAReactions` this morning: **a gate whose SURFACE exists and whose
+ACTION does not.** Two for two, and it is now the thing to check before filing anything as cheap.
+
+**Both halves of the gate are decided on the SERVER, from data the server owns.** The role through
+`presenterRoom()`, and the entitlement through `readRoomConfig` — not from the request and not from
+the page's copy of `sessData`. This is the widest read in the room: a presenter sees the member's
+private conversations with **everybody**, not the thread they share with the presenter. A room that
+has not enabled it hands out nothing however the endpoint is reached. `!== true`, fail-closed.
+
+**Two bounds the reference does not have, and both are stated in the markup rather than assumed.**
+Upstream asks for everything and gets everything; `loadPeerHistory` caps at `MAX_PEER_HISTORY` and
+asks for one row more than the cap so `truncated` is known without a second COUNT. The modal says so
+— *"Showing the most recent messages only"* — because a moderator must not read a truncated history
+as a complete one. And the refusal branch exists because ours **can** refuse where the reference's
+fetch cannot; rendering a refusal as `No logs.` would tell a presenter the member has no private
+messages, which is a different and worse answer than *you may not read them*.
+
+**The row is now ONE definition, and that is what stopped this being a second transcription.**
+`app-st-compactmessage` is one component upstream rendered by two surfaces. Here it was inline
+markup inside `PrivateChatPanel.svelte`, and the modal needed the same rows — so the choice was a
+second copy or an extraction. `CompactMessageRow.svelte` took the markup and the link split with it,
+and `formatCompactTime` took the clock. **`+page.svelte` fell 1387 → 1366**: the fourteen-line
+`bodySegmentsPrivate` snippet and its two props went with them. Three for three now — every large
+fall on that file has been a decision moving to the thing that owns it, never an extraction invented
+to satisfy a number.
+
+**Nine negative controls seen RED**, each on the assertion that guards it: the role gate, the
+entitlement gate, the read narrowed to a thread, the bound removed, the clear-then-load order
+inverted, the `finally` that stops the spinner, the button's gate, the fail-closed `=== true`, and
+the handler opening the modal without asking for anything.
+
+**Four ceilings raised and two set for the first time.** `ModalHost` 6010 → 6101 is the largest
+single raise this file has taken, and it is a feature arriving rather than a wire — the honest
+measure of how wrong the triage row was. `PrivateChatPanel` was **uncapped** and is capped at 396,
+which is its post-extraction size deliberately, so the twenty-nine lines that just left are not
+licensed back.
+
+**Verified:** room 161 files / 2,455 tests (1 skipped; 49 evidence-bound files excluded on this
+checkout by design) · controller 95 files / 1,006 tests (5 skipped) · `schema:verify` byte-compares
+at **84 wired** · both room gates and the six controller verifiers green · `svelte-check` 0/0 across
+1,286 files · eslint clean · prettier clean on every file this change touches.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+the five `.svelte` files. Recorded rather than glossed.
+
 ### 2026-08-28 10:10 UTC — A setting whose vendor is not in the capture, and what that changes
 
 **Runtime impact: YES.** A room that ticks *"Simplified Note Editor?"* gets a note toolbar whose

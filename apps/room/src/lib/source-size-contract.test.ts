@@ -417,7 +417,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       depends on belongs beside that surface, and a page that lists them is a page that will be
       edited every time the list changes. It paid for the `simplifiedEditor` wire outright.
     */
-    max: 1387,
+    /*
+      1387 -> 1366, 2026-08-28, and TWENTY-ONE lines left in one change without a single one being
+      deleted. `bodySegmentsPrivate` — a fourteen-line snippet splitting a message body on URLs,
+      plus its two props at the `PrivateChatPanel` call site — moved into
+      `CompactMessageRow.svelte`, because a second surface (the all-user private-message modal)
+      renders the same row and the snippet would have had to be threaded through two more components
+      to reach it.
+
+      The pattern is now three for three on this file: every large fall here has been a decision
+      moving to the thing that owns it — `buildMessageChrome`, `resolveNoteSurfaceGates`, and now the
+      row. None was an extraction invented to satisfy a number, and that is why each one stuck.
+    */
+    max: 1366,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -813,7 +825,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       behind it. This component already holds `data`, so the value is read here rather than crossing
       the page — which is why the page paid nothing for this one.
     */
-    max: 778,
+    /*
+      778 -> 786, 2026-08-28, for `enablePrivateMessageHistory`: the entitlement, the open-and-load
+      handler, and the three fields the all-user private-message modal renders.
+
+      HERE and not on the page, which is why the page paid nothing: this file already holds `data`,
+      `modals` and `privateChat`, so the handler is the two calls it actually is rather than a
+      callback threaded down from a component that would have to be handed all three. That is the
+      same reason `stickyNonTradeAlert` and `autoSwitchToOfftopics` cost the page nothing.
+
+      Three fields rather than one object because they are three ANSWERS, not three parts of one:
+      see the note at `RoomPrivateChat.#peerHistory` for why collapsing them shows a moderator the
+      previous member's messages under a spinner labelled with the new one.
+    */
+    max: 786,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
@@ -865,6 +890,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 447,
     why: 'the note tab strip and the three confirmations; everything else passes through'
+  },
+  {
+    file: 'lib/components/PrivateChatPanel.svelte',
+    /*
+      CAPPED 2026-08-28, having been uncapped — the third component found without a ceiling in two
+      days, after `NoteEditor` and `NotesPane`. The hand-kept list is the problem and this entry does
+      not fix it; what it does is stop this file.
+
+      396 and FALLING: it was 425 before the row inside its scroller became
+      `CompactMessageRow.svelte`. The number below is the post-extraction measurement deliberately,
+      so the ceiling starts where the file actually is rather than licensing the twenty-nine lines
+      back.
+
+      If this number climbs, the thing to check is whether the panel has started deciding something.
+      It holds no state of its own beyond the drag/resize attachment: the thread, the tabs, the
+      search and the draft all belong to `RoomPrivateChat`.
+    */
+    max: 396,
+    why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
     file: 'lib/components/RoomShell.svelte',
@@ -1121,7 +1165,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       through a component that exists to carry things through, which is what this file's own note
       calls the cost of `ModalHost` being 85 props wide.
     */
-    max: 6010,
+    /*
+      6010 -> 6101, 2026-08-28, and this is the largest single raise this file has taken. It is a
+      FEATURE arriving, not a wire, and the size is the honest measure of a triage row that was
+      wrong.
+
+      `enablePrivateMessageHistory` was filed in `missing-settings-triage.md` as WIRE — "one row in
+      the user-info modal". It is not. The button is one row; what it opens was a permanent
+      `Loading...` spinner with no fetch behind it, no list, no empty state and nothing that could
+      ever open it. Reading the reference end to end is what found that: `showPrivateMessages()`
+      emits `doUserPMModal`, a separate component subscribes and calls `getAllUserPM`, and NONE of
+      that half existed here.
+
+      WHAT THE NINETY-ONE LINES ARE: the gated button (13, most of it the citation), the modal body
+      as the reference's own two-way switch plus the two branches it does NOT have — a refusal, and
+      a notice when the answer was capped — and the six props carrying the answer in. The ROW is not
+      among them: `CompactMessageRow.svelte` is shared with `PrivateChatPanel`, which is what stopped
+      this from being a second copy of a transcription.
+
+      The extraction this file needs has not changed and is not this: it is the user-info modal
+      itself, which is the largest single surface in here and now has one more reason to leave.
+    */
+    max: 6101,
     why: 'every modal in the room, in one component'
   },
   {
@@ -1672,7 +1737,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/private-chat.svelte.ts',
     /* +3, 2026-08-16: the same `#lib/*.js` import reflow as `files.svelte.ts` above. */
-    max: 524,
+    /*
+      524 -> 605, 2026-08-28, for the moderation read: `getAllUserPM`.
+
+      Three `$state` fields and their accessors, the `showPeerHistory` method, the `PeerHistory`
+      type and the fourth entry on `PrivateChatCommands`. Roughly half is the prose, and it is
+      earning its place: why the answer is `$state.raw`, why loading and error are separate fields
+      rather than variants of the value, why the entitlement is NOT re-checked here, and why this is
+      a second command rather than a flag on `loadLog`.
+
+      That last one is the important sentence in the file. `loadLog` reads a thread the caller is a
+      party to; this reads every conversation one member had. A flag would have made the narrow read
+      widen on a `true`, and the two would have shared a code path that only one of them is allowed
+      to take.
+    */
+    max: 605,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -1933,7 +2012,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1111 -> 1114 for the off-topic seed: `new RoomChat({ … })` went from one line to four when the
       second argument arrived and the formatter reflowed it. Pure wiring, which is what this file is.
     */
-    max: 1114,
+    /*
+      1114 -> 1116, 2026-08-28. Two lines: the import of `loadPeerPrivateMessageHistory` and its
+      entry on the private-chat command bag. This file is the composition root, so a new command on
+      an existing class costs exactly the wiring and nothing else — which is what it is for.
+    */
+    max: 1116,
     why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
   },
   {

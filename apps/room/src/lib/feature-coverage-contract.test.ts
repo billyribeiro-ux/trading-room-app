@@ -49,7 +49,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'demux',
   'doShowMsgToAll',
   'forceStopScreen',
-  'getAllUserPM',
   'getMyRepeater',
   'getMyState',
   'getScheduledAlerts',

@@ -61,6 +61,7 @@ import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mu
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
+  loadPeerPrivateMessageHistory as loadPeerPrivateMessageHistoryCommand,
   loadPrivateChatLog as loadPrivateChatLogCommand,
   sendPrivateMessage as sendPrivateMessageCommand
 } from '../../routes/private-chat.remote';
@@ -567,7 +568,8 @@ export function createRoom(deps: RoomDeps) {
     commands: {
       loadLog: (payload) => loadPrivateChatLogCommand(payload),
       send: (payload) => sendPrivateMessageCommand(payload),
-      deleteLog: (payload) => deletePrivateChatLogCommand(payload)
+      deleteLog: (payload) => deletePrivateChatLogCommand(payload),
+      loadPeerHistory: (payload) => loadPeerPrivateMessageHistoryCommand(payload)
     },
     session: () => data,
     isPresenter: () => isPresenter,

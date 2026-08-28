@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { createRawSnippet, flushSync, mount, unmount } from 'svelte';
+import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
+
+import { formatCompactTime } from '#lib/compact-message-time.js';
 
 import PrivateChatPanel, {
   type PrivateChatRow,
@@ -94,15 +96,6 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
       searching: false,
       searchTerm: '',
       draft: '',
-      /*
-        A stand-in for the page's `bodySegmentsPrivate` snippet. The linkifying rule belongs to the
-        page, which owns the same rule for the chat log; what this component owes is that the body
-        is RENDERED, which the assertion below checks by its text.
-      */
-      body: createRawSnippet((text: () => string) => ({
-        render: () => `<span data-body>${text()}</span>`
-      })),
-      formatTime: (at: number) => `t${at}`,
       onclosepeer: () => (calls.closepeer += 1),
       ondeletethis: () => (calls.deletethis += 1),
       onclose: () => (calls.close += 1),
@@ -183,14 +176,22 @@ describe('the tab strip', () => {
 });
 
 describe('the conversation', () => {
-  it('renders each row through the body snippet', () => {
+  it('renders each row through the shared compact row', () => {
     const { root } = render({
       tabs: [tab({ uid: 1 })],
       currentUserId: 1,
       log: [row({ _id: 'a', txt: 'first' }), row({ _id: 'b', txt: 'second' })]
     });
 
-    const bodies = [...root.querySelectorAll('[data-body]')].map((node) => node.textContent);
+    /*
+      Read off the ROW's own element rather than a stand-in snippet.
+
+      This used to inject a `createRawSnippet` marked `data-body`, because the linkifying rule was a
+      prop the page supplied. It is `CompactMessageRow`'s now — one row, one definition, rendered by
+      both this panel and the all-user modal — so the assertion reads the real markup, which is
+      strictly more than the stand-in proved.
+    */
+    const bodies = [...root.querySelectorAll('.msg-left')].map((node) => node.textContent?.trim());
     expect(bodies).toEqual(['first', 'second']);
   });
 
@@ -206,13 +207,22 @@ describe('the conversation', () => {
     expect(names[1]?.classList.contains('presUser')).toBe(false);
   });
 
-  it('formats the timestamp through the page’s formatter', () => {
+  /*
+    THE SHARED FORMATTER, and the assertion is now against the real one.
+
+    This used to inject `formatTime: (at) => \`t${at}\`` as a prop and check the panel spent it. The
+    formatter is `#lib/compact-message-time.ts` now, because two surfaces need it and neither should
+    have to hold a `RoomPrivateChat` to print a clock. So the test compares against that function
+    rather than against a literal: hard-coding "12:00 AM" would fail on any machine outside UTC and
+    would be asserting the runner's timezone rather than this component's behaviour.
+  */
+  it('prints the timestamp through the shared compact formatter', () => {
     const { root } = render({
       tabs: [tab({ uid: 1 })],
       currentUserId: 1,
       log: [row({ _id: 'a', t: 42 })]
     });
-    expect(root.querySelector('.msg-time')?.textContent).toBe('t42');
+    expect(root.querySelector('.msg-time')?.textContent).toBe(formatCompactTime(42));
   });
 
   it('with a tab strip but nothing selected, still says "No active chat"', () => {

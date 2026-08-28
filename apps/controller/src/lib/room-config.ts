@@ -594,6 +594,26 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'simplifiedEditor',
   /*
+    "Private message history?" - a MODERATION read, and the widest one this room performs.
+
+      O(102, e.appService.globals.sessData.enablePrivateMessageHistory ? 102 : -1)   byte 2,068,640
+      hTe: a button, click showPrivateMessages(), targeting the all-user-pm-modal
+      showPrivateMessages() emits doUserPMModal with peerID and nick               byte 2,087,336
+      the modal then calls invokeAdminCmd getAllUserPM with that peerID            byte 2,417,900
+
+    A presenter reading it sees the members OWN private conversations with everybody, not the thread
+    they share with the presenter. That is what the reference does and what the setting is named for,
+    and it is written out here because a setting that widens a read this far should not be crossed by
+    somebody skimming a list of names.
+
+    IT CROSSES SO THE SERVER CAN REFUSE. `loadPeerPrivateMessageHistory` checks the role AND this
+    setting from the control plane before it reads a row; the markup gate is the convenience for the
+    person clicking. A room that has not enabled it hands out nothing, however the button is reached.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'enablePrivateMessageHistory',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

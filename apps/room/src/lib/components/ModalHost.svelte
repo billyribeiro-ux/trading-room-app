@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
+  import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
@@ -172,6 +174,25 @@
     streamingType: string;
     onManagedUserRemoval: (list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) => void;
     onManagedUserInfo: (user: ManagedChatUser) => void;
+    /**
+     * `sessData.enablePrivateMessageHistory` — whether the user-info modal offers the moderation
+     * read at all.
+     *
+     * A CONVENIENCE, not the authority: `loadPeerPrivateMessageHistory` refuses on the server from
+     * the control plane. Hiding the button stops a presenter asking for something the room has not
+     * enabled; it is not what stops the read.
+     */
+    privateMessageHistoryEnabled: boolean;
+    /** Opens the all-user private-message modal for one peer. */
+    onShowPrivateMessages: (user: ModalTargetUser) => void;
+    /** What that modal is showing, and why it is not. All three owned by `RoomPrivateChat`. */
+    peerHistory: {
+      readonly nick: string;
+      readonly messages: readonly PrivateChatMessage[];
+      readonly truncated: boolean;
+    } | null;
+    peerHistoryLoading: boolean;
+    peerHistoryError: string | null;
     currentUser: {
       id: number;
       email: string;
@@ -336,6 +357,11 @@
     streamingType,
     onManagedUserRemoval,
     onManagedUserInfo,
+    privateMessageHistoryEnabled,
+    onShowPrivateMessages,
+    peerHistory,
+    peerHistoryLoading,
+    peerHistoryError,
     currentUser,
     mobilePin = 'N/A',
     mobileAndroidUrl = null,
@@ -2441,6 +2467,20 @@
                   onclick={() => onUserAction('upload-profile-picture', targetUser)}
                   ><i class="icon fa fa-user-circle"></i> Upload Profile Picture</button
                 >
+                <!--
+                  Slot 102, `O(102, sessData.enablePrivateMessageHistory ? 102 : -1)` at bundle byte
+                  2,068,640, template `hTe` with consts 90 and 91. `{#if}` and not `hidden`: the
+                  reference REMOVES the node, and what it gates is an entitlement rather than a mode,
+                  which is `MainTabStrip`'s rule for choosing between the two.
+                -->
+                {#if privateMessageHistoryEnabled}
+                  <button
+                    type="button"
+                    class="btn btn-block btn-outline-light"
+                    onclick={() => onShowPrivateMessages(targetUser)}
+                    ><i class="icon fas fa-comment"></i> Show private messages</button
+                  >
+                {/if}
               </div>
             </div>
           </div>
@@ -5205,12 +5245,63 @@
     id="all-user-pm-modal"
     open={name === 'all-private'}
     ariaLabelledby="all-user-pm-modal"
-    title="All private messages:"
     {onclose}
   >
-    <div class="text-center my-4">
-      <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
-    </div>
+    <!--
+      `O(6, userData?.nick ? 6 : -1)` — template `OMe`, a `<strong>` beside the title carrying the
+      member's name. It comes back WITH the answer rather than from the request: the modal is
+      labelling somebody else's private messages, so the label is the server's to supply.
+    -->
+    {#snippet header()}
+      <h5>
+        All private messages:
+        {#if peerHistory?.nick}<strong>{peerHistory.nick}</strong>{/if}
+      </h5>
+    {/snippet}
+    <!--
+      `O(9, loading ? 9 : -1)` then `O(10, loading ? -1 : 10)` — the spinner and the log are the two
+      halves of one switch (bundle byte 2,417,700), so exactly one of them is ever on screen. This
+      was the spinner ALONE and nothing opened the modal: a permanent "Loading..." with no fetch
+      behind it, which is why `enablePrivateMessageHistory` was mis-filed as a one-line WIRE.
+    -->
+    {#if peerHistoryLoading}
+      <div class="text-center my-4">
+        <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
+      </div>
+    {:else if peerHistoryError}
+      <!--
+        NOT in the capture: upstream has no failure branch here, because its fetch cannot refuse.
+        Ours can — the server checks the role AND the room setting before it reads a row — and a
+        refusal that rendered as "No logs." would tell a presenter the member has no private
+        messages, which is a different and worse answer than "you may not read them".
+      -->
+      <div class="mt-3 text-center text-warning">{peerHistoryError}</div>
+    {:else}
+      <div class="w-100">
+        <div class="log-body">
+          {#if peerHistory && peerHistory.messages.length > 0}
+            <div class="log-messages">
+              {#each peerHistory.messages as message (message._id)}
+                <CompactMessageRow {message} />
+              {/each}
+            </div>
+            {#if peerHistory.truncated}
+              <!--
+                ALSO NOT in the capture, and for the same reason: the reference asks for everything
+                and gets everything. `loadPeerHistory` caps at `MAX_PEER_HISTORY` because this read
+                is unbounded and runs on a click, and a moderator must not read a truncated history
+                as a complete one. Saying so is the whole point of having the flag come back.
+              -->
+              <div class="mt-3 text-center text-muted">
+                Showing the most recent messages only; older ones are not listed.
+              </div>
+            {/if}
+          {:else}
+            <div class="mt-3">No logs.</div>
+          {/if}
+        </div>
+      </div>
+    {/if}
     <div class="modal-footer text-center">
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
         Close

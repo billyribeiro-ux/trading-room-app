@@ -888,26 +888,6 @@
   />
 {/snippet}
 
-{#snippet bodySegmentsPrivate(text: string)}
-  <!--
-    Unkeyed: the parts come straight out of `split()` on one message and are replaced wholesale.
-    An index key here reads as identity and provides none — `RoomMessage.bodySegments` carries the
-    full reasoning, and `each-key-contract.test.ts` enforces the distinction. The disable is there
-    because `require-each-key` cannot express "this list has no identity"; the docs' rule is the
-    specific one and it forbids the only key available.
-  -->
-  <!-- eslint-disable-next-line svelte/require-each-key -->
-  {#each text.split(/((?:http|https|ftp):\/\/[\w?=&.@/\-;#~%]+)/gi) as part}
-    {#if /^(?:http|https|ftp):\/\//i.test(part)}<a
-        href={part}
-        target="_blank"
-        rel="noreferrer"
-        class="linkColor"
-        onclick={(event) => event.stopPropagation()}>{part}</a
-      >{:else}{part}{/if}
-  {/each}
-{/snippet}
-
 <!-- Not an effect: see `onVisibilityChange`. Svelte owns the add and the remove. -->
 <svelte:document onvisibilitychange={() => roomRefresh.visibilityChanged(document.hidden)} />
 
@@ -1359,8 +1339,6 @@
       searching={privateChat.searching}
       searchTerm={privateChat.searchTerm}
       bind:draft={privateChat.draft}
-      body={bodySegmentsPrivate}
-      formatTime={(at) => privateChat.formatTime(at)}
       onclosepeer={() => {
         userActions.clearSelectedMessageUser();
         messageActions.clearSelected();

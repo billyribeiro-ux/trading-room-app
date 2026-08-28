@@ -290,6 +290,15 @@ export interface RoomSessionSettings {
    */
   simplifiedEditor?: boolean;
   /**
+   * "Private message history?" — the moderation read behind the user-info modal.
+   *
+   * `O(102, sessData.enablePrivateMessageHistory ? 102 : -1)` (byte 2,068,640) draws a
+   * "Show private messages" button whose click reaches `getAllUserPM` for that peer. It crosses so
+   * that `loadPeerPrivateMessageHistory` can refuse on the SERVER; the markup gate is the
+   * convenience, not the authority.
+   */
+  enablePrivateMessageHistory?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *
