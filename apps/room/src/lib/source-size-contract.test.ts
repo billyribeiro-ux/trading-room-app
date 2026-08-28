@@ -481,7 +481,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       construction inside the overlay layer, which is a second answer to which settings a message
       reads.
     */
-    max: 1383,
+    /*
+      1383 -> 1385, 2026-08-28. TWO lines: `chatTabs={data.chatTabs}` at each of the two chat call
+      sites.
+
+      Two and not one because there are two columns, and that is the feature rather than duplication
+      — the strip is drawn twice and each column tracks its own open tab. The list itself is the
+      same for both, because an entitlement does not depend on which column a member is looking at.
+    */
+    max: 1385,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -926,6 +934,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 809,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
+  },
+  {
+    file: 'lib/components/ChatTabStrip.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      It is the channel strip above a chat column — nine lines of the capture's own markup and a
+      loop. It was those nine lines written out TWICE, once per column, with the two channels spelled
+      as two `<li>` blocks apiece; that was defensible while every room had exactly those two.
+      `chatTabsWithBadges` ended it: an owner configures extra channels behind badges and the SERVER
+      decides which of them a member gets, so both strips loop, and two loops over one list is one
+      too many.
+
+      If this number climbs, the thing to check is whether it has started DECIDING which tabs to
+      draw. It must not: it renders the list it is handed, and that list is an entitlement resolved
+      in `memberChatChannels`.
+    */
+    max: 56,
+    why: 'the chat channel strip - the captured markup, once, over a list the server decided'
   },
   {
     file: 'lib/components/AlertQaModal.svelte',
@@ -1391,7 +1418,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       dropped again by somebody tidying a list that looks redundant, which is exactly how it was
       absent in the first place.
     */
-    max: 1601,
+    /*
+      1601 -> 1617, 2026-08-28, for `chatTabsWithBadges`: the per-member channel resolution and the
+      `chatTabs` key that carries its answer to the browser.
+
+      SIXTEEN LINES, and the paragraph is most of them because the thing it prevents is silent. The
+      channel list used to be a constant, and reading a constant here would have put a badge
+      channel's messages into every member's page payload with the client filtering them out for
+      display — which is not a filter. That sentence has to sit at the read, because the read is what
+      somebody would "simplify" back.
+
+      The `chatTabs` key's own docblock was trimmed to one line in the same pass, deliberately: it
+      was restating `#lib/chat-tabs.ts`, and two places recording one fact is how one of them goes
+      stale. What stayed is what is true HERE and nowhere else.
+    */
+    max: 1617,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*

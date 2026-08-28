@@ -1,13 +1,11 @@
+import { error } from '@sveltejs/kit';
 import { getRequestEvent, query } from '$app/server';
 import { z } from 'zod';
+import { MAX_CHAT_TAB_NAME } from '#lib/chat-tabs.js';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
-import {
-  MAX_CHAT_LOG_PAGE,
-  isChatChannel,
-  loadChatPage,
-  type ChatChannel
-} from '#lib/server/chat-log.js';
+import { MAX_CHAT_LOG_PAGE, loadChatPage } from '#lib/server/chat-log.js';
+import { isMemberChatChannel, memberChatChannels } from '#lib/server/chat-channels.js';
 import { loadAlertPage } from '#lib/server/alert-log.js';
 
 /*
@@ -69,21 +67,29 @@ const pageNumber = z.number().int().min(1).max(MAX_CHAT_LOG_PAGE);
 /**
  * `getChatLog {channel, page}` — one page older for one channel.
  *
- * `z.custom<ChatChannel>` rather than `z.string()`, so the validated value NARROWS to the union
- * `loadChatPage` requires instead of being cast at the call. `isChatChannel` is the same deny-by-
- * default predicate the action used; the channel list is fixed by the room, never by the request.
+ * ## The channel is checked against THIS MEMBER's list, not against a constant
+ *
+ * It used to be `z.custom<ChatChannel>(… isChatChannel …)` over the fixed pair `['main',
+ * 'off-topic']`, and that was the whole check because every room had exactly those two.
+ * `chatTabsWithBadges` (2026-08-28) lets an owner configure extra channels behind badges, so a name
+ * being a channel SOMEWHERE is no longer evidence that this member may read it.
+ *
+ * The schema therefore accepts a bounded string and the AUTHORISATION happens in the body, against
+ * `memberChatChannels` — which resolves the list on the server from the room's configuration and
+ * this member's own badges. It has to be there rather than in the schema because it needs the
+ * request's user, and a Zod predicate has none.
+ *
+ * A channel the member may not read is a 403 with the same message a nonexistent one gets, so the
+ * refusal does not enumerate the room's private channels.
  */
 export const loadOlderChatMessages = query(
   z.strictObject({
     /*
-      The `typeof` is not redundant. `z.custom` hands its predicate `unknown` — the argument comes
-      off the wire and could be a number, an object, anything — while `isChatChannel` is declared
-      over `string`. Passing it bare type-errors, and casting the error away would mean handing a
-      non-string to `.includes` and trusting the result.
+      A bound, not an allow-list — the allow-list is in the body. `MAX_CHAT_TAB_NAME` is the same
+      bound the parser applies to an owner-configured name, so a value that could never be a channel
+      is refused before anything else runs.
     */
-    channel: z.custom<ChatChannel>((value) => typeof value === 'string' && isChatChannel(value), {
-      message: 'No such channel.'
-    }),
+    channel: z.string().min(1).max(MAX_CHAT_TAB_NAME),
     page: pageNumber
   }),
   async ({ channel, page }) => {
@@ -94,10 +100,14 @@ export const loadOlderChatMessages = query(
       SESSION, never from the request. A `roomShortCode` field on this argument would be the
       2026-08-07 privilege escalation again, in a new place.
     */
-    const { locals } = getRequestEvent();
-    requireUser(locals);
+    const { locals, request } = getRequestEvent();
+    const user = requireUser(locals);
+    const shortCode = requireRoomShortCode(locals);
 
-    return loadChatPage(requireRoomShortCode(locals), channel, page);
+    const channels = await memberChatChannels(request, shortCode, user);
+    if (!isMemberChatChannel(channels, channel)) error(403, 'No such channel.');
+
+    return loadChatPage(shortCode, channel, page);
   }
 );
 

@@ -147,6 +147,7 @@ describe('page load contract', () => {
         "chatMode",
         "chatMutedTill",
         "chatSoundForEmailHashes",
+        "chatTabs",
         "closedMessage",
         "connectedUsers",
         "dayTradeAlerts",

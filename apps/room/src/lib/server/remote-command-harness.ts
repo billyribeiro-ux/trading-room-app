@@ -73,7 +73,22 @@ export function callRemote<T>(locals: App.Locals, run: () => T | Promise<T>): Pr
   const state = {
     is_in_remote_query: false,
     is_in_remote_prerender: false,
-    is_in_render: false
+    is_in_render: false,
+    /*
+      THE PER-REQUEST REMOTE CACHE, added 2026-08-28 so a `query` can be executed here too.
+
+      `command()` never touches it, which is why this harness ran without one for as long as it only
+      ran commands. `query()` does: `run_remote_function` in
+      `src/runtime/app/server/remote/shared.js:231-235` reads `state.remote.data?.get(internals)` and
+      creates the map on a miss, so an absent `state.remote` is a TypeError before the handler is
+      reached — which is exactly what `chat-tabs-contract.test.ts` hit when it began calling
+      `loadOlderChatMessages`.
+
+      An EMPTY object rather than a pre-seeded one, deliberately: Kit creates every sub-map lazily
+      (`??=`), so the empty object is the honest "nothing cached yet" state, and a fresh one per call
+      means one test's query result can never be served to another's.
+    */
+    remote: {} as Record<string, unknown>
     /*
       NO `handleValidationError`, and its removal on 2026-08-17 is a FRAMEWORK change rather than a
       simplification.

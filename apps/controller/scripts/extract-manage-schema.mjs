@@ -328,6 +328,15 @@ const ROOM_CONSUMED = [
 
      NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
   'alertLabels',
+  /* "List of chat tabs with badges" - extra chat CHANNELS behind an entitlement.
+
+     The fifth setting shipped as a string containing JSON. It crosses because the channel list is a
+     room policy with nothing to default from; a room that configures none has the two built-in tabs.
+
+     The raw JSON crosses and decides nothing. The reference evaluates the badge gate in the browser
+     and then subscribes the socket to the channel; here the room SERVER decides, in
+     memberChatChannels, and the member is told which tabs they have. */
+  'chatTabsWithBadges',
   /* Four gates that RoomMessage.svelte already implements and no room could switch on.
 
      Every occurrence of all four in the reference bundle is sessData dotted onto the name, so they
@@ -824,6 +833,12 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 98 since 2026-08-28: `chatTabsWithBadges`. Twenty-ninth find, and the first that turns a CLOSED
+// UNION into a runtime allow-list: the room had two hard-coded chat channels and a `ChatTab` type
+// over them. An owner can configure more, behind badges, so the set is per room and per member — and
+// the reference decides it in the BROWSER, which is why every read and write path here now asks the
+// server instead. It also made the chat fan-out audience-aware, which it was not.
+//
 // 97 since 2026-08-28: `enableQAReactions`. Twenty-eighth find, and the second CORRECTION of the
 // enumeration after `dontShowRecInfoToUsers`: the rule was already written in `message-behavior.ts`
 // and could never evaluate true, because the Q and A thread passed `kind="chat"` and an `onaction`
@@ -870,7 +885,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 97 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 98 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

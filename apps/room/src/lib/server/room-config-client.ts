@@ -540,6 +540,24 @@ export interface RoomSessionSettings {
    */
   alertLabels?: string;
   /**
+   * "List of chat tabs with badges" — extra chat CHANNELS behind an entitlement.
+   *
+   * The FOURTH setting shipped as a string containing JSON, beside `alertLabels`,
+   * `modAlertFilterList` and the two above. Its shape is in its own help text:
+   * `[ { "name": "easy channel", "badges": ["61eafd…"] }, … ]`.
+   *
+   * It crosses because the channel list is a ROOM's own configuration and there is nothing to
+   * default from — a room that configures none has the two built-in tabs, which is what every room
+   * had before this existed.
+   *
+   * **The raw JSON crossing does not decide anything.** Upstream evaluates the badge gate in the
+   * BROWSER; here the ROOM SERVER does, in `memberChatChannels`, and the member is told which tabs
+   * they have. The badge IDS in this value are already the owner's own and name nothing private —
+   * `badges.definitions` crosses in full beside it — so what travels is a list of names and ids the
+   * room already holds, and never a decision.
+   */
+  chatTabsWithBadges?: string;
+  /**
    * Four per-room gates that `RoomMessage.svelte` already implements.
    *
    * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.

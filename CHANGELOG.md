@@ -33,7 +33,98 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
-### 2026-08-28 19:32 UTC — The Q&A thread acts, and `enableQAReactions` finally has something to gate
+### 2026-08-28 16:18 UTC — Extra chat channels behind badges, and a fan-out that finally asks who is entitled
+
+> **A NOTE ON THE TIMES, and it is a correction.** This entry is stamped from `date -u` at the
+> moment it was written, and the one below it from its own commit (`6913210`, 15:43:15 +00:00). The
+> entries ABOVE them read 18:40 and later against commits made at 14:53 and earlier — roughly four
+> hours ahead, the size of an EDT offset applied to a clock that was already UTC. This file's own
+> header says a time is a commit stamp or a measurement and never an estimate, so the drift is
+> recorded here rather than continued. Ordering in this file is by position, which is unaffected.
+
+**Runtime impact: YES.** A room with *"List of chat tabs with badges"* configured now shows those
+channels as tabs, to the members whose badges open them and to presenters. None of it existed: this
+room had exactly two chat channels, `main` and `off-topic`, hard-coded in three components and held
+in a closed `ChatTab` union.
+
+#### The first setting to change a type, and the union was answering the wrong question
+
+`ChatTab = 'main' | 'off-topic'` with `CHAT_TABS` and `isChatTab` beside it, and the argument for it
+was written down: a typo in a comparison becomes a compile error. An owner can configure more
+channels now, so the set is per ROOM and per MEMBER and cannot be a type at all.
+
+**What the union never did is the part that mattered.** It caught a typo. It never asked whether the
+member naming a channel was allowed to read it — because until this setting existed, every member
+could read every channel, so there was no such question. There is now, and the reference answers it
+in the BROWSER:
+
+```js
+const s = i.badges.every(r =>
+  globals.user.badges && globals.user.badges.length > 0 && globals.user.badges.includes(r));
+o = s || globals.isPresenter;
+o && globals.chatTabs.push({displayName: i.name, name: i.name, type: "r"})   // byte 1,007,526
+```
+
+and then subscribes its socket to `/sess/{id}/chat/{name}/`. A member who edits that array in a
+console gets the channel. **Every path here asks the server instead** — `memberChatChannels`, one
+function, resolving the list from the room's configuration and `badges.byEmailHash`:
+
+| path | what it refuses |
+| --- | --- |
+| the page load | reads only this member's channels, so a badge channel's messages never enter their page payload |
+| `sendMessage` | 403 on a channel this member does not hold |
+| `replyMessage` | **404** on a message in one — the reply inserts into `original.room`, so without this a member could reply INTO a channel they cannot read, quoting the line back at the people who can |
+| `loadOlderChatMessages` | 403, with the same message a nonexistent channel gets |
+| the SSE hub | `publishChatToRoom` and `publishTypingToRoom` skip a listener without the channel |
+
+The refusals are deliberately indistinguishable from "no such channel", so the answer does not
+enumerate a room's private channels.
+
+#### The realtime hub became audience-aware, which it was not
+
+`publishChatToRoom` sent its frame to every listener in the room. The frame carries no body — that
+is why it is already built per listener, for the mention bit — but it carries the sender, the
+channel and the fact that something happened, and it is what makes a client refetch. The listener
+context now holds the entitlement resolved when the stream opened, in ONE map rather than a parallel
+one, and both room-wide chat publishers consult it. It is off `RosterUser` deliberately: that object
+is published to the room as roster data.
+
+#### Deny by default, per entry, with the owner's own footgun reproduced
+
+`parseChatTabsWithBadges` refuses a malformed document outright and drops a malformed ENTRY while
+keeping the rest — `parseReactions`' rule, and dropping is the fail-closed direction here. It also
+refuses a name that collides with a built-in (a `main` tab would put a badge channel's messages in
+every member's main log, because the channel name IS `messages.room`), a duplicate, a name past 40
+characters, and a control character.
+
+**An entry with an EMPTY badge list is public, and that is upstream's behaviour rather than a bug we
+inherited by accident.** `[].every(…)` is true and the `badges.length > 0` guard sits inside the
+callback. Reproduced with a test that says so, because reading it as "nobody" would silently hide a
+channel an owner asked for.
+
+#### Also
+
+* **`ChatTabStrip.svelte`**, new: the captured markup once, over a list the server decided. It was
+  nine lines written out twice with the channels spelled as two `<li>` blocks apiece.
+* **The remote-command harness can execute a `query`.** `state.remote` was absent, which `command()`
+  never touches and `query()` reads at `shared.js:231` — a TypeError before the handler.
+
+#### Verified
+
+* **Eleven negative controls, each seen RED**: the send, reply and paging checks removed one at a
+  time; `every` weakened to `some`; the built-in-name refusal removed; the duplicate refusal
+  removed; the control-character refusal removed; both fan-out filters removed; the hub's default
+  widened from the built-in pair to none; and the page load pointed back at a fixed list.
+* Room: `pnpm test` green — 173 files / 2,841 tests, 1 skipped. `vite build` clean. `svelte-check` 0
+  errors, `eslint` clean. Controller: 96 files / 1,013 passed, 21 skipped; `svelte-check` and
+  `eslint` clean; `schema:verify` at **98 wired**.
+* **NOT verified:** the Svelte MCP is disconnected, so `svelte-autofixer` could not be run on
+  `ChatTabStrip.svelte`, `AlertChatArea.svelte`, `ExtraChatPane.svelte` or `+page.svelte`. Nothing
+  was opened in a browser: the two-member behaviour is asserted against the commands and the
+  database, and the fan-out filter is asserted as source, because it needs an open SSE stream and a
+  live controller.
+
+### 2026-08-28 15:43 UTC — The Q&A thread acts, and `enableQAReactions` finally has something to gate
 
 **Runtime impact: YES.** The Q&A thread on an alert had a kebab menu on every entry and
 `onaction={() => {}}` behind it: nothing any of those entries offered could happen. It works now —

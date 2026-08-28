@@ -44,9 +44,7 @@ describe('both are queries, and both are pure', () => {
     expect(remoteCode).not.toContain('db.insert');
     expect(remoteCode).not.toContain('db.update');
     expect(remoteCode).not.toContain('db.delete');
-    expect(remoteCode).toContain(
-      'return loadChatPage(requireRoomShortCode(locals), channel, page);'
-    );
+    expect(remoteCode).toContain('return loadChatPage(shortCode, channel, page);');
     expect(remoteCode).toContain('return loadAlertPage(requireRoomShortCode(locals), page);');
   });
 
@@ -73,20 +71,31 @@ describe('the page bound survived the move', () => {
 });
 
 describe('the channel is validated, not trusted', () => {
-  it('keeps the deny-by-default allow-list', () => {
-    // Without it the field is an arbitrary string reaching a WHERE clause — parameterised, so not
-    // injectable, but enough to enumerate whether messages exist under any label a caller guesses.
-    expect(remoteCode).toContain('isChatChannel(value)');
+  /*
+    THIS BLOCK USED TO ASSERT `isChatChannel(value)` INSIDE THE SCHEMA, and the predicate is gone.
+
+    It was a deny-by-default allow-list over the fixed pair `['main', 'off-topic']`, and while every
+    room had exactly those two it was the whole check. `chatTabsWithBadges` ended that on 2026-08-28:
+    an owner can configure extra channels behind badges, so a name being a channel SOMEWHERE stopped
+    being evidence that this member may read it.
+
+    The check did not weaken — it moved, and it got stronger. The schema keeps a BOUND, and the
+    authorisation happens in the body against `memberChatChannels`, which resolves the list on the
+    server from the room configuration and this member's own badges. It cannot live in the schema
+    because it needs the request's user, and a Zod predicate has none.
+  */
+  it('bounds the channel at the schema and AUTHORISES it in the body', () => {
+    expect(remoteCode).toContain('z.string().min(1).max(MAX_CHAT_TAB_NAME)');
+    expect(remoteCode).toContain('memberChatChannels(request, shortCode, user)');
+    expect(remoteCode).toContain('isMemberChatChannel(channels, channel)');
   });
 
-  it('checks the value is a string BEFORE the allow-list', () => {
+  it('refuses with the same message a nonexistent channel gets', () => {
     /*
-      `z.custom` hands its predicate `unknown`; the argument comes off the wire and could be a
-      number or an object. `isChatChannel` is declared over `string`. Dropping the `typeof` means
-      handing a non-string to `.includes` and trusting the answer — and it type-errors, which is how
-      this was caught rather than shipped.
+      A distinct refusal for "exists but not yours" would confirm that a private channel exists,
+      which is the enumeration the check is closing. One message, both cases.
     */
-    expect(remoteCode).toContain("typeof value === 'string' && isChatChannel(value)");
+    expect(remoteCode).toContain("error(403, 'No such channel.')");
   });
 });
 

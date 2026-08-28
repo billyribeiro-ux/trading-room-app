@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **172** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **171** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**28 of the 172 are read by the reference's OWN room client**, as `sessData.<name>`.
+**27 of the 171 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Twenty-nine have already left the list, on the day it was written.** It opened at 202 unwired and
-58 questions; both numbers have moved twenty-four times since.
+**Thirty have already left the list, on the day it was written.** It opened at 202 unwired and
+58 questions; both numbers have moved twenty-five times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -313,13 +313,22 @@ reproduces the decision — foreground-only colour — and `resolveNoteSurfaceGa
 words which part of that is evidenced and which part is this repository's call. A setting wired
 without that distinction written down would read, later, as a transcription.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 28 by NAME and asserts separately that the seven
+`src/lib/setting-coverage-contract.test.ts` pins the 27 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `altChatRender` (6) and
 `smallerImagePreview` (6, answered as NOT A GAP). **Read count is not priority** — it is how many
 times the reference mentions a name, and the biggest number on this list is a credential we refuse.
 `enableQAReactions` was second at 10 and is built; `positionsIframe` was fourth at 7 and is built.
+
+**`chatTabsWithBadges` was the first row to change a TYPE**, 2026-08-28. This room had two chat
+channels hard-coded in three components behind a closed `ChatTab` union, and the union's own note
+argued for it: a typo becomes a compile error. An owner can configure more channels, behind badges,
+so the set is per room AND per member — and the reference decides which a member gets **in the
+browser**, against a list the browser holds. Every read and write path here asks the server instead,
+and the realtime chat and typing fan-outs became audience-aware, which they were not. Two live
+defects fell out of it: a reply could be posted into a channel the replier could not read, and the
+chat fan-out told every listener in the room that something had happened in a private one.
 
 ---
 

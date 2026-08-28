@@ -1124,6 +1124,7 @@
               searchScopeNotice={alertsPane.searchScopeNotice}
               visibleChatMessages={feeds.visibleChat}
               alertLabels={gates.alertLabels}
+              chatTabs={data.chatTabs}
               {messageChrome}
               followedUsers={userActions.followedUsers}
               {captureAlertChatElement}
@@ -1246,6 +1247,7 @@
                 canUseRTE={composer.canUseRTE}
                 {giphyApiKey}
                 chrome={messageChrome}
+                chatTabs={data.chatTabs}
                 followedUsers={userActions.followedUsers}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}

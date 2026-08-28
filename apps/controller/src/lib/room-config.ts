@@ -938,6 +938,26 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'alertLabels',
   /*
+    "List of chat tabs with badges" — extra chat CHANNELS behind an entitlement.
+
+    The FIFTH setting shipped as a string containing JSON, after `alertLabels`, `modAlertFilterList`
+    and the two the note above names. Its shape is in its own help text: a list of objects of name
+    and badges, where each badge is one of the ids `badges.definitions` already carries.
+
+    It crosses because the channel list is a room POLICY and there is nothing to default from. A room
+    that configures none has the two built-in tabs, which is what every room had before this existed,
+    so the absent case needs no value.
+
+    THE RAW JSON CROSSES AND DECIDES NOTHING. The reference evaluates the badge gate in the BROWSER
+    against globals dot user dot badges and then subscribes the socket to the channel, so a member
+    who edits that list in a console gets the channel. Here the ROOM SERVER decides, in
+    `memberChatChannels`, and the member is told which tabs they have. What travels is a list of
+    names and badge ids the room already holds beside it, never a decision.
+
+    Read by `#lib/chat-tabs.ts` and `#lib/server/chat-channels.ts`.
+  */
+  'chatTabsWithBadges',
+  /*
     FOUR gates the room already implemented and could never switch on.
 
     `RoomMessage.svelte` has carried all four props since it was written, each defaulting false,

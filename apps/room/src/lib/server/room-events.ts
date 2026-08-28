@@ -36,6 +36,7 @@
  */
 
 /** One realtime message, mirroring the capture's channel-per-topic shape. */
+import { BUILT_IN_CHAT_TABS } from '../chat-tabs';
 import { isMentionOf } from '../mention';
 
 import type { PrivateChatMessage } from './private-chat';
@@ -387,7 +388,36 @@ export type RosterUser = {
  * nowhere else: an SSE hub IS process-local state by definition, and the alternative - a database
  * poll per client - is the thing being replaced. The cost is stated above rather than hidden.
  */
-const subscribers = new Map<string, Map<Subscriber, RosterUser | null>>();
+const subscribers = new Map<string, Map<Subscriber, ListenerContext>>();
+
+/**
+ * What the hub knows about ONE connection.
+ *
+ * `user` is who it belongs to, or `null` for a subscriber that joined before an identity was known.
+ * That has been the map's value since the roster was served from here.
+ *
+ * `chatChannels` joined it on 2026-08-28 with `chatTabsWithBadges`, and it is an entitlement rather
+ * than a preference: a badge channel is readable by some members of a room and not others, so a
+ * chat frame is no longer something the whole room is entitled to. `publishChatToRoom` and
+ * `publishTypingToRoom` both consult it.
+ *
+ * ONE MAP, not two. A parallel `Map<Subscriber, Set<string>>` would have to be added and deleted in
+ * step with this one at four sites, and the failure of that pattern is silent: a stale entry means
+ * a closed connection's entitlement outliving it.
+ */
+type ListenerContext = {
+  user: RosterUser | null;
+  /*
+    Resolved on the SERVER when the stream opens, from the room's configuration and this member's
+    badges — never asserted by the client. `memberChatChannels` is the one function that answers it,
+    here and at the three other call sites.
+
+    A subscriber that opened before the list could be resolved gets the two built-in channels, which
+    is what every room had before badge channels existed and is the fail-closed answer: it can never
+    widen access, only withhold a channel the member would have been allowed.
+  */
+  chatChannels: ReadonlySet<string>;
+};
 
 /**
  * Adds a listener; the returned function removes it. Always call it from the stream's `cancel`.
@@ -403,7 +433,13 @@ const subscribers = new Map<string, Map<Subscriber, RosterUser | null>>();
 export function subscribeToRoom(
   room: string,
   listener: Subscriber,
-  user: RosterUser | null = null
+  user: RosterUser | null = null,
+  /*
+    The chat channels this connection is entitled to receive. Defaults to the built-in pair rather
+    than to "everything": a caller that forgets to resolve them withholds a badge channel, which is
+    the direction a mistake here has to fail in.
+  */
+  chatChannels: readonly string[] = BUILT_IN_CHAT_TABS
 ): () => void {
   let listeners = subscribers.get(room);
   if (!listeners) {
@@ -423,7 +459,7 @@ export function subscribeToRoom(
     and the reference's payload is `{nick, userXrefID}`.
   */
   const alreadyHere = user !== null && heldBy(listeners, user.id);
-  listeners.set(listener, user);
+  listeners.set(listener, { user, chatChannels: new Set(chatChannels) });
   if (user !== null && !alreadyHere) {
     publishToRoom(room, {
       channel: 'roster',
@@ -445,9 +481,9 @@ export function subscribeToRoom(
 }
 
 /** Whether any remaining listener in this room belongs to that person. */
-function heldBy(listeners: Map<Subscriber, RosterUser | null>, userId: number): boolean {
+function heldBy(listeners: Map<Subscriber, ListenerContext>, userId: number): boolean {
   for (const held of listeners.values()) {
-    if (held?.id === userId) return true;
+    if (held.user?.id === userId) return true;
   }
   return false;
 }
@@ -463,9 +499,10 @@ export function setRosterLocation(room: string, userId: number, locStr: string):
   const listeners = subscribers.get(room);
   if (!listeners) return false;
   let changed = false;
-  for (const [listener, user] of listeners) {
+  for (const [listener, context] of listeners) {
+    const { user } = context;
     if (!user || user.id !== userId || user.locStr === locStr) continue;
-    listeners.set(listener, { ...user, locStr });
+    listeners.set(listener, { ...context, user: { ...user, locStr } });
     changed = true;
   }
   return changed;
@@ -482,7 +519,7 @@ export function roomRoster(room: string): RosterUser[] {
   const listeners = subscribers.get(room);
   if (!listeners) return [];
   const byId = new Map<number, RosterUser>();
-  for (const user of listeners.values()) {
+  for (const { user } of listeners.values()) {
     if (user && !byId.has(user.id)) byId.set(user.id, user);
   }
   return [...byId.values()];
@@ -583,7 +620,7 @@ export function publishRosterToRoom(room: string): void {
     canEditNotes: false
   }));
 
-  for (const [listener, viewer] of listeners) {
+  for (const [listener, { user: viewer }] of listeners) {
     try {
       listener({
         channel: 'roster',
@@ -627,17 +664,33 @@ export function publishRosterToRoom(room: string): void {
  */
 export function publishChatToRoom(
   room: string,
+  channel: string,
   data: unknown,
   message: { body: string | null | undefined; fromAdmin: boolean }
 ): void {
   const listeners = subscribers.get(room);
   if (!listeners) return;
-  for (const [listener, user] of listeners) {
+  for (const [listener, context] of listeners) {
+    /*
+      THE SECOND THING THIS FAN-OUT DECIDES PER RECIPIENT, added 2026-08-28.
+
+      `chatTabsWithBadges` makes a chat channel an ENTITLEMENT: a room's badge channels are readable
+      by some of its members and not others. This frame carries no body — the mention bit above is
+      the whole reason it is built per listener — but it does carry the sender's id, their email hash
+      and the channel name, and it is what makes a client refetch. Sent to everyone, it would tell a
+      member without the badge that a private channel exists and that somebody just posted in it,
+      and their refetch would ask for a page the load has already refused them.
+
+      The entitlement is the one `memberChatChannels` resolved when the stream opened. A listener
+      that has none of it — an anonymous subscriber, or one that opened before the list was known —
+      holds the two built-in channels, so this skips it for a badge channel and never for `main`.
+    */
+    if (!context.chatChannels.has(channel)) continue;
     try {
       listener({
         channel: 'chat',
         data,
-        isMention: isMentionOf(message.body, user?.displayName, message.fromAdmin)
+        isMention: isMentionOf(message.body, context.user?.displayName, message.fromAdmin)
       });
     } catch (error) {
       console.error('[room-events] subscriber failed', error);
@@ -687,7 +740,7 @@ export function publishToUsers(room: string, userIds: readonly number[], event: 
   if (!listeners) return;
   const addressed = new Set(userIds);
 
-  for (const [listener, user] of listeners) {
+  for (const [listener, { user }] of listeners) {
     if (user === null || !addressed.has(user.id)) continue;
     try {
       listener(event);
@@ -713,15 +766,21 @@ export function publishTypingToRoom(room: string, chatChannel: string): void {
   const listeners = subscribers.get(room);
   if (!listeners) return;
   for (const [listener, context] of listeners) {
+    /*
+      Same entitlement as the chat fan-out above, and it matters as much: a typing frame names the
+      people typing in a channel, so sending a badge channel's to the whole room would leak both the
+      channel's existence and who is active in it. See `publishChatToRoom`.
+    */
+    if (!context.chatChannels.has(chatChannel)) continue;
     try {
       listener({
         channel: 'typing',
         /*
-          `context` is the listener's own `RosterUser`, or null for a subscriber that joined before
-          one was known. A null context gets the UNFILTERED list, which is correct rather than a
+          `context.user` is the listener's own `RosterUser`, or null for a subscriber that joined
+          before one was known. A null user gets the UNFILTERED list, which is correct rather than a
           shortcut: it has no identity to remove, and `-1` matches no real user id.
         */
-        data: { chatChannel, names: typistsIn(room, chatChannel, context?.id ?? -1) }
+        data: { chatChannel, names: typistsIn(room, chatChannel, context.user?.id ?? -1) }
       });
     } catch (error) {
       console.error('[room-events] typing subscriber failed', error);

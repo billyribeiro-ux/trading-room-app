@@ -278,6 +278,15 @@ describe('the allow-list itself', () => {
         an owner who left it off gets a room where the reaction cannot be recorded, not one where the
         button is merely hidden.
       */
+      /*
+        The raw JSON crosses; the ENTITLEMENT does not. That distinction is the whole reason this map
+        entry is worth reading: the reference evaluates the badge gate in the browser against
+        `globals.user.badges` and then subscribes the socket to the channel, so a member who edits
+        that list in a console gets it. Here the room server decides — `memberChatChannels` — and
+        every path that could reach a channel asks it: the page load, the send, the reply, the older-
+        pages query and the realtime fan-out.
+      */
+      chatTabsWithBadges: 'chat-tabs.ts parses it, and memberChatChannels decides which channels each member holds',
       enableQAReactions:
         'RoomMessageChrome — reactions inside the Q&A thread — and reactToQuestion, which refuses when the room has it off',
       /*

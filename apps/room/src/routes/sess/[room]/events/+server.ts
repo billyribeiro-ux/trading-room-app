@@ -30,6 +30,8 @@ import { error } from '@sveltejs/kit';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { hashEmail, sessionStillAuthenticates } from '#lib/server/connection.js';
 import { readRoomConfig, type RoomMembership } from '#lib/server/room-config-client.js';
+import { memberChatChannels } from '#lib/server/chat-channels.js';
+import { BUILT_IN_CHAT_TABS } from '#lib/chat-tabs.js';
 import { isBannedFromRoom, isShutOutByRoomState } from '#lib/server/room-role.js';
 import {
   decideLiveAccess,
@@ -74,8 +76,19 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
     room's own role — which is the same answer this endpoint gave before it asked at all.
   */
   let membership: RoomMembership | null = null;
+  /*
+    The chat channels this connection may RECEIVE, resolved here for the same reason the membership
+    is: one config read per CONNECTION, not per message.
+
+    `chatTabsWithBadges` makes a chat channel an entitlement — see `#lib/chat-tabs.ts` — so the hub
+    has to know which ones this listener holds before it fans a frame out. Seeded with the two
+    built-in channels, which is both the answer for a room that configures none and the fail-soft
+    answer if the read below throws: a failed read withholds a badge channel and never grants one.
+  */
+  let chatChannels: readonly string[] = BUILT_IN_CHAT_TABS;
   try {
     membership = (await readRoomConfig(request, room, user.email)).member;
+    chatChannels = await memberChatChannels(request, room, user);
   } catch (cause) {
     console.warn('[events] no membership for this subscriber; roster flags fall back', cause);
   }
@@ -143,20 +156,23 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
 
       // The identity goes in with the listener, so the hub can answer WHO is here and not just
       // how many. See `subscribeToRoom`.
-      unsubscribe = subscribeToRoom(room, send, {
-        id: user.id,
-        // `userXrefID` is what the capture keys presence on - `onUserJoin`/`onUserLeave` both
-        // match against it. Carried as a string so it survives the uuid cutover unchanged.
-        userXrefID: String(user.id),
-        displayName: user.displayName,
-        email: user.email,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-        // They are holding an open stream, so they are online by definition - the stored column
-        // is a stale snapshot from whenever it was last written.
-        status: 'online',
-        emailHash: hashEmail(user.email),
-        /*
+      unsubscribe = subscribeToRoom(
+        room,
+        send,
+        {
+          id: user.id,
+          // `userXrefID` is what the capture keys presence on - `onUserJoin`/`onUserLeave` both
+          // match against it. Carried as a string so it survives the uuid cutover unchanged.
+          userXrefID: String(user.id),
+          displayName: user.displayName,
+          email: user.email,
+          avatarUrl: user.avatarUrl,
+          role: user.role,
+          // They are holding an open stream, so they are online by definition - the stored column
+          // is a stale snapshot from whenever it was last written.
+          status: 'online',
+          emailHash: hashEmail(user.email),
+          /*
           The real per-room standing, read once when the connection opens.
 
           These were hardcoded false with a note saying the hub could not know them. It can: one
@@ -170,7 +186,7 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
           for everyone made a trial invisible to the filter and an admin-chat member indistinguish-
           able from a participant, in every other member's browser.
         */
-        /*
+          /*
           One source, not a fallback pair.
 
           This was `membership?.isP ?? isPresenterRole(user.role)`. Both sides happened to agree,
@@ -180,12 +196,12 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
           a presenter in anybody's roster, so `false` is the honest answer rather than a second
           opinion derived from the room's own account table.
         */
-        /* Filled in by `POST /api/roster/location` once the browser's lookup answers. */
-        locStr: '',
-        isP: membership?.isP === true,
-        isFT: membership?.isFT ?? false,
-        hasAdminChat: membership?.permissions.hasAdminChat ?? false,
-        /*
+          /* Filled in by `POST /api/roster/location` once the browser's lookup answers. */
+          locStr: '',
+          isP: membership?.isP === true,
+          isFT: membership?.isFT ?? false,
+          hasAdminChat: membership?.permissions.hasAdminChat ?? false,
+          /*
           The other four, so `#permissionsModal` seeds from the truth rather than from `undefined`.
 
           Same membership read as `hasAdminChat` above — one config call at subscribe time, already
@@ -194,11 +210,18 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
 
           Presenter-only on the way out; `publishRosterToRoom` blanks them for members.
         */
-        hasMic: membership?.permissions.hasMic ?? false,
-        hasScreen: membership?.permissions.hasScreen ?? false,
-        hasCam: membership?.permissions.hasCam ?? false,
-        canEditNotes: membership?.permissions.canEditNotes ?? false
-      });
+          hasMic: membership?.permissions.hasMic ?? false,
+          hasScreen: membership?.permissions.hasScreen ?? false,
+          hasCam: membership?.permissions.hasCam ?? false,
+          canEditNotes: membership?.permissions.canEditNotes ?? false
+        },
+        /*
+        The chat entitlement, resolved above. It is a THIRD argument rather than a field on the
+        roster entry deliberately: `RosterUser` is what the roster RENDERS and it is published to
+        every other member, so a channel list on it would travel to the room as roster data.
+      */
+        chatChannels
+      );
 
       /*
         The roster count is the number of PEOPLE, not the number of connections.

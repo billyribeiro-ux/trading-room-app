@@ -66,20 +66,34 @@ export const CHAT_LOG_PAGE_SIZE = 50;
 export const MAX_CHAT_LOG_PAGE = 2_000;
 
 /**
- * The channels this room renders, and therefore the channels worth reading.
+ * The channels EVERY room has, and the reason this is no longer the whole list.
  *
- * `messages.room` is a channel label rather than a foreign key, so an arbitrary string can be
- * written into it. Only these two are ever displayed — `ChatTab` in `#lib/types.js` is a closed union
- * of exactly these — so a row in any other channel is invisible today whatever this returns.
- * Reading only what is rendered is the same fail-closed rule the settings allow-list follows.
+ * It used to be, and it used to be defined here: `['main', 'off-topic'] as const` with a closed
+ * union over it, and the argument was that only those two are ever displayed so a row in any other
+ * channel is invisible. **`chatTabsWithBadges` ended that on 2026-08-28** — an owner can configure
+ * extra channels whose names come out of JSON at runtime, so the set is per ROOM and per MEMBER and
+ * cannot be a type.
+ *
+ * What replaces the union is not weaker, and this is the paragraph to read before widening anything
+ * here: the closed union protected against a TYPO, never against a member naming a channel they may
+ * not read. Every caller now asks `memberChatChannels` — which resolves the list on the server from
+ * the room's configuration and the member's badges — and passes what it got. A channel that is not
+ * on that list is refused, which is a stronger guarantee than the union ever made and is the one
+ * that matters.
+ *
+ * The constant itself lives in `#lib/chat-tabs.ts` because the parser there has to refuse an owner
+ * name that collides with a built-in, and that module is shared client code while this one is not.
  */
-export const CHAT_CHANNELS = ['main', 'off-topic'] as const;
+export { BUILT_IN_CHAT_TABS as CHAT_CHANNELS } from '#lib/chat-tabs.js';
 
-export type ChatChannel = (typeof CHAT_CHANNELS)[number];
-
-export function isChatChannel(value: string): value is ChatChannel {
-  return (CHAT_CHANNELS as readonly string[]).includes(value);
-}
+/**
+ * A channel name.
+ *
+ * A bare `string`, and deliberately: the value is only ever safe because a caller checked it against
+ * a member's own list, and a nominal type here would let a check somewhere prove the wrong thing.
+ * `isMemberChatChannel` in `#lib/server/chat-channels.ts` is that check.
+ */
+export type ChatChannel = string;
 
 /**
  * One page of one channel, oldest-first.
@@ -133,12 +147,27 @@ export function loadChatPage(roomShortCode: string, channel: ChatChannel, page =
   );
 }
 
-/** Page 0 of every rendered channel, which is what a page load needs. */
-export function loadNewestChatPages(roomShortCode: string) {
-  return CHAT_CHANNELS.flatMap((channel) => loadChatPage(roomShortCode, channel)).sort(
-    /* One array again, chronological across channels. The client filters by channel for display;
+/**
+ * Page 0 of every channel THIS MEMBER may read, which is what a page load needs.
+ *
+ * ## The channel list is an ARGUMENT now, and that is the security change
+ *
+ * It used to be the module's own `CHAT_CHANNELS`, because every room had the same two. A badge
+ * channel is visible to some members and not others, so reading a fixed list here would have put a
+ * private channel's messages into the page payload of every member in the room — the SSR HTML
+ * included — with the client filtering them out for display. That is the shape of the private-chat
+ * defect `publishToUsers` was written to close, and it is a leak whatever the client renders.
+ *
+ * The caller resolves the list with `memberChatChannels`, on the server, from the room's
+ * configuration and the member's own badges.
+ */
+export function loadNewestChatPages(roomShortCode: string, channels: readonly string[]) {
+  return channels
+    .flatMap((channel) => loadChatPage(roomShortCode, channel))
+    .sort(
+      /* One array again, chronological across channels. The client filters by channel for display;
        everything else here — the popup, the mention rule, the unread counts — reads the whole set
        and expects it ordered. `getTime()` on the Date the driver already parsed. */
-    (left, right) => left.createdAt.getTime() - right.createdAt.getTime()
-  );
+      (left, right) => left.createdAt.getTime() - right.createdAt.getTime()
+    );
 }

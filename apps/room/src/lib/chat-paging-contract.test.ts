@@ -1,12 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import {
-  CHAT_CHANNELS,
-  CHAT_LOG_PAGE_SIZE,
-  MAX_CHAT_LOG_PAGE,
-  isChatChannel
-} from './server/chat-log';
+import { CHAT_CHANNELS, CHAT_LOG_PAGE_SIZE, MAX_CHAT_LOG_PAGE } from './server/chat-log';
 
 /*
   The chat log read is BOUNDED, and the history it no longer sends is still reachable.
@@ -89,7 +84,7 @@ describe('the read is bounded', () => {
       with `.all()` and no limit. Asserted as the absence of the unbounded ORDER BY, because that
       is the line that made it unbounded — `asc(messages.createdAt)` followed by `.all()`.
     */
-    expect(serverCode).toContain('loadNewestChatPages(requireRoomShortCode(locals))');
+    expect(serverCode).toContain('loadNewestChatPages(requireRoomShortCode(locals), chatChannels)');
     expect(serverCode).not.toContain('.orderBy(asc(messages.createdAt))');
   });
 
@@ -164,7 +159,13 @@ describe('the read is bounded', () => {
     */
     expect([...CHAT_CHANNELS]).toEqual(['main', 'off-topic']);
     expect(chatLogCode).toContain('eq(messages.room, channel)');
-    expect(chatLogCode).toContain('CHAT_CHANNELS.flatMap((channel) => loadChatPage(');
+    /*
+      THE LIST IS AN ARGUMENT since 2026-08-28, and that is a tenancy change rather than a
+      refactor: `chatTabsWithBadges` makes a channel an entitlement, so reading a fixed list here
+      would put a badge channel's messages into every member's page payload with the client
+      filtering them for display. The caller resolves it with `memberChatChannels`.
+    */
+    expect(chatLogCode).toContain('.flatMap((channel) => loadChatPage(roomShortCode, channel))');
   });
 
   it('the index answers the WHERE and the ORDER BY together', () => {
@@ -200,7 +201,7 @@ const pagesClass = readFileSync(
 describe('and nothing became unreachable', () => {
   it('there is a query that serves older pages', () => {
     expect(remoteCode).toContain('export const loadOlderChatMessages = query(');
-    expect(remoteCode).toContain('loadChatPage(requireRoomShortCode(locals), channel, page)');
+    expect(remoteCode).toContain('loadChatPage(shortCode, channel, page)');
   });
 
   it('the client asks for them, and folds them in', () => {
@@ -253,17 +254,22 @@ describe('and nothing became unreachable', () => {
 });
 
 describe('the action refuses what it should', () => {
-  it('the channel is an allow-list, not a string that reaches a WHERE clause', () => {
-    expect(isChatChannel('main')).toBe(true);
-    expect(isChatChannel('off-topic')).toBe(true);
-    expect(isChatChannel('admin')).toBe(false);
-    expect(isChatChannel('')).toBe(false);
+  it('the channel is an allow-list, and the list is now THIS MEMBER own', () => {
     /*
-      The allow-list survived the move into the schema. `typeof value === 'string'` is not padding:
-      `z.custom` hands its predicate `unknown` off the wire, and `isChatChannel` is declared over
-      `string`, so without it a non-string reaches `.includes` and its answer is trusted.
+      THIS ASSERTION USED TO CALL `isChatChannel` against the fixed pair, and that predicate is gone.
+
+      It was the whole check while every room had the same two channels. `chatTabsWithBadges` ended
+      that on 2026-08-28: a name being a channel SOMEWHERE stopped being evidence that this member
+      may read it, so the check moved to `memberChatChannels` — resolved on the server from the
+      room's configuration and the member's badges — and the schema keeps only a bound.
+
+      Asserted as SOURCE here because the behaviour itself is executed in
+      `chat-tabs-contract.test.ts`, against the database and the two commands.
     */
-    expect(chatAction()).toContain("typeof value === 'string' && isChatChannel(value)");
+    const action = chatAction();
+    expect(action).toContain('z.string().min(1).max(MAX_CHAT_TAB_NAME)');
+    expect(action).toContain('memberChatChannels(request, shortCode, user)');
+    expect(action).toContain('isMemberChatChannel(channels, channel)');
   });
 
   it('page 0 is refused, because the load already sent it', () => {

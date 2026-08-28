@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, EIGHTY-FOUR by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 97.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 98.
+
+  84 -> 85 on 2026-08-28: chatTabsWithBadges. Extra chat channels behind badges. The room decides who
+  sees which on the SERVER — the reference decides it in the browser against a list the browser holds
+  — so the raw JSON crosses and the ENTITLEMENT never does.
 
   83 -> 84 on 2026-08-28: enableQAReactions. A CORRECTION rather than a new gate — the rule was
   already transcribed in `message-behavior.ts` and could never evaluate true, because the Q&A thread
@@ -330,6 +334,7 @@ const EXPECTED_WIRED_SETTINGS = [
     owner typed, with nothing to default from.
   */
   'alertLabels',
+  'chatTabsWithBadges',
   'usersPublicReply',
   'enableReactions',
   'enableQAReactions',

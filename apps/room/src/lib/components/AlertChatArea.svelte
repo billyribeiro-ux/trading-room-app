@@ -41,6 +41,7 @@
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
@@ -74,6 +75,14 @@
      */
     broadcasts: RoomBroadcasts;
     chat: RoomChat;
+    /**
+     * The channel strip this column draws, decided on the SERVER.
+     *
+     * `chatTabsWithBadges` lets an owner configure extra channels behind badges, so the list is per
+     * room AND per member; it arrives with the page as `data.chatTabs`. Both columns get the same
+     * one — an entitlement does not depend on which column a member is looking at.
+     */
+    chatTabs: readonly string[];
     polls: RoomPolls;
     /** The page owns which menu is open, so only one is open across every column at once. */
     menus: RoomMenus;
@@ -219,6 +228,7 @@
     alerts,
     broadcasts,
     chat,
+    chatTabs,
     polls,
     menus,
     isPresenter,
@@ -733,33 +743,7 @@
                   <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
                 {/if}</a
               >
-              <ul
-                role="tablist"
-                class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs"
-              >
-                <li class="nav-item">
-                  <!-- svelte-ignore a11y_interactive_supports_focus -->
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <a
-                    data-bs-toggle="tab"
-                    role="tab"
-                    class={['nav-link', { active: chat.tab === 'main' }]}
-                    onclick={() => (chat.tab = 'main')}>Main Chat</a
-                  >
-                </li>
-                <li class="nav-item">
-                  <!-- svelte-ignore a11y_interactive_supports_focus -->
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <a
-                    data-bs-toggle="tab"
-                    role="tab"
-                    class={['nav-link', { active: chat.tab === 'off-topic' }]}
-                    onclick={() => (chat.tab = 'off-topic')}>Off Topic</a
-                  >
-                </li>
-              </ul>
+              <ChatTabStrip tabs={chatTabs} bind:active={chat.tab} />
               <ul class="nav ml-auto align-items-center">
                 <li class="nav-item">
                   <!-- svelte-ignore a11y_missing_attribute -->

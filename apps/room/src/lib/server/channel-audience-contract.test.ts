@@ -60,6 +60,21 @@ const serverModules = tracked.filter(
 const AUDIENCE: Record<string, 'room' | 'addressed'> = {
   // Everybody in the room is entitled to these.
   alerts: 'room',
+  /*
+    `room`, and it needs its paragraph since 2026-08-28 because a chat frame is no longer sent to
+    every listener.
+
+    `chatTabsWithBadges` lets an owner configure extra chat CHANNELS behind badges, so who may read a
+    given channel is a per-member entitlement — `publishChatToRoom` skips a listener whose resolved
+    channel set does not hold the one being published. That is a narrower AUDIENCE than `room` in the
+    sense of "not literally everyone".
+
+    It is still `room` and not `addressed`, and the distinction is the one `typing` makes below:
+    `addressed` means the payload concerns ONE PERSON and delivery must name them, as a private
+    message does. A chat message concerns everybody entitled to its channel, which is a room —
+    a smaller one. Classifying it `addressed` would demand `publishToUsers` and a recipient list,
+    which is the wrong shape for a broadcast to a group nobody enumerated.
+  */
   chat: 'room',
   roster: 'room',
   cmdsAdmin: 'room',
@@ -79,6 +94,10 @@ const AUDIENCE: Record<string, 'room' | 'addressed'> = {
     composer means, and every member of the channel is entitled to it. What differs per recipient is
     one NAME: `publishTypingToRoom` removes the reader's own, because the frame that would tell you
     about your own keystrokes is the one you just sent.
+
+    …and, since 2026-08-28, whether they receive the frame at all: a badge channel's typists are as
+    private as its messages, so this publisher consults the same entitlement `chat` does. Same
+    reasoning as the entry above — a smaller room is still a room.
 
     That is a REDACTION, not an addressing rule, and the distinction is the same one `roster` makes
     two lines up: `publishRosterToRoom` also builds a frame per listener and also removes fields

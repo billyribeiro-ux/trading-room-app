@@ -99,7 +99,14 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `enableQAReactions` left last, and it is the clearest case yet for READING a row before sizing it.
+ * `chatTabsWithBadges` left after it, and it is the only row so far that changed a TYPE: this room
+ * had two hard-coded chat channels and a closed `ChatTab` union over them. An owner can configure
+ * more, behind badges, so the set is per room and per member — and the reference decides it in the
+ * BROWSER, which is why every read and write path here asks the server instead, and why the chat and
+ * typing fan-outs became audience-aware. `chat-tabs-contract.test.ts`.
+ *
+ * `enableQAReactions` left before it, and it is the clearest case yet for READING a row before
+ * sizing it.
  * It was filed as a one-line wire because `sourceMessageBehavior.react` already carried the rule
  * verbatim — and that rule could never evaluate true, because the Q&A thread rendered its entries as
  * `kind="chat"` behind `onaction={() => {}}`. What the setting needed underneath it was a thread
@@ -117,7 +124,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'isNewIndicatorOn',
   'openLoginLink',
   'authMode',
-  'chatTabsWithBadges',
   'enableDiscord',
   'hasAlertScheduler',
   'playChatMessageSoundFor',

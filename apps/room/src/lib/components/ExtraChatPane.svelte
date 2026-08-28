@@ -33,6 +33,7 @@
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
+  import ChatTabStrip from './ChatTabStrip.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
@@ -53,6 +54,13 @@
      * owns the value so that paging and unread counts can be keyed by channel across both columns.
      */
     tab: ChatTab;
+    /**
+     * The channel strip this column draws, decided on the SERVER.
+     *
+     * Both columns get the SAME list — a member's entitlement does not depend on which column they
+     * are looking at — and it arrives with the page as `data.chatTabs`. See `#lib/chat-tabs.ts`.
+     */
+    chatTabs: readonly string[];
     /** `#textAreaTxtExtra`'s value. Bindable for the same reason the main composer is. */
     composer: string;
     /** Already filtered to `tab` by the page, so this component never decides what it may show. */
@@ -156,6 +164,7 @@
 
   let {
     tab = $bindable('off-topic'),
+    chatTabs,
     composer = $bindable(''),
     messages,
     doNotDisturbOn,
@@ -301,33 +310,7 @@
             <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
           {/if}</a
         >
-        <ul
-          role="tablist"
-          class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs"
-        >
-          <li class="nav-item">
-            <!-- svelte-ignore a11y_interactive_supports_focus -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_missing_attribute -->
-            <a
-              data-bs-toggle="tab"
-              role="tab"
-              class={['nav-link', { active: tab === 'main' }]}
-              onclick={() => (tab = 'main')}>Main Chat</a
-            >
-          </li>
-          <li class="nav-item">
-            <!-- svelte-ignore a11y_interactive_supports_focus -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_missing_attribute -->
-            <a
-              data-bs-toggle="tab"
-              role="tab"
-              class={['nav-link', { active: tab === 'off-topic' }]}
-              onclick={() => (tab = 'off-topic')}>Off Topic</a
-            >
-          </li>
-        </ul>
+        <ChatTabStrip tabs={chatTabs} bind:active={tab} />
         <ul class="nav ml-auto align-items-center">
           <!-- `O(9, o.showPMBtn ? 9 : -1)` — the same gate the main pane's PM button uses. -->
           {#if showPmButton}

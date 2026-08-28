@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 97 of 269 are wired today.
+// nothing in the room reads it yet. 98 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -232,7 +232,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "extraRegChannels", section: "settings", type: "textarea", label: "Extra Regular Channels", help: "Comma separated list of extra regular (anyone can post) channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "altGenChannelName", section: "settings", type: "textarea", label: "Rename \"Main Chat\"", help: "Rename the Main Chat channel to...", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "altOffTopicChannelName", section: "settings", type: "textarea", label: "Rename \"Off-Topic\"", help: "Rename the Off-Topic channel to...", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "chatTabsWithBadges", section: "settings", type: "textarea", label: null, help: "List of chat tabs with badges: [ { \"name\": \"easy channel\", \"badges\": [ \"61eafd612fcdee7bc8e979bc\", \"6489f1f98993a677b83cdd70\" ] }, { \"name\": \"harder channel\", \"badges\": [ \"61eafd612fcdee7bc8e979bc\" ] } ]", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "chatTabsWithBadges", section: "settings", type: "textarea", label: null, help: "List of chat tabs with badges: [ { \"name\": \"easy channel\", \"badges\": [ \"61eafd612fcdee7bc8e979bc\", \"6489f1f98993a677b83cdd70\" ] }, { \"name\": \"harder channel\", \"badges\": [ \"61eafd612fcdee7bc8e979bc\" ] } ]", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasProfanityFilter", section: "settings", type: "checkbox", label: "Chat Profanity filter?", help: "Profanity filter will try to filter (put xxxx) on bad words", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "ingnoreBadWordsList", section: "settings", type: "text", label: "Ignore List", help: "Comma separated list OK words to remove from the filter", helpShape: "bare", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "additionalBadWordsList", section: "settings", type: "text", label: "Extra Bad list", help: "Comma separated list of additional bad words you want to filter", helpShape: "bare", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

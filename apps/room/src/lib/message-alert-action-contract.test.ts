@@ -177,15 +177,22 @@ describe('sendMessage', () => {
     It is a schema check now, so the compiler refuses `'not-a-channel'` before the runtime does —
     hence the cast, which is what lets this keep proving the runtime guard is still there.
   */
-  it('refuses a channel outside CHAT_TABS', async () => {
-    await expectSchemaRefusal(
-      callRemote(locals(member), () =>
-        sendMessage({ body: 'hidden', room: 'not-a-channel' as 'main' })
-      )
-    );
+  it('refuses a channel this member does not hold', async () => {
+    /*
+      IT USED TO BE A SCHEMA REFUSAL against the fixed pair `['main', 'off-topic']`. Since 2026-08-28
+      the schema only BOUNDS the string and the answer comes from `memberChatChannels`, because
+      `chatTabsWithBadges` makes the channel set per room and per member — so a 403 rather than a
+      validation error, and the room's own configuration rather than a constant decides it.
+
+      The controller stub above configures no badge channels, so the two built-ins are this member's
+      whole list, which is exactly the situation this assertion always described.
+    */
+    await expect(
+      callRemote(locals(member), () => sendMessage({ body: 'hidden', room: 'not-a-channel' }))
+    ).rejects.toMatchObject({ status: 403 });
     expect(db.select().from(messages).all()).toHaveLength(0);
 
-    // Both real channels are accepted.
+    // Both built-in channels are accepted.
     for (const room of ['main', 'off-topic'] as const) {
       await expect(
         callRemote(locals(member), () => sendMessage({ body: 'ok', room }))

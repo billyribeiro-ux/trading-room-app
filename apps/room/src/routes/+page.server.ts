@@ -31,6 +31,7 @@ import { hashEmail, publicSessionHandle } from '#lib/server/connection.js';
 // `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
 // `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
 import { loadNewestChatPages } from '#lib/server/chat-log.js';
+import { memberChatChannels } from '#lib/server/chat-channels.js';
 import { loadAlertPage, loadQuestionsForAlerts } from '#lib/server/alert-log.js';
 // `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
 import { parseReactions } from '#lib/server/reactions.js';
@@ -467,7 +468,20 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     `loadOlderChatMessages` and held in client state, so nothing became unreachable; see
     `#lib/server/chat-log.ts` for why a bare LIMIT would have been worse than the bug.
   */
-  const messageRows = loadNewestChatPages(requireRoomShortCode(locals));
+  /*
+    THE CHANNELS THIS MEMBER MAY READ, resolved before a single row is selected.
+
+    `chatTabsWithBadges` makes a chat channel an entitlement, so the set is per room AND per member.
+    Reading a fixed list here would have put a private channel's messages into every member's page
+    payload — SSR HTML included — with the client filtering them for display, which is not a filter,
+    it is a leak with a rendering step after it. `#lib/chat-tabs.ts` has the rule; this is the read.
+  */
+  const chatChannels = await memberChatChannels(request, requireRoomShortCode(locals), {
+    email: requireUser(locals).email,
+    role: requireUser(locals).role
+  });
+
+  const messageRows = loadNewestChatPages(requireRoomShortCode(locals), chatChannels);
 
   /*
     THE NEWEST PAGE, not every alert the room has ever posted.
@@ -684,6 +698,8 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         )
         .orderBy(desc(chatMutes.expiresAt))
         .get()?.expiresAt ?? null,
+    /** The tab strip, in the order it is drawn — resolved above. `#lib/chat-tabs.ts` has the rest. */
+    chatTabs: chatChannels,
     alertQuestions: questionRows,
     files: db
       .select()

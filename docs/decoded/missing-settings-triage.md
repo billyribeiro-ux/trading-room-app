@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **28** as this is written; twenty-nine have been answered by building, one more
+2026-08-28 and is at **27** as this is written; thirty have been answered by building, one more
 is answered NOT A GAP, and the CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -250,6 +250,19 @@ Q&A thread needed it: a question is neither an alert nor a chat message, so muti
 the shared shape meant labelling a question id as one of the two, and the day anything started
 reading `id` it would have acted on the wrong table.
 
+**A reply could be posted into a channel the replier could not read.** Found 2026-08-28 while
+building `chatTabsWithBadges`, and it existed only because that setting created private channels at
+all. `replyMessage` looks its target up by ROOM and id — never by channel — and then inserts into
+`original.room`. Without a check a member could name the id of a message in a badge channel and post
+a reply INTO it, quoting the line they were replying to back at the people who can read it. Refused
+with the same 404 the cross-room case gets, because a 403 would confirm the id exists.
+
+**The realtime chat fan-out went to every listener in the room.** Same feature, same day.
+`publishChatToRoom` carries no body, which is why it is built per listener at all — but it carries
+the sender, the channel and the fact that something happened, and it is what makes a client refetch.
+A badge channel's frames would have told every member that a private channel exists and that
+somebody just posted in it. `publishTypingToRoom` had the same shape and named who was active there.
+
 **Two badges leaked another member's billing status.** Found earlier the same day while checking
 `isNewIndicatorOn`; recorded in the CORRECTED section above.
 
@@ -259,7 +272,6 @@ reading `id` it would have acted on the wrong table.
 
 | setting | byte | size |
 | --- | --- | --- |
-| `chatTabsWithBadges` | 1,007,480 | Badge-gated extra chat channels. A JSON list — the schema's help text carries the shape — and `registerForExtraChannels` subscribes only to the channels whose badges the member holds. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
@@ -283,7 +295,7 @@ reading `id` it would have acted on the wrong table.
 
 ---
 
-## The twenty-nine already answered
+## The thirty already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -311,6 +323,7 @@ reading `id` it would have acted on the wrong table.
 | `copyTrades` | BUILT — `copy-trades.ts` plus a `trade` segment on `RoomMessage`. Alerts only, as upstream gates it. Divergence: the reference's two `String.replace` calls take string patterns, so it makes only the FIRST order in a message copyable; the room splits every balanced pair. | 2026-08-28 |
 | `positionsIframe` + `positionsIframeUrl` | BUILT — `PositionsContainer` and `PositionsControls`, wired at nodes 3 and 5 of the presentation split area. ONE feature, two settings, conjoined once on the page. The thirty-second reload is behind a SECOND per-viewer gate, ANDed, so a member who never opens the panel has no background timer. | 2026-08-28 |
 | `usersCanDeleteOwnMsgs` | **BUILT, and it closed a hole.** The row's caveat — *"needs the `userDeleteChatMsg` command, which is absent"* — was FALSE: `messageAction`'s delete branch already let a member remove their own message, on all three item kinds, and never asked whether the room allowed it. The setting is now checked on the SERVER from the control plane, and the menu entry it feeds was defaulting off the whole time so nothing showed the gap. | 2026-08-28 |
+| `chatTabsWithBadges` | **BUILT, and it is the first row to change a TYPE.** This room had two chat channels hard-coded in three components behind a closed `ChatTab` union. An owner can configure more, behind badges, so the set is per room and per member — and the reference decides it in the BROWSER, so every read and write path here asks the server instead (`memberChatChannels`), and the chat and typing fan-outs became audience-aware. An entry with an EMPTY badge list is public, which is upstream's own `[].every(…)` and is reproduced with a test saying so. | 2026-08-28 |
 | `enableQAReactions` | **BUILT, and it was filed as a one-line WIRE twice over.** The rule was already transcribed and could never evaluate true — the Q&A thread rendered `kind="chat"` behind an inert handler. It needed two commands addressing a question by its own row id, two columns on `alert_questions`, and the thread extracted to its own component. Three menu entries that turn on with `kind="alert"` are deliberately NOT drawn: they address an `_id` a thread entry does not have, and are dead upstream. | 2026-08-28 |
 | `hasTypingIndicator` | BUILT — `lib/server/typing.ts` (an in-memory registry swept on read), `setTyping`, `publishTypingToRoom`, `TypingSignal` and the indicator in both columns. It gates the SEND as well as the display. The animated dots are deliberately NOT drawn: neither `app-typing-indicator-dots` nor `.typing-indicator` has a rule in any stylesheet we hold. | 2026-08-28 |
 

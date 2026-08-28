@@ -142,7 +142,7 @@ describe('the fan-out filters per recipient', () => {
     expect(at, 'the publisher is missing').toBeGreaterThan(-1);
     const body = events.slice(at, events.indexOf('\n}', at));
     // `typistsIn(room, channel, thatListener'sId)` — the exclusion happens per listener.
-    expect(body).toContain('typistsIn(room, chatChannel, context?.id ?? -1)');
+    expect(body).toContain('typistsIn(room, chatChannel, context.user?.id ?? -1)');
     expect(body).not.toContain('publishToRoom(');
   });
 });
