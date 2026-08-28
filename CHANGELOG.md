@@ -33,6 +33,57 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 16:30 UTC — Two blockers re-measured, and `altChatRender` reclassified out of FEATURE
+
+**Runtime impact: NO.** Documentation and triage only. No source file changed.
+
+Both findings are corrections to things this repository had written down, and both were measured
+rather than inherited.
+
+#### `altChatRender` is BLOCKED, not a FEATURE, and the blocker is the capture roots
+
+The compact renderer is fully transcribable from the pinned v4 bundle — `app-st-compactmessage`'s
+const table (byte 1,395,475), its template (1,399,986) and its own `styles:[…]` block were all read
+today. The two classes our stylesheets lack, `.nowrap{white-space:nowrap;display:table}` and
+`.reactions-container{margin-left:20px}`, are in that block; they are absent from
+`css/complete-app-styles.css` for the right reason, which is that this room renders neither, because
+it has no compact mode.
+
+**What is blocked is building it cleanly.** Compact and regular share one ten-entry kebab menu, so
+the honest build extracts that menu out of `RoomMessage.svelte` — and `room-message-render.test.ts`
+pins *"all 18 captured kebabs with the exact labels and source order"*, the exact string
+`msgMenu dropright pt-1`, and `dropdown-menu users-dropdown-options`. It is one of the 49
+evidence-bound files EXCLUDED in this checkout: 13 of the 14 capture roots are gitignored and absent.
+So the extraction would be a change to the room's most-rendered component with its one guard switched
+off, and the alternative — a second copy of that menu and its ten gates — is the duplication
+`room-message-chrome.ts` exists to prevent.
+
+Unblocked by the capture roots being present, which is one `ln -s` on the owner's machine.
+
+#### The Rust blocker is narrower than it has been read as
+
+Measured in this container today:
+
+* `cargo check -p tradingroom-api --features testing` — **green** (1m 48s).
+* `cargo clippy -p tradingroom-api --features testing -- -D warnings` — **green**.
+* `cargo test -p tradingroom-api --features testing` — **cannot build.** The crate dev-depends on
+  `tradingroom-media` for one contract test, that pulls `mediasoup-sys`, and its build script fetches
+  `github.com/versatica/libsrtp/archive/v3.0.0-beta-2fc078db.zip`, where the egress proxy answers
+  **403 Forbidden**. Reported rather than worked around, as the proxy documentation says to.
+
+The CHANGELOG entry of 2026-08-27 already stated this precisely; what had drifted was the shorthand
+it gets quoted as ("the Rust suite is blocked"). A `services/api` change **can** be compiled and
+linted here. It cannot be unit-tested — which is the reason `hasAlertScheduler` stays unbuilt: a
+timer that writes to a multi-tenant fintech database is not something to ship on a compile.
+
+#### Where the settings enumeration stands
+
+**27 open questions, 30 answered by building.** The FEATURE table is down to four rows —
+`enableDiscord`, `alertsOverlayOnScreenshare`, `autoRecord`+`dontStopRecOnMicMute`, and
+`hasAlertScheduler` — and every one of the four is blocked on something outside this repository: a
+Discord application registration, a human at a screen picker, a server-side recorder, and the
+untestable-here crate above.
+
 ### 2026-08-28 16:18 UTC — Extra chat channels behind badges, and a fan-out that finally asks who is entitled
 
 > **A NOTE ON THE TIMES, and it is a correction.** This entry is stamped from `date -u` at the

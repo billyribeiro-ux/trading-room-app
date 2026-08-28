@@ -321,6 +321,22 @@ The largest by read count are `deleteAlertPW` (12, a credential), `altChatRender
 times the reference mentions a name, and the biggest number on this list is a credential we refuse.
 `enableQAReactions` was second at 10 and is built; `positionsIframe` was fourth at 7 and is built.
 
+**THE SETTINGS ENUMERATION IS DOWN TO FOUR UNBUILT FEATURES, and every one of the four is blocked on
+something outside this repository** — measured 2026-08-28, not inherited. `enableDiscord` needs a
+Discord application registration; `alertsOverlayOnScreenshare` needs a human at a screen picker
+(`getDisplayMedia` cannot be automated and headless returns a synthetic gradient);
+`autoRecord`/`dontStopRecOnMicMute` need the server-side recorder that `start-recording` is also
+waiting for; `hasAlertScheduler` needs a scheduler process in `services/api`. `altChatRender` moved
+OUT of that table the same day and into BLOCKED — see the triage for the measurement.
+
+**TWO INHERITED BLOCKERS WERE RE-MEASURED AND ONE IS NARROWER THAN IT READS.** `cargo check -p
+tradingroom-api --features testing` and `cargo clippy -p tradingroom-api --features testing --
+-D warnings` are **both green in this container**. What cannot build is `cargo test`: the crate
+dev-depends on `tradingroom-media` for one contract test, which pulls `mediasoup-sys`, whose build
+script fetches `libsrtp` from GitHub and gets **403** from the egress proxy. So a `services/api`
+change can be compiled and linted here — it just cannot be unit-tested, which is why a scheduler
+that writes to a multi-tenant database on a timer is not something to ship from this container.
+
 **`chatTabsWithBadges` was the first row to change a TYPE**, 2026-08-28. This room had two chat
 channels hard-coded in three components behind a closed `ChatTab` union, and the union's own note
 argued for it: a typo becomes a compile error. An owner can configure more channels, behind badges,
