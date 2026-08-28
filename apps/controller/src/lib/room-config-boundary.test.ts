@@ -291,6 +291,14 @@ describe('the allow-list itself', () => {
         page and travels as `displayMode`, so a component cannot read this setting and decide for
         itself. What travels on the chrome is the one term it contributes to the hide-avatar rule.
       */
+      /*
+        The only consumer on this map that is not a DOM read: it decides whether a canvas is spliced
+        between `getDisplayMedia` and the producer. `RoomScreenOverlay` is the gate and the
+        lifecycle; the SSE router feeds it each arriving alert, including this presenter's own, which
+        is the one frame the router must not skip on the own-sender guard.
+      */
+      alertsOverlayOnScreenshare:
+        'RoomScreenOverlay wraps the display capture with it, and the SSE router feeds every arriving alert to it',
       altChatRender: 'RoomDisplayModes seeds the compact mode from it, and hideMessageAvatar reads it as one term',
       chatTabsWithBadges: 'chat-tabs.ts parses it, and memberChatChannels decides which channels each member holds',
       enableQAReactions:

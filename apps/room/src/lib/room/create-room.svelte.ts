@@ -121,6 +121,7 @@ import { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
 import { RoomRecording } from '#lib/room/recording.js';
 import { RoomWindowHandlers } from '#lib/room/window-handlers.js';
 import { RoomWebcams } from '#lib/room/webcams.js';
+import { RoomScreenOverlay } from '#lib/room/screen-overlay.svelte.js';
 import { RoomScreens } from '#lib/room/screens.svelte.js';
 import { RoomUserActions } from '#lib/room/user-actions.svelte.js';
 import {
@@ -621,11 +622,27 @@ export function createRoom(deps: RoomDeps) {
     — `screens`'s list thunk and its removal receiver — read `mediaTransport` through arrows, which
     is why the order only has to satisfy the compiler.
   */
+  /*
+    `alertsOverlayOnScreenshare` — the canvas that goes between a shared screen and the wire.
+
+    Constructed HERE rather than inside the transport because it has two consumers that never meet:
+    the local publisher wraps a capture with it, and the SSE router feeds it arriving alerts. The
+    setting is read through a thunk for the reason every other `data` read here is — the load can
+    replace the object, and an owner un-ticking it must stop the next share being wrapped.
+
+    `=== true` and not a truthy test: the field is optional on the wire, and a room-config response
+    that omitted it must leave the share alone rather than overlay it by accident.
+  */
+  const screenOverlay = new RoomScreenOverlay({
+    enabled: () => data.sessData?.alertsOverlayOnScreenshare === true
+  });
+
   const mediaTransport: RoomMediaTransport = new RoomMediaTransport({
     dialogs,
     toasts,
     media,
     screens,
+    overlay: screenOverlay,
     session: () => data,
     closeScreenMenu: () => menus.set('screen', false),
     videoDeviceId: () =>
@@ -880,6 +897,8 @@ export function createRoom(deps: RoomDeps) {
     privateChat,
     /* The chat columns, for `typingUpdated`. Constructed above, so it is a value and not a thunk. */
     chat,
+    /* Every arriving alert, burned into whatever this presenter is sharing. */
+    screenOverlay,
     userActions,
     session: () => data,
     isPresenter: () => isPresenter,

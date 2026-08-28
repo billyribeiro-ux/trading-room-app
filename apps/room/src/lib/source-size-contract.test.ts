@@ -592,8 +592,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       per-recipient snapshot rather than somebody's message — so the guard that stops a member
       refetching on their own post would have dropped every one of them.
     */
-    max: 892,
-    why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
+    /*
+      RAISED 892 -> 935 on 2026-08-28, for `alertsOverlayOnScreenshare`, and argued here because the
+      rule at the top of this file says a raise is a conversation and not a number to edit.
+
+      What arrived is a SEVENTH channel this router recognises — `alerts` — a structural
+      `ScreenOverlaySink`, and the paragraph explaining why the branch sits BEFORE the own-sender
+      guard. That last part is the whole value of the diff and is the reason it was not shortened:
+      the presenter posting an alert is usually the presenter sharing the screen, so an author who
+      later "tidies" this branch below the guard would silently stop the overlay drawing the alerts
+      that matter most, with every test still green and nothing to read that says why it was there.
+
+      The alternative on offer was a second router, or an `$effect` on the page watching `data.alerts`
+      — one of which invents a module to satisfy a number and the other of which grows the file this
+      ratchet cares about most. Six channels were already routed here; the seventh belongs with them.
+
+      It goes DOWN if the `privChat` or `cmds` transcriptions ever find a module of their own, which
+      is where the next real extraction in this file is. It does not go up again.
+    */
+    max: 935,
+    why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
     file: 'lib/room/webcams.ts',
@@ -834,7 +852,39 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       From here it ratchets down like every other entry.
     */
-    max: 872,
+    /*
+      RAISED 872 -> 925 on 2026-08-28, for `alertsOverlayOnScreenshare`, and argued rather than edited.
+
+      The setting splices a CANVAS between `getDisplayMedia` and the producer, so the change lands in
+      the one method in this repository that cannot be exercised by any test in it: a screen capture
+      needs a human at a picker. That is precisely why the growth here is comment and why none of it
+      was trimmed. Four of the five hunks are a sentence saying what the line below it protects — why
+      `wrapped` is declared outside the `try` (an abandoned overlay keeps a 33ms interval alive
+      forever), why the preview follows the WRAPPED stream (a presenter who cannot see the overlay
+      cannot tell it is on), why `keep` is called after the publish and not before (there is no
+      producer id until then, and nothing for the browser's Stop-sharing bar to end), and why the
+      catch releases the overlay before `stopStream` (the overlay holds the raw tracks, so it is what
+      takes the browser's sharing indicator down).
+
+      THE PAYMENT IS REAL AND IT IS ELSEWHERE. 116 lines of lifecycle went to
+      `lib/room/screen-overlay.svelte.ts`, 253 to `lib/alert-overlay-compositor.ts` and 268 to the
+      pure `lib/alert-overlay-layout.ts`, which is the half that carries the tests. Had that gone in
+      here — which is how the reference does it, one 400-line method — this file would be past 1,200
+      and the geometry would be untestable. The ratchet did its job: it forced the split first.
+
+      +16 OF IT IS TWO LEAKS FOUND BY RE-READING THE DIFF, and they are the reason the raise is worth
+      it rather than a cost of it. A publish that failed after the wrap succeeded left a 33ms interval
+      drawing for the rest of the page's life, because nothing would ever call `stopLocalScreen` for
+      a share that was never published; and a reconnect re-publishing under a new producer id left
+      the overlay keyed by one the SFU had closed, so the eventual stop released nothing and the
+      browser kept saying the screen was still being shared. Neither is reachable from any test here
+      — a failed produce and a reconnect both need a real SFU — so what stands in their place is the
+      paragraph at each site saying what it protects.
+
+      It goes DOWN if `startScreenSharing`'s constraint transcription ever moves to the media module
+      that owns constraints. It does not go up again.
+    */
+    max: 925,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -2294,6 +2344,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'which renderer each pair of surfaces uses; seeded once, then owned by the member'
   },
   {
+    file: 'lib/room/screen-overlay.svelte.ts',
+    /*
+      Born capped, 2026-08-28, in the commit that created it, and the cap moved once BEFORE it
+      landed: 117 -> 166, for `rekey` and the two-teardown split. Recorded rather than quietly set to
+      whatever the file measured, because a "born capped" number that was silently rewritten twice is
+      not evidence of anything. Both additions are defects this class had and the review found — see
+      `local-capture.svelte.ts`'s note for what each one leaked.
+
+      `alertsOverlayOnScreenshare` split into three because only one third of it can be tested here:
+      `lib/alert-overlay-layout.ts` is pure geometry and is exercised exhaustively against a stub
+      measurer; `lib/alert-overlay-compositor.ts` is canvas, video element, interval and
+      `captureStream`, and is as thin as it can be made; and THIS is what knows what a producer id
+      is — the setting gate, the map from producer to overlay, and the fan-out of an arriving alert
+      to every screen this presenter is sharing.
+
+      If this number climbs, the question is whether GEOMETRY or CANVAS work has arrived in it. Both
+      belong to the other two, and the reason the split exists is that neither can be tested from
+      where the other lives.
+    */
+    max: 166,
+    why: 'which shares carry an alert overlay, and for how long'
+  },
+  {
     file: 'lib/room/create-room.svelte.ts',
     /*
       THE COMPOSITION ROOT, created 2026-08-17 (S7) and capped in the same commit.
@@ -2395,8 +2468,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a composition root is for, and it is the smallest form that growth takes: two hand-offs and an
       import that was already there.
     */
-    max: 1141,
-    why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
+    /*
+      1141 -> 1160 on 2026-08-28: `new RoomScreenOverlay`, its two hand-offs, and the citation.
+
+      Assembly, which is what this file is for — the overlay has two consumers that never meet (the
+      local publisher wraps a capture with it, the SSE router feeds it alerts), so nowhere below this
+      file can construct it. The lines beyond the construction itself say why the setting is read
+      through a thunk and why the read is `=== true`, which is the fail-closed rule this repository
+      applies to every optional field arriving from the control plane.
+    */
+    max: 1160,
+    why: 'the composition root - 37 constructions and their citations, assembly and nothing else'
   },
   {
     file: 'lib/room/gates.svelte.ts',

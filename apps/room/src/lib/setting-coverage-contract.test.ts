@@ -99,7 +99,18 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `altChatRender` left last, and it is the largest row the enumeration has produced: this room had
+ * `alertsOverlayOnScreenshare` left last, and it is the first row whose disposition in the triage
+ * was WRONG rather than merely stale. It was filed as blocked on "a human at a screen picker", and
+ * that is true of the only thing it blocks: nothing here can look at a composited frame. But the
+ * risk in this feature is not the canvas, it is the WRAPPING — the reference packs the first line
+ * against a width reduced by the sender prefix, spills what did not fit into a second pass at full
+ * width, breaks an over-long word character by character and keeps the tail in the buffer, and
+ * preserves an empty paragraph as a blank line. Four rules with edges, all of them arithmetic, and
+ * every one is now measured against a stub text measurer with its negative control seen red.
+ * The lesson is the one `altChatRender` taught on the same day: RE-MEASURE AN INHERITED BLOCKER.
+ * `alert-overlay-contract.test.ts`, and what it cannot verify is said in its own header.
+ *
+ * `altChatRender` left before it, and it is the largest row the enumeration has produced: this room had
  * no compact display mode at ALL, so two of the setting's three behaviours had nothing to act on.
  * It needed `app-st-compactmessage` transcribed as a second layout, the twelve-gate kebab menu
  * shared out of `RoomMessage.svelte` rather than copied, and a preference-key collision handled —
@@ -133,7 +144,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'enableDiscord',
   'hasAlertScheduler',
   'playChatMessageSoundFor',
-  'alertsOverlayOnScreenshare',
   'description',
   'dontStopRecOnMicMute',
   'isLocked',

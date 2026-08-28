@@ -974,6 +974,22 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'altChatRender',
   /*
+    "Alerts over screenshare?" — the last four alerts burned into the outgoing screen capture.
+
+    The reference does not draw this over the video element for the viewer; it puts a CANVAS between
+    the display capture and the wire and publishes the canvas instead, so the alerts are in the
+    pixels every member receives and in any recording made of them. That is why it is a room policy
+    and not a viewer preference: one presenter ticking it changes what everybody else sees.
+
+    Every occurrence in the reference bundle is sessData dotted onto the name, and the compositor at
+    bundle byte 1,099,577 reads it as the gate on whether the wrap happens at all. Nothing the room
+    can infer for itself: it depends on how the owner intends the room to be recorded.
+
+    Read by `#lib/room/screen-overlay.svelte.ts`, which wraps the capture, and by
+    `#lib/room/events.svelte.ts`, which feeds it each arriving alert.
+  */
+  'alertsOverlayOnScreenshare',
+  /*
     FOUR gates the room already implemented and could never switch on.
 
     `RoomMessage.svelte` has carried all four props since it was written, each defaulting false,

@@ -278,17 +278,27 @@ building around it. This section stays separate from BLOCKED because these
 are features with a known size, not questions with an unknown answer: what to build is understood in
 every case, and only the means to verify it is missing.
 
+**`alertsOverlayOnScreenshare` LEFT THIS SECTION ON 2026-08-28, and its row was wrong rather than
+stale.** It read "a human at a screen picker", and that is still true of exactly one thing: nothing
+in this repository can look at a composited frame, and the contract test says so in its own header
+rather than implying otherwise. What the row got wrong is treating that as the size of the feature.
+The risk here is not the canvas — it is the WRAPPING, and the wrapping is arithmetic: the first line
+is packed against a width reduced by the sender prefix, the spill wraps at the full width, an
+over-long word breaks character by character with its tail kept in the buffer for the next word, and
+an empty paragraph survives as a blank line. Four rules with edges. Split into a pure
+`alert-overlay-layout.ts`, all four are measured against a stub text measurer, and twelve negative
+controls were seen red. That is the second inherited blocker in one day to dissolve on re-measurement
+(`altChatRender` was the first), which is why this paragraph is here and not in a commit message.
+
 | row | what it needs, measured |
 | --- | --- |
 | `enableDiscord` | A Discord application registration. Owner's call — there is nothing to link to. |
-| `alertsOverlayOnScreenshare` | A human at a screen picker. `getDisplayMedia` cannot be automated and headless returns a synthetic gradient, so a compositor that replaces the outgoing track would ship to the most fragile path in the room with nothing able to look at the result. |
 | `autoRecord` + `dontStopRecOnMicMute` | A server-side recorder, which does not exist. Same blocker `start-recording` / `stop-recording` carry. |
 | `hasAlertScheduler` | A scheduler process in `services/api`, and the crate's TEST targets cannot be built here. **The Rust position is narrower than it has been written down as, measured today:** `cargo check -p tradingroom-api --features testing` and `cargo clippy … -- -D warnings` are both GREEN in this container. What fails is `cargo test`, because the crate dev-depends on `tradingroom-media` for one contract test, that pulls `mediasoup-sys`, and its build script fetches `libsrtp` from GitHub where the egress proxy answers **403**. So a `services/api` change can be compiled and linted here and cannot be unit-tested — and a timer that writes to a multi-tenant fintech database is not something to ship on a compile. |
 
 | setting | byte | size |
 | --- | --- | --- |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
-| `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
 | `hasAlertScheduler` | 1,009,745 | Already tracked in `TODO.md` with its own section — three commands and a server-side scheduler. |
 

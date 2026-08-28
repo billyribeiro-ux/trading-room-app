@@ -33,6 +33,136 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 17:45 UTC — `alertsOverlayOnScreenshare`: alerts burned into the outgoing screen capture
+
+**Runtime impact: YES.** In a room with *"Alerts over screenshare?"* on, a presenter's shared screen
+now goes out through a canvas that paints the last four alerts over it. The alerts are in the pixels
+every member receives and in any recording made of them, which is what the setting's help text has
+always promised. Rooms with the setting off are byte-for-byte unchanged: the wrap does not happen and
+the raw display stream reaches the producer exactly as before.
+
+#### The blocker was wrong, not stale — and that is the third one in a day
+
+The triage row read *"a human at a screen picker. `getDisplayMedia` cannot be automated and headless
+returns a synthetic gradient."* One half of that is still true and is stated in the contract test's
+own header: **nothing in this repository has seen a composited frame, and that the result looks right
+on a real desktop is unverified.**
+
+What the row got wrong was treating that as the size of the feature. The canvas is four calls. The
+part that is easy to get subtly wrong is the WRAPPING, and the wrapping is arithmetic:
+
+* the first line is **packed, not wrapped** — it takes words while they fit beside the sender prefix
+  and stops at the first that does not, without skipping ahead to a shorter one;
+* the spill wraps at the **full** width, not the prefix-reduced one;
+* a word wider than the line breaks **character by character**, and its last piece stays in the
+  buffer to be joined by the words after it rather than being flushed as its own line;
+* an **empty paragraph survives as a blank line**.
+
+Four rules, each with an edge, and every one measured through `ctx.measureText` upstream. Split into
+a pure `alert-overlay-layout.ts`, all four are exercised against a stub measurer at inputs a real
+share would take an afternoon to reproduce. **Nine negative controls were run and seen RED**, then
+the tree restored green: flushing every piece of a broken word, `continue` instead of `break` on the
+packed first line, an inclusive eviction bound, evicting the newest instead of the oldest, wrapping a
+camera capture, leaving a released overlay in the map, measuring the fade from arrival rather than
+from the hold, stacking cards with no gap, and dropping a blank paragraph.
+
+#### Three modules, because only one of them can be tested here
+
+| module | what it is | how it is verified |
+| --- | --- | --- |
+| `lib/alert-overlay-layout.ts` | pure geometry and wrapping | 28 assertions against a stub measurer |
+| `lib/alert-overlay-compositor.ts` | canvas, hidden `<video>`, interval, `captureStream` | constants pinned; behaviour needs a browser and is **not** verified |
+| `lib/room/screen-overlay.svelte.ts` | the producer-id lifecycle | 16 assertions against a fake compositor |
+
+Doing it the way the reference does — one 400-line method inside the capture service — would have put
+the geometry somewhere no test could reach it. The size ratchet is what forced the split, which is
+the clearest case yet of that file earning its keep.
+
+#### Transcribed constants, none rounded
+
+From the compositor at byte 1,098,419 and its draw loop at 1,100,450–1,102,700: `setInterval(…, 33)`
+stored in a field the reference misleadingly calls `animFrameId`; `canvas.captureStream(30)` with
+`contentHint = 'detail'`; a 5s `loadedmetadata` timeout falling back to 1920×1080; card width
+`min(900, .9 × width)` at `x = width − cardWidth − 24`; alpha `age < 14000 ? 1 : 1 − (age − 14000)/1000`;
+height `48 + 44 × (1 + lines)`; baseline `y + 24 + 32`; `rgba(0, 0, 0, 0.72)` ground with an 8px
+`#f0c040` left rule; at most four alerts, evicted at 15s.
+
+**`setInterval` and not `requestAnimationFrame`, deliberately.** The field name is a leftover; the
+mechanism is a timer, and it is reproduced because a `requestAnimationFrame` loop is throttled to a
+stop in a background tab — a presenter who tabbed away from their own share would silently stop
+sending frames to everybody watching.
+
+#### It fails OPEN, and that is a decision
+
+Every early return in the compositor leaves the RAW stream flowing: no `document`, no 2d context, no
+`captureStream`, and the consumer returns the unwrapped stream on a `null` handle. A share that
+silently does not start because an overlay could not initialise trades the room's primary function
+for a cosmetic one.
+
+#### Re-reading the diff found two leaks, and neither was reachable by any test here
+
+Both are in the capture path and both were found by reading the staged diff as a reviewer, which is
+the step this repository's standard names before "done":
+
+* **A publish that failed after the wrap succeeded leaked the draw loop forever.** Nothing calls
+  `stopLocalScreen` for a share that was never published, so nothing would ever release the canvas —
+  a 33ms interval drawing for the rest of the page's life. The fix is a second, narrower teardown:
+  `detach()` releases the canvas, the interval and the hidden `<video>` and **leaves the raw capture
+  running**, because the presenter keeps their local preview on that path and an error path whose
+  behaviour depends on a room setting is worse than either behaviour on its own. `#screenStream` is
+  put back to the raw stream with it, or the presenter's own Stop would end the canvas and leave the
+  browser still sharing their screen.
+* **A reconnect left the overlay keyed by a dead producer id.** `restartLocalScreens` re-publishes
+  the same track onto a fresh producer; the overlay stayed under the old key, so the eventual
+  `stopLocalScreen(newId)` released nothing and the raw capture kept running after the presenter
+  stopped sharing. `rekey(old, new)` moves the map entry **and** re-points the raw-ended callback —
+  a map-only rekey would have left the browser's own Stop bar aimed at a producer the SFU had closed.
+
+Neither is reachable from a test in this repository: one needs a failing `produce` against a real
+SFU, the other needs a reconnect. What stands in their place is the paragraph at each site saying
+what it protects, plus three of the twelve negative controls, which prove the lifecycle rules by
+mutating them.
+
+#### Two decisions worth finding later
+
+* **The presenter's own preview follows the WRAPPED stream.** A presenter who cannot see the overlay
+  cannot tell that alerts are being burned into what everybody else is watching.
+* **The SSE router feeds the overlay BEFORE its own-sender guard.** The presenter posting the alert
+  is usually the presenter sharing the screen, so skipping their own alert would mean the one member
+  who cannot see it is the room everybody else is watching. That guard exists to stop a refetch the
+  poster already did; it was never about what the poster may be shown. The reason is written at the
+  branch, because moving it below the guard is a change that leaves every test green.
+
+#### Three ceilings raised, each argued in place
+
+`local-capture.svelte.ts` 872 → 925, `events.svelte.ts` 892 → 935, `create-room.svelte.ts` 1141 →
+1160, and `lib/room/screen-overlay.svelte.ts` born capped at 166. Nearly all of the growth is the
+mandatory WHY at the four places in the capture path where a later edit would look harmless and
+would not be. The payment is 700 lines of new documented module carrying the tests.
+
+#### Verified
+
+`svelte-check` 0/0. `alert-overlay-contract.test.ts` 44 passing, with twelve negative controls seen RED
+and the tree restored green after each. Room `pnpm test` (privacy:verify + schema:verify + vitest) —
+**182 files / 3,006 tests, 1 skipped**, up from 181 / 2,956. Controller: schema regenerated at **100
+wired / 269 declared**, `verify-room-settings-schema` green, `verify-documented-test-counts` green at
+101 files / 1,034 tests, unit suite 1,013 passing / 21 skipped.
+
+**One gate step could not run and it is pre-existing and environmental**, confirmed by stashing this
+work and reproducing it on HEAD: `apps/controller/scripts/verify-public-preview-http.mjs` needs a
+PostgreSQL on `127.0.0.1:5432` and this container has none — `ECONNREFUSED`, before any assertion.
+Every controller step ahead of it in the chain passed (`schema:verify`, migrations, release,
+evidence, privacy, breakpoints, manage:styles, account, home, fonts, room-login).
+
+**One defect in this work was caught by a gate rather than by review:** the new `sessData` docblock
+was inserted between `altChatRender`'s prose and its declaration, and `orphaned-comment-contract`
+named the file and the line. That file exists because a comment separated from its code explains the
+wrong thing, and it earned its keep here.
+
+**Not verified: the composited frame itself.** No test in this repository has seen one, and nothing
+claims otherwise. The Svelte MCP is disconnected, so `svelte-autofixer` could not be run — no
+`.svelte` file was changed in this commit, only `.svelte.ts` modules.
+
 ### 2026-08-28 17:17 UTC — `altChatRender`: a compact renderer, a shared menu, and a third dead control
 
 **Runtime impact: YES.** A room with *"Alt chat render"* on now renders every log as compact single

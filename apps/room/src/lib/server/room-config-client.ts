@@ -572,6 +572,20 @@ export interface RoomSessionSettings {
    */
   altChatRender?: boolean;
   /**
+   * "Alerts over screenshare?" — the last four alerts burned into the outgoing screen capture.
+   *
+   * The reference does not draw these over the viewer's `<video>`. It puts a CANVAS between
+   * `getDisplayMedia` and the producer and publishes the canvas instead (compositor at byte
+   * 1,099,577), so the alerts are in the pixels every member receives and in any recording made of
+   * them — which is what the setting's own help text says it is for.
+   *
+   * It crosses because every occurrence is `sessData.<name>`, and because it is not a viewer
+   * preference in any sense: one presenter ticking it changes what everybody else sees.
+   * `#lib/room/screen-overlay.svelte.ts` is the gate and the lifecycle;
+   * `#lib/alert-overlay-layout.ts` is the geometry, and it is pure.
+   */
+  alertsOverlayOnScreenshare?: boolean;
+  /**
    * Four per-room gates that `RoomMessage.svelte` already implements.
    *
    * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.

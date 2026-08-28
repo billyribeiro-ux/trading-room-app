@@ -10,6 +10,7 @@ import type { WebcamPresenter } from '#lib/types.js';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomLocalCapture } from './local-capture.svelte';
 import type { RoomMedia } from './media.svelte';
+import type { RoomScreenOverlay } from './screen-overlay.svelte';
 import type { RoomScreens } from './screens.svelte';
 import type { RoomToasts } from './toasts.svelte';
 import type { RoomVolume } from './volume.svelte';
@@ -133,6 +134,12 @@ export class RoomMediaTransport {
     toasts: RoomToasts;
     media: RoomMedia;
     screens: RoomScreens;
+    /*
+      PASSED THROUGH, not held: `alertsOverlayOnScreenshare` belongs to the local publisher and this
+      class never touches it. A field here would be a second name for the same object in a file whose
+      header already records that the seam between the two is the direction media travels.
+    */
+    overlay: RoomScreenOverlay;
     session: () => TransportSession;
     roomVolume: RoomVolume;
     /** Speech recognition is a browser API the PAGE owns, because it writes into the caption list. */
@@ -346,6 +353,7 @@ export class RoomMediaTransport {
       toasts: this.#toasts,
       media: this.#media,
       screens: this.#screens,
+      overlay: options.overlay,
       session: () => this.#session(),
       beginSpeech: () => this.#beginSpeech(),
       endSpeech: () => this.#endSpeech(),

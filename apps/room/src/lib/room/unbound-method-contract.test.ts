@@ -30,6 +30,7 @@ import { RoomSessionControl } from './session-control.svelte';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
 import { RoomDisplayModes } from './display-modes.svelte';
+import { RoomScreenOverlay } from './screen-overlay.svelte';
 import { TypingSignal } from './typing-signal.svelte';
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomLogPages } from './log-pages.svelte';
@@ -124,6 +125,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
     bare — and passing it by reference is exactly what this file exists to refuse.
   */
   displayModes: RoomDisplayModes,
+  screenOverlay: RoomScreenOverlay,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole

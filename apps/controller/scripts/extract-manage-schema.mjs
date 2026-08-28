@@ -346,6 +346,16 @@ const ROOM_CONSUMED = [
      It crosses because every occurrence is sessData dotted onto the name. It seeds rather than
      locks: a member can still switch modes in the settings modal afterwards. */
   'altChatRender',
+  /* "Alerts over screenshare?" - the last four alerts burned into the outgoing screen capture.
+
+     The reference does not draw these over the viewer video element. It puts a CANVAS between the
+     display capture and the wire and publishes the canvas instead, so the alerts are in the pixels
+     every member receives and in any recording made of them. That is why it is room policy and not
+     a viewer preference: one presenter ticking it changes what everybody else sees.
+
+     Every occurrence in the bundle is sessData dotted onto the name, and the compositor at byte
+     1,099,577 reads it as the gate on whether the wrap happens at all. */
+  'alertsOverlayOnScreenshare',
   /* Four gates that RoomMessage.svelte already implements and no room could switch on.
 
      Every occurrence of all four in the reference bundle is sessData dotted onto the name, so they
@@ -898,9 +908,15 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // vendor is absent from the capture — so the room reproduces the DECISION (foreground-only colour)
 // and records that the reference's exact markup for it is unevidenced.
 //
+// 100 since 2026-08-28: `alertsOverlayOnScreenshare`. Thirty-first find, and the first that reaches
+// the MEDIA path rather than the DOM: the value decides whether a canvas is spliced between
+// `getDisplayMedia` and the producer, so what it changes is the bytes on the wire. Its layout half
+// is pure and unit-tested against a stub text measurer; its plumbing half fails OPEN, because a
+// share that does not start is a worse outcome than a share without its overlay.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 99 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 100 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

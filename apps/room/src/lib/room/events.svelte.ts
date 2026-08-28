@@ -23,6 +23,18 @@ interface TypingSink {
   typingUpdated(chatChannel: string, names: readonly string[]): void;
 }
 
+/**
+ * The screenshare overlay, seen as the one method this router uses.
+ *
+ * Structural rather than the class, for the reason `TypingSink` and `PrivateChatSink` are: the
+ * router recognises a channel and hands the frame over. What an overlay IS — a canvas, an interval,
+ * a producer-id map — is `#lib/room/screen-overlay.svelte.ts`'s business and no import of this file
+ * should be able to reach it.
+ */
+interface ScreenOverlaySink {
+  show(alert: { text: string; sender: string }): void;
+}
+
 interface EventStreamSession {
   room: { shortCode: string };
   user: { id: number };
@@ -128,6 +140,8 @@ export class RoomEventStream<Entry> {
     privateChat: PrivateChatSink;
     /** See `#chat`. Optional so existing constructions are unchanged. */
     chat?: TypingSink;
+    /** See `#screenOverlay`. Optional for the same reason `chat` is. */
+    screenOverlay?: ScreenOverlaySink;
     userActions: FollowStyleSource;
     /** The loaded page data, through a thunk because the load can replace it. */
     session: () => EventStreamSession;
@@ -182,6 +196,7 @@ export class RoomEventStream<Entry> {
     this.#roster = options.roster;
     this.#privateChat = options.privateChat;
     this.#chat = options.chat;
+    this.#screenOverlay = options.screenOverlay;
     this.#userActions = options.userActions;
     this.#session = options.session;
     this.#isPresenter = options.isPresenter;
@@ -228,6 +243,14 @@ export class RoomEventStream<Entry> {
    * error — nobody is looking at a column that has not been made yet.
    */
   readonly #chat: TypingSink | undefined;
+  /**
+   * The screenshare overlay, for arriving alerts and nothing else.
+   *
+   * OPTIONAL for the same two reasons `#chat` is: it is constructed alongside this stream rather
+   * than before it, and an alert arriving with no overlay to draw on has nowhere to land, which is
+   * the correct outcome in every room that did not tick the setting.
+   */
+  readonly #screenOverlay: ScreenOverlaySink | undefined;
   readonly #userActions: FollowStyleSource;
   readonly #session: () => EventStreamSession;
   readonly #isPresenter: () => boolean;
@@ -700,8 +723,7 @@ export class RoomEventStream<Entry> {
       */
       if (payload.channel === 'typing') {
         const frame = payload.data as
-          | { chatChannel?: string; names?: readonly string[] }
-          | undefined;
+          { chatChannel?: string; names?: readonly string[] } | undefined;
         if (typeof frame?.chatChannel === 'string') {
           this.#chat?.typingUpdated(frame.chatChannel, frame.names ?? []);
         }
@@ -719,6 +741,27 @@ export class RoomEventStream<Entry> {
         }
         this.#privateChat.ingest(priv.message);
         return;
+      }
+
+      /*
+        `alertsOverlayOnScreenshare` — an arriving alert, handed to every screen this peer is sharing
+        so it is burned into the frames the room receives. `#lib/room/screen-overlay.svelte.ts` is
+        the gate; a room without the setting, or a presenter sharing nothing, fans out to nothing.
+
+        BEFORE the own-sender guard below, and that is the whole point rather than an accident of
+        ordering. The presenter posting the alert is usually the presenter sharing the screen, and
+        skipping their own alert would mean the one member who cannot see it is the room that
+        everybody else is watching. The guard exists to stop a REFETCH the poster already did; it
+        was never about what the poster may be shown.
+
+        The body travels on this channel already (`post-alert.remote.ts` publishes `body` and
+        `senderName`), so nothing here refetches to learn a line of text.
+      */
+      if (payload.channel === 'alerts') {
+        const alert = payload.data as { body?: string; senderName?: string } | undefined;
+        if (typeof alert?.body === 'string') {
+          this.#screenOverlay?.show({ text: alert.body, sender: alert.senderName ?? '' });
+        }
       }
 
       // Our own post already refetched. Re-invalidating would refetch twice per alert.

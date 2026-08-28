@@ -333,13 +333,19 @@ narrowings are in place and `evidence-partition.test.ts` pins 42.
 day. The guard was never off. That is the SECOND inherited blocker to dissolve on re-measurement in
 one session, after the Rust one below — **re-measure a blocker before building around it.**
 
-**THE SETTINGS ENUMERATION IS DOWN TO FOUR UNBUILT FEATURES, and every one is blocked on something
+**THE SETTINGS ENUMERATION IS DOWN TO THREE UNBUILT FEATURES, and every one is blocked on something
 outside this repository** — measured 2026-08-28, not inherited. `enableDiscord` needs a
-Discord application registration; `alertsOverlayOnScreenshare` needs a human at a screen picker
-(`getDisplayMedia` cannot be automated and headless returns a synthetic gradient);
-`autoRecord`/`dontStopRecOnMicMute` need the server-side recorder that `start-recording` is also
-waiting for; `hasAlertScheduler` needs a scheduler process in `services/api`. `altChatRender`
-was the fifth and is BUILT.
+Discord application registration; `autoRecord`/`dontStopRecOnMicMute` need the server-side recorder
+that `start-recording` is also waiting for; `hasAlertScheduler` needs a scheduler process in
+`services/api`. `altChatRender` was the fifth and is BUILT.
+
+**`alertsOverlayOnScreenshare` was the fourth, and it is BUILT — its blocker was WRONG, not merely
+stale.** The row read "a human at a screen picker", which remains true of the one thing it blocks:
+nothing here can look at a composited frame, and `alert-overlay-contract.test.ts` says so in its own
+header. But the risk in that feature was never the canvas; it was the wrapping, and the wrapping is
+arithmetic. Split into a pure `alert-overlay-layout.ts`, all four of its wrapping rules are measured
+against a stub text measurer and twelve negative controls were seen red. THIRD inherited blocker to
+dissolve on re-measurement in one session.
 
 **TWO INHERITED BLOCKERS WERE RE-MEASURED AND ONE IS NARROWER THAN IT READS.** `cargo check -p
 tradingroom-api --features testing` and `cargo clippy -p tradingroom-api --features testing --

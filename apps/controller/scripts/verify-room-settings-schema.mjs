@@ -16,7 +16,12 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
   Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 99.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 100.
+
+  86 -> 87 on 2026-08-28: alertsOverlayOnScreenshare. The first on this list that changes the BYTES
+  ON THE WIRE rather than the DOM: a canvas is spliced between the display capture and the producer,
+  so the alerts are burned into the frames every member receives and into any recording of them. It
+  is room policy for that reason - one presenter ticking it changes what everybody else sees.
 
   85 -> 86 on 2026-08-28: altChatRender. The compact log, and the room had no compact renderer at
   all — two of the setting's three behaviours had nothing to act on until one existed.
@@ -337,6 +342,7 @@ const EXPECTED_WIRED_SETTINGS = [
     owner typed, with nothing to default from.
   */
   'alertLabels',
+  'alertsOverlayOnScreenshare',
   'altChatRender',
   'chatTabsWithBadges',
   'usersPublicReply',
