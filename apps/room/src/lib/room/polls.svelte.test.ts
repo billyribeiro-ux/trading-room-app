@@ -69,6 +69,27 @@ describe('a poll arriving decides who sees it', () => {
     /*
       The reason `deliveredId` exists. Without it the same poll re-opens every time anything else on
       the page changes, which is what an effect watching `data.activePoll` does on every re-render.
+
+      ## THIS IS ALSO THE ANSWER TO THE AUTOFIXER, and it lives here rather than at `deliver`
+
+      `svelte-autofixer` flags the call site in `+page.svelte` — *"you are calling a function inside
+      an $effect… could it use `$derived`?"* — and unlike the other three effects in that file, the
+      honest answer is that yes, `deliver` assigns `$state`. That is the case the suggestion exists
+      to catch, so it is argued rather than dismissed:
+
+      **A latch is not a derivation.** The third of `deliver`'s three refusals is *this browser has
+      already opened this poll once*. A `$derived` has no memory of having fired, so the shape
+      cannot be written as one — and the two assertions below are what that memory looks like.
+
+      **It reads what it writes, and it CONVERGES rather than looping.** `#deliveredId` is read
+      inside `deliver` and assigned three lines later, so the effect tracks it: the write makes
+      `#deliveredId === poll.id` true, the effect runs once more, `deliver` returns false, and
+      nothing is written. One extra pass, no cycle.
+
+      The argument sits in the TEST and not in the docblock because `polls.svelte.ts` is at its
+      size ceiling (119 lines, `source-size-contract.test.ts`) and ceilings here only go down.
+      Reasoning next to the assertion that enforces it is not a consolation prize — this is the
+      file that would go red if somebody "simplified" the latch into a derivation.
     */
     const polls = new RoomPolls();
     expect(polls.deliver(poll(), VIEWER)).toBe(true);

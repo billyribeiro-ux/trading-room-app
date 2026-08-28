@@ -93,7 +93,7 @@ export class RoomPolls {
    *
    * A null poll is the poll ending: the delivery marker is cleared so the NEXT poll opens, and the
    * minimised flag with it, because a minimised modal for a poll that no longer exists is a
-   * restore button that opens nothing.
+   * restore button that opens nothing. It ASSIGNS from inside an `$effect`; the tests argue why.
    */
   deliver(poll: ActivePoll | null, viewerId: number): boolean {
     if (!poll) {

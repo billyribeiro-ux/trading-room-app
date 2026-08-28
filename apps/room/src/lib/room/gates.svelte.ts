@@ -15,7 +15,7 @@ import type { RoomMedia } from './media.svelte';
 import type { RoomPrefs } from './prefs.svelte';
 
 /**
- * What the sixteen predicates read off the loaded page data.
+ * What the eighteen predicates read off the loaded page data.
  *
  * DERIVED from `PageData` rather than restated. Between them these read a dozen fields off
  * `sessData`, and hand-narrowing that is how a gate ends up reading `unknown` and being cast into
@@ -30,14 +30,14 @@ type RosterSession = Parameters<typeof rosterBlockVisible>[1];
 /**
  * WHAT THIS VIEWER MAY SEE, in one place.
  *
- * Phase 5 slice 27. Sixteen `$derived` predicates — whether the roster is visible, whether archives
+ * Phase 5 slice 27. Eighteen `$derived` predicates — whether the roster is visible, whether archives
  * are reachable, which alert labels this room uses, whether the Benzinga panel appears and at what
  * URL, whether the mobile app link is offered, whether the chat column is hidden at all.
  *
- * **They are one module because they answer one question**, asked sixteen ways: given this room's
+ * **They are one module because they answer one question**, asked eighteen ways: given this room's
  * configuration and this viewer's role, what is on screen. Every one reads `data` and most read
  * nothing else; none of them writes anything. That is the tightest seam left on the page — seven
- * collaborators across 286 lines, and not a single field shared with it.
+ * collaborators across 388 lines, and not a single field shared with it.
  *
  * **GETTERS, not `$derived` class fields, and this is the precedent rather than a preference.** A
  * derived field initialises in DECLARATION ORDER, before the constructor has assigned the thunks it

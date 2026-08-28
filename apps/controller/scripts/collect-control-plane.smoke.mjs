@@ -179,12 +179,35 @@ function buildContext({ healthy, camelOnly = false, exemptClick = false }) {
         The 06:47 live run wrote 8 live JWTs into the downloaded file through exactly this element:
         ng-href="/session?id={{s.uuid}}&jwtSite={{tokSite}}" (views/page.welcome.html:379-381).
         Redaction was written against emails and hex, and a base64url token matched neither.
+
+        ## Its payload decodes to PLACEHOLDERS, and that is not cosmetic
+
+        This fixture used the jwt.io example token, whose payload decodes to
+        {"sub":"1234567890","name":"Ada Lovelace"}. Synthetic, published, nobody's data — and
+        `privacy:verify` flagged it anyway, correctly by its own rule: `countEncodedIdentityPayloads`
+        base64url-decodes every `eyJ…` run in every tracked file and reports one carrying an identity
+        CLAIM, because it cannot tell a famous example payload from a live one and must not try.
+
+        **That failure was real and it was standing.** `pnpm test` was red on `main` on this line
+        alone — not in CI, which runs the controller's `test:unit` and deliberately leaves the
+        evidence verifiers to the pre-merge full gate, so nothing announced it. Fixed 2026-08-28.
+
+        The payload is now {"sub":"[OWNER_JWT_SUB]","name":"[OWNER_JWT_NAME]"} — the same bracketed
+        convention every redacted capture in `evidence-dumps/` uses, and the exact shape the
+        verifier's own negative lookahead treats as already-redacted.
+
+        **The token is still a literal, and still three real base64url segments.** The alternative
+        was to assemble it from fragments so no `eyJ…` run appears in the source, which is what
+        `verify-privacy-boundary.mjs` does for the literals it rejects. Rejected here: it would make
+        the scanner blind to a genuinely live token pasted in the same split form, and this fixture
+        exists to prove the collector catches tokens by SHAPE. The shape has to survive; only the
+        claims had to go.
       */
       makeElement('a', {
         /* 400 chars, so `text` (capped at 300) truncates and must SAY it truncated. */
         text: 'Manage ' + 'x'.repeat(400),
         attrs: {
-          href: '#/page/manageSession/652882112ad80b3e7c5132d5?jwtSite=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFkYSBMb3ZlbGFjZSJ9.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXkw'
+          href: '#/page/manageSession/652882112ad80b3e7c5132d5?jwtSite=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJbT1dORVJfSldUX1NVQl0iLCJuYW1lIjoiW09XTkVSX0pXVF9OQU1FXSJ9.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXkw'
         }
       }),
       makeElement('a', { text: 'Suspend Account', attrs: { title: 'Suspend Account' } }),

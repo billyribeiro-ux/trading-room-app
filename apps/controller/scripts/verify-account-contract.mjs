@@ -20,7 +20,25 @@ const [
   ddl
 ] = await Promise.all([
   readFile(new URL('../evidence-dumps/login-page/logged-in-page', import.meta.url), 'utf8'),
-  readFile(new URL('../evidence-dumps/account-page/upload-image-badge-prompt.html', import.meta.url), 'utf8'),
+  /*
+    The one capture in this list that MAY NOT BE HERE, and the read is written to survive that.
+
+    `evidence-dumps/account-page/` has never been committed — see the note in
+    `evidence-dumps/README.md`. Reading it unconditionally made this whole contract die with ENOENT
+    on every clone before asserting anything at all, which the comment three reads below already
+    calls out as the worse failure: unverifiable while looking like a broken build. It was standing
+    that way in `main` until 2026-08-28, unnoticed because CI runs `test:unit` and leaves the
+    evidence verifiers to the pre-merge full gate.
+
+    `null` here means ABSENT, and the hash pin below says so out loud rather than passing quietly.
+    Nothing else in this file reads the value, so the rest of the contract is unaffected either way.
+  */
+  readFile(new URL('../evidence-dumps/account-page/upload-image-badge-prompt.html', import.meta.url), 'utf8').catch(
+    (error) => {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return null;
+      throw error;
+    }
+  ),
   readFile(new URL('../src/routes/(app)/account/+page.svelte', import.meta.url), 'utf8'),
   readFile(new URL('../src/routes/(app)/account/+page.server.ts', import.meta.url), 'utf8'),
   /*
@@ -47,11 +65,26 @@ assert.equal(
   '4e1cfd1e9f84fc420066cc0d9eb23bb3a6ebdef52d4b551f707113dc1a444e34',
   'the saved authenticated account reference changed; recapture and re-audit before accepting it'
 );
-assert.equal(
-  createHash('sha256').update(imageBadgePrompt).digest('hex'),
-  'fb4e934f761f15fb2eac26882ce6ebac9b6628f6f3b8ab48b20ad521a6c7c43f',
-  'the supplied original image-badge prompt changed; re-audit before accepting it'
-);
+/*
+  Pinned when the capture is here, and ANNOUNCED as unpinned when it is not.
+
+  The alternative — deleting the pin because the file is missing from this clone — would mean the
+  capture could come back changed and nothing would notice. This way the pin re-engages the moment
+  somebody commits the set, and `verify-evidence-layout.mjs` goes red at the same moment to make
+  them move its entry into the verified lists.
+*/
+if (imageBadgePrompt === null) {
+  console.log(
+    'account contract: SKIPPED the image-badge prompt hash — evidence-dumps/account-page/ is not in ' +
+      'this repository (see evidence-dumps/README.md). Every other assertion below still ran.'
+  );
+} else {
+  assert.equal(
+    createHash('sha256').update(imageBadgePrompt).digest('hex'),
+    'fb4e934f761f15fb2eac26882ce6ebac9b6628f6f3b8ab48b20ad521a6c7c43f',
+    'the supplied original image-badge prompt changed; re-audit before accepting it'
+  );
+}
 
 assert.match(reference, /var __disableMarketplace = 'true'/);
 assert.match(reference, /ng-hide="disableMarketplace"[^>]*>\s*<i[^>]*><\/i> Marketplace/);

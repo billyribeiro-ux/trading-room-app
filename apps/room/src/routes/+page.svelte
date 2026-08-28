@@ -153,14 +153,14 @@
    * rather than being left behind as a comment about something that is no longer in this file.
    */
 
-
   /*
     The playback credential, from `/internal/stream-read/{code}` at load time.
 
     Empty strings when the room has no media server, when the controller refused, or when it could
     not be reached. `StreamingView` is only ever rendered from inside the `#streams` pane, which
-    `hideStreams` already keeps out of rooms without MediaMTX, so an empty pair here means a room
-    that HAS MediaMTX but whose viewer has no token — an honest gap, not a URL built from blanks.
+    `RoomGates.streamsHidden` already keeps out of rooms without MediaMTX, so an empty pair here
+    means a room that HAS MediaMTX but whose viewer has no token — an honest gap, not a URL built
+    from blanks.
   */
   const streamServerMTX = $derived(data.streamRead?.streamServerMTX ?? '');
   const mtxToken = $derived(data.streamRead?.mtxToken ?? '');
@@ -603,7 +603,7 @@
 
   $effect(() => {
     // The decision is `RoomPolls.deliver` — who may see this poll, and whether this browser has
-    // already shown it. What is left here is the one thing the class does not own: the modal.
+    // already shown it. It ASSIGNS inside an effect on purpose, and its docblock argues the latch.
     if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';
   });
 

@@ -33,6 +33,130 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 01:25 UTC — The Svelte MCP became available mid-session, so the three files it had not seen went through it
+
+**Runtime impact: NO.** Four comments, one docblock moved, one stale count corrected. No behaviour.
+
+**The gate this repository names as mandatory could not run when the code was written.** CLAUDE.md
+requires `svelte-autofixer` on every modified `.svelte` / `.svelte.ts` file, *"down to a one-line
+prop change"*, and the Svelte MCP was not exposed to this session until after the `hideNotes` commit
+landed. Rather than leaving that as an absence recorded in prose, the three files that commit
+touched — `PresentationArea.svelte`, `gates.svelte.ts` and `routes/+page.svelte` — went through it
+now. **All three: zero issues.**
+
+**What it caught is not a Svelte defect, which is the honest way to report it.** The autofixer
+returned no issues on any file. What running it surfaced was in the reading:
+
+- **`gates.svelte.ts` said "sixteen" three times and there are eighteen**, and it claimed 388 lines
+  while saying 286. `streamsHidden` and `notesHidden` landed in that class hours earlier and the
+  header did not move with them. This is precisely the failure CLAUDE.md's own pre-push checklist
+  names — *"every comment claiming X is bounded/constant/checked still matches the next line"*.
+- **`+page.svelte` still pointed at a `hideStreams` that is no longer in it**, in the comment on
+  `streamServerMTX` explaining which pane keeps the empty credential out of view. It names
+  `RoomGates.streamsHidden` now. A double blank line left by the same removal is closed up.
+
+**One suggestion was worth arguing rather than dismissing, and it is the poll effect.** The
+autofixer's *"you are calling a function inside an $effect… could it use `$derived`?"* fires four
+times across these files. Three are already answered at the code — `PresentationArea`'s SFU
+spatial-layer effect records the decline verbatim, and the `noselect` effect carries a paragraph
+saying why it stays an effect. The fourth, `polls.deliver`, is the case the suggestion exists to
+catch: **it really does assign `$state` from inside an effect.**
+
+It is correct, and now says so. A LATCH IS NOT A DERIVATION — the third of `deliver`'s three
+refusals is *this browser has already opened this poll once*, and a `$derived` has no memory of
+having fired. It reads what it writes and CONVERGES rather than looping: the write makes
+`#deliveredId === poll.id` true, the effect runs once more, `deliver` returns false, nothing is
+written. One extra pass, no cycle. **Negative control seen RED**: replacing that refusal with
+`false` fails `polls.svelte.test.ts` on *"the same poll must not re-open"*.
+
+**The argument lives in the TEST file, and the reason is the ratchet.** `polls.svelte.ts` sits
+exactly on its 119-line ceiling, and ceilings here only go down — so a sixteen-line docblock was
+refused three times before it went where it is more useful anyway: beside the assertion that would
+go red if somebody simplified the latch into a derivation. The module keeps a one-line pointer, on
+a line that already existed. `+page.svelte` was likewise refused at 1,412 and 1,396 lines and is
+back at 1,395 with a two-line note. **Three refusals, no raise taken.**
+
+**Not claimed:** `list-sections` / `get-documentation` were not consulted for these files, because
+no framework question needed deciding — no rune, boundary or API choice changed. The autofixer is
+the gate that applied, and it ran on all three.
+
+**Verified:** room 151 files / 2,287 tests · `svelte-check` 0 errors 0 warnings · eslint clean ·
+prettier clean on every file it covers (`routes/+page.svelte` is deliberately in `.prettierignore`,
+with the pixel-diff reason recorded there).
+
+### 2026-08-28 01:10 UTC — The pre-merge full gate had been red on `main` for anybody but its author
+
+**Runtime impact: NO.** Four gate scripts, one evidence README, four documented counts. No shipped
+code changed.
+
+**`pnpm test` — the gate this repository names as the only verification a production deploy gets —
+could not pass on a fresh clone, and had not been able to for some time.** It was found by running
+it, which is the whole point of running it before a push rather than trusting the last green run.
+Confirmed pre-existing by running each failing script in a worktree at the merge-base
+(`3b5d930`, PR #147) with none of this branch's changes present.
+
+**Why nothing announced it.** CI runs the controller's `test:unit`, not `test`.
+`quality.yml:164-178` states the reason and states it honestly — `runtime:http` makes live requests
+to a deployed preview, and a gate that depends on somebody else's deployment reports their outage as
+this revision's failure. What that boundary also did was leave twelve verifiers running nowhere
+except on the machine of whoever remembered. Three of them had been failing there too.
+
+**1. `privacy:verify` — a synthetic token the scanner could not tell from a live one.**
+`collect-control-plane.smoke.mjs` used the published jwt.io example token, decoding to
+`{"sub":"1234567890","name":"Ada Lovelace"}`. `countEncodedIdentityPayloads` base64url-decodes every
+`eyJ…` run in every tracked file and reported it, **correctly by its own rule**: it cannot tell a
+famous example payload from a live one and must not try. The payload is now
+`{"sub":"[OWNER_JWT_SUB]","name":"[OWNER_JWT_NAME]"}` — the bracketed convention every redacted
+capture uses, and the exact shape the verifier's own negative lookahead treats as already redacted.
+The token stays a literal with three real base64url segments, because the fixture exists to prove
+the collector masks by SHAPE; assembling it from fragments would have hidden it from the scanner and
+would hide a genuinely live token pasted the same way. **Negative control seen RED**, and it taught
+something: disabling `maskJwt` alone left the smoke green, because `maskTokenParams` catches
+`?…jwtSite=` by parameter NAME. The two patterns are deliberately overlapping and the collector's
+own comment says so. Only disabling both turns the smoke red — which it did, on both assertions.
+
+**2. `evidence:verify` and `account:contract` — a documented evidence set that has never existed.**
+`evidence-dumps/account-page/` is in the archive map, is cited by `docs/reference/`, is required by
+the layout verifier, and `git log --all -- 'apps/controller/evidence-dumps/account-page*'` returns
+**nothing**: never committed, never deleted. A capture that stayed on the machine that took it — the
+same shape as the untracked `apps/room/scripts/` this branch already had to republish.
+
+The absence is now PINNED rather than forgotten. `verify-evidence-layout.mjs` asserts the directory
+is not there, and going red if it reappears is the point: the message names the two lists the entry
+has to move to, so a restored capture gets verified instead of merely being present. **Negative
+control seen RED** by creating the directory. `verify-account-contract.mjs` used the set for exactly
+one thing, a SHA-256 pin, and died with ENOENT before asserting any of its other 120-odd checks —
+which its own comment three reads above already calls the worse failure, *"unverifiable while
+looking like a broken build"*. It now reads the file as optional, prints a SKIPPED line naming what
+was not pinned, and runs the rest. `evidence-dumps/README.md` carries the same fact in prose.
+
+**3. `fonts:verify` — the pnpm pin has now gone stale on both upgrades it has seen.**
+The literal read `pnpm@11.21.0` while both manifests read `pnpm@11.24.0`, so the font contract failed
+on the package manager rather than on anything about fonts — the second time, and the comment
+recording the FIRST time was still sitting above the assertion. The 2026-08-26 dependency sweep is
+described in this file as *"every pin that holds one moved with it"*; this pin did not, and that
+sentence was wrong. Corrected to 11.24.0, and the literal is now backed by an assertion that needs no
+maintenance: the controller and the repo root must pin the SAME package manager. That is the shape
+both drifts actually had. **Negative control seen RED** by moving the root to 11.23.0.
+
+**4. `verify-documented-test-counts.mjs` — four documented totals, all stale, and this one is mine.**
+985 → 1027 tests and 94 → 100 files across `ENGINEERING-SSOT.md`, `PRODUCTION-CUTOVER-PLAN.md` and
+two sites in `SVELTE-CONFORMANCE-AUDIT.md`. The controller suite grew by 42 tests over this branch —
+the `svelte-kit sync` pin, the config-write capability, the room-mute door, the register recount —
+and I never ran the verifier that keeps those four numbers honest. It re-runs vitest itself and
+measures, so the numbers are live, not transcribed.
+
+**Verified:** every script in the controller's `test` chain run individually and green — `schema`,
+`backend:migrations`, `backend:release`, `evidence`, `privacy`, `breakpoints`, `manage:styles`,
+`account:contract`, `home:contract`, `fonts`, `room-login:contract`, `test:unit` (95 files / 1,006
+tests, 5 skipped) and the documented-counts verifier. Room `pnpm test` green: 151 files / 2,287
+tests. eslint clean, prettier clean.
+
+**Still not runnable here, and named rather than skipped:** `runtime:http`, which needs a PostgreSQL
+host and a deployed preview — it fails on `InitializeSessionUserId` in this container, and it is the
+one script CI leaves out for the same reason. The Rust suite and the `.db.test.ts` suites remain
+blocked on the libsrtp fetch (agent proxy 403) and on `initdb` refusing to run as root.
+
 ### 2026-08-28 00:55 UTC — *"Hide Notes Section?"* did nothing, and the enumeration that found it was hours old
 
 **Runtime impact: YES.** An owner who ticks *"Hide Notes Section?"* now gets a room with no Notes

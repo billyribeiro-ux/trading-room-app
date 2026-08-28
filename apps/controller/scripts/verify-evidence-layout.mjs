@@ -21,7 +21,6 @@ const expectedDirectories = [
     than inferred.
   */
   'TIER1-fetched',
-  'account-page',
   'home-page',
   'login-page',
   'main-nav-login-clicked',
@@ -68,6 +67,46 @@ const expectedFiles = [
   'stripe-details-2026-08-14.json'
 ];
 
+/**
+ * Evidence sets that are DOCUMENTED and are NOT IN THIS REPOSITORY.
+ *
+ * ## Why a list of absences rather than a deletion
+ *
+ * `account-page` was listed above as an expected directory from the day this verifier was written,
+ * and `account-page/upload-image-badge-prompt.html` was a required artefact. Neither has ever
+ * existed in git: `git log --all -- 'apps/controller/evidence-dumps/account-page*'` returns nothing,
+ * so it was never committed and never deleted. It is a capture that lives on the machine that took
+ * it, exactly like the untracked `apps/room/scripts/` this repository has already had to republish.
+ *
+ * **The consequence was a standing red gate.** `pnpm test` failed here on every clone including
+ * `main`, and nothing announced it because CI runs the controller's `test:unit`, which deliberately
+ * leaves the evidence verifiers to the pre-merge full gate (`quality.yml:164-178` says so). A gate
+ * that fails for everybody is a gate nobody reads. Found and fixed 2026-08-28.
+ *
+ * ## Why it is asserted ABSENT rather than simply forgotten
+ *
+ * Dropping the name would make this file silent about a documented evidence set that is missing,
+ * and the first person to restore the capture would get a green run that quietly stopped checking
+ * its required artefact. So the absence is pinned: put the directory back and THIS assertion goes
+ * red, naming the two lists the entry has to move to. Fails closed in both directions, which is the
+ * same shape every other pinned list in this repository has.
+ *
+ * `evidence-dumps/README.md` carries the same fact in prose, for a reader who is not running node.
+ */
+const documentedButNeverCommitted = [
+  { path: 'account-page', held: 'the authenticated account page and the upload-image badge prompt' }
+];
+
+for (const { path, held } of documentedButNeverCommitted) {
+  await assert.rejects(
+    stat(new URL(path, evidenceRoot)),
+    { code: 'ENOENT' },
+    `evidence-dumps/${path} is here now — it holds ${held}. Move it into expectedDirectories (and ` +
+      'its required artefact into requiredArtifacts) and delete this entry, so the set is verified ' +
+      'rather than merely present.'
+  );
+}
+
 const entries = await readdir(evidenceRoot, { withFileTypes: true });
 const repositoryEntries = entries.filter(({ name }) => name !== '.DS_Store');
 assert.deepEqual(
@@ -94,7 +133,6 @@ for (const directory of expectedDirectories) {
 
 const requiredArtifacts = [
   'COPY/login-page-source',
-  'account-page/upload-image-badge-prompt.html',
   'home-page/file',
   'login-page/logged-in-page',
   'login-page/manage',

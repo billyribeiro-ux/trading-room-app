@@ -79,6 +79,26 @@ them under "baselined finding(s) are gone — run `--update` to shrink" rather t
 
 ## What the CI gates left behind
 
+### One evidence set is documented and has never been committed — needs the owner
+
+`apps/controller/evidence-dumps/account-page/` is in the archive map, is cited by
+`docs/reference/account-pixel-match.md` and others, and does not exist in this repository.
+`git log --all -- 'apps/controller/evidence-dumps/account-page*'` returns nothing, so it was never
+committed rather than deleted — it is a capture that stayed on the machine that took it.
+
+**Nothing here can close this.** The capture is of an authenticated page on the reference site;
+it cannot be re-derived from what the repository holds, and fabricating it would be worse than its
+absence. What was done on 2026-08-28 is everything short of that: the absence is pinned in
+`scripts/verify-evidence-layout.mjs` (restore the directory and the verifier goes red, naming the
+lists the entry has to move to), `verify-account-contract.mjs` skips one SHA-256 pin out loud
+instead of dying with ENOENT before its other assertions, and `evidence-dumps/README.md` says so
+in prose.
+
+**What unblocks it:** the owner committing `account-page/` from the machine that holds it, with
+`upload-image-badge-prompt.html` hashing to
+`fb4e934f761f15fb2eac26882ce6ebac9b6628f6f3b8ab48b20ad521a6c7c43f` — the hash the contract still
+carries. Conclusions already drawn from that capture stay unrecheckable by anybody else until then.
+
 ### Local dev secrets — one standing warning, no outstanding action
 
 The 2026-08-15 restoration is finished and its record is in `CHANGELOG.md`. What survives here is the
