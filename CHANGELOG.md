@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 16:41 UTC — Seven test files were being dropped from every CI run, behind a banner saying so
+
+**Runtime impact: NO** — no application source changed. **Coverage impact: YES, and it is the
+direction this repository calls worse than a red build.** The suite goes from 173 files / 2,841
+tests to **180 files / 2,904 tests**. Nothing was written to make those 63 tests pass; they existed,
+and they were being excluded.
+
+#### What was wrong
+
+`vite.config.ts` excludes the evidence-bound test files when the reference captures are not readable
+— every CI checkout, because the captures are dumps of a live room and this repository is public.
+`gate/evidence-bound-tests.mjs` decides which files those are, and it was over-matching in two ways.
+Its own header names over-matching as the dangerous direction and says why: *"coverage lost with
+nobody informed."* Both faults were found the only way they could be, by lifting the exclusions and
+running the whole suite.
+
+**1. A CITATION IS NOT A READ.** The pattern ran over the raw file, so a path named in a COMMENT
+excluded the test. The expensive case is `room-message-render.test.ts` — 226 lines pinning **all 18
+captured kebabs with their exact labels and source order**, the exact `msgMenu dropright pt-1` class,
+`dropdown-menu users-dropdown-options`, and the whole colour contract. It was excluded by ONE comment
+citing a compiled-component path under `docs/source`. The data it actually reads,
+`src/lib/server/captured-message-fixture.json`, is tracked, present, and 23KB. It passes here and has
+passed all along.
+
+**2. A ROOT THAT IS PRESENT IS NOT MISSING.** The pattern named all fourteen roots, so a test reading
+only under `css/` — a real directory in this repository, not a symlink — was excluded whenever any
+OTHER root was absent. Two style contracts went that way.
+
+The fix is two narrowings: comments are stripped before matching (the same `codeOf` shape half the
+contract tests here already use before a `not.toContain`, for the identical reason), and the pattern
+is built from `missingEvidenceRoots()` rather than from `EVIDENCE_ROOTS`.
+
+#### What it cost, beyond the coverage
+
+**It was the stated reason `altChatRender` was filed BLOCKED four hours earlier, in this same
+CHANGELOG.** The compact renderer shares a ten-entry kebab menu with `RoomMessage`, so building it
+cleanly means extracting that menu — and doing so looked like a change to the room's most-rendered
+component with its one guard switched off. The guard was never off. The row moves back to buildable,
+and the entry that called it blocked is corrected in place rather than deleted.
+
+That is the second time today a blocker in this repository turned out to be softer than it read: the
+Rust one narrowed this morning from "the suite is blocked" to "`check` and `clippy` are green,
+`cargo test` cannot build". **Re-measure an inherited blocker before building around it.**
+
+#### The seven
+
+`room-message-render.test.ts`, `alert-chat-style-contract.test.ts`, `notes-style-contract.test.ts`,
+`media/session.test.ts`, `mute-all-non-admins.test.ts`, `screen-volume.test.ts`,
+`tawk-support.test.ts`.
+
+#### Verified
+
+* 49 excluded before, **42** after; the seven that left are exactly the seven that pass with the
+  exclusions lifted — measured by running the full suite both ways, not by reasoning about the
+  regex. No file that needs a missing root was released.
+* `evidence-partition.test.ts` caught the change unasked and demanded a deliberate update, which is
+  precisely what it is for; its pinned count moves 49 → 42 with the reasoning in place.
+* Its `doesNotExcludeItself` guard then caught my own new comment naming a root, and it is kept
+  STRICTER than discovery on purpose: discovery now strips comments, but this one file may still not
+  name a root at all, so the guard holds even if the pattern changes again.
+* Room suite: **180 files / 2,904 tests passed, 1 skipped.**
+
 ### 2026-08-28 16:30 UTC — Two blockers re-measured, and `altChatRender` reclassified out of FEATURE
 
 **Runtime impact: NO.** Documentation and triage only. No source file changed.
@@ -41,6 +103,12 @@ Both findings are corrections to things this repository had written down, and bo
 rather than inherited.
 
 #### `altChatRender` is BLOCKED, not a FEATURE, and the blocker is the capture roots
+
+> **CORRECTED 16:41 UTC, forty minutes later, and the correction is the entry above this one.** The
+> blocker named below is FALSE. `room-message-render.test.ts` was not unrunnable here — it was being
+> excluded by a comment, along with six other files, and it passes. The section is left standing
+> rather than deleted because the reasoning in it is exactly the reasoning that has to be re-checked
+> next time: a guard reported as absent was never asked whether it was.
 
 The compact renderer is fully transcribable from the pinned v4 bundle — `app-st-compactmessage`'s
 const table (byte 1,395,475), its template (1,399,986) and its own `styles:[…]` block were all read

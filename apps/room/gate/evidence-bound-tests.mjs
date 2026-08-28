@@ -72,10 +72,66 @@ export const EVIDENCE_ROOTS = Object.freeze([
   A root counts as referenced only where it appears as a path SEGMENT — opening a quote, or after a
   slash in a relative specifier. Matching the bare word would catch `css` in a class name and
   `modal` in `ModalHost.svelte`, and over-matching is the failure mode that loses coverage quietly.
+
+  ## TWO NARROWINGS, added 2026-08-28, and they were worth 7 test files and 75 tests
+
+  This discovery was over-matching in two ways at once, and the header above says exactly why that
+  is the dangerous direction: coverage lost QUIETLY, behind a banner announcing it. Both were found
+  by lifting the exclusions and running the suite, which is the only way either could have shown up.
+
+  **1. A CITATION IS NOT A READ.** The pattern ran over the raw file, so a path named in a COMMENT
+  excluded the test. `room-message-render.test.ts` — 226 lines pinning all 18 captured kebabs with
+  their exact labels and source order, the `msgMenu dropright pt-1` class and the colour contract —
+  was excluded by one comment citing `docs/source/components/app-st-message.compiled.js`. Its actual
+  data is `src/lib/server/captured-message-fixture.json`, which is TRACKED and present. It passes
+  here, and had been reported as uncovered for as long as the banner has existed.
+
+  That cost more than the coverage. It was the stated reason `altChatRender` was filed BLOCKED on
+  2026-08-28 — the compact renderer shares a kebab menu with `RoomMessage`, and extracting that menu
+  looked like a change to the room's most-rendered component with its one guard switched off. The
+  guard was never off. The row moved back to buildable in the same commit that fixed this.
+
+  **2. A ROOT THAT IS PRESENT IS NOT MISSING.** The pattern named all fourteen roots, so a test
+  reading only under `css/` — which is a real directory in this repository, not a symlink — was
+  excluded whenever any OTHER root was absent. Two style contracts were lost that way.
+
+  Comments are stripped before matching and the pattern is built from `missingEvidenceRoots()`
+  rather than from `EVIDENCE_ROOTS`. Measured on the day: 49 excluded before, 42 after, and the
+  seven that left are exactly the seven that pass with the exclusions lifted. No file that needs a
+  missing root was released, and none that does not is still held.
 */
-const REFERENCE_PATTERN = new RegExp(
-  `(?:['"\`]|\\.\\./|/)(?:${EVIDENCE_ROOTS.map((root) => root.replace('/', '\\/')).join('|')})/`
-);
+
+/**
+ * Comments removed, so a path cited in prose does not read as a path opened in code.
+ *
+ * The same `codeOf` shape half the contract tests in this repository already use before a
+ * `not.toContain`, and for the identical reason: a comment quoting the thing being asserted about
+ * matches the assertion. Block comments first, then line comments — and a line comment is only one
+ * when `//` does not follow `:` or a quote, so `https://…` inside a string survives.
+ *
+ * @param {string} source
+ * @returns {string}
+ */
+function codeOf(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+}
+
+/**
+ * The pattern for the roots that are actually absent, built per call rather than once at module
+ * load: the answer depends on the filesystem, and a constant computed at import time would be wrong
+ * on any machine where a symlink is created after this module is first loaded.
+ *
+ * @param {string} root
+ * @returns {RegExp}
+ */
+function referencePattern(root) {
+  const missing = missingEvidenceRoots(root);
+  // No missing root means nothing can be evidence-bound: match nothing rather than everything.
+  if (missing.length === 0) return /(?!)/;
+  return new RegExp(
+    `(?:['"\`]|\\.\\./|/)(?:${missing.map((name) => name.replace('/', '\\/')).join('|')})/`
+  );
+}
 
 /** Absolute path of `apps/room`, derived from this file rather than from `process.cwd()`. */
 export function appRoot() {
@@ -126,8 +182,9 @@ function collectTestFiles(dir, out) {
 export function discoverEvidenceBoundTests(root = appRoot()) {
   const src = join(root, 'src');
   if (!existsSync(src)) return [];
+  const pattern = referencePattern(root);
   return collectTestFiles(src, [])
-    .filter((path) => REFERENCE_PATTERN.test(readFileSync(path, 'utf8')))
+    .filter((path) => pattern.test(codeOf(readFileSync(path, 'utf8'))))
     .map((path) => relative(root, path).split('\\').join('/'))
     .sort();
 }

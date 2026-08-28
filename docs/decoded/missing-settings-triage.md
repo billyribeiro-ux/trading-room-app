@@ -270,13 +270,15 @@ somebody just posted in it. `publishTypingToRoom` had the same shape and named w
 
 ## FEATURE — genuinely unbuilt
 
-**All FOUR remaining rows need something this container does not have**, and each obstacle was
-measured on 2026-08-28 rather than inherited. This section stays separate from BLOCKED because these
+**FIVE rows, and FOUR of them need something this container does not have.** Each obstacle was
+measured on 2026-08-28 rather than inherited — and one of the measurements was WRONG and was
+corrected the same day, which is why `altChatRender` is back in this table rather than in BLOCKED. This section stays separate from BLOCKED because these
 are features with a known size, not questions with an unknown answer: what to build is understood in
 every case, and only the means to verify it is missing.
 
 | row | what it needs, measured |
 | --- | --- |
+| `altChatRender` | **Nothing external. It is buildable here.** Filed BLOCKED at 16:30 and unblocked at 16:41 when the guard it was blocked on turned out to be running fine — see the row below and `CHANGELOG.md`. |
 | `enableDiscord` | A Discord application registration. Owner's call — there is nothing to link to. |
 | `alertsOverlayOnScreenshare` | A human at a screen picker. `getDisplayMedia` cannot be automated and headless returns a synthetic gradient, so a compositor that replaces the outgoing track would ship to the most fragile path in the room with nothing able to look at the result. |
 | `autoRecord` + `dontStopRecOnMicMute` | A server-side recorder, which does not exist. Same blocker `start-recording` / `stop-recording` carry. |
@@ -284,6 +286,7 @@ every case, and only the means to verify it is missing.
 
 | setting | byte | size |
 | --- | --- | --- |
+| `altChatRender` | 1,349,151 / 1,434,685 / 2,047,129 | **FILED BLOCKED AND UNBLOCKED THE SAME DAY, and the correction is worth more than the row.** The stated blocker was that building compact mode cleanly means extracting the shared kebab menu out of `RoomMessage.svelte`, whose captured-DOM contract `room-message-render.test.ts` — all 18 kebabs, exact labels, source order — was one of the 49 evidence-bound files "excluded in this checkout". **It was not unrunnable.** It was being excluded by a COMMENT citing a `docs/source/…` path while the fixture it actually reads is tracked and present; `gate/evidence-bound-tests.mjs` was over-matching, seven files were affected, and it is fixed. The guard runs. What the row actually needs is transcription work: `app-st-compactmessage`'s const table (1,395,475), template (1,399,986) and `styles:[…]` block are all readable, including the two rules our stylesheets lack (`.nowrap`, `.reactions-container`) — absent from the captured CSS for the right reason, since this room renders neither. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
@@ -299,7 +302,6 @@ every case, and only the means to verify it is missing.
 | `linkedRoomAlerts` | **The server-side fan-out, which is not in the capture.** The setting's own help text is *"Comma separated list of Room IDs of the rooms to PUSH our alerts to"* — the pushing is the reference's SERVER. What the client contributes is one composer row (`WTe`, byte 2,119,618) whose checkbox is `dontCrossPost`, sent on the `alertMsg` and `alertMsgLater` payloads. **Measured 2026-08-28: `crossPost` occurs ZERO times in the bundle**, so the browser never does the fan-out and never reads the flag back. Building the checkbox alone would ship a control whose only effect is sending a field nothing reads — the thing this repository refuses by name. Unblocked by cross-posting existing at all, which is its own feature and needs an owner decision about what "linked room" means across two databases. |
 | `recsInRoom` | The Recordings tab it gates. `presAreaTabs-recordings` is an iframe onto a server archive page, and there are zero recordings or archive tables in either database. `TODO.md` carries the blocker. Wire the setting WITH the tab, never before it. |
 | `isLocked` | Byte 1,148,353 — refuses a non-presenter at connect with a named dialog, and byte 2,500,128 offers the presenter an unlock confirm. Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a lock. |
-| `altChatRender` | **The captured evidence roots, and this is a RECLASSIFICATION from FEATURE — measured 2026-08-28.** The compact renderer itself is fully transcribable from the pinned bundle: `app-st-compactmessage`'s const table (byte 1,395,475), its template (1,399,986) and its own `styles:[…]` block were all read today, and the two classes our stylesheets lack — `.nowrap{white-space:nowrap;display:table}` and `.reactions-container{margin-left:20px}` — are in that block. They are absent from `css/complete-app-styles.css` for the correct reason: this room renders neither, because it has no compact mode. **What is blocked is building it cleanly.** Compact and regular share one ten-entry kebab menu, so the honest build extracts that menu out of `RoomMessage.svelte` — and `room-message-render.test.ts` pins *"all 18 captured kebabs with the exact labels and source order"*, the exact string `msgMenu dropright pt-1` and `dropdown-menu users-dropdown-options`. It is one of the 49 evidence-bound files EXCLUDED in this checkout (`gate/evidence-bound-tests.mjs`; 13 of 14 capture roots missing), so that extraction is a change to the room's most-rendered component with its one guard switched off. The alternative — a second copy of that menu and its ten gates — is the duplication `room-message-chrome.ts` exists to prevent. Unblocked by the capture roots being present, which is one `ln -s` on the owner's machine. |
 | `backupClusterID` | Media infrastructure — a second MediaMTX cluster. Same blocker as every other `STREAM_SERVER_MTX` row. |
 | `recordChat` | Only ever read inside the `videoOnlyMode` recording-bot branch (bytes 1,497,779 and 2,498,823), and this room does not model the `r` query parameter. The same honest gap `files-gates.ts` already records for `hideFiles`. |
 | `authMode` | Login-page state on the controller side, not a room read. `e.authMode` is a component field. |

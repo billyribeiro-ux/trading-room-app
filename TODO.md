@@ -321,13 +321,25 @@ The largest by read count are `deleteAlertPW` (12, a credential), `altChatRender
 times the reference mentions a name, and the biggest number on this list is a credential we refuse.
 `enableQAReactions` was second at 10 and is built; `positionsIframe` was fourth at 7 and is built.
 
-**THE SETTINGS ENUMERATION IS DOWN TO FOUR UNBUILT FEATURES, and every one of the four is blocked on
+**SEVEN TEST FILES WERE BEING DROPPED FROM EVERY CI RUN**, 2026-08-28, behind a banner announcing
+them as uncovered. `gate/evidence-bound-tests.mjs` matched an evidence-root path anywhere in a test
+file, including in a COMMENT, and matched all fourteen roots rather than the ones actually missing.
+`room-message-render.test.ts` — 226 lines pinning all 18 captured kebabs with their exact labels and
+source order — was excluded by one citation while the fixture it reads is tracked and present. The
+suite goes 173 files / 2,841 tests to **180 / 2,904** with nothing written to make them pass. Both
+narrowings are in place and `evidence-partition.test.ts` pins 42.
+
+**AND IT WAS THE STATED REASON `altChatRender` WAS FILED BLOCKED**, forty minutes earlier the same
+day. The guard was never off. That is the SECOND inherited blocker to dissolve on re-measurement in
+one session, after the Rust one below — **re-measure a blocker before building around it.**
+
+**THE SETTINGS ENUMERATION IS DOWN TO FIVE UNBUILT FEATURES, and four of the five are blocked on
 something outside this repository** — measured 2026-08-28, not inherited. `enableDiscord` needs a
 Discord application registration; `alertsOverlayOnScreenshare` needs a human at a screen picker
 (`getDisplayMedia` cannot be automated and headless returns a synthetic gradient);
 `autoRecord`/`dontStopRecOnMicMute` need the server-side recorder that `start-recording` is also
-waiting for; `hasAlertScheduler` needs a scheduler process in `services/api`. `altChatRender` moved
-OUT of that table the same day and into BLOCKED — see the triage for the measurement.
+waiting for; `hasAlertScheduler` needs a scheduler process in `services/api`. The fifth,
+`altChatRender`, needs nothing external and is buildable here.
 
 **TWO INHERITED BLOCKERS WERE RE-MEASURED AND ONE IS NARROWER THAN IT READS.** `cargo check -p
 tradingroom-api --features testing` and `cargo clippy -p tradingroom-api --features testing --

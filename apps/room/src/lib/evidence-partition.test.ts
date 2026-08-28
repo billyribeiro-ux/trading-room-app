@@ -50,7 +50,32 @@ const SELF = 'src/lib/evidence-partition.test.ts';
  * Moving this number is allowed and expected — a new evidence-bound test SHOULD move it. Moving it
  * without saying so in the same diff is what this prevents.
  */
-const EVIDENCE_BOUND_FILE_COUNT = 49;
+/*
+  49 -> 42 on 2026-08-28, and it is the direction this constant exists to make visible: SEVEN files
+  were being dropped from every CI run while the banner announced them as uncovered.
+
+  Both causes were over-matching in `discoverEvidenceBoundTests`, and both were found the only way
+  they could be — by lifting the exclusions and running the whole suite.
+
+  * **A CITATION IS NOT A READ.** The pattern ran over the raw file, so a path named in a COMMENT
+    excluded the test. `room-message-render.test.ts` is the expensive one: 226 lines pinning all 18
+    captured kebabs with their exact labels and source order, the `msgMenu dropright pt-1` class and
+    the colour contract — excluded by a single comment citing a compiled-component path under the
+    first root named below, while the data it actually reads
+    (`server/captured-message-fixture.json`) is tracked and present. It passes.
+
+    THE PATH IS DESCRIBED RATHER THAN WRITTEN, here as everywhere else in this file, and the reason
+    is the section below: {@link doesNotExcludeItself} reads the RAW source, deliberately stricter
+    than discovery now is. Discovery strips comments; this file still may not name a root at all, so
+    that the guard holds even if the pattern changes again.
+  * **A ROOT THAT IS PRESENT IS NOT MISSING.** The pattern named all fourteen roots, so a test
+    reading only under the one root that is a real directory here rather than a symlink was excluded
+    whenever any other root was absent. Two style contracts were lost that way.
+
+  Measured: 49 before, 42 after, and the seven that left are exactly the seven that pass with the
+  exclusions lifted. Neither narrowing released a file that needs a missing root.
+*/
+const EVIDENCE_BOUND_FILE_COUNT = 42;
 
 describe('the evidence partition, which decides what CI claims to have covered', () => {
   it('discovers a stable, sorted, duplicate-free list', () => {
