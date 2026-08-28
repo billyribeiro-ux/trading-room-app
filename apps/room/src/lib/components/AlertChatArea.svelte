@@ -45,6 +45,7 @@
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
   import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
   import type { RoomChat } from '#lib/room/chat.svelte.js';
@@ -83,6 +84,15 @@
      * one — an entitlement does not depend on which column a member is looking at.
      */
     chatTabs: readonly string[];
+    /**
+     * The display mode for each of this component's TWO logs, resolved on the page.
+     *
+     * Two props and not one because upstream keys them separately — `loadChatMode` against
+     * `chatMode`, `loadAlertsMode` against `alertsMode` — so a member can run the alerts log compact
+     * and the chat log as cards. `#lib/chat-display-mode.ts`.
+     */
+    alertsDisplayMode: ChatDisplayMode;
+    chatDisplayMode: ChatDisplayMode;
     polls: RoomPolls;
     /** The page owns which menu is open, so only one is open across every column at once. */
     menus: RoomMenus;
@@ -229,6 +239,8 @@
     broadcasts,
     chat,
     chatTabs,
+    alertsDisplayMode,
+    chatDisplayMode,
     polls,
     menus,
     isPresenter,
@@ -697,6 +709,7 @@
                   {item}
                   kind="alert"
                   {...messageChrome}
+                  displayMode={alertsDisplayMode}
                   {alertLabels}
                   followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
                   menuOpen={menus.messageId === `alert:${item.id}`}
@@ -790,6 +803,7 @@
                   {item}
                   kind="chat"
                   {...messageChrome}
+                  displayMode={chatDisplayMode}
                   followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
                   menuOpen={menus.messageId === `chat:${item.id}`}
                   showDateSeparator={'evidenceSeparatorText' in item

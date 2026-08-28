@@ -203,14 +203,14 @@ Three consequences, all real and none of them papered over in code:
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **171** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **170** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
-**27 of the 171 are read by the reference's OWN room client**, as `sessData.<name>`.
+**26 of the 170 are read by the reference's OWN room client**, as `sessData.<name>`.
 
-**Thirty have already left the list, on the day it was written.** It opened at 202 unwired and
-58 questions; both numbers have moved twenty-five times since.
+**Thirty-one have already left the list, on the day it was written.** It opened at 202 unwired and
+58 questions; both numbers have moved twenty-six times since.
 
 - `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
@@ -313,7 +313,7 @@ reproduces the decision — foreground-only colour — and `resolveNoteSurfaceGa
 words which part of that is evidenced and which part is this repository's call. A setting wired
 without that distinction written down would read, later, as a transcription.
 
-`src/lib/setting-coverage-contract.test.ts` pins the 27 by NAME and asserts separately that the seven
+`src/lib/setting-coverage-contract.test.ts` pins the 26 by NAME and asserts separately that the seven
 credentials are still on it — because a name leaving that list means the room started reading it.
 
 The largest by read count are `deleteAlertPW` (12, a credential), `altChatRender` (6) and
@@ -333,13 +333,13 @@ narrowings are in place and `evidence-partition.test.ts` pins 42.
 day. The guard was never off. That is the SECOND inherited blocker to dissolve on re-measurement in
 one session, after the Rust one below — **re-measure a blocker before building around it.**
 
-**THE SETTINGS ENUMERATION IS DOWN TO FIVE UNBUILT FEATURES, and four of the five are blocked on
-something outside this repository** — measured 2026-08-28, not inherited. `enableDiscord` needs a
+**THE SETTINGS ENUMERATION IS DOWN TO FOUR UNBUILT FEATURES, and every one is blocked on something
+outside this repository** — measured 2026-08-28, not inherited. `enableDiscord` needs a
 Discord application registration; `alertsOverlayOnScreenshare` needs a human at a screen picker
 (`getDisplayMedia` cannot be automated and headless returns a synthetic gradient);
 `autoRecord`/`dontStopRecOnMicMute` need the server-side recorder that `start-recording` is also
-waiting for; `hasAlertScheduler` needs a scheduler process in `services/api`. The fifth,
-`altChatRender`, needs nothing external and is buildable here.
+waiting for; `hasAlertScheduler` needs a scheduler process in `services/api`. `altChatRender`
+was the fifth and is BUILT.
 
 **TWO INHERITED BLOCKERS WERE RE-MEASURED AND ONE IS NARROWER THAN IT READS.** `cargo check -p
 tradingroom-api --features testing` and `cargo clippy -p tradingroom-api --features testing --

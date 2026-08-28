@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **27** as this is written; thirty have been answered by building, one more
+2026-08-28 and is at **26** as this is written; thirty-one have been answered by building, one more
 is answered NOT A GAP, and the CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -270,15 +270,16 @@ somebody just posted in it. `publishTypingToRoom` had the same shape and named w
 
 ## FEATURE — genuinely unbuilt
 
-**FIVE rows, and FOUR of them need something this container does not have.** Each obstacle was
-measured on 2026-08-28 rather than inherited — and one of the measurements was WRONG and was
-corrected the same day, which is why `altChatRender` is back in this table rather than in BLOCKED. This section stays separate from BLOCKED because these
+**FOUR rows, and every one of them needs something this container does not have.** Each obstacle was
+measured on 2026-08-28 rather than inherited. `altChatRender` was in this table that morning, was
+filed BLOCKED on a measurement that turned out to be wrong, came back, and is BUILT by the evening —
+the whole sequence is in `CHANGELOG.md` and is the argument for re-measuring a blocker before
+building around it. This section stays separate from BLOCKED because these
 are features with a known size, not questions with an unknown answer: what to build is understood in
 every case, and only the means to verify it is missing.
 
 | row | what it needs, measured |
 | --- | --- |
-| `altChatRender` | **Nothing external. It is buildable here.** Filed BLOCKED at 16:30 and unblocked at 16:41 when the guard it was blocked on turned out to be running fine — see the row below and `CHANGELOG.md`. |
 | `enableDiscord` | A Discord application registration. Owner's call — there is nothing to link to. |
 | `alertsOverlayOnScreenshare` | A human at a screen picker. `getDisplayMedia` cannot be automated and headless returns a synthetic gradient, so a compositor that replaces the outgoing track would ship to the most fragile path in the room with nothing able to look at the result. |
 | `autoRecord` + `dontStopRecOnMicMute` | A server-side recorder, which does not exist. Same blocker `start-recording` / `stop-recording` carry. |
@@ -286,7 +287,6 @@ every case, and only the means to verify it is missing.
 
 | setting | byte | size |
 | --- | --- | --- |
-| `altChatRender` | 1,349,151 / 1,434,685 / 2,047,129 | **FILED BLOCKED AND UNBLOCKED THE SAME DAY, and the correction is worth more than the row.** The stated blocker was that building compact mode cleanly means extracting the shared kebab menu out of `RoomMessage.svelte`, whose captured-DOM contract `room-message-render.test.ts` — all 18 kebabs, exact labels, source order — was one of the 49 evidence-bound files "excluded in this checkout". **It was not unrunnable.** It was being excluded by a COMMENT citing a `docs/source/…` path while the fixture it actually reads is tracked and present; `gate/evidence-bound-tests.mjs` was over-matching, seven files were affected, and it is fixed. The guard runs. What the row actually needs is transcription work: `app-st-compactmessage`'s const table (1,395,475), template (1,399,986) and `styles:[…]` block are all readable, including the two rules our stylesheets lack (`.nowrap`, `.reactions-container`) — absent from the captured CSS for the right reason, since this room renders neither. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
@@ -309,7 +309,7 @@ every case, and only the means to verify it is missing.
 
 ---
 
-## The thirty already answered
+## The thirty-one already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -337,6 +337,7 @@ every case, and only the means to verify it is missing.
 | `copyTrades` | BUILT — `copy-trades.ts` plus a `trade` segment on `RoomMessage`. Alerts only, as upstream gates it. Divergence: the reference's two `String.replace` calls take string patterns, so it makes only the FIRST order in a message copyable; the room splits every balanced pair. | 2026-08-28 |
 | `positionsIframe` + `positionsIframeUrl` | BUILT — `PositionsContainer` and `PositionsControls`, wired at nodes 3 and 5 of the presentation split area. ONE feature, two settings, conjoined once on the page. The thirty-second reload is behind a SECOND per-viewer gate, ANDed, so a member who never opens the panel has no background timer. | 2026-08-28 |
 | `usersCanDeleteOwnMsgs` | **BUILT, and it closed a hole.** The row's caveat — *"needs the `userDeleteChatMsg` command, which is absent"* — was FALSE: `messageAction`'s delete branch already let a member remove their own message, on all three item kinds, and never asked whether the room allowed it. The setting is now checked on the SERVER from the control plane, and the menu entry it feeds was defaulting off the whole time so nothing showed the gap. | 2026-08-28 |
+| `altChatRender` | **BUILT, and it is the largest row this enumeration has produced.** Three behaviours behind one checkbox, and two of them had nothing to act on because this room had no compact display mode at all. It needed `app-st-compactmessage` transcribed as a second layout in two mirrored variants, the twelve-gate kebab menu shared out of `RoomMessage.svelte` rather than copied (`MessageMenu.svelte`), and a preference-key collision handled: upstream keys the display mode `chatMode`, which is what this room's removed chat-policy radio had been writing `'g'`/`'p'`/`'d'` into, so the read validates instead of transcribing the reference's `"r" == mode ? … : …` literally. It also found a THIRD dead control — both Text Mode radio pairs already existed, seeded from a constant, writing invented preference names nothing read. | 2026-08-28 |
 | `chatTabsWithBadges` | **BUILT, and it is the first row to change a TYPE.** This room had two chat channels hard-coded in three components behind a closed `ChatTab` union. An owner can configure more, behind badges, so the set is per room and per member — and the reference decides it in the BROWSER, so every read and write path here asks the server instead (`memberChatChannels`), and the chat and typing fan-outs became audience-aware. An entry with an EMPTY badge list is public, which is upstream's own `[].every(…)` and is reproduced with a test saying so. | 2026-08-28 |
 | `enableQAReactions` | **BUILT, and it was filed as a one-line WIRE twice over.** The rule was already transcribed and could never evaluate true — the Q&A thread rendered `kind="chat"` behind an inert handler. It needed two commands addressing a question by its own row id, two columns on `alert_questions`, and the thread extracted to its own component. Three menu entries that turn on with `kind="alert"` are deliberately NOT drawn: they address an `_id` a thread entry does not have, and are dead upstream. | 2026-08-28 |
 | `hasTypingIndicator` | BUILT — `lib/server/typing.ts` (an in-memory registry swept on read), `setTyping`, `publishTypingToRoom`, `TypingSignal` and the indicator in both columns. It gates the SEND as well as the display. The animated dots are deliberately NOT drawn: neither `app-typing-indicator-dots` nor `.typing-indicator` has a rule in any stylesheet we hold. | 2026-08-28 |

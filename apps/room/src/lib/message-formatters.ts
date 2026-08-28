@@ -45,6 +45,23 @@ export const chatTimeFormatter = new Intl.DateTimeFormat('en-US', {
 });
 
 /**
+ * The time on a COMPACT line — "9:31", and the difference from the one above is a leading zero.
+ *
+ * Angular's `date:'h:mm a'` against the card's `date:'hh:mm a'`, both the capture's own:
+ * `Ct(29, 27, e.msg.t, "h:mm a")` at byte 1,395,475's template versus `"hh:mm a"` in
+ * `app-st-message`. The compact renderer also wraps it in literal brackets, which is markup rather
+ * than format and so lives at the call site.
+ *
+ * Its own formatter rather than a parameter on the one above, because these are built ONCE at module
+ * scope and that is the entire reason this file exists — constructing one per render is what it was
+ * written to stop. Two constants cost two objects for the life of the process.
+ */
+export const compactTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit'
+});
+
+/**
  * Angular's `date:'medium'` pipe, which for en-US is `MMM d, y, h:mm:ss a` — the Files pane's
  * uploaded-at column.
  *

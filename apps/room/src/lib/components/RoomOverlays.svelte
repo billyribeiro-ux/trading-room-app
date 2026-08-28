@@ -10,6 +10,7 @@
   import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
   import ImageUploadDialog from '#lib/components/ImageUploadDialog.svelte';
@@ -104,6 +105,9 @@
     // Page state this layer renders from. Only these two are written back.
     isPresenter,
     messageChrome,
+    alertsDisplayMode,
+    chatLogDisplayMode,
+    onDisplayModeChange,
     unreadQaAlertIds,
     modals,
     chatMode,
@@ -160,6 +164,10 @@
      * construction is a second answer to which settings a message reads.
      */
     messageChrome: RoomMessageChrome;
+    /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
+    alertsDisplayMode: ChatDisplayMode;
+    chatLogDisplayMode: ChatDisplayMode;
+    onDisplayModeChange: (surface: ChatDisplaySurface, mode: ChatDisplayMode) => void;
     /**
      * The page's INSTANCE, not a copy — `RoomFeeds` reads it for the badge and `RoomModals`
      * clears it, so a second set would be a second answer to which alerts are unread.
@@ -580,6 +588,9 @@
   onQuestionSend={messageActions.sendAlertQuestion}
   alertQuestions={data.alertQuestions}
   {messageChrome}
+  {alertsDisplayMode}
+  {chatLogDisplayMode}
+  {onDisplayModeChange}
   onQaAction={(action, item, payload) =>
     messageActions.handle('alert', action, item, payload, false, 'qa')}
   onMentionUser={(name) => messageActions.mention(name)}

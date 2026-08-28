@@ -337,6 +337,15 @@ const ROOM_CONSUMED = [
      and then subscribes the socket to the channel; here the room SERVER decides, in
      memberChatChannels, and the member is told which tabs they have. */
   'chatTabsWithBadges',
+  /* "Alt chat render" - the owner forcing the compact log on every member.
+
+     Three behaviours behind one checkbox, six reads. It forces the display mode to compact on chat,
+     alerts and the Q and A thread, writing the member preference as it goes, and it is one term of
+     the hide-avatar rule on chat and the Q and A thread but not on alerts.
+
+     It crosses because every occurrence is sessData dotted onto the name. It seeds rather than
+     locks: a member can still switch modes in the settings modal afterwards. */
+  'altChatRender',
   /* Four gates that RoomMessage.svelte already implements and no room could switch on.
 
      Every occurrence of all four in the reference bundle is sessData dotted onto the name, so they
@@ -833,6 +842,12 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 99 since 2026-08-28: `altChatRender`. Thirtieth find, and the one that needed a whole second
+// RENDERER underneath it: this room had no compact display mode at all, so two of the setting's
+// three behaviours had nothing to act on. Building it shared the twelve-gate kebab menu out of
+// `RoomMessage.svelte` rather than copying it, and turned up a THIRD dead control on the way - both
+// Text Mode radio pairs were writing invented preference names nothing read.
+//
 // 98 since 2026-08-28: `chatTabsWithBadges`. Twenty-ninth find, and the first that turns a CLOSED
 // UNION into a runtime allow-list: the room had two hard-coded chat channels and a `ChatTab` type
 // over them. An owner can configure more, behind badges, so the set is per room and per member — and
@@ -885,7 +900,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 98 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 99 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

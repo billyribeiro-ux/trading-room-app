@@ -489,7 +489,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       — the strip is drawn twice and each column tracks its own open tab. The list itself is the
       same for both, because an entitlement does not depend on which column a member is looking at.
     */
-    max: 1385,
+    /*
+      1385 -> 1401, 2026-08-28, for the display mode: the `RoomDisplayModes` instance, the seed call,
+      and two props at each of the three surfaces that render a message.
+
+      SIXTEEN AND NOT FIFTY-TWO because the ratchet refused the first attempt, which had the seeding
+      loop and the preference write inline here. Those went to `#lib/room/display-modes.svelte.ts`,
+      which is the right home for the same reason `room-defaults.ts` is: the seed, the write-back and
+      the member's later change are one rule with three parts, and split between a page loop and a
+      modal callback they were two halves that had to agree about a preference key.
+    */
+    max: 1401,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -932,8 +942,41 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       same commit: the Q&A modal it used to hold is `AlertQaModal.svelte` now, and that extraction is
       what made room for the feature in the first place.
     */
-    max: 809,
+    /*
+      809 -> 820, 2026-08-28. Eleven lines: the two display modes and the change callback arriving as
+      props with their docblock, and passed straight through to `ModalHost`.
+
+      A PASS-THROUGH, which is what this layer is for — the modal holds the Text Mode radios and the
+      Q&A thread, and neither the mode nor the setter belongs to it.
+    */
+    max: 820,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
+  },
+  {
+    file: 'lib/components/MessageMenu.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      It is the kebab on a message: the trigger, the dropdown, its twelve entries and the popper
+      placement that puts it on screen. 214 of these lines came out of `RoomMessage.svelte` in the
+      same commit, so the pair is smaller than the one file was.
+
+      Two things to check if this number climbs. Has it started DECIDING which entries to show? It
+      must not — it is handed twelve resolved booleans and `messageMenuAllows` owns the mapping. And
+      has a renderer-specific concern leaked in? The compact and regular renderers differ only in
+      `direction`, and a second such prop is the signal that the wrong thing is being shared.
+    */
+    /*
+      271 -> 293, 2026-08-28, in the commit that created it: the three captured trigger classes
+      became a pinned lookup rather than one composed string.
+
+      `msgMenu dropright pt-1`, `msgMenu dropleft float-right align-baseline` and
+      `msgMenu dropright float-left align-baseline` are not variations on a theme — the compact pair
+      mirrors and the regular one does neither — so composing them would have invented a pattern the
+      reference does not have. Twenty-two lines buys three exact strings a call site cannot add to.
+    */
+    max: 293,
+    why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
   },
   {
     file: 'lib/components/ChatTabStrip.svelte',
@@ -971,7 +1014,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       allows a reaction — is answered on the server, and the two menu actions handled here are the
       composer insert and its own open row. Both are this component's state and nothing else's.
     */
-    max: 348,
+    /*
+      348 -> 359, 2026-08-28. Eleven lines: the `displayMode` prop and the docblock saying why the
+      thread renders in the ALERTS mode rather than one of its own — upstream's Q&A modal calls
+      `loadAlertsMode()`, the same function the alerts log calls.
+    */
+    max: 359,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its composer and its own open menu row'
   },
   {
@@ -1391,7 +1439,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       file outgrowing its ceiling is to take a self-contained piece out of it. The next candidate has
       not changed and is named two entries up — the user-info modal.
     */
-    max: 5960,
+    /*
+      5960 -> 5976, 2026-08-28, and sixteen of the lines are a comment on a DELETION.
+
+      The two Text Mode radio pairs were dead: local `$state` seeded from a constant, writing
+      `alertDisplayMode` / `chatDisplayMode` with `'regular'` / `'compact'` — three invented names
+      against the reference's own keys and values — and nothing read any of them. The code shrank
+      (eight lines of handler became four one-liners); what grew is the paragraph recording the third
+      control of that exact shape found in this room, so the next reader does not have to rediscover
+      why the keys are on `dead-preference-keys.ts`.
+    */
+    max: 5976,
     why: 'every modal in the room, in one component'
   },
   {
@@ -2217,6 +2275,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the chat mute: two senders, two receivers and the rule that they agree'
   },
   {
+    file: 'lib/room/display-modes.svelte.ts',
+    /*
+      Born capped, 2026-08-28, in the commit that created it — the rule this section states for every
+      destination module.
+
+      It holds `loadChatMode()` and `loadAlertsMode()`: the seed from the owner's `altChatRender` and
+      the member's stored preference, the write-back that upstream does on both branches, and the
+      member's later change from the settings radios. Four lines on `+page.svelte` before the ratchet
+      refused them, and the refusal was right — those four lines and the modal's callback were two
+      halves of one rule that had to agree about a preference key.
+
+      If this number climbs, the question is whether it has started DECIDING anything beyond which of
+      two renderers a surface uses. It must not: `chat-display-mode.ts` owns the rules, including the
+      preference-key collision with the room's own chat policy, and this only applies them.
+    */
+    max: 87,
+    why: 'which renderer each pair of surfaces uses; seeded once, then owned by the member'
+  },
+  {
     file: 'lib/room/create-room.svelte.ts',
     /*
       THE COMPOSITION ROOT, created 2026-08-17 (S7) and capped in the same commit.
@@ -2583,7 +2660,42 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this number climbs again the extraction is the same one it has always been: `bodySegments`
       and its four parse functions are a module with a component wrapped around them.
     */
-    max: 1032,
+    /*
+      1032 -> 818, 2026-08-28, and it is the biggest single drop this entry has taken.
+
+      The kebab menu left: 143 lines of markup, the two element refs and the whole popper placement
+      effect, plus twelve near-identical three-line gate derivations collapsed into one call to
+      `messageMenuAllows`. It went because `altChatRender` needs a SECOND renderer whose menu is the
+      same twelve entries with the same twelve gates, and copying that block would have been twelve
+      entitlement rules written out twice.
+
+      **THE MOVE IS VERIFIED, not asserted.** `room-message-render.test.ts` pins all 18 captured
+      kebabs with their exact labels and source order, the `msgMenu dropright pt-1` class string and
+      `dropdown-menu users-dropdown-options`; it was run green immediately before the extraction and
+      immediately after. It could only be run at all because the same day's fix to
+      `gate/evidence-bound-tests.mjs` stopped excluding it over a comment.
+    */
+    /*
+      818 -> 1008 in the SAME commit that took it to 818, and the pair is one change rather than a
+      raise chasing a drop.
+
+      The kebab left (-214) and the COMPACT RENDERER arrived (+190). `altChatRender` forces
+      `app-st-compactmessage`, which is the same message laid out on one line in two mirrored
+      variants — `msg-box msg-box-adm` in `flex-row-reverse` for a presenter, plain `msg-box` running
+      the other way for a member — and the member row is the only place the trial badge, the new
+      indicator and the membership stars appear.
+
+      WHY IT IS A BRANCH HERE AND NOT A SECOND COMPONENT. Every value the compact layout renders is
+      already derived in this file: the behaviour, the twelve gates, the four styles, the parsed body
+      segments, the reactions, the badges. A sibling component would have taken ~35 props and
+      duplicated ~200 lines of derivation — which is the cost `room-message-chrome.ts` exists to
+      describe. What IS shared went out properly: `MessageMenu.svelte`, because the menu is the one
+      part with twelve entitlement gates on it.
+
+      **The file is smaller than it was this morning** (1032), and the captured-DOM contract that
+      pins the card layout ran green throughout.
+    */
+    max: 1008,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

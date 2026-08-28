@@ -32,6 +32,7 @@
     TradeCopyPayload
   } from '#lib/types.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import AlertQaModal from './AlertQaModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
@@ -173,6 +174,15 @@
      * question stays text.
      */
     messageChrome: RoomMessageChrome;
+    /**
+     * The two display modes the settings modal's Text Mode radios show and set.
+     *
+     * `alertsDisplayMode` is also what the Q&A thread renders in — upstream's Q&A modal calls
+     * `loadAlertsMode()`, the same function the alerts log calls, rather than keeping a third key.
+     */
+    alertsDisplayMode: ChatDisplayMode;
+    chatLogDisplayMode: ChatDisplayMode;
+    onDisplayModeChange: (surface: ChatDisplaySurface, mode: ChatDisplayMode) => void;
     /**
      * What a Q&A entry's menu asks for. `mention` never arrives here — this component owns the
      * thread's composer, so it inserts that one itself.
@@ -386,6 +396,9 @@
     onQuestionSend,
     alertQuestions = [],
     messageChrome,
+    alertsDisplayMode,
+    chatLogDisplayMode,
+    onDisplayModeChange,
     onQaAction,
     onMentionUser,
     onPrivateChat,
@@ -689,8 +702,22 @@
       : ''
   );
   let reportLoading = $state(true);
-  let alertDisplayMode = $state<'regular' | 'compact'>('regular');
-  let chatDisplayMode = $state<'regular' | 'compact'>('regular');
+  /*
+    ── THE TWO TEXT-MODE RADIOS WERE DEAD, and this is the third control of that exact shape ────────
+
+    They were `$state<'regular' | 'compact'>('regular')` here, seeded to a CONSTANT and never from
+    anything, writing `onPreferenceChange('alertDisplayMode' | 'chatDisplayMode', 'regular' |
+    'compact')` — three invented names against the reference's own `alertsMode` / `chatMode` keys and
+    its `'r'` / `'c'` values. Nothing in this room read any of them. So the radios persisted a
+    preference nobody consulted, and reopening the modal showed Regular whatever had been picked.
+
+    That is the same defect the room's chat-mode radio had (`chat-mode.remote.ts` records it) and the
+    same one `dead-preference-keys.ts` was written for. Both invented keys join that list.
+
+    They are PROPS now: the mode is resolved once per surface on the page — `resolveChatDisplayMode`,
+    which the owner's `altChatRender` can force — and a change is reported back up rather than kept
+    here, because the logs that render it are not inside this component.
+  */
   let presenterTextColor = $state('#f7fd37');
   let presenterBackgroundColor = $state('#000000');
   let chatStyle = $state<FollowChatStyle>({
@@ -3213,11 +3240,8 @@
               value="Alert Regular Mode"
               id="alert-regular-mode"
               class="form-check-input"
-              {@attach setInputChecked(alertDisplayMode === 'regular')}
-              onchange={() => {
-                alertDisplayMode = 'regular';
-                onPreferenceChange('alertDisplayMode', 'regular');
-              }}
+              {@attach setInputChecked(alertsDisplayMode === 'r')}
+              onchange={() => onDisplayModeChange('alerts', 'r')}
             />
             <label for="alert-regular-mode" class="form-check-label">Regular Mode</label>
           </div>
@@ -3228,11 +3252,8 @@
               value="Alert Compact Mode"
               id="alert-compact-mode"
               class="form-check-input"
-              {@attach setInputChecked(alertDisplayMode === 'compact')}
-              onchange={() => {
-                alertDisplayMode = 'compact';
-                onPreferenceChange('alertDisplayMode', 'compact');
-              }}
+              {@attach setInputChecked(alertsDisplayMode === 'c')}
+              onchange={() => onDisplayModeChange('alerts', 'c')}
             />
             <label for="alert-compact-mode" class="form-check-label">Compact Mode</label>
           </div>
@@ -3370,11 +3391,8 @@
               id="chat-regular-mode"
               aria-checked="true"
               class="form-check-input"
-              {@attach setInputChecked(chatDisplayMode === 'regular')}
-              onchange={() => {
-                chatDisplayMode = 'regular';
-                onPreferenceChange('chatDisplayMode', 'regular');
-              }}
+              {@attach setInputChecked(chatLogDisplayMode === 'r')}
+              onchange={() => onDisplayModeChange('chat', 'r')}
             />
             <label for="chat-regular-mode" class="form-check-label">Regular Mode</label>
           </div>
@@ -3385,11 +3403,8 @@
               value="Chat Compact Mode"
               id="chat-compact-mode"
               class="form-check-input"
-              {@attach setInputChecked(chatDisplayMode === 'compact')}
-              onchange={() => {
-                chatDisplayMode = 'compact';
-                onPreferenceChange('chatDisplayMode', 'compact');
-              }}
+              {@attach setInputChecked(chatLogDisplayMode === 'c')}
+              onchange={() => onDisplayModeChange('chat', 'c')}
             />
             <label for="chat-compact-mode" class="form-check-label">Compact Mode</label>
           </div>
@@ -4863,6 +4878,7 @@
   {targetMessage}
   {alertQuestions}
   {messageChrome}
+  displayMode={alertsDisplayMode}
   {isPresenter}
   {onclose}
   {onQuestionSend}

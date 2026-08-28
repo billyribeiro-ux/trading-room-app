@@ -29,6 +29,7 @@ import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control.svelte';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
+import { RoomDisplayModes } from './display-modes.svelte';
 import { TypingSignal } from './typing-signal.svelte';
 import { RoomDialogs } from './dialogs.svelte';
 import { RoomLogPages } from './log-pages.svelte';
@@ -114,6 +115,15 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   */
   'typing.main': TypingSignal,
   'typing.extra': TypingSignal,
+  /*
+    Added 2026-08-28 with the compact renderer, and again because the completeness check asked rather
+    than because anybody remembered.
+
+    `set` is the one to watch: it is handed to `ModalHost` through `RoomOverlays` as
+    `onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}` — wrapped, never
+    bare — and passing it by reference is exactly what this file exists to refuse.
+  */
+  displayModes: RoomDisplayModes,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole

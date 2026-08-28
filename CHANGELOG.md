@@ -33,6 +33,95 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 17:17 UTC — `altChatRender`: a compact renderer, a shared menu, and a third dead control
+
+**Runtime impact: YES.** A room with *"Alt chat render"* on now renders every log as compact single
+lines instead of cards, and hides avatars on chat and in the Q&A thread. A member can also pick the
+mode themselves, in the Text Mode radios that have been in the settings modal all along doing
+nothing. **None of it worked before:** this room had no compact display mode at all.
+
+#### The row was blocked at 16:30 and built by 17:17, and the guard was never off
+
+`altChatRender` was filed BLOCKED four hours earlier on the reasoning that building it cleanly means
+extracting the shared kebab menu out of `RoomMessage.svelte`, whose captured-DOM contract could not
+run here. That contract was being excluded by a comment — the 16:41 entry — and it runs. **It was run
+green immediately before the extraction and immediately after**, which is the only reason the move is
+a fact rather than a hope: it pins all 18 captured kebabs with their exact labels and source order,
+the `msgMenu dropright pt-1` class string, and the colour contract.
+
+#### Three behaviours, and two of them had nothing to act on
+
+`altChatRender` forces `displayMode = 'c'` on the chat columns (byte 1,434,685), the alerts log
+(2,047,129) and the Q&A thread (2,335,599), writing the member's preference as it goes; and it is
+the first term of `hideAvatar` on chat and the Q&A thread — **not on the alerts log** (1,349,065).
+That last asymmetry looks like an oversight and is reproduced, because `hideAvatars` is the control
+that already means "everywhere".
+
+* **`app-st-compactmessage`, transcribed as a second layout in `RoomMessage.svelte`.** TWO mirrored
+  variants, not one with a modifier: `msg-box msg-box-adm` inside `w-100 h-100 d-flex
+  flex-row-reverse` for a presenter (template `z1e`), plain `msg-box` inside `w-100 h-100
+  d-inline-block` for a member (`b_e`). The member row is the only place the trial badge, the new
+  indicator and the membership stars appear. Its timestamp is bracketed and uses `h:mm a` against
+  the card's bare `hh:mm a` — a leading zero apart, both the capture's own.
+* **`MessageMenu.svelte`**, new: the kebab, its twelve entries and the popper placement, taken out of
+  `RoomMessage.svelte` (-214 lines) so both layouts raise the same twelve gates. Twelve entitlement
+  rules written out twice is the failure `room-message-chrome.ts` exists to prevent. The three
+  captured trigger classes are pinned in one lookup because they are not variations on a theme — the
+  compact pair mirrors, the regular one does neither and carries `pt-1`.
+* **`RoomMessage.svelte` ends at 1,008 lines, smaller than the 1,032 it started the day at**, with a
+  whole second renderer added.
+
+#### THE PREFERENCE KEY COLLIDES WITH A ROOM SETTING, and transcribing literally would have hurt
+
+Upstream stores the display mode under `preferences.chatMode` and reads the room's chat POLICY from
+`sessData.chatMode` — two stores, one key, two meanings. **This room has written the wrong one under
+it**: the settings modal's three-way radio called `onPreferenceChange('chatMode', 'g' | 'p' | 'd')`
+for as long as it existed and nothing read it back. Every account that touched that control is
+carrying one of those three values.
+
+So the read VALIDATES rather than reproducing the reference's `"r" == displayMode ? card : compact`.
+A literal transcription would have handed the compact log to every one of those accounts on the first
+load. The stale key is deliberately NOT added to `dead-preference-keys.ts` — that list deletes what
+it names, and the key is about to be live again under the same name.
+
+#### DEFECT: both Text Mode radio pairs were dead, and that is the third control of that shape
+
+They already existed in the settings modal. Both were component-local `$state<'regular' |
+'compact'>('regular')` — seeded from a CONSTANT, never from a preference — writing
+`onPreferenceChange('alertDisplayMode' | 'chatDisplayMode', 'regular' | 'compact')`: three invented
+names against the reference's own `alertsMode` / `chatMode` keys and its `'r'` / `'c'` values.
+Nothing read any of them. So the radios persisted something nobody consulted, and reopening the modal
+showed Regular whatever had been picked.
+
+Same shape as the room's chat-mode radio and the permissions Save, both found earlier. Both invented
+keys are retired to `dead-preference-keys.ts`; the live keys are the reference's and are deliberately
+not on it.
+
+#### Verified
+
+* **Eleven negative controls, each seen RED**: the resolver reverted to the reference-literal read;
+  `altChatRender` no longer forcing compact; the avatar rule losing its surface term; the component
+  no longer consulting it; the compact admin trigger swapped for the regular class; the compact
+  branch removed; a radio reverted to the invented key; the page deriving instead of seeding; one of
+  the twelve shared gates hard-coded; the captured menu stopping overriding; and the two dead keys
+  un-retired.
+* **`room-message-render.test.ts` green before and after the menu extraction** — the side-by-side
+  that makes the refactor checkable rather than hopeful.
+* The size ratchet forced one extraction it should have: the seeding loop left `+page.svelte` for
+  `#lib/room/display-modes.svelte.ts`, which is where the seed, the write-back and the member's
+  later change belong together.
+* Room: `pnpm test` green — **181 files / 2,954 tests**, 1 skipped. `vite build` clean.
+  `svelte-check` 0 errors, `eslint` clean. Controller: 96 files / 1,013 passed, 21 skipped;
+  `schema:verify` at **99 wired**.
+* **NOT verified:** the Svelte MCP is disconnected, so `svelte-autofixer` could not be run on any
+  `.svelte` file. Nothing was opened in a browser — the compact layout is asserted as source and
+  against the captured DOM contract for the card, never as pixels. `.nowrap` and
+  `.reactions-container` have no rule in any stylesheet this repository holds; they are in the
+  bundle's own component styles and are absent from the captured CSS because the capture never
+  rendered compact mode. **The compact timestamp will wrap and the reaction row will sit flush**
+  until those two rules are added, which needs the owner's decision about editing the captured
+  stylesheet.
+
 ### 2026-08-28 16:41 UTC — Seven test files were being dropped from every CI run, behind a banner saying so
 
 **Runtime impact: NO** — no application source changed. **Coverage impact: YES, and it is the

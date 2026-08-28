@@ -38,6 +38,7 @@
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type {
     ChatTab,
     FollowChatStyle,
@@ -61,6 +62,8 @@
      * are looking at — and it arrives with the page as `data.chatTabs`. See `#lib/chat-tabs.ts`.
      */
     chatTabs: readonly string[];
+    /** The chat surfaces' display mode, resolved on the page. `#lib/chat-display-mode.ts`. */
+    displayMode: ChatDisplayMode;
     /** `#textAreaTxtExtra`'s value. Bindable for the same reason the main composer is. */
     composer: string;
     /** Already filtered to `tab` by the page, so this component never decides what it may show. */
@@ -165,6 +168,7 @@
   let {
     tab = $bindable('off-topic'),
     chatTabs,
+    displayMode,
     composer = $bindable(''),
     messages,
     doNotDisturbOn,
@@ -362,6 +366,7 @@
       <div>
         {#each messages as item, index (item.id)}
           <RoomMessage
+            {displayMode}
             {item}
             kind="chat"
             {...chrome}

@@ -958,6 +958,22 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'chatTabsWithBadges',
   /*
+    "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with it.
+
+    THREE behaviours behind one checkbox, read from six sites. It forces the display mode to compact
+    on the chat columns, the alerts log and the Q and A thread — writing the member preference as it
+    goes — and it is the first term of the hide-avatar rule on chat and the Q and A thread but NOT on
+    the alerts log. That last asymmetry is upstream own and is reproduced with the reason recorded.
+
+    It crosses because every occurrence is sessData dotted onto the name: per-room policy, nothing
+    the room can infer. It is a SEED rather than a lock, exactly as upstream applies it — a member
+    can still switch modes afterwards in the settings modal, and re-deriving would put the owner
+    value back on every refresh.
+
+    Read by `#lib/chat-display-mode.ts` and `#lib/room/display-modes.svelte.ts`.
+  */
+  'altChatRender',
+  /*
     FOUR gates the room already implemented and could never switch on.
 
     `RoomMessage.svelte` has carried all four props since it was written, each defaulting false,

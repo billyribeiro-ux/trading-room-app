@@ -111,6 +111,62 @@ export function sourceMessageBehavior(input: SourceMessageBehaviorInput): Source
   };
 }
 
+/**
+ * The twelve menu entries, resolved — one object instead of twelve `$derived` lines.
+ *
+ * ## Why it exists
+ *
+ * `RoomMessage.svelte` computed these twelve as twelve near-identical three-line derivations, each
+ * `capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.x, behavior.y)`. That was fine while one
+ * component rendered a message. `altChatRender` adds a SECOND renderer whose menu is the same twelve
+ * entries with the same twelve gates, and copying the block would be twelve entitlement rules
+ * written out twice — which is the failure `room-message-chrome.ts` was written to end, in the one
+ * place where a drift means a member getting a control they should not have.
+ *
+ * ## The keys are `MESSAGE_MENU_LABEL`'s, not `SourceMessageBehavior`'s
+ *
+ * `delete` rather than `deleteMessage`, `reaction` rather than `react`. The label table is what the
+ * captured menu is matched against, so keying on it means the mapping between a gate and the label
+ * it guards is stated ONCE, here, rather than at each of the twelve call sites.
+ */
+export interface MessageMenuAllows {
+  delete: boolean;
+  mute: boolean;
+  user: boolean;
+  mention: boolean;
+  showAll: boolean;
+  report: boolean;
+  reply: boolean;
+  answered: boolean;
+  reaction: boolean;
+  edit: boolean;
+  copy: boolean;
+  private: boolean;
+}
+
+export function messageMenuAllows(
+  behavior: SourceMessageBehavior,
+  capturedMenuItems: readonly string[] | undefined
+): MessageMenuAllows {
+  const allow = (label: MessageMenuLabel, fallback: boolean) =>
+    capturedMenuAllows(capturedMenuItems, label, fallback);
+
+  return {
+    delete: allow(MESSAGE_MENU_LABEL.delete, behavior.deleteMessage),
+    mute: allow(MESSAGE_MENU_LABEL.mute, behavior.muteMessage),
+    user: allow(MESSAGE_MENU_LABEL.user, behavior.openUserInfo),
+    mention: allow(MESSAGE_MENU_LABEL.mention, behavior.mention),
+    showAll: allow(MESSAGE_MENU_LABEL.showAll, behavior.showToAll),
+    report: allow(MESSAGE_MENU_LABEL.report, behavior.openAlertReport),
+    reply: allow(MESSAGE_MENU_LABEL.reply, behavior.publicReply),
+    answered: allow(MESSAGE_MENU_LABEL.answered, behavior.markAnswered),
+    reaction: allow(MESSAGE_MENU_LABEL.reaction, behavior.react),
+    edit: allow(MESSAGE_MENU_LABEL.edit, behavior.edit),
+    copy: allow(MESSAGE_MENU_LABEL.copy, behavior.copy),
+    private: allow(MESSAGE_MENU_LABEL.private, behavior.privateMessage)
+  };
+}
+
 export function capturedMenuAllows(
   capturedMenuItems: readonly string[] | undefined,
   label: MessageMenuLabel,

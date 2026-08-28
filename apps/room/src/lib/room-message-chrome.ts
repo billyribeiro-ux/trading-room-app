@@ -135,6 +135,15 @@ export type RoomMessageChrome = {
   readonly disablePrivateMessagingForTrials: boolean;
   readonly currentUserIsTrial: boolean;
   readonly hideAvatars: boolean;
+  /**
+   * "Alt chat render" — and it is on the chrome for its SECOND behaviour, not its first.
+   *
+   * The display MODE it forces is resolved once per surface on the page and travels as
+   * `displayMode`, because the alerts log and the chat columns keep separate modes. What travels
+   * here is the term it contributes to `hideAvatar`, which is per MESSAGE — chat and the Q&A thread
+   * only, never the alerts log. `hideMessageAvatar` in `#lib/chat-display-mode.ts` states the rule.
+   */
+  readonly altChatRender: boolean;
   readonly viewerIsLimitedPresenter: boolean;
   /**
    * "Copy trades" — whether `[{( … )}]` in an ALERT becomes a click-to-copy order.
@@ -180,6 +189,7 @@ export interface MessageChromeSettings {
   readonly userToPresenterPM?: boolean;
   readonly disablePMForTrials?: boolean;
   readonly hideAvatars?: boolean;
+  readonly altChatRender?: boolean;
   readonly copyTrades?: boolean;
   readonly usersCanDeleteOwnMsgs?: boolean;
 }
@@ -257,6 +267,7 @@ export function buildMessageChrome(sources: MessageChromeSources): RoomMessageCh
     userToPresenterPrivateMessaging: settings?.userToPresenterPM === true,
     disablePrivateMessagingForTrials: settings?.disablePMForTrials === true,
     hideAvatars: settings?.hideAvatars === true,
+    altChatRender: settings?.altChatRender === true,
     copyTrades: settings?.copyTrades === true,
     allowDeleteOwnMessage: settings?.usersCanDeleteOwnMsgs === true
   };

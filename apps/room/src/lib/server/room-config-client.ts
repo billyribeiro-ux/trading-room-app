@@ -558,6 +558,20 @@ export interface RoomSessionSettings {
    */
   chatTabsWithBadges?: string;
   /**
+   * "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with
+   * it.
+   *
+   * THREE behaviours behind one checkbox, read from six sites in the reference. It forces
+   * `displayMode = 'c'` on the chat columns (byte 1,434,685), the alerts log (2,047,129) and the
+   * Q&A thread (2,335,599) — writing the preference as it goes — and it is the first term of
+   * `hideAvatar` on chat and the Q&A thread but NOT on alerts (1,349,065).
+   *
+   * It crosses because every occurrence is `sessData.<name>`: per-room policy, nothing the room can
+   * infer. `#lib/chat-display-mode.ts` holds the rules and the preference-key collision that comes
+   * with them.
+   */
+  altChatRender?: boolean;
+  /**
    * Four per-room gates that `RoomMessage.svelte` already implements.
    *
    * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.

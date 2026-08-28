@@ -3,6 +3,7 @@
   import { alertDateFormatter } from '#lib/message-formatters.js';
   import { appendMention } from '#lib/mention-insert.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type {
     MessageAction,
     MessageActionItem,
@@ -45,6 +46,7 @@
     targetMessage,
     alertQuestions = [],
     messageChrome,
+    displayMode,
     isPresenter,
     onclose,
     onQuestionSend,
@@ -81,6 +83,14 @@
       reactions: MessageReactions;
     }[];
     messageChrome: RoomMessageChrome;
+    /**
+     * The thread renders in the ALERTS mode, not a mode of its own.
+     *
+     * Upstream's Q&A modal calls `loadAlertsMode()` — byte 2,335,599, the same function the alerts
+     * log calls — rather than having a third preference key. Reproduced: a key of its own would let
+     * the thread drift from the log it belongs to.
+     */
+    displayMode: ChatDisplayMode;
     /** Drives the composer's placeholder and the image button, which is `canPostImages` upstream. */
     isPresenter: boolean;
     onclose: () => void;
@@ -273,6 +283,7 @@
             evidenceQuestion: true
           }}
           {...messageChrome}
+          {displayMode}
           kind="alert"
           isQaMessage={true}
           menuOpen={qaMenuQuestionId === question.id}

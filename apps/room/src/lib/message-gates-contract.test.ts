@@ -49,6 +49,13 @@ const GATES = [
   { prop: 'disablePrivateMessagingForTrials', setting: 'disablePMForTrials', via: 'behavior' },
   { prop: 'hideAvatars', setting: 'hideAvatars', via: 'template' },
   /*
+    `altChatRender` is the OTHER term of `hideAvatar`, and it is `via: template` for the same reason
+    `hideAvatars` is: it gates an element in the message's own markup rather than a menu entry. Its
+    display-mode half does not travel on the chrome at all — that is resolved per SURFACE on the page
+    and arrives as `displayMode`.
+  */
+  { prop: 'altChatRender', setting: 'altChatRender', via: 'template' },
+  /*
     Added 2026-08-28. `copyTrades` gates the click-to-copy order marker on an ALERT body;
     `allowDeleteOwnMessage` is the ROOM's half of `canDeleteOwnMessage` (byte 1,158,799) and is
     named for the PROP it feeds rather than for the setting it comes from — the chrome is applied
@@ -239,10 +246,19 @@ describe('the component end of the wire', () => {
     expect(componentCode).toContain('{#if !isQaMessage && hasQaOnAlerts}');
     /*
       `(sessData.altChatRender && ("chat" === logType || isQAMsg) || sessData.hideAvatars) &&
-      (this.hideAvatar = !0)` — byte 1,349,126. Only the second term is implemented here, and the
-      first is a recorded gap: `altChatRender` is its own unbuilt feature in the settings triage.
+      (this.hideAvatar = !0)` — byte 1,349,126.
+
+      BOTH TERMS SINCE 2026-08-28. This used to assert `{#if !hideAvatars}` and record the first term
+      as a gap while `altChatRender` was unbuilt. The rule is now `hideMessageAvatar` in
+      `#lib/chat-display-mode.ts`, which owns the transcription — including which surfaces the first
+      term covers, chat and the Q&A thread and NOT the alerts log — and the component reads its
+      answer. `chat-display-mode-contract.test.ts` executes the rule; this asserts the component
+      consults it rather than re-deriving.
     */
-    expect(componentCode).toContain('{#if !hideAvatars}');
+    expect(componentCode).toContain(
+      'hideMessageAvatar({ altChatRender, hideAvatars, kind, isQaMessage })'
+    );
+    expect(componentCode).toContain('{#if !hideAvatar}');
   });
 
   it('keeps edit as TWO gates, because upstream gates chat and alerts apart', () => {

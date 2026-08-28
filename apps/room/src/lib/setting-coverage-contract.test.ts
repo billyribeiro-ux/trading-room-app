@@ -99,7 +99,14 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `chatTabsWithBadges` left after it, and it is the only row so far that changed a TYPE: this room
+ * `altChatRender` left last, and it is the largest row the enumeration has produced: this room had
+ * no compact display mode at ALL, so two of the setting's three behaviours had nothing to act on.
+ * It needed `app-st-compactmessage` transcribed as a second layout, the twelve-gate kebab menu
+ * shared out of `RoomMessage.svelte` rather than copied, and a preference-key collision handled —
+ * upstream stores the display mode under `chatMode`, which is what this room's removed chat-policy
+ * radio had been writing `'g'`/`'p'`/`'d'` into. `chat-display-mode-contract.test.ts`.
+ *
+ * `chatTabsWithBadges` left before it, and it is the only row so far that changed a TYPE: this room
  * had two hard-coded chat channels and a closed `ChatTab` union over them. An owner can configure
  * more, behind badges, so the set is per room and per member — and the reference decides it in the
  * BROWSER, which is why every read and write path here asks the server instead, and why the chat and
@@ -117,7 +124,6 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
-  'altChatRender',
   'smallerImagePreview',
   'allRoomsWelcomeMatPW',
   'autoRecord',

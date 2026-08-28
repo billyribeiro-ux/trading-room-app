@@ -28,6 +28,7 @@
                           import { createRoom } from '#lib/room/create-room.svelte.js';
                         import { setAutoplayAttribute, setWebcamAudioAttributes } from '#lib/room/webcams.js';
         import { buildMessageChrome, type RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import { RoomDisplayModes } from '#lib/room/display-modes.svelte.js';
   import { EXTRA_COMPOSER } from '#lib/room/chat.svelte.js';
     import { createTawkRuntime } from '#lib/tawk-runtime.js';
     import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
@@ -545,6 +546,11 @@
     already crossing the boundary, and nothing passed them, because the type and the construction
     lived in different files and nothing compared them.
   */
+  /** Which renderer each pair of surfaces uses. `#lib/room/display-modes.svelte.ts`. */
+  const displayModes = new RoomDisplayModes({
+    savePreference: (key, value) => prefs.save(key, value)
+  });
+
   const messageChrome: RoomMessageChrome = $derived(
     buildMessageChrome({
       user: data.user,
@@ -715,6 +721,10 @@
       { sessData: data.sessData ?? {}, loaded: prefs.loaded },
       { setTheme: (next) => modals.setTheme(next), savePreference: (key, value) => prefs.save(key, value) }
     );
+
+    // `loadChatMode()` and `loadAlertsMode()`, once on mount. The module holds the whole rule and
+    // says why it is a seed rather than a derivation.
+    displayModes.seed(data.sessData?.altChatRender === true, prefs.loaded);
 
     /*
      * Connect to the media server.
@@ -1125,6 +1135,8 @@
               visibleChatMessages={feeds.visibleChat}
               alertLabels={gates.alertLabels}
               chatTabs={data.chatTabs}
+              alertsDisplayMode={displayModes.alerts}
+              chatDisplayMode={displayModes.chat}
               {messageChrome}
               followedUsers={userActions.followedUsers}
               {captureAlertChatElement}
@@ -1248,6 +1260,7 @@
                 {giphyApiKey}
                 chrome={messageChrome}
                 chatTabs={data.chatTabs}
+                displayMode={displayModes.chat}
                 followedUsers={userActions.followedUsers}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
@@ -1317,6 +1330,9 @@
       {mediaTransport}
       {messageActions}
       {messageChrome}
+      alertsDisplayMode={displayModes.alerts}
+      chatLogDisplayMode={displayModes.chat}
+      onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}
       {polls}
       {prefs}
       {privateChat}

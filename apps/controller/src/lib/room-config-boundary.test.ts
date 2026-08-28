@@ -286,6 +286,12 @@ describe('the allow-list itself', () => {
         every path that could reach a channel asks it: the page load, the send, the reply, the older-
         pages query and the realtime fan-out.
       */
+      /*
+        Its DISPLAY-MODE half never reaches a message: the mode is resolved once per surface on the
+        page and travels as `displayMode`, so a component cannot read this setting and decide for
+        itself. What travels on the chrome is the one term it contributes to the hide-avatar rule.
+      */
+      altChatRender: 'RoomDisplayModes seeds the compact mode from it, and hideMessageAvatar reads it as one term',
       chatTabsWithBadges: 'chat-tabs.ts parses it, and memberChatChannels decides which channels each member holds',
       enableQAReactions:
         'RoomMessageChrome — reactions inside the Q&A thread — and reactToQuestion, which refuses when the room has it off',
