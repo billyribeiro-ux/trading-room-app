@@ -17,13 +17,20 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  *
  * ## ⚠️ NOT A BACKLOG — and here it is sharper than usual ⚠️
  *
- * **Five of these are CREDENTIALS the reference ships to every member's browser**, and this room
- * refuses to: `deleteAlertPW`, `banIPList`, `obsStreamKey`, `twillioApiSID` and `modAdminLoginList`.
+ * **SEVEN of these are CREDENTIALS the reference ships to every member's browser**, and this room
+ * refuses to: `deleteAlertPW`, `banIPList`, `obsStreamKey`, `twillioApiSID`, `modAdminLoginList`,
+ * `allRoomsWelcomeMatPW` and `needPasswordForUserNotes`.
  * `room-config-boundary.test.ts` asserts that no room-visible setting reads like a credential, and
  * `internal/room-entry` is the shape used instead — the credential stays on the controller and the
- * QUESTION travels. **Wiring any of those five would be a regression wearing an enumeration's
+ * QUESTION travels. **Wiring any of those seven would be a regression wearing an enumeration's
  * clothes**, and this paragraph exists so that the next person to read this list top-to-bottom knows
  * it before they start.
+ *
+ * It said FIVE until 2026-08-28. The two that joined were found by reading every entry in the bundle
+ * for the triage document — `allRoomsWelcomeMatPW` at byte 1,474,192 and `needPasswordForUserNotes`
+ * at byte 2,081,795, both the identical `bootbox.prompt` then `i.trim() === sessData.<pw>` shape as
+ * `deleteAlertPW`. Neither name matches a `*PW`-style pattern that a heuristic would catch, which is
+ * the argument for the explicit list below rather than a regex.
  *
  * Others are honoured under another mechanism, which is the false-gap rate that killed 7 of 34 claims
  * in the command triage. Only the rest are unbuilt work.
@@ -54,6 +61,21 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * handed it the same wrong source the code read. **Nothing but this list could have found it**: a
  * room setting implemented against a preference looks identical to a working one from every
  * direction except the one that asks the bundle what the reference reads.
+ *
+ * ## ⚠️ THIS LIST IS NOT A BACKLOG ⚠️
+ *
+ * Each entry is a QUESTION, and the answers are in `docs/decoded/missing-settings-triage.md` — that
+ * document, not this list, is the tracker. All 53 were read in the bundle on 2026-08-28 and given a
+ * disposition, and three classes of answer are NOT work:
+ *
+ * - **NEVER** — six of them are passwords the reference compares in the BROWSER. Wiring one is a
+ *   regression wearing an enumeration's clothes, which is why `credentialShaped` below asserts they
+ *   are still here.
+ * - **NOT A GAP** — `h264Enabled` is `sessData.h264Enabled || !0`, unconditionally true upstream;
+ *   `advancedSearchAlerts` is gated on one hard-coded owner id; `smallerImagePreview` seeds a
+ *   preference whose only effect is a class with no rule in any of the 52 stylesheets we hold.
+ * - **ENUMERATION ARTEFACT** — `name`'s read count is almost entirely `this.name` on unrelated error
+ *   classes. Its one real read is a real gap; the number is not evidence of anything.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -112,7 +134,7 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
 ];
 
 /*
-  The five that must NEVER leave this list by being wired.
+  The seven that must NEVER leave this list by being wired.
 
   Named separately from the list above so that removing one is two edits and a visible one, rather
   than a single line disappearing from a long alphabetical block. `room-config-boundary.test.ts`
@@ -120,9 +142,19 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   somebody reads while deciding what to build next.
 */
 const CREDENTIALS_THE_REFERENCE_LEAKS: readonly string[] = [
+  /*
+    Both added 2026-08-28, by reading rather than by pattern. `allRoomsWelcomeMatPW` (byte 1,474,192)
+    guards replacing every room's Welcome Mat and `needPasswordForUserNotes` (byte 2,081,795) guards
+    a presenter reading a member's notes; each is `bootbox.prompt` then `i.trim() === sessData.<pw>`,
+    the same client-side comparison `deleteAlertPW` uses five times over. Neither ends in `PW` in a
+    way a heuristic would catch — `needPasswordForUserNotes` does not contain a credential suffix at
+    all — which is precisely why this list is written out.
+  */
+  'allRoomsWelcomeMatPW',
   'banIPList',
   'deleteAlertPW',
   'modAdminLoginList',
+  'needPasswordForUserNotes',
   'obsStreamKey',
   'twillioApiSID'
 ];
@@ -155,7 +187,7 @@ describe('room settings the reference reads and this room does not', () => {
 
   it('still lists every credential the reference leaks, because wiring one is a REGRESSION', () => {
     /*
-      If one of these five leaves the list it means the room started reading it, which is the exact
+      If one of these seven leaves the list it means the room started reading it, which is the exact
       thing `room-config-boundary.test.ts` refuses one layer down. Asserted here as well because this
       is the file somebody reads while choosing what to build, and the boundary test is the file they
       read after it has already gone wrong.

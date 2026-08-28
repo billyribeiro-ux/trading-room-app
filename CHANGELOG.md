@@ -33,6 +33,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 02:05 UTC — All 53 remaining settings read and triaged, and two more client-side passwords found
+
+**Runtime impact: NO.** One new document, one strengthened guard, two corrected counts.
+
+**A list of names is not a backlog, and until now that warning was the only thing standing between
+this list and somebody working it top to bottom.** `docs/decoded/missing-settings-triage.md` is the
+answer: every one of the 53 was READ in the pinned v4 bundle, given a byte offset and a disposition.
+It is the companion to `missing-commands-triage.md` and exists for the same reason.
+
+**The headline is how much of the list is NOT work.**
+
+- **NEVER — seven are credentials**, up from the five this repository already knew about. The two
+  new ones were found by reading every entry rather than by matching a pattern:
+  `allRoomsWelcomeMatPW` (byte 1,474,192) and `needPasswordForUserNotes` (byte 2,081,795), each the
+  identical `bootbox.prompt` then `value.trim() === sessData.<pw>` shape `deleteAlertPW` uses five
+  times over. **Neither would be caught by a heuristic** — `needPasswordForUserNotes` contains no
+  credential suffix at all — which is the argument for the written-out list. Both are now in
+  `CREDENTIALS_THE_REFERENCE_LEAKS`, with **the negative control seen RED**: simulating a wire by
+  removing one from the pinned list fails both that test and the exact-list test.
+- **NOT A GAP — three would reproduce a defect.** `h264Enabled` is `sessData.h264Enabled || !0`:
+  `!0` is `true`, so the expression is unconditionally true and the setting has no effect upstream
+  at all. `advancedSearchAlerts` is gated on `"56ba547185ae93560d186ea8" == sessData.ownerdID` — one
+  hard-coded customer, not a room setting. And `smallerImagePreview` is a room default with a latch,
+  the same shape as the three built two hours ago — but the preference it seeds only applies
+  `chat-uploaded-img-sm`, a class this repository proved on 2026-08-14 has no rule in any of its 52
+  stylesheets. **The module was designed to accept a fourth rule and this is not one**; recorded as
+  answered rather than built.
+- **ENUMERATION ARTEFACT — one count is noise.** `name` is reported with a read count that is almost
+  entirely `this.name` on `UnsubscriptionError`, `ObjectUnsubscribedError` and Angular's own
+  reflection. Its one real read is `globals.sessionName = r.name`, feeding `document.title` and the
+  transcript window title — a real, small gap. The limitation is recorded rather than fixed:
+  tightening the pattern to `sessData.<name>` would lose the reads that go through a local alias,
+  which is how several of these settings are actually consumed.
+
+**What is left is 15 WIRE, 17 FEATURE and 6 BLOCKED**, each with its byte offset. The cheapest are
+named as such — `enableQAReactions` is an OR-term missing from a gate this room already has, and
+`chatDisabledForTrials` is a policy gap that lets trials chat in a room that disabled it. The
+largest are sized honestly: `hasTypingIndicator` is a wire round trip, a 5,000 ms debounce and a
+display slot, not a flag.
+
+**Three settings turned out to be one feature each time somebody looked**, which is the pattern the
+enumeration keeps producing: `tipMeBtnEnabled && tipMeBtnUrl && tipMeBtnTxt` is a conjunction, and
+`positionsIframe && positionsIframeUrl` is another.
+
+**Verified:** room 152 files / 2,306 tests (1 skipped) · prettier clean · the triage document's
+every byte offset taken from a verified-SHA read of the bundle, none from memory.
+
 ### 2026-08-28 01:52 UTC — A room setting implemented against a preference: every member saw the recording file name
 
 **Runtime impact: YES.** *"Don't show recording info to users"* now works. Until this commit it did

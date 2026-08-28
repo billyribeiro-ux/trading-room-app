@@ -228,12 +228,27 @@ questions; both numbers have moved three times since.
   wrong source the code read. Every member in every room saw the recording file name the owner had
   asked to hide. **Nothing but this list could have found it.**
 
-**They are 53 questions, not 53 gaps, and here that warning is sharper than usual.** FIVE of them are
-credentials the reference ships to every member's browser — `deleteAlertPW`, `banIPList`,
-`obsStreamKey`, `twillioApiSID`, `modAdminLoginList` — and this room refuses to, which is what
-`room-config-boundary.test.ts` enforces and what `internal/room-entry` exists to replace. **Wiring one
-of those is a regression wearing an enumeration's clothes.** Others are honoured under another
-mechanism; only the rest are unbuilt.
+**All 53 have now been READ and triaged**, and the answers are in
+`docs/decoded/missing-settings-triage.md` — that document, not the pinned list, is the tracker. Three
+classes of answer are not work at all:
+
+- **NEVER — SEVEN are credentials the reference ships to every member's browser.** `deleteAlertPW`,
+  `banIPList`, `obsStreamKey`, `twillioApiSID`, `modAdminLoginList`, and — found on 2026-08-28 by
+  reading every entry rather than by pattern — `allRoomsWelcomeMatPW` and `needPasswordForUserNotes`.
+  Each is `bootbox.prompt` then `value.trim() === sessData.<pw>` **in the browser**, so upstream the
+  gate protects nothing. `internal/room-entry` is the shape that replaces them: the credential stays
+  on the controller and the question travels. **Wiring one is a regression wearing an enumeration's
+  clothes.**
+- **NOT A GAP — three reproduce a defect.** `h264Enabled` is `sessData.h264Enabled || !0`, so it is
+  unconditionally true upstream and the setting does nothing at all. `advancedSearchAlerts` is gated
+  on one hard-coded owner id. `smallerImagePreview` seeds a preference whose only effect is a class
+  with no rule in any of the 52 stylesheets this repository holds.
+- **ENUMERATION ARTEFACT — one count is noise.** `name` matches `this.name` on unrelated error
+  classes throughout the bundle. Its one real read — `globals.sessionName = r.name`, feeding
+  `document.title` — is a real gap; the number is not evidence of anything.
+
+The remainder split into **15 WIRE** (the surface exists here and is missing a term), **17 FEATURE**
+and **6 BLOCKED**, each with its byte offset and its size in the triage document.
 
 `src/lib/setting-coverage-contract.test.ts` pins the 53 by NAME and asserts separately that the five
 credentials are still on it — because a name leaving that list means the room started reading it.
