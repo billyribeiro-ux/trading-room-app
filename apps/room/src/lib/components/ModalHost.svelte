@@ -2087,8 +2087,33 @@
                       <th scope="row">Badges:</th>
                       <td>
                         <div class="d-inline-block align-baseline mr-1"></div>
-                        {#if targetUser.isTrial}<span class="badge badge-danger">Trial</span>{/if}
-                        {#if targetUser.isNew}<span class="badge badge-info">New</span>{/if}
+                        <!--
+                          `O(20, sessData.isNewIndicatorOn && isPresenter && user.isNew ? 20 : -1)`
+                          — bundle byte 2,060,925, and this gate had ONE of its three terms.
+
+                          `isPresenter` is added here because it is the term this room can actually
+                          evaluate, and it is the one that matters: whether somebody is a new member
+                          is a moderation fact, and a member should not be reading it about another
+                          member. The `Trial` badge above it carries the same rule upstream
+                          (`O(19, isPresenter && user.isFT ? 19 : -1)`) and it is fixed with it.
+
+                          `isNewIndicatorOn` is deliberately NOT added, and the reason is the same
+                          one that keeps it off `ROOM_VISIBLE_SETTINGS`: **`isNew` has no supply.**
+                          It arrives on the reference's own login payload (`globals.user.isNew =
+                          B.data.isNew`, byte 995,175; `isNew: s.isNew || !1`, 1,157,344) from a
+                          server that is not in the capture, so the rule deciding who is new is
+                          unknowable here. Zero occurrences in `apps/room/src/lib/server` or on the
+                          controller — measured, not assumed. A gate with nothing to gate is not a
+                          consumer, which is exactly why `enableBadges` was held out until
+                          `item.badges` had a supply. `missing-settings-triage.md` carries it as
+                          BLOCKED with what would unblock it.
+                        -->
+                        {#if isPresenter && targetUser.isTrial}<span class="badge badge-danger"
+                            >Trial</span
+                          >{/if}
+                        {#if isPresenter && targetUser.isNew}<span class="badge badge-info"
+                            >New</span
+                          >{/if}
                         {#if targetUser.years}
                           <span class="stars-container">
                             <i class="fas fa-star stars-icon"></i>

@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 11:20 UTC — A billing status any member could read, found by checking a caveat
+
+**Runtime impact: YES.** The `Trial` and `New` badges in the user-info modal are presenter-only now.
+They were not, and `Trial` has a supply — so **any member who opened another member's info card
+could read whether that person was on a free trial.**
+
+**Found by doing what a triage row told me to do.** `isNewIndicatorOn` was filed as WIRE with a
+caveat: *"Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was
+checked."* Checking it is what found both the correct disposition and the defect.
+
+**The gate, at four sites** (bytes 1,344,564 / 1,382,617 / 2,034,811 / 2,060,925), is always the same
+three terms: `isNewIndicatorOn && isPresenter && <row>.isNew`. This room had **one term between two
+badges** at the modal site: `{#if targetUser.isTrial}` and `{#if targetUser.isNew}`, where the
+capture has `O(19, isPresenter && user.isFT ? 19 : -1)` and
+`O(20, isNewIndicatorOn && isPresenter && user.isNew ? 20 : -1)`. `isPresenter` has been a prop on
+`ModalHost` since it was written; the term was simply never applied.
+
+**The third term is deliberately NOT added, and that is the disposition change.** `isNew` has no
+supply. Upstream it is not computed in the browser at all — it arrives on the login payload from the
+reference's own server (`globals.user.isNew = B.data.isNew`, byte 995,175) — so the rule deciding who
+counts as new is unknowable from the capture, and inventing one ("joined in the last N days") would
+be inventing the decision the setting exists to express. **Measured, not assumed:** `isNew` occurs
+zero times in `apps/room/src/lib/server` and zero times on the controller. A gate with nothing to
+gate is not a consumer, which is the reasoning that held `enableBadges` out of the boundary until
+`item.badges` had a supply.
+
+So `isNewIndicatorOn` moves WIRE → **BLOCKED**, unblocked by one owner answer about what makes a
+member new, or by one capture of that login response. **That is the third WIRE row corrected by
+reading** after `enableQAReactions` and `enablePrivateMessageHistory`, and WIRE is now down to one
+row from twelve.
+
+**The contract re-measures rather than quoting.** `moderation-badge-contract.test.ts` reads the three
+server modules and asserts `isNew` still appears in none of them, comments stripped — so the day a
+feed starts supplying it, the BLOCKED row and the gate both become work automatically. A negative
+control adding `isNew: boolean` to `room-events.ts` was seen RED, as were both ungated badge forms.
+
+**One ceiling raised**, `ModalHost` 6101 → 6126, and all but two of the twenty-five lines are the
+citation. A two-word fix with no recorded WHY is the one that gets "simplified" back into the bug.
+
+**Verified:** room 162 files / 2,461 tests (1 skipped) · `svelte-check` 0/0 across 1,287 files ·
+eslint and prettier clean · controller 95 files / 1,006 tests (5 skipped), run even though no
+controller file changed, because the new contract READS one of them to prove `isNew` has no supply
+there. The controller verifier chain was not re-run: nothing it pins moved.
+
 ### 2026-08-28 10:55 UTC — A triage row that said "one row", and the modal behind it that was a spinner
 
 **Runtime impact: YES.** A room that enables *"Private message history?"* gives presenters a

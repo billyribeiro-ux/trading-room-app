@@ -257,9 +257,20 @@ flag would light a control that cannot act. The remainder split into **12 WIRE**
 here and is missing a term), **18 FEATURE** and **6 BLOCKED**, each with its byte offset and its
 size in the triage document.
 
-**WIRE is down to TWO**, and both are named with what they need: `isNewIndicatorOn` (wants a supply
-for `msg.isNew` before it is wired) and `recsInRoom` (BLOCKED — wire it with the Recordings tab,
-never before it).
+**WIRE is down to ONE**, and it is `recsInRoom`, which is BLOCKED anyway — wire it with the
+Recordings tab, never before it. The section opened with twelve.
+
+**`isNewIndicatorOn` was the THIRD row corrected out of WIRE**, on 2026-08-28, and its own caveat is
+what did it: *"Needs `msg.isNew` to have a supply; check before wiring."* The check says there is no
+supply and there cannot be one from evidence — `isNew` is produced by the reference's SERVER and
+arrives on the login payload (bytes 995,175 and 1,157,344), so the rule deciding who is new is
+unknowable here, and inventing one would invent the decision the setting exists to express. It is
+BLOCKED on one owner answer or one capture of that response.
+
+**The check found a live defect on the way.** `ModalHost.svelte` drew the `Trial` and `New` badges
+as `{#if targetUser.isTrial}` and `{#if targetUser.isNew}` — ONE term between them, where the capture
+has `isPresenter &&` on both. `isTrial` has a supply, so **any member opening another member's info
+card could read their billing status.** Both now carry the presenter term.
 
 **A SECOND WIRE ROW WAS WRONG, and reading fixed it.** `enablePrivateMessageHistory` was filed as
 "one row in the user-info modal". The button is one row; the modal it opens was a permanent

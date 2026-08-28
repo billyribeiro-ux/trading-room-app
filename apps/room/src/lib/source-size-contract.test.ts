@@ -1186,7 +1186,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The extraction this file needs has not changed and is not this: it is the user-info modal
       itself, which is the largest single surface in here and now has one more reason to leave.
     */
-    max: 6101,
+    /*
+      6101 -> 6126, 2026-08-28, and all but two of the twenty-five lines are the citation for a
+      two-word fix.
+
+      The `Trial` and `New` badges in the user-info modal were `{#if targetUser.isTrial}` and
+      `{#if targetUser.isNew}` — ONE term between them, where the capture has `isPresenter &&` on
+      both (byte 2,060,925). A member opening another member's info card could read their billing
+      status. The fix is `isPresenter &&` twice; the comment is long because it also has to record
+      why the THIRD term, `isNewIndicatorOn`, is deliberately absent — `isNew` has no supply
+      anywhere, and a gate with nothing to gate is not a consumer.
+
+      That is the standard this file exists to protect. A two-word fix with no recorded WHY is the
+      one that gets "simplified" back into the bug.
+    */
+    max: 6126,
     why: 'every modal in the room, in one component'
   },
   {

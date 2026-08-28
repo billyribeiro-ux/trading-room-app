@@ -94,16 +94,18 @@ questions, and a question that turns out to be noise is answered here.
 
 ## WIRE — the surface exists here and is missing a term
 
-Ordered by how much of the work is already done.
+**This section opened with twelve rows and is down to one**, and two of the eleven that left were
+CORRECTIONS rather than builds — see the section below. The pattern both shared is worth carrying
+into whatever is filed here next: a gate whose SURFACE exists reads as cheap, and says nothing about
+whether the ACTION behind it does.
 
 | setting | byte | what is missing |
 | --- | --- | --- |
-| `isNewIndicatorOn` | 1,344,539 | `isNewIndicatorOn && isPresenter && msg.isNew` — a presenter-only "new member" marker on a message and on the roster row (byte 2,034,786). Needs `msg.isNew` to have a supply; check before wiring, the way `disableStarYears` was checked. |
 | `recsInRoom` | 2,016,810 | `archivesAvailableTo() && sessData.recsInRoom` gates the Recordings tab AND its pane. **Wire it only with the tab** — see BLOCKED. |
 
 ---
 
-## CORRECTED — two rows of this document were wrong, and reading fixed them
+## CORRECTED — three rows of this document were wrong, and reading fixed them
 
 **`enableQAReactions` was filed as WIRE on the first pass and it is a FEATURE.** The correction is
 recorded rather than quietly swapped, because the reasoning is the useful part.
@@ -161,6 +163,21 @@ notice), and the row markup extracted to `CompactMessageRow.svelte` so it was no
 everybody, not the thread they share with the presenter — which is what the setting is named for and
 why the entitlement is checked where a client cannot reach it.
 
+**`isNewIndicatorOn` was filed as WIRE and it is BLOCKED.** Corrected 2026-08-28. The row's own
+caveat was right — *"Needs `msg.isNew` to have a supply; check before wiring"* — and the check is
+what changes the disposition: there is no supply and there cannot be one from evidence, because
+`isNew` is produced by the reference's server rather than derived in its client. Inventing a rule
+("joined in the last N days") would be inventing the decision the setting exists to express.
+
+**The check found a live defect on the way, and it is fixed.** `ModalHost.svelte` rendered
+`{#if targetUser.isTrial}` and `{#if targetUser.isNew}` where the capture has
+`O(19, isPresenter && user.isFT ? 19 : -1)` and
+`O(20, isNewIndicatorOn && isPresenter && user.isNew ? 20 : -1)` — **one term between the two
+badges**. `isTrial` HAS a supply, so any member opening another member's info card could read their
+billing status. Both badges now carry the presenter term; the third term stays out with the reason at
+the code, and `moderation-badge-contract.test.ts` re-measures the absence of an `isNew` supply rather
+than quoting this paragraph.
+
 ---
 
 ## FEATURE — genuinely unbuilt
@@ -193,6 +210,7 @@ why the entitlement is checked where a client cannot reach it.
 
 | setting | blocked on |
 | --- | --- |
+| `isNewIndicatorOn` | **Its data.** The gate is `isNewIndicatorOn && isPresenter && <row>.isNew` at four sites (bytes 1,344,564 / 1,382,617 / 2,034,811 / 2,060,925), and `isNew` is not computed in the browser at all: it arrives on the login payload from the reference's own server — `globals.user.isNew = B.data.isNew` (995,175), `isNew: s.isNew || !1` (1,157,344) — so the rule deciding who counts as new is unknowable from the capture. Measured 2026-08-28: `isNew` occurs ZERO times in `apps/room/src/lib/server` and zero times on the controller. Crossing the setting would put a gate on a value nothing supplies, which is what `enableBadges` was held out of the boundary to avoid. Unblocked by one answer from the owner about what makes a member new, or by a capture of that login response. |
 | `recsInRoom` | The Recordings tab it gates. `presAreaTabs-recordings` is an iframe onto a server archive page, and there are zero recordings or archive tables in either database. `TODO.md` carries the blocker. Wire the setting WITH the tab, never before it. |
 | `isLocked` | Byte 1,148,353 — refuses a non-presenter at connect with a named dialog, and byte 2,500,128 offers the presenter an unlock confirm. Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a lock. |
 | `backupClusterID` | Media infrastructure — a second MediaMTX cluster. Same blocker as every other `STREAM_SERVER_MTX` row. |
