@@ -271,6 +271,14 @@ with one `ls`. The navbar's real gap was a client `mount` — SSR runs no handle
 write — and `components/RoomNavbar.svelte.test.ts` closed it on 2026-08-28. Both trackers are
 corrected.
 
+**A THIRD KIND OF ANSWER, added 2026-08-28: DERIVED.** `playChatMessageSoundFor` holds member email
+ADDRESSES and the reference ships them to every browser to hash there. The room never needs them:
+`internal/room-config/[code]` sends the HASHES, the same digest it already sends for
+`badges.byEmailHash`. **The feature is built and the setting stays `wired: false`** — so the counts
+above do not move, and that is correct rather than a bookkeeping problem: the pinned list asks
+whether the raw value crosses, and here it must not. Two silent upstream defects are fixed on the
+way, including one where following a single person turns off every chat sound in the room.
+
 **WIRE is down to ONE**, and it is `recsInRoom`, which is BLOCKED anyway — wire it with the
 Recordings tab, never before it. The section opened with twelve.
 

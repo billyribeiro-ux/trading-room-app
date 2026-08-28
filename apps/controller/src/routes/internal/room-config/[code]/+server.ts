@@ -182,8 +182,42 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     memberBadges[hash] = ids;
   }
 
+  /*
+    "Play chat message sound for" — the SETTING STAYS HERE; only the hashes travel.
+
+    The reference stores a comma-separated list of member EMAIL ADDRESSES and hashes them in the
+    browser on `globalsLoaded` (bundle byte 2,595,225):
+
+      sessData.playChatMessageSoundFor.replace(" ", "").split(",")
+        -> hashEmail(each) -> globals.playChatMessageSoundFor
+
+    …then compares that list against `e.avt`, the sender's email HASH, on every arriving message
+    (byte 1,431,949). So the raw addresses are shipped to every member's browser to be turned into
+    hashes the room could have been given directly.
+
+    **They are not shipped here.** `playChatMessageSoundFor` is NOT on `ROOM_VISIBLE_SETTINGS`; this
+    endpoint hashes the list and sends the digests, which is the only form the room's comparison
+    actually needs. Same reasoning, same `md5(email.trim().toLowerCase())` and same precedent as
+    `memberBadges` directly above: the room needs to MATCH a member, not to learn anybody's address,
+    and this response is serialised into SSR HTML on every load.
+
+    `.split(/[\s,]+/)` rather than the reference's `.replace(" ", "").split(",")`. **That is a fix,
+    and it is a one-character-class fix for a real defect**: `String.replace` with a STRING pattern
+    replaces the FIRST occurrence only, so upstream a list of `a@example.test, b@example.test, c@example.test` loses the
+    space before `b` and keeps the one before `c`, and ` c@example.test` hashes to something no sender
+    will ever match. MEASURED, not reasoned: the first two entries of any list are always fine and
+    every entry from the THIRD on is dead, so a five-address list loses three of five.
+  */
+  const chatSoundForEmailHashes = String(resolved.values.playChatMessageSoundFor ?? '')
+    .split(/[\s,]+/)
+    .map((address) => address.trim().toLowerCase())
+    .filter((address) => address.length > 0)
+    .map((address) => createHash('md5').update(address).digest('hex'));
+
   return json({
     badges: { definitions: badgeDefinitions, byEmailHash: memberBadges },
+    /* Derived from `playChatMessageSoundFor`, which itself never crosses. See above. */
+    chatSoundForEmailHashes: [...new Set(chatSoundForEmailHashes)],
     room: {
       shortCode: room.shortCode,
       name: room.name,

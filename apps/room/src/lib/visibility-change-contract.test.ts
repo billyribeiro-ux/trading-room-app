@@ -111,8 +111,17 @@ describe('the hidden tab stops refetching', () => {
       trade this feature makes, and it is what is asserted now. The mention behaviour is recorded in
       `TODO.md` as a gap; changing it is a product decision, not a refactor's.
     */
+    /*
+      RE-POINTED 2026-08-28, when the sound RULE moved to `#lib/chat-arrival-sound.ts` and this
+      dispatcher kept only the call. The anchor was `playSoundEffect('pling')` — a literal that no
+      longer exists here — and re-pointing it rather than deleting it is the rule this repository
+      earned four times over: migrate the test with the code, and re-anchor on what now owns it.
+
+      What is asserted is unchanged and is still about THIS file: the sound call runs before the
+      hidden-tab early return, so a followed user is heard while the tab is hidden.
+    */
     const code = streamCode.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    const ding = code.indexOf("playSoundEffect('pling')");
+    const ding = code.indexOf('if (sound) playSoundEffect(sound);');
     const gate = code.indexOf('if (this.#prefs.visibilityChangeEnabled && !this.#appHasFocus()) {');
     expect(ding, 'the chat ding must exist').toBeGreaterThan(-1);
     expect(gate, 'the hidden-tab gate must exist').toBeGreaterThan(-1);

@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 14:45 UTC — Following one person turned off every chat sound, and a third kind of answer
+
+**Runtime impact: YES.** A room that lists members under *"Play chat message sound for"* now plays a
+sound when those members post. And a member who follows anybody at all gets their chat sounds back —
+they had been silently off.
+
+**THE DEFECT IS UPSTREAM AND IT IS BIGGER THAN THE FEATURE.** The branch that chooses between the two
+sounds reads:
+
+```js
+followedUsers && Object.keys(followedUsers).length > 0
+  && followedUsers[e.avt].followChatStyle.playSound ? pling : ( … )
+```
+
+It checks only that the map is NON-EMPTY, then indexes it with the SENDER's hash. So the moment a
+member follows one person, every message from somebody they do **not** follow evaluates
+`undefined.followChatStyle` and throws — swallowed by the `try/catch` around the block
+(`console.log("Error in chat.component for chatSoundOn")`). **`dingOnNewMessage` and the per-member
+list both go silent**, for every message from every non-followed sender, permanently. This room's
+optional lookup already made that impossible; the rule now takes a resolved boolean rather than the
+map, so it cannot be reintroduced.
+
+**A THIRD KIND OF ANSWER, and it needed naming: DERIVED.** `playChatMessageSoundFor` holds member
+email ADDRESSES. The reference ships them to every browser and hashes them there (byte 2,595,225),
+then compares against `e.avt` — the sender's hash — on each message (1,431,949). **The room never
+needs the addresses.** `internal/room-config/[code]` splits and hashes the list and sends
+`chatSoundForEmailHashes`, exactly as it already does for `badges.byEmailHash` twenty lines above.
+
+So the feature is BUILT and the setting stays `wired: false`, and the enumeration counts do not move
+— 90 wired, 35 questions, unchanged. That is correct rather than a bookkeeping problem: the pinned
+list asks whether the RAW VALUE crosses, and here the answer is no and must stay no. The coverage
+contract now names that category and asserts the name cannot quietly leave the list.
+
+**A second upstream defect, measured rather than reasoned.**
+`sessData.playChatMessageSoundFor.replace(" ", "")` uses a STRING pattern, and `String.replace`
+applies one to the FIRST occurrence only. The first draft of the test expected two damaged entries in
+a three-address list and the run said **one**: the space that goes is the one before the SECOND
+address, so entries from the THIRD on keep theirs. A five-address list loses three. The prose in two
+files was corrected to the measured shape. The controller splits on `/[\s,]+/`.
+
+**The rule left the dispatcher.** Five inputs and three outcomes lived inside a 900-line event router
+whose only entry point was an `EventSource` plus nine collaborators — which is exactly why the
+per-member list sat unimplemented behind a paragraph explaining what it would take. It is
+`#lib/chat-arrival-sound.ts` now, with eleven tests and five negative controls.
+
+**Two gates caught things, and both were right.** The load-key snapshot refused a new `data` key
+until it was updated deliberately. The controller's privacy verifier refused my example addresses for
+being outside the reserved test domains — `a@x.com` is somebody's address.
+
+**One test was re-pointed rather than deleted**, which is the rule this repository earned four times:
+`visibility-change-contract` anchored on `playSoundEffect('pling')`, a literal the extraction removed.
+It anchors on the call site now and asserts the same thing — the sound plays before the hidden-tab
+early return.
+
+**Verified:** room 167 files / 2,640 tests (1 skipped) · controller 96 files / 1,013 tests (5
+skipped) · `schema:verify` at 90 wired · both room gates and the six controller verifiers green ·
+`svelte-check` 0/0 across 1,296 room files and 1,540 controller files · eslint and prettier clean.
+
 ### 2026-08-28 14:05 UTC — A room's own favicon and stylesheet, and a security claim I had to retract
 
 **Runtime impact: YES.** A room that sets a **custom favicon** now replaces the shell's icon with

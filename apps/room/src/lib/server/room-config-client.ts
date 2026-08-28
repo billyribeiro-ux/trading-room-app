@@ -561,6 +561,17 @@ export interface RoomBadges {
 
 export interface RoomConfig {
   badges?: RoomBadges;
+  /**
+   * "Play chat message sound for" — the member email HASHES an arriving message is checked against.
+   *
+   * DERIVED, not crossed. The setting itself holds raw email addresses and stays off
+   * `ROOM_VISIBLE_SETTINGS`; `internal/room-config/[code]` splits and hashes it, because a hash is
+   * the only form this room's comparison needs — messages carry `senderEmailHash`, never an address.
+   * Same reasoning and the same digest as `badges.byEmailHash` beside it.
+   *
+   * Absent for a room that configured none, which reads the same as an empty list.
+   */
+  chatSoundForEmailHashes?: string[];
   room: {
     shortCode: string;
     name: string;

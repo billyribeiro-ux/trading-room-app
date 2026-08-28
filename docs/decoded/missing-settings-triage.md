@@ -25,6 +25,7 @@ assumed.
 | **WIRE** | Our room already has the surface; it is missing a term or a value. Cheap and evidenced. |
 | **FEATURE** | Genuinely unbuilt. Sized by what it needs, not by the setting. |
 | **BLOCKED** | Needs something this repository does not have. |
+| **DERIVED** | The feature is BUILT, and the raw setting still does not cross — the controller sends what the room actually needs instead. Added 2026-08-28. |
 
 ---
 
@@ -193,7 +194,6 @@ than quoting this paragraph.
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
 | `customPlayerURL` | 1,918,564 | An iframe in the screens pane, chosen over the normal content at byte 2,017,223. |
-| `playChatMessageSoundFor` | 1,431,925 | A list of hashed senders whose messages play a sound for this viewer. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
 | `altChatRender` | 1,349,151 / 1,434,685 / 2,047,129 (six sites) | **CORRECTED AND RESIZED 2026-08-28 — read the six occurrences, not the one.** Three behaviours, not one: it hides avatars on chat and Q&A messages (`hideAvatar = altChatRender && (chat \|\| isQAMsg) \|\| hideAvatars`), and it FORCES `displayMode = "c"` on **four** surfaces — main chat, extra chat, alerts and the Q&A modal — writing that over the viewer's own stored preference. **This room has no compact display mode at all**, so the setting's main half needs the mode itself built first, on four surfaces, with its picker. Building only the avatar third would give an owner who ticks it hidden avatars and no compact layout, which is not what the setting means. **TRAP FOR WHOEVER BUILDS IT:** `sessData.chatMode` and `preferences.chatMode` are DIFFERENT things sharing a key — the first is the room's mode (`"p"` presenters-only, `"d"` disabled, byte 1,003,622), the second is this per-viewer display mode (`"c"`, byte 1,434,808). Writing `"c"` into the room's `room_state.chat_mode` would corrupt the room's chat policy. |
 | `linkedRoomAlerts` | 2,139,184 | One row of the alert composer, cross-posting to a linked room. |
@@ -240,6 +240,31 @@ than quoting this paragraph.
 | `showOnlyUsernames` | BUILT — `rosterRowIsFull`. The row's own advice paid off: `e` is the ROW, so the setting reduces MEMBER rows and leaves presenters in full, for every viewer. The obvious reading was the exact inverse. | 2026-08-28 |
 | `tipMeBtnEnabled` + `tipMeBtnUrl` + `tipMeBtnTxt` | BUILT — `tipButtonFor`, one conjunction feeding both captured render sites. The URL is checked for `http:`/`https:` here, which the reference does not do. | 2026-08-28 |
 | `customFaviconURL` + `customCSS` | BUILT — `RoomBranding`. The upstream `indexOf("https")` check that decides link-versus-inline is a substring test and is fixed by parsing: ordinary CSS mentioning an https URL was being set as a stylesheet href, and a plain `http://` stylesheet was being injected as CSS text. Both failures were silent. | 2026-08-28 |
+
+---
+
+## DERIVED — the feature is built and the raw setting still does not cross
+
+A setting can be honoured without being sent. This is the third kind of answer, and it exists
+because the first two — *wire it* and *do not wire it* — could not describe what happened here.
+
+| setting | byte | what crosses instead |
+| --- | --- | --- |
+| `playChatMessageSoundFor` | 2,595,225 and 1,431,949 | **Email HASHES.** The setting holds member email ADDRESSES, and the reference ships them to every browser to hash there, then compares the result against `e.avt` — the sender's hash — on each arriving message. The room never needs the addresses. `internal/room-config/[code]` splits and hashes the list and sends `chatSoundForEmailHashes`, exactly as it already does for `badges.byEmailHash`. **`playChatMessageSoundFor` stays `wired: false` and stays on the pinned list**, which is correct: that list asks whether the RAW VALUE crosses, and the answer is no and should remain no. |
+
+**Two upstream defects are not reproduced, and both are silent.**
+
+1. `sessData.playChatMessageSoundFor.replace(" ", "")` uses a STRING pattern, and `String.replace`
+   applies one to the FIRST occurrence only. Measured: in `a, b, c` the space before `b` goes and
+   every entry from the THIRD on keeps its own, so a five-address list has three entries that hash
+   to digests no sender can ever match. The controller splits on `/[\s,]+/`.
+
+2. The branch that chooses between the two sounds reads
+   `followedUsers[e.avt].followChatStyle.playSound` after checking only that the map is NON-EMPTY.
+   For a member who follows anybody, every message from a sender they do NOT follow evaluates
+   `undefined.followChatStyle` and throws — swallowed by the surrounding `try/catch`. **So
+   `dingOnNewMessage` and this list both go silent the moment a member follows one person.**
+   `chat-arrival-sound.ts` takes a resolved boolean rather than the map, so it cannot happen.
 
 ---
 

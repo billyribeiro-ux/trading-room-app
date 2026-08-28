@@ -127,6 +127,24 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
 ];
 
 /*
+  ── ANSWERED BY DERIVATION, and this is a THIRD kind of answer ────────────────────────────────────
+
+  A setting can be honoured without crossing. `playChatMessageSoundFor` holds member EMAIL ADDRESSES
+  and the reference ships them to every browser to hash there (byte 2,595,225), then compares the
+  result against `e.avt` — the sender's email hash — on every message (1,431,949). The room never
+  needs the addresses: `internal/room-config/[code]` splits and hashes the list and sends
+  `chatSoundForEmailHashes`, exactly as it already does for `badges.byEmailHash`.
+
+  So the FEATURE is built and the SETTING is still `wired: false`, which means this name stays on the
+  list above. That is correct rather than a bookkeeping problem — the list asks "does the raw value
+  cross", and the honest answer here is no and should stay no.
+
+  Named separately from the credentials below because the reason is different: those must never be
+  wired at all, this one is DONE. `docs/decoded/missing-settings-triage.md` records which.
+*/
+const ANSWERED_BY_DERIVATION: readonly string[] = ['playChatMessageSoundFor'];
+
+/*
   The seven that must NEVER leave this list by being wired.
 
   Named separately from the list above so that removing one is two edits and a visible one, rather
@@ -187,6 +205,16 @@ describe('room settings the reference reads and this room does not', () => {
     */
     for (const credential of CREDENTIALS_THE_REFERENCE_LEAKS) {
       expect(REFERENCE_READS_AND_WE_DO_NOT).toContain(credential);
+    }
+  });
+
+  /*
+    …and the derived ones stay too, for the opposite reason: the feature is BUILT and the raw value
+    still must not cross. A name leaving this list would mean somebody started sending the addresses.
+  */
+  it('keeps the settings answered by DERIVATION, whose raw value must still not cross', () => {
+    for (const derived of ANSWERED_BY_DERIVATION) {
+      expect(REFERENCE_READS_AND_WE_DO_NOT).toContain(derived);
     }
   });
 });

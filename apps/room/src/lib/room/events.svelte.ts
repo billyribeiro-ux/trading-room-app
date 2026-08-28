@@ -1,3 +1,4 @@
+import { arrivalSoundFor } from '#lib/chat-arrival-sound.js';
 import { invalidate, invalidateAll } from '$app/navigation';
 
 import { resolveArrivalAnnouncement } from '#lib/arrival-announcement.js';
@@ -25,6 +26,13 @@ interface EventStreamSession {
     beepOnUserJoin?: boolean;
     dingOnNewMessage?: boolean;
   } | null;
+  /**
+   * "Play chat message sound for" — member email HASHES, derived on the controller.
+   *
+   * Not on `sessData`, because it is not a setting: the setting holds raw addresses and never
+   * crosses. `internal/room-config/[code]` hashes it and the load passes the digests through.
+   */
+  chatSoundForEmailHashes?: readonly string[];
 }
 
 /** `setTimeout(…, 3e3)`. */
@@ -682,40 +690,29 @@ export class RoomEventStream<Entry> {
       if (payload.data?.senderId === this.#session().user.id) return;
 
       /*
-        The chat ding, transcribed from `app-chat.compiled.js:112-137`:
+        THE CHAT DING. The rule is `#lib/chat-arrival-sound.ts`, which carries the transcription,
+        both upstream defects it does not reproduce, and the reason a rule with five inputs does not
+        belong inside a dispatcher only reachable through nine collaborators.
 
-          !preferences.doNotDisturbOn && preferences.chatSoundOn
-            ? userActions.followedUsers[e.avt].followChatStyle.playSound
-                ? pling.play()
-                : ((playChatMessageSoundFor.length && hashEmail(user.email) !== e.avt
-                     && playChatMessageSoundFor.includes(e.avt))
-                   || (sessData.dingOnNewMessage && hashEmail(user.email) !== e.avt))
-                  && followed.play()
-
-        Three things about it are worth stating, because each is easy to get wrong:
-
-        * **A followed user wins, and plays a DIFFERENT sound.** `pling`, not `followed` — the
-          per-user preference outranks the room-wide setting, and it is the only branch that does.
-        * **`followed` is the sound for an ordinary new message.** The name is the reference's, and
-          it is confusing: the sound file called "followed" is what the ROOM-WIDE ding uses, while
-          a followed user gets "pling".
-        * **Never for your own message.** The reference compares `hashEmail(user.email) !== e.avt`;
-          the `senderId` guard directly above already does that here, so the check is not repeated.
-
-        `playChatMessageSoundFor` — the per-email list — is NOT implemented. It is a room setting
-        holding member email addresses, and the reference compares it against `e.avt`, an email
-        HASH, so honouring it means the server sending hashed addresses rather than the raw list.
-        Sending raw member emails to every browser to decide a sound would be the wrong trade;
-        recorded rather than quietly skipped.
+        THE LOOKUP IS OPTIONAL, and that is the half of the fix that has to live HERE: upstream
+        reads `followedUsers[e.avt].followChatStyle` after checking only that the map is non-empty,
+        so it throws for every message from anyone a member does not follow. Resolving it at the
+        call site with `?.` is what makes that impossible; the module takes the answer, not the map.
       */
       if (payload.channel === 'chat' && !this.#prefs.doNotDisturbOn && this.#prefs.chatSoundOn) {
         const senderHash = (payload.data as { senderEmailHash?: string } | undefined)
           ?.senderEmailHash;
-        const followStyle = senderHash
-          ? this.#userActions.followedUsers[senderHash]?.followChatStyle
-          : undefined;
-        if (followStyle?.playSound) playSoundEffect('pling');
-        else if (this.#session().sessData?.dingOnNewMessage) playSoundEffect('followed');
+        const sound = arrivalSoundFor({
+          doNotDisturb: this.#prefs.doNotDisturbOn,
+          chatSoundOn: this.#prefs.chatSoundOn,
+          followedSenderPlaysSound:
+            senderHash !== undefined &&
+            this.#userActions.followedUsers[senderHash]?.followChatStyle?.playSound === true,
+          dingOnNewMessage: this.#session().sessData?.dingOnNewMessage === true,
+          senderEmailHash: senderHash,
+          chatSoundForEmailHashes: this.#session().chatSoundForEmailHashes
+        });
+        if (sound) playSoundEffect(sound);
       }
 
       /*

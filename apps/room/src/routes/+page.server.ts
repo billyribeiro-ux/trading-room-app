@@ -783,6 +783,13 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
      * here and nothing identifying in it.
      */
     badges: roomConfig.badges ?? { definitions: {}, byEmailHash: {} },
+    /**
+     * "Play chat message sound for" — the member hashes an arriving message is checked against.
+     *
+     * Hashes and never addresses: the setting holds raw emails and does not cross at all. See
+     * `RoomConfig.chatSoundForEmailHashes` for why the derivation is the controller's job.
+     */
+    chatSoundForEmailHashes: roomConfig.chatSoundForEmailHashes ?? [],
     /** Settings the owner is enforcing. A locked control must not render as a flippable toggle. */
     lockedSettings: roomConfig.locked,
     /** This room, as the controller describes it. */

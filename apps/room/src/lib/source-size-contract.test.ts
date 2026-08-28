@@ -1259,7 +1259,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+page.server.ts',
-    max: 1584,
+    /*
+      1584 -> 1589, 2026-08-28. Five lines: `chatSoundForEmailHashes` on the returned object and the
+      four-line docblock saying why it is hashes and never addresses.
+
+      A LOAD KEY IS THE RIGHT PLACE FOR THAT SENTENCE. This file is the list of everything the room
+      is handed, and the one thing a reader should learn about this entry is that the setting behind
+      it — a list of member email ADDRESSES — deliberately does not cross at all. Four lines here
+      buy that; a reader who has to follow two files to find out is a reader who will not.
+    */
+    max: 1589,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
