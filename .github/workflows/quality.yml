@@ -344,3 +344,100 @@ jobs:
           path: apps/controller/test-results/
           if-no-files-found: warn
           retention-days: 14
+
+  room-e2e:
+    name: room end-to-end
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    # THE ROOM HAD NO BROWSER, AND IT COST TWO PRODUCTION DEFECTS.
+    #
+    # `controller-e2e` above has driven a browser since 2026-08-23. The ROOM — the product surface,
+    # forty-six components, three thousand unit assertions — had none, and every verification note in
+    # `CHANGELOG.md` said so in the same words: "nothing was opened in a browser".
+    #
+    # The first run of this suite, on 2026-08-28, found two defects that had been shipping:
+    #
+    #   ReferenceError:      `createRoom` sat above ten page bindings its dependency thunks close
+    #   every render 500     over. On the server a `$derived` evaluates immediately, so the root read
+    #                        `deps.isPresenter()` while that binding was in its temporal dead zone.
+    #                        Introduced 2026-08-17; ELEVEN DAYS of the room's own page answering 500.
+    #
+    #   two <title> tags     `app.html` carried `<title>PTRChat</title>` before `%sveltekit.head%`.
+    #                        `document.title` is the FIRST title, so the browser tab never showed the
+    #                        room's name — a wired setting whose entire purpose is that tab.
+    #
+    # Neither was visible to anything else here: both type-check, both lint clean, `svelte-check` is
+    # silent on both, and every unit test constructs its subject with stubs that are already
+    # initialised. That is the argument for this job, so it is not a workflow anyone deletes as
+    # redundant.
+    #
+    # No PostgreSQL service, unlike the controller's job. The room fails closed without its
+    # configuration, so `e2e/stub-controller.mjs` answers the two control-plane routes it needs — and
+    # VERIFIES the capability bearer rather than accepting it, so the seam is exercised by every page
+    # load. Bringing the real controller here would give every room-render failure two possible
+    # causes; the controller's own behaviour is tested by the controller's own job.
+
+    steps:
+      - name: Check out the immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the repository-pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Activate the repository pnpm version
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          corepack enable
+          # No version literal, for the reason `ci-package-manager-pin.test.ts` asserts, and retried
+          # for the reason the frontend job above records — the undici parser crash is a property of
+          # the download, so it can strike any job that installs.
+          attempt=1
+          until corepack install; do
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error title=corepack install failed::three attempts; see the log above"
+              exit 1
+            fi
+            echo "corepack install crashed or failed (attempt $attempt); retrying"
+            sleep "$((attempt * 5))"
+            attempt=$((attempt + 1))
+          done
+          expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          actual="$(pnpm --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error title=pnpm version mismatch::package.json pins $expected, the runner has $actual"
+            exit 1
+          fi
+          echo "pnpm $actual, matching the packageManager pin"
+
+      - name: Install dependencies from the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the browser the harness is configured for
+        working-directory: apps/room
+        # Chromium ALONE — `playwright.config.ts` declares exactly one project. `--with-deps` because
+        # a bare runner has none of the shared libraries it needs.
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end
+        working-directory: apps/room
+        # The config owns both servers: a stub control plane, then `vite build && node build`. The
+        # BUILT server and not `vite dev`, because the room's page is compiled on first request under
+        # dev and that one compile exceeded every bound this suite tried — measured, not assumed. It
+        # is also what actually ships.
+        run: pnpm run test:e2e
+
+      - name: Preserve the traces and screenshots of a failing run
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: room-e2e-failure-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/room/test-results/
+          if-no-files-found: warn
+          retention-days: 14

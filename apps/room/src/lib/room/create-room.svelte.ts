@@ -22,7 +22,7 @@ import type { SplitPair } from '#lib/room/split.svelte.js';
     `mergeGlobalChatStyle`. Nine sites that previously held an inline arrow assigning to a page
     `let` now call one. That IS a rewrite, deliberately, and it is an improvement: the receiver is
     declared once with a name instead of being re-derived at each site.
-  * **Plain values** — `mtx`, `unreadQaAlertIds`, `settingsSplitPair` — pass straight through.
+  * **Plain values** — `mtx`, `unreadQaAlertIds` — pass straight through.
 
   **The template was not touched, and that is a measured fact rather than a hope:** none of the 13
   page `let`s that cross here is written by the template. Every write is script-side. Had even one
@@ -135,7 +135,7 @@ import {
 import { RoomChat } from '#lib/room/chat.svelte.js';
 import { RoomMedia } from '#lib/room/media.svelte.js';
 
-import { RoomSplit, isRoomSplitDir } from '#lib/room/split.svelte.js';
+import { RoomSplit, isRoomSplitDir, splitPairFromValue } from '#lib/room/split.svelte.js';
 
 import { resolveNoteSurfaceGates } from '#lib/components/notes/note-gates.js';
 import { swingAlertsTabVisible } from '#lib/swing-alerts.js';
@@ -180,7 +180,6 @@ export interface RoomDeps {
   // ── Plain values. Not reactive, so they cross as themselves.
   mtx: MtxStreamTabs;
   unreadQaAlertIds: SvelteSet<number>;
-  settingsSplitPair: (key: string) => SplitPair | null;
   defaultFollowChatStyle: () => FollowChatStyle;
 }
 
@@ -207,7 +206,7 @@ export function createRoom(deps: RoomDeps) {
   const composerElement = $derived(deps.composerElement());
   const alertsScroller = $derived(deps.alertsScroller());
 
-  const { mtx, unreadQaAlertIds, settingsSplitPair, defaultFollowChatStyle } = deps;
+  const { mtx, unreadQaAlertIds, defaultFollowChatStyle } = deps;
 
   /*
     Every preference this viewer owns, in `#lib/room/prefs.svelte.ts`.
@@ -363,6 +362,33 @@ export function createRoom(deps: RoomDeps) {
   const loadedRoomSplitDir = isRoomSplitDir(prefs.loaded.roomSplitDir)
     ? prefs.loaded.roomSplitDir
     : 'ltr';
+  /**
+   * The server-persisted pane sizes, read over THIS function's own `prefs`.
+   *
+   * ## It used to arrive as a dep, and the room returned 500 on every load for eleven days
+   *
+   * `+page.svelte` declared `function settingsSplitPair(key) { return splitPairFromValue(prefs.loaded[key]) }`
+   * and passed it in — where `prefs` was the page's own binding, destructured from THIS function's
+   * return value. `RoomSplit`'s constructor calls its reader SYNCHRONOUSLY, seeding the geometry so
+   * the first paint already has the member's layout (its own docblock says why that eager read
+   * matters). So the reader ran while the page's `const { prefs, … } = createRoom({…})` was still in
+   * its temporal dead zone, and threw `ReferenceError: Cannot access 'prefs' before initialization`
+   * before a single pane was measured.
+   *
+   * Unconditional — no setting, no preference, no browser makes any difference — and invisible to
+   * everything that guards this repository: it type-checks, it lints, `svelte-check` is silent, and
+   * 3,085 unit assertions pass, because a class constructed with a stub reader in a test never
+   * touches the page's binding. **A browser found it in the first minute it was ever pointed at the
+   * room.** Introduced 2026-08-17 in `b981316`, the commit that created this file.
+   *
+   * The fix is not a reordering, which would leave the same shape one edit away from breaking again.
+   * The reader reads `prefs.loaded`, and `prefs` is created HERE, twelve lines above — so it is
+   * declared here too and the page has nothing to get wrong. `promoteLegacySplitSizes` on the page
+   * uses the one returned below, so there is a single reader rather than two that must agree.
+   */
+  const settingsSplitPair = (key: string): SplitPair | null =>
+    splitPairFromValue(prefs.loaded[key]);
+
   const split = new RoomSplit(loadedRoomSplitDir, settingsSplitPair);
 
   /*
@@ -1127,6 +1153,11 @@ export function createRoom(deps: RoomDeps) {
   */
   return {
     prefs,
+    /*
+      The ONE split reader. `promoteLegacySplitSizes` on the page takes this rather than declaring a
+      second one — see the declaration above for what the page's own copy of it cost.
+    */
+    settingsSplitPair,
     roomVolume,
     roster,
     chat,

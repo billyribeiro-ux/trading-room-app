@@ -27,7 +27,27 @@
       referenced by the captured shell but its bytes appear in no capture artifact.
     -->
     <link rel="icon" type="image/x-icon" href="%sveltekit.assets%/favicon.ico" />
-    <title>PTRChat</title>
+    <!--
+      NO <title> HERE, AND ITS REMOVAL FIXED A SHIPPED FEATURE.
+
+      The shell used to carry `<title>PTRChat</title>` on this line, immediately BEFORE
+      `%sveltekit.head%`. Every route in this application sets its own title through `<svelte:head>`,
+      so every page was served with TWO title elements — and `document.title` is the FIRST one in the
+      document, so the browser tab said "PTRChat" on every page of the room, always.
+
+      What that cost: `name` is a wired room setting whose entire purpose is the browser tab (its
+      CHANGELOG entry reads "the room's own title finally reaches the browser tab"), and it never
+      reached it. Nor did the login page's "<room> - sign in". Both were rendered, both were in the
+      HTML, and neither was ever the document's title.
+
+      Found by the room's first browser test, which asked for the page title and got "PTRChat".
+      Invisible to everything else here: the markup is valid, both titles type-check, and a source
+      assertion looking for the room name in `<svelte:head>` finds it and passes.
+
+      A static fallback cannot be restored "just in case": HTML has no notion of a fallback title, so
+      any title here wins over every page's. The guarantee is kept by
+      `document-title-contract.test.ts`, which requires every `+page.svelte` to set one.
+    -->
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

@@ -333,6 +333,11 @@ narrowings are in place and `evidence-partition.test.ts` pins 42.
 day. The guard was never off. That is the SECOND inherited blocker to dissolve on re-measurement in
 one session, after the Rust one below — **re-measure a blocker before building around it.**
 
+**THE ROOM NOW HAS A BROWSER GATE, and its first run found two defects that were shipping** — a
+`ReferenceError` that made every room render 500 for eleven days, and a duplicate `<title>` that had
+been overriding every page's. Both fixed; `.github/workflows/quality.yml` runs the suite on every PR.
+Four of its seven specs are marked `fixme` with the reason written at the group.
+
 **THE SETTINGS ENUMERATION IS DOWN TO ONE UNBUILT FEATURE** — measured 2026-08-28, not inherited.
 `enableDiscord` needs a Discord application registration, which is the owner's call because there is
 nothing to link accounts to until one exists. `altChatRender` was the fifth and is BUILT.

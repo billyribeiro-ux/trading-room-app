@@ -499,7 +499,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the member's later change are one rule with three parts, and split between a page loop and a
       modal callback they were two halves that had to agree about a preference key.
     */
-    max: 1401,
+    /*
+      RAISED 1401 -> 1426 on 2026-08-28, and this one bought a fixed production defect.
+
+      The `createRoom(...)` call moved ~390 lines down, below the ten bindings its dependency thunks
+      close over, because on the SERVER a `$derived` evaluates immediately — so the composition root
+      read `deps.isPresenter()` while the page's `isPresenter` was still in its temporal dead zone,
+      and **every room render returned 500**. The growth is the paragraph at the call explaining why
+      it sits there, plus the note on `globalChatStyle`, which seeds from a value the root returns.
+
+      Moving the CALL rather than the ten declarations is the point: reordering consts leaves the same
+      shape one edit away from breaking again, where a root constructed after everything it composes
+      cannot have this bug at all. The full account is at the call site and in `app.html`'s sibling
+      finding.
+    */
+    max: 1426,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -2521,7 +2535,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that omitted the pair must record nothing automatically rather than start a recording nobody
       asked for.
     */
-    max: 1174,
+    /*
+      1174 -> 1205 on 2026-08-28: the split reader moved here from the page, with the account of what
+      its old position cost — a `ReferenceError` on every server render, for eleven days, invisible to
+      every gate in this repository. It is declared beside the `prefs` it reads and returned so the
+      page uses the same one, which is what makes a second copy impossible rather than merely unwise.
+    */
+    max: 1205,
     why: 'the composition root - 37 constructions and their citations, assembly and nothing else'
   },
   {

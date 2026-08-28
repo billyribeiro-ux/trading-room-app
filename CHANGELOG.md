@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 22:55 UTC — A browser drives the room, and finds two defects that were shipping
+
+**Runtime impact: YES, and it is a repair.** Two production defects, both fixed. The room's own page
+had been answering **500 on every render for eleven days**, and the browser tab had **never** shown a
+room's name despite a wired setting whose whole purpose is that tab.
+
+Both were found within the first minute a browser was ever pointed at the room.
+
+#### Why nothing else could see them
+
+| defect | why every existing gate missed it |
+| --- | --- |
+| `ReferenceError: Cannot access 'prefs' before initialization` | valid TypeScript, valid Svelte; `svelte-check` silent; every unit test constructs `createRoom` with its own stubs, which are already initialised |
+| two `<title>` elements | valid HTML; both titles type-check; a source assertion looking for the room name inside `<svelte:head>` finds it and passes |
+
+`apps/controller` has had an end-to-end job since 2026-08-23. The ROOM — the product surface, 46
+components, 3,000 unit assertions — had none, and every verification note in this file said so in the
+same words: *"nothing was opened in a browser."*
+
+#### Defect 1 — the composition root ran before its inputs
+
+`createRoom(...)` sat ~390 lines ABOVE ten page bindings that its dependency thunks close over. On
+the SERVER a `$derived` evaluates immediately, so the root read `deps.isPresenter()` while the page's
+`isPresenter` was still in its temporal dead zone.
+
+**Ten bindings were in that position, each a latent `ReferenceError`** — two had to be fixed before
+the third could even be seen, exactly as the controller's first e2e run went. Introduced 2026-08-17
+in `b981316`, the commit that created the composition root.
+
+The fix moves the CALL, not the ten declarations, and that choice is the point: reordering consts
+leaves the same shape one edit away from breaking again — the eleventh input gets added wherever it
+reads best and the room 500s again. A root constructed after everything it composes cannot have this
+bug at all. The split reader moved with it, from the page to beside the `prefs` it reads.
+
+#### Defect 2 — the shell's `<title>` overrode every page's
+
+`app.html` carried `<title>PTRChat</title>` immediately before `%sveltekit.head%`. Every route also
+sets its own title, so every page was served with TWO — and `document.title` is **the first** in tree
+order. So the tab read "PTRChat" everywhere, and `name`, whose own entry here reads *"the room's own
+title finally reaches the browser tab"*, never reached it. Nor did the login page's `"<room> — sign
+in"`.
+
+There is no such thing as a fallback title in HTML, so the shell's had to go outright — which makes
+"every page sets one" a requirement. `document-title-contract.test.ts` enforces it, both directions,
+with its own negative controls seen red.
+
+#### The harness, and three things it taught
+
+* **A stub control plane that VERIFIES the bearer.** The room fails closed without its configuration,
+  so `e2e/stub-controller.mjs` answers the two routes it needs — recomputing the `config-read` HMAC
+  rather than accepting anything, so the capability seam is exercised on every page load. Its second
+  route, `/internal/room-entry`, was discovered by watching the room correctly refuse every login
+  with a 503 because nothing answered it.
+* **`networkidle` and `load` are unusable here.** The room holds a `text/event-stream` by design, so
+  neither ever fires. Cost a ten-minute hang to learn, twice, in different places.
+* **Test the BUILT server, not `vite dev`.** The room's page is compiled on first request under dev,
+  and that single compile exceeded every bound the suite tried. `vite build` takes 25s once and the
+  server then answers immediately — and it is what actually ships. The suite runs in **30.6s**.
+
+#### What is green and what is honestly marked
+
+**3 passed, 4 marked `fixme`.** The four exercise the room's interior and are blocked on one thing:
+the login click against the built server never resolves, while `goto` of the same page takes 205ms —
+so nothing is slow, one interaction does not complete. Marked `fixme` rather than deleted, skipped
+silently, or weakened into something that passes: Playwright reports the group as skipped and names
+it, so the gate stays honest about its own coverage. The reason and the two candidate causes are
+written at the group. **The three that DO run already found both defects above.**
+
+#### Verified
+
+`svelte-check` 0/0 · `eslint` clean in both apps · room `pnpm test` **187 files / 3,089 tests**,
+1 skipped · controller **101 / 1,034** · room e2e **3 passed, 4 skipped, 30.6s** · three negative
+controls on the title gate seen RED. Two ceilings raised, each argued in place. `vite.config.ts` now
+excludes `e2e/` from Vitest, which was reporting a healthy Playwright suite as a failed test file.
+
+**Not verified: the room's interior in a browser.** That is what the four `fixme` specs are for.
+
 ### 2026-08-28 20:10 UTC — `hasAlertScheduler`: the room posts an alert while nobody is watching
 
 **Runtime impact: YES.** A presenter can now write an alert, pick a date and a repeat, and have the

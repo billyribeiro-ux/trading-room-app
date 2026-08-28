@@ -34,7 +34,6 @@
     import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
   import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
   import { applyRoomDefaults } from '#lib/room/room-defaults.js';
-  import { splitPairFromValue } from '#lib/room/split.svelte.js';
   import { defaultChatStyleForTheme, defaultFollowChatStyle } from '#lib/chat-style.js';
   import { shouldDisableSelection } from '#lib/room-key-gates.js';
   import AlertChatArea from '#lib/components/AlertChatArea.svelte';
@@ -74,74 +73,6 @@
     shared reactive value breaks the link for everything reading it downstream, and here that would
     mean the whole room rendering once and then silently stopping.
   */
-  const {
-    prefs,
-    roomVolume,
-    roster,
-    chat,
-    typing,
-    media,
-    split,
-    polls,
-    alerts,
-    menus,
-    dialogs,
-    screens,
-    broadcasts,
-    files,
-    swingAlerts,
-    dayTradeAlerts,
-    privateChat,
-    toasts,
-    mediaTransport,
-    composer,
-    messageActions,
-    recording,
-    windowHandlers,
-    webcams,
-    userActions,
-    roomEvents,
-    alertsFollow,
-    chatFollow,
-    extraChatFollow,
-    gates,
-    feeds,
-    modals,
-    notes,
-    feedScroll,
-    alertsPane,
-    loadedChatStyle,
-    rosterViewer
-  } = createRoom({
-    session: () => data,
-    isPresenter: () => isPresenter,
-    chatOnlyMode: () => chatOnlyMode,
-    disableCopy: () => disableCopy,
-    webinarMode: () => webinarMode,
-    noteGates: () => noteGates,
-    rosterSession: () => rosterSession,
-    theme: () => theme,
-    chatAlertsDetached: () => chatAlertsDetached,
-    appHasFocus: () => roomRefresh.appHasFocus,
-    mainElement: () => mainElement,
-    alertChatElement: () => alertChatElement,
-    composerElement: () => composerElement,
-    alertsScroller: () => alertsScroller,
-    setTheme: (next) => (theme = next),
-    setMainTab: (tab) => (mainTab = tab),
-    setChatAlertsDetached: (next) => (chatAlertsDetached = next),
-    mergeGlobalChatStyle: (patch) => (globalChatStyle = { ...globalChatStyle, ...patch }),
-    setCurrentCaption: (caption) => (currentCaption = caption),
-    pushCaptionHistory: (caption) => {
-      captionHistory = [...captionHistory, caption].slice(-CAPTION_HISTORY_LIMIT);
-    },
-    chatMissedWhileHidden: () => roomRefresh.chatMissedWhileHidden(),
-    hidePreviewWindows: () => (previewWindowsVisible = false),
-    mtx,
-    unreadQaAlertIds,
-    settingsSplitPair,
-    defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
-  });
 
   // svelte-ignore state_referenced_locally
   let sidebarOpen = $state(data.sessData?.alwaysShowRoster === true);
@@ -263,11 +194,6 @@
 
   /* RAW: `mergeGlobalChatStyle` replaces it whole; `ModalHost` spread-copies before binding, so no
      one writes through this reference. Read by `messageChrome`, i.e. on every rendered message. */
-  // svelte-ignore state_referenced_locally
-  let globalChatStyle = $state.raw<FollowChatStyle>({
-    ...defaultChatStyleForTheme(theme),
-    ...loadedChatStyle
-  });
   // The captured alerts toolbar (alert-section/datach-alerts-1) is a strip between the alerts
   // header and the scroller. It is absent from the default capture (alert-section/1.html states
   // "No alertsToolbar search strip in this snapshot"), so it is toggled, not permanent.
@@ -508,6 +434,110 @@
   /** `this.webinarMode = 'p' == e`. */
   const webinarMode = $derived(isWebinarMode(chatMode));
 
+  /*
+    ── THE COMPOSITION ROOT IS CONSTRUCTED HERE, BELOW ITS INPUTS, AND THAT IS THE FIX ───────────
+
+    It used to sit ~390 lines above this, before ten of the bindings its own dependency thunks
+    close over. That worked on the client, where a `$derived` is lazy, and returned **500 on every
+    server render** — because on the server Svelte evaluates a derived immediately, so `createRoom`
+    read `deps.isPresenter()` while building `rosterViewer`, the thunk reached back for this page's
+    `isPresenter`, and that binding was still in its temporal dead zone.
+
+    TEN bindings were in that position, each a latent `ReferenceError`; two had to be fixed before
+    the third could even be seen. Nothing caught it: it type-checks, it lints, `svelte-check` is
+    silent, and every unit test constructs `createRoom` with its own stub deps, which are of course
+    already initialised. The first browser ever pointed at this room found it in one minute.
+
+    Moving the CALL rather than the ten declarations is deliberate. Reordering ten consts leaves the
+    same shape one edit away from breaking again — the eleventh input would be added wherever it
+    reads best and the room would 500 again. A composition root that runs after everything it
+    composes cannot have this bug at all, which is the property worth having.
+
+    Nothing between the old position and here reads a value this returns: measured, not assumed.
+  */
+  const {
+    prefs,
+    roomVolume,
+    roster,
+    chat,
+    typing,
+    media,
+    split,
+    polls,
+    alerts,
+    menus,
+    dialogs,
+    screens,
+    broadcasts,
+    files,
+    swingAlerts,
+    dayTradeAlerts,
+    privateChat,
+    toasts,
+    mediaTransport,
+    composer,
+    messageActions,
+    recording,
+    windowHandlers,
+    webcams,
+    userActions,
+    roomEvents,
+    alertsFollow,
+    chatFollow,
+    extraChatFollow,
+    gates,
+    feeds,
+    modals,
+    notes,
+    feedScroll,
+    alertsPane,
+    loadedChatStyle,
+    rosterViewer,
+    /*
+      The split reader comes FROM `createRoom` now, and it did not used to. This page declared its
+      own — `splitPairFromValue(prefs.loaded[key])` — and passed it in, which read `prefs` before
+      this very destructuring had bound it and returned 500 on every room load for eleven days.
+      `create-room.svelte.ts` carries the full account at the declaration.
+    */
+    settingsSplitPair
+  } = createRoom({
+    session: () => data,
+    isPresenter: () => isPresenter,
+    chatOnlyMode: () => chatOnlyMode,
+    disableCopy: () => disableCopy,
+    webinarMode: () => webinarMode,
+    noteGates: () => noteGates,
+    rosterSession: () => rosterSession,
+    theme: () => theme,
+    chatAlertsDetached: () => chatAlertsDetached,
+    appHasFocus: () => roomRefresh.appHasFocus,
+    mainElement: () => mainElement,
+    alertChatElement: () => alertChatElement,
+    composerElement: () => composerElement,
+    alertsScroller: () => alertsScroller,
+    setTheme: (next) => (theme = next),
+    setMainTab: (tab) => (mainTab = tab),
+    setChatAlertsDetached: (next) => (chatAlertsDetached = next),
+    mergeGlobalChatStyle: (patch) => (globalChatStyle = { ...globalChatStyle, ...patch }),
+    setCurrentCaption: (caption) => (currentCaption = caption),
+    pushCaptionHistory: (caption) => {
+      captionHistory = [...captionHistory, caption].slice(-CAPTION_HISTORY_LIMIT);
+    },
+    chatMissedWhileHidden: () => roomRefresh.chatMissedWhileHidden(),
+    hidePreviewWindows: () => (previewWindowsVisible = false),
+    mtx,
+    unreadQaAlertIds,
+    defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
+  });
+
+  /* Seeded from `loadedChatStyle`, which `createRoom` derives from the member's preferences, so it
+     is declared after the call for that reason alone. */
+  // svelte-ignore state_referenced_locally
+  let globalChatStyle = $state.raw<FollowChatStyle>({
+    ...defaultChatStyleForTheme(theme),
+    ...loadedChatStyle
+  });
+
   /** The THREE reasons the composer is off are in `chatComposerAvailable`, with the transcription. */
   const selfMutedUntil = $derived(data.chatMutedTill ? new Date(data.chatMutedTill) : null);
   const chatEnabled = $derived(
@@ -671,11 +701,6 @@
       return;
     }
     await invalidateAll();
-  }
-
-  // Server-persisted sizes. These are the ones SSR can see, so they are the source of truth.
-  function settingsSplitPair(key: string) {
-    return splitPairFromValue(prefs.loaded[key]);
   }
 
   function beginSplit(event: PointerEvent, target: 'main' | 'chat-alerts') {

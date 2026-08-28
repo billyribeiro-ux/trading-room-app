@@ -174,6 +174,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.9.1(supports-color@11.0.0))
+      '@playwright/test':
+        specifier: 1.62.1
+        version: 1.62.1
       '@sveltejs/adapter-node':
         specifier: 6.0.0-next.10
         version: 6.0.0-next.10(@sveltejs/kit@3.0.0-next.25(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vite@8.2.2(@types/node@26.3.0)(esbuild@0.28.1)(tsx@4.23.11)))(svelte@5.56.10(@typescript-eslint/types@8.68.0))(typescript@6.0.3)(vite@8.2.2(@types/node@26.3.0)(esbuild@0.28.1)(tsx@4.23.11)))
