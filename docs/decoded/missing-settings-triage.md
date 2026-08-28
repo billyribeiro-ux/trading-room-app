@@ -9,7 +9,7 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **34** as this is written; twenty-four have been answered by building, one more
+2026-08-28 and is at **33** as this is written; twenty-five have been answered by building, one more
 is answered NOT A GAP, and the CHANGELOG entries for each say what.
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
@@ -212,14 +212,12 @@ than quoting this paragraph.
 | `enableQAReactions` | 1,335,445 | Reactions on the entries of the Q&A thread. See CORRECTED above — the rule is already written in `message-behavior.ts`; what is missing is a Q&A thread whose menu acts at all. |
 | `hasTypingIndicator` | 1,437,143 | A whole feature: `refreshTypingStatus`, `updateLastTypedTime`, a 5,000 ms `typingDelayMillis` debounce, `usersTyping` / `usersTypingCnt`, a wire round trip, and the display slot `O(22, showTyping && usersTypingCnt > 0 ? 22 : -1)`. Two copies upstream, main and extra column. |
 | `usersCanDeleteOwnMsgs` | 1,158,826 | `canDeleteOwnMessage(msg)` — own email hash or own uid, gated on the setting. Needs the `userDeleteChatMsg` command, which is on the command list as absent. |
-| `copyTrades` | 1,414,899 | Rewrites `[{( … )}]` inside an alert body into a `span.tradeColor` with a generated id, and swaps the whole message component (byte 1,419,422 picks between two templates on it). |
 | `positionsIframe` + `positionsIframeUrl` | 2,285,266 | A positions pane with its own refresh loop (`startIframeRefresh` / `stopIframeRefresh`, byte 2,329,124) driven by a `updatePositionsIframe` preference. Two settings, one pane, three render sites. |
 | `chatTabsWithBadges` | 1,007,480 | Badge-gated extra chat channels. A JSON list — the schema's help text carries the shape — and `registerForExtraChannels` subscribes only to the channels whose badges the member holds. |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
 | `alertsOverlayOnScreenshare` | 1,099,577 | Composites the last four alerts onto the screenshare canvas — `startAlertOverlayCompositor` replaces the outgoing track (byte 1,103,589). Real work in the media path. |
 | `autoRecord` + `dontStopRecOnMicMute` | 1,116,616 / 1,116,675 | A pair. Auto-start recording when a screenshare begins; do not stop on mic mute unless the flag says so, and only when `talkingUsers.length <= 1`. |
 | `altChatRender` | 1,349,151 / 1,434,685 / 2,047,129 (six sites) | **CORRECTED AND RESIZED 2026-08-28 — read the six occurrences, not the one.** Three behaviours, not one: it hides avatars on chat and Q&A messages (`hideAvatar = altChatRender && (chat \|\| isQAMsg) \|\| hideAvatars`), and it FORCES `displayMode = "c"` on **four** surfaces — main chat, extra chat, alerts and the Q&A modal — writing that over the viewer's own stored preference. **This room has no compact display mode at all**, so the setting's main half needs the mode itself built first, on four surfaces, with its picker. Building only the avatar third would give an owner who ticks it hidden avatars and no compact layout, which is not what the setting means. **TRAP FOR WHOEVER BUILDS IT:** `sessData.chatMode` and `preferences.chatMode` are DIFFERENT things sharing a key — the first is the room's mode (`"p"` presenters-only, `"d"` disabled, byte 1,003,622), the second is this per-viewer display mode (`"c"`, byte 1,434,808). Writing `"c"` into the room's `room_state.chat_mode` would corrupt the room's chat policy. |
-| `linkedRoomAlerts` | 2,139,184 | One row of the alert composer, cross-posting to a linked room. |
 | `hasAlertScheduler` | 1,009,745 | Already tracked in `TODO.md` with its own section — three commands and a server-side scheduler. |
 
 ---
@@ -229,6 +227,7 @@ than quoting this paragraph.
 | setting | blocked on |
 | --- | --- |
 | `isNewIndicatorOn` | **Its data.** The gate is `isNewIndicatorOn && isPresenter && <row>.isNew` at four sites (bytes 1,344,564 / 1,382,617 / 2,034,811 / 2,060,925), and `isNew` is not computed in the browser at all: it arrives on the login payload from the reference's own server — `globals.user.isNew = B.data.isNew` (995,175), `isNew: s.isNew || !1` (1,157,344) — so the rule deciding who counts as new is unknowable from the capture. Measured 2026-08-28: `isNew` occurs ZERO times in `apps/room/src/lib/server` and zero times on the controller. Crossing the setting would put a gate on a value nothing supplies, which is what `enableBadges` was held out of the boundary to avoid. Unblocked by one answer from the owner about what makes a member new, or by a capture of that login response. |
+| `linkedRoomAlerts` | **The server-side fan-out, which is not in the capture.** The setting's own help text is *"Comma separated list of Room IDs of the rooms to PUSH our alerts to"* — the pushing is the reference's SERVER. What the client contributes is one composer row (`WTe`, byte 2,119,618) whose checkbox is `dontCrossPost`, sent on the `alertMsg` and `alertMsgLater` payloads. **Measured 2026-08-28: `crossPost` occurs ZERO times in the bundle**, so the browser never does the fan-out and never reads the flag back. Building the checkbox alone would ship a control whose only effect is sending a field nothing reads — the thing this repository refuses by name. Unblocked by cross-posting existing at all, which is its own feature and needs an owner decision about what "linked room" means across two databases. |
 | `recsInRoom` | The Recordings tab it gates. `presAreaTabs-recordings` is an iframe onto a server archive page, and there are zero recordings or archive tables in either database. `TODO.md` carries the blocker. Wire the setting WITH the tab, never before it. |
 | `isLocked` | Byte 1,148,353 — refuses a non-presenter at connect with a named dialog, and byte 2,500,128 offers the presenter an unlock confirm. Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a lock. |
 | `backupClusterID` | Media infrastructure — a second MediaMTX cluster. Same blocker as every other `STREAM_SERVER_MTX` row. |
@@ -238,7 +237,7 @@ than quoting this paragraph.
 
 ---
 
-## The twenty-four already answered
+## The twenty-five already answered
 
 | setting | answer | date |
 | --- | --- | --- |
@@ -263,6 +262,7 @@ than quoting this paragraph.
 | `tipMeBtnEnabled` + `tipMeBtnUrl` + `tipMeBtnTxt` | BUILT — `tipButtonFor`, one conjunction feeding both captured render sites. The URL is checked for `http:`/`https:` here, which the reference does not do. | 2026-08-28 |
 | `customFaviconURL` + `customCSS` | BUILT — `RoomBranding`. The upstream `indexOf("https")` check that decides link-versus-inline is a substring test and is fixed by parsing: ordinary CSS mentioning an https URL was being set as a stylesheet href, and a plain `http://` stylesheet was being injected as CSS text. Both failures were silent. | 2026-08-28 |
 | `customPlayerURL` | BUILT — `PresentationArea`'s `#screens` pane. It replaces the WHOLE pane including the save-data switch, and the URL is scheme-checked here: the reference binds it through `bypassSecurityTrustResourceUrl`, i.e. it explicitly opts out of its own sanitiser. | 2026-08-28 |
+| `copyTrades` | BUILT — `copy-trades.ts` plus a `trade` segment on `RoomMessage`. Alerts only, as upstream gates it. Divergence: the reference's two `String.replace` calls take string patterns, so it makes only the FIRST order in a message copyable; the room splits every balanced pair. | 2026-08-28 |
 
 ---
 

@@ -339,6 +339,14 @@ export interface RoomSessionSettings {
    */
   customPlayerURL?: string;
   /**
+   * "Copy trades" — `[{( … )}]` in an ALERT becomes one click-to-copy order.
+   *
+   * Rewrite at byte 1,414,924, click beside it, and the scroller's whole template is
+   * `O(0, sessData.copyTrades ? 0 : 1)` between two row lists differing only by a click binding
+   * (1,419,447). `copy-trades.ts` carries the argument and the one divergence.
+   */
+  copyTrades?: boolean;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

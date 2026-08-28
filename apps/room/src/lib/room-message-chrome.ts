@@ -116,6 +116,13 @@ export type RoomMessageChrome = {
   readonly currentUserIsTrial: boolean;
   readonly hideAvatars: boolean;
   readonly viewerIsLimitedPresenter: boolean;
+  /**
+   * "Copy trades" — whether `[{( … )}]` in an ALERT becomes a click-to-copy order.
+   *
+   * On the chrome for this type's own reason: three components render a message, and a room setting
+   * handed to each of them separately is a room setting one of them will stop being handed.
+   */
+  readonly copyTrades: boolean;
 };
 
 /**
@@ -138,6 +145,7 @@ export interface MessageChromeSettings {
   readonly userToPresenterPM?: boolean;
   readonly disablePMForTrials?: boolean;
   readonly hideAvatars?: boolean;
+  readonly copyTrades?: boolean;
 }
 
 export interface MessageChromeSources {
@@ -211,6 +219,7 @@ export function buildMessageChrome(sources: MessageChromeSources): RoomMessageCh
     userPrivateMessaging: settings?.userPM === true,
     userToPresenterPrivateMessaging: settings?.userToPresenterPM === true,
     disablePrivateMessagingForTrials: settings?.disablePMForTrials === true,
-    hideAvatars: settings?.hideAvatars === true
+    hideAvatars: settings?.hideAvatars === true,
+    copyTrades: settings?.copyTrades === true
   };
 }

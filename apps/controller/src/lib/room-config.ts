@@ -699,6 +699,25 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'customPlayerURL',
   /*
+    "Copy trades" - a bracketed order inside an ALERT becomes one click to copy.
+
+      filterChatMessages rewrites the open and close markers into a tradeColor span   byte 1,414,924
+      copyTradeOnClick then doTradeCopy writes the span textContent to the clipboard  the same class
+      app-roomscroller template is O(0, sessData.copyTrades ? 0 : 1) between two row
+      lists whose consts differ ONLY by a click binding                               byte 1,419,447
+
+    ALERTS ONLY. The transform is gated on the log type as well as the setting, so the same markers
+    typed into chat stay literal - the same shape the alert-label substitution has.
+
+    NOTE THE DIVERGENCE, recorded at `copy-trades.ts`: the reference uses String replace with a
+    string pattern for both markers, so only the FIRST order in a message is ever made copyable. The
+    room splits every balanced pair. That is the second first-occurrence defect of this kind found in
+    the bundle today.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'copyTrades',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

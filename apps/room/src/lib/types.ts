@@ -371,7 +371,15 @@ export type MessageAction =
   | 'question'
   | 'image'
   | 'edit'
-  | 'reaction';
+  | 'reaction'
+  /**
+   * "Copy trades" — one `[{( … )}]` order copied to the clipboard.
+   *
+   * Its own action rather than a second use of `copy`: `copy` takes the WHOLE message, and the
+   * whole point here is that a member gets the order and nothing else. The payload carries the
+   * text, because the segment that was clicked is the only thing that knows which order it was.
+   */
+  | 'copy-trade';
 
 /**
  * One entry per user with a live camera — the room's `webcamingUsers`.
@@ -433,5 +441,10 @@ export interface MessageActionItem {
   }>;
 }
 
-/** What rides with a message action: a click, or a reaction pill. */
-export type MessageActionEvent = MouseEvent | MessageReactionPayload | undefined;
+/** The text of one `[{( … )}]` order, emitted with the `copy-trade` action. */
+export interface TradeCopyPayload {
+  text: string;
+}
+
+/** What rides with a message action: a click, a reaction pill, or one copyable order. */
+export type MessageActionEvent = MouseEvent | MessageReactionPayload | TradeCopyPayload | undefined;

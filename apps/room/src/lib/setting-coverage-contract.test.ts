@@ -86,7 +86,8 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * user-info modal, refused on the SERVER), `showOnlyUsernames` (which SHAPE a roster row draws in —
  * per row, never per viewer), the `tipMeBtn*` trio (ONE feature, `tipButtonFor`) and
  * `customFaviconURL` + `customCSS` (`RoomBranding`) and `customPlayerURL` (`PresentationArea`'s
- * `#screens` pane), all on 2026-08-28 and each with its own contract file.
+ * `#screens` pane) and `copyTrades` (the click-to-copy order marker, `copy-trades.ts`), all on
+ * 2026-08-28 and each with its own contract file.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -101,7 +102,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'positionsIframeUrl',
   'authMode',
   'chatTabsWithBadges',
-  'copyTrades',
   'enableDiscord',
   'hasAlertScheduler',
   'playChatMessageSoundFor',

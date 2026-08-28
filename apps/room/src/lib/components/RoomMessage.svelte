@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { splitTradeOrders, tradeOrderId } from '#lib/copy-trades.js';
   import type { MessageAction, RoomMessageItem } from '#lib/types.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '#lib/emoji-data.js';
@@ -28,6 +29,10 @@
   interface MessageReactionPayload {
     key: string;
     emoji: string;
+  }
+  /** `#lib/types.ts`'s `TradeCopyPayload`, restated locally beside its sibling above. */
+  interface TradeCopyPayload {
+    text: string;
   }
 
   interface Props {
@@ -79,12 +84,21 @@
     enableBadges?: boolean;
     showBadgesToPresentersOnly?: boolean;
     showNewIndicator?: boolean;
+    /**
+     * "Copy trades" — whether `[{( … )}]` in an ALERT becomes a click-to-copy order.
+     *
+     * On the chrome rather than per call site, for the reason that type exists: three components
+     * render a message, and a room setting handed to each separately is one that a component will
+     * stop being handed. Defaults `false`, so a room that never configured it renders the marker as
+     * the literal text it is.
+     */
+    copyTrades?: boolean;
     disableStarYears?: boolean;
     ontoggle: (id: number) => void;
     onaction: (
       action: MessageAction,
       item: RoomMessageItem,
-      payload?: MouseEvent | MessageReactionPayload
+      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
     ) => void;
   }
 
@@ -121,6 +135,7 @@
     enableBadges = false,
     showBadgesToPresentersOnly = false,
     showNewIndicator = false,
+    copyTrades = false,
     disableStarYears = false,
     ontoggle,
     onaction
@@ -325,10 +340,19 @@
   const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.jfif'];
 
   type BodySegment = {
-    kind: 'text' | 'stock' | 'link' | 'image' | 'label';
+    kind: 'text' | 'stock' | 'link' | 'image' | 'label' | 'trade';
     text: string;
     url?: string;
     label?: AlertLabel;
+    /**
+     * `trade` only — the element id `doTradeCopy` looks up, `id_<messageId>` for the first order.
+     *
+     * The order's own text lives in `children`, not in `text`, because the reference leaves the
+     * span's CONTENT to the later pipes: a `$TICKER` inside an order is still coloured. So a trade
+     * segment wraps segments rather than carrying a string.
+     */
+    tradeId?: string;
+    children?: BodySegment[];
   };
 
   /**
@@ -356,6 +380,37 @@
    * the easy mistake.
    */
   function parseBodySegments(value: string): BodySegment[] {
+    /*
+      TRADE ORDERS FIRST, and the order of these passes is the capture's.
+
+      `filterChatMessages` rewrites `[{( … )}]` into a span BEFORE the message reaches the renderer,
+      so `parseSymbols` and `parseStock` run over the already-wrapped string and colour tickers
+      INSIDE an order. Splitting orders last would put a `$TICKER` and an order in competition for
+      the same characters.
+
+      `kind === 'alert'` is part of the reference's gate (`"alerts" === i`), not an optimisation: a
+      `[{( … )}]` typed into chat stays literal, exactly as a `#label` does.
+    */
+    const pieces =
+      copyTrades && kind === 'alert'
+        ? splitTradeOrders(value)
+        : [{ kind: 'text' as const, text: value }];
+
+    return pieces.flatMap<BodySegment>((piece, index) =>
+      piece.kind === 'trade'
+        ? [
+            {
+              kind: 'trade',
+              text: piece.text,
+              tradeId: tradeOrderId(item.id, index),
+              children: parseLabelsTickersAndLinks(piece.text)
+            }
+          ]
+        : parseLabelsTickersAndLinks(piece.text)
+    );
+  }
+
+  function parseLabelsTickersAndLinks(value: string): BodySegment[] {
     const labelled =
       kind === 'alert' && alertLabels.length > 0
         ? splitAlertLabels(value, alertLabels)
@@ -408,7 +463,10 @@
     chat time only on the chat branch. Construction costs ~35x a `format()` call, and the objects
     are byte-identical every time because the locale and every option are literals.
   */
-  function runAction(action: MessageAction, payload?: MouseEvent | MessageReactionPayload) {
+  function runAction(
+    action: MessageAction,
+    payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+  ) {
     onaction(action, item, payload);
   }
 
@@ -524,7 +582,32 @@
   -->
   <!-- eslint-disable-next-line svelte/require-each-key -->
   {#each segments as segment}
-    {#if segment.kind === 'label' && segment.label}<span
+    {#if segment.kind === 'trade'}<!--
+        `<span class="tradeColor" id="id_<messageId>">` — the element `doTradeCopy` looks up by id
+        and `copyTradeOnClick` compares against. `stopPropagation` is the reference's own: the
+        message row is itself clickable, so without it copying an order would also fire the row.
+
+        A BUTTON in a span's clothing. Upstream binds the click to the span and checks `tagName`
+        inside the handler; a span is not focusable and not reachable by keyboard, so this carries
+        the role and the key handler that make it a control. The class and the id are unchanged,
+        because both are what the captured stylesheet and the captured handler select on.
+      --><span
+        class="tradeColor"
+        id={segment.tradeId}
+        role="button"
+        tabindex="0"
+        title="Copy order"
+        onclick={(event) => {
+          event.stopPropagation();
+          runAction('copy-trade', { text: segment.text });
+        }}
+        onkeydown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          runAction('copy-trade', { text: segment.text });
+        }}>{@render bodySegments(segment.children ?? [])}</span
+      >{:else if segment.kind === 'label' && segment.label}<span
         class={ALERT_LABEL_BADGE_CLASS}
         style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
       >{:else if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}

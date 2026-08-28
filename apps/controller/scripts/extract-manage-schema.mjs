@@ -215,6 +215,8 @@ const ROOM_CONSUMED = [
   'customCSS',
   /* The owner own iframe in place of the screens pane, added 2026-08-28. See `room-config.ts`. */
   'customPlayerURL',
+  /* The click-to-copy order marker in an alert, added 2026-08-28. See `room-config.ts`. */
+  'copyTrades',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -802,6 +804,9 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
 // enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
 //
+// 92 since 2026-08-28: `copyTrades`. Twenty-third find, and the second in one day whose upstream
+// implementation is broken by String replace taking a string pattern rather than a global regex.
+//
 // 91 since 2026-08-28: `customPlayerURL`. Twenty-second find, and the second in a row whose value
 // is a URL the reference hands to a browser without checking it - here through an explicit
 // sanitiser bypass.
@@ -827,7 +832,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 91 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 92 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

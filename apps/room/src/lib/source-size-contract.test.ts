@@ -1632,7 +1632,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/message-actions.svelte.ts',
-    max: 474,
+    /*
+      474 -> 495, 2026-08-28, for the `copy-trade` handler and its citation.
+
+      TWENTY-ONE LINES FOR SIX OF CODE, and most of the rest answers one question a reader will
+      have: why this is not `copy` with a different argument. `copy` takes the WHOLE message; the
+      whole point of an order marker is that a member gets the order and nothing else, and the
+      TOAST differs for the same reason — "Copied to clipboard." would leave a member unsure which
+      of the two they got.
+    */
+    max: 495,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -2190,7 +2199,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   */
   {
     file: 'lib/components/AlertChatArea.svelte',
-    max: 1113,
+    /*
+      1113 -> 1114, 2026-08-28. ONE line: the `onaction` payload widened from a two-member union to
+      the shared `MessageActionEvent`, which now also carries a copyable order.
+
+      Widening to the SHARED alias rather than adding a third member by hand is the fix that keeps
+      this from recurring — this file had its own copy of that union, and a fourth payload would
+      otherwise have to be added here too.
+    */
+    max: 1114,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -2294,7 +2311,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/RoomMessage.svelte',
-    max: 949,
+    /*
+      949 -> 1032, 2026-08-28, and eighty-three lines is the largest single addition this file has
+      taken. `copyTrades`.
+
+      WHAT THEY ARE: the trade branch of `bodySegments` (a span carrying `role`, `tabindex`, a click
+      and a keydown, plus its twelve-line citation), the `trade` member of `BodySegment` with the
+      `children` field that makes it a WRAPPER, the split of `parseBodySegments` into an outer pass
+      and `parseLabelsTickersAndLinks`, and the chrome prop.
+
+      TWO THINGS IN THERE ARE NOT TRANSCRIPTION AND ARE WHY THE COMMENTS ARE LONG. The order of the
+      passes is the capture's and is load-bearing — upstream rewrites the marker BEFORE the symbol
+      and link pipes run, so a `$TICKER` inside an order is still coloured, which is the whole
+      reason a trade segment wraps segments instead of carrying a string. And the span is a
+      keyboard-reachable control here where upstream binds a click to a bare `<span>` and checks
+      `tagName` inside the handler.
+
+      If this number climbs again the extraction is the same one it has always been: `bodySegments`
+      and its four parse functions are a module with a component wrapped around them.
+    */
+    max: 1032,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

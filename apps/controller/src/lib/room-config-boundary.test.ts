@@ -348,6 +348,7 @@ describe('the allow-list itself', () => {
         to know first about a setting that can remove the room's whole video surface.
       */
       customPlayerURL: 'PresentationArea #screens — an owner iframe instead of the whole pane',
+      copyTrades: 'buildMessageChrome — the click-to-copy order marker on an ALERT body',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

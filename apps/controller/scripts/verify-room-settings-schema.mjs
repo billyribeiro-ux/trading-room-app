@@ -13,10 +13,15 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY-EIGHT by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY-NINE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 91.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 92.
+
+  78 -> 79 on 2026-08-28: copyTrades, which turns a bracketed order inside an ALERT into one click
+  to copy. It reaches the message through `buildMessageChrome` rather than per call site, because
+  three components render a message and a setting handed to each separately is one that a component
+  will stop being handed.
 
   77 -> 78 on 2026-08-28: customPlayerURL, which replaces the room's whole screens pane with an
   owner-supplied iframe. Checked in the room for scheme, which the reference explicitly is not — its
@@ -225,6 +230,8 @@ const EXPECTED_WIRED_SETTINGS = [
   'customCSS',
   /* Added 2026-08-28: the owner own iframe in place of the screens pane. */
   'customPlayerURL',
+  /* Added 2026-08-28: the click-to-copy order marker in an alert. */
+  'copyTrades',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

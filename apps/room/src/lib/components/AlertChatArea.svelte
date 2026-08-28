@@ -56,8 +56,8 @@
     ChatTab,
     FollowChatStyle,
     MessageAction,
+    MessageActionEvent,
     MessageActionItem,
-    MessageReactionPayload,
     ModalName,
     RoomMessageItem
   } from '#lib/types.js';
@@ -193,7 +193,7 @@
       kind: 'alert' | 'chat',
       action: MessageAction,
       item: MessageActionItem,
-      payload?: MouseEvent | MessageReactionPayload
+      payload?: MessageActionEvent
     ) => void;
     onprivatechat: () => void;
     onexpandcomposer: (element: HTMLTextAreaElement | undefined) => void;

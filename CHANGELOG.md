@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 16:10 UTC — A copyable order inside an alert, and a checkbox that would have sent a flag nothing reads
+
+**Runtime impact: YES.** A room with **Copy trades** on turns `[{( … )}]` inside an **alert** into a
+click-to-copy order. It rendered as literal punctuation before.
+
+**Three sites, and the third is the one that is easy to miss.** The rewrite at byte 1,414,924, the
+`copyTradeOnClick`/`doTradeCopy` pair beside it, and — at 1,419,447 — `app-roomscroller`'s ENTIRE
+template being `O(0, sessData.copyTrades ? 0 : 1)` between two row lists whose consts differ by
+exactly one thing: `[3,"msg",…]` versus `[3,"click","msg",…]`. **The only difference the setting
+makes to the scroller is whether rows carry a click handler.**
+
+**ALERTS ONLY**, and that is part of the reference's gate rather than an optimisation: `"alerts" === i`
+sits beside the setting, so the same markers typed into chat stay literal — exactly as a `#label`
+does, and for the same reason.
+
+**The pass ORDER is the capture's and is load-bearing.** Upstream rewrites the marker into a span
+BEFORE `parseSymbols` and `parseStock` run, so a `$TICKER` inside an order is still coloured. That is
+why a trade segment WRAPS segments rather than carrying a string, and why `parseBodySegments` split
+into an outer pass and `parseLabelsTickersAndLinks`. Splitting orders last would put a ticker and an
+order in competition for the same characters.
+
+**One divergence, and it is the second `String.replace` first-occurrence defect found in this bundle
+today.** `.replace("[{(", …)` and `.replace(")}]", …)` take STRING patterns, so upstream rewrites only
+the first marker of each kind: in `A [{(x)}] B [{(y)}] C` the second order stays literal punctuation
+and cannot be copied. The room splits every balanced pair, and the test reproduces the upstream
+expression beside it so the difference is concrete rather than described.
+
+**Its own action, not a second use of `copy`.** `copy` takes the WHOLE message; the point of an order
+marker is that a member gets the order and nothing else — so the toast differs too, and it is the
+reference's own words: *"Order copied to clipboard."* A member told *"Copied to clipboard."* would not
+know which of the two they got.
+
+**Upstream binds the click to a bare `<span>`** and checks `tagName` inside the handler. A span is
+neither focusable nor keyboard-reachable, so this one carries `role`, `tabindex` and a keydown. The
+class and the id are unchanged, because both are what the captured stylesheet and the captured
+handler select on.
+
+**Six negative controls seen RED**, including one that restores the upstream single-split and one
+that lets an unclosed marker swallow the rest of the message.
+
+**`linkedRoomAlerts` is BLOCKED, and the measurement is what decides it.** Its row said "one row of
+the alert composer". The row is real — `WTe` at byte 2,119,618, a `dontCrossPost` checkbox — but the
+setting's own help text is *"Comma separated list of Room IDs of the rooms to PUSH our alerts to"*,
+and **`crossPost` occurs ZERO times in the whole bundle**. The fan-out is the reference's SERVER,
+which is not in the capture, and neither room has cross-posting. Building the checkbox alone would
+ship a control whose only effect is sending a field nothing reads.
+
+**An assertion met its own explanation for the SIXTH time**, and this one was new in shape: the
+citation above the markup quotes `<span class="tradeColor" id="id_…">`, so an unstripped `indexOf`
+found the PROSE and sliced nine hundred characters of comment instead of the element.
+
+**`RoomMessage` 949 → 1032 is the largest single addition that file has taken**, and its entry names
+the extraction for when it climbs again: `bodySegments` and its four parse functions are a module
+with a component wrapped around them.
+
+**Verified:** room 169 files / 2,677 tests (1 skipped) · controller 96 files / 1,013 tests (5
+skipped) · `schema:verify` at **92 wired** · both room gates and the six controller verifiers green ·
+`svelte-check` 0/0 across 1,300 files · eslint and prettier clean.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+`RoomMessage.svelte` or `AlertChatArea.svelte`.
+
 ### 2026-08-28 15:25 UTC — An owner's iframe in place of the whole video surface, and a popup that never opened
 
 **Runtime impact: YES.** A room that sets a **custom player URL** now renders that iframe in the

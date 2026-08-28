@@ -5,6 +5,7 @@ import type {
   MessageAction,
   MessageActionItem,
   MessageReactionPayload,
+  TradeCopyPayload,
   ModalName,
   ModalTargetUser
 } from '#lib/types.js';
@@ -294,7 +295,7 @@ export class RoomMessageActions {
     kind: 'alert' | 'chat',
     action: MessageAction,
     item: MessageActionItem,
-    payload?: MouseEvent | MessageReactionPayload,
+    payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload,
     /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
     fromExtraColumn = false
   ) {
@@ -415,6 +416,26 @@ export class RoomMessageActions {
       void navigator.clipboard.writeText(plainText).then(() => {
         this.#toasts.info('Copied to clipboard.');
       });
+    }
+    /*
+      "Copy trades" — ONE `[{( … )}]` order, not the message.
+
+      `doTradeCopy` (bundle byte 1,414,924's neighbour) reads `document.getElementById(id).textContent`
+      and writes that. Here the segment that was clicked sends its own text, so nothing has to find
+      an element by id to learn what it just rendered — same result, one fewer thing that can go
+      stale between the DOM and the model.
+
+      THE MESSAGE IS THE REFERENCE'S OWN and is different from `copy`'s: *"Order copied to
+      clipboard."* A member copying an order and being told "Copied to clipboard." would not know
+      whether they got the order or the whole alert.
+    */
+    if (action === 'copy-trade' && typeof navigator !== 'undefined') {
+      const text = (payload as TradeCopyPayload | undefined)?.text ?? '';
+      if (text) {
+        void navigator.clipboard.writeText(text).then(() => {
+          this.#toasts.info('Order copied to clipboard.');
+        });
+      }
     }
     if (action === 'edit') {
       /*
