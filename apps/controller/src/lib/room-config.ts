@@ -990,6 +990,21 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'alertsOverlayOnScreenshare',
   /*
+    "Alert Scheduler?" — an alert written now and posted by the server later.
+
+    Three commands upstream and one gate on all of them: `alertMsgLater` (bundle byte 2,130,937),
+    `getScheduledAlerts` (1,009,767, sent on session load when this flag is on) and
+    `removeScheduledAlert` (2,406,725). Every occurrence is sessData dotted onto the name.
+
+    It crosses as a POLICY and is enforced on the room server, not only drawn: a room whose owner has
+    the scheduler off refuses a schedule. The reference gates only the UI, which is a gate anyone can
+    step past from a console.
+
+    Read by `#lib/scheduled-alert.ts`, `#lib/server/scheduled-alerts.ts` and
+    `routes/scheduled-alerts.remote.ts`.
+  */
+  'hasAlertScheduler',
+  /*
     "Auto Record?" and "Do not stop recording on mic mute?" — ONE feature, two settings.
 
     They cross together because the second is inert without the first. `autoRecord` is read at three

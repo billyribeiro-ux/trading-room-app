@@ -278,6 +278,24 @@ building around it. This section stays separate from BLOCKED because these
 are features with a known size, not questions with an unknown answer: what to build is understood in
 every case, and only the means to verify it is missing.
 
+**`hasAlertScheduler` LEFT THIS SECTION ON 2026-08-28, and its blocker named the wrong process.** The
+row read *"A scheduler process in `services/api`, and the crate's TEST targets cannot be built
+here."* Both halves are true of that crate and neither is a reason to put the scheduler in it. The
+reference's scheduler is its own Node server; this stack's long-lived Node process is the ROOM, which
+`docs/NEXT-SESSION.md` establishes cannot be serverless at all on two independent grounds it already
+documents — a WAL SQLite file Vercel's read-only filesystem cannot hold, and a `text/event-stream` a
+bounded function duration cuts. The room owns the `alerts` table a scheduled alert is written into
+and the fan-out that announces it; a Rust sweep would have reached across a process boundary into a
+SQLite file it does not own.
+
+Durable rows, an ephemeral sweep timer, and one atomic conditional `UPDATE … WHERE claimed_at IS NULL
+… RETURNING` so a firing is exactly-once. The rescheduling arithmetic is a DECISION and is marked as
+one — the reference's server does it and no byte of it reaches the browser.
+
+**With this row gone, `enableDiscord` is the only unbuilt setting left**, and it needs a Discord
+application registration that does not exist. Every other row of this enumeration is built or has a
+recorded reason.
+
 **`autoRecord` + `dontStopRecOnMicMute` LEFT THIS SECTION ON 2026-08-28, and their row described the
 wrong system.** It read "a server-side recorder, which does not exist. Same blocker `start-recording`
 / `stop-recording` carry." The first sentence is a true statement about the REFERENCE: its
@@ -311,12 +329,10 @@ controls were seen red. That is the second inherited blocker in one day to disso
 | row | what it needs, measured |
 | --- | --- |
 | `enableDiscord` | A Discord application registration. Owner's call — there is nothing to link to. |
-| `hasAlertScheduler` | A scheduler process in `services/api`, and the crate's TEST targets cannot be built here. **The Rust position is narrower than it has been written down as, measured today:** `cargo check -p tradingroom-api --features testing` and `cargo clippy … -- -D warnings` are both GREEN in this container. What fails is `cargo test`, because the crate dev-depends on `tradingroom-media` for one contract test, that pulls `mediasoup-sys`, and its build script fetches `libsrtp` from GitHub where the egress proxy answers **403**. So a `services/api` change can be compiled and linted here and cannot be unit-tested — and a timer that writes to a multi-tenant fintech database is not something to ship on a compile. |
 
 | setting | byte | size |
 | --- | --- | --- |
 | `enableDiscord` | 2,241,684 | Discord account linking: `checkDiscordAuth()` on load, plus two presenter-only settings rows. |
-| `hasAlertScheduler` | 1,009,745 | Already tracked in `TODO.md` with its own section — three commands and a server-side scheduler. |
 
 ---
 

@@ -356,6 +356,15 @@ const ROOM_CONSUMED = [
      Every occurrence in the bundle is sessData dotted onto the name, and the compositor at byte
      1,099,577 reads it as the gate on whether the wrap happens at all. */
   'alertsOverlayOnScreenshare',
+  /* "Alert Scheduler?" - an alert written now and posted by the server later.
+
+     Three commands upstream and one gate on all of them: alertMsgLater (byte 2,130,937),
+     getScheduledAlerts (1,009,767, sent on session load when this flag is on) and
+     removeScheduledAlert (2,406,725). Every occurrence is sessData dotted onto the name.
+
+     It crosses as a POLICY and is enforced on the room server as well as drawn: a room with the
+     scheduler off refuses a schedule. The reference gates only the UI. */
+  'hasAlertScheduler',
   /* "Auto Record?" and "Do not stop recording on mic mute?" - ONE feature, two settings.
 
      They cross together because the second is inert without the first: autoRecord is read at three
@@ -933,9 +942,17 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // written down: only this peer's own share can be auto-recorded, and the start is guarded on not
 // already recording because a second MediaRecorder would orphan the first.
 //
+// 103 since 2026-08-28: `hasAlertScheduler`. Thirty-fourth find, and the LAST buildable row of the
+// settings enumeration. Its recorded blocker named the wrong process: "a scheduler process in
+// services/api, and the crate's TEST targets cannot build here" is true of that crate and is not a
+// reason to put the scheduler in it. The reference's scheduler is its own Node server; this stack's
+// long-lived Node process is the ROOM, which cannot be serverless at all on two grounds already
+// documented, and which owns the alerts table and the fan-out. Durable rows, an ephemeral sweep
+// timer, and an atomic conditional UPDATE so firing is exactly-once.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 102 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 103 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

@@ -304,6 +304,12 @@ describe('the allow-list itself', () => {
       */
       autoRecord: 'autoRecordAction decides all three moments, and RoomRecording applies it',
       dontStopRecOnMicMute: 'autoRecordAction reads it on the stop path, and only when autoRecord is on',
+      /*
+        The only setting on this map whose consumer runs on a TIMER rather than on a request, and the
+        only one enforced by a server the reference gates in the browser alone.
+      */
+      hasAlertScheduler:
+        'scheduled-alerts.remote.ts refuses all three commands without it, and the sweep in server/scheduled-alerts.ts posts what it allowed',
       alertsOverlayOnScreenshare:
         'RoomScreenOverlay wraps the display capture with it, and the SSE router feeds every arriving alert to it',
       altChatRender: 'RoomDisplayModes seeds the compact mode from it, and hideMessageAvatar reads it as one term',

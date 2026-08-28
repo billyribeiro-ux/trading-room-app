@@ -333,10 +333,16 @@ narrowings are in place and `evidence-partition.test.ts` pins 42.
 day. The guard was never off. That is the SECOND inherited blocker to dissolve on re-measurement in
 one session, after the Rust one below — **re-measure a blocker before building around it.**
 
-**THE SETTINGS ENUMERATION IS DOWN TO TWO UNBUILT FEATURES** — measured 2026-08-28, not inherited.
+**THE SETTINGS ENUMERATION IS DOWN TO ONE UNBUILT FEATURE** — measured 2026-08-28, not inherited.
 `enableDiscord` needs a Discord application registration, which is the owner's call because there is
-nothing to link to; `hasAlertScheduler` needs a scheduler process in `services/api`. `altChatRender`
-was the fifth and is BUILT.
+nothing to link accounts to until one exists. `altChatRender` was the fifth and is BUILT.
+
+**`hasAlertScheduler` is BUILT, and its blocker named the wrong process.** "A scheduler process in
+`services/api`" is true of that crate and is not where this belongs: the reference's scheduler is its
+own Node server, and this stack's long-lived Node process is the ROOM, which cannot be serverless on
+two grounds already documented and which owns the `alerts` table and the fan-out. Durable rows, an
+ephemeral sweep timer, one atomic conditional UPDATE so firing is exactly-once. FIFTH inherited
+blocker to dissolve on re-measurement in one session.
 
 **`autoRecord` + `dontStopRecOnMicMute` are BUILT, and their blocker described the wrong system.** It
 read "a server-side recorder, which does not exist", which is true of the REFERENCE — its

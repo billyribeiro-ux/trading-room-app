@@ -33,6 +33,95 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 20:10 UTC — `hasAlertScheduler`: the room posts an alert while nobody is watching
+
+**Runtime impact: YES.** A presenter can now write an alert, pick a date and a repeat, and have the
+SERVER post it — with both browsers closed. Pending alerts are listed and can be cancelled. Rooms
+without the setting are unchanged and REFUSE all three commands.
+
+**This is the last buildable row of the settings enumeration.** What remains is `enableDiscord`,
+which needs an application registration that does not exist.
+
+#### The blocker named the wrong process — the fifth of the day
+
+The row read *"A scheduler process in `services/api`, and the crate's TEST targets cannot be built
+here."* Both halves are true of that crate. Neither is a reason to put the scheduler in it.
+
+The reference's scheduler is its own Node server. This stack's long-lived Node process is the ROOM —
+which `docs/NEXT-SESSION.md` already establishes **cannot be serverless at all**, on two independent
+grounds it documents: a WAL SQLite file Vercel's read-only filesystem cannot hold, and a
+`text/event-stream` a bounded function duration cuts. The room owns the `alerts` table a scheduled
+alert is written into and the fan-out that announces it. A Rust sweep would have reached across a
+process boundary into a SQLite file it does not own.
+
+#### Durable rows, an ephemeral timer, an atomic claim
+
+The ROW is the schedule: `send_on` is an absolute instant, so a restart loses nothing — the sweep
+comes back and asks the same question. Nothing about *when* an alert fires lives in a process, which
+is what makes a `setInterval` an acceptable answer here and not a breach of the shared-server-state
+rule. `room-events.ts` records the same distinction for the SSE hub.
+
+`claimed_at` is a **claim, not a status**, set by one conditional `UPDATE … WHERE claimed_at IS NULL
+… RETURNING`. A SELECT-then-UPDATE is a TOCTOU and two sweeps would both post the row — a duplicate
+alert to every member of a trading room, from a missing WHERE clause. The room is single-process
+today, so the race cannot currently happen; the claim is there because the day it can, nothing else
+would say so.
+
+#### A truncation defect this feature's own test caught before it shipped
+
+Drizzle's `timestamp` mode stores **whole seconds**, and truncates DOWNWARDS — so a `send_on` written
+from `Date.now()` was due up to **999 ms early**. The contract test found it directly: a sweep run at
+`sendOn - 1ms` fired an alert it should not have.
+
+Harmless once and not harmless as a rule: `nextSendOn` advances from the STORED value, so a daily
+series would lose up to a second per occurrence and walk backwards through the day. `send_on`,
+`claimed_at` and `created_at` are now `timestamp_ms` — the only table here that departs from the
+second-precision convention, because it is the only one whose timestamps are **compared to decide an
+action** rather than recorded to be displayed. The hand-written subquery in the claim had to follow;
+its first draft divided by 1000 out of habit and would have claimed nothing after the epoch.
+
+#### What is transcribed and what is a DECISION
+
+Transcribed: the payload (byte 2,130,937), the future-date refusal, the load on session start when
+the flag is on (1,009,767), the removal by `_id` (2,406,725), the manage row's shape and its "no
+weekends" badge, and the composer's own `ignoreWeekends: "daily" === repeat && ignoreWeekends`.
+
+**A DECISION, marked as one:** the reference's SERVER does the rescheduling and no byte of it reaches
+the browser. `daily` advances a day and skips weekends when asked; `weekly` advances seven and
+therefore cannot move onto a weekend it did not start on. A third rule is ours and is stated —
+a missed series **catches up rather than replays**, because a room down for three days has three
+missed daily occurrences and firing all three on return would put a wall of identical alerts on every
+screen.
+
+#### Six payload fields REFUSED at the boundary
+
+`sendTxt`, `sendEmail`, `sendTweet`, `sendLaterAsNick`, `sendLaterAsEmail`, `dontCrossPost` — each
+instructs a downstream this deployment does not have. Left OUT of the schema so `z.strictObject`
+refuses them loudly, rather than accepted and dropped: accepting a field nothing reads is how a
+presenter comes to believe an alert was texted to their members. `sendLaterAs*` is also a security
+decision — it is the client naming who an alert is from, which is the 2026-08-07 privilege escalation.
+
+#### A weak assertion of my own, found by its negative control
+
+The "six fields are refused" test sent `true` for all six — so the two STRING fields were being
+refused for a **type mismatch, not the unknown-key rule**. The control proved it: adding
+`sendLaterAsNick: z.string().optional()` to the schema left the test green. Each field now carries a
+value of the shape the reference actually sends, so `strictObject` is the only thing that can refuse
+it. Seven controls, all firing.
+
+#### Verified
+
+`svelte-check` 0/0 · `eslint` clean in both apps · room `pnpm test` **186 files / 3,085 tests**,
+1 skipped · controller **101 / 1,034** · schema at **103 wired / 269** · **seven negative controls
+seen RED**: the claim as a SELECT-then-UPDATE, the weekend skip applied to weekly, advancing from the
+clock instead of the occurrence, the room dropped from the delete WHERE, the setting gate removed,
+the sender taken from the request, and `ignoreWeekends` stored for a weekly row. Five ceilings
+raised, each argued in place; `ScheduledAlerts.svelte` born capped at 274.
+
+**Not verified: no alert has fired from a real timer here.** The sweep is driven directly with an
+injected clock, which is the point of taking one — a test that waited fifteen seconds would be slow
+and would prove less. Two browsers and a wall clock are what would close that.
+
 ### 2026-08-28 18:57 UTC — A Svelte conformance sweep, and the gate for the last ungated rune trap
 
 **Runtime impact: NO.** One new contract file. **The sweep found no defects**, and that is the

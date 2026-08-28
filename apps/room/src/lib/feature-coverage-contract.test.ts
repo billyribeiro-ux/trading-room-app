@@ -38,6 +38,13 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   commands they name were built in `session-commands.remote.ts`. That is the routine edit this list
   exists for: landing a feature removes a name, and the diff says which.
 
+  `getScheduledAlerts` left on 2026-08-28 with `hasAlertScheduler`, and it is the only one of the
+  three scheduler commands that was ever on this list — `alertMsgLater` and `removeScheduledAlert`
+  were already named in the triage prose and so were never "absent from our source". All three are
+  cited at `routes/scheduled-alerts.remote.ts`, each beside the divergence it carries: six of the
+  reference's twelve payload fields are REFUSED there rather than accepted and dropped, because every
+  one of them instructs a downstream this deployment does not have.
+
   `chatReactions` and `deleteQAAlertMsg` left on 2026-08-28 with the Q&A thread. Both are cited at
   the code that replaces them — `reactToQuestion` and `deleteQuestion` in
   `routes/alert-questions.remote.ts` — and BOTH cites are there to record a divergence rather than a
@@ -56,7 +63,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'forceStopScreen',
   'getMyRepeater',
   'getMyState',
-  'getScheduledAlerts',
   'getSessionNotes',
   'hardResetSession',
   'lockSession',

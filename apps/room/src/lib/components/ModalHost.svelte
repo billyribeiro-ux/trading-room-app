@@ -86,6 +86,8 @@
     alertTab: AlertTab;
     /** "Sticky non-trade alert?" — passed through to the composer, which re-applies it per open. */
     stickyNonTradeAlert?: boolean;
+    /** `sessData.hasAlertScheduler`, forwarded to the composer — see `PostAlertModal`'s own prop. */
+    schedulerAvailable?: boolean;
     theme: Theme;
     roomSplitDir: 'ltr' | 'ttb' | 'rtl' | 'btt';
     sessionControlInitialTab:
@@ -357,6 +359,7 @@
     settingsTab,
     alertTab,
     stickyNonTradeAlert = false,
+    schedulerAvailable = false,
     theme,
     roomSplitDir,
     sessionControlInitialTab,
@@ -4003,6 +4006,7 @@
     onpost={onPostAlert}
     onpastepost={onPastePostAlert}
     {stickyNonTradeAlert}
+    {schedulerAvailable}
   />
 </app-post-alert-modal>
 <app-poll-modal id="pollModalCompHolder" class="pollModalHolder" bind:this={pollPanelHost}>

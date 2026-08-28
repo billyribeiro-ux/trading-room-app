@@ -135,6 +135,78 @@ export const messages = sqliteTable('messages', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
 
+/**
+ * `hasAlertScheduler` — an alert a presenter wrote now and the server posts later.
+ *
+ * ## Durable rows, an ephemeral timer, and why that split is the whole design
+ *
+ * The ROW is the schedule. `send_on` is an absolute instant, so a restart loses nothing: the sweep
+ * comes back and asks the same question it always asks — what is due and unclaimed. Nothing about
+ * when an alert fires lives in a process. That is the difference between this and
+ * `server/room-events.ts`, whose state is live connections and is ephemeral by nature.
+ *
+ * ## `claimed_at` is a claim, not a status
+ *
+ * It is set by an atomic conditional `UPDATE … WHERE claimed_at IS NULL … RETURNING`, which is the
+ * pattern `CLAUDE.md` names for exactly this shape: a SELECT-then-UPDATE is a TOCTOU, and two
+ * sweeps that both read a due row would both post it. Zero rows back means another sweep won, and
+ * losing that race is the normal path rather than an error.
+ *
+ * The room runs one node process today (`docs/NEXT-SESSION.md` §"The room cannot deploy to Vercel"
+ * — a WAL SQLite file and long-lived SSE), so the race cannot currently happen. The claim is here
+ * anyway because the day it can, nothing else would say so: a duplicate alert to every member of a
+ * trading room is not a defect anyone would trace back to a missing WHERE clause.
+ *
+ * ## What is NOT stored, and why
+ *
+ * `sendTxt`, `sendEmail`, `sendTweet`, `sendLaterAsNick`, `sendLaterAsEmail` and `dontCrossPost`
+ * all travel on the reference's `alertMsgLater` payload and are dropped here. Every one of them is
+ * an instruction to a downstream this deployment does not have — SMS, the mailer's alert path,
+ * Twitter, and the cross-post fan-out `linkedRoomAlerts` is itself blocked on. Storing a flag no
+ * consumer reads is the thing this repository refuses by name, so they are refused at the boundary
+ * and the refusal is recorded rather than the column being created empty.
+ */
+export const scheduledAlerts = sqliteTable('scheduled_alerts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** Same rule as `alerts.roomShortCode`: `.notNull()` with no default, so a forgotten write fails to compile. */
+  roomShortCode: text('room_short_code').notNull(),
+  senderId: integer('sender_id')
+    .notNull()
+    .references(() => users.id),
+  /**
+   * `n: globals.user.name` on the reference's own payload, stored rather than joined.
+   *
+   * The manage modal renders `alert.n`, and an alert posted weeks later must carry the name the
+   * presenter had when they scheduled it — joining `users` would rewrite history on a rename, which
+   * for a trade alert is a change to who appears to have called it.
+   */
+  senderName: text('sender_name').notNull(),
+  body: text('body').notNull(),
+  nonTrade: integer('non_trade', { mode: 'boolean' }).notNull().default(false),
+  /** `''` | `'daily'` | `'weekly'` — `#lib/scheduled-alert.ts` owns the vocabulary and the advance. */
+  repeatMode: text('repeat_mode').notNull().default(''),
+  ignoreWeekends: integer('ignore_weekends', { mode: 'boolean' }).notNull().default(false),
+  /**
+   * `timestamp_ms`, and it is the ONLY table here that departs from the second-precision `timestamp`
+   * every other column uses. The reason is that these three are COMPARED to decide an action, where
+   * the rest are recorded to be displayed.
+   *
+   * Drizzle's `timestamp` mode stores whole seconds, so a `send_on` written from `Date.now()` loses
+   * its milliseconds — and it truncates DOWNWARDS, which makes the row due up to 999ms EARLY. Found
+   * by this feature's own contract test before it shipped: a sweep run at `sendOn - 1ms` fired an
+   * alert it should not have, because the stored instant was already in the past.
+   *
+   * Harmless for one alert and not harmless as a rule: `nextSendOn` advances from the STORED value,
+   * so a daily series would lose up to a second per occurrence and walk backwards through the day.
+   * Milliseconds make the value round-trip exactly, and `claimed_at` and `created_at` follow it so
+   * that no reader of this table has to remember which of its columns is in which unit.
+   */
+  sendOn: integer('send_on', { mode: 'timestamp_ms' }).notNull(),
+  /** Non-null once a sweep has taken this row. See the docblock: a claim, not a status. */
+  claimedAt: integer('claimed_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull()
+});
+
 export const alerts = sqliteTable('alerts', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   /*

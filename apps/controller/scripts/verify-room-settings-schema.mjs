@@ -16,7 +16,11 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
   Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 102.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 103.
+
+  89 -> 90 on 2026-08-28: hasAlertScheduler. The last buildable row of the settings enumeration, and
+  the third blocker in a day that named the wrong obstacle: the scheduler does not need the Rust
+  crate, it needs a long-lived process, and the room already is one because it cannot be serverless.
 
   87 -> 89 on 2026-08-28: autoRecord and dontStopRecOnMicMute. ONE feature and two settings, crossing
   together because the second is inert without the first - autoRecord gates the stop as well as both
@@ -348,6 +352,7 @@ const EXPECTED_WIRED_SETTINGS = [
   */
   'alertLabels',
   'alertsOverlayOnScreenshare',
+  'hasAlertScheduler',
   'autoRecord',
   'dontStopRecOnMicMute',
   'altChatRender',

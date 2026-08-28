@@ -523,6 +523,7 @@
   {mobilePin}
   modAlertFilterList={data.sessData?.modAlertFilterList}
   stickyNonTradeAlert={data.sessData?.styckyNonTradeAlert === true}
+  schedulerAvailable={data.sessData?.hasAlertScheduler === true}
   bind:alertFilterFor={alerts.filterFor}
   bind:showAlertsFrom={alerts.showFrom}
   onsavealertfilter={saveAlertFilter}

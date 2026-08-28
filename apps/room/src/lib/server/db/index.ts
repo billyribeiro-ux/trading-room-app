@@ -270,6 +270,19 @@ export function ensureDatabase() {
       closed_message TEXT,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS scheduled_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      sender_id INTEGER NOT NULL REFERENCES users(id),
+      sender_name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      non_trade INTEGER NOT NULL DEFAULT 0,
+      repeat_mode TEXT NOT NULL DEFAULT '',
+      ignore_weekends INTEGER NOT NULL DEFAULT 0,
+      send_on INTEGER NOT NULL,
+      claimed_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
@@ -581,6 +594,28 @@ export function ensureDatabase() {
   sqlite.exec(
     `CREATE INDEX IF NOT EXISTS alerts_paging_idx
        ON alerts(room_short_code, created_at DESC, id DESC)`
+  );
+
+  /*
+    THE SWEEP'S ONLY READ PATH, and the one query in this database that runs on a timer rather than
+    on a request.
+
+    `claimed_at IS NULL` first, then `send_on`: the sweep asks for the oldest UNCLAIMED row that is
+    due, across every room, and the partial index means the scan is over pending rows only. Without
+    it the sweep degrades with the number of alerts ever scheduled rather than with the number
+    currently pending, which is the shape `CLAUDE.md` asks about every new read path — at 10,000
+    delivered alerts a full scan every few seconds is the cost, and this bounds it to what is
+    actually waiting.
+  */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS scheduled_alerts_due_idx
+       ON scheduled_alerts(send_on) WHERE claimed_at IS NULL`
+  );
+
+  /* The manage modal's list: one room's pending alerts, soonest first. */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS scheduled_alerts_room_idx
+       ON scheduled_alerts(room_short_code, send_on)`
   );
 
   /*

@@ -586,6 +586,19 @@ export interface RoomSessionSettings {
    */
   alertsOverlayOnScreenshare?: boolean;
   /**
+   * "Alert Scheduler?" — an alert a presenter writes now and the SERVER posts later.
+   *
+   * Three commands upstream (`alertMsgLater`, `getScheduledAlerts`, `removeScheduledAlert`) and one
+   * gate on all of them. `#lib/scheduled-alert.ts` holds the repeat arithmetic and says which parts
+   * are transcribed and which are a decision; `#lib/server/scheduled-alerts.ts` holds the store, the
+   * atomic claim and the sweep.
+   *
+   * It crosses because every occurrence is `sessData.<name>`, and it is checked on the SERVER as
+   * well as drawn: a room with the scheduler off REFUSES a schedule rather than merely not offering
+   * one, which is the correction `enableQAReactions` was made under.
+   */
+  hasAlertScheduler?: boolean;
+  /**
    * "Auto Record?" and "Do not stop recording on mic mute?" — a recording that starts and stops on
    * its own.
    *

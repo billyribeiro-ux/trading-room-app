@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 102 of 269 are wired today.
+// nothing in the room reads it yet. 103 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -172,7 +172,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "archiveAlertsLog", section: "settings", type: "checkbox", label: "Archive Alerts?", help: "If enabled, archived alert logs will be available from a link in the room", helpShape: "muted", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "archiveChatLog", section: "settings", type: "checkbox", label: "Archive Chatlog?", help: null, helpShape: null, helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hideChatLog", section: "settings", type: "checkbox", label: "Hide Chatlog from Archive?", help: "If enabled, archived chat logs will be hidden for the regular users in the room", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "hasAlertScheduler", section: "settings", type: "checkbox", label: "Enable alert scheduler?", help: "Presenters will be able to schedule sending alerts in the future", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasAlertScheduler", section: "settings", type: "checkbox", label: "Enable alert scheduler?", help: "Presenters will be able to schedule sending alerts in the future", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableVideoPlayer", section: "settings", type: "checkbox", label: "Enable VideoPlayer?", help: "In room video player", helpShape: "muted", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "userUploads", section: "settings", type: "checkbox", label: "User Chat Screenshots?", help: "If enabled, Users will be able to upload screenshots on the chat", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "enableDiscord", section: "settings", type: "checkbox", label: "Enable Discord?", help: "It will enable Discord", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },

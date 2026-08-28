@@ -1025,7 +1025,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       A PASS-THROUGH, which is what this layer is for — the modal holds the Text Mode radios and the
       Q&A thread, and neither the mode nor the setter belongs to it.
     */
-    max: 820,
+    /*
+      820 -> 821 on 2026-08-28: one line, `schedulerAvailable={data.sessData?.hasAlertScheduler === true}`,
+      which is the composition root doing exactly what this file is for — resolving a room setting
+      once and handing it down. `=== true` is the fail-closed read every optional control-plane field
+      takes here.
+    */
+    max: 821,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
@@ -1525,7 +1531,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       control of that exact shape found in this room, so the next reader does not have to rediscover
       why the keys are on `dead-preference-keys.ts`.
     */
-    max: 5976,
+    /*
+      5976 -> 5980 on 2026-08-28: the `schedulerAvailable` prop, its default, its one-line docblock
+      and the forward to the composer. A pass-through and nothing more — this file reads the value
+      nowhere. Recorded rather than absorbed, because this is the largest component in the repository
+      and the rule that its ceiling only moves with a reason written down is what has taken it from
+      6,021 to here.
+    */
+    max: 5980,
     why: 'every modal in the room, in one component'
   },
   {
@@ -2692,7 +2705,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/PostAlertModal.svelte',
-    max: 494,
+    /*
+      RAISED 494 -> 522 on 2026-08-28, for `hasAlertScheduler`, and argued in place.
+
+      The send-later PANE is not here: `ScheduledAlerts.svelte` holds the date field, the repeat, the
+      weekend flag, the three command calls and the manage table, born capped in the same commit.
+      What this file gained is one `{#if schedulerAvailable}` block, one prop with its docblock, and
+      the paragraph saying why the gate is drawn here AND enforced on the server.
+
+      That is the shape this ratchet is meant to allow. The alternative was the reference's own
+      layout — the fields inline in the composer and a second modal beside it — which would have put
+      roughly two hundred lines into the file that was already one line from its ceiling.
+    */
+    max: 522,
     why: 'the alert composer and its per-open resets'
   },
   {
@@ -2820,6 +2845,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/components/ScreenPane.svelte',
     max: 441,
     why: 'the screenshare pane and its zoom/stack controls'
+  },
+  {
+    file: 'lib/components/ScheduledAlerts.svelte',
+    /*
+      Born capped, 2026-08-28, in the commit that created it.
+
+      `hasAlertScheduler`'s whole browser surface: the date, the repeat, the weekend flag, the three
+      command calls and the manage table. It exists so that `PostAlertModal.svelte` — one line from
+      its ceiling when this was written — took an `{#if}` block instead of two hundred lines.
+
+      The reference splits this in two (`app-post-alert-modal` and `app-scheduled-alerts-modal`) and
+      that split is deliberately not reproduced: both halves ask one question — what is already
+      scheduled — so two components would refetch the same list and disagree about it after a
+      removal. If this number climbs, the question is whether SCHEDULING RULES have arrived in it.
+      They must not: `#lib/scheduled-alert.ts` owns the arithmetic and is pure.
+    */
+    max: 274,
+    why: 'the send-later pane and the manage table; one question, one component'
   },
   {
     file: 'lib/components/ScreenTabs.svelte',

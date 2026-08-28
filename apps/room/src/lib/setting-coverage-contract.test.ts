@@ -99,7 +99,17 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `autoRecord` and `dontStopRecOnMicMute` left last, together, and they are the THIRD blocker in one
+ * `hasAlertScheduler` left last, and it is the LAST buildable row of this enumeration — what remains
+ * is `enableDiscord`, which needs an application registration that does not exist. Its blocker named
+ * the wrong process: *"a scheduler process in `services/api`, and the crate's TEST targets cannot
+ * build here."* Both halves are true of that crate and neither is a reason to put the scheduler in
+ * it. The reference's scheduler is its own Node server; this stack's long-lived Node process is the
+ * ROOM, which `docs/NEXT-SESSION.md` establishes cannot be serverless on two independent grounds,
+ * and which already owns the `alerts` table and the fan-out. Durable rows, an ephemeral sweep timer,
+ * and one atomic conditional `UPDATE … WHERE claimed_at IS NULL … RETURNING` so a firing is
+ * exactly-once. `scheduled-alert-contract.test.ts`.
+ *
+ * `autoRecord` and `dontStopRecOnMicMute` left before it, together, and they are the THIRD blocker in one
  * session to describe the wrong system. The row read "a server-side recorder, which does not exist",
  * which is a true statement about the reference and an irrelevant one here: upstream's `startRecLocal`
  * event is a misnomer that reaches `socket.emit("cmd", {cmd: "startRecord"})`, an opcode to a recorder
@@ -150,7 +160,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'openLoginLink',
   'authMode',
   'enableDiscord',
-  'hasAlertScheduler',
   'playChatMessageSoundFor',
   'description',
   'isLocked',

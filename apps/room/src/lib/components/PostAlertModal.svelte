@@ -9,6 +9,7 @@
   } from '#lib/post-alert-behavior.js';
   import BootboxDialog from './BootboxDialog.svelte';
   import Modal from './Modal.svelte';
+  import ScheduledAlerts from './ScheduledAlerts.svelte';
 
   interface Props {
     open: boolean;
@@ -27,6 +28,14 @@
      * them was written against.
      */
     stickyNonTradeAlert?: boolean;
+    /**
+     * `sessData.hasAlertScheduler` — whether this room may schedule alerts for later.
+     *
+     * A prop rather than a read here, for the reason every other room setting reaches this component
+     * as one: the page owns `data.sessData` and resolves it once, so a component cannot read a
+     * setting and decide for itself. Defaults `false`, which is the fail-closed direction.
+     */
+    schedulerAvailable?: boolean;
   }
 
   let {
@@ -37,7 +46,8 @@
     onalert,
     onpost,
     onpastepost,
-    stickyNonTradeAlert = false
+    stickyNonTradeAlert = false,
+    schedulerAvailable = false
   }: Props = $props();
 
   let alertText = $state('');
@@ -465,6 +475,24 @@
               bind:value={legalDisclosureText}
             />
           </div>
+        {/if}
+        <!--
+          `hasAlertScheduler` — the send-later pane, and the manage table reached from it.
+
+          Rendered only when the room has the scheduler, matching where upstream puts it (inside
+          `app-post-alert-modal`, gated on `sessData.hasAlertScheduler`). The gate is drawn here AND
+          enforced on the server: `scheduled-alerts.remote.ts` refuses all three commands without the
+          setting, because a gate that only removes a control is not a gate.
+        -->
+        {#if schedulerAvailable}
+          <ScheduledAlerts
+            body={alertText}
+            {nonTradeAlert}
+            onscheduled={() => {
+              if (!keepOpen) onclose();
+              else clearInputFields();
+            }}
+          />
         {/if}
       </div>
       <div class="text-right">
