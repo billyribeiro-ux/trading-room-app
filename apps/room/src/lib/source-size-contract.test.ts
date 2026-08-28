@@ -858,7 +858,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       see the note at `RoomPrivateChat.#peerHistory` for why collapsing them shows a moderator the
       previous member's messages under a spinner labelled with the new one.
     */
-    max: 786,
+    /*
+      786 -> 796, 2026-08-28, for the room's own favicon and stylesheet: the import, the call site
+      and the eight-line citation above it.
+
+      HERE and not on the page for the reason this entry already gives twice over — this component
+      holds `data`. The alternative was three lines on `+page.svelte` plus a `<svelte:head>` block,
+      and the page is the file this repository keeps shrinking.
+
+      Ten lines is more than the two the tip button cost, and the difference is the citation: a
+      setting that puts OWNER-AUTHORED CODE in every member's browser gets its reasoning at the call
+      site as well as in its module, because this is the file somebody reads while wondering what
+      the room does to a member's page.
+    */
+    max: 796,
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
@@ -2231,6 +2244,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/components/RichTextEditor.svelte',
     max: 192,
     why: 'the chat RTE, gated on three flags rather than one'
+  },
+  {
+    file: 'lib/components/RoomBranding.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — and this one did not need remembering, which is
+      the point of the change three commits ago. `every component is discovered and capped` failed
+      the moment this file appeared, named it, and would not go green until it had a number. That is
+      the first time this repository has been TOLD about an uncapped component rather than finding
+      one by accident.
+
+      92 lines, of which the markup is nine. The rest is the citation for `changeFavicon` and
+      `addCustomCSS`, the argument for why two of its three pieces are declarative and two are not,
+      and a refuted security claim kept in place rather than deleted.
+
+      If this number climbs, the thing to check is whether it has started DECIDING what to apply.
+      `room-branding.ts` resolves both settings; this file applies the answers.
+    */
+    max: 92,
+    why: 'the room favicon and stylesheet applied to document.head; nine lines of markup'
   },
   {
     file: 'lib/components/RoomMessage.svelte',

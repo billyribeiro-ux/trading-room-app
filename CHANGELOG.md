@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 14:05 UTC — A room's own favicon and stylesheet, and a security claim I had to retract
+
+**Runtime impact: YES.** A room that sets a **custom favicon** now replaces the shell's icon with
+it, and a room that sets **custom CSS** gets it — linked when it is a stylesheet URL, inlined when it
+is CSS. Neither did anything before.
+
+**The upstream check that decides between those two forms is BROKEN, and both failures are silent.**
+`addCustomCSS` (byte 2,602,486) tests `e.indexOf("https") >= 0` — a substring, anywhere in the value:
+
+* `body { background: url(https://cdn.example/x.png) }` — an ordinary stylesheet — contains `https`,
+  so upstream sets the whole thing as a `link.href`. A broken request and **no styling at all**.
+* `http://cdn.example/room.css` does **not** contain `https`, so upstream injects the URL as CSS
+  text. **The stylesheet never loads.**
+
+This room parses instead: a value that IS a complete `http:`/`https:` URL is a stylesheet, and
+anything else is CSS. That is what the check was reaching for.
+
+**`app.html` was already built for this**, which was a pleasant find: its icon link carries
+`type="image/x-icon"` and the comment there says the attribute is load-bearing because
+`changeFavicon` uses it as the selector for the tag it replaces. It is removed now, so the room does
+not ship two icon links and "let the browser choose" — that comment's own words.
+
+**A SECURITY CLAIM WAS WRITTEN, MEASURED, AND RETRACTED.** The first draft said the inline form is a
+text node because a raw-HTML insertion inside a style element would let a closing style tag followed
+by a script tag become executable script. **A negative control replacing the text node with `innerHTML` stayed GREEN**, which sent it
+to be measured: a style element is **RAWTEXT**, so its content is never parsed as HTML and neither
+form is a breakout. Confirmed in this repository's own jsdom — both produce an identical single
+`#text` child and no `<script>` element.
+
+The claim is **refuted in place, in four files**, rather than deleted: the module, the component, the
+controller boundary comment and the test's own header. "innerHTML in a style tag is XSS" is a
+plausible thing to believe twice.
+
+**The real reason survived and is now the one with a control behind it.** Ordinary Svelte
+interpolation HTML-escapes text content, so `.a > .b { content: "x & y" }` would reach the CSS parser
+as `&gt;` and `&amp;` — correct CSS in, broken CSS out, silently. Swapping the attachment for
+interpolation goes red.
+
+**A second control stayed green and found a second gap.** Removing the attachment's clear-before-append
+passed, because a fresh `<style>` is empty and clearing is a no-op on FIRST attach. It matters on a
+RE-RUN — and a re-run is reachable, because this page re-reads `sessData` every five seconds, so an
+owner editing the setting changes the value under a live element. Without the clear a room
+accumulates every version of its CSS, oldest first. That test exists now and the control goes red.
+
+**And the rule about template syntax in comments cost this file twice in one sitting.** An at-html
+and a braced identifier, written as PROSE inside a script-block comment, each made `svelte2tsx` emit
+a module with **no default export** — not a parse error, not a warning: two other files simply
+reported that `RoomBranding` does not exist. CLAUDE.md carries the rule; the component now carries
+what breaking it looks like.
+
+**The ceiling gate worked for the first time as designed.** `RoomBranding.svelte` was capped in the
+commit that created it because `every component is discovered and capped` **failed the moment the
+file appeared** and named it. That is the first uncapped component this repository has been TOLD
+about rather than tripped over.
+
+**Verified:** room 166 files / 2,627 tests (1 skipped) · controller 95 files / 1,006 tests (5
+skipped) · `schema:verify` byte-compares at **90 wired** · both room gates and the six controller
+verifiers green · `svelte-check` 0/0 across 1,294 files · eslint clean · prettier clean on every file
+this change touches.
+
+**Not verified:** the Svelte MCP is still disconnected, so **`svelte-autofixer` could not be run** on
+`RoomBranding.svelte` or `RoomOverlays.svelte`.
+
 ### 2026-08-28 13:20 UTC — A mount test for the navbar, and a correction I owed twice
 
 **Runtime impact: NO.** One new test file, plus corrections in four places.

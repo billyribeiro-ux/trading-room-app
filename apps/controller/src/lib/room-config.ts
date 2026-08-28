@@ -653,6 +653,31 @@ export const ROOM_VISIBLE_SETTINGS = [
   'tipMeBtnUrl',
   'tipMeBtnTxt',
   /*
+    The room OWN favicon and stylesheet, applied together on globalsLoaded.
+
+      sessData.customFaviconURL && this.changeFavicon(sessData.customFaviconURL)   byte 2,594,998
+      sessData.customCSS && this.addCustomCSS(sessData.customCSS)                  byte 2,595,119
+      changeFavicon                                                                byte 2,602,147
+      addCustomCSS                                                                 byte 2,602,486
+
+    THE SECOND ONE IS OWNER-AUTHORED CODE running in every member browser of that owner own room.
+    That is the reference feature and it is the same bargain a site theme makes, but it is written
+    down here rather than left implicit, because a settings list is where somebody decides to cross
+    something and this one deserves a sentence at that moment.
+
+    It is inlined as a TEXT NODE, and the reason is NOT the obvious one - a first draft of this
+    comment said a text node stops a closing style tag turning into executable script, and that was
+    MEASURED AND REFUTED: a style element is RAWTEXT, so innerHTML there is not a breakout either.
+    The real reason is that ordinary Svelte interpolation escapes, which would hand the CSS parser
+    entities instead of selectors. `room-branding.ts` records both the refuted claim and the real
+    one, together with the fix for the upstream substring check that decides whether a value is a
+    URL or a stylesheet body.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'customFaviconURL',
+  'customCSS',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:

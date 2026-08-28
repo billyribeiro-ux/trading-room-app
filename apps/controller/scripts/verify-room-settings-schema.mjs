@@ -13,10 +13,14 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, SEVENTY-FIVE by the room application
+  Eleven consumed by this repository's room-login page, SEVENTY-SEVEN by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 88.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 90.
+
+  75 -> 77 on 2026-08-28: customFaviconURL and customCSS. They cross together because the reference
+  applies them on the same line, and the second is the first setting on this list whose value is
+  CODE the owner writes and every member's browser runs.
 
   72 -> 75 on 2026-08-28: tipMeBtnEnabled, tipMeBtnUrl and tipMeBtnTxt — ONE feature. They cross as
   a group because the gate is their conjunction, and a settings list that lets them cross separately
@@ -212,6 +216,9 @@ const EXPECTED_WIRED_SETTINGS = [
   'tipMeBtnEnabled',
   'tipMeBtnUrl',
   'tipMeBtnTxt',
+  /* Added 2026-08-28: the room own favicon and stylesheet. */
+  'customFaviconURL',
+  'customCSS',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',

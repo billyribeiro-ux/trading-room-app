@@ -335,6 +335,13 @@ describe('the allow-list itself', () => {
       tipMeBtnEnabled: 'tipButtonFor — the tip button, all three settings or none',
       tipMeBtnUrl: 'tipButtonFor — the tip button, all three settings or none',
       tipMeBtnTxt: 'tipButtonFor — the tip button, all three settings or none',
+      /*
+        Verified in the room before being written here. `RoomBranding` owns both, and the second is
+        deliberately named with what it IS rather than with what it does: owner-authored code in
+        every member's page is the fact a reader of this table should meet first.
+      */
+      customFaviconURL: 'RoomBranding — the room’s own favicon, replacing the shell’s',
+      customCSS: 'RoomBranding — owner-authored CSS, linked or inlined as a text node',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

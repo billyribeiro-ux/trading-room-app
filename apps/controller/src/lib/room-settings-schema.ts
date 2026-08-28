@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 88 of 269 are wired today.
+// nothing in the room reads it yet. 90 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -89,7 +89,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "allRoomsWelcomeMatPW", section: "settings", type: "textarea", label: "All Rooms Welcome Mat Password", help: "If set, Presenters will need to enter the password to replace all the rooms welcome mats", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "needPasswordForUserNotes", section: "settings", type: "textarea", label: "Password to Manage User's Notes", help: "If set, Presenters will need to enter the password to manage user's notes", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "nickFilter", section: "settings", type: "textarea", label: "Nickname filter for members:", help: "(Coma separated list of filters, i.e. 'SO_,SS_,John Carter, etc...'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "customFaviconURL", section: "settings", type: "textarea", label: "Custom Favicon", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "customFaviconURL", section: "settings", type: "textarea", label: "Custom Favicon", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "overwriteCashRegisterSound", section: "settings", type: "text", label: "Overwrite Cash Register Sound", help: "If set, it will play instead of the chash.mp3", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "login_webhook_url", section: "settings", type: "textarea", label: "Login Webhook URL", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "logout_webhook_url", section: "settings", type: "textarea", label: "Logout Webhook URL", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
@@ -318,7 +318,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "customJanus", section: "settings", type: "textarea", label: "Alt JanusJS", help: "(name if alt janusJS. ie. 'janus4.js'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "alt_roomjs", section: "settings", type: "textarea", label: "Alt Room.js", help: "(name if alt Room.js. ie. 'RoomRemoteRec.js'", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "modAlertFilterList", section: "settings", type: "textarea", label: "Alert filter list for mods:", help: "i.e. [{\"username\":\"John\",\"avatar\":\"john@example.com\"}]", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: true },
-  { name: "customCSS", section: "settings", type: "textarea", label: "Custom CSS", help: "Custom CSS to custimize colors, etc...", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
+  { name: "customCSS", section: "settings", type: "textarea", label: "Custom CSS", help: "Custom CSS to custimize colors, etc...", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: true },
   { name: "darkThemeStyle", section: "settings", type: "textarea", label: "Dark Theme Style", help: "Dark theme style to custimize colors.", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "hideLogo", section: "settings", type: "checkbox", label: "Hide Logo", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "hidePoweredBy", section: "settings", type: "checkbox", label: "Hide Powered By", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: true },

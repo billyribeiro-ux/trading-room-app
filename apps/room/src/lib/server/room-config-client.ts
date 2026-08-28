@@ -319,6 +319,19 @@ export interface RoomSessionSettings {
   /** See {@link RoomSessionSettings.tipMeBtnEnabled}. The label AND the `title` attribute. */
   tipMeBtnTxt?: string;
   /**
+   * The room's own favicon, applied on `globalsLoaded` (byte 2,594,998) by `changeFavicon`
+   * (2,602,147). `app.html`'s icon link carries `type="image/x-icon"` for exactly this reason.
+   */
+  customFaviconURL?: string;
+  /**
+   * The room's own stylesheet — a URL to link, or CSS to inline. `addCustomCSS` (byte 2,602,486).
+   *
+   * OWNER-AUTHORED CODE served to every member of that owner's room. `room-branding.ts` records
+   * what that does and does not mean, and fixes the `indexOf("https")` check that decides which of
+   * the two forms a value is.
+   */
+  customCSS?: string;
+  /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
    *

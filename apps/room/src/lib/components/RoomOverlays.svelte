@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RoomBranding from '#lib/components/RoomBranding.svelte';
   import { saveCloseMessageThen } from '#lib/room/close-message.js';
   import type { SvelteSet } from 'svelte/reactivity';
 
@@ -489,6 +490,15 @@
 </div>
 <!-- The close message takes NO new prop: `data`, `dialogs` and `prefs` are already here. The rule,
      and the six callbacks deleted under it on 2026-08-18, are in the props docblock above. -->
+<!--
+  The room's own favicon and stylesheet, applied on `globalsLoaded` upstream (byte 2,594,998). Here
+  rather than on the page because this component already holds `data`; `RoomBranding` explains why
+  two of its three pieces are `<svelte:head>` and the other two are done by hand.
+-->
+<RoomBranding
+  customFaviconURL={data.sessData?.customFaviconURL}
+  customCSS={data.sessData?.customCSS}
+/>
 <ModalHost
   name={modals.modal}
   mediaIceServers={media.iceServers}

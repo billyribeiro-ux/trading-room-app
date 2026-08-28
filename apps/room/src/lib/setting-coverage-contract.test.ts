@@ -84,8 +84,9 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * `lib/components/ModeratorMessage.svelte`), `simplifiedEditor` (foreground-only colour on the note
  * toolbar, `resolveNoteSurfaceGates`), `enablePrivateMessageHistory` (the moderation read behind the
  * user-info modal, refused on the SERVER), `showOnlyUsernames` (which SHAPE a roster row draws in —
- * per row, never per viewer) and the `tipMeBtn*` trio (ONE feature, `tipButtonFor`), all on
- * 2026-08-28 and each with its own contract file.
+ * per row, never per viewer), the `tipMeBtn*` trio (ONE feature, `tipButtonFor`) and
+ * `customFaviconURL` + `customCSS` (`RoomBranding`), all on 2026-08-28 and each with its own
+ * contract file.
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
@@ -105,8 +106,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'hasAlertScheduler',
   'playChatMessageSoundFor',
   'alertsOverlayOnScreenshare',
-  'customCSS',
-  'customFaviconURL',
   'customPlayerURL',
   'description',
   'dontStopRecOnMicMute',
