@@ -105,35 +105,7 @@ test.describe('the room opens and paints', () => {
   than running them against unknown state) and why every assertion below reads the page rather than
   changing it. A suite that MUTATED the room would have to pay for isolation instead.
 */
-/*
-  ── THIS GROUP IS `fixme`, AND THE REASON IS WRITTEN DOWN RATHER THAN THE SPECS DELETED ───────────
-
-  The four specs below are correct in intent and do not yet run. What blocks them is the LOGIN CLICK
-  against the built server: `page.locator('button[type=submit]').first().click()` never resolves, and
-  Playwright waits on actionability until the hook's budget is gone. Measured in the same run:
-  `goto` of the login page takes **205ms**, so nothing here is slow — one interaction does not
-  complete.
-
-  Two candidates, neither confirmed: the submit control carries `disabled={submitting}` and the
-  enhanced submit may leave it disabled where a Playwright click is still waiting for it; or the form
-  posts through `use:enhance` and resolves client-side without the navigation these specs wait for —
-  which is already why the room is reached by an explicit `goto` below rather than by watching the
-  URL.
-
-  Marked `fixme` rather than deleted, skipped silently, or "fixed" by asserting something weaker.
-  Playwright reports a fixme group as skipped and names it, so the gate stays honest about its own
-  coverage — which matters more here than a green tick, because **the three specs that DO run already
-  found two production defects** (a `ReferenceError` that made every room render 500, and a duplicate
-  `<title>` that had been overriding every page's). A suite that lies about what it covers would have
-  found neither.
-
-  What closes this: one session with the trace viewer on the click — `playwright show-trace` over the
-  zip this suite already writes into `test-results` on a failure, which records exactly what the
-  element was doing while the click waited. (The glob for that path is deliberately not spelled out
-  here: a star followed by a slash ends a block comment, and writing it closed this one early on the
-  first attempt — the same trap `CLAUDE.md` records for template syntax in comments.)
-*/
-test.describe.fixme('the room itself', () => {
+test.describe('the room itself', () => {
   // Scoped to THIS group. At file level it made a failure in the login group skip these too, which
   // hid three results behind one — the opposite of what a gate is for.
   test.describe.configure({ mode: 'serial' });
@@ -178,7 +150,20 @@ test.describe.fixme('the room itself', () => {
       if the cookie was never set, because the room refuses a request without a session.
     */
     await page.waitForTimeout(1_000);
-    await page.goto(`/?room=${ROOM}`, { waitUntil: 'domcontentloaded' });
+    const entered = await page.goto(`/?room=${ROOM}`, { waitUntil: 'domcontentloaded' });
+    /*
+      THE STATUS IS ASSERTED HERE, IN THE SETUP, and that is not belt-and-braces.
+
+      Every assertion in this group reads the rendered page — it is not empty, it contains no
+      `undefined`, it does not scroll sideways. **An error page satisfies all three.** So without
+      this line the group could report four green ticks while the room was answering 403 to every
+      request, which is exactly the shape of hollow coverage the rest of this repository's gates
+      exist to refuse. Caught by the console-error spec noticing a 403 the other specs were happily
+      asserting against.
+    */
+    expect(entered?.status(), 'the room must answer 200 before anything below means anything').toBe(
+      200
+    );
   });
 
   test.afterAll(async () => {
@@ -217,6 +202,16 @@ test.describe.fixme('the room itself', () => {
       if (message.type() === 'error') errors.push(message.text());
     });
     page.on('pageerror', (error) => errors.push(error.message));
+    /*
+      RESPONSES TOO, and they are the half that is diagnosable. A failed request reaches the console
+      as the bare string "Failed to load resource: the server responded with a status of 403" — with
+      no URL — so an assertion on console text alone tells whoever reads the failure that something
+      is broken and nothing about what. Recording the response gives the address.
+    */
+    const failed: string[] = [];
+    page.on('response', (response) => {
+      if (response.status() >= 400) failed.push(`${response.status()} ${response.url()}`);
+    });
 
     await page.reload();
     /*
@@ -244,8 +239,32 @@ test.describe.fixme('the room itself', () => {
         !/websocket|mediasoup|ws:\/\//i.test(text) &&
         // The aborts this suite causes itself — see the hermetic-routing note at the top.
         !/ERR_FAILED|ERR_ABORTED|net::/i.test(text) &&
-        !/gravatar|googleapis|google\.com|freegeoip/i.test(text)
+        !/gravatar|googleapis|google\.com|freegeoip/i.test(text) &&
+        /*
+          "Failed to load resource: the server responded with a status of N" carries NO URL, so it
+          can only ever be filtered by status — which would mean excluding every 503 anywhere, the
+          blanket the response assertion above exists to avoid. Dropped here because that assertion
+          already covers precisely these failures WITH the address: a request that fails is reported
+          once, by the check that can name it.
+        */
+        !/^Failed to load resource:/.test(text)
     );
+    /*
+      The same two named exclusions apply to responses: this suite aborts every third-party request
+      itself, and there is no SFU in this job.
+    */
+    const realFailures = failed.filter(
+      (line) =>
+        !/favicon|gravatar|googleapis|google\.com|freegeoip/i.test(line) &&
+        /*
+          `/api/media/grant` 503 — the SFU admission endpoint, and there is no SFU in this job. Named
+          as one path with one status rather than filtered as "any 503", because a 503 from anywhere
+          ELSE is a real failure and this suite must still say so. The room degrades honestly without
+          a media plane, which is a property `.env.example` documents and this run exercises.
+        */
+        !/503 .*\/api\/media\/grant/.test(line)
+    );
+    expect(realFailures, realFailures.join('\n')).toEqual([]);
     expect(real, real.join('\n')).toEqual([]);
   });
 

@@ -119,21 +119,45 @@
     "Shallow Routing". `replace: true` carries the other half of the old name: a Back press must not
     return the reader to a URL that still holds their token.
 
-    ON THE FEEDBACK LOOP, because this is the obvious objection and the autofixer raises it: the
-    effect READS `page.url` and the shallow navigation WRITES it, so it re-runs itself exactly once. The
-    `has('jwtSite')` guard is what terminates it — the second pass finds no token and returns before
-    touching history. The guard is load-bearing, not defensive; delete it and this spins.
+    ON THE FEEDBACK LOOP — AND THIS PARAGRAPH USED TO BE WRONG, WHICH IS THE WHOLE STORY.
+
+    It said: *"the effect READS `page.url` and the shallow navigation WRITES it, so it re-runs itself
+    exactly once. The `has('jwtSite')` guard is what terminates it — the second pass finds no token
+    and returns before touching history. The guard is load-bearing, not defensive; delete it and this
+    spins."*
+
+    Every sentence of that was true of `replaceState`, which is what this used until the SvelteKit 3
+    migration above. **It is not true of `goto(…, { shallow: true })`, which does not update
+    `page.url`** — a shallow navigation deliberately leaves the loaded URL alone, because no load ran.
+    So the guard re-read the ORIGINAL address every time, found the token still there, and called
+    `goto` again. Forever.
+
+    Measured 2026-08-28 by the room's first browser test: a `framenavigated` listener recorded the
+    same `/session?id=7301` fourteen times in seven seconds and climbing. A member arriving with a
+    valid handoff got a page that navigated in a loop, which is why nothing on it was ever "stable"
+    enough for Playwright to click — the symptom that led here.
+
+    THE LATCH IS NOW WHAT TERMINATES IT, and it cannot be defeated by a URL that does not change. A
+    plain `let` and not `$state`, deliberately: reading it must NOT create a dependency, or the effect
+    would re-run on the very write that is supposed to stop it.
 
     An effect rather than a `$derived` because there is nothing to derive: the value being produced
     is a history entry, which is precisely the "synchronise with something outside Svelte" case the
     docs keep effects for.
   */
+  let handoffStripped = false;
   $effect(() => {
-    if (window.top !== window.self) return;
-
+    /*
+      Read FIRST, so `page.url` is still a dependency and a genuinely new address — a second handoff
+      arriving through a client-side navigation — re-enters rather than being latched out. The latch
+      guards the loop, not the feature.
+    */
     const stripped = new URL(page.url.href);
+    if (handoffStripped) return;
+    if (window.top !== window.self) return;
     if (!stripped.searchParams.has('jwtSite')) return;
 
+    handoffStripped = true;
     stripped.searchParams.delete('jwtSite');
     void goto(`${stripped.pathname}${stripped.search}`, {
       shallow: true,

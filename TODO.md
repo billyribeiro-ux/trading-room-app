@@ -336,7 +336,11 @@ one session, after the Rust one below — **re-measure a blocker before building
 **THE ROOM NOW HAS A BROWSER GATE, and its first run found two defects that were shipping** — a
 `ReferenceError` that made every room render 500 for eleven days, and a duplicate `<title>` that had
 been overriding every page's. Both fixed; `.github/workflows/quality.yml` runs the suite on every PR.
-Four of its seven specs are marked `fixme` with the reason written at the group.
+All seven of its specs pass in 35 seconds. Getting the last four green turned up a THIRD shipped
+defect: the login page navigated to itself in an infinite loop for anyone arriving with a valid
+handoff, because the SvelteKit 3 migration to `goto(…, { shallow: true })` broke the termination
+condition its own comment documented — that call does not update `page.url`, so the guard re-read the
+token forever.
 
 **THE SETTINGS ENUMERATION IS DOWN TO ONE UNBUILT FEATURE** — measured 2026-08-28, not inherited.
 `enableDiscord` needs a Discord application registration, which is the owner's call because there is

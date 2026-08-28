@@ -87,6 +87,29 @@ export default defineConfig({
   reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
+    /*
+      `prefers-reduced-motion: reduce`, and it is a CORRECTNESS setting here rather than a courtesy.
+
+      Playwright refuses to click an element until it is visible, enabled and STABLE — two animation
+      frames in the same place. The login button never became stable, so every click hung until the
+      hook's budget was gone, and the call log said so in as many words: "waiting for element to be
+      visible, enabled and stable".
+
+      This stack's own stylesheet answers the query — `@media (prefers-reduced-motion: reduce)` sets
+      `transition: none` on `.btn` and `.form-control` — so asking for it is asking the application
+      for the behaviour it already implements, not suppressing a check. It also means the suite
+      exercises the reduced-motion path, which nothing else here does.
+    */
+    reducedMotion: 'reduce',
+    /*
+      What a reverse proxy in front of the built server would set. See `PROTOCOL_HEADER` below for
+      why the server needs telling: without these it assumes `https`, and every form POST from this
+      `http` origin is refused as cross-site.
+    */
+    extraHTTPHeaders: {
+      'x-forwarded-proto': 'http',
+      'x-forwarded-host': `127.0.0.1:${PORT}`
+    },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     /*
@@ -180,7 +203,25 @@ export default defineConfig({
         // `adapter-node` reads both. Without ORIGIN it refuses form POSTs as cross-site.
         PORT: String(PORT),
         HOST: '127.0.0.1',
-        ORIGIN: `http://127.0.0.1:${PORT}`
+        /*
+          THE HARNESS PLAYS THE REVERSE PROXY THAT PRODUCTION HAS, and without it every form POST is
+          refused as cross-site.
+
+          `adapter-node` builds the request URL with `protocol_header ? headers[protocol_header] :
+          'https'` — it assumes HTTPS when nothing tells it otherwise, which is right, because the
+          only sane way to serve it is behind TLS. SvelteKit's CSRF check then compares the browser's
+          `Origin` (`http://127.0.0.1:5174`) against that self-origin (`https://127.0.0.1:5174`),
+          they differ, and the login POST comes back
+          `403 {"message":"Cross-site POST form submissions are forbidden"}`.
+
+          `ORIGIN` used to override this and is GONE in this version — the built server reads no such
+          variable; `kit.paths.origin` replaced it, and setting that would be a production config
+          change made for a test. So the harness does what a proxy does: names the header and sends
+          it (see `extraHTTPHeaders` above). Nothing is weakened — the check still runs, against the
+          truth.
+        */
+        PROTOCOL_HEADER: 'x-forwarded-proto',
+        HOST_HEADER: 'x-forwarded-host'
       }
     }
   ]

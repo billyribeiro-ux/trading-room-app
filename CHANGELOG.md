@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 00:05 UTC — The login page navigated in an infinite loop, and the browser gate proved it
+
+**Runtime impact: YES, and it is a repair.** A member arriving with a valid handoff landed on a page
+that re-navigated to itself **forever**. Fixed, and the whole room suite now passes: **7 of 7 in 35
+seconds**, up from 3 with 4 marked `fixme`.
+
+#### The defect, and the comment that predicted it
+
+`session/+page.svelte` strips the JWT from the address bar after entry — correct, and its docblock
+argues the case well. It also contained this, about its own termination:
+
+> *"the effect READS `page.url` and the shallow navigation WRITES it, so it re-runs itself exactly
+> once. The `has('jwtSite')` guard is what terminates it… The guard is load-bearing, not defensive;
+> delete it and this spins."*
+
+Every sentence was true of `replaceState`, which is what the code used until the SvelteKit 3
+migration on 2026-08-13. **It is not true of `goto(…, { shallow: true })`, which does not update
+`page.url`** — a shallow navigation deliberately leaves the loaded URL alone, because no load ran. So
+the guard re-read the original address every time, found the token still there, and navigated again.
+
+**The migration broke the very termination condition its own comment documented.** Measured with a
+`framenavigated` listener: the same URL fourteen times in seven seconds and climbing. After the fix:
+**three** — the load, and one shallow replace.
+
+A plain `let` latch now terminates it, and it must stay a plain `let`: `$state` would make reading it
+a dependency, and the effect would re-run on the very write meant to stop it. `page.url` is still read
+first, so a genuinely new address still re-enters — the latch guards the loop, not the feature.
+
+#### Three more findings on the way to it
+
+* **My own coverage was hollow, and my own gate caught it.** Every spec in the room group reads the
+  rendered page — not empty, no `undefined`, no sideways scroll — and **an error page satisfies all
+  three**. The console-error spec noticed a 403 the others were happily asserting against. The setup
+  now asserts `status === 200` before anything else runs.
+* **`adapter-node` assumes HTTPS.** The built server derives the request URL with
+  `protocol_header ? … : 'https'`, so SvelteKit's CSRF check compared `https://127.0.0.1:5174`
+  against the browser's `http://…` and refused every form POST as cross-site. `ORIGIN` used to
+  override that and **is gone in this version** — the built server reads no such variable. The
+  harness now sends `x-forwarded-proto` and the server is told to read it, which is what a reverse
+  proxy does in production. Nothing is weakened: the check still runs, against the truth.
+* **A failed request reaches the console with no URL.** "Failed to load resource: … status of 503"
+  names nothing, so it can only be filtered by status — the blanket this suite exists to avoid. The
+  response listener owns resource failures now, because it can name the address; the one exclusion is
+  `503 /api/media/grant`, one path and one status, because there is no SFU in this job and a 503 from
+  anywhere else must still fail.
+
+#### Verified
+
+Room e2e **7 passed / 0 skipped in 35.1s** · **negative control run**: removing the latch reproduces
+the hang (1 failed, 3.2 minutes) and restoring it returns to 35.5s green · `svelte-check` 0/0 ·
+`eslint` clean in both apps · room `pnpm test` **187 files / 3,089 tests**, 1 skipped · controller
+**101 / 1,034**.
+
+That is the whole room suite green against a real browser, and it took four production defects out of
+this application in a single evening — three of them shipped, one of them mine.
+
 ### 2026-08-28 22:55 UTC — A browser drives the room, and finds two defects that were shipping
 
 **Runtime impact: YES, and it is a repair.** Two production defects, both fixed. The room's own page
