@@ -2135,10 +2135,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     WHAT THIS SWEEP IS NOT. It is not a claim that any of these files is the right size. The three
     worth naming are `AlertChatArea` (1,113 — the alerts/chat column, and the extraction the
     `buildMessageChrome` note has been pointing at since it was written), `RoomMessage` (949 — the
-    component that type exists to serve) and `RoomNavbar` (922 — still the ONE component in the
-    repository with neither a mount nor an SSR render test, which `todo-next.md` has carried for
-    weeks). Each of those is its own change with its own evidence, and none is bundled here: a sweep
-    that also refactored would be impossible to review.
+    component that type exists to serve) and `RoomNavbar` (922). Each of those is its own change
+    with its own evidence, and none is bundled here: a sweep that also refactored would be
+    impossible to review.
+
+    CORRECTION, 2026-08-28: this paragraph first called `RoomNavbar` "the ONE component with neither
+    a mount nor an SSR render test, which `todo-next.md` has carried for weeks". **That was false.**
+    `room-navbar-render.test.ts` and `room-navbar-contract.test.ts` both existed, and `TODO.md:679`
+    said so; `todo-next.md` carries the stale line and it was believed rather than checked. It is
+    corrected in place rather than deleted, because a wrong claim that simply disappears teaches
+    nobody why it was made. The navbar's real gap was a MOUNT test, and
+    `components/RoomNavbar.svelte.test.ts` closed it.
   */
   {
     file: 'lib/components/AlertChatArea.svelte',

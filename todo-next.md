@@ -37,7 +37,7 @@ this file says which, and no claim about them should be read into it.**
 | `notes/NoteEditor.svelte` | 1,517 | `app-notes` |
 | `PresentationArea.svelte` | 1,123 | `as-split-area.presentation-box` |
 | `RoomMessage.svelte` | 936 | `app-st-message` / `app-st-compactmessage` |
-| `RoomNavbar.svelte` | 904 | `nav.mainAppNav` |
+| `RoomNavbar.svelte` | 922 | `nav.mainAppNav` — **covered**: SSR by `room-navbar-render.test.ts`, source by `room-navbar-contract.test.ts`, and client `mount` by `components/RoomNavbar.svelte.test.ts` since 2026-08-28. This table's line count was also stale by 18. |
 | `AlertChatArea.svelte` | 873 | `as-split-area.alert-chat-box` |
 | `PollPanel.svelte` | 804 | `app-poll-modal` |
 | `EmojiPicker.svelte` | 709 | `emoji-mart` |

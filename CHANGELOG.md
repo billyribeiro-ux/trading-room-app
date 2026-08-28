@@ -33,6 +33,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-28 13:20 UTC — A mount test for the navbar, and a correction I owed twice
+
+**Runtime impact: NO.** One new test file, plus corrections in four places.
+
+**THE CORRECTION FIRST, because two entries below carry the wrong claim.** The 12:25 and 12:50
+entries, and the ceiling sweep's own comment, all called `RoomNavbar` *"the one component in the
+repository with neither a mount nor an SSR render test"*. **That is false.**
+`room-navbar-render.test.ts` (SSR) and `room-navbar-contract.test.ts` (source) both already existed,
+and **`TODO.md` row AE said so in as many words**. `todo-next.md` carries the stale line, and it was
+read, believed and repeated three times rather than checked with an `ls` that took one second.
+
+That breaks the first rule this repository has: evidence is READ, never recalled. It is corrected in
+`source-size-contract.test.ts`, in the new test's own header, in `TODO.md` and in `todo-next.md` —
+**in place rather than deleted**, because a wrong claim that simply disappears teaches nobody why it
+was made. The two entries below are left standing; this one is the correction, which is how a dated
+log stays honest.
+
+**What is genuinely new, stated accurately.** Both existing files use `render` from `svelte/server`.
+SSR emits the first frame and nothing after it: no handler runs, no `{@attach}` fires, and **no
+`$bindable` write can happen**. So `components/RoomNavbar.svelte.test.ts` is the first CLIENT MOUNT
+of this component, and everything in it is a write or a transition that SSR structurally cannot see.
+
+**The first assertion is the defect the component's own docblock says the extraction nearly
+shipped.** `sidebarOpen` and `mobileNavOpen` are `$bindable()`; as plain props the hamburger would
+have animated while the sidebar it controls — a sibling component reading the page's value — never
+moved. `svelte-check` is silent on that and so was the suite; what caught it originally was a source
+assertion looking for a handler in the wrong file, which is to say luck. The test asserts on the
+PAGE's value and deliberately **not** on the icon: a test that only checked the arrow flipped would
+pass under exactly the bug being guarded against.
+
+**Also covered, and each with a negative control seen RED:** the three-way recording indicator and
+the ORDER of its branches (a paused recording must read `[ REC PAUSED]` rather than falling through
+to the live badge — invisible to a source assertion); `blinkingRec` landing on the `[ REC ]` item,
+which is the divergence the prop's docblock records; the recording tooltip rendered **verbatim**,
+including empty, because `dontShowRecInfoToUsers` is resolved by `RoomGates` and this bar must not
+acquire its own opinion; and `hideWebcamForRoom`, the fifth term of the webcam gate.
+
+**Six negative controls seen RED**, both `$bindable`s among them.
+
+**One instrument mistake worth recording.** The first draft found the webcam control by filtering
+`a,span,button` on a lower-cased title substring, and found nothing — the control is an `<li>`. A
+selector that guesses the element reports "hidden" for a control that is right there, which is a
+false GREEN in the other direction. It asserts on the captured title exactly now.
+
+**Verified:** room 165 files / 2,598 tests (1 skipped) · `svelte-check` 0/0 across 1,291 files ·
+eslint and prettier clean · both room gates green. No controller or runtime file changed.
+
 ### 2026-08-28 12:50 UTC — Three quarters of the components had no ceiling, and the list was the reason
 
 **Runtime impact: NO.** One test file. It is here because the previous entry named this as the

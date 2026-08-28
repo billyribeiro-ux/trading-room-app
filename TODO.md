@@ -263,6 +263,14 @@ part: `AlertChatArea` (1,113) and `RoomMessage` (949) had never had one either. 
 now how a component is ADMITTED, not how it gets covered. Three files are named as their own
 outstanding work rather than swept: `AlertChatArea`, `RoomMessage` and `RoomNavbar`.
 
+**A CORRECTION THAT BELONGS BESIDE THAT ROW.** The ceiling sweep and two CHANGELOG entries called
+`RoomNavbar` "the one component with neither a mount nor an SSR render test". **That was false.**
+`room-navbar-render.test.ts` and `room-navbar-contract.test.ts` both existed, and row AE below said
+so; `todo-next.md` carried the stale line and it was read, believed and repeated rather than checked
+with one `ls`. The navbar's real gap was a client `mount` — SSR runs no handler and no `$bindable`
+write — and `components/RoomNavbar.svelte.test.ts` closed it on 2026-08-28. Both trackers are
+corrected.
+
 **WIRE is down to ONE**, and it is `recsInRoom`, which is BLOCKED anyway — wire it with the
 Recordings tab, never before it. The section opened with twelve.
 
