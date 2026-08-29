@@ -344,7 +344,7 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     sitting in the same menu as `" Mute Microphone for all non-admins "`.
   */
   'get-my-token':
-    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button'
+    'ModalHost.svelte:3230 — INERT ON PURPOSE, and the reason changed on 2026-08-29 from "merely unbuilt" to a SECURITY divergence. The reference dialog (byte 2255348) renders the session-token global into a readonly input. This room CANNOT reproduce that without a regression: its session cookie is set httpOnly (server/auth.ts:91), so no script can read it today, and every occurrence of that global name in this repository is a QUOTATION of the reference inside a comment — the client holds no token at all. Building it would mean handing the server the job of putting an httpOnly value into the DOM, turning a cookie an XSS cannot read into a string it can, in a multi-tenant fintech room. The other half is not worth building alone: globals.sessionID is the room code, already visible in the address bar, so a dialog showing only that is a control whose only effect is repeating what the URL says. Unblocking this needs a token that is SAFE to show — a short-lived, narrowly-scoped support identifier minted for the purpose — which is a feature, not a port.'
 };
 
 /**

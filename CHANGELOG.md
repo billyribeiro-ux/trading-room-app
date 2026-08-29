@@ -33,6 +33,76 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 05:10 UTC — `get-my-token` is not "merely unbuilt"; building it would open the session cookie
+
+**Runtime impact: NO.** A tracker correction, a new gate, and one lint-config fix.
+
+#### The correction
+
+`TODO.md` row 4 called `get-my-token` *"fully evidenced at byte 2255348 and merely unbuilt"*, and its
+`INERT_ACTIONS` entry said the same. That reads as an invitation, and it is wrong in the direction
+that matters.
+
+The reference handler (bundle byte 2,255,348, read in full) opens a "Session Information" dialog
+rendering the session-token global into a **readonly `<input>` with a Copy button**. It can do that
+because its room and its site are one system and that value is already a plain global there.
+
+**This room cannot, and the evidence is unambiguous:**
+
+* the session cookie is set **`httpOnly: true`** (`lib/server/auth.ts`), so no script can read it;
+* **every** occurrence of the reference's session-token identifier in this repository is a
+  **quotation inside a comment** — the client holds no token at all.
+
+Building it would mean asking the server to put an httpOnly value into the DOM: turning a cookie an
+XSS cannot reach into a string it can, in a multi-tenant fintech room. The other half is not worth
+building alone — `globals.sessionID` is the room code, already in the address bar, so a dialog
+showing only that repeats what the URL says.
+
+**It stays inert, and the reason is now a security divergence rather than a to-do.** Unblocking it
+needs a token that is *safe* to show — a short-lived, narrowly-scoped support identifier minted for
+the purpose — which is a feature, not a port. Row 4 now says two controls are real work, not three.
+
+#### The gate, because a comment is what got this wrong
+
+`session-cookie-httponly-contract.test.ts` pins the two properties the decision rests on: the session
+cookie is still `httpOnly`, and no session token is named in **client** code outside a comment.
+
+Two drafts were needed, and the second exists because **a control did not fire**:
+
+* the first asserted `httpOnly: true` *anywhere* in `auth.ts` with `toContain('SESSION_COOKIE')` as a
+  vacuity guard. Renaming the constant to `SESSION_COOKIE_RENAMED` **still passed** — the substring
+  survives. Worse, an `httpOnly: true` on some *other* cookie would have satisfied it while the
+  session cookie was wide open;
+* the second slices the options object out of the session cookie's **own `cookies.set` call**, so the
+  flag is tied to the cookie it is about.
+
+The decoy-cookie case is now a control of its own, and it fails.
+
+#### One of my own strings broke the build, and the gate caught it
+
+Rephrasing the inert reason to avoid naming the identifier introduced `global's` — an apostrophe
+inside a single-quoted TypeScript string. **`svelte-check` went from 0 to 217 errors in one file.**
+Found and fixed in the same pass; recorded because the cause was a comment-avoidance edit, which is
+exactly the kind that looks harmless.
+
+#### The stray generated directory, fixed at the config rather than by hand
+
+`svelte-kit sync` writes its tree relative to the cwd it runs from, so a tool invoked from `src/`
+leaves one at `src/.svelte-kit` — which eslint then reads, failing on generated code nobody wrote.
+That happened **three times** tonight and was deleted by hand each time. `eslint.config.js` ignored
+`.svelte-kit/**`; it now ignores `**/.svelte-kit/**`.
+
+Verified in both directions: a stray generated tree is ignored, and a genuinely unused argument in
+real source still produces errors.
+
+#### Verified
+
+* **Four negative controls, each proved to have applied:** the cookie opened to script; a session
+  token named in client code; the `cookies.set` call renamed away; and `httpOnly: true` present on a
+  decoy cookie only — the last two being the cases the first draft passed.
+* Room **193 files, 3,140 passed, 1 skipped**; `svelte-check` **1,340 files 0/0**; `eslint` clean.
+* Controller **97 files, 1,024 passed, 21 skipped**.
+
 ### 2026-08-29 04:45 UTC — The duplication audit's verdict, and the blind spot it found while disproving itself
 
 **Runtime impact: NO.** One vacuity guard, one stale line reference.
