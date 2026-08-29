@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 02:35 UTC — NEW-TODO.md was scheduling five things that were already built
+
+**Runtime impact: NO.** Tracker corrections.
+
+**Landed in commit `1c1cc8d`**, whose message describes the comment-stripper fix instead — swept in
+by a `git add -A`. Named here because that is how it will be found later, which is what this file's
+own header asks for.
+
+#### PART 5 was a stale copy of a document that was not stale
+
+Its three sections — Alert Filter, Alert Labels, Alert Scheduler — were a **summary** of
+`docs/decoded/alert-scheduler-filter-labels.md`, which carries the same evidence (byte offsets,
+verbatim strings, both 2026-08-15 corrections) roughly **five times over**. Two places recording one
+thing is how one of them goes stale, and it is precisely what happened: **§5.3 still carried a 🔴 and
+still said *"`hasAlertScheduler` … is NOT in `room-settings-schema.ts`"***, while the entitlement was
+`wired: true` and all four modules had shipped.
+
+All three are built, and the sections are removed the way this file already removes built items:
+
+| | shipped as | contract |
+| --- | --- | --- |
+| 5.1 Alert Filter | `alert-filter.ts`, persisted via `savePreference('alertFilterFor')`, consumed in `alerts.svelte.ts`, `alerts-pane.ts`, `create-room.svelte.ts` | `alert-filter-contract.test.ts` — 26 tests |
+| 5.2 Alert Labels | `alert-labels.ts`, rendered by `RoomMessage.svelte`, configured in `ModalHost.svelte` | `alert-labels-contract.test.ts` |
+| 5.3 Alert Scheduler | `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte`, sweeper `startAlertScheduler`; `hasAlertScheduler` `wired: true` | `scheduled-alert-contract.test.ts` — with 5.2, 50 tests |
+
+**The decoded document is the spec; this file tracks what is left to build, and none of this is.**
+
+#### The suggested order was scheduling built work
+
+Items 1, 4 and 7 named *1.1 + 1.2* (PART 1 has recorded them CLOSED since 2026-08-27), *5.1*, *5.2*
+and *5.3*. Removed and renumbered — five of eight entries were work already done, **which is how a
+plan outlives the work it was planning.**
+
+#### "Evidence, all committed" — half of it is not
+
+Measured with `git ls-files` and on disk:
+
+| | tracked | present |
+| --- | --- | --- |
+| `apps/room/docs/source-v4-2026-08-15/` | **5 files** | yes |
+| `v5.md` | yes | yes |
+| `apps/room/scripts/collect-app-versions.js` | **0** | **no** |
+| `apps/room/docs/source/` | **0** | **no** |
+
+Both absences are deliberate — `.gitignore` excludes them because the collectors reach the reference
+application and the captures carry live-room personal data, and this repository is public. The
+heading was the problem: *"all committed"* is read as **a clone has these**, and a clone has half.
+What a clone holds is the v4 bundle and `v5.md`; anything reconstructed from a DOM capture needs the
+author's machine — which is the same fact that keeps **42 evidence-bound test files excluded from
+every run here**.
+
+#### Verified
+
+* All three features confirmed shipped by file and by consumer before their sections were removed;
+  their contract tests run green (26 + 50 tests).
+* `hasAlertScheduler` read from `room-settings-schema.ts` as `wired: true`.
+* Every tracked/present claim in the evidence table measured with `git ls-files` and a disk check.
+* `doc-citation-contract` and `todo-next-coverage-contract` still green over the edited file.
+* NEW-TODO.md: 316 → 276 lines.
+
 ### 2026-08-29 02:40 UTC — `accept="image/*"` opened a comment that ate a real render, and a false claim I had just written
 
 **Runtime impact: NO.** A test-helper fix, a tripwire, and two corrections to claims of mine.
