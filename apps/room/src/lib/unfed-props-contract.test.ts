@@ -195,16 +195,6 @@ const DELIBERATELY_UNSUPPLIED: Readonly<Record<string, Readonly<Record<string, s
       'own `display: none`, so the default is the answer; the prop exists for a captured modal that ' +
       'carries its own closed geometry, and none does yet.'
   },
-  'lib/components/SettingOption.svelte': {
-    showState:
-      'appends the current value to the label. No captured settings row does this; the prop is the ' +
-      'affordance, and turning it on without a capture that shows it would be inventing copy.'
-  },
-  'lib/components/ToggleRow.svelte': {
-    detail:
-      'the `<small>` under a toggle’s label. Captured rows carry it only where the manage page has ' +
-      'help text, and this room’s toggles are the ones that do not.'
-  }
 };
 
 describe('every component prop is supplied by somebody, or explained here', () => {

@@ -2900,11 +2900,6 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the zoom and pan controls over a shared screen'
   },
   {
-    file: 'lib/components/SettingOption.svelte',
-    max: 71,
-    why: 'one labelled setting row in the session-control modal'
-  },
-  {
     file: 'lib/components/SpeechRecoOverlay.svelte',
     max: 254,
     why: 'the captions overlay and its transcript controls'
@@ -2923,11 +2918,6 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/components/ToastHost.svelte',
     max: 65,
     why: 'the toast container'
-  },
-  {
-    file: 'lib/components/ToggleRow.svelte',
-    max: 94,
-    why: 'one labelled switch, used across the settings surfaces'
   },
   {
     file: 'lib/components/VideoPlayer.svelte',

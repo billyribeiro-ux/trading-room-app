@@ -33,6 +33,75 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 01:31 UTC — Two components nothing renders, and the gate that will not let a third happen
+
+**Runtime impact: NO.** Both deleted components were unreachable from every route, so nothing the
+site serves changes. The new file is a test.
+
+#### What was found
+
+`SettingOption.svelte` (70 lines) and `ToggleRow.svelte` (93 lines) are rendered by **nothing**. Not
+by a component, not by a route, not imperatively — the only files in the repository that name either
+one are two TEST CATALOGS.
+
+That is what makes this worth an entry rather than a quiet deletion. Both were mentioned by
+`source-size-contract.test.ts`, which capped their length, and by `unfed-props-contract.test.ts`,
+which explained their unsupplied props. Every automated reading of this repository therefore
+reported them as covered code with an argued design, and both descriptions were false:
+
+| catalog | claim | measured |
+| --- | --- | --- |
+| `source-size-contract.test.ts` | `SettingOption` is *"one labelled setting row in the session-control modal"* | in no modal; `ModalHost.svelte` hand-rolls those rows itself |
+| `source-size-contract.test.ts` | `ToggleRow` is *"one labelled switch, used across the settings surfaces"* | on no surface |
+
+They match nothing in the reference either, and that was checked before deleting rather than
+assumed: `setting-option` and `toggle-row` each appear **0 times** across 2,891,205 bytes of
+`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` and 444,793 bytes of
+`styles.ee2a710065b60389.css`, against a **control of 54 hits** for `form-check-input` in the same
+stylesheet. All three artifacts verified against `sha256sums.txt` at the time of reading.
+
+#### Why nothing caught it
+
+`unfed-props-contract.test.ts` can see this case and deliberately steps around it, at line 214:
+
+> `// A component nothing renders is a different problem, and not this file's.`
+
+It was right — a props gate is not a reachability gate — but nothing else picked the problem up, so
+a component with zero call sites was skipped by the one sweep that visited it.
+
+#### The gate
+
+`src/lib/orphan-component-contract.test.ts` walks the render graph from the ROUTE files
+(`+page`/`+layout`/`+error`, which SvelteKit renders by routing) and fails on anything it cannot
+reach. Reachability rather than "has at least one call site", because a one-hop check passes happily
+on an orphaned CLUSTER — two dead components that render each other vouch for one another forever.
+
+Three properties make it a gate rather than a guess:
+
+* **Comments are stripped before matching.** The docblocks here name almost every component in the
+  tree; a file that merely discusses `<ToggleRow>` must not thereby render it. This repository has
+  been bitten five times by an assertion that read prose as code.
+* **The soundness condition is asserted, not assumed.** The walk finds every render only while every
+  render is a `<Name` tag, so the file also pins that no `<svelte:component>` and no `mount()` exists
+  in product source. Introduce one and that pin fails FIRST, naming the construct — instead of a live
+  component quietly reading as orphaned later.
+* **Fixtures are a catalog with reasons, not a filename pattern.** `*Probe.svelte` would be a rule
+  nobody agreed to, and it would absolve the next dead component that happened to be named one.
+
+#### Verified
+
+* The gate seen **RED against reality** before anything was deleted, naming exactly
+  `SettingOption.svelte` and `ToggleRow.svelte`, with its four soundness assertions green.
+* Two **synthetic negative controls**, each seen red and then reverted: a brand-new empty orphan
+  component (caught by name), and a `<svelte:component>` added to `ToastHost.svelte` (caught by the
+  soundness pin, which named `ToastHost`).
+* `vitest run orphan-component-contract unfed-props-contract source-size-contract` — 3 files, **386
+  tests, all passing** after the deletions.
+* `svelte-check` — **1,332 files, 0 errors, 0 warnings.**
+* **Not run, and stated rather than implied:** the full gate. Three test files and two component
+  deletions were touched; per `CLAUDE.md`'s test-what-changed table the full suite runs once,
+  immediately before the push.
+
 ### 2026-08-29 01:20 UTC — A security review of the branch, and the dead feature it found
 
 **Runtime impact: YES, and it is a repair.** *"Play chat message sound for"* — the setting an owner
