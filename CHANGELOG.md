@@ -33,6 +33,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 19:00 UTC — Two unbuilt reference surfaces, found by arithmetic instead of by luck
+
+**Runtime impact: NO.** One gate, two findings recorded, no code changed.
+
+#### How `.debug-area` was found, and why that was not good enough
+
+`.debug-area` sat in `app.css` with two rules and no element wearing them for the entire port. It was
+the captured class for the Debug Log textarea, and the CSS was the **only trace** that the feature
+was missing. Finding it required noticing a stylesheet rule while building something else.
+
+`CLAUDE.md` states the rule in one direction — *"No `.flipped` class with no CSS"* — and the inverse
+is the same defect and far harder to see: CSS for a class no element wears compiles, lints,
+type-checks, and is invisible to every other gate here.
+
+#### Measured: 200 class selectors in `app.css`, **29 with no wearer**
+
+The corpus of possible wearers is every `.svelte` and every non-test `.ts` under `src/` — test files
+excluded, and only test files, because a class named in an assertion is not a wearer and counting one
+would let a deleted control keep its styling alive through the test that mourns it.
+
+They split cleanly, and the split is what makes each actionable:
+
+| | count | meaning |
+| --- | --- | --- |
+| **captured** | 14 | the reference's own sheet has the class, so the rule is waiting for markup |
+| **ours** | 15 | invented pre-decomposition panel names that nothing will ever wear |
+
+#### The two findings
+
+**`#user-modal` is missing four affordances.** `edit-user-avatar-options`,
+`remove-profile-picture-btn`, `chat-stars` and `tagline` all carry the Angular component id
+`ng-c1441935951` — which *is* the user-info modal this room renders. So the modal is built and four of
+its controls are not. `remove-profile-picture-btn` is the other half of the feature built earlier
+today: **a presenter can set an avatar and cannot clear one.**
+
+**A microphone-test surface with five states** — `mic-status-idle` / `testing` / `success` /
+`no-audio` / `error`, all `ng-c2606333922`, with no counterpart here at all.
+
+#### Nothing was deleted, deliberately
+
+Removing the fifteen invented rules changes nothing observable — which is both the argument for doing
+it and the reason it is not in the commit that measured them. `app.css` is read by
+`dump-contract.test.ts` and the capture verifiers, and a bulk stylesheet edit landing beside a
+feature is how a change gets attributed to the wrong commit.
+
+#### The gate
+
+Three states and no fourth, the shape that worked for images: every class is worn, or catalogued with
+a reason, or the build fails. The `captured` flag is **measured against the captured sheets rather
+than trusted**, because getting it backwards would file a missing feature as dead code. An entry that
+gains markup fails until it is deleted — the same declaration `INERT_ACTIONS` treats as done.
+
+**Five negative controls seen RED**: a new orphan added to `app.css`; a catalogued orphan given
+markup; a `captured` flag set wrongly; the wearer matcher broken (the vacuity floor); an entry for a
+class `app.css` no longer declares. A sixth attempt **did not fire and was my own mutation missing
+its anchor** — re-run against the real text, it fired.
+
+**Verified:** `format:check`, `eslint`, **199 files / 3,203 tests green**.
+
 ### 2026-08-29 18:20 UTC — `upload-profile-picture`, and the tenancy check every command before it got for free
 
 **Runtime impact: YES.** A presenter can set a member's avatar. **Zero inert controls now represent unbuilt work.**
