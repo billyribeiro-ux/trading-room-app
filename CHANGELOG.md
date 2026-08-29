@@ -33,6 +33,111 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 23:20 UTC — Two of the last three "missing surfaces" were never surfaces, and the third was the wrong one
+
+**Runtime impact: NO in effect, YES in the stylesheet.** Two rules were deleted from `app.css`
+(`.chat-stars`, `span.chat-stars`, `#user-modal .tagline`). No element in this room wore any of
+them, and no element in the reference wears them either, so nothing renders differently. Everything
+else here is a test and two trackers.
+
+#### The premise that was never checked
+
+`orphan-style-contract.test.ts` catalogues every class `app.css` styles that nothing wears, split by
+whether a captured stylesheet has the class. `captured: true` was being READ as *"the rule is
+waiting for markup"* — a feature to build — and `TODO.md` row AJ carried two entries upward on
+exactly that reading: `chat-stars`, *"a per-member rating nothing in this room reads or writes"*, and
+`tagline`, *"which needs a column"*.
+
+**A stylesheet can carry a rule the application never renders.** That is the very defect this gate
+exists to catch, and there was no reason to assume the reference was free of it.
+
+Measured across BOTH pinned bundles — v4 `main.d1d09071be31f1ba.js` and v3 `main.99a5781d1d7a7775.js`
+— `chat-stars` occurs 12 times and `tagline` once, and **all 26 occurrences are immediately followed
+by `[_ngcontent-%COMP%]`**: compiled Angular CSS selectors, zero of them strings in a const table.
+The full 131-entry const table of `app-user-info-modal`, parsed at byte 2,087,741, holds neither
+name. The global `styles.ee2a710065b60389.css` holds neither.
+
+**The star rating is real and this room already renders it.** It wears three OTHER classes — consts
+60/61/62, `stars-container` / `stars-icon` / `stars-num` — at `ModalHost.svelte` and twice in
+`RoomMessage.svelte`. `chat-stars` is the PREDECESSOR's name for the same badge:
+`ptr1-DECODE.md:5289` records `09.css:1160  .chatStars { … vertical-align: text-top }` and
+`todo-next.md:1145` records what wore it, `<img class="chatStars" src="/public/images/<years>.png">`,
+the tenure badge. v4 kept the rule, kebab-cased and still carrying `vertical-align: text-top`, and
+re-implemented the badge. **This room copied in a rule that had been dead upstream for a whole major
+version and then filed it as a feature to build.** `tagline` is the same shape with less of a trail:
+the FIELD is real — it is on the login wire and in the roster row — but the predecessor rendered it
+as `<small class="text-muted user-info-block">`, and no capture held here shows anything wearing
+`.tagline`.
+
+`renderedUpstream` is now a MEASURED field on every catalog entry, asserted against the pinned v4
+bundle on every run, so "captured" can never again be read as "pending". The predicate requires the
+class to be a string INSIDE AN ARRAY — the shape of a const-table entry — because bare containment
+matched `{name:"mid"}` in the bundled sdp parser, which is a library property and not a class.
+
+#### A third blindness in the same matcher, on the same component, eleven lines from the second
+
+`mid` was catalogued as *"a captured layout name with no counterpart in this decomposition"*. It is
+worn, on the microphone level bar in `ModalHost.svelte`, with `low` and `high` beside it and the
+reference's own three thresholds:
+
+```svelte
+class={['volume-bar-fill', { low: micLevel <= 30, mid: micLevel > 30 && micLevel <= 70, high: micLevel > 70 }]}
+```
+
+The literal matcher missed it **for one character**. Its boundary sets admit the punctuation a class
+sits between in an attribute or a clsx array, and an object key is followed by a COLON, which was in
+the leading set and not the trailing one.
+
+`class` takes an object or array since Svelte 5.16 and the official guidance (`svelte/class`, read
+today) is to prefer it over `class:` — so the idiomatic conditional class in this codebase is a name
+that appears only as an object key, and the gate could not see any of them. `isWornAsClassKey` reads
+`class={…}` VALUES only, extracted with a string-aware brace walker because the value is arbitrary
+JavaScript. **Not by adding `:` to the boundary set**, which would let every options bag in the room
+vouch for a class named `title` or `id` — the gate would keep passing and stop measuring.
+
+That is the third way this matcher has answered "no" for the wrong reason, after the five
+`mic-status-*` classes it filed as an entirely missing surface. Two of the three landed on the same
+component.
+
+#### What the last entry actually is, and it is not what the consts suggested
+
+`smallAvatarImg` is the one entry measured as both captured and rendered upstream. Its neighbouring
+consts read as a followed-users list — 93 a `col` scrolling at `max-height:300px`, 96
+`fa-plus-circle`, 99 `fa-minus-circle`, the follow-chat colour inputs a few entries later — and that
+reading was **wrong**, which is the fourth wrong guess made from a const table alone in two days.
+
+Reading the TEMPLATE settles it. `fTe` @ 2,064,959 is one row of the **per-user ADMIN NOTES** list on
+`#user-modal`'s notes tab: the avatar, then `" [" (date | short) "] " name ": " note`, then a
+`fa-minus-circle` calling `deleteNode(note, $index)`. `mTe` wraps them and adds " Add Note ".
+
+**This room renders that tab and only its FALSE branch.** `{#if !canManageNotes}` — upstream's `pTe`
+password prompt — has no `{:else}`, so a presenter who clears the password gets an empty panel. The
+gate itself was fixed earlier the same day; it opens onto nothing. Filed as `TODO.md` row AK, with
+its addressing (by ordinal, like the Q&A thread, for the same reason: the rows have no id) and its
+dependency on row 9's `userInfo` frame, which carries `notesArr`.
+
+The follow feature it was mistaken for is largely BUILT here — `managed-users.svelte.ts`,
+`followChatStyle`, the five colour inputs and the sound gate, `#followedUsersModal` worn — and its
+own avatar is sized by a descendant rule rather than that class.
+
+#### Verification
+
+Five negative controls, each seen RED:
+
+1. Deleting the `mid:` key from the level bar → `mid` reported as an uncatalogued orphan.
+2. `smallAvatarImg` catalogued `renderedUpstream: false` → *"catalogued false, measured true"*.
+3. `chat-header` catalogued `renderedUpstream: true` → *"catalogued true, measured false"*.
+4. Restoring a `.chat-stars` rule to `app.css` → uncatalogued, and *"is dead upstream too; app.css
+   must not declare it again"*.
+5. **The region restriction, proved load-bearing rather than argued.** `.refreshAll` added to
+   `app.css` — a name that is an object key in this codebase and never a class — fails as shipped
+   and PASSES once `isWornAsClassKey` is widened from `class={…}` values to the whole corpus. The
+   first two candidate probes (`.title`, then a scan for keys the literal matcher already sees)
+   found nothing, which is how the third was chosen; a control that cannot fire is not a control.
+
+`orphan-style-contract.test.ts` 6 passed. The catalog is FOUR entries: one surface to build, three
+carried rules. Row AJ is closed.
+
 ### 2026-08-29 22:40 UTC — Two of `#user-modal`'s four missing affordances were one control, and it corrected the one already built
 
 **Runtime impact: YES.** Any member can now change their own profile picture from the user modal —
