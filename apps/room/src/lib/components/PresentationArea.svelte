@@ -711,6 +711,7 @@
                       {doNotDisturbOn}
                       {bufferSizeLevel}
                       {onBufferSizeChange}
+                      {menus}
                     />
                   </div>
                 </div>

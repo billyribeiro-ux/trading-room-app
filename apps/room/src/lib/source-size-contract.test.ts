@@ -513,7 +513,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       cannot have this bug at all. The full account is at the call site and in `app.html`'s sibling
       finding.
     */
-    max: 1426,
+    /*
+      1426 -> 1428, 2026-08-29: two lines, `open` and `ontoggle` on `ScreenVolumeControl`, whose
+      dropdown could not be opened at all. See `bootstrap-dropdown-contract.test.ts`.
+    */
+    max: 1428,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1357,7 +1361,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       wiring and the local `showPositions`, which is local because upstream's `globals.showPositions`
       has exactly three readers and all three are in this column.
     */
-    max: 958,
+    /*
+      958 -> 959, 2026-08-29: one line, `{menus}` forwarded to `StreamingView` so its buffer-size
+      dropdown can open at all. See `bootstrap-dropdown-contract.test.ts`.
+    */
+    max: 959,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -1733,8 +1741,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/menus.svelte.ts',
-    max: 187,
-    why: 'the eleven floating menus and the two closers that deliberately differ'
+    /*
+      187 -> 219, 2026-08-29, for the two dropdowns that could not be opened.
+
+      `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
+      JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
+      volume menu or the streaming view's buffer menu. Seventeen other dropdowns had already been
+      hand-driven from `RoomMenus`; these two were the two that were missed, and one of them hid
+      three `setBufferSize` handlers that a repair the day before had made callable without
+      noticing nothing could reach them.
+
+      Here it is two flags, their getters, two `set` branches and two lines in each closer — the closers being exactly why these live on this class rather than as private `$state` in two components.
+
+      The prose that would otherwise have landed here was moved into
+      `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
+      nineteenth dropdown arrives without a way to open it.
+    */
+    max: 219,
+    why: 'the thirteen floating menus and the two closers that deliberately differ'
   },
   {
     file: 'lib/room/derived-return-probe.svelte.ts',
@@ -2973,8 +2997,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ScreenVolumeControl.svelte',
-    max: 197,
-    why: 'the per-screen volume slider'
+    /*
+      197 -> 228, 2026-08-29, for the two dropdowns that could not be opened.
+
+      `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
+      JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
+      volume menu or the streaming view's buffer menu. Seventeen other dropdowns had already been
+      hand-driven from `RoomMenus`; these two were the two that were missed, and one of them hid
+      three `setBufferSize` handlers that a repair the day before had made callable without
+      noticing nothing could reach them.
+
+      Here it is an `open` prop and an `ontoggle`, the trigger wrapped onto six lines to carry them, the class turned into an expression, and a handler on the close control inside the heading — which had also never done anything.
+
+      The prose that would otherwise have landed here was moved into
+      `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
+      nineteenth dropdown arrives without a way to open it.
+    */
+    max: 228,
+    why: 'the per-screen volume slider and the dropdown that now opens it'
   },
   {
     file: 'lib/components/ScreenZoomControls.svelte',
@@ -2993,7 +3033,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/StreamingView.svelte',
-    max: 561,
+    /*
+      561 -> 592, 2026-08-29, for the two dropdowns that could not be opened.
+
+      `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
+      JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
+      volume menu or the streaming view's buffer menu. Seventeen other dropdowns had already been
+      hand-driven from `RoomMenus`; these two were the two that were missed, and one of them hid
+      three `setBufferSize` handlers that a repair the day before had made callable without
+      noticing nothing could reach them.
+
+      Here it is the `menus` prop and its import, the trigger, the class expression, and three entries that each grew from one line to four because selecting a level now closes the menu — which Bootstrap used to do.
+
+      The prose that would otherwise have landed here was moved into
+      `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
+      nineteenth dropdown arrives without a way to open it.
+    */
+    max: 592,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {

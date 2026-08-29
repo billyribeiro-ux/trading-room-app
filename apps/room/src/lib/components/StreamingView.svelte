@@ -22,6 +22,7 @@
    *    separates them, and conflating the two turns one bad segment into a permanent downgrade.
    *  - Volume is read from the viewer's own preferences at attach time, not defaulted to 1.
    */
+  import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import { onDestroy } from 'svelte';
   import type Hls from 'hls.js';
   import { mtxPlaylistUrl, type MtxStream } from '#lib/mtx-streams.js';
@@ -53,6 +54,14 @@
     bufferSizeLevel?: number;
     /** `appService.setPreference('bufferSizeLevel', e)` — persists AND reloads the stream. */
     onBufferSizeChange?: (level: number) => void;
+    /**
+     * The room's dropdown state, for the buffer-size menu.
+     *
+     * PASSED SINCE 2026-08-29, finishing the repair the note above started: that one fixed the
+     * three entries, which were calling `undefined?.()`, and could not see that the menu holding
+     * them never opened. Two layers of one control, each dead for a different reason.
+     */
+    menus: RoomMenus;
   }
 
   let {
@@ -65,7 +74,8 @@
     audioVolume,
     doNotDisturbOn,
     bufferSizeLevel = 3,
-    onBufferSizeChange
+    onBufferSizeChange,
+    menus
   }: Props = $props();
 
   /* The four tuning constants, verbatim from the constructor (lines 21-24). */
@@ -389,12 +399,19 @@
   <div class="controls-container">
     <div class="buffer-size-dropdown">
       <div class="dropdown">
+        <!--
+          `data-bs-toggle="dropdown"` is the reference's whole mechanism and is INERT here, so the
+          three `setBufferSize` calls below had never been reachable. Kept because the markup is a
+          transcription; the open state comes from `RoomMenus`. See
+          `bootstrap-dropdown-contract.test.ts`.
+        -->
         <button
           type="button"
           id="bufferSizeDropdown"
           data-bs-toggle="dropdown"
-          aria-expanded="false"
+          aria-expanded={menus.streamBuffer}
           class="btn btn-sm dropdown-toggle"
+          onclick={() => menus.toggle('streamBuffer')}
         >
           <i class="fas fa-database"></i> Buffer: {bufferSizeName}
         </button>
@@ -405,19 +422,33 @@
           differently, while an anchor with no href is neither focusable nor operable by keyboard.
           Same substitution, same reasoning, as the restream cross-link in `ModalHost`.
         -->
-        <ul aria-labelledby="bufferSizeDropdown" class="dropdown-menu dropdown-menu-end">
+        <ul
+          aria-labelledby="bufferSizeDropdown"
+          class={menus.streamBuffer
+            ? 'dropdown-menu dropdown-menu-end show'
+            : 'dropdown-menu dropdown-menu-end'}
+        >
           <li>
-            <button type="button" class="dropdown-item" onclick={() => setBufferSize(1)}
+            <button type="button" class="dropdown-item" onclick={() => {
+                setBufferSize(1);
+                menus.set('streamBuffer', false);
+              }}
               >Normal</button
             >
           </li>
           <li>
-            <button type="button" class="dropdown-item" onclick={() => setBufferSize(2)}
+            <button type="button" class="dropdown-item" onclick={() => {
+                setBufferSize(2);
+                menus.set('streamBuffer', false);
+              }}
               >Increased</button
             >
           </li>
           <li>
-            <button type="button" class="dropdown-item" onclick={() => setBufferSize(3)}
+            <button type="button" class="dropdown-item" onclick={() => {
+                setBufferSize(3);
+                menus.set('streamBuffer', false);
+              }}
               >Maximum</button
             >
           </li>

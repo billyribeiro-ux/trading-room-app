@@ -33,6 +33,89 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 14:35 UTC — Two dropdowns that could never be opened, because Bootstrap's JavaScript is not here
+
+**Runtime impact: YES.** Two controls that did nothing now work; one gate; five argued ceiling raises.
+
+#### The defect
+
+This app renders Bootstrap's markup — `data-bs-toggle="dropdown"`, `.dropdown-menu`,
+`.dropdown-item` — because its components are transcriptions of a reference that shipped Bootstrap.
+**It ships no Bootstrap JavaScript.** `bootstrap` is not a dependency of any app here; what ships is
+the captured CSS, which says `.dropdown-menu { display: none }` with
+`.dropdown-menu.show { display: block }`. So `data-bs-toggle` is inert, and a dropdown opens only if
+something in this codebase adds `.show`. `RoomMenus` exists for exactly that.
+
+Nineteen `.dropdown-menu` elements were measured. **Seventeen drove `.show` from `RoomMenus`. Two did
+not**, and were therefore unopenable:
+
+* **`ScreenVolumeControl.svelte`** — the presentation area's volume dropdown. Its own docblock said
+  the menu is *"hidden by Bootstrap's own `.dropdown-menu { display: none }` until `.show` lands"* —
+  a true sentence about the reference and a false one about this app. The navbar's twin of the same
+  control had driven `menus.volume` all along. Its close control (the `×` in the heading) was dead
+  for the same reason, so even had it opened it could not have been shut.
+* **`StreamingView.svelte`** — the buffer-size dropdown. Its three `setBufferSize` entries had been
+  repaired on **2026-08-28**, when they were found calling `undefined?.()`. That repair could not see
+  that the menu holding them never opened. **Two layers of one control, each dead for a different
+  reason, found a day apart.**
+
+Nothing else here could see either: both type-check, both lint clean, `svelte-check` is silent on
+both, and every unit test around them constructs the component directly.
+
+#### The fix
+
+`screenVolume` and `streamBuffer` join `RoomMenus` — separate flags, because the navbar's volume
+dropdown and the presentation area's are two different menus and one flag would open both. Joining
+the class rather than growing a private `$state` each is also what makes the existing window-click
+and open-modal closers cover them for free. Selecting a buffer level closes its menu, which is what
+Bootstrap used to do.
+
+#### `bootstrap-dropdown-contract.test.ts`
+
+Asserts the **premise first** — no app depends on `bootstrap` — because if that changes, every rule
+in the file becomes wrong rather than redundant, and hand-driven `.show` would fight the real thing.
+Then: every `.dropdown-menu` has a class that can carry `show`, and every dropdown trigger has a real
+handler. Those two catch the same defect from opposite sides — a menu that *can* show is still dead
+if nothing flips the flag.
+
+Scope is **measured, not assumed**: `data-bs-toggle` carries four values here — `dropdown` (21),
+`tab` (31), `modal` (16), `collapse` (1). Only the dropdown one was measured end to end, so only it
+is asserted. Tabs are driven by conditional `active` classes on real `<button onclick>` elements and
+modals by the project's own `Modal` component; asserting over those without the same work would be a
+claim, not a finding.
+
+Two controls seen RED: a `.dropdown-menu` reverted to a literal class, and a trigger stripped of its
+handler. The `note-dropdown-menu` boundary is asserted both ways — summernote's seven toolbar menus
+are excluded, and the fact that they still exist is asserted too, so the exclusion cannot quietly
+stop mattering.
+
+**Found while writing it:** the trigger check first flagged a third element, `PrivateChatPanel`'s
+active-tab header. That one is `data-bs-toggle="tab"` on a static header, and its sibling tabs are
+real `<button onclick>` elements — not a defect, and the reason the gate is scoped to `dropdown`.
+
+#### A mistake worth recording
+
+Running the negative controls, `git checkout` on two components **reverted the uncommitted fixes
+themselves**, and the "restored" run went red for the right reason but the wrong cause. This is the
+third time in this repository that mutate-then-restore has destroyed live work. The rule already
+written down — **commit first, then mutate** — was mine to follow and I did not. Both fixes were
+re-applied and re-verified.
+
+#### The ratchet
+
+Five raises, each argued in place: `menus.svelte.ts` 187 → 219, `ScreenVolumeControl` 197 → 228,
+`StreamingView` 561 → 592, `PresentationArea` 958 → 959, `+page.svelte` 1426 → 1428. The prose was
+first moved out of all five sites into the gate that enforces it — the extraction the ratchet asks
+for — and only the residue was paid for with a raise. `todo-next.md` restated: 27,331 → 27,396.
+
+**Verified:** the full room suite, 196 files / 3,156 tests green; `svelte-check` 1,343 files, 0
+errors, 0 warnings. **Not run and stated as such:** `screen-volume-contract.test.ts` is
+evidence-bound and excluded in this checkout, and my change breaks one of its assertions — the
+literal `class="dropdown-menu volumeControl"` is now an expression. That assertion was rewritten to
+pin both halves with the divergence recorded beside it, and the new form was checked by applying the
+test's own `stripComments` to the source; **the test itself could not be executed here** and will
+first run in CI.
+
 ### 2026-08-29 14:20 UTC — A broken image in the navbar, and the `<img>` rule CLAUDE.md names but nothing enforced
 
 **Runtime impact: YES.** One broken image replaced, three images given a reserved box, two new gates.

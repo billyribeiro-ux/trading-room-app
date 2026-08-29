@@ -268,7 +268,22 @@ describe('the menu reproduces its consts attribute for attribute', () => {
     expect(attributesOf(CONSTS[menu])).toEqual({ 'aria-labelledby': 'dropdownVolume' });
     expect(classesOf(CONSTS[menu])).toEqual(['dropdown-menu', 'volumeControl']);
     expect(controlMarkup).toContain('aria-labelledby="dropdownVolume"');
-    expect(controlMarkup).toContain('class="dropdown-menu volumeControl"');
+    /*
+      OUR MARKUP DIVERGES HERE, deliberately, since 2026-08-29 - the class is an expression rather
+      than a literal, and the two classes above are still exactly the reference's.
+
+      The const table one line up is the evidence and it is unchanged: upstream renders
+      `class="dropdown-menu volumeControl"` and lets BOOTSTRAP'S JAVASCRIPT add `.show` on the
+      trigger's click. This app ships no Bootstrap JavaScript - only its captured CSS - so
+      `.dropdown-menu { display: none }` never lifted and this dropdown COULD NOT BE OPENED AT ALL.
+      `.show` now comes from `RoomMenus`, which is what the other eight dropdowns in this room
+      already did and what the navbar's twin of this very control has always done.
+
+      Asserted as both halves so the reference's two classes still cannot drift, while the third is
+      pinned as conditional rather than as absent.
+    */
+    expect(controlMarkup).toContain("'dropdown-menu volumeControl show'");
+    expect(controlMarkup).toContain("'dropdown-menu volumeControl'");
 
     // The `h4`'s own text node, spaces included: `v(6, ' Volume ')`.
     expect(HELPERS).toContain("v(6, ' Volume ')");

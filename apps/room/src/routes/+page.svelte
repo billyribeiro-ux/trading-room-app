@@ -924,6 +924,8 @@
     onunmute={() => roomVolume.unmuteScreenAudio()}
     ontogglepresenter={(user) => roomVolume.toggleTalkingPresenterAudio(user)}
     onpresentervolume={(user, raw) => roomVolume.adjustPresenterVolume(user, raw)}
+    open={menus.screenVolume}
+    ontoggle={() => menus.toggle('screenVolume')}
   />
 {/snippet}
 
