@@ -457,6 +457,7 @@
   */
   const {
     prefs,
+    searchChat,
     roomVolume,
     roster,
     chat,
@@ -1212,6 +1213,7 @@
               onopenpoll={() => modals.openPollUI()}
               ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
               ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
+              onchatsearch={searchChat}
               ondetachalerts={() => alertsPane.detach()}
               onsavealerts={() => alertsPane.save()}
               onarchivealerts={() => alertsPane.archive()}
@@ -1339,7 +1341,12 @@
                 onstopreadinghistory={() => feedScroll.stopReadingHistory('extraChat')}
                 onscrolltobottom={(scroller) => feedScroll.forceChatToBottom(scroller)}
                 onprivatechat={() => privateChat.show()}
-                onsearch={() => modals.open('chat-logs')}
+                onsearch={() => chat.search.toggle('extra')}
+                searchOpen={chat.search.isOpen('extra')}
+                searchTerm={chat.search.term('extra')}
+                onsearchinput={(value) => chat.search.setTerm('extra', value)}
+                onsearchsubmit={() => searchChat('extra', chat.search.term('extra'))}
+                onsearchclear={() => chat.search.clear('extra')}
                 onsettings={() => modals.open('settings')}
                 onimageupload={() => composer.openImageUpload()}
                 onrte={() => composer.openExtraRTE()}

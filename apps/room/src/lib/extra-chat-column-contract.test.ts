@@ -220,9 +220,15 @@ describe('both columns share one pipeline, and that is the point', () => {
       A second derived would have been a second copy of merge, trim, hide, badge and the webinar
       filter — five steps that must agree, in two places that would drift.
     */
-    expect(feedsModule).toContain('chatMessagesFor(tab: ChatTab) {');
-    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.tab);');
-    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.extraTab);');
+    expect(feedsModule).toContain(
+      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+    );
+    expect(feedsModule).toContain(
+      'return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);'
+    );
+    expect(feedsModule).toContain(
+      'return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);'
+    );
   });
 
   it('the paging state is shared, because it is keyed by CHANNEL', () => {

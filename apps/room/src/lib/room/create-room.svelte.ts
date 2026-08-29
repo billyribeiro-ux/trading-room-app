@@ -1,3 +1,4 @@
+import { isHttpError } from '@sveltejs/kit';
 import type { PageData } from '../../routes/$types';
 import type { RoomSessionSettings } from '#lib/server/room-config-client.js';
 import type { SplitPair } from '#lib/room/split.svelte.js';
@@ -76,6 +77,7 @@ import {
   restartAudio
 } from '../../routes/presenter-commands.remote';
 import { sessionSendUrl, videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
+import { searchChatMessages } from '../../routes/log-pages.remote';
 
 import {
   deleteFile as deleteFileCommand,
@@ -146,6 +148,7 @@ import {
 } from '#lib/room/trade-alerts.svelte.js';
 
 import { RoomChat } from '#lib/room/chat.svelte.js';
+import { RoomChatSearch } from '#lib/room/chat-search.svelte.js';
 import { RoomMedia } from '#lib/room/media.svelte.js';
 
 import { RoomSplit, isRoomSplitDir, splitPairFromValue } from '#lib/room/split.svelte.js';
@@ -326,7 +329,12 @@ export function createRoom(deps: RoomDeps) {
   */
   const chat = new RoomChat({
     extraColumnEnabled: () => prefs.extraChatColumn,
-    autoSwitchToOffTopic: data.sessData?.autoSwitchToOfftopics === true
+    autoSwitchToOffTopic: data.sessData?.autoSwitchToOfftopics === true,
+    /*
+      `feeds` is declared below this call — the closure runs on a reader's keystroke, long after it
+      exists. The same forward reference `focusSessionNote` makes further down, for the same reason.
+    */
+    search: new RoomChatSearch({ ended: (column) => feeds.setChatSearchResults(column, null) })
   });
 
   /*
@@ -1118,6 +1126,52 @@ export function createRoom(deps: RoomDeps) {
     alertsLogKey: ALERTS_LOG
   });
 
+  /**
+   * `doChatLogSearch` — ask the server for the whole channel, and put the answer in front of the log.
+   *
+   * ## Why the term is not read from `chat` here
+   *
+   * It is passed in from the submit. Reading it back would make this a function of whatever the box
+   * holds when the promise settles, and a reader who keeps typing after pressing Enter would get
+   * results labelled with a term they have already changed.
+   *
+   * ## An empty term is a CLEAR, not a search
+   *
+   * `doSearchSubmit` returns early on an empty term (`if (!this.chatSearchTerm) return`) and
+   * `searchTermChanged` clears the results separately. Both paths end in the same place here, and
+   * routing them through `clearSearch` rather than through an empty query means no round trip for
+   * the commonest way a search ends.
+   *
+   * ## The failure is SHOWN
+   *
+   * A rejected search that silently left the log in place would be indistinguishable from a term
+   * that matched everything — the reader would read their whole log as the result. `RoomDialogs`
+   * carries the sentence, which is ours: upstream has no failure path here because its command is
+   * fire-and-forget over a socket.
+   */
+  function searchChat(column: 'main' | 'extra', term: string): void {
+    const channel = column === 'main' ? chat.tab : chat.extraTab;
+    if (!term.trim()) {
+      chat.search.clear(column);
+      return;
+    }
+    void searchChatMessages({ channel, searchTerm: term })
+      .then((rows) => {
+        /*
+          THE CHANNEL IS RE-CHECKED against the column's CURRENT tab before the rows are shown. A
+          reader can switch channels while the query is in flight, and `RoomChat` clears the search
+          on a switch — so without this, a late answer would repopulate a search the reader ended,
+          with another channel's messages. Dropping it is correct rather than defensive: the switch
+          already put the column back on its own log.
+        */
+        if ((column === 'main' ? chat.tab : chat.extraTab) !== channel) return;
+        feeds.setChatSearchResults(column, rows);
+      })
+      .catch((cause: unknown) => {
+        dialogs.alert = isHttpError(cause) ? cause.body.message : 'That search did not work.';
+      });
+  }
+
   /*
     WHICH OVERLAY IS SHOWING, in `#lib/room/modals.svelte.ts`.
 
@@ -1205,6 +1259,8 @@ export function createRoom(deps: RoomDeps) {
   */
   return {
     prefs,
+    /** `doChatLogSearch`, both columns. See the function for why the term is passed rather than read. */
+    searchChat,
     /*
       The ONE split reader. `promoteLegacySplitSizes` on the page takes this rather than declaring a
       second one — see the declaration above for what the page's own copy of it cost.

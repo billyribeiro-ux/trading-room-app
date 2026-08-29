@@ -24,6 +24,7 @@ import { RoomWebcams } from './webcams';
 import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
 import { RoomChatMute } from './chat-mute';
+import { RoomChatSearch } from './chat-search.svelte';
 import { RoomKicks } from './kicks';
 import { RoomPrivateCommands } from './private-commands';
 import { RoomManagedUsers } from './managed-users.svelte';
@@ -104,6 +105,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   recording: RoomRecording,
   roomEvents: RoomEventStream,
   chatMute: RoomChatMute,
+  chatSearch: RoomChatSearch,
   privateCommands: RoomPrivateCommands,
   kicks: RoomKicks,
   managedUsers: RoomManagedUsers,

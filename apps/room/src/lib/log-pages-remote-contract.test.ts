@@ -100,19 +100,40 @@ describe('the channel is validated, not trusted', () => {
 });
 
 describe('the room comes from the session, never the request', () => {
-  it('takes the room short code from locals in both', () => {
+  /*
+    A COUNT, not a spot check, and the count is the assertion: this module exports three readers of
+    the room's logs, and every one of them has to take its room from the session. It was two until
+    `searchChatMessages` arrived on 2026-08-29, and this test going red is how that arrival was
+    forced to be looked at rather than assumed — a new export inheriting the file's reputation is
+    exactly how the third one would have shipped taking a room from its caller.
+  */
+  const READERS = 3;
+
+  it('takes the room short code from locals in every one', () => {
     /*
-      A `roomShortCode` field on either argument would be the 2026-08-07 privilege escalation again
-      in a new place. `strictObject` is what stops one being accepted silently if somebody adds it
-      to the client call.
+      A `roomShortCode` field on any of the arguments would be the 2026-08-07 privilege escalation
+      again in a new place. `strictObject` is what stops one being accepted silently if somebody
+      adds it to the client call.
     */
-    expect((remoteCode.match(/requireRoomShortCode\(locals\)/g) ?? []).length).toBe(2);
+    expect((remoteCode.match(/requireRoomShortCode\(locals\)/g) ?? []).length).toBe(READERS);
     expect(remoteCode).toContain('z.strictObject({');
     expect(remoteCode).not.toContain('roomShortCode:');
   });
 
-  it('still requires a user on both', () => {
-    expect((remoteCode.match(/requireUser\(locals\);/g) ?? []).length).toBe(2);
+  it('still requires a user in every one', () => {
+    expect((remoteCode.match(/requireUser\(locals\);/g) ?? []).length).toBe(READERS);
+  });
+
+  it('checks the channel against THIS member list wherever a channel is named', () => {
+    /*
+      The two channel-scoped readers — the page loader and the search. A search is the shape that
+      makes such a leak useful, since it takes a term as well as a channel, so it is asserted
+      alongside rather than trusted to have copied the gate.
+    */
+    expect((remoteCode.match(/memberChatChannels\(request, shortCode, user\)/g) ?? []).length).toBe(
+      2
+    );
+    expect((remoteCode.match(/isMemberChatChannel\(channels, channel\)/g) ?? []).length).toBe(2);
   });
 });
 

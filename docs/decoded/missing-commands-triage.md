@@ -28,8 +28,8 @@ again without a red test.
 | outcome | count |
 | --- | ---: |
 | *Confirmed missing*, now **BUILT** | **13** |
-| *Confirmed missing*, **BUILT AS** something else | 4 |
-| *Confirmed missing*, still **NOT BUILT** | 8 |
+| *Confirmed missing*, **BUILT AS** something else | 5 |
+| *Confirmed missing*, still **NOT BUILT** | 7 |
 | need a decision first (the operator toolkit, below) — all still outstanding | 5 |
 | claimed missing, then REFUTED — we already have it | 7 |
 | classified as built-under-another-name at triage | 9 |
@@ -93,7 +93,7 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 | `kickUser` | BUILT | 11 | medium | No client-side predicate on the buttons; authority is the separate socket channel `sendAdm | Presenter ejects one member. Sent from app-user-info-modal and from app-st-message/app-st-compactmessage as sendServerAdminCommand over the separate `adminCmd` socket channel. Two receive paths: (1) the per-user private channel `/sess/{sessionID}/privCmdsIn/{u |
 | `playYTForAll` | BUILT | 9 | small | Opener: the chat-composer span, const 71 ["data-bs-toggle","modal","data-bs-target","#play | Broadcasts a YouTube URL that every client renders in a floating app-ytplayer iframe. The SEEK POSITION is derived, not sent: the subscriber computes `i = Math.round((Date.now() - Number(e.startTime)) / 1e3)` seconds and appends `start=${i}` to the embed URL ( |
 | `stopYTForAll` | BUILT | 8 | small | The "Stop For All" button in app-ytplayer is O(1, o.appService.globals.isPresenter ? 1 : - | Tears the room-wide YouTube overlay down on every client. The two-button design is the load-bearing detail: "Stop For All" goes to the server, "×" only clears the local iframe, and the reference distinguishes them by which bus it emits on. OURS: YoutubePlayerO |
-| `doChatLogSearch` | NOT BUILT | 8 | medium | The plain search has NO gate — any viewer can run it. The destructive `del:true` path is r | A server-side search over the FULL stored chat/alert history, whose results replace the live log in place — plus a bulk-delete mode on the same command. The 8 hits break down as: 4 sends (1439114 main chat, 2385404 extra-chat column, 2051344 and 2051436 alerts |
+| `doChatLogSearch` | BUILT AS searchChatMessages | 8 | medium | The plain search has NO gate — any viewer can run it. The destructive `del:true` path is r | A server-side search over the FULL stored chat/alert history, whose results replace the live log in place — plus a bulk-delete mode on the same command. The 8 hits break down as: 4 sends (1439114 main chat, 2385404 extra-chat column, 2051344 and 2051436 alerts |
 | `playVideoForAll` | BUILT | 7 | medium | UI: O(0, g(2).isP ? 0 : -1) on the whole video-list/schedule block (fn ZSe, byte 1932536 r | A presenter picks a URL from their localStorage video list (`videos-${sessionID}`) and either plays it room-wide now or schedules it. On receipt every client sets videoPlayerUrl = i.url, hideVideoPlayer = true, and a NON-presenter is force-switched to the vide |
 | `remoteRestartAudio` | BUILT | 7 | small | Transport: sendServerAdminCommand -> socketService.sendAdminCmd -> this.socket.transmit("a | A presenter picks a member in the user-info modal and forces THAT member's browser to re-establish its incoming audio. Sender at offset 2080401: remoteRestartAudio(){this.appService.sendServerAdminCommand("remoteRestartAudio",this.user),bootbox.alert("Audio re |
 | `sendUsersToURL` | BUILT | 7 | small | Send: none client-side, `adminCmd` channel. Receive: `this.globals.isPresenter \|\|` — pre | Redirects the room's browsers to a URL. Asked specifically: it targets ALL users in the session, NOT a selection — the payload is only {url, sessID} with no user list, and it is fired from app-session-control-modal (a room-level panel), not from a roster row.  |

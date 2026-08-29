@@ -41,6 +41,7 @@
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import ChatSearchBar from '#lib/components/ChatSearchBar.svelte';
   import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import type { AlertLabel } from '#lib/alert-labels.js';
@@ -190,6 +191,14 @@
     onopenpoll: () => void;
     ontogglealertstoolbar: () => void;
     ontogglealertssearch: () => void;
+    /**
+     * `doChatLogSearch` — submit the chat column's term to the server.
+     *
+     * Takes the column AND the term rather than reading either, so the component decides nothing:
+     * which column it is in is the one thing a shared handler gets wrong, and the term is passed at
+     * the moment of submit rather than read later from state that may have moved on.
+     */
+    onchatsearch: (column: 'main' | 'extra', term: string) => void;
     ondetachalerts: () => void;
     onsavealerts: () => void;
     onarchivealerts: () => void;
@@ -274,6 +283,7 @@
     onopenpoll,
     ontogglealertstoolbar,
     ontogglealertssearch,
+    onchatsearch,
     ondetachalerts,
     onsavealerts,
     onarchivealerts,
@@ -770,7 +780,7 @@
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <!-- svelte-ignore a11y_missing_attribute -->
-                  <a title="Search" class="nav-link p-0" onclick={() => onopenmodal('chat-logs')}>
+                  <a title="Search" class="nav-link p-0" onclick={() => chat.search.toggle('main')}>
                     <i class="fas fa-search"></i>
                   </a>
                 </li>
@@ -791,6 +801,21 @@
               </ul>
             </nav>
           </div>
+
+          <!--
+            The magnifier above used to open the Chat Logs modal. Upstream binds it to
+            `toggleChatToolbarSearchOnly()` (byte 1,453,494, the `li` at index 10), and this room's
+            own ALERTS column already worked that way — so the chat column was the odd one out. The
+            modal is still reached from the sidebar, so nothing lost a route.
+          -->
+          {#if chat.search.isOpen('main')}
+            <ChatSearchBar
+              term={chat.search.term('main')}
+              oninput={(value) => chat.search.setTerm('main', value)}
+              onsubmit={() => onchatsearch('main', chat.search.term('main'))}
+              onclear={() => chat.search.clear('main')}
+            />
+          {/if}
 
           <app-roomscroller
             bind:this={chatScroller}

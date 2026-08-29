@@ -528,7 +528,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 1463,
+    /*
+      RAISED 1463 -> 1470 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 1470,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1146,6 +1151,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 293,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
+  },
+  {
+    file: 'lib/components/ChatSearchBar.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The search bar under a chat column's header — `chatToolbar` and the `form#chat-settings`
+      inside it, transcribed from the const table at bundle byte 1,449,203.
+
+      IT WENT IN TWICE FIRST, once per pane, and this contract refused the second copy. That was the
+      right call and the reason is worth the line: the extra column's const table at 2,395,378 is
+      byte-identical to the main column's, so two hand-maintained transcriptions of one table is how
+      one of them loses an attribute with nothing to notice. The dangling
+      `aria-describedby="addon-search"` is the capture's own and now exists in exactly one place.
+    */
+    max: 89,
+    why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
     file: 'lib/components/ChatTabStrip.svelte',
@@ -1787,6 +1809,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'which rows in a wholesale-replaced list are new; a plain .ts on purpose'
   },
   {
+    file: 'lib/room/chat-search.svelte.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE.
+
+      `doChatLogSearch`'s two boxes. It arrived inside `RoomChat` and took that file from 260 to 397,
+      which is what asked for this extraction rather than a raise — and the split is real rather than
+      cosmetic: `RoomChat` is about which channel each column shows and what is typed in each
+      composer, and a search box is a third thing with its own rule about when it ends.
+
+      Most of the file is that rule and the two divergences it carries — `showChatToolbarExtended` is
+      not held because the controls it would gate are not built, and closing the bar ENDS the search
+      where upstream leaves a hidden bar filtering the log with nothing on screen saying so.
+    */
+    max: 124,
+    why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
+  },
+  {
     file: 'lib/room/chat.svelte.ts',
     /*
       179 -> 194 on 2026-08-28 for the off-topic SEED, and fourteen of the fifteen lines are why.
@@ -1803,7 +1842,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the two columns can show different ones. Routing by channel rather than by column is what
       makes a frame land in BOTH when they happen to show the same one, without needing a rule.
     */
-    max: 260,
+    /*
+      RAISED 260 -> 283 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 283,
     why: 'the two chat columns and the mention routing that reads three of their fields at once'
   },
   {
@@ -2209,7 +2253,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       computed at read time rather than stored. A filtered-out trader's alerts would have come back
       in search results and nowhere else. `searchableAlerts` stays; the alerts PANE still reads it.
     */
-    max: 403,
+    /*
+      403 -> 463, 2026-08-29, for `doChatLogSearch` — and this raise bought a REFUSAL as much as a
+      feature, which is why it is the one argued at length.
+
+      Upstream's handler assigns search results straight to `globals.chatSearchResults` and renders
+      that. It can afford to: it applies WEBINAR MODE as messages ARRIVE, dropping them before they
+      reach a log, so results coming back from a server are simply outside that filter. This room
+      applies webinar mode as a VIEW filter, because it re-reads its log from the server on every
+      invalidate and a drop-on-arrival would be undone by the next load — a difference this file
+      already recorded, for a different reason, before any of this.
+
+      Feeding search results in AHEAD of that filter, which is the shape a faithful port takes, would
+      therefore have handed a member in webinar mode every other member's messages: the exact thing
+      the mode exists to hide, reachable by typing one letter into a box. So the results enter the
+      pipeline where the merged log leaves it, and hidden rows, webinar mode, evidence and badges
+      apply to both identically.
+
+      Most of the 60 lines are that argument, on `chatMessagesFor`, plus the note on why `null` and
+      `[]` are different — no search, versus a search that matched nothing. Collapsing those two
+      would show a reader their whole log as the result of a search that found none of it.
+    */
+    max: 463,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
@@ -2960,7 +3025,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines by prettier. Assembly only — see the entry for `message-actions.svelte.ts`, which is
       where that change actually lives.
     */
-    max: 1277,
+    /*
+      RAISED 1277 -> 1333 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 1333,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -3085,7 +3155,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       have no rule in any stylesheet this repository holds, so emitting three empty spans would be
       markup with no consumer — the check `smallerImagePreview` failed.
     */
-    max: 1165,
+    /*
+      RAISED 1165 -> 1188 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 1188,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -3124,7 +3199,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       543 -> 567, 2026-08-28 — the typing indicator. The extra column's own copy of the indicator and its two handlers. Its OWN channel, which is the
       whole reason it is a second copy rather than a shared one.
     */
-    max: 567,
+    /*
+      RAISED 567 -> 586 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 586,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

@@ -1,4 +1,5 @@
 import { appendMention } from '#lib/mention-insert.js';
+import { RoomChatSearch } from './chat-search.svelte.js';
 import type { ChatTab } from '#lib/types.js';
 
 /*
@@ -98,6 +99,17 @@ export class RoomChat {
   readonly #extraColumnEnabled: () => boolean = () => false;
 
   /**
+   * The two columns' search boxes, in `#lib/room/chat-search.svelte.ts`.
+   *
+   * HELD, not owned. This class knows one thing about a search — that switching a channel ends it —
+   * because a search is scoped to a channel on the wire. Everything else about the box reads there.
+   *
+   * Defaults to an unwired instance so the many callers that construct this class for its tabs alone
+   * need not know the feature exists.
+   */
+  readonly search: RoomChatSearch;
+
+  /**
    * Takes the extra column's preference as a thunk rather than a value.
    *
    * A copy would be the value as of construction, and the viewer can turn the second column on from
@@ -111,8 +123,11 @@ export class RoomChat {
      * seed and a lock. It is read once, here, exactly as the reference reads it once in `ngOnInit`.
      */
     autoSwitchToOffTopic?: boolean;
+    /** See `search`. Omitted by callers that render no search box. */
+    search?: RoomChatSearch;
   }) {
     this.#extraColumnEnabled = sources.extraColumnEnabled;
+    this.search = sources.search ?? new RoomChatSearch();
     if (sources.autoSwitchToOffTopic) this.#tab = 'off-topic';
   }
 
@@ -168,6 +183,12 @@ export class RoomChat {
 
   set tab(next: ChatTab) {
     this.#tab = next;
+    /*
+      SWITCHING CHANNELS ENDS THE SEARCH. In the SETTER rather than in an effect, so it is a property
+      of switching rather than a reaction that could run a frame late — or not at all, if a switch
+      happened without a render. Why it must end is on `endedByChannelSwitch`.
+    */
+    this.search.endedByChannelSwitch('main');
   }
 
   get extraTab(): ChatTab {
@@ -176,6 +197,8 @@ export class RoomChat {
 
   set extraTab(next: ChatTab) {
     this.#extraTab = next;
+    // See `tab` above: a search belongs to one channel.
+    this.search.endedByChannelSwitch('extra');
   }
 
   /*

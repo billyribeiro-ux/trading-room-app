@@ -227,14 +227,20 @@ describe('and nothing became unreachable', () => {
       constructor assigns the thunks it reads. The property this test is about is unchanged: ONE
       function, called twice, keyed on the channel parameter.
     */
-    expect(feedsModule).toContain('chatMessagesFor(tab: ChatTab) {');
+    expect(feedsModule).toContain(
+      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+    );
     expect(feedsModule).toContain(
       'mergeOlderChatMessages(this.#chatPages.older(tab), this.#session().messages)'
     );
     expect(feedsModule).toContain('get visibleChat() {');
-    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.tab);');
+    expect(feedsModule).toContain(
+      'return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);'
+    );
     expect(feedsModule).toContain('get visibleExtraChat() {');
-    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.extraTab);');
+    expect(feedsModule).toContain(
+      'return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);'
+    );
   });
 
   it('the trim runs AFTER the merge, so the cap still holds', () => {
@@ -243,7 +249,9 @@ describe('and nothing became unreachable', () => {
       `trimLogSize` by exactly the pages this feature adds — the preference would stop meaning
       anything for the readers most likely to have it on.
     */
-    const from = feedsModule.indexOf('chatMessagesFor(tab: ChatTab) {');
+    const from = feedsModule.indexOf(
+      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+    );
     const derived = feedsModule.slice(from, feedsModule.indexOf('.filter(', from));
     expect(derived).toContain('trimChatLog(');
     expect(derived).toContain('mergeOlderChatMessages(');

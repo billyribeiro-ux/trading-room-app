@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { MAX_CHAT_TAB_NAME } from '#lib/chat-tabs.js';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
-import { MAX_CHAT_LOG_PAGE, loadChatPage } from '#lib/server/chat-log.js';
+import { MAX_CHAT_LOG_PAGE, loadChatPage, searchChatChannel } from '#lib/server/chat-log.js';
 import { isMemberChatChannel, memberChatChannels } from '#lib/server/chat-channels.js';
 import { loadAlertPage } from '#lib/server/alert-log.js';
 
@@ -108,6 +108,65 @@ export const loadOlderChatMessages = query(
     if (!isMemberChatChannel(channels, channel)) error(403, 'No such channel.');
 
     return loadChatPage(shortCode, channel, page);
+  }
+);
+
+/**
+ * `doChatLogSearch {searchTerm, channel, type:"chat"}` — the whole channel, not the loaded page.
+ *
+ * ## Why this is a search and not a filter, when the alerts toolbar is the other way round
+ *
+ * `alert-toolbar-search-scope.ts` argues at length that the ALERTS toolbar should stay a local
+ * filter, and the argument turns entirely on a premise that does not hold here: *"a correct search
+ * already exists and is one click away"* — the Advanced Search modal, which asks the database. The
+ * chat columns had nothing. No field, no filter, and no way to reach a message older than the fifty
+ * a page delivers. So the resolution that was right there is not available here, and this is the one
+ * upstream chose: byte 1,439,114 sends the term to the server and its handler REPLACES the log with
+ * what comes back.
+ *
+ * ## The channel gate is `loadOlderChatMessages`'s, and that is the point of putting it here
+ *
+ * A search that reads the table directly would be a second door onto the same rows. Badge channels
+ * are visible to some members and not others (`chatTabsWithBadges`, 2026-08-28), so a name being a
+ * channel SOMEWHERE is not evidence that this member may read it — and a search is exactly the shape
+ * that would make such a leak useful to an attacker, since it takes a term as well as a channel.
+ * Same `memberChatChannels` resolution, same `isMemberChatChannel` check, same refusal message so a
+ * 403 does not enumerate the room's private channels.
+ *
+ * ## A `query`, like its neighbours
+ *
+ * It reads and writes nothing, so it is a `query` — the rule this module's header states. The term
+ * is part of the cache key, which is what makes retyping the same search free and is why the term is
+ * an argument rather than something the client holds and the server infers.
+ *
+ * ## The destructive half of the upstream command is NOT here
+ *
+ * `doChatLogSearch` also carries `del: true` — a bulk delete of everything the term matched. It is
+ * refused rather than omitted: a destructive operation whose blast radius is a LIKE pattern the
+ * caller typed needs its own authority argument and its own confirmation, and putting it behind this
+ * endpoint's flag would mean one door for reading and erasing. See `searchChatChannel`.
+ */
+export const searchChatMessages = query(
+  z.strictObject({
+    channel: z.string().min(1).max(MAX_CHAT_TAB_NAME),
+    /*
+      Bounded at 200 like `searchAlerts`, and trimmed before it is bounded so trailing whitespace
+      cannot be used to sit under the limit with a longer term. An empty term returns nothing rather
+      than everything — the refusal is in `searchChatChannel`, where the LIKE is built.
+    */
+    searchTerm: z.string().trim().max(200)
+  }),
+  async ({ channel, searchTerm }) => {
+    ensureDatabase();
+
+    const { locals, request } = getRequestEvent();
+    const user = requireUser(locals);
+    const shortCode = requireRoomShortCode(locals);
+
+    const channels = await memberChatChannels(request, shortCode, user);
+    if (!isMemberChatChannel(channels, channel)) error(403, 'No such channel.');
+
+    return searchChatChannel(shortCode, channel, searchTerm);
   }
 );
 

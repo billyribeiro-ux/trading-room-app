@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 19:15 UTC — Chat search, and the filter a faithful port would have skipped
+
+**Runtime impact: YES.** Both chat columns can search their whole channel. Neither had a search box
+at all, and no way to reach a message older than the fifty a page delivers.
+
+#### The premise the alerts side's argument rested on, and why it does not hold here
+
+`alert-toolbar-search-scope.ts` argues at length that the ALERTS toolbar should stay a LOCAL filter
+with a scope notice rather than become a search. The argument is good and it turns entirely on one
+sentence: *"a correct search already exists and is one click away"* — the Advanced Search modal,
+which asks the database.
+
+The chat columns had no such thing. No field, no filter, no fallback. So the resolution that was
+right for alerts was not available for chat, and this is the one upstream chose.
+
+#### The property that made this more than a transcription
+
+Upstream's handler assigns results straight to `globals.chatSearchResults` (byte 1,020,422) and
+renders that. **It can afford to, and this room cannot.** Upstream applies WEBINAR MODE as messages
+ARRIVE, dropping them before they reach a log — so results coming back from a server are simply
+outside that filter. This room applies webinar mode as a VIEW filter, because it re-reads its log on
+every invalidate and a drop-on-arrival would be undone by the next load.
+
+So the faithful port — results in front of the pipeline — would have handed a member in webinar mode
+**every other member's messages, reachable by typing one letter into a box.** Results enter the
+pipeline where the merged log leaves it instead, and hidden rows, webinar mode, evidence and badges
+apply to both identically.
+
+The negative control for this is the one worth naming: rewriting `visibleChat` to return the raw
+results turned the contract red on *"keeps no search branch anywhere else in the feed"* — the
+assertion written for exactly that bypass, because the two that check the pipeline itself stay green
+when the pipeline is skipped rather than reordered.
+
+#### What landed
+
+* `searchChatChannel` in `server/chat-log.ts` — `searchThread`'s shape deliberately, including its
+  escaping (`%`, `_` and the backslash, so `100%` does not match the log) and its bound. Two search
+  implementations over two message tables is how one gets the wildcard bug the other fixed.
+* The twenty-column projection and the `email -> hash` step are now `chatRows` / `chatRowsToMessages`,
+  shared with `loadChatPage`. A second hand-written copy is a second place to forget `senderEmail` —
+  which does not fail to compile, it ships search results with placeholder avatars.
+* `searchChatMessages` in `log-pages.remote.ts`, reusing `loadOlderChatMessages`'s channel gate
+  verbatim. Badge channels are visible to some members and not others, and a search is the shape
+  that makes such a leak useful, since it takes a term as well as a channel.
+* `RoomChatSearch` (`lib/room/chat-search.svelte.ts`) and `ChatSearchBar.svelte`. **Both are
+  extractions the size contract forced and both were right**: the search went into `RoomChat` first
+  and took it from 260 lines to 397, and the bar went into both panes before the contract refused
+  the second copy — the two panes' const tables are byte-identical, so two transcriptions is how one
+  loses an attribute silently.
+* The magnifier in each chat header now toggles the bar, which is upstream's
+  `toggleChatToolbarSearchOnly()` and what this room's alerts column already did. It opened the Chat
+  Logs modal; that modal is still reached from the sidebar, so no route was lost.
+
+#### Three divergences, each recorded at the code
+
+* **Webinar mode applies to results.** Above.
+* **Closing the bar ends the search.** Upstream's bar can be hidden with a term still in it and
+  results still standing in for the log — a reader left looking at a filtered log with nothing on
+  screen saying so.
+* **`del: true` is refused, not omitted.** The same upstream command carries a bulk delete of
+  everything a term matched. A destructive operation whose blast radius is a LIKE pattern the caller
+  typed needs its own authority argument and its own confirmation; behind this endpoint's flag it
+  would mean one door for reading and erasing. It stays on the census as its own row.
+
+`.replace("$", "\\$")` is upstream's and is NOT reproduced: it escapes only the first `$` (a string
+pattern replaces once), `$` is not special to SQL LIKE, and reproducing it would corrupt a search for
+a price.
+
+#### Verification
+
+`svelte-check` 0 errors, 0 warnings. `eslint` clean. `prettier --check` clean. Room suite **204 files,
+3,276 passed, 1 skipped**. **Six negative controls, each seen RED**: results in front of the filters;
+the channel gate dropped; the LIKE escaping dropped; an empty term answering with the whole channel;
+the search surviving a channel switch; the bar closing without ending the search.
+
+`log-pages-remote-contract.test.ts` counted TWO readers taking their room from the session and now
+counts three — the gate that forced this new export to be looked at rather than assumed, which is
+how the third one would otherwise have shipped taking a room from its caller.
+
+`doChatLogSearch` moves to **BUILT AS searchChatMessages**; the census stands at 13 built, 5 under
+another name, 7 not built.
+
+**Not verified in a browser.** A reader searching for a message older than the loaded page, and a
+member in webinar mode searching, are the owner's confirmations to give.
+
 ### 2026-08-29 18:40 UTC — A Q&A entry can be edited, and the docblock that said it could not
 
 **Runtime impact: YES.** A presenter can correct one entry of a Q&A thread when `enableEditAlerts`

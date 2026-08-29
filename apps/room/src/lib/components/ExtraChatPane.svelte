@@ -33,6 +33,7 @@
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
+  import ChatSearchBar from './ChatSearchBar.svelte';
   import ChatTabStrip from './ChatTabStrip.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
@@ -158,7 +159,23 @@
     onstopreadinghistory: () => void;
     onscrolltobottom: (scroller: HTMLElement) => void;
     onprivatechat: () => void;
+    /**
+     * The magnifier. The PAGE decides what it does — see `ExtraChatPane`'s own note below.
+     *
+     * It opened the Chat Logs modal until 2026-08-29 and now toggles the search bar, which is what
+     * upstream's `toggleChatToolbarSearchOnly()` does and what this room's alerts column already did.
+     * The modal is still reached from the sidebar.
+     */
     onsearch: () => void;
+    /** Whether the search bar under the header is showing — `RoomChat.searchBarOpen('extra')`. */
+    searchOpen: boolean;
+    /** The term. A plain prop plus a handler rather than a binding, because the setter on
+     * `RoomChat` does work — emptying the box drops the results with no round trip — and a binding
+     * would let a caller assign the field while skipping it. */
+    searchTerm: string;
+    onsearchinput: (value: string) => void;
+    onsearchsubmit: () => void;
+    onsearchclear: () => void;
     onsettings: () => void;
     onimageupload: () => void;
     onrte: () => void;
@@ -197,6 +214,11 @@
     onscrolltobottom,
     onprivatechat,
     onsearch,
+    searchOpen,
+    searchTerm,
+    onsearchinput,
+    onsearchsubmit,
+    onsearchclear,
     onsettings,
     onimageupload,
     onrte,
@@ -352,6 +374,15 @@
         </ul>
       </nav>
     </div>
+
+    {#if searchOpen}
+      <ChatSearchBar
+        term={searchTerm}
+        oninput={onsearchinput}
+        onsubmit={onsearchsubmit}
+        onclear={onsearchclear}
+      />
+    {/if}
 
     <!--
       `app-extra-roomscroller` — its own element, not the main pane's. The reference gives the extra
