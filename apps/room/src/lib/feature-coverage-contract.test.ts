@@ -51,6 +51,15 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   transcription: the reference addresses a thread entry by its parent alert plus an ORDINAL, because
   its entries live inside the alert document and have no id. Ours have one. So these two names leave
   the list because the feature landed, and the citation beside each says exactly how it differs.
+
+  `forceStopScreen` left on 2026-08-29, and it is the one whose absence was HIDING A DEFECT rather
+  than naming an unbuilt feature. `missing-commands-triage.md` had recorded it as built, citing
+  `ScreenTabs.svelte:211,227` — the menu item. The item was there; the behaviour was not. A presenter
+  clicking "Stop This Screen" on a member's share removed their own tab and left the member
+  broadcasting to everyone else, which is the `stopVideoForAll` shape that same document resolved by
+  reading, two rows above. The name is gone from this list because the command now exists
+  (`presenter-commands.remote.ts`), and the pair is held together by
+  `force-stop-screen-contract.test.ts` — a citation would not have caught this one, and did not.
 */
 const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'alertQAMsg',
@@ -60,7 +69,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'deleteChatMsg',
   'demux',
   'doShowMsgToAll',
-  'forceStopScreen',
   'getMyRepeater',
   'getMyState',
   'getSessionNotes',

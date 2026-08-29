@@ -9,22 +9,32 @@ import type { RoomChatMute } from './chat-mute';
  * not: every frame here names a single member, and what makes each safe is the same test. That test
  * is the subject, and it now happens ONCE — see below.
  *
- * The upstream switch has ELEVEN cases (bundle bytes 995800-997400, read whole rather than
- * searched). FIVE have a branch here — `forceReload`, `muteChat`, `unmuteChat`, `kickUser`,
- * `remoteRestartAudio` — and two more are built elsewhere because they are not addressed frames:
- * `getRoster` in `RoomRoster`, and `remotePresCommand` on the `cmds` channel.
+ * The upstream switch has ELEVEN cases (bundle bytes 995,800-997,400, read whole rather than
+ * searched, and re-enumerated on 2026-08-29 to settle this paragraph by measurement):
  *
- * **THREE ARE LEFT and each is a feature rather than a branch.** `TODO.md` row 9 carries the audit
- * of 2026-08-26 — what each needs, with the sender's byte offset — and it is deliberately NOT
- * repeated here: an inventory of unbuilt work in two places is how one of them goes stale, which is
- * the rule that already cost this row four false blockers.
+ * ```
+ * 995896 forceReload   995969 remoteRestartAudio   996041 getDebugLog   996120 debugLogResp
+ * 996187 kickUser      996261 muteChat             996320 unmuteChat    996376 remotePresCommand
+ * 996456 userInfo      996699 updateProfilePic     996894 getRoster
+ * ```
  *
- * ONE of the three has a constraint that belongs in code rather than in a register, because it is
- * about this gate: **`debugLogResp` cannot be ported as written.** Upstream replies
- * `{requestor: xe.requestor}` — the CLIENT names who receives the log — so a member could inject
- * content into any presenter's modal. Whoever builds it must have the server remember who asked and
- * ignore that field. It is the 2026-08-07 rule arriving on the one frame that travels member→
- * presenter instead of the other way.
+ * **EIGHT have a branch here**, plus `forceStopScreen`, which upstream has no case for at all. The
+ * three without one are not addressed frames: `remotePresCommand` rides the `cmds` channel and
+ * `getRoster` lives in `RoomRoster`, both built.
+ *
+ * **ONE IS LEFT: `userInfo`** — a feature rather than a branch. Its frame carries `notesArr`,
+ * `privData` and `badges`, needing a user-detail lookup this room has no endpoint for; `TODO.md`
+ * row 9 has the audit, and is not repeated here because an inventory in two places goes stale in
+ * one of them. This paragraph said FIVE-and-THREE-left until 2026-08-29, written before three of
+ * the eight were built — the same staleness it warns about, one paragraph above the warning, which
+ * is why the case list is quoted with offsets: **re-run the count rather than trust the sentence.**
+ *
+ * One constraint belongs in code rather than in a register, because it is about this gate:
+ * **`debugLogResp` could not be ported as written.** Upstream replies `{requestor: xe.requestor}` —
+ * the CLIENT names who receives the log — so a member could have injected content into any
+ * presenter's modal. The server remembers who asked and ignores that field; see
+ * `routes/debug-log.remote.ts`. It is the 2026-08-07 rule arriving on the one frame that travels
+ * member→presenter instead of the other way.
  *
  * That queue is why this is a module: more receivers were about to be added to a router with no room
  * for them and no structural guarantee that each would remember to check who the frame was for.
@@ -73,6 +83,13 @@ export interface AddressedCommand {
    * authority: a reload reaches the same value from `users.avatar_url`.
    */
   avatarUrl?: unknown;
+  /**
+   * `forceStopScreen` only — which of THIS member's screens a presenter asked to end.
+   *
+   * A producer id, not a user id: a member can share several screens at once and the reference's
+   * menu item stops exactly the one whose gear was opened.
+   */
+  producerId?: unknown;
 }
 
 export class RoomPrivateCommands {
@@ -120,6 +137,15 @@ export class RoomPrivateCommands {
      * where an avatar is rendered, so this class reports the new URL and decides nothing.
      */
     profilePictureChanged: (avatarUrl: string) => void;
+    /**
+     * `forceStopScreen` — the transport's `stopLocalScreen`, closing the producer.
+     *
+     * Nothing is shown to the member: upstream has no client handler for this command at all, and
+     * the member sees their share end exactly as if they had clicked Stop themselves. A LOOKUP
+     * rather than a comparison — `stopLocalScreen` finds the producer in `localScreenStreams` or
+     * does nothing — so "only this member's own screens" is structural, not a line to remember.
+     */
+    stopLocalScreen: (producerId: string) => void;
   }) {
     this.#viewerId = options.viewerId;
     this.#chatMute = options.chatMute;
@@ -130,6 +156,7 @@ export class RoomPrivateCommands {
     this.#sendDebugLog = options.sendDebugLog;
     this.#debugLogReceived = options.debugLogReceived;
     this.#profilePictureChanged = options.profilePictureChanged;
+    this.#stopLocalScreen = options.stopLocalScreen;
   }
 
   readonly #viewerId: () => number;
@@ -141,6 +168,7 @@ export class RoomPrivateCommands {
   readonly #sendDebugLog: (log: string) => void;
   readonly #debugLogReceived: (from: { fromUserId: number; fromName: string; log: string }) => void;
   readonly #profilePictureChanged: (avatarUrl: string) => void;
+  readonly #stopLocalScreen: (producerId: string) => void;
 
   /**
    * Route one addressed frame.
@@ -291,6 +319,23 @@ export class RoomPrivateCommands {
       */
       if (typeof command.avatarUrl !== 'string' || command.avatarUrl.length === 0) return false;
       this.#profilePictureChanged(command.avatarUrl);
+      return true;
+    }
+
+    if (command.cmd === 'forceStopScreen') {
+      /*
+        THE ONE COMMAND ON THIS CHANNEL WITH NO UPSTREAM RECEIVER: `case "forceStopScreen"` has zero
+        occurrences in the bundle, because upstream's SERVER closes the producer. This room's SFU
+        refuses `closeProducer` from any session but the producer's owner — the property that stops
+        one member ending another's stream — so the ask is delivered here and the owner closes their
+        own; the `producerClosed` that follows is what makes the stop room-wide. Without this branch
+        "Stop This Screen" only ever dropped the presenter's own tab. The whole argument is on
+        `forceStopScreen` in `routes/presenter-commands.remote.ts`.
+
+        Validated rather than trusted, like the two frames above.
+      */
+      if (typeof command.producerId !== 'string' || command.producerId.length === 0) return false;
+      this.#stopLocalScreen(command.producerId);
       return true;
     }
 

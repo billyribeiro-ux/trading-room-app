@@ -1107,6 +1107,11 @@ export class RoomMediaTransport {
     await this.#sessionReady;
 
     const screenName = typeof share.screenName === 'string' ? share.screenName : '';
+    // Resolved ONCE and used twice: the avatar and the owner are the same question, and asking it
+    // twice is how one of them ends up reading a different roster than the other.
+    const owner = this.#session().connectedUsers.find(
+      (user) => user.id === legacyUserId(info.userId)
+    );
     this.#sharedScreens = [
       ...this.#sharedScreens,
       {
@@ -1115,9 +1120,10 @@ export class RoomMediaTransport {
         screenName,
         // The producer carries no avatar. Resolve it from the roster when the peer is known;
         // gravatar's own `d=mm` placeholder otherwise, rather than inventing a hash.
-        avatarUrl:
-          this.#session().connectedUsers.find((user) => user.id === legacyUserId(info.userId))
-            ?.avatarUrl ?? 'https://secure.gravatar.com/avatar/?d=mm&s=20'
+        avatarUrl: owner?.avatarUrl ?? 'https://secure.gravatar.com/avatar/?d=mm&s=20',
+        // Who `forceStopScreen` is addressed to; null in the same window the avatar falls back
+        // above, and `RoomScreens.stop` then sends nothing rather than guessing a recipient.
+        ownerId: owner?.id ?? null
       }
     ];
     // A viewer is brought to the screen too, not just the presenter sharing it. The capture emits

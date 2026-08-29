@@ -290,7 +290,8 @@ describe('the receiver applies only a well-formed frame', () => {
       collectDebugLog: () => '',
       sendDebugLog: () => {},
       debugLogReceived: () => {},
-      profilePictureChanged: (avatarUrl) => applied.push(avatarUrl)
+      profilePictureChanged: (avatarUrl) => applied.push(avatarUrl),
+      stopLocalScreen: () => {}
     });
   }
 

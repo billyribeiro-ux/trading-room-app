@@ -33,6 +33,116 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 18:25 UTC — "Stop This Screen" stopped nothing, and the census that said it was built
+
+**Runtime impact: YES.** A presenter ending another member's screen share now ends it for the whole
+room. Until this commit it ended only the presenter's own tab.
+
+#### The defect
+
+`ScreenTabs.svelte` has rendered a presenter-only "Stop This Screen" item in each screen's gear menu
+since the tab bar was built, matching upstream's own gate (`O(11, i.isP ? 11 : -1)`, bundle byte
+1,920,554). Its handler, `RoomScreens.stop`, branched:
+
+```ts
+if (this.#isLocalScreen(screenId)) { this.#stopLocalScreen(screenId); return }
+this.#removeScreen(screenId);   // somebody else's
+```
+
+On the presenter's own screen it worked. On the one the menu exists for — a member's — it removed the
+presenter's tab and returned. The member kept broadcasting their desktop, every other viewer kept
+watching it, and nothing anywhere reported that the stop had not happened. The comment above that
+line explained the behaviour as deliberate: stopping their producer *"is not ours to do, so this only
+drops the tab and is deliberately not pretending the remote share ended."* Every clause was true of
+the code and false of the control.
+
+#### How it was found, and what that says about the tracker
+
+`docs/decoded/missing-commands-triage.md` lists `forceStopScreen` under **Confirmed missing**, and
+its payload row cites *"ours apps/room/src/lib/components/ScreenTabs.svelte:211,227"* — the BUTTON.
+That same document, forty lines above, records the identical mistake being caught on `stopVideoForAll`
+and states the rule: *"The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR."*
+
+It was found by a census rather than by reading: measuring all 25 rows of that table against the
+current source, with comments stripped, showed **twelve of them now built** — and `forceStopScreen`
+among the thirteen that are not, despite the row's own citation. A citation is not a test, which is
+why this one landed with a contract rather than a corrected line number.
+
+#### The wire, and the divergence
+
+Sender at byte 1,969,578, read whole rather than searched:
+
+```js
+stopSharingThisScreenRemote(e){
+  e && (this.mediaService.stopSharingProducer(e.producerID),
+        setTimeout(() => { this.appService.sendServerAdminCommand("forceStopScreen", {id: e._id}) }, 2e3))
+}
+```
+
+**`case "forceStopScreen"` has zero occurrences in the 2,891,205-byte bundle** — upstream's SERVER
+closes the producer. This room cannot: its SFU accepts `closeProducer` only from the session that
+owns the producer, which is the property that stops one member ending another's stream. So the ask is
+addressed to the SHARER, whose browser closes its own producer, and the SFU's `producerClosed`
+notification is what makes the stop room-wide. The 2,000 ms timer is deliberately NOT reproduced —
+upstream needs it because two ends are closing the same producer and here only one is.
+
+#### What landed
+
+* `forceStopScreen` in `routes/presenter-commands.remote.ts` — `presenterRoom()` for the authority
+  and `requireRoomMember` for the tenancy, the membership check BEFORE the publish, addressed with
+  `publishToUsers` rather than broadcast.
+* A ninth receiver in `lib/room/private-commands.ts`, behind the channel's one addressing gate.
+* `ownerId` on `ScreenTab` / `SharedScreen`, resolved once beside the avatar in `addRemoteScreen`
+  from the same roster lookup, so the two answers cannot disagree.
+* `lib/force-stop-screen-contract.test.ts` — 13 tests holding BOTH halves, because the pair can only
+  drift when no file holds both. **Six negative controls, each seen RED**: deleting the send;
+  deleting the receiver branch; `publishToUsers` → `publishToRoom`; moving `requireRoomMember` after
+  the publish; dropping the presenter guard; dropping the receiver's `producerId` validation.
+
+#### The tracker now recomputes its own status
+
+Rewriting the prose would have fixed the sentence for a day. `missing-command-census-contract.test.ts`
+fixes the class: every row of *Confirmed missing* carries a measured status, and the gate recomputes
+it against `apps/room/src` with comments stripped, refusing a disagreement in either direction. The
+headline counts are recomputed from the rows as well, because the summary is the half a reader
+actually reads and the half that went stale.
+
+The document said **30 not built**. Measured: **13 built, 3 built under another name, 9 still not
+built**, plus the five operator-toolkit rows that were always outstanding.
+
+**Five negative controls, each seen RED**: marking `kickUser` NOT BUILT; marking `archiveLogs` BUILT;
+pointing a `BUILT AS` row at a symbol that does not exist; **removing the comment strip** — which
+turns `notyping`'s nine transcription notes into false implementations, and is the control that
+proves the strip is load-bearing rather than decorative; and desyncing the headline from the rows.
+
+What it deliberately does NOT measure is whether a feature is correct or reaches the network. **An
+identifier is a floor, not a proof** — the lesson of `forceStopScreen` itself, whose name would have
+satisfied a weaker gate while the control was still lying. That is what the per-feature contract
+tests are for; this one refuses the drift.
+
+#### Two corrections carried in the same commit
+
+* **`private-commands.ts`'s module census was stale.** It said the upstream switch has eleven cases,
+  FIVE built here and THREE left — written before `getDebugLog`, `debugLogResp` and
+  `updateProfilePic` were built. Re-enumerated from bytes 995,800-997,400: it is **eight built here,
+  two elsewhere, and ONE left — `userInfo`**. The eleven cases are now quoted with their byte offsets
+  so the next reader re-runs the count rather than trusting the sentence. This is the second false
+  census this file has had corrected.
+* **`feature-coverage-contract.test.ts`** loses `forceStopScreen` from `ABSENT_FROM_OUR_SOURCE`,
+  which is the declaration that it is built.
+* **`TODO.md` row 9** carried the same false census and is rewritten to the measured one, with the
+  eleven byte offsets in the row so it can be re-run.
+
+#### Verification
+
+`svelte-check` 1,353 files, 0 errors, 0 warnings. `eslint` clean. `prettier --check` clean. The full
+room suite: **201 files, 3,232 passed, 1 skipped**. Seven size ceilings raised and each argued in
+place — `private-commands.ts` 300 → 345 is argued at length, because the note it sits under said this
+particular cap only goes down.
+
+**Not verified in a browser.** Two members and a presenter in a live room is what would prove the
+`producerClosed` fan-out end to end, and that is the owner's confirmation to give.
+
 ### 2026-08-29 22:00 UTC — The 125px downscale and the alerts: a correction to a feature shipped hours earlier
 
 **Runtime impact: YES.** Uploaded pictures are resized before they leave the browser, and the

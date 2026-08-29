@@ -875,7 +875,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       class reads neither of them — see the note at the option itself for why it is passed rather
       than held.
     */
-    max: 1359,
+    /*
+      RAISED 1359 -> 1365 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 1365,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -951,7 +956,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It goes DOWN if `startScreenSharing`'s constraint transcription ever moves to the media module
       that owns constraints. It does not go up again.
     */
-    max: 957,
+    /*
+      RAISED 957 -> 960 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 960,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -2099,7 +2109,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/screens.svelte.ts',
     /* +11, slice 27: the popout test note, orphaned on the page, now above `detachedScreenId`. */
-    max: 370,
+    /*
+      370 -> 396, 2026-08-29, and this raise BOUGHT A CONTROL THAT WAS LYING.
+
+      `stop()` answered "Stop This Screen" on somebody else's share by removing the presenter's own
+      tab and returning, under a comment explaining that stopping their producer "is not ours to do".
+      Every clause was true of the code and false of the control: the member kept broadcasting, every
+      other viewer kept watching, and nothing reported it. The extra lines are the send, the owner
+      lookup, and the correction kept in place beside them — see `forceStopScreen` in
+      `presenter-commands.remote.ts` for the full argument and the byte offsets.
+    */
+    max: 396,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
@@ -2578,7 +2598,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 71,
+    /*
+      RAISED 71 -> 74 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 74,
     why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
   },
   {
@@ -2657,7 +2682,38 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 300,
+    /*
+      300 -> 345, 2026-08-29, for `forceStopScreen` — and the note directly above says this cap goes
+      DOWN as receivers are built. It went down for exactly that reason and is going up now, so the
+      claim owes an answer rather than an edit.
+
+      THE ANSWER IS THAT THE NOTE MEANT SOMETHING NARROWER THAN IT SAID. What must never grow is the
+      GATE: a fifth copy of `targetUserId === viewerId` is what the extraction bought and what the
+      single early return makes impossible. A ninth RECEIVER is the opposite — it is the work the row
+      exists to record, and it inherits the gate for free, which is the property being protected.
+
+      Forty-five lines, and they are three things:
+
+      * A NEW RECEIVER, ~20 lines. `forceStopScreen` is the one frame on this channel with no
+        upstream `case` at all — upstream's server closes the producer, and this room's SFU refuses
+        `closeProducer` from any session but the owner's, so the ask has to reach the owner instead.
+        A reader who finds no `case "forceStopScreen"` in the bundle needs that written down or they
+        will conclude the receiver was invented.
+
+      * A CORRECTED CENSUS, ~18 lines. The module docblock said FIVE built and THREE left, having
+        been written before `getDebugLog`, `debugLogResp` and `updateProfilePic` were built. It is
+        now EIGHT and one, and the eleven cases are quoted WITH THEIR BYTE OFFSETS so the next reader
+        re-runs the count instead of trusting the sentence — which is what let this one go stale.
+        That is the second false census this file has had corrected (the first, at 180 -> 198, is
+        argued a few entries up), and the offsets are the fix for the pattern rather than the row.
+
+      * The frame's own field, ~6 lines.
+
+      Prose is most of it, and shortening it is what the rule forbids: the receiver's whole reason
+      for existing is a divergence from the capture, and a divergence with no recorded WHY is the
+      one that gets "simplified" back.
+    */
+    max: 345,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
@@ -2878,7 +2934,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in that catalog turned red the moment the button existed and has been deleted, which is the
       declaration that it is done.
     */
-    max: 1266,
+    /*
+      RAISED 1266 -> 1271 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 1271,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -3254,7 +3315,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ScreenTabs.svelte',
-    max: 295,
+    /*
+      RAISED 295 -> 301 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 301,
     why: 'the screenshare tab strip'
   },
   {

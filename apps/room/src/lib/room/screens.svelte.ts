@@ -4,9 +4,14 @@ import { INITIAL_ZOOM_LEVEL, type Pan, zoomIn, zoomOut } from '#lib/screen-zoom.
 
 import type { RoomDialogs } from './dialogs.svelte';
 
+/** Who to ask, and which of their shares — the payload `forceStopScreen` carries. */
+export type ForceStopScreenTarget = { targetUserId: number; producerId: string };
+
 /** One shared screen, as far as this class is concerned. */
 export interface SharedScreen {
   id: string;
+  /** Who is sharing it; read by `stop` alone, as who `forceStopScreen` is addressed to. */
+  ownerId: number | null;
 }
 
 /*
@@ -50,6 +55,7 @@ export class RoomScreens {
   readonly #isPresenter: () => boolean;
   readonly #followMyScreens: () => boolean;
   readonly #focusOnScreen: (screenId: string) => Promise<unknown>;
+  readonly #forceStopScreen: (target: ForceStopScreenTarget) => Promise<unknown>;
 
   #selectedScreenTab: string | null;
   #forcedScreenId: string | null;
@@ -75,6 +81,8 @@ export class RoomScreens {
     isPresenter: () => boolean;
     followMyScreens: () => boolean;
     focusOnScreen: (screenId: string) => Promise<unknown>;
+    /** Injected like `focusOnScreen` beside it, so this class needs no route import. */
+    forceStopScreen: (target: ForceStopScreenTarget) => Promise<unknown>;
   }) {
     this.#dialogs = options.dialogs;
     this.#screens = options.screens;
@@ -87,6 +95,7 @@ export class RoomScreens {
     this.#isPresenter = options.isPresenter;
     this.#followMyScreens = options.followMyScreens;
     this.#focusOnScreen = options.focusOnScreen;
+    this.#forceStopScreen = options.forceStopScreen;
 
     this.#selectedScreenTab = $state<string | null>(null);
 
@@ -361,9 +370,26 @@ export class RoomScreens {
       this.#stopLocalScreen(screenId);
       return;
     }
-    // Somebody else's. Stopping their producer is not ours to do, so this only drops the tab and
-    // is deliberately not pretending the remote share ended.
+    /*
+      SOMEBODY ELSE'S, and this is what "Stop This Screen" is actually for.
+
+      The comment that stood here said stopping their producer "is not ours to do, so this only drops
+      the tab and is deliberately not pretending the remote share ended" — every clause true of the
+      code and false of the control. A presenter clicked a presenter-only item, their own tab
+      vanished, and the member kept broadcasting to everyone else. The argument, its byte offsets
+      and the divergence from upstream are on `forceStopScreen` in `presenter-commands.remote.ts`.
+
+      Order: the local drop is FIRST so the click is answered without a round trip, as
+      `bringEveryoneHere` above. The send is skipped for a viewer, whose menu has no such item, and
+      for a screen with no known owner — there is nobody to address, and dropping the tab without
+      sending beats inventing a recipient. The server re-checks the role either way.
+    */
+    const owner = this.#screens().find((screen) => screen.id === screenId)?.ownerId ?? null;
     this.#removeScreen(screenId);
     this.screenRemoved(screenId, this.#screens()[0]?.id ?? null);
+    if (!this.#isPresenter() || owner === null) return;
+    void this.#forceStopScreen({ targetUserId: owner, producerId: screenId }).catch((cause) =>
+      console.error('[forceStopScreen]', cause)
+    );
   }
 }

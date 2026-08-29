@@ -35,6 +35,12 @@
     screenName: string;
     /** Gravatar URL for `img.presenter-img`. */
     avatarUrl: string;
+    /**
+     * Who is sharing it — never rendered; it is who "Stop This Screen" is addressed to. `null` for
+     * one of this browser's own, and for a producer whose peer is not in the roster yet. Why the
+     * stop needs a recipient at all is on `forceStopScreen` in `presenter-commands.remote.ts`.
+     */
+    ownerId: number | null;
   };
 
   type Props = {

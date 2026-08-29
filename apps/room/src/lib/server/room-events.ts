@@ -277,7 +277,8 @@ export type RoomEvent =
           | 'remoteRestartAudio'
           | 'getDebugLog'
           | 'debugLogResp'
-          | 'updateProfilePic';
+          | 'updateProfilePic'
+          | 'forceStopScreen';
         targetUserId?: number;
         msg?: string;
         mutedTill?: string;
@@ -303,6 +304,23 @@ export type RoomEvent =
           `startRec`.
         */
         avatarUrl?: string;
+        /*
+          `forceStopScreen` only — WHICH of this member's screens to stop, as the producer id every
+          peer already knows the share by.
+
+          The frame is addressed to the SHARER, not to the room. Upstream's server closes the
+          producer itself (`sendServerAdminCommand("forceStopScreen", {id: e._id})` at bundle byte
+          1,969,578, and there is no `case "forceStopScreen"` anywhere in the bundle), which this
+          room cannot reproduce: the SFU accepts `closeProducer` from the session that owns the
+          producer and from nobody else. So the ask travels to the owner's browser, which closes its
+          own producer, and the SFU's `producerClosed` notification tears the tab down everywhere —
+          the same path a sharer clicking their own Stop already takes.
+
+          The id is a producer id and NOT a user id on purpose: a member may be sharing several
+          screens at once, and the reference's menu item stops exactly the one whose gear was
+          opened.
+        */
+        producerId?: string;
       };
     };
 

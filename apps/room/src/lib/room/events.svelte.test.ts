@@ -155,7 +155,8 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
       collectDebugLog: () => 'log',
       sendDebugLog: () => {},
       debugLogReceived: () => {},
-      profilePictureChanged: () => {}
+      profilePictureChanged: () => {},
+      stopLocalScreen: () => {}
     })
     /*
       Records the message AND whether the stream was already closed when it arrived. That second
@@ -322,7 +323,8 @@ const hiddenTabStream = (missed: true[]) =>
       collectDebugLog: () => '',
       sendDebugLog: () => {},
       debugLogReceived: () => {},
-      profilePictureChanged: () => {}
+      profilePictureChanged: () => {},
+      stopLocalScreen: () => {}
     })
   });
 

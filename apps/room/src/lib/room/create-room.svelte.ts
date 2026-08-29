@@ -70,6 +70,7 @@ import {
   focusOnScreen,
   focusOnSessionNote,
   forceReload,
+  forceStopScreen,
   kickUser,
   presenterCommand,
   restartAudio
@@ -489,7 +490,8 @@ export function createRoom(deps: RoomDeps) {
     sessionHandle: () => data.sessionHandle,
     isPresenter: () => isPresenter,
     followMyScreens: () => prefs.makeUsersFollowMyScreens,
-    focusOnScreen
+    focusOnScreen,
+    forceStopScreen
   });
 
   /*
@@ -1000,7 +1002,10 @@ export function createRoom(deps: RoomDeps) {
       */
       profilePictureChanged: () => {
         void invalidate('room:data').catch(() => {});
-      }
+      },
+      // A presenter ended one of this member's shares. Closing the producer is the whole of it —
+      // the SFU's `producerClosed` is what removes the tab everywhere else.
+      stopLocalScreen: (producerId) => mediaTransport.stopLocalScreen(producerId)
     })
   });
 

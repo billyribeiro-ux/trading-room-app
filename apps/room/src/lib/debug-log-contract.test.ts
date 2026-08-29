@@ -197,7 +197,8 @@ describe('the receiver refuses a malformed frame', () => {
       collectDebugLog: () => 'the log',
       sendDebugLog: (log) => received.push({ sent: log }),
       debugLogReceived: (from) => received.push(from),
-      profilePictureChanged: () => {}
+      profilePictureChanged: () => {},
+      stopLocalScreen: () => {}
     });
   }
 

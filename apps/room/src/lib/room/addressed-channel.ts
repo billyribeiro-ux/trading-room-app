@@ -50,6 +50,8 @@ export function addressedChannelFor(deps: {
    * the same reasoning `forceReloadRequested` and `kicked` carry for their dialogs.
    */
   profilePictureChanged: (avatarUrl: string) => void;
+  /** The transport's `stopLocalScreen`, for the same reason `reconnectAudio` is the transport's. */
+  stopLocalScreen: (producerId: string) => void;
 }): RoomPrivateCommands {
   return new RoomPrivateCommands({
     viewerId: deps.viewerId,
@@ -65,6 +67,7 @@ export function addressedChannelFor(deps: {
     collectDebugLog: deps.debugLog.collect,
     sendDebugLog: deps.debugLog.send,
     debugLogReceived: deps.debugLog.received,
-    profilePictureChanged: deps.profilePictureChanged
+    profilePictureChanged: deps.profilePictureChanged,
+    stopLocalScreen: deps.stopLocalScreen
   });
 }

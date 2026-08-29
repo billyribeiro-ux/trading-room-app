@@ -940,7 +940,10 @@ export class RoomLocalCapture {
         id: producerId,
         name: this.#session().user.displayName,
         screenName,
-        avatarUrl: this.#session().user.avatarUrl
+        avatarUrl: this.#session().user.avatarUrl,
+        // Null, not this member's id: `RoomScreens.stop` asks `isLocalScreen` first, so a screen
+        // shared from here is stopped here and no frame is ever addressed for it.
+        ownerId: null
       }
     ]);
     this.#tabs.streams.set(producerId, stream);

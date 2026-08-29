@@ -101,7 +101,7 @@ guessed.
 | 25 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 356 | no |
 | 26 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 326 | no |
 | 27 | `lib/components/StreamTabs.svelte` | 305 | no |
-| 28 | `lib/components/ScreenTabs.svelte` | 294 | no |
+| 28 | `lib/components/ScreenTabs.svelte` | 300 | no |
 | 29 | `lib/components/MessageMenu.svelte` | 292 | no |
 | 30 | `lib/components/ScheduledAlerts.svelte` | 271 | no |
 | 31 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `routes/logout/+page.svelte` | 31 | no |
 | 55 | `routes/+layout.svelte` | 27 | no |
 
-**2 of 55 surfaces audited · 1,059 of 27,659 lines · 3.8%.**
+**2 of 55 surfaces audited · 1,059 of 27,665 lines · 3.8%.**
 
 ## The honest scoping statement
 

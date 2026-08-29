@@ -61,7 +61,8 @@ const make = () => {
     sessionHandle: () => 'room',
     isPresenter: () => false,
     followMyScreens: () => false,
-    focusOnScreen: async () => undefined
+    focusOnScreen: async () => undefined,
+    forceStopScreen: async () => undefined
   });
 
   const transport: RoomMediaTransport = new RoomMediaTransport({
