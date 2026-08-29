@@ -1,5 +1,4 @@
 import { error, json } from '@sveltejs/kit';
-import { timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
@@ -7,6 +6,7 @@ import { rooms } from '#lib/server/db/schema.js';
 import { readSettings } from '#lib/server/rooms.js';
 import { resolveRoomConfig } from '#lib/room-config.js';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { answerCredentialPrompt } from '#lib/server/room-credential-prompt.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -54,13 +54,8 @@ import type { RequestHandler } from './$types';
  *
  * ## The comparison
  *
- * `candidate.trim() === configured` — the CANDIDATE is trimmed and the stored value is not, which is
- * upstream's `e.trim() === …` reproduced rather than tidied. An owner who configured a password with
- * a trailing space has a password with a trailing space, and matching that is the point.
- *
- * Constant-time, over equal-length buffers, because a length-varying compare on a secret is the one
- * shape that leaks it a character at a time. `timingSafeEqual` throws on unequal lengths, so the
- * length check comes first and the comparison only runs when it can be meaningful.
+ * Shared with the alert-delete prompt — see `room-credential-prompt.ts` for the trim asymmetry, the
+ * constant-time compare, and why the credential is never a parameter on the wire.
  */
 export const POST: RequestHandler = async ({ params, request }) => {
   const secret = ROOM_JWT_SECRET;
@@ -91,17 +86,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
   const configured = String(resolveRoomConfig(await readSettings(room.id)).values.needPasswordForUserNotes ?? '');
 
-  if (configured === '') {
-    /*
-      No password configured — upstream grants immediately and never prompts. `required:false` is what
-      lets the room reproduce that without ever holding the setting.
-    */
-    return json({ required: false, ok: true });
-  }
-
-  const offered = Buffer.from(candidate.trim());
-  const expected = Buffer.from(configured);
-  const ok = offered.length === expected.length && timingSafeEqual(offered, expected);
-
-  return json({ required: true, ok });
+  /*
+    The comparison moved to `room-credential-prompt.ts` on 2026-08-30, when the alert-delete password
+    became a second caller. It is shared and the ROUTE is not: a credential NAME on the wire would be
+    an oracle over all seven, so each question keeps its own door and its own setting, and only the
+    constant-time compare — the part that is written wrongly when it is written twice — is common.
+  */
+  return json(answerCredentialPrompt(configured, candidate));
 };
