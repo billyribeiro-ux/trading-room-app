@@ -33,6 +33,97 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 02:12 UTC — A duplication audit of this session's own gates, and the four holes it found in them
+
+**Runtime impact: NO.** Documentation and gate corrections.
+
+Asked for explicitly: *"Make sure nothing is duplicated so audit the entire report first."* The audit
+turned inward first, on the five gates added earlier tonight, and **every one of the four findings
+below is a defect I introduced while fixing the same class of defect.**
+
+#### 1. The coverage-map correction reintroduced the drift it was repairing
+
+`todo-next.md`'s corrected section carries a *"the map said / measured"* comparison table — nine line
+counts — and the gated inventory below repeats all nine. The comparison table is **not** gated: its
+header said "measured" and its lead-in said "what `wc -l` says **today**", so a reader takes it as
+live, and the next time a component grows the inventory row is forced to move while the comparison
+table silently is not.
+
+That is exactly what `CLAUDE.md` names — *two places recording the same thing is how one of them goes
+stale* — created by the commit that was fixing it.
+
+Fixed by **freezing** it: the table is now labelled a snapshot of 2026-08-29, says in a blockquote
+that it is deliberately never updated, and points at the inventory as the live table. Deduplicating
+by deletion would have lost the "off by 5,469" narrative, which is the point of the section; freezing
+keeps the story and removes the second source of truth.
+
+#### 2. The wired-count gate checked one half of a sentence it had written
+
+Correcting five documents wrote a **second** number beside the first in four of them — *"the other
+166 entries"*, *"the remaining 166"*, *"166 unwired"*, *"166 are not"* — and the check added an hour
+earlier matches only `<n> of 269`. Wire a 104th setting and every one would read *"104 of 269 … the
+other 166"*: the guarded half moves, the unguarded half does not.
+
+`docs/decoded/admin-surface.md` also lists all 103 wired settings **by name**. A count check forces
+that paragraph to be edited when the count moves; nothing made the edit correct.
+
+Both are now checked: the unwired count in all five documents, and the roster element by element
+against `EXPECTED_WIRED_SETTINGS`.
+
+#### 3. The extended gate found a stale claim the original correction had missed
+
+`admin-surface.md:920` — a live sentence, outside the section that was rewritten — read *"The 211
+unwired include … the whole channels group (…, `chatTabsWithBadges`)"*. Two defects: the count, and
+**`chatTabsWithBadges` has been wired since**, consumed by `chat-tabs.ts`, `ChatTabStrip.svelte` and
+`AlertChatArea.svelte`. Corrected to 166 and to "most of the channels group".
+
+#### 4. Two of the four new patterns guarded nothing, and only their controls said so
+
+Both holes were invisible to a passing run and were found because a negative control **failed to
+fire**:
+
+* **A line break.** The README's own sentence is `The other\n166 entries remain`; the phrase pattern
+  matched a literal space. These files wrap at 100 columns, so a phrase check over Markdown must
+  never depend on where the wrap falls — the text is now whitespace-collapsed before phrase matching.
+* **A capital letter.** Both surviving phrasings begin a sentence — *"**T**he other 166 entries"*,
+  *"**T**he remaining 166 are stored"* — and with `/g` alone neither matched. Now `/gi`.
+
+Two holes in one four-pattern block is the argument for controlling **every pattern separately**
+rather than once for the block, which is how these were being controlled before.
+
+#### The blockquote convention, which the gate now depends on
+
+Recording what each document *used to say* necessarily quotes the old numbers, and the checks failed
+on those on their first run — correctly by their own rule, wrongly in substance. The alternative was
+to loosen the checks until old numbers slipped through, which loosens them for a genuinely stale
+number too.
+
+So: **superseded numbers live in a Markdown blockquote.** A reader sees the sentence visibly quoted
+as former; the verifier skips blockquoted lines. One convention, both audiences, and the check stays
+exact. It is documented at the code and carried by `README.md`, `ARCHITECTURE.md` and
+`admin-surface.md`.
+
+#### Verified
+
+* **Seven negative controls, every one firing on the right assertion**: unwired count off by one in
+  each of the four phrasings (`ARCHITECTURE`, `README` across a line break, `OUTSTANDING`,
+  `admin-surface`); a name dropped from the roster; an unwired name added to it; and a superseded
+  number un-blockquoted.
+* `verify-room-settings-schema.mjs` green: *"wired-count prose verified in 5 documents; 166 unwired;
+  roster of 103 names matches"*.
+* Controller suite **96 files passed / 5 skipped; 1,016 tests passed / 21 skipped**.
+* Room gates (`todo-next-coverage`, `doc-citation`, `orphan-component`) — 19 tests passing.
+* `eslint` on the changed verifier — clean.
+
+#### A second destructive slip, recorded like the first
+
+A control whose mutation did not apply left a **shared** `/tmp` backup holding a different file, and
+the restore copied `README.md` over `docs/decoded/admin-surface.md` — 1,054 lines replaced by 211.
+Recovered in full from `HEAD` (the roster had been committed in `a4d0288`) and the one uncommitted
+edit redone. The control harness now writes a **per-file** backup and aborts loudly when a mutation
+does not apply, instead of proceeding. This is the second time this session that a restore from a
+baseline I had not isolated has destroyed work; both are written down rather than quietly repaired.
+
 ### 2026-08-29 01:58 UTC — Seventeen citations pointed past the end of the file they named
 
 **Runtime impact: NO.** Documentation corrections and one new test.

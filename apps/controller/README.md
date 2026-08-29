@@ -170,9 +170,14 @@ found in the tooling along the way and what each would have caused.
 166 entries remain `wired: false`: the controller can store them, but the room does
 not yet consume them. The flag changes only with a real consumer and its test.
 
-This paragraph said **33 … the other 257** until 2026-08-29. Both halves were wrong: the count had
-tripled without the sentence moving, and 33 + 257 is 290 rather than 269, so the arithmetic never
-described this schema at all. The verifier now fails if this number drifts again.
+> **Superseded 2026-08-29.** This paragraph read *"33 of 269 settings are wired … the other 257
+> entries remain `wired: false`"*. Both halves were wrong: the count had tripled without the sentence
+> moving, and 33 + 257 is 290 rather than 269, so the arithmetic never described this schema at all.
+
+Superseded numbers are kept in a blockquote, here and in the three sibling documents. That is a
+convention `scripts/verify-room-settings-schema.mjs` relies on: it checks every live wired and
+unwired count in these files and skips blockquoted lines, so history can be recorded without a stale
+number failing the build — or, worse, without the gate being loosened to let it pass.
 
 ## What the evidence cannot support
 

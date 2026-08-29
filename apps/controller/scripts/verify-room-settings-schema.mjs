@@ -469,9 +469,44 @@ try {
     '../../v5.md'
   ];
 
+  /**
+   * A document's LIVE text — every line that is not a Markdown blockquote.
+   *
+   * SUPERSEDED NUMBERS LIVE IN A BLOCKQUOTE, and that convention is load-bearing rather than
+   * stylistic. Correcting these five documents also recorded what each had said before, and two of
+   * those notes necessarily quote the old numbers — *"33 of 269 … the other 257"*, *"33 wired; 236
+   * unwired"*. The checks below found them on their first run and failed, correctly by their own
+   * rule and wrongly in substance: a history note is not a claim about today.
+   *
+   * The alternative was to loosen the checks until the old numbers slipped through, which would have
+   * loosened them for a genuinely stale number too. A blockquote is instead a mark a READER also
+   * sees — the sentence is visibly quoted as former — so one convention serves both audiences, and
+   * the gate stays exact.
+   */
+  const liveText = (text) =>
+    text
+      .split('\n')
+      .filter((line) => !/^\s*>/.test(line))
+      .join('\n');
+
+  /**
+   * The same text with every run of whitespace collapsed to one space, for PHRASE matching only.
+   *
+   * These files wrap prose at 100 columns, so a phrase can straddle a newline: the controller
+   * README's own sentence is `The other\n166 entries remain`. The phrase patterns below matched a
+   * literal space, so that claim was invisible to them — found because its negative control FAILED
+   * TO FIRE, which is the only reason the hole was caught rather than shipped. A phrase check over
+   * wrapped Markdown must never depend on where the wrap happens to fall.
+   *
+   * Kept SEPARATE from `liveText` rather than replacing it: the roster parse below is anchored on
+   * blank lines and a trailing `.\n`, and collapsing whitespace made it unparsable — which the run
+   * after that change said in as many words. One transform per question.
+   */
+  const livePhrases = (text) => liveText(text).replace(/\s+/g, ' ');
+
   for (const relative of COUNT_CLAIMS) {
     const path = resolve(REPO_ROOT, relative);
-    const text = readFileSync(path, 'utf8');
+    const text = livePhrases(readFileSync(path, 'utf8'));
     /*
       "<n> of 269" WHERE THE WORD `wired` IS NEARBY, and the narrowing was measured rather than
       chosen.
@@ -500,7 +535,82 @@ try {
     }
   }
 
-  console.log(`wired-count prose verified in ${COUNT_CLAIMS.length} documents`);
+  /*
+    THE UNWIRED HALF, AND THE ROSTER — both added 2026-08-29, in the same hour as the check above,
+    because a duplication audit of that check found it had reproduced the defect it was fixing.
+
+    Correcting the five documents wrote a SECOND number beside the first in four of them — "the other
+    166 entries", "the remaining 166", "166 unwired", "166 are not" — and the check above matches only
+    `<n> of 269`, so none of those was guarded. Wire a 104th setting and every one of them would read
+    "104 of 269 … the other 166": the guarded half moves, the unguarded half does not, and the
+    paragraph is wrong in a new way. That is the same shape as the drift being repaired, introduced by
+    the repair.
+
+    `docs/decoded/admin-surface.md` additionally lists every wired setting BY NAME. A count check
+    forces that paragraph to be edited when the count moves, but nothing made the edit correct, so the
+    roster is compared against `EXPECTED_WIRED_SETTINGS` element by element.
+  */
+  const unwired = 269 - wired.length;
+
+  for (const relative of COUNT_CLAIMS) {
+    const path = resolve(REPO_ROOT, relative);
+    const text = livePhrases(readFileSync(path, 'utf8'));
+    /*
+      The four phrasings actually used, named rather than generalised. A loose "any number near the
+      word unwired" would sweep in `hasSwingTradeAlerts`'s row number 1166 from the manage-page table
+      in `admin-surface.md`, which is a row id and not a count — measured, on this check's first run.
+    */
+    const stated = [
+      ...text.matchAll(/(?:the other|the remaining) (\d+) entries?/gi),
+      ...text.matchAll(/(?:the other|the remaining) (\d+) are/gi),
+      ...text.matchAll(/(\d+) unwired/gi),
+      ...text.matchAll(/(\d+) are not\.\*\*/gi)
+    ].map((match) => Number(match[1]));
+    /*
+      CASE-INSENSITIVE, because prose starts sentences. Both surviving phrasings begin one — *"The
+      other 166 entries remain"*, *"The remaining 166 are stored"* — and with `/g` alone neither
+      matched, so two of this block's four patterns guarded nothing. Found the same way as the line
+      break above: their negative controls did not fire. Two holes in one small block, both invisible
+      to a run that passes, is the argument for controlling every pattern separately rather than
+      once for the block.
+    */
+
+    const wrong = stated.filter((claimed) => claimed !== unwired);
+    if (wrong.length > 0) {
+      fail(
+        `${relative} states ${wrong.join(', ')} unwired but 269 - ${wired.length} = ${unwired}. ` +
+          `The wired half of this sentence is checked; this is the half beside it.`
+      );
+    }
+  }
+
+  /*
+    The roster in `admin-surface.md`, compared name by name. Alphabetical because that is how it is
+    written there, and because a roster in schema order would silently reorder on every regeneration.
+  */
+  const ROSTER_DOC = '../../docs/decoded/admin-surface.md';
+  const rosterText = liveText(readFileSync(resolve(REPO_ROOT, ROSTER_DOC), 'utf8'));
+  const rosterBlock = /Wired \(\d+\), alphabetically:\n\n([\s\S]*?)\.\n/.exec(rosterText);
+  if (!rosterBlock) {
+    fail(`${ROSTER_DOC} no longer carries a parsable "Wired (n), alphabetically:" roster`);
+  }
+  const listed = [...rosterBlock[1].matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+  const expected = [...EXPECTED_WIRED_SETTINGS].sort();
+  if (JSON.stringify(listed) !== JSON.stringify(expected)) {
+    const missing = expected.filter((name) => !listed.includes(name));
+    const extra = listed.filter((name) => !expected.includes(name));
+    fail(
+      `${ROSTER_DOC}'s wired roster disagrees with EXPECTED_WIRED_SETTINGS` +
+        (missing.length > 0 ? `; missing: ${missing.join(', ')}` : '') +
+        (extra.length > 0 ? `; listed but not wired: ${extra.join(', ')}` : '') +
+        (missing.length === 0 && extra.length === 0 ? '; same names, different order' : '')
+    );
+  }
+
+  console.log(
+    `wired-count prose verified in ${COUNT_CLAIMS.length} documents; ${unwired} unwired; roster of ${listed.length} names matches`
+  );
+
 
   console.log(`room-settings schema verified: 268 extracted + 1 reviewed deviation = 269 total; ${wired.length} wired`);
 } finally {

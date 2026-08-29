@@ -10,9 +10,17 @@ our app is missing and needs to be implemented in detail. did you get that right
 ## Corrected 2026-08-29 01:36 UTC, by measurement
 
 This section said **"2 of 42 surfaces, ~818 of ~30,000 lines"**. Every number in it was stale, and
-one was stale by a factor of five. What it claimed, against what `wc -l` says today:
+one was stale by a factor of five. What it claimed, against what `wc -l` said on the day it was
+corrected:
 
-| the map said | measured | |
+> **This comparison is a FROZEN SNAPSHOT of 2026-08-29 and is deliberately never updated.** It exists
+> to record how far the map had drifted, which is a fact about that date. The **live** numbers are
+> the inventory further down, which is the only table here that a gate checks — and the reason this
+> one is frozen rather than maintained is the correction it is describing: two places recording the
+> same measurement is how one of them goes stale, and repeating these nine numbers in a second
+> maintained table would have reintroduced the defect this section exists to record.
+
+| the map said | measured 2026-08-29 | |
 | --- | --- | --- |
 | 42 Svelte surfaces, ~30,000 lines | **55 surfaces, 27,290 lines** | the count was never right |
 | `routes/+page.svelte` — 6,894 | **1,425** | off by 5,469; the page was decomposed and the row never moved |
@@ -26,7 +34,7 @@ one was stale by a factor of five. What it claimed, against what `wc -l` says to
 
 It also **omitted `RoomOverlays.svelte` entirely** — 820 lines, the fourth-largest component in the
 room — along with 26 other surfaces named nowhere in it. The old table named 30 files explicitly and
-gestured at "13 smaller"; the repository has 55.
+gestured at "13 smaller"; the repository had 55 that day.
 
 **The lesson is not that the numbers drifted. It is that a documented measurement with no gate
 drifts silently, and this one was being read as scope.** The table below is now checked on every run

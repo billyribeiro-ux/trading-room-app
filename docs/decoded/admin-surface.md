@@ -917,16 +917,23 @@ Wired (103), alphabetically:
 `tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
 `userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
 
-The 211 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+The 166 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
 `saveRecsToVimeo` and the four Vimeo fields), every streaming field (`obsBroadcastRoom`,
 `obsStreamKey`, `restreamToURL`, `restreamToURLKey`, `hasYTStreaming`), every SMS field
 (`twillioApiSID`, `twillioApiToken`, `twilioPhone`, `protextingSecretTok`, `protextingGroupIDs`),
-the whole channels group (`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`,
-`extraRegChannels`, `altGenChannelName`, `altOffTopicChannelName`, `chatTabsWithBadges`), the
-profanity filter (`hasProfanityFilter`, `ingnoreBadWordsList`, `additionalBadWordsList`), every
-linked-room push (`linkedRoomAlerts`, `linkedRoomSwingAlerts`, `linkedRoomSwingAlertsOther`,
+most of the channels group (`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`,
+`extraRegChannels`, `altGenChannelName`, `altOffTopicChannelName`), the profanity filter
+(`hasProfanityFilter`, `ingnoreBadWordsList`, `additionalBadWordsList`), every linked-room push
+(`linkedRoomAlerts`, `linkedRoomSwingAlerts`, `linkedRoomSwingAlertsOther`,
 `linkedRoomDayTradeAlerts`, `linkedRoomDayTradeAlertsOther`, `linkedRoomRecordings`,
 `linkedStreamsAPIKey`), all 49 DON'T TOUCH fields, and `apiSecret`.
+
+> **Superseded 2026-08-29.** This paragraph read *"The 211 unwired …"* and listed
+> `chatTabsWithBadges` inside the channels group. It has been wired since — `chat-tabs.ts`,
+> `ChatTabStrip.svelte` and `AlertChatArea.svelte` all consume it — so the group is now "most of"
+> rather than "the whole". The count and the roster above are both checked by
+> `apps/controller/scripts/verify-room-settings-schema.mjs`; this sentence was not, and it is what
+> the check caught on its first run.
 
 ### E.6 — Account-page diff
 
