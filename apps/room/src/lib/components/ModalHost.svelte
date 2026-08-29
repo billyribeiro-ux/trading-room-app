@@ -289,6 +289,8 @@
      * the server as a real `File`, which `uploadComposerImage` already relies on and documents.
      */
     onUploadProfilePicture: (user: ModalTargetUser, file: File) => void;
+    /** The other half of the same control — see the button in the avatar cluster. */
+    onRemoveProfilePicture: (user: ModalTargetUser) => void;
     /**
      * The debug log this presenter last received, or null.
      *
@@ -451,6 +453,7 @@
     targetUser,
     debugLog = null,
     onUploadProfilePicture,
+    onRemoveProfilePicture,
     mutedUsers,
     followedUsers,
     targetMessage,
@@ -2070,6 +2073,36 @@
           shown - the element, its attributes and its rendered size are unchanged.
         -->
         <img src={targetUserModalAvatar} alt={targetUser.nick} loading="lazy" />
+        <!--
+          WIRED 2026-08-29, and it was found by ARITHMETIC rather than by reading the bundle:
+          `remove-profile-picture-btn` carried two rules in `app.css` and had no wearer for the whole
+          port, which `orphan-style-contract.test.ts` now refuses.
+
+          The class list is the capture's, verbatim from the const table at bundle byte 2,088,832:
+
+            ["type","button",1,"btn","btn-danger","btn-sm","rounded-pill",
+             "remove-profile-picture-btn",3,"click"], [1,"fas","fa-times"]
+
+          What its click CALLS was not read — the const table gives the shape and the binding
+          position, and the handler lives in a render function this pass did not locate. So the
+          BEHAVIOUR is inferred from the control's own icon and placement rather than transcribed,
+          and `profile-picture.remote.ts` records that as invented.
+
+          `title` is ours too: the capture's button is an icon with no label, which is a control a
+          screen reader announces as "button". An icon-only control needs an accessible name, and
+          adding one is an addition rather than a divergence.
+        -->
+        {#if isPresenter}
+          <button
+            type="button"
+            title="Remove profile picture"
+            aria-label="Remove profile picture"
+            class="btn btn-danger btn-sm rounded-pill remove-profile-picture-btn"
+            onclick={() => onRemoveProfilePicture(targetUser)}
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        {/if}
       </div>
       <h3 class="modal-title">
         {targetUser.nick}

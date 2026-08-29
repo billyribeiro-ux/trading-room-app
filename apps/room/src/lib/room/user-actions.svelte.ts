@@ -857,4 +857,23 @@ export class RoomUserActions<
             : 'That profile picture could not be uploaded.';
       });
   }
+
+  /**
+   * Clear a member's picture. The mirror of {@link uploadProfilePicture}, and deliberately so.
+   *
+   * Silent on success and loud on failure, for that method's reason: the avatar changing IS the
+   * confirmation, and the ways this can fail — the member has left the room — are ones a presenter
+   * cannot infer from a control that did nothing.
+   *
+   * NO CONFIRM DIALOG. The reference's button raises none, and the act is reversible by the upload
+   * beside it; asking twice for something undoable in one click is friction, not safety.
+   */
+  removeProfilePicture(user: ModalTargetUser): void {
+    void this.#commands.removeProfilePicture(user.id).catch((cause: unknown) => {
+      this.#dialogs.alert =
+        cause instanceof Error && cause.message
+          ? cause.message
+          : 'That profile picture could not be removed.';
+    });
+  }
 }

@@ -87,7 +87,7 @@ import {
   requestDebugLog,
   sendDebugLog as sendDebugLogCommand
 } from '../../routes/debug-log.remote';
-import { uploadProfilePicture } from '../../routes/profile-picture.remote';
+import { removeProfilePicture, uploadProfilePicture } from '../../routes/profile-picture.remote';
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
@@ -890,6 +890,7 @@ export function createRoom(deps: RoomDeps) {
       forceReload,
       requestDebugLog,
       uploadProfilePicture,
+      removeProfilePicture,
       restartAudio,
       kickUser,
       sessionSendUrl,

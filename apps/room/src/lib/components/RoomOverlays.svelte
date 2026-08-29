@@ -623,6 +623,7 @@
   targetUser={userActions.target}
   debugLog={debugLog.received}
   onUploadProfilePicture={(user, file) => userActions.uploadProfilePicture(user, file)}
+  onRemoveProfilePicture={(user) => userActions.removeProfilePicture(user)}
   privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
   onShowPrivateMessages={(user) => {
     modals.open('all-private');

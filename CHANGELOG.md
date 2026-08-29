@@ -33,6 +33,61 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 19:45 UTC — The remove half of the avatar control, found by the gate written an hour earlier
+
+**Runtime impact: YES.** A presenter can now clear a member's picture as well as set one.
+
+#### The gate found the work
+
+`orphan-style-contract.test.ts` catalogued `remove-profile-picture-btn` as a captured class with no
+wearer — an affordance of `#user-modal` the reference has and this room did not. **A presenter could
+set an avatar and could not clear one.** Building it turned that gate red, and deleting the entry is
+the declaration that it is done — the shape `INERT_ACTIONS` uses. Three of the user modal's four
+remain.
+
+#### What was read, and what was not
+
+The const table at bundle byte 2,088,832 gives the button verbatim:
+`["type","button",1,"btn","btn-danger","btn-sm","rounded-pill","remove-profile-picture-btn",3,
+"click"]` followed by `[1,"fas","fa-times"]`. **What its click calls was not read** — the handler
+lives in a render function this pass did not locate — so the behaviour is inferred from the icon and
+placement, and both the command and the markup say so rather than letting it look transcribed.
+
+"Remove" writes the **gravatar**, not the `/avatar.svg` placeholder. Both express "no custom
+picture" and differ only in timing, since `connection.ts` replaces the placeholder on the member's
+next connection; writing the gravatar directly skips an intermediate state that a roster of fifty
+would show as a broken avatar for as long as that member's browser stayed idle.
+
+The `title`/`aria-label` are ours: the capture's button is an icon with no label, which a screen
+reader announces as "button". An accessible name is an addition, not a divergence.
+
+#### A control that did not fire, and the gate weakness it exposed
+
+Removing the class from the button *should* have failed the orphan gate. It did not — **because the
+note beside that button quotes the capture's const table verbatim, and the class name is in it.** The
+gate was reading a comment as markup.
+
+That matters more here than in most codebases: this one quotes the reference's class lists constantly,
+so **every transcription note was a potential false wearer**. The corpus is now stripped of comments
+before matching, and the control fires. A second control was added for the shape itself: a class named
+only in a comment must not count as worn.
+
+#### Two mistakes of my own
+
+The new command and method were anchored on their **signatures**, which orphaned the docblocks
+already sitting above them — caught by `orphaned-comment-contract.test.ts`. Relocating them, my slice
+indices were inverted and **duplicated a docblock**; the fix then left the upload's prose stranded
+above the wrong command, and it took a third pass to put it back with its own function.
+
+And `git checkout -- .` destroyed the comment-stripping fix while it was still uncommitted — the
+fourth time in this session, and the same rule I have written down twice. It was re-applied and
+committed before the next control ran.
+
+**Verified:** `format:check`, `eslint`, `svelte-check` 1,351 files / 0 errors / 0 warnings, **199
+files / 3,204 tests green**, **8-spec browser suite green**. Negative controls seen RED: the remove
+losing its membership check; the remove writing a value that is not the server's; the button losing
+the captured class (after the gate was fixed); a class named only in a comment.
+
 ### 2026-08-29 19:00 UTC — Two unbuilt reference surfaces, found by arithmetic instead of by luck
 
 **Runtime impact: NO.** One gate, two findings recorded, no code changed.

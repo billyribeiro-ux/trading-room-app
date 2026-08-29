@@ -6,6 +6,7 @@ import { presenterRoom, requireRoomMember } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
 import { storeUpload } from '#lib/server/file-storage.js';
+import { gravatarUrl } from '#lib/server/connection.js';
 import { publishRosterToRoom, publishToUsers, setRosterAvatar } from '#lib/server/room-events.js';
 
 /*
@@ -45,6 +46,66 @@ import { publishRosterToRoom, publishToUsers, setRosterAvatar } from '#lib/serve
   feature instead of through a token. See that helper for why membership is a session rather than
   presence in the live roster.
 */
+
+/**
+ * Clear a member's uploaded picture, returning them to the gravatar this room derives.
+ *
+ * ## What "remove" means here, and why it is not a null
+ *
+ * `users.avatar_url` is `notNull` with a default of `/avatar.svg`, and `connection.ts` replaces that
+ * placeholder with `gravatarUrl(user.email)` the next time the member connects. So there are two
+ * ways to express "no custom picture" and they differ only in timing: writing the placeholder leaves
+ * the member showing `/avatar.svg` until their next request, and writing the gravatar directly is
+ * what that request would have produced anyway.
+ *
+ * The gravatar is written, because the intermediate state is visible to the whole room — a roster of
+ * fifty would show one grey placeholder for as long as that member's browser happened to stay idle,
+ * which reads as a broken avatar rather than a removed one. Same destination, no flicker.
+ *
+ * ## The reference's own button
+ *
+ * `remove-profile-picture-btn` at bundle byte 2,088,832, in `#user-modal`'s avatar cluster:
+ * `["type","button",1,"btn","btn-danger","btn-sm","rounded-pill","remove-profile-picture-btn",3,
+ * "click"]` followed by `[1,"fas","fa-times"]`. Its class carried styling in `app.css` and had NO
+ * WEARER for the whole port — which is how the gap was found, by `orphan-style-contract.test.ts`
+ * rather than by reading the bundle.
+ *
+ * **What the click CALLS was not read.** The const table gives the button's shape and its binding
+ * position; the handler lives in a render function this pass did not locate. The NAME is therefore
+ * ours, and the behaviour is inferred from the control's own label and icon rather than transcribed.
+ * Recorded as invented so the next reader does not take it for evidence.
+ */
+export const removeProfilePicture = command(z.number().int().positive(), async (targetUserId) => {
+  ensureDatabase();
+  const room = presenterRoom();
+  requireRoomMember(targetUserId, room);
+
+  /*
+      The email is read from the row rather than taken from the caller, for the same reason the
+      whole feature checks membership: the value that decides what this member's avatar becomes must
+      come from the server's own data.
+    */
+  const target = db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, targetUserId))
+    .get();
+  if (!target) error(404, 'No such member in this room.');
+
+  const avatarUrl = gravatarUrl(target.email);
+  db.update(users).set({ avatarUrl }).where(eq(users.id, targetUserId)).run();
+
+  publishToUsers(room, [targetUserId], {
+    channel: 'privCmds',
+    data: { cmd: 'updateProfilePic', targetUserId, avatarUrl }
+  });
+
+  // Patch before publish — see the note in `uploadProfilePicture` for why the order matters.
+  setRosterAvatar(room, targetUserId, avatarUrl);
+  publishRosterToRoom(room);
+
+  return { avatarUrl };
+});
 
 /**
  * Store the image, point the member's row at it, and tell the room.

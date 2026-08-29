@@ -68,6 +68,7 @@ const make = (
   const mutesSent: { targetUserId: number }[] = [];
   const debugLogsAsked: number[] = [];
   const profilePicturesSent: { targetUserId: number; file: File }[] = [];
+  const profilePicturesRemoved: number[] = [];
   const audioRestarts: number[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
@@ -127,6 +128,10 @@ const make = (
         profilePictureFails
           ? Promise.reject(new Error('That is not an image.'))
           : (profilePicturesSent.push(payload), Promise.resolve(null)),
+      removeProfilePicture: (targetUserId: number) => (
+        profilePicturesRemoved.push(targetUserId),
+        Promise.resolve(null)
+      ),
       muteChat: (payload: { targetUserId: number }) => (
         mutesSent.push(payload),
         Promise.resolve(null)
@@ -210,6 +215,7 @@ const make = (
     mutesSent,
     debugLogsAsked,
     profilePicturesSent,
+    profilePicturesRemoved,
     failProfilePicture: () => (profilePictureFails = true),
     indefiniteMutesSent,
     audioRestarts,

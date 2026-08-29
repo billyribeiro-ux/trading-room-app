@@ -1094,7 +1094,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 835,
+    /*
+      835 -> 836, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One line, forwarding the remove.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    max: 836,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1646,7 +1656,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 6118,
+    /*
+      6118 -> 6151, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One button, one prop, and the paragraph recording what was NOT read: the const table gives the button's class list verbatim and its binding position, and the handler its click reaches lives in a render function this pass did not locate — so the behaviour is inferred and says so.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    max: 6151,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2331,7 +2351,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 861,
+    /*
+      861 -> 880, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One method, mirroring `uploadProfilePicture` — silent on success, loud on failure — plus the note on why there is no confirm dialog for an act one click undoes.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    max: 880,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -2459,7 +2489,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 85,
+    /*
+      85 -> 87, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One command and a one-line docblock.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    max: 87,
     why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
   },
   {
@@ -2808,7 +2848,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
       security argument; these files carry only what each of them does.
     */
-    max: 1265,
+    /*
+      1265 -> 1266, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One name in the command surface.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    max: 1266,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

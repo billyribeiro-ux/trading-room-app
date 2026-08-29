@@ -57,6 +57,8 @@ export interface UserActionCommands extends ChatMuteCommands {
    * it is the only one that writes a durable row keyed on the target alone.
    */
   uploadProfilePicture: (payload: { targetUserId: number; file: File }) => Promise<unknown>;
+  /** The other half: clear the uploaded picture, returning the member to their gravatar. */
+  removeProfilePicture: (targetUserId: number) => Promise<unknown>;
   /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */
   restartAudio: (targetUserId: number) => Promise<unknown>;
   /**

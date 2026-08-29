@@ -16,16 +16,21 @@ import { describe, expect, it } from 'vitest';
  * port; it turned out to be the captured class for the Debug Log textarea, and the reason it had no
  * wearer was that the FEATURE was not built. Finding it was luck. This makes it arithmetic.
  *
- * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer
+ * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 28
  *
  * They split cleanly, and the split is what makes each one actionable:
  *
  * - **CAPTURED** — the class exists in the reference's own stylesheet. `app.css` carries a copy for
  *   markup this room has not built, so the rule is waiting rather than dead. Four of them
- *   (`edit-user-avatar-options`, `remove-profile-picture-btn`, `chat-stars`, `tagline`) share the
+ *   (`edit-user-avatar-options`, `remove-profile-picture-btn`, `chat-stars`, `tagline`) shared the
  *   Angular component id `ng-c1441935951`, which is `#user-modal` — the user-info modal this room
  *   DOES render, missing four of its affordances. Five more (`mic-status-*`) share `ng-c2606333922`,
  *   a microphone-test surface with five states that has no counterpart here at all.
+ *
+ * **`remove-profile-picture-btn` LEFT THIS LIST the same day**, which is the gate working as
+ * intended rather than a note: it turned red the moment the button was built, and deleting its
+ * entry is the declaration that it is done — the shape `INERT_ACTIONS` uses. Three of the user
+ * modal's four remain.
  * - **OURS** — the class is in no captured sheet. `app.css` invented it, and nothing in `src/`
  *   mentions it. Every one of these is a panel-layout name from before the page was decomposed into
  *   components; they style nothing and they never will.
@@ -57,10 +62,6 @@ const ORPHANS: Record<string, { captured: boolean; why: string }> = {
   'edit-user-avatar-options': {
     captured: true,
     why: 'the avatar dropdown inside `#user-modal` — the pencil overlay on the picture. `.edit-user-avatar img` beside it IS worn, so the container is built and its options menu is not.'
-  },
-  'remove-profile-picture-btn': {
-    captured: true,
-    why: 'the other half of `upload-profile-picture`, built 2026-08-29. A presenter can SET an avatar and cannot clear one; the reference renders this 12px button next to the picture.'
   },
   'chat-stars': {
     captured: true,
@@ -145,6 +146,30 @@ function declaredClasses(): Map<string, number[]> {
 }
 
 /**
+ * Source with its comments removed, because a class NAMED IN PROSE is not worn by anything.
+ *
+ * Added after a negative control refused to fire. `remove-profile-picture-btn` was built and its
+ * catalog entry deleted; removing the class from the button again should have failed this file, and
+ * did not — because the note beside that button quotes the capture's const table verbatim, and the
+ * class name is in it. The gate was reading a comment as markup.
+ *
+ * That is the same hollow-coverage shape this repository has hit twice before: a matcher that
+ * answers "yes" for the wrong reason reports a clean sweep while measuring nothing. It matters more
+ * here than in most gates, because THIS codebase quotes the reference's class lists constantly —
+ * every transcription note is a potential false wearer.
+ *
+ * The strip is the whole-file regex the rest of the corpus uses. It is imprecise in the direction
+ * that is safe here: an over-eager strip can only DELETE candidate wearers, which makes a class look
+ * orphaned and fails loudly, never the reverse.
+ */
+function withoutComments(source: string): string {
+  return source
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
+/**
  * Everything that could wear a class: markup, scripts, and the modules that build class strings.
  *
  * `.test.ts` files are excluded and only those — a class named in an assertion is not a wearer, and
@@ -154,7 +179,7 @@ const WEARERS = [
   ...globSync('**/*.svelte', { cwd: ROOT }),
   ...globSync('**/*.ts', { cwd: ROOT }).filter((file) => !file.endsWith('.test.ts'))
 ]
-  .map((file) => readFileSync(`${ROOT}${file}`, 'utf8'))
+  .map((file) => withoutComments(readFileSync(`${ROOT}${file}`, 'utf8')))
   .join('\n');
 
 function isWorn(cls: string): boolean {
@@ -197,9 +222,13 @@ describe('app.css styles nothing that no element wears', () => {
 
   it('carries no stale entry — an orphan that gained a wearer must leave the list', () => {
     /*
-      The other direction, and it is what keeps the catalog from becoming a place to hide. When
-      `remove-profile-picture-btn` is finally built, this fails until its entry is deleted — which is
-      the same declaration `INERT_ACTIONS` treats as "this is done".
+      The other direction, and it is what keeps the catalog from becoming a place to hide: when a
+      catalogued class gains markup, this fails until its entry is deleted — the same declaration
+      `INERT_ACTIONS` treats as "this is done".
+
+      IT HAS ALREADY DONE THAT ONCE. `remove-profile-picture-btn` was catalogued as an unbuilt
+      affordance of `#user-modal` and turned this red the same day, when the button was built. The
+      entry is gone; the mechanism is what is being asserted here.
     */
     const revived = Object.keys(ORPHANS)
       .filter((cls) => isWorn(cls))
@@ -246,12 +275,7 @@ describe('app.css styles nothing that no element wears', () => {
       trivia — and if either is built, the stale-entry test above turns red and forces this to be
       revisited with it.
     */
-    const userModal = [
-      'edit-user-avatar-options',
-      'remove-profile-picture-btn',
-      'chat-stars',
-      'tagline'
-    ];
+    const userModal = ['edit-user-avatar-options', 'chat-stars', 'tagline'];
     for (const cls of userModal) expect(ORPHANS[cls]?.captured, cls).toBe(true);
 
     const micTest = Object.keys(ORPHANS).filter((cls) => cls.startsWith('mic-status-'));

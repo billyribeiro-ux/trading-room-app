@@ -33,6 +33,20 @@ import type { RoomChatMute } from '#lib/room/chat-mute.js';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SOURCE = readFileSync(`${ROOT}routes/profile-picture.remote.ts`, 'utf8');
 
+/**
+ * One exported command's body, from its `export const <name> = command(` to the end of the module.
+ *
+ * Crude on purpose: the assertions below are about ORDER within a command, and the cheapest correct
+ * way to bound one is to start at its declaration. Ending at the next `export const` keeps the two
+ * commands from bleeding into each other, which is exactly the bug that made this helper necessary.
+ */
+function commandBody(name: string): string {
+  const from = SOURCE.indexOf(`export const ${name} = command(`);
+  expect(from, `${name} is no longer exported as a command`).toBeGreaterThan(-1);
+  const next = SOURCE.indexOf('\nexport const ', from + 1);
+  return SOURCE.slice(from, next === -1 ? SOURCE.length : next);
+}
+
 describe('a presenter can only set an avatar for a member of their own room', () => {
   it('gates on the presenter role and the caller own room, in one call', () => {
     /*
@@ -45,9 +59,10 @@ describe('a presenter can only set an avatar for a member of their own room', ()
   });
 
   it('checks membership BEFORE the durable write, not after', () => {
-    const check = SOURCE.indexOf('requireRoomMember(targetUserId, room)');
-    const write = SOURCE.indexOf('db.update(users)');
-    const store = SOURCE.indexOf('storeUpload(file)');
+    const body = commandBody('uploadProfilePicture');
+    const check = body.indexOf('requireRoomMember(targetUserId, room)');
+    const write = body.indexOf('db.update(users)');
+    const store = body.indexOf('storeUpload(file)');
 
     expect(check, 'the membership check is gone').toBeGreaterThan(-1);
     expect(write, 'the durable write is gone').toBeGreaterThan(-1);
@@ -61,6 +76,30 @@ describe('a presenter can only set an avatar for a member of their own room', ()
     expect(check).toBeLessThan(store);
   });
 
+  it('gates the REMOVE the same way, because it writes the same row', () => {
+    /*
+      A second durable write keyed on the target alone, and therefore a second place the tenancy
+      check has to be remembered. It is asserted separately rather than trusted to the shared
+      docblock: the whole reason `requireRoomMember` exists is that this class of check is easy to
+      leave out of the next command, and "the file has one somewhere" is not the property that
+      matters.
+    */
+    const body = commandBody('removeProfilePicture');
+    expect(body).toContain('presenterRoom()');
+    const check = body.indexOf('requireRoomMember(targetUserId, room)');
+    const write = body.indexOf('db.update(users)');
+    expect(check, 'removeProfilePicture no longer checks membership').toBeGreaterThan(-1);
+    expect(check).toBeLessThan(write);
+
+    /*
+      And the value it writes is the SERVER's, derived from the row's own email — not a url the
+      caller supplies. A remove that accepted a replacement url would be an upload with no content
+      check.
+    */
+    expect(body).toContain('gravatarUrl(target.email)');
+    expect(body).toContain('z.number().int().positive()');
+  });
+
   it('proves the content type as well as the type', () => {
     /*
       `z.instanceof(File)` proves the TYPE and this proves the CONTENT TYPE. The picker restricts to
@@ -70,16 +109,26 @@ describe('a presenter can only set an avatar for a member of their own room', ()
     expect(SOURCE).toContain("file.type.startsWith('image/')");
   });
 
-  it('patches the roster snapshot before publishing it', () => {
+  it('patches the roster snapshot before publishing it, in BOTH commands', () => {
     /*
       THE BUG THE FIRST DRAFT HAD. `RosterUser.avatarUrl` is captured into the subscriber context at
       SUBSCRIBE TIME, so `publishRosterToRoom` alone re-pushes the OLD url and every other member
       keeps the previous picture until they reconnect — while the durable row already disagrees.
+
+      PER COMMAND, not over the whole file, and that is a correction. The first version searched the
+      module with `indexOf` and passed only while there was one command in it; adding
+      `removeProfilePicture` made it compare the remove's publish against the upload's patch and go
+      red for code that was correct. A positional assertion over a file is a positional assertion
+      about whatever happens to be in that file.
     */
-    const patch = SOURCE.indexOf('setRosterAvatar(room, targetUserId, stored.url)');
-    const publish = SOURCE.indexOf('publishRosterToRoom(room)');
-    expect(patch, 'the roster snapshot is no longer patched').toBeGreaterThan(-1);
-    expect(patch).toBeLessThan(publish);
+    for (const name of ['uploadProfilePicture', 'removeProfilePicture']) {
+      const body = commandBody(name);
+      const patch = body.indexOf('setRosterAvatar(');
+      const publish = body.indexOf('publishRosterToRoom(');
+      expect(patch, `${name} no longer patches the roster snapshot`).toBeGreaterThan(-1);
+      expect(publish, `${name} no longer publishes the roster`).toBeGreaterThan(-1);
+      expect(patch, `${name} publishes the roster before patching it`).toBeLessThan(publish);
+    }
   });
 
   it('tells the member AND the room, which are two different updates', () => {
