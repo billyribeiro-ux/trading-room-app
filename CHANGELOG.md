@@ -33,6 +33,73 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:50 UTC — Two defects an audit fan-out found: a publish after a `return`, and a navbar gate with no gate in it
+
+**Runtime impact: YES, twice.** A presenter watching a live poll is now told when an answer arrives.
+A room whose owner turns Benzinga News off no longer keeps the navbar logo.
+
+Both came out of a six-cluster measurement pass over every open `TODO.md` / `NEW-TODO.md` row —
+31 agents, each finding adversarially verified against primary evidence before anything was built.
+59 findings settled. Neither of these two was in any tracker.
+
+#### 1. `sendPollAnswer` published to nobody
+
+`+page.server.ts` ended the action with `return { success: true }` and then, **below the return**,
+under a six-line comment quoting the reference's `handleServerCmdAdmin`, called
+`publishToRoom({channel:'cmdsAdmin', data:{cmd:'gotPollAnswer'}})`. Statically unreachable.
+
+The receiver has been complete the whole time — `events.svelte.ts` handles `gotPollAnswer` behind a
+presenter check and calls `invalidateAll()`, and the tally it refetches is computed in the load — so
+a presenter watching a live poll simply never learned an answer had arrived. One live receiver, one
+dead sender, four lines apart.
+
+**Two documents recorded it as working.** `ROOM-STATE-2026-08-06.md` lists the channel with a tick
+and says *"publishes on `gotPollAnswer`, presenter-gated (channel proven, flow not)"*. The channel
+was proven; the flow was the half nobody ran, and the parenthetical said so in advance. Both lines
+are corrected.
+
+The new assertion is BEHAVIOURAL — a real subscriber on the room, `toContainEqual` on the frame —
+rather than a text check for the call, because the defect was never that the line was missing. It
+was there, spelled correctly, with a comment explaining it. Only running it could tell the
+difference. Negative control: move the publish back below the return, watch it go red.
+
+#### 2. The Benzinga navbar item had no room setting in its gate
+
+`RoomNavbar` rendered on `{#if benzingaUrl && benzingaLogoUrl}`. `hasBenzingaNews` was read into
+`gates.benzingaVisible` and passed to the **sidebar only**. The controller ships the three settings
+independently — `room-config.ts` allow-lists three keys, the schema exposes three controls — so an
+owner who unticked "BZ News" and left the URL fields populated lost the sidebar item and kept the
+navbar logo. Upstream gates both on the same flag: `O(15, hasBenzingaNews ? 15 : -1)`, bundle byte
+2,487,962.
+
+**The contract test that looks like it covers this could not fail on it.** Its own comment names the
+failure — *"how one of them keeps showing the item after an owner turns it off"* — and it asserts a
+COUNT of `hasBenzingaNews` inside `gates.ts`. The flag was read once, correctly. The defect was one
+file over, in the delivery.
+
+The fix is structural rather than a patched condition: the three settings travel as ONE value,
+`gates.benzinga`, because three props were three chances to forget one and forgetting the flag is
+precisely what happened. Three getters collapsed to one, six prop lines across two components became
+two, and the new assertion checks the **delivery** — that no surface takes the pieces apart again.
+
+#### A control that did not fire, and the hollow assertion it exposed
+
+Deleting `hasBenzingaNews` from the gate entirely left `gates.svelte.test.ts` GREEN. Its test is
+titled *"needs BOTH the room flag and a URL"* — and both of its cases set `hasBenzingaNews: true`.
+It proved the URL half twice and the flag half never, which is the fourth hollow assertion this
+session has turned up and the second found by a control rather than by reading. The missing case is
+added: link configured, feed switched off, `visible` false. The control fires now.
+
+#### Verification
+
+Four negative controls seen RED (gate the navbar on the URL again; take the feature apart into
+separate props; move the publish below the return; drop the room flag — after the assertion that
+could see it existed).
+
+Room **210 files / 3,402 tests**, `svelte-check` 0/0 over 1,381 files, eslint clean, prettier clean,
+browser suite **10 passed**. Ceilings drop on four files: `RoomNavbar.svelte` 1008 → 1006,
+`+page.svelte` 1474 → 1471, `RoomSidebar.svelte` 778 → 775, `gates.ts` 421 → 420.
+
 ### 2026-08-30 03:05 UTC — One comparison for the two prompted credentials, and a door NOT built
 
 **Runtime impact: NO.** `internal/room-notes-auth` answers exactly as before; its comparison now

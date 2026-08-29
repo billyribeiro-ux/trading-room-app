@@ -188,7 +188,7 @@ describe('the gates themselves answer what the reference says they answer', () =
     expect(gates.hideChatAlerts).toBe(true);
   });
 
-  it('benzingaVisible needs BOTH the room flag and a URL, so a blank link cannot render', () => {
+  it('benzinga.visible needs BOTH the room flag and a URL, so a blank link cannot render', () => {
     const { gates, state } = make();
     state.session = {
       sessData: { hasBenzingaNews: true },
@@ -196,16 +196,37 @@ describe('the gates themselves answer what the reference says they answer', () =
       streamRead: null
     } as never;
     // The room says it has the feed; without `altBenzingaLinkURL` there is no link to point at.
-    expect(gates.benzingaUrl).toBe(null);
-    expect(gates.benzingaVisible).toBe(false);
+    expect(gates.benzinga.url).toBe(null);
+    expect(gates.benzinga.visible).toBe(false);
 
     state.session = {
       sessData: { hasBenzingaNews: true, altBenzingaLinkURL: '  https://bz.test/x  ' },
       user: { isFT: false },
       streamRead: null
     } as never;
-    expect(gates.benzingaUrl).toBe('https://bz.test/x');
-    expect(gates.benzingaVisible).toBe(true);
+    expect(gates.benzinga.url).toBe('https://bz.test/x');
+    expect(gates.benzinga.visible).toBe(true);
+
+    /*
+      THE FLAG HALF, MISSING UNTIL 2026-08-30 — and the omission was found by a negative control,
+      not by reading.
+
+      This test's title has always said "needs BOTH", and both of the cases above set
+      `hasBenzingaNews: true`. So deleting the flag from the getter entirely left it green: it proved
+      the URL half twice and the flag half never. That is the hollow shape this repository has now
+      hit four times — an assertion that cannot fail for the reason its own name gives.
+
+      It matters here because the flag is the feature's switch and the URLs are three INDEPENDENT
+      settings on the controller: an owner who unticks "BZ News" and leaves the link populated is
+      exactly the case a room hits in production, and it is the case that was rendering.
+    */
+    state.session = {
+      sessData: { hasBenzingaNews: false, altBenzingaLinkURL: 'https://bz.test/x' },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
+    expect(gates.benzinga.url, 'the link is still configured').toBe('https://bz.test/x');
+    expect(gates.benzinga.visible, 'and the owner turned the feed off').toBe(false);
   });
 
   it('mobileAppAvailable refuses a free trial unless the room lets trials have the app', () => {

@@ -103,6 +103,8 @@ function props(overrides: Stub = {}): Stub {
     recordingTooltip: '',
     mobileAppAvailable: false,
     tawkAvailable: false,
+    /* The three Benzinga settings travel as one value — see `gates.benzinga`. */
+    benzinga: { visible: false, url: null, logoUrl: null },
     doNotDisturbOn: false,
     mp3Playing: false,
     youtubeForAllUrl: '',

@@ -81,6 +81,8 @@ function html(over: Record<string, unknown> = {}): string {
       recordingReminderAllowed: false,
       recordingTooltip: '',
       mobileAppAvailable: false,
+      /* The three Benzinga settings travel as one value — see `gates.benzinga`. */
+      benzinga: { visible: false, url: null, logoUrl: null },
       tawkAvailable: false,
       doNotDisturbOn: false,
       mp3Playing: false,

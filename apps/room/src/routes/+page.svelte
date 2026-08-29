@@ -1041,8 +1041,7 @@
           individualVolumeControls={gates.individualVolumeControls}
           recordingReminderAllowed={gates.recordingReminderAllowed}
           recordingTooltip={gates.recordingTooltip}
-          benzingaUrl={gates.benzingaUrl}
-          benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
+          benzinga={gates.benzinga}
           mobileAppAvailable={gates.mobileAppAvailable}
           tawkAvailable={gates.tawkAvailable}
           doNotDisturbOn={prefs.doNotDisturbOn}
@@ -1135,9 +1134,7 @@
           tip={tipButtonFor(data.sessData)}
           canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
           mobileAppAvailable={gates.mobileAppAvailable}
-          benzingaVisible={gates.benzingaVisible}
-          benzingaUrl={gates.benzingaUrl}
-          benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
+          benzinga={gates.benzinga}
           dumpVersion={DUMP_CONTRACT.version}
           onopenmodal={(name) => modals.open(name)}
           onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}

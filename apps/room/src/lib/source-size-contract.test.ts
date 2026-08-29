@@ -542,7 +542,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
       `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
     */
-    max: 1474,
+    /*
+      DOWN 3 on 2026-08-30. The Benzinga feature was six prop lines across two components; it is two
+      now, and the flag that was missing from one of them cannot be dropped again.
+    */
+    max: 1471,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1385,7 +1389,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `benzingaVisible`, `tip` — and if this number climbs the thing to check is whether one of them
       has started being computed here instead.
     */
-    max: 778,
+    max: 775,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
@@ -3262,7 +3266,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       "corrects" later, and `always-show-roster-contract.test.ts` asserts that paragraph is still
       there.
     */
-    max: 421,
+    /*
+      DOWN one on 2026-08-30. `benzingaUrl` and `benzingaVisible` were separate getters feeding
+      separate props, which is how the navbar ended up with two of the three settings and not the
+      flag. One accessor answers the whole feature now.
+    */
+    max: 420,
     why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {
@@ -3610,7 +3619,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       broken image in every unconfigured room's navbar — the `playing.gif` defect that is fixed
       forty lines further down this same file.
     */
-    max: 1008,
+    /*
+      DOWN 2 on 2026-08-30, while GAINING the room setting it had been missing. The Benzinga item
+      rendered on a URL and a logo with no `hasBenzingaNews` term at all; the three settings now
+      arrive as ONE prop, so a surface cannot take two of the three and forget the third.
+    */
+    max: 1006,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

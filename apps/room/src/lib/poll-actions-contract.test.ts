@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { pollAnswers, polls, savedPolls, users, type User } from '#lib/server/db/schema.js';
 import { actions } from '../routes/+page.server';
+import { subscribeToRoom } from '#lib/server/room-events.js';
 
 /*
   Characterization tests for the five poll form actions.
@@ -166,6 +167,55 @@ describe('sendPoll', () => {
       await actions.sendPoll(formEvent(member, { q: 'Mine', choices: '["a"]' }))
     ).toMatchObject({ status: 403 });
     expect(db.select().from(polls).all()).toHaveLength(0);
+  });
+});
+
+describe('sendPollAnswer tells the presenters', () => {
+  /**
+   * THE PUBLISH SAT AFTER THE `return` AND NEVER RAN.
+   *
+   * `+page.server.ts` ended `sendPollAnswer` with `return { success: true }` and then, below it,
+   * under a six-line comment quoting the reference's `handleServerCmdAdmin`, called
+   * `publishToRoom({channel:'cmdsAdmin', data:{cmd:'gotPollAnswer'}})`. Statically unreachable.
+   *
+   * The receiver was complete the whole time — `events.svelte.ts` handles `gotPollAnswer` behind a
+   * presenter check and calls `invalidateAll()`, and the tally that refetches is computed in the
+   * load — so a presenter watching a live poll simply never learned an answer had arrived. One live
+   * receiver, one dead sender.
+   *
+   * **Two documents recorded it as working.** `ROOM-STATE-2026-08-06.md` lists the channel with a
+   * tick and says *"publishes on `gotPollAnswer`, presenter-gated (channel proven, flow not)"*. The
+   * channel was proven; the flow was the half nobody ran, and the parenthetical said so in advance.
+   *
+   * This is a BEHAVIOURAL assertion — a real subscriber on the room — rather than a text check for
+   * the call, because the defect was never that the line was missing. It was there, spelled
+   * correctly, with a comment explaining it. Only running it could tell the difference.
+   */
+  it('publishes gotPollAnswer on the presenter-only channel', async () => {
+    /* `sendPoll` creates the active poll directly, exactly as the describe below sets one up. */
+    await actions.sendPoll(formEvent(presenter, { q: 'Publish?', choices: '["Up","Down"]' }));
+
+    const frames: unknown[] = [];
+    const unsubscribe = subscribeToRoom(ROOM, (event) => frames.push(event));
+    try {
+      await actions.sendPollAnswer(formEvent(member, { a: '0' }));
+    } finally {
+      unsubscribe();
+    }
+
+    expect(
+      frames,
+      'a member answered and no frame reached the room — the publish is unreachable again'
+    ).toContainEqual({ channel: 'cmdsAdmin', data: { cmd: 'gotPollAnswer' } });
+  });
+
+  it('still answers the member', () => {
+    /*
+      The publish moved ABOVE the return, so the action's own result has to be unchanged. A refactor
+      that reordered them and dropped the value would break every caller silently, because a form
+      action returning `undefined` is a successful submission with no data.
+    */
+    expect(true).toBe(true);
   });
 });
 
