@@ -33,6 +33,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 20:45 UTC — The settings enumeration is fully triaged, and the count that said otherwise is gone
+
+**Runtime impact: none.** A measurement, two corrections and a guard.
+
+#### The largest open surface turned out to be closed
+
+`TODO.md` presented the settings enumeration as the biggest remaining question: 269 declared, 166
+unwired, *"26 read by the reference's OWN room client"*. Run live against the pinned bundle
+(`gate/audit-setting-coverage.mjs`, sha256 `40796ca8…`):
+
+```
+settings  269 declared · 103 this room reads · 166 it does not
+Of the 166 it does not read, the REFERENCE reads 22 in its own browser
+```
+
+**Twenty-two, not twenty-six** — and every one of the 22 already has a disposition in
+`docs/decoded/missing-settings-triage.md`, each with a byte offset:
+
+* **7 are credentials** the reference ships to every browser and this room refuses to. Wiring one is
+  a regression wearing an enumeration's clothes.
+* **1 is answered by derivation** — `playChatMessageSoundFor`'s feature is built and the raw value
+  deliberately does not cross.
+* **3 are not gaps at all**, because the reference's own feature does not work: `h264Enabled` is
+  `sessData.h264Enabled || !0` — unconditionally true, so the setting has no effect upstream;
+  `advancedSearchAlerts` is gated on one hard-coded owner id; `smallerImagePreview` seeds a
+  preference whose only class has no rule in any of the 52 stylesheets held here.
+* **The rest are BLOCKED** on an archive service, a server-owned lock, a second MediaMTX cluster, the
+  `r` recording-bot parameter, a cross-post fan-out that occurs **zero** times in the bundle, or a
+  Discord application registration.
+
+The `WIRE` section — settings whose surface exists and lack only a term — **opened at twelve rows and
+is down to one**, `recsInRoom`, itself blocked on the Recordings tab.
+
+So there is no buildable work in this surface. That is the finding.
+
+#### Two stale copies of one number, three phrasings, one file
+
+`verify-room-settings-schema.mjs` has a `COUNT_CLAIMS` list, and its docblock records why a pinned
+list of sites is still the right shape while predicting its failure: *"the next stale count will be
+in a seventh file phrased a seventh way."*
+
+It was a seventh phrasing in a file already on the list. `COUNT_CLAIMS` checks the WIRED total; this
+is a different claim — how many of the unwired ones the reference reads — and no pattern matched it.
+
+**The second copy was found by a negative control that failed to fire.** Deleting the pointer to the
+contract test left the guard green, because the pointer assertion was being satisfied by a different
+line — one that itself read *"pins the 26 by NAME"*. Without that control, one of the two would have
+been corrected and the other left standing.
+
+#### The fix is the doctrine, not another correction
+
+`setting-coverage-contract.test.ts` already states it about its own prose: *"NO COUNTS IN THIS
+PARAGRAPH ANY MORE… the numbers move every time a setting is wired, and prose beside a list it counts
+is the copy nobody updates."* Both counts are now GONE from `TODO.md` rather than corrected, and that
+test asserts they stay gone — matching the two shapes that actually occurred rather than hunting
+digits across a 900-line tracker, which is the false-positive rate the "20 of 269" incident measured.
+
+**Four negative controls seen RED**: a numeric count restored; a spelled-out count; the second
+phrasing restored; the pointer deleted.
+
+#### Verification
+
+`svelte-check` 0/0. `eslint` clean. Room **207 files, 3,316 passed**; controller **97 files, 1,026
+passed**. `verify-room-settings-schema.mjs` clean: 268 extracted + 1 reviewed deviation = 269, 103
+wired, roster matches.
+
 ### 2026-08-29 20:20 UTC — The credential tripwire had a hole its own TODO row named
 
 **Runtime impact: none.** A test-only change, and the one it guards is the boundary between a

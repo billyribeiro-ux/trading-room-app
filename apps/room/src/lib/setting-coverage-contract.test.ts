@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
 
@@ -245,6 +246,55 @@ describe('room settings the reference reads and this room does not', () => {
     expect(report.unwiredButReferenceReads.map((setting) => setting.name)).toEqual([
       ...REFERENCE_READS_AND_WE_DO_NOT
     ]);
+  });
+
+  it('keeps TODO.md pointing at this list rather than restating its size', () => {
+    /*
+      `TODO.md` carried this count twice and it was stale both times — "26 of the 170", then "26" when
+      the measurement said 22. Neither was caught by `verify-room-settings-schema.mjs`, whose
+      `COUNT_CLAIMS` checks the WIRED total: this is a different claim, phrased a way no pattern
+      matched. That verifier's own docblock predicted it — *"the next stale count will be in a
+      seventh file phrased a seventh way"* — and it turned out to be a seventh phrasing in a file
+      already on the list.
+
+      The fix is the doctrine this file states about its own prose: the LIST is the fact, and a
+      number beside it is the copy nobody updates. So the assertion is that no such number is there,
+      not that it is right.
+
+      Deliberately narrow. It matches the sentence shape that went stale — a digit or a spelled
+      number immediately before "read by the reference" — rather than hunting digits in a 900-line
+      tracker, which is the false-positive rate the "20 of 269" incident already measured.
+    */
+    const todo = readFileSync(new URL('../../../../TODO.md', import.meta.url), 'utf8');
+    const live = todo
+      .split('\n')
+      .filter((line) => !/^\s*>/.test(line))
+      .join(' ')
+      .replace(/\s+/g, ' ');
+
+    const NUMBER = '(\\d+|one|two|three|four|five|six|seven|eight|nine|ten|dozens?|\\w+ty)';
+    /*
+      TWO phrasings, because there were two sites and the second was found by a control that FAILED
+      TO FIRE: deleting the pointer left this test green, since the pointer assertion below was
+      being satisfied by a DIFFERENT line — one which itself read *"pins the 26 by NAME"*. Two stale
+      copies of one number in one file, three phrasings between them.
+
+      So the pattern covers the shape of both: a count before "read by the reference", and a count
+      after "pins the". Not a general digit hunt — that is the false-positive rate the "20 of 269"
+      incident already measured.
+    */
+    const restated = new RegExp(
+      `${NUMBER}\\s+(?:of them\\s+)?(?:are\\s+)?read by the reference|pins the\\s+${NUMBER}\\b`,
+      'i'
+    ).exec(live);
+    expect(
+      restated?.[0] ?? null,
+      'TODO.md is restating the size of this list. Point at the list instead — it moves every time a ' +
+        'setting is wired, and the number beside it is the copy nobody updates.'
+    ).toBeNull();
+
+    /* And that it still points here at all, so the pointer cannot be deleted along with the count. */
+    expect(live).toContain('setting-coverage-contract.test.ts');
   });
 
   it('still lists every credential the reference leaks, because wiring one is a REGRESSION', () => {
