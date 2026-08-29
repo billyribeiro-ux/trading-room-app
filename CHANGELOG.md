@@ -33,6 +33,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 01:40 UTC — Four of the census's six "NOT BUILT" commands cannot be built here at all
+
+**Runtime impact: NO.** A tracker document, its contract test, and one new machine-checked status.
+
+`missing-commands-triage.md` tagged 25 commands with `BUILT` / `BUILT AS x` / `NOT BUILT`, and
+`NOT BUILT` had a precise meaning to the gate — *the command name does not occur in `apps/room/src`*
+— and a different meaning to a reader: **work**. Six rows carried it. Two of them are work.
+
+The other four were measured, each to a different and specific blocker:
+
+| command | blocker, measured |
+| --- | --- |
+| `presAreaTabs-recordings` | no archive service, and ZERO recordings/archive tables in either schema |
+| `stopRecMsg` | the reference's own server does not send it; it needs a recorder |
+| `stopOBStream` | its Start/Stop pair renders under `O(1, e.useMTX ? -1 : 1)` at bundle byte 2,145,988 — only when MTX is **off**, and this deployment is MTX |
+| `streamPlayerDisabled` | gated on `globals.isPlayer`, which is `decodedPassedToken.isPTRPlayer` (byte 1,191,994) — a JWT claim the controller mints nowhere |
+
+The last one is the reason this was worth doing rather than leaving as prose. `gates.ts` already
+recorded *"`isPlayer` has ZERO occurrences in this room… this room has no such mode, so there is
+nothing to read"* — true, and only half the story. The other half is the SUPPLY: `isPlayer` is not a
+mode somebody forgot to build, it is a claim on the handoff token, and `HandoffPayload` in
+`room-handoff.ts` carries `type`, `issued`, `iat`, `exp` and the identity. `isPTRPlayer` occurs zero
+times in `apps/room/src` and zero times in `apps/controller/src`, counted. **No client could ever
+be a player, so the command could never fire.** That is a different sentence from "not built", and
+only one of the two tells the next engineer to stop.
+
+#### The status is machine-checked, because BLOCKED is the one most able to become a hiding place
+
+It is the status that means "not my problem". So the gate requires that a row claiming it NAMES the
+blocker, in a vocabulary of things that exist or can be obtained — `archive`, `recorder`,
+`MediaMTX`, `useMTX`, `isPTRPlayer`, `isPlayer`, `capture`, `owner`. A row that says BLOCKED and
+explains nothing fails, the same rule `INERT_ACTIONS` and `ORPHANS` are held to. The check found a
+row immediately: `presAreaTabs-recordings` had its blocker recorded in `TODO.md` and not in its own
+cell, so the document did not say the thing the document was being trusted for.
+
+The two that remain are asserted BY NAME — `archiveLogs`, `unarchiveLogs` — so finishing them turns
+the gate red rather than quietly leaving the census looking the same. Both are real work: sends are
+`{type:"chat"|"alerts", date, channel}` and `{type, roomID, archiveID}`, with a third command
+`getArchiveList {type}` behind the browser at bytes 2,304,726 and 2,312,026 that the census does not
+yet carry a row for.
+
+#### Verification
+
+Three negative controls, each seen RED: stripping the blocker text from a BLOCKED row; moving
+`archiveLogs` to BLOCKED to hide real work (fires twice — the vocabulary check and the
+remaining-work list); and letting the headline disagree with the rows.
+
+Room suite **209 files / 3,365 tests**. Nothing else was run: one document and one test file changed.
+
 ### 2026-08-30 01:05 UTC — A second construction of an entitlement-bearing object, found one call site from being real
 
 **Runtime impact: NO.** No live path reached the lossy branch. The change removes it and gates

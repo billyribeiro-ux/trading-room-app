@@ -86,14 +86,15 @@ function occurs(identifier: string): boolean {
 }
 
 /** One row of the *Confirmed missing* table: its command and the status it claims. */
-type Row = { command: string; status: string };
+type Row = { command: string; status: string; rest: string };
 
 function rows(): Row[] {
   const doc = readFileSync(TRIAGE, 'utf8');
   const found: Row[] = [];
   for (const line of doc.split('\n')) {
-    const match = /^\| `([A-Za-z-]+)` \| (BUILT AS [A-Za-z]+|BUILT|NOT BUILT) \| /.exec(line);
-    if (match) found.push({ command: match[1], status: match[2] });
+    const match =
+      /^\| `([A-Za-z-]+)` \| (BUILT AS [A-Za-z]+|BUILT|NOT BUILT|BLOCKED) \| (.*)$/.exec(line);
+    if (match) found.push({ command: match[1], status: match[2], rest: match[3] });
   }
   return found;
 }
@@ -120,7 +121,9 @@ describe('the triage document tells the truth about what is built', () => {
       them a feature somebody could have been sent to rebuild.
     */
     const stale = table
-      .filter((row) => row.status === 'NOT BUILT' && occurs(row.command))
+      .filter(
+        (row) => (row.status === 'NOT BUILT' || row.status === 'BLOCKED') && occurs(row.command)
+      )
       .map((row) => row.command)
       .sort();
 
@@ -130,6 +133,80 @@ describe('the triage document tells the truth about what is built', () => {
         'the status column. A tracker that says a built thing is missing sends the next engineer ' +
         'to rebuild working code.'
     ).toEqual([]);
+  });
+
+  it('makes every BLOCKED row name what would unblock it', () => {
+    /*
+      ## WHY A FOURTH STATUS, added 2026-08-30
+
+      `NOT BUILT` meant one thing to this file — the command name does not occur in `apps/room/src` —
+      and something else entirely to a reader: WORK. Six rows carried it, and only two of them were
+      work. The other four cannot be built here at all, each for a different and specific reason:
+
+        `presAreaTabs-recordings`  there is no archive service and zero archive tables in either
+                                   database, so the tab has nothing to point at
+        `stopRecMsg`               the reference's server does not send it; it needs a recorder
+        `stopOBStream`             its Start/Stop pair renders under `O(1, e.useMTX ? -1 : 1)` at
+                                   bundle byte 2,145,988 — only when MTX is OFF, and this
+                                   deployment is MTX
+        `streamPlayerDisabled`     gated on `globals.isPlayer`, which is
+                                   `decodedPassedToken.isPTRPlayer` (byte 1,191,994) — a claim the
+                                   controller mints nowhere. `HandoffPayload` in
+                                   `room-handoff.ts` carries `type`, `issued`, `iat`, `exp` and the
+                                   identity, and `isPTRPlayer` occurs ZERO times in either app.
+
+      A tracker that files four unbuildable things beside two buildable ones under one word is a
+      tracker that costs somebody a day finding out which is which. That has already happened here
+      twice, in the other direction, and the cost was the same.
+
+      ## AND WHY IT IS MACHINE-CHECKED
+
+      `BLOCKED` is the status most able to become a place to hide — it is the one that means "not my
+      problem". So a row may only claim it while its own cells NAME the blocker, in the vocabulary
+      of things that actually block work here. A row that says BLOCKED and explains nothing fails,
+      which is the same rule `INERT_ACTIONS` and `ORPHANS` are held to.
+    */
+    const blocked = table.filter((row) => row.status === 'BLOCKED');
+    expect(blocked.length, 'the BLOCKED rows have gone; is the census still measuring?').toBe(4);
+
+    /*
+      Deliberately a VOCABULARY and not a free-text check. "Blocked" with a reason nobody can act on
+      is the same as blocked with no reason; every term here names a thing that either exists or can
+      be obtained, so each row points at something somebody could go and do.
+    */
+    const UNBLOCKERS = [
+      'archive',
+      'recorder',
+      'MediaMTX',
+      'useMTX',
+      'isPTRPlayer',
+      'isPlayer',
+      'capture',
+      'owner'
+    ];
+    const silent = blocked
+      .filter((row) => !UNBLOCKERS.some((term) => row.rest.includes(term)))
+      .map((row) => row.command)
+      .sort();
+
+    expect(
+      silent,
+      'these rows claim BLOCKED without naming what would unblock them. A blocker nobody can act ' +
+        'on is indistinguishable from an excuse — say which thing is missing.'
+    ).toEqual([]);
+
+    /*
+      And the two that are LEFT are the real remaining work, asserted by name so that finishing them
+      turns this red rather than quietly leaving the census looking the same.
+    */
+    const notBuilt = table
+      .filter((row) => row.status === 'NOT BUILT')
+      .map((row) => row.command)
+      .sort();
+    expect(
+      notBuilt,
+      'the buildable remainder of the census has changed — update this list and TODO.md with it'
+    ).toEqual(['archiveLogs', 'unarchiveLogs']);
   });
 
   it('has no row marked BUILT whose command does not occur at all', () => {
@@ -228,5 +305,13 @@ describe('the triage document tells the truth about what is built', () => {
     expect(doc).toContain(`| *Confirmed missing*, now **BUILT** | **${built}** |`);
     expect(doc).toContain(`| *Confirmed missing*, **BUILT AS** something else | ${renamed} |`);
     expect(doc).toContain(`| *Confirmed missing*, still **NOT BUILT** | ${notBuilt} |`);
+    /*
+      Added with the BLOCKED status. The headline's whole job is to be the number a reader trusts,
+      and a reader who sees "6 NOT BUILT" plans six pieces of work when two of them are work — so
+      the split has to appear here, recomputed, or the summary is stale again by construction.
+    */
+    expect(doc).toContain(
+      `| *Confirmed missing*, **BLOCKED** — cannot be built here, blocker named | ${tally('BLOCKED')} |`
+    );
   });
 });
