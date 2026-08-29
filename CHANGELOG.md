@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 02:25 UTC — The duplication audit's findings, and the one lesson worth borrowing
+
+**Runtime impact: NO.**
+
+#### Four dimensions reported; none of the new gates is redundant
+
+Each agent ran a positive control first, to prove its search method worked before reporting an
+absence:
+
+| dimension | verdict |
+| --- | --- |
+| component reachability | **Nothing asserted it before.** `unfed-props-contract.test.ts` explicitly declines the case at :205 — *"A component nothing renders is a different problem, and not this file's."* |
+| documented inventory accuracy | Partly overlapping — see the correction below |
+| markdown path/line validity | **Nothing validated it before**, proven empirically rather than by an empty grep |
+| tracker count gates | **Not redundant.** `evidence-gap-register-counts.test.ts` guards `TODO.md`'s *"66 CLOSED, 6 OPEN, 15 parked…"* recounted from the 87-row register; the census gate guards row 4's disposition line recounted from `dispatchedActions()`. Different sentences, different sources, different apps |
+
+#### The one lesson borrowed, from a sibling that had already paid for it
+
+`verify-backend-provenance.mjs` carries `DOCUMENTED_COUNT_SITES` — the same mechanism as the new
+`COUNT_CLAIMS`: a pinned list of prose sites quoting a number the script already computes. Its
+docblock records what that list cost. Paths resolving from `apps/controller/` *"happened to work for
+the wrong reason"*, and repairing one broke two others — **"the FOURTH instance of one original bug,
+which is why every path in this file now resolves from a single explicit root."**
+
+`COUNT_CLAIMS` had exactly that shape: three entries app-relative, two escaping upward with `../../`.
+It worked, and it produced failures naming `../../docs/decoded/admin-surface.md` — not a path anyone
+can paste. Every site is now written from an explicit `REPOSITORY_ROOT`.
+
+**Four instances of one bug is a price already paid once here. Paying it again in a file written the
+same week would be the avoidable kind.**
+
+#### Corrections to the audit's own findings, verified before use
+
+* It reported that `source-size-contract.test.ts` already requires a catalog entry for **52 of 55**
+  surfaces. Measured: **51**. It counted `routes/+page.svelte` as covered because that file carries a
+  ceiling — it carries one **voluntarily**, and nothing would fail if it were removed, because the
+  completeness check enumerates only `svelteFilesUnder('lib/components/')`. "Has an entry" and "is
+  required to have one" are different properties, and only the second is coverage.
+* It placed `unfed-props-contract.test.ts`'s declining comment at line **205**, and was right — the
+  earlier reference in this CHANGELOG to "line 214" named the neighbouring `children` comment.
+
+#### Not findings, recorded so they are not chased again
+
+* **The generated schema header states the count too** — `room-settings-schema.ts:17`, *"103 of 269
+  are wired today"*. It cannot drift: `extract-manage-schema.mjs:991` emits it as
+  `${wiredCount} of ${defs.length}`. Generation beats verification wherever the text is generated;
+  the five documents are hand-written prose carrying argument around the number, which is why they
+  get a verifier instead.
+* **A cross-reference was rejected rather than written.** `doc-citation-contract` and
+  `lib-subpath-imports` both resolve a path with `existsSync`, over markdown citations and `#lib/`
+  import specifiers respectively. Nobody would think one makes the other redundant, and a
+  cross-reference that reads as noise is how the ones that matter get skipped.
+
+#### Verified
+
+* All **seven** wired-count negative controls re-run after the path change — every one still fires,
+  and every message now names a repository-root path.
+* `verify-room-settings-schema.mjs` green; controller **97 files / 1,023 tests passing**; `eslint`
+  clean.
+
 ### 2026-08-29 02:20 UTC — Eleven controller verifiers were enforced by nobody, and now CI runs them
 
 **Runtime impact: NO** to what the site serves — and a real change to what a pull request means.

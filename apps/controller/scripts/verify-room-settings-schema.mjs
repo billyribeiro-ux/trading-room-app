@@ -9,6 +9,21 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '..');
+/**
+ * The REPOSITORY root, distinct from `REPO_ROOT` above — which, despite its name, is this APP.
+ *
+ * Introduced 2026-08-29 after a duplication audit pointed at `verify-backend-provenance.mjs`, whose
+ * sibling `DOCUMENTED_COUNT_SITES` list is the same mechanism as `COUNT_CLAIMS` below and whose
+ * docblock records what that list cost: paths that resolved from `apps/controller/` "happened to
+ * work for the wrong reason", and repairing one broke two others — *"the FOURTH instance of one
+ * original bug, which is why every path in this file now resolves from a single explicit root."*
+ *
+ * `COUNT_CLAIMS` had exactly that shape: three entries app-relative, two escaping upward with
+ * `../../`. It worked, and it produced error messages naming `../../docs/decoded/admin-surface.md`,
+ * which is not a path anyone can paste. Every site is now written from the repository root, so the
+ * list reads as locations rather than as directions.
+ */
+const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '../../..');
 const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
@@ -462,11 +477,11 @@ try {
     would have to re-derive it — which is how two sources of one truth start disagreeing.
   */
   const COUNT_CLAIMS = [
-    'README.md',
-    'docs/OUTSTANDING.md',
-    'docs/ARCHITECTURE.md',
-    '../../docs/decoded/admin-surface.md',
-    '../../v5.md'
+    'apps/controller/README.md',
+    'apps/controller/docs/OUTSTANDING.md',
+    'apps/controller/docs/ARCHITECTURE.md',
+    'docs/decoded/admin-surface.md',
+    'v5.md'
   ];
 
   /**
@@ -505,7 +520,7 @@ try {
   const livePhrases = (text) => liveText(text).replace(/\s+/g, ' ');
 
   for (const relative of COUNT_CLAIMS) {
-    const path = resolve(REPO_ROOT, relative);
+    const path = resolve(REPOSITORY_ROOT, relative);
     const text = livePhrases(readFileSync(path, 'utf8'));
     /*
       "<n> of 269" WHERE THE WORD `wired` IS NEARBY, and the narrowing was measured rather than
@@ -553,7 +568,7 @@ try {
   const unwired = 269 - wired.length;
 
   for (const relative of COUNT_CLAIMS) {
-    const path = resolve(REPO_ROOT, relative);
+    const path = resolve(REPOSITORY_ROOT, relative);
     const text = livePhrases(readFileSync(path, 'utf8'));
     /*
       The four phrasings actually used, named rather than generalised. A loose "any number near the
@@ -588,8 +603,8 @@ try {
     The roster in `admin-surface.md`, compared name by name. Alphabetical because that is how it is
     written there, and because a roster in schema order would silently reorder on every regeneration.
   */
-  const ROSTER_DOC = '../../docs/decoded/admin-surface.md';
-  const rosterText = liveText(readFileSync(resolve(REPO_ROOT, ROSTER_DOC), 'utf8'));
+  const ROSTER_DOC = 'docs/decoded/admin-surface.md';
+  const rosterText = liveText(readFileSync(resolve(REPOSITORY_ROOT, ROSTER_DOC), 'utf8'));
   const rosterBlock = /Wired \(\d+\), alphabetically:\n\n([\s\S]*?)\.\n/.exec(rosterText);
   if (!rosterBlock) {
     fail(`${ROSTER_DOC} no longer carries a parsable "Wired (n), alphabetically:" roster`);
