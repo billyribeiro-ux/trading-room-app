@@ -158,11 +158,84 @@ describe('the allow-list itself', () => {
       Mobile App Info and Benzinga unbuildable for the wrong reason. What matters is a URL that IS
       a secret — a webhook or a post endpoint whose only protection is that nobody knows it.
     */
+    /*
+      `Password` JOINED THE PATTERN 2026-08-29, and it needed the type check beside it.
+
+      `TODO.md` row 2 recorded the hole and named it exactly: `needPasswordForUserNotes` — the
+      setting whose VALUE a presenter types to unlock user notes — matched NONE of the patterns
+      above. `PW$` catches `deleteAlertPW` and `allRoomsWelcomeMatPW` because the reference
+      abbreviates; this one it spells out, so the tripwire meant to catch a credential crossing to
+      the room would have watched this one go past.
+
+      **A bare `/[Pp]assword/` is the wrong fix**, and measuring said so before it was written:
+      `showPasswordField` is already on `ROOM_VISIBLE_SETTINGS` and is a BOOLEAN — whether the login
+      page draws a password box. Blocking it would repeat the mistake the note above records about
+      `URL$`, where a rule that read the name instead of the thing kept two buildable features out.
+
+      What separates them is not the name, it is the SHAPE: a `checkbox` cannot hold a secret,
+      whatever it is called. The schema already says which is which and is already imported for the
+      wired check above, so the rule asks it rather than encoding `(?!Field)` and hoping the next
+      credential is spelled the same way.
+    */
     const credentialShaped =
-      /PW$|PW\d|Secret|secret|Token|token|ApiKey|apiKey|KeyID|KeySecret|[Ww]ebhook|WebHook|_url$|PostURL$|Email$|banIPList|LoginList/;
+      /PW$|PW\d|[Pp]assword|Secret|secret|Token|token|ApiKey|apiKey|KeyID|KeySecret|[Ww]ebhook|WebHook|_url$|PostURL$|Email$|banIPList|LoginList/;
+
+    /** Settings whose value is a flag. A boolean is not a credential however it is named. */
+    const booleanSettings = new Set(
+      ROOM_SETTINGS.filter((setting) => setting.type === 'checkbox').map((setting) => setting.name)
+    );
+
     for (const name of ROOM_VISIBLE_SETTINGS) {
+      if (booleanSettings.has(name)) continue;
       expect(name, `${name} reads like a credential`).not.toMatch(credentialShaped);
     }
+  });
+
+  it('the credential tripwire would catch the one that got past it', () => {
+    /*
+      A POSITIVE control on the tripwire itself, which the assertion above cannot give: it passes
+      when the allow-list is clean, which is also exactly what it does when the pattern matches
+      nothing at all. `TODO.md` row 2 is the case in point — the pattern was clean and blind at the
+      same time, for as long as the row went unread.
+
+      Both halves are asserted. `needPasswordForUserNotes` must be caught, and `showPasswordField`
+      must be exempt on its TYPE rather than its name, because a rule that catches everything is a
+      rule somebody deletes the first time it blocks real work.
+    */
+    const credentialShaped =
+      /PW$|PW\d|[Pp]assword|Secret|secret|Token|token|ApiKey|apiKey|KeyID|KeySecret|[Ww]ebhook|WebHook|_url$|PostURL$|Email$|banIPList|LoginList/;
+
+    expect('needPasswordForUserNotes', 'the hole row 2 named').toMatch(credentialShaped);
+    expect('deleteAlertPW').toMatch(credentialShaped);
+    expect('allRoomsWelcomeMatPW').toMatch(credentialShaped);
+
+    /*
+      `showPasswordField` DOES match the pattern and crosses to the room anyway. That is the whole
+      reason the loop above consults the schema, so it is asserted here rather than left implicit —
+      if this ever stops being a checkbox, the exemption stops being safe and this fails.
+    */
+    expect('showPasswordField').toMatch(credentialShaped);
+    expect([...ROOM_VISIBLE_SETTINGS]).toContain('showPasswordField');
+    const showPasswordField = ROOM_SETTINGS.find((s) => s.name === 'showPasswordField');
+    expect(showPasswordField?.type, 'the exemption depends on this').toBe('checkbox');
+
+    /*
+      ONE CONTROL ON THIS FILE DID NOT FIRE, and it is recorded rather than left implied.
+
+      Replacing the loop's `booleanSettings.has(name)` with `name === 'showPasswordField'` keeps
+      every assertion here green. So this file pins the OUTCOME — that flag stays visible, that
+      credential does not — and not the MECHANISM.
+
+      The type-based form was kept anyway, and the reason is that it is the one that survives: a
+      name exemption is an allow-list of one, and the next `...Password...` checkbox somebody adds
+      would be blocked by a rule that had already decided the answer for a different setting.
+
+      It is not asserted because it CANNOT be, honestly. `showPasswordField` is the only entry on
+      `ROOM_VISIBLE_SETTINGS` that is both credential-shaped and a checkbox — measured, all ninety —
+      so a test that the rule generalises would need a second setting invented to prove it, and an
+      invented fixture proving a rule about real settings is the hollow coverage this repository
+      keeps catching. The day a second one exists, it belongs here.
+    */
   });
 
   it('every entry is a setting some room code actually reads', () => {

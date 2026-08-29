@@ -285,8 +285,11 @@ records them CLOSED on 2026-08-27), *5.1 Alert Filter*, *5.2 Alert Labels* and *
 (PART 5 above). The order below was still scheduling all five, which is how a plan outlives the work
 it was planning.
 
-1. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
-   to end.
+1. ~~2.1 the sort bar~~ — **BUILT, and all three of the re-spec's corrections landed.** Verified by
+   reading `lib/file-sort.ts` on 2026-08-29: ONE shared `direction` (line 29), a field switch that
+   resets to that field's default (`field === 'date' ? 'desc' : 'asc'`, line 189), and
+   `INITIAL_FILE_SORT = { field: 'date', direction: 'desc' }`. The labels keep their leading and
+   trailing spaces, cited at `FilesPane.svelte:328`. This entry was still scheduling it.
 2. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
    onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
    Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller

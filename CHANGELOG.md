@@ -33,6 +33,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 20:20 UTC — The credential tripwire had a hole its own TODO row named
+
+**Runtime impact: none.** A test-only change, and the one it guards is the boundary between a
+multi-tenant room and the credentials its controller holds.
+
+#### The hole
+
+`room-config-boundary.test.ts` carries a tripwire: no name on `ROOM_VISIBLE_SETTINGS` may read like
+a credential. `TODO.md` row 2 recorded, in its own words, that the tripwire would not have caught the
+setting that row was about — *"`needPasswordForUserNotes` matches NONE of
+`room-config-boundary.test.ts`'s `credentialShaped` patterns, so the tripwire that is supposed to
+catch a credential leaking to the room would not catch this one"*.
+
+Measured and confirmed: `PW$` catches `deleteAlertPW` and `allRoomsWelcomeMatPW` because the
+reference abbreviates. This one it spells out.
+
+#### Why the obvious fix is wrong, established before writing it
+
+A bare `/[Pp]assword/` fails. `showPasswordField` is **already on `ROOM_VISIBLE_SETTINGS`** — one of
+ninety — matches that pattern, and is a boolean about whether the login page draws a password box.
+Blocking it would repeat the mistake this same test already records about `URL$`, where a rule that
+read the name instead of the thing *"would have kept Mobile App Info and Benzinga unbuildable for the
+wrong reason"*.
+
+What separates them is not the name but the SHAPE: **a checkbox cannot hold a secret, whatever it is
+called.** The schema says which is which and was already imported for the wired check two assertions
+up, so the rule asks it rather than encoding `(?!Field)` and hoping the next credential is spelled
+the same way.
+
+#### A positive control, because the assertion cannot give one
+
+The loop passes when the allow-list is clean, which is exactly what it does when the pattern matches
+nothing at all — row 2 is the case in point: clean and blind at the same time, for as long as the row
+went unread. A second test now asserts the tripwire catches `needPasswordForUserNotes`,
+`deleteAlertPW` and `allRoomsWelcomeMatPW`, and that `showPasswordField` is exempt on its TYPE.
+
+**Four negative controls, three seen RED**: removing `Password` from the pattern; adding
+`needPasswordForUserNotes` to the allow-list; changing `showPasswordField` to a text setting.
+
+**One did not fire, and is recorded in the file rather than left implied.** Replacing the loop's
+`booleanSettings.has(name)` with `name === 'showPasswordField'` keeps everything green — so this
+pins the outcome, not the mechanism. The type-based form was kept because it is the one that
+survives: a name exemption is an allow-list of one, and it cannot be asserted honestly, because
+`showPasswordField` is the only entry that is both credential-shaped and a checkbox. Proving the rule
+generalises would need a second setting invented for the purpose, which is the hollow coverage this
+repository keeps catching.
+
+#### Four TODO rows closed on measurement, not on work
+
+Each was checked against the code rather than trusted:
+
+* **Row 2** — `admin-notes-password` is BUILT: `POST /internal/room-notes-auth/<code>` compares the
+  candidate on the controller and answers two booleans, exactly the `internal/room-entry` precedent
+  the row specified. Its second half — the tripwire — is what this entry closes.
+* **Row 7(c)** — the opcode-3 door is BUILT: `internal/room-mute/[code]`, `writeRoomMute` as a
+  WRITER in the capability census, and `muteChatIndefinitely` wired through `create-room.svelte.ts`.
+  Only 7(b), the close message, is left, and it needs a storage decision.
+* **The defect table's `doChatLogSearch`** — both halves are now done; the chat half shipped earlier
+  today. The row still said the chat search *"this room does not have at all"*.
+* **Ready-to-build's Benzinga row** — said the const pass *"found nothing to change"*. It found a
+  whole second surface.
+
+**Row 5 was checked and is genuinely still blocked**: the four Chromium gates drive a real browser
+against reference captures that are themselves unpublished, so they cannot be re-derived from tracked
+bytes the way the enumeration could. That remains the owner's decision, unchanged.
+
 ### 2026-08-29 19:55 UTC — The Mobile App tab, and the alert upstream raises over nothing
 
 **Runtime impact: YES.** A member who has stopped getting push notifications can press one button,
