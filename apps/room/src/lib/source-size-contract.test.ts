@@ -2164,7 +2164,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What paid for it, in the same commit: `ModalHost.svelte` drops 166 lines, and `RoomMessage`'s
       two unfed-prop exemptions are deleted rather than reworded.
     */
-    max: 590,
+    /*
+      590 -> 630, 2026-08-29, for the Q&A `edit` arm — and this raise BOUGHT A CONTROL THAT WAS NEVER
+      DRAWN, which is a quieter defect than the ones the entries above paid for.
+
+      `message-behavior.ts` suppressed `edit` inside the Q&A thread under the claim that it, like
+      `showToAll` and `openAlertReport`, addresses `msg._id` — which a thread entry does not have.
+      True of those two. False of `edit`: byte 1,351,806 branches to
+      `editQAMessage {qaMsgID, msgIndex, newAlertMsg}`, which is the parent-plus-ordinal shape the
+      same docblock cites for the controls that DO work. A suppressed menu item raises nothing, sends
+      nothing, fails no test and leaves no `INERT_ACTIONS` row, so nothing here could have noticed.
+
+      The arm is ~35 lines and half of it is that argument, plus the two things a reader will
+      otherwise re-derive: why the title says "qa message" (it is the capture's own noun, from the
+      same expression that says "alert") and why there is no optimistic `#patchEvidence` (a thread
+      entry is never a fixture row — `askQuestion` writes a real one even for a captured alert).
+    */
+    max: 630,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -2939,7 +2955,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 1271,
+    /*
+      RAISED 1271 -> 1277 on 2026-08-29: the `editQuestion` wiring and its import, split across
+      lines by prettier. Assembly only — see the entry for `message-actions.svelte.ts`, which is
+      where that change actually lives.
+    */
+    max: 1277,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

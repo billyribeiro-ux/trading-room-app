@@ -56,7 +56,7 @@ export interface SourceMessageBehavior {
  * Concrete captured DOM menus are applied separately because the supplied
  * capture does not expose the session values behind every feature flag.
  *
- * ## THREE ENTRIES DIVERGE INSIDE THE Q&A THREAD, and the divergence is deliberate
+ * ## TWO ENTRIES DIVERGE INSIDE THE Q&A THREAD — and it was THREE, wrongly, until 2026-08-29
  *
  * `isQaMessage` means one thing upstream: this row is being drawn inside the Q&A thread modal. Its
  * own constructor sets `this.isQAMsg = !0, this.logType = "alerts"` (bundle byte 2,334,347) and
@@ -65,17 +65,33 @@ export interface SourceMessageBehavior {
  * `openAlertReport` (`isP && "alerts" === logType`) and `edit` (`enableEditAlerts && "alerts" ===
  * logType && isP` — byte 1,348,838, with no `isQAMsg` term anywhere in it).
  *
- * **All three are dead upstream.** Every one of them addresses `this.msg._id`, and a Q&A entry has
- * no `_id`: that is exactly why the two things the reference CAN do to a thread entry address it
- * some other way — `manageChatReactions(this.isQAMsg ? this.qaMsgID : this.msg._id, …, msgIndex)`
- * (1,354,136) and `deleteQAAlert({qaMsgID, msgIndex})` (1,159,097) both send the PARENT ALERT's id
- * and the entry's ordinal. A control that cannot name the thing it acts on is a control whose only
- * effect is changing its own label, and this repository refuses those by name.
+ * **TWO of the three are dead upstream.** Both address `this.msg._id`, and a Q&A entry has no
+ * `_id`: that is exactly why everything the reference CAN do to a thread entry addresses it some
+ * other way, sending the PARENT ALERT's id plus the entry's ORDINAL. A control that cannot name the
+ * thing it acts on is a control whose only effect is changing its own label, and this repository
+ * refuses those by name. So those two are suppressed here rather than drawn.
  *
- * So they are suppressed here rather than drawn. The remaining seven all act on a question:
- * `deleteMessage` and `react` through the two commands in `alert-questions.remote.ts`, `muteMessage`
- * / `openUserInfo` / `privateMessage` through the sender, `mention` into the thread's own composer
- * (the reference has a `doQAMention` subscription for exactly that), and `copy` on the text.
+ * **`edit` IS NOT ONE OF THEM, and this docblock said it was.** The claim was that all three address
+ * `msg._id`. `edit` does not. Byte 1,351,806, read whole:
+ *
+ * ```js
+ * this.isQAMsg ? sendServerCommand("editQAMessage",    {qaMsgID: this.qaMsgID, msgIndex: this.msgIndex, newAlertMsg: o})
+ *              : sendServerCommand("editAlertMessage", {alertID: this.msg._id, newAlertMsg: o})
+ * ```
+ *
+ * The Q&A arm is parent-plus-ordinal — the very "some other way" this paragraph names for the
+ * controls that DO work. The list of those was written as two (reactions and delete) when it is
+ * three, and `edit` was filed with the dead ones on the strength of a sentence rather than a read.
+ *
+ * The cost was invisible by construction: a suppressed menu item raises nothing, breaks nothing, and
+ * leaves no `INERT_ACTIONS` row — the absence looked exactly like a decision. Built 2026-08-29 as
+ * `editQuestion` in `routes/alert-questions.remote.ts`, addressed by the question's own id for the
+ * reason its two neighbours record.
+ *
+ * The remaining eight all act on a question: `deleteMessage`, `react` and `edit` through the three
+ * commands in `alert-questions.remote.ts`, `muteMessage` / `openUserInfo` / `privateMessage` through
+ * the sender, `mention` into the thread's own composer (the reference has a `doQAMention`
+ * subscription for exactly that), and `copy` on the text.
  */
 export function sourceMessageBehavior(input: SourceMessageBehaviorInput): SourceMessageBehavior {
   return {
@@ -98,10 +114,9 @@ export function sourceMessageBehavior(input: SourceMessageBehaviorInput): Source
       (input.enableEditMessage &&
         input.kind === 'chat' &&
         (input.isOwnMessage || (input.viewerIsPresenter && !input.isAdminMessage))) ||
-      (input.enableEditAlerts &&
-        input.kind === 'alert' &&
-        input.viewerIsPresenter &&
-        !input.isQaMessage),
+      // NO `!isQaMessage` here, though there was until 2026-08-29: see the DIVERGENCE section above,
+      // which filed `edit` with two controls that genuinely cannot name a thread entry.
+      (input.enableEditAlerts && input.kind === 'alert' && input.viewerIsPresenter),
     copy: input.kind === 'alert',
     privateMessage:
       (input.viewerIsPresenter ||

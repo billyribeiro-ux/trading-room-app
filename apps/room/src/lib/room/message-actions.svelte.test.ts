@@ -95,6 +95,10 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
       options.refuse
         ? Promise.reject(new Error('refused'))
         : (questionSends.push({ command: 'deleteQuestion', ...payload }), Promise.resolve()),
+    editQuestion: (payload) =>
+      options.refuse
+        ? Promise.reject(new Error('refused'))
+        : (questionSends.push({ command: 'editQuestion', ...payload }), Promise.resolve()),
     replyMessage: () => Promise.resolve(),
     openModal: (name) => opened.push(name),
     closeMessageMenu: () => {},

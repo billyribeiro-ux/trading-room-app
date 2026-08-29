@@ -157,7 +157,7 @@ describe('the triage document tells the truth about what is built', () => {
       is then free to be absent, which is the whole point.
     */
     const renamed = table.filter((row) => row.status.startsWith('BUILT AS '));
-    expect(renamed.length, 'the BUILT AS rows have gone; is the census still measuring?').toBe(3);
+    expect(renamed.length, 'the BUILT AS rows have gone; is the census still measuring?').toBe(4);
 
     const missing = renamed
       .filter((row) => !occurs(row.status.slice('BUILT AS '.length)))

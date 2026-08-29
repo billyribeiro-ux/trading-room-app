@@ -339,3 +339,94 @@ export const deleteQuestion = command(
     });
   }
 );
+
+/**
+ * `editQAMessage` — a presenter corrects one entry in a Q&A thread.
+ *
+ * ## The gate is the ALERT log's gate, and the `!isQaMessage` term that hid this was ours
+ *
+ * Upstream resolves the Edit item once, for both surfaces, at byte 1,348,838:
+ *
+ * ```js
+ * sessData.enableEditMessage && "chat" === this.logType &&
+ *   (this.canEditMessage = hashEmail(user.email) === this.msg.avt || (isPresenter && !this.msg.isA)),
+ * sessData.enableEditAlerts && "alerts" === this.logType &&
+ *   (this.canEditMessage = globals.isPresenter)
+ * ```
+ *
+ * **There is no `isQAMsg` term in either branch.** A Q&A entry renders in the alerts log type, so
+ * `enableEditAlerts` plus presenter is the whole of it, and the send at byte 1,351,806 then picks
+ * the command by surface:
+ *
+ * ```js
+ * bootbox.prompt({ title: `Edit ${this.isQAMsg ? "qa message" : "alert"} by <strong>${this.msg.n}:</strong>`,
+ *                  inputType: "textarea", value: this.msg.txt,
+ *   callback: i => { if (i) { const o = i.trim();
+ *     this.isQAMsg ? sendServerCommand("editQAMessage",    {qaMsgID, msgIndex, newAlertMsg: o})
+ *                  : sendServerCommand("editAlertMessage", {alertID: this.msg._id, newAlertMsg: o}) } } })
+ * ```
+ *
+ * `message-behavior.ts` carried `&& !input.isQaMessage` on its `edit` rule. That term is not in the
+ * capture: it was added because this command did not exist, and it made the absence invisible — the
+ * menu item simply never appeared, so nothing looked broken and no `INERT_ACTIONS` entry recorded
+ * it. The term is removed in the same commit as this command.
+ *
+ * ## Presenter only, and NOT "or your own"
+ *
+ * `deleteQuestion` beside this one lets a member remove their own entry when `usersCanDeleteOwnMsgs`
+ * allows it, and applying the same shape here would be reasonable design and unevidenced. Upstream's
+ * alert-side rule is `canEditMessage = globals.isPresenter` — flatly, with no self-edit clause, and
+ * its chat-side rule two lines above DOES have one (`hashEmail(user.email) === this.msg.avt`). The
+ * asymmetry is upstream's and is reproduced rather than smoothed: an answer in a public thread is a
+ * record other readers have already acted on.
+ *
+ * ## The identity divergence, same as its two neighbours
+ *
+ * The reference addresses an entry by `{qaMsgID, msgIndex}` — the PARENT alert's id plus an ORDINAL
+ * — because its thread entries live inside the alert document and have no identity of their own. An
+ * ordinal moves when a neighbour is deleted. Ours have an id, so this takes one, exactly as
+ * `reactToQuestion` and `deleteQuestion` do and for the reason recorded there.
+ *
+ * ## What is NOT touched
+ *
+ * `answeredAt`, and the alert's `questionCount` / `questionAnswered` cache. Editing text changes
+ * neither how many entries there are nor whether they are answered, and recomputing them here would
+ * be work with no reader — the shape `deleteQuestion` recounts for because a delete genuinely moves
+ * both.
+ */
+export const editQuestion = command(
+  z.strictObject({
+    questionId: z.number().int().positive(),
+    body: z.string()
+  }),
+  async ({ questionId, body: submittedBody }) => {
+    ensureDatabase();
+    const { locals } = getRequestEvent();
+    const user = requireUser(locals);
+    const shortCode = requireRoomShortCode(locals);
+
+    if (!isPresenterRole(user.role)) error(403, 'Presenters only.');
+
+    /*
+      The same bound `askQuestion` applies, and for the same reason: an entry lands in a thread every
+      reader of that alert loads, so an unbounded body is an unbounded payload for the room. An edit
+      that could not be posted as a question must not be reachable as an edit either.
+    */
+    const body = submittedBody.trim();
+    if (!body) error(400, 'A question is required.');
+    if (body.length > MAX_QUESTION_BODY) error(400, 'That question is too long.');
+
+    /*
+      Resolved through `questionInRoom` rather than trusted, so the room predicate is applied before
+      anything is written — a presenter of room A naming a question of room B gets a 404 here rather
+      than an UPDATE that happens to match zero rows. The `where` below repeats the room term anyway,
+      because a lookup and a write that disagree about scope is the shape this repository refuses.
+    */
+    if (!questionInRoom(questionId, shortCode)) error(404, 'Question not found.');
+
+    db.update(alertQuestions)
+      .set({ body })
+      .where(and(eq(alertQuestions.roomShortCode, shortCode), eq(alertQuestions.id, questionId)))
+      .run();
+  }
+);

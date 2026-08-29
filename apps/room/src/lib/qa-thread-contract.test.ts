@@ -196,17 +196,24 @@ describe('what enableQAReactions actually gates', () => {
   });
 });
 
-describe('the three entries that are DEAD upstream and are not drawn here', () => {
+describe('the two entries that are DEAD upstream and are not drawn here', () => {
   /*
-    Each of the three turns on purely because the thread renders `logType="alerts"`, and each acts
-    on `this.msg._id` — which a Q&A entry does not have. That is not an inference: it is why the two
-    things the reference CAN do to a thread entry send the parent alert plus an ordinal instead
+    Both turn on purely because the thread renders `logType="alerts"`, and both act on
+    `this.msg._id` — which a Q&A entry does not have. That is not an inference: it is why everything
+    the reference CAN do to a thread entry sends the parent alert plus an ordinal instead
     (`manageChatReactions`, byte 1,354,136; `deleteQAAlert`, byte 1,159,097).
+
+    THIS LIST HELD THREE UNTIL 2026-08-29, and the third was `edit`. It does not act on `msg._id`:
+    byte 1,351,806 branches `this.isQAMsg ? sendServerCommand("editQAMessage", {qaMsgID, msgIndex,
+    newAlertMsg}) : sendServerCommand("editAlertMessage", {alertID: this.msg._id, newAlertMsg})`, so
+    the Q&A arm is parent-plus-ordinal — the very shape this comment cites for the ones that work.
+    The claim was inherited from a docblock rather than read, and the cost of getting it wrong was
+    invisible by construction: a suppressed menu item raises nothing and leaves no `INERT_ACTIONS`
+    row, so the absence looked exactly like this decision. See the section below.
   */
   it.each([
     ['showToAll', { viewerIsPresenter: true }],
-    ['openAlertReport', { viewerIsPresenter: true }],
-    ['edit', { viewerIsPresenter: true, enableEditAlerts: true }]
+    ['openAlertReport', { viewerIsPresenter: true }]
   ] as const)('%s is offered on a plain alert and refused inside the thread', (entry, extra) => {
     const onAnAlert = sourceMessageBehavior({ ...BASE, ...extra });
     const inTheThread = sourceMessageBehavior({ ...BASE, ...extra, isQaMessage: true });
@@ -215,15 +222,16 @@ describe('the three entries that are DEAD upstream and are not drawn here', () =
   });
 
   /*
-    …and the seven that DO act are still there, because suppressing a menu is easy to overdo. Each
+    …and the eight that DO act are still there, because suppressing a menu is easy to overdo. Each
     of these acts on the question, on its sender, or on its text.
   */
-  it('leaves the seven that act', () => {
+  it('leaves the eight that act', () => {
     const behavior = sourceMessageBehavior({
       ...BASE,
       isQaMessage: true,
       viewerIsPresenter: true,
-      enableQaReactions: true
+      enableQaReactions: true,
+      enableEditAlerts: true
     });
     expect(behavior.deleteMessage).toBe(true);
     expect(behavior.muteMessage).toBe(true);
@@ -232,6 +240,49 @@ describe('the three entries that are DEAD upstream and are not drawn here', () =
     expect(behavior.react).toBe(true);
     expect(behavior.copy).toBe(true);
     expect(behavior.privateMessage).toBe(true);
+    expect(behavior.edit, 'the eighth, built 2026-08-29 as `editQuestion`').toBe(true);
+  });
+});
+
+describe('edit inside the thread takes the ALERT rule, with no Q&A term of its own', () => {
+  /*
+    Upstream resolves it once for the whole alerts log type, byte 1,348,838:
+    `sessData.enableEditAlerts && "alerts" === logType && (canEditMessage = globals.isPresenter)`.
+
+    Flatly presenter — and the CHAT branch two lines above it in the same expression DOES carry a
+    self-edit clause (`hashEmail(user.email) === this.msg.avt`). The asymmetry is upstream's and is
+    reproduced rather than smoothed, which is what these three assertions pin: adding "or your own"
+    here would be reasonable design and unevidenced.
+  */
+  const inThread = { ...BASE, isQaMessage: true, viewerIsPresenter: true, enableEditAlerts: true };
+
+  it('needs the setting AND the presenter role', () => {
+    expect(sourceMessageBehavior(inThread).edit, 'both').toBe(true);
+    expect(
+      sourceMessageBehavior({ ...inThread, enableEditAlerts: false }).edit,
+      'owner left it off'
+    ).toBe(false);
+    expect(
+      sourceMessageBehavior({ ...inThread, viewerIsPresenter: false }).edit,
+      'a member, in their own thread'
+    ).toBe(false);
+  });
+
+  it('does not let a member edit their own entry', () => {
+    /*
+      `isOwnMessage` unlocks the CHAT rule and must not reach this one. A thread entry is a public
+      answer other readers have already acted on, and the capture's alert branch has no such clause.
+    */
+    expect(
+      sourceMessageBehavior({ ...inThread, viewerIsPresenter: false, isOwnMessage: true }).edit
+    ).toBe(false);
+  });
+
+  it('does not unlock on the chat setting', () => {
+    expect(
+      sourceMessageBehavior({ ...inThread, enableEditAlerts: false, enableEditMessage: true }).edit,
+      'the two settings are separate, as they are for reactions'
+    ).toBe(false);
   });
 });
 

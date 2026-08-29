@@ -92,7 +92,12 @@ import { removeProfilePicture, uploadProfilePicture } from '../../routes/profile
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
-import { askQuestion, deleteQuestion, reactToQuestion } from '../../routes/alert-questions.remote';
+import {
+  askQuestion,
+  deleteQuestion,
+  editQuestion,
+  reactToQuestion
+} from '../../routes/alert-questions.remote';
 import { postAlert as postAlertCommand } from '../../routes/post-alert.remote';
 import { messageAction } from '../../routes/message-actions.remote';
 
@@ -784,6 +789,7 @@ export function createRoom(deps: RoomDeps) {
     askQuestion: (payload) => askQuestion(payload),
     reactToQuestion: (payload) => reactToQuestion(payload),
     deleteQuestion: (payload) => deleteQuestion(payload),
+    editQuestion: (payload) => editQuestion(payload),
     replyMessage: (payload) => replyMessage(payload),
     openModal: (name) => modals.open(name),
     closeMessageMenu: () => menus.openMessageMenu(null),

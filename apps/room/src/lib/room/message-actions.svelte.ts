@@ -84,6 +84,7 @@ export class RoomMessageActions {
     reactionEmoji: string;
   }) => Promise<void>;
   readonly #deleteQuestion: (payload: { questionId: number }) => Promise<void>;
+  readonly #editQuestion: (payload: { questionId: number; body: string }) => Promise<void>;
   readonly #replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
   readonly #openModal: (name: Exclude<ModalName, null>) => void;
   readonly #closeMessageMenu: () => void;
@@ -118,6 +119,8 @@ export class RoomMessageActions {
       reactionEmoji: string;
     }) => Promise<void>;
     deleteQuestion: (payload: { questionId: number }) => Promise<void>;
+    /** `editQAMessage` — a presenter corrects one thread entry. Presenter-gated on the server. */
+    editQuestion: (payload: { questionId: number; body: string }) => Promise<void>;
     replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
     closeMessageMenu: () => void;
@@ -141,6 +144,7 @@ export class RoomMessageActions {
     this.#askQuestion = options.askQuestion;
     this.#reactToQuestion = options.reactToQuestion;
     this.#deleteQuestion = options.deleteQuestion;
+    this.#editQuestion = options.editQuestion;
     this.#replyMessage = options.replyMessage;
     this.#openModal = options.openModal;
     this.#closeMessageMenu = options.closeMessageMenu;
@@ -534,6 +538,42 @@ export class RoomMessageActions {
         this.#composer.editInRTE(item, item.bodyHtml);
         return;
       }
+
+      if (surface === 'qa') {
+        /*
+          The reference composes ONE title for both surfaces and picks the noun by surface —
+          byte 1,351,806: `Edit ${this.isQAMsg ? "qa message" : "alert"} by <strong>${this.msg.n}:</strong>`.
+          So "qa message" is the capture's own wording, not a label invented to fill the branch. The
+          `<strong>` is dropped for the reason the alert title beside it drops it: this room's dialog
+          primitive renders text, and a prompt that showed literal tags would be worse than plain.
+
+          Addressed by the question's own id, like `deleteQuestion` and `reactToQuestion` — the
+          divergence all three share is recorded at `editQuestion`.
+
+          No optimistic patch and no `#patchEvidence`, unlike the alert branch below: a thread entry
+          is never a captured fixture row (`askQuestion` writes a real row even for a captured
+          alert), so there is nothing local to roll back, and `#onChanged` refetches the thread the
+          same way the delete and the reaction do.
+        */
+        this.#dialogs.prompt = {
+          title: `Edit qa message by ${item.senderName}:`,
+          value: item.body,
+          onconfirm: (value) => {
+            const body = value.trim();
+            if (!body) return;
+            this.#dialogs.prompt = null;
+            void this.#editQuestion({ questionId: item.id, body })
+              .then(() => this.#onChanged())
+              .catch((cause: unknown) => {
+                this.#dialogs.alert = isHttpError(cause)
+                  ? cause.body.message
+                  : 'That did not work.';
+              });
+          }
+        };
+        return;
+      }
+
       this.#dialogs.prompt = {
         title: kind === 'chat' ? 'Edit chat message:' : `Edit alert by ${item.senderName}:`,
         value: item.body,

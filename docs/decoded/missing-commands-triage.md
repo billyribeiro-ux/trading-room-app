@@ -28,8 +28,8 @@ again without a red test.
 | outcome | count |
 | --- | ---: |
 | *Confirmed missing*, now **BUILT** | **13** |
-| *Confirmed missing*, **BUILT AS** something else | 3 |
-| *Confirmed missing*, still **NOT BUILT** | 9 |
+| *Confirmed missing*, **BUILT AS** something else | 4 |
+| *Confirmed missing*, still **NOT BUILT** | 8 |
 | need a decision first (the operator toolkit, below) — all still outstanding | 5 |
 | claimed missing, then REFUTED — we already have it | 7 |
 | classified as built-under-another-name at triage | 9 |
@@ -107,7 +107,7 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 | `restoreMobileAppTokens` | NOT BUILT | 3 | medium | None. The panel renders on `z("ngIf", "mobile" === o.activeTab)` alone. Note the surroundi | Re-registers the caller's mobile push tokens with the server and asks it to fire a test push at the device. Fire-and-forget: the client sends an EMPTY payload and immediately shows a confirmation, so it never learns whether the restore worked. It is the sole c |
 | `stopRecMsg` | NOT BUILT | 3 | trivial | None. No permission check, no doNotDisturb check, and no Notification.permission check bef | A free-text recording status line pushed from the recorder. The subscriber branches on the STRING: `-1 != i.data.indexOf("Stopped") ? alertsService.error(i.data) : alertsService.info(i.data)` — so a message containing the word "Stopped" is rendered red and any |
 | `unarchiveLogs` | NOT BUILT | 2 | medium | `O(17, e.appService.globals.isPresenter ? 17 : -1)` — the Unarchive button is rendered onl | Restores a whole archive back into the live log. Both hits are sends, one per archives modal: `app-chat-logs-modal` (byte 2304724) and `app-alert-logs-modal` (byte 2312024). No `case"unarchiveLogs"` handler — after sending, the client optimistically flips `thi |
-| `editQAMessage` | NOT BUILT | 2 | small | `this.appService.globals.sessData.enableEditAlerts && "alerts"===this.logType && (this.can | Edits one Q&A reply nested inside an alert. Both hits are sends, one in each of the two compiled copies of `app-st-message` (1351806, 1389696); `case"editQAMessage"` count is 0, so it is send-only. It is the `isQAMsg` branch of a single `editMessage()` method  |
+| `editQAMessage` | BUILT AS editQuestion | 2 | small | `this.appService.globals.sessData.enableEditAlerts && "alerts"===this.logType && (this.can | Edits one Q&A reply nested inside an alert. Both hits are sends, one in each of the two compiled copies of `app-st-message` (1351806, 1389696); `case"editQAMessage"` count is 0, so it is send-only. It is the `isQAMsg` branch of a single `editMessage()` method  |
 | `updateProfilePic` | BUILT | 2 | medium | None. The dropdown that reaches it is `O(6, o.user.userXrefID === o.appService.globals.use | Tells the caller their OWN profile picture changed. Two independent case labels in two different handlers, both doing the same three things: set globals.preferences.profilePic, set globals.user.profilePic, then emit preferenceChanged {key:'profilePic', value}. |
 | `forceStopScreen` | BUILT | 1 | medium | The two-item block holding it renders only for a presenter: O(11, i.isP ? 11 : -1) inside  | A presenter stops SOMEBODY ELSE'S screen share for the whole room, addressed by that screen's muser _id. There is no `case "forceStopScreen"` in the client switch - the only occurrence in the bundle is the send - so the server is what acts, presumably closing  |
 | `stopOBStream` | NOT BUILT | 1 | trivial | O(1, e.useMTX ? -1 : 1) - the Start/Stop pair (fn SDe) renders ONLY when useMTX is FALSE.  | Stops the browser-publishes-WHIP ingest that startOBStream opened, and blanks the panel's streamingLink field. NOT built here, and the omission is DELIBERATE and already written down: apps/room/src/lib/components/ModalHost.svelte:4317-4325 records it - "Its `b |

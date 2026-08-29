@@ -33,6 +33,89 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 18:40 UTC — A Q&A entry can be edited, and the docblock that said it could not
+
+**Runtime impact: YES.** A presenter can correct one entry of a Q&A thread when `enableEditAlerts`
+is on. The menu item has never been drawn.
+
+#### A missing control is quieter than an inert one
+
+`message-behavior.ts` suppressed `edit` inside the Q&A thread with `&& !input.isQaMessage`, and
+`qa-thread-contract.test.ts` pinned it under a heading reading *"the three entries that are DEAD
+upstream"*. The argument for all three was the same and was written once: each acts on
+`this.msg._id`, and a Q&A entry has none.
+
+**It is true of two of them.** Byte 1,351,806, read whole rather than searched:
+
+```js
+bootbox.prompt({ title: `Edit ${this.isQAMsg ? "qa message" : "alert"} by <strong>${this.msg.n}:</strong>`,
+                 inputType: "textarea", value: this.msg.txt,
+  callback: i => { if (i) { const o = i.trim();
+    this.isQAMsg ? sendServerCommand("editQAMessage",    {qaMsgID: this.qaMsgID, msgIndex: this.msgIndex, newAlertMsg: o})
+                 : sendServerCommand("editAlertMessage", {alertID: this.msg._id, newAlertMsg: o}) } } })
+```
+
+The Q&A arm is parent-plus-ordinal — the exact shape that docblock cites for the controls that DO
+work, listing two of them when there are three. `edit` was filed with the dead ones on the strength
+of a sentence rather than a read.
+
+**Nothing here could have caught it.** A suppressed menu item raises no alert, sends nothing, breaks
+no test, and leaves no `INERT_ACTIONS` row — the absence is indistinguishable from the decision. That
+is why this is worth a CHANGELOG entry longer than the diff: `INERT_ACTIONS` and `EXACT_ALERTS` both
+track controls that are DRAWN and do nothing, and this repository has no register for one that is
+not drawn at all.
+
+#### The gate is the capture's, including its asymmetry
+
+Byte 1,348,838 holds both branches in one expression:
+
+```js
+enableEditMessage && "chat"   === logType && (canEditMessage = hashEmail(email) === msg.avt || (isP && !msg.isA))
+enableEditAlerts  && "alerts" === logType && (canEditMessage = isPresenter)
+```
+
+The chat branch carries a self-edit clause and the alerts branch does not. Extending it — *a member
+may fix their own question* — is reasonable design and unevidenced, so it is refused rather than
+added quietly, and `qa-edit-contract.test.ts` asserts the refusal.
+
+#### What landed
+
+* `editQuestion` in `routes/alert-questions.remote.ts` — presenter-gated on the SERVER (the menu not
+  offering a control is not the endpoint refusing it), the room lookup before the write, the room
+  term repeated on the `where`, and `MAX_QUESTION_BODY` shared with `askQuestion` so an edit that
+  could not be posted cannot be reached.
+* Addressed by the question's own id, like `reactToQuestion` and `deleteQuestion` — the divergence
+  all three share.
+* `answeredAt` and the alert's `questionCount` / `questionAnswered` cache are untouched: an edit moves
+  neither, and a second writer on a cache with one is how it goes wrong.
+* The `edit` branch in `message-actions.svelte.ts` routes `surface === 'qa'` to `editQuestion` and
+  returns BEFORE the message endpoint — a question id sent there would be read as an alert or chat id
+  and edit the wrong table. Title `Edit qa message by …`, the capture's own noun; no optimistic
+  `#patchEvidence`, because a thread entry is never a fixture row.
+* `qa-edit-contract.test.ts`, 11 tests. **Five negative controls, each seen RED**: restoring
+  `!isQaMessage`; adding a self-edit clause; dropping the server's presenter check; moving the room
+  lookup after the write; disabling the Q&A routing arm.
+* `qa-thread-contract.test.ts` corrected — three dead entries to two, seven that act to eight, with
+  the byte offset that settles it.
+
+#### One correction found while writing the test
+
+The first run of the routing assertion failed on `not.toContain('#patchEvidence')` — because the Q&A
+arm's own comment EXPLAINS why it does not call it. The same comment-as-evidence shape three earlier
+gates here were caught by, arriving in the opposite direction. `codeOf` strips before every absence
+assertion in this file, and the reason is recorded on it.
+
+`editQAMessage` moves to **BUILT AS editQuestion** in `missing-commands-triage.md`, which is the
+census gate working at its stated boundary: it measures identifiers, and ours is not the reference's.
+
+#### Verification
+
+`svelte-check` 0 errors, 0 warnings. `eslint` clean. `prettier --check` clean. Room suite **203 files,
+3,251 passed, 1 skipped**. Two ceilings raised and argued.
+
+**Not verified in a browser.** A presenter opening a thread and editing an answer is the owner's
+confirmation to give.
+
 ### 2026-08-29 18:25 UTC — "Stop This Screen" stopped nothing, and the census that said it was built
 
 **Runtime impact: YES.** A presenter ending another member's screen share now ends it for the whole
