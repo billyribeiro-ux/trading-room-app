@@ -33,6 +33,60 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 22:05 UTC — A gate reported a built feature as a missing one, and a tracker row carried it upward
+
+**Runtime impact: none.** The feature was already there. What changes is that the gate can now see it.
+
+#### The claim
+
+`TODO.md` row AJ named two unbuilt reference surfaces found by measuring `app.css` against its
+wearers. The second: *"A microphone-test surface with FIVE states — `mic-status-idle`/`testing`/
+`success`/`no-audio`/`error`, all `ng-c2606333922`, with no counterpart here at all."*
+
+**It is fully built.** `ModalHost.svelte` declares
+
+```ts
+type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
+```
+
+assigns every one of the five, and renders `class="mic-status mic-status-{micStatus} mb-3"`.
+
+#### Why the gate could not see it
+
+`orphan-style-contract.test.ts` matched class names LITERALLY, and these are never written down
+whole — each is assembled at render time from a prefix and an interpolation. So five worn classes
+were catalogued as orphans, and the row carried them up as a whole missing surface.
+
+**This is the mirror of the failure that same file already records about comments**, and it is the
+more expensive direction. A matcher that answers "yes" for the wrong reason reports a clean sweep
+over nothing; a matcher that answers "no" for the wrong reason **files working code as absent** — and
+that answer looks like work, gets scheduled, and gets built twice.
+
+#### The fix requires both halves
+
+`isWornByInterpolation` asks two questions and needs both: does the corpus contain the prefix
+immediately followed by `{`, and does the suffix appear as a string literal? A prefix alone would let
+`mic-status-{x}` vouch for `mic-status-anything`, and the catalog would lose the power to refuse that
+is its whole point. Every hyphen is tried as the cut, because `a-b-{c}` and `a-{b}` are both real.
+
+**Three negative controls seen RED**: removing the matcher (the blind spot returns); removing every
+trace of the `no-audio` state (a class with no wearer again); and removing the interpolation site
+while leaving the literals, which proves a half-match does not vouch.
+
+The five entries are gone from the catalog — **13 to 8** — which is that file's own declaration that
+something is done, the same shape `INERT_ACTIONS` uses.
+
+#### What row AJ still has
+
+**(a) stands and was re-verified**: `edit-user-avatar-options`, `chat-stars` and `tagline` have
+**zero** occurrences in `src/`. They are three genuine affordances of `#user-modal` — a modal this
+room does render — and the fourth of that group, `remove-profile-picture-btn`, was built earlier
+today.
+
+#### Verification
+
+`eslint` clean, unit suite **207 files / 3,317 passed**.
+
 ### 2026-08-29 21:45 UTC — A browser finally watched a room setting change the DOM
 
 **Runtime impact: none.** Verification, and the kind this repository had none of at this seam.

@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * port; it turned out to be the captured class for the Debug Log textarea, and the reason it had no
  * wearer was that the FEATURE was not built. Finding it was luck. This makes it arithmetic.
  *
- * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 13
+ * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 8
  *
  * They split cleanly, and the split is what makes each one actionable:
  *
@@ -24,8 +24,7 @@ import { describe, expect, it } from 'vitest';
  *   markup this room has not built, so the rule is waiting rather than dead. Four of them
  *   (`edit-user-avatar-options`, `remove-profile-picture-btn`, `chat-stars`, `tagline`) shared the
  *   Angular component id `ng-c1441935951`, which is `#user-modal` — the user-info modal this room
- *   DOES render, missing four of its affordances. Five more (`mic-status-*`) share `ng-c2606333922`,
- *   a microphone-test surface with five states that has no counterpart here at all.
+ *   DOES render, missing four of its affordances.
  *
  * **`remove-profile-picture-btn` LEFT THIS LIST the same day**, which is the gate working as
  * intended rather than a note: it turned red the moment the button was built, and deleting its
@@ -71,16 +70,6 @@ const ORPHANS: Record<string, { captured: boolean; why: string }> = {
     captured: true,
     why: '`#user-modal .tagline` — a free-text line under the display name. This room has no column for one.'
   },
-
-  // ── The microphone test, `ng-c2606333922` — five states, no counterpart here ──
-  'mic-status-idle': {
-    captured: true,
-    why: 'one of five states of a mic-test surface this room does not have.'
-  },
-  'mic-status-testing': { captured: true, why: 'see `mic-status-idle`.' },
-  'mic-status-success': { captured: true, why: 'see `mic-status-idle`.' },
-  'mic-status-no-audio': { captured: true, why: 'see `mic-status-idle`.' },
-  'mic-status-error': { captured: true, why: 'see `mic-status-idle`.' },
 
   // ── Captured, and not a feature ──
   'sr-only': {
@@ -153,14 +142,59 @@ const WEARERS = [
   .map((file) => withoutComments(readFileSync(`${ROOT}${file}`, 'utf8')))
   .join('\n');
 
-function isWorn(cls: string): boolean {
+function escapeForRegExp(value: string): string {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function isWornLiterally(cls: string): boolean {
   /*
     Bounded on both sides so `chat-panel` is not matched by `chat-panel-wide`, and so a class inside
     a `class={[...]}` array, a template literal or a plain attribute all count. The boundary set is
     the punctuation a class name can actually sit between in this codebase's markup and clsx arrays.
   */
-  const escaped = cls.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-  return new RegExp(`[\\s"'\`{|:.,\\[]${escaped}[\\s"'\`}|,\\]]`).test(WEARERS);
+  return new RegExp(`[\\s"'\`{|:.,\\[]${escapeForRegExp(cls)}[\\s"'\`}|,\\]]`).test(WEARERS);
+}
+
+/**
+ * A class ASSEMBLED at render time — `class="mic-status mic-status-{micStatus}"`.
+ *
+ * ## Why this exists, and what not having it cost
+ *
+ * The literal matcher above cannot see a class that is never written down whole. Five were:
+ * `mic-status-idle`, `-testing`, `-success`, `-no-audio` and `-error` sat in the catalog below
+ * reading *"one of five states of a mic-test surface this room does not have"* — and the surface is
+ * fully built. `ModalHost.svelte` declares
+ * `type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error'`, assigns every one of the
+ * five, and renders `class="mic-status mic-status-{micStatus} mb-3"`.
+ *
+ * So this gate reported five orphans that were worn, and `TODO.md` row AJ carried them upward as a
+ * whole missing reference surface — *"a microphone-test surface with FIVE states … with no
+ * counterpart here at all"*. **A matcher that answers "no" for the wrong reason files working code
+ * as absent**, which is the mirror of the hollow-coverage failure this file already records about
+ * comments, and the more expensive direction: the answer looks like work.
+ *
+ * ## The test is BOTH halves, deliberately
+ *
+ * A prefix ending in an interpolation is not enough on its own — `mic-status-{x}` would then vouch
+ * for `mic-status-anything`, and the catalog would lose its power to refuse. The suffix must ALSO
+ * appear as a string literal in the corpus, which is what a union member, an enum value or a `?:`
+ * arm looks like. Both conditions, or it is not worn.
+ *
+ * Every hyphen is tried as the cut rather than only the last, because a class can be assembled at
+ * any of them: `a-b-{c}` and `a-{b}` are both real shapes.
+ */
+function isWornByInterpolation(cls: string): boolean {
+  for (let cut = cls.indexOf('-'); cut !== -1; cut = cls.indexOf('-', cut + 1)) {
+    const prefix = cls.slice(0, cut + 1);
+    const suffix = cls.slice(cut + 1);
+    if (!WEARERS.includes(`${prefix}{`)) continue;
+    if (new RegExp(`['"\`]${escapeForRegExp(suffix)}['"\`]`).test(WEARERS)) return true;
+  }
+  return false;
+}
+
+function isWorn(cls: string): boolean {
+  return isWornLiterally(cls) || isWornByInterpolation(cls);
 }
 
 describe('app.css styles nothing that no element wears', () => {
@@ -249,8 +283,29 @@ describe('app.css styles nothing that no element wears', () => {
     const userModal = ['edit-user-avatar-options', 'chat-stars', 'tagline'];
     for (const cls of userModal) expect(ORPHANS[cls]?.captured, cls).toBe(true);
 
-    const micTest = Object.keys(ORPHANS).filter((cls) => cls.startsWith('mic-status-'));
-    expect(micTest).toHaveLength(5);
-    for (const cls of micTest) expect(ORPHANS[cls]?.captured, cls).toBe(true);
+    /*
+      THE MIC-TEST SURFACE WAS NEVER MISSING, and this assertion is what is left of the claim that it
+      was. Five `mic-status-*` classes were catalogued here as *"a microphone-test surface with five
+      states that has no counterpart here at all"*, and `TODO.md` row AJ carried that upward as a
+      whole unbuilt reference surface.
+
+      It is built. `ModalHost.svelte` declares
+      `type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error'`, assigns all five, and
+      renders `class="mic-status mic-status-{micStatus} mb-3"` — so every one of the five is worn,
+      by an interpolation the literal matcher could not see. `isWornByInterpolation` sees it now, and
+      the five entries are gone from the catalog, which is this file's own declaration that something
+      is done.
+
+      What remains asserted is the SHAPE that made the error possible, so it cannot come back
+      silently: the surface exists and every state it can reach has a class.
+    */
+    const micStates = ['idle', 'testing', 'success', 'no-audio', 'error'];
+    for (const state of micStates) {
+      expect(isWorn(`mic-status-${state}`), `mic-status-${state}`).toBe(true);
+      expect(
+        ORPHANS[`mic-status-${state}`],
+        `mic-status-${state} is not an orphan`
+      ).toBeUndefined();
+    }
   });
 });
