@@ -486,12 +486,23 @@ still outstanding is the DOCUMENT: `missing-commands-triage.md` must be restated
 names, and **its verdicts need three buckets, not one** — see *What "not built" actually means here*
 below.
 
-**ITS LINE POINTERS ARE STALE REPO-WIDE.** The document's `ours` column was written before the
-`apps/room` decomposition. Verified drifts: the videoplayer row cites `+page.svelte:11294-11316` for
-a file that is now under 3,000 lines; the `restoreMobileAppTokens` row cites
-`ModalHost.svelte:5327-5362`, which is now the alerts advanced-search modal. **A reader who follows
-one of its line numbers, finds unrelated code, and concludes the feature is gone will be wrong.**
-Cite symbols and verbatim strings there, not line numbers — strings survive refactors.
+**ITS LINE POINTERS WERE STALE REPO-WIDE — FIXED AND GATED, 2026-08-29.** The document's `ours`
+column was written before the `apps/room` decomposition. Measured: **44 `path:line` citations, 23 of
+them naming a line that no longer exists** — the videoplayer row cited `+page.svelte:11294-11316` for
+a file now under 1,500 lines, and the `restoreMobileAppTokens` row cited `ModalHost.svelte:5327-5362`,
+which is now the alerts advanced-search modal. **Two were absolute paths into the author's home
+directory**, which no clone can resolve at all.
+
+All 44 are now a path plus a SYMBOL, which is what the document's own method section already
+recommended — *cite symbols and verbatim strings, which survive refactors*. **The 200 byte offsets
+are untouched and must stay:** they cite the SHA-256'd bundle, which cannot drift. A byte offset is
+evidence; a line number is a guess about a file somebody else will edit.
+
+`missing-command-census-contract.test.ts` now refuses a `path:line` citation, a dangling `, :133`
+continuation, an absolute path, and — as its vacuity floor — the loss of the byte offsets. Four
+negative controls seen red. This closes what `doc-citation-contract.test.ts` states it cannot see:
+*"a citation that still lands INSIDE the file can still point at the wrong line… it catches the loud
+half only."*
 
 **Nothing that is not built gets parked.** An earlier version of that table carried a fifth bucket —
 "unclear, needs a product decision" — which read as resolved and was not. A pending decision is

@@ -36,7 +36,7 @@ again without a red test.
 | framework/library noise, not our work at all | 4 |
 
 **The status column is not decoration; it is where a defect hid.** `forceStopScreen` sat in this
-table with a payload row citing *"ours … ScreenTabs.svelte:211,227"* — the presenter's menu ITEM.
+table with a payload row citing *"ours … ScreenTabs.svelte"* — the presenter's menu ITEM.
 The item rendered; the behaviour did not. A presenter clicking "Stop This Screen" on a member's share
 removed their own tab and left the member broadcasting to the whole room. That is the exact mistake
 this document records catching on `stopVideoForAll` one section below — *"the refuter matched the
@@ -64,19 +64,19 @@ died on contact with our source.
 
 | command | where we already do it |
 | --- | --- |
-| `hardResetSession` | /Users/billyribeiro/Desktop/trading-room-app/apps/room/src/lib/components/ModalHost.svelte:3901 (and :3912); handler at /Users/billyribeiro/Desktop/trading-room-app/apps/room/src/routes/+page.svelte:3 |
-| `lockSession` | apps/controller/src/lib/room-entry.ts:221 |
-| `saveAndCloseSession` | apps/room/src/lib/components/ModalHost.svelte:3984 |
-| `saveCloseMessage` | apps/room/src/lib/components/ModalHost.svelte:3988 (button, label "Just Save Close Message"); apps/room/src/routes/+page.svelte:3510 (handler: 'Message Saved' alert, modal deliberately not closed) |
-| `savePresenterColors` | apps/room/src/lib/components/ModalHost.svelte:3556 |
-| `softResetSession` | apps/room/src/lib/components/ModalHost.svelte:3891 |
-| `stopRecMtx` | apps/room/src/routes/+page.svelte:5904 (stopRecording), :5909 (broadcastRecordingState('stopRec')), :6174 (broadcastRecordingState def); apps/room/src/routes/+page.server.ts:2217 (recordingState actio |
+| `hardResetSession` | apps/room/src/lib/components/ModalHost.svelte (two buttons); handler at apps/room/src/routes/+page.svelte |
+| `lockSession` | apps/controller/src/lib/room-entry.ts |
+| `saveAndCloseSession` | apps/room/src/lib/components/ModalHost.svelte |
+| `saveCloseMessage` | apps/room/src/lib/components/ModalHost.svelte (button, label "Just Save Close Message"); apps/room/src/routes/+page.svelte (handler: 'Message Saved' alert, modal deliberately not closed) |
+| `savePresenterColors` | apps/room/src/lib/components/ModalHost.svelte |
+| `softResetSession` | apps/room/src/lib/components/ModalHost.svelte |
+| `stopRecMtx` | apps/room/src/routes/+page.svelte — `stopRecording`, `broadcastRecordingState('stopRec')` and the `broadcastRecordingState` definition; apps/room/src/routes/+page.server.ts (recordingState actio |
 
 ### One was contested, and I resolved it by reading rather than averaging
 
 `stopVideoForAll` was judged twice and the two verdicts disagreed — one found our button and called
 it built, the other called it a real gap. **The gap is real.** `requestStopVideo()` at
-`VideoPlayer.svelte:156` carries the correct confirm string and the correct two callers, and its
+`VideoPlayer.svelte` carries the correct confirm string and the correct two callers, and its
 `onconfirm` clears local `$state` and a timer and nothing else. The component makes **zero** network
 calls: 0 `fetch(`, 0 `use:enhance`, 0 `action=`, 0 socket.
 
@@ -110,7 +110,7 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 | `editQAMessage` | BUILT AS editQuestion | 2 | small | `this.appService.globals.sessData.enableEditAlerts && "alerts"===this.logType && (this.can | Edits one Q&A reply nested inside an alert. Both hits are sends, one in each of the two compiled copies of `app-st-message` (1351806, 1389696); `case"editQAMessage"` count is 0, so it is send-only. It is the `isQAMsg` branch of a single `editMessage()` method  |
 | `updateProfilePic` | BUILT | 2 | medium | None. The dropdown that reaches it is `O(6, o.user.userXrefID === o.appService.globals.use | Tells the caller their OWN profile picture changed. Two independent case labels in two different handlers, both doing the same three things: set globals.preferences.profilePic, set globals.user.profilePic, then emit preferenceChanged {key:'profilePic', value}. |
 | `forceStopScreen` | BUILT | 1 | medium | The two-item block holding it renders only for a presenter: O(11, i.isP ? 11 : -1) inside  | A presenter stops SOMEBODY ELSE'S screen share for the whole room, addressed by that screen's muser _id. There is no `case "forceStopScreen"` in the client switch - the only occurrence in the bundle is the send - so the server is what acts, presumably closing  |
-| `stopOBStream` | NOT BUILT | 1 | trivial | O(1, e.useMTX ? -1 : 1) - the Start/Stop pair (fn SDe) renders ONLY when useMTX is FALSE.  | Stops the browser-publishes-WHIP ingest that startOBStream opened, and blanks the panel's streamingLink field. NOT built here, and the omission is DELIBERATE and already written down: apps/room/src/lib/components/ModalHost.svelte:4317-4325 records it - "Its `b |
+| `stopOBStream` | NOT BUILT | 1 | trivial | O(1, e.useMTX ? -1 : 1) - the Start/Stop pair (fn SDe) renders ONLY when useMTX is FALSE.  | Stops the browser-publishes-WHIP ingest that startOBStream opened, and blanks the panel's streamingLink field. NOT built here, and the omission is DELIBERATE and already written down: apps/room/src/lib/components/ModalHost.svelte records it - "Its `b |
 | `setUserProfilePic` | BUILT AS uploadProfilePicture | 1 | medium | The button sits inside gTe (bytes 2065610-2068821), rendered by `O(14, o.appService.global | A presenter uploads a profile picture ON BEHALF OF another user. adminUploadProfilePic() opens a file dialog, canvas-downscales the image to a 125px longest edge, POSTs it as multipart to `${globals.upload_server}/image/${sessionID}` with an `Authorization: Cl |
 | `updateUserProfilePic` | BUILT AS setRosterAvatar | 1 | small — once a stored pictur | None — every client applies it. | The fan-out for SOMEBODY ELSE'S new picture. It patches the roster entry whose `_id === i.userId` (`se.pic = i.pic`), then walks every channel of globals.chatLog and rewrites `_e.pic = i.pic` on every message whose `uid` matches either `i.userXrefID` or `i.use |
 | `streamPlayerDisabled` | NOT BUILT | 1 | medium — it needs the player | `this.globals.isPlayer` on receipt, and again inside the streamPlayerEnded subscriber. isP | Ends a standalone stream-PLAYBACK session. Guarded by `this.globals.isPlayer &&` — a client global set from the JWT, `globals.isPlayer = decodedPassedToken.isPTRPlayer` — so only browsers in player mode react. It emits softResetDone and then streamPlayerEnded, |
@@ -150,21 +150,21 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 | `doChatLogSearch` | chat: {searchTerm:this.chatSearchTerm.replace("$","\\$"),channel:this.channel,type:"chat",del:e}   extra chat: {searchTerm:…,channel:this.channel,type:"chat",del:e,extraChat:!0}   alerts: {searchTerm:…,type:"alerts",del:e}   RESPO | 1020422(handler), 1020526(doChatLogSearchDeleteExtra), 1020555(doChatLogSearchDelete), 1439114(chat send), 2051344 and 2051436(alerts sends) |
 | `editQAMessage` | {qaMsgID:this.qaMsgID, msgIndex:this.msgIndex, newAlertMsg:o}   (o = the trimmed prompt value) | 1351806, 1389696, 1348838(gate), 1335539(menu render condition), 1330618 and 1337958(Edit menu item templates) |
 | `focusOnSessionNote` | {id: this.tab._id}  (note editor, byte 1474124)   {id: e}  (presentation area, byte 1970890) | 1023554(case), 1023597(emit inside case), 1474124(editor send), 1962371(subscriber), 1969946 and 1970054(handleNoPresenter local emits), 197 |
-| `forceStopScreen` | {id: e._id} - the muser _id, NOT the producerID. Sent inside a setTimeout of 2e3 ms, after the local call `this.mediaService.stopSharingProducer(e.producerID)`: `stopSharingThisScreenRemote(e){ e && (this.mediaService.stopSharingP | 1969578 (send), 1919818 (menu + isP gate); ours apps/room/src/lib/components/ScreenTabs.svelte:211,227; apps/room/src/routes/+page.svelte:74 |
+| `forceStopScreen` | {id: e._id} - the muser _id, NOT the producerID. Sent inside a setTimeout of 2e3 ms, after the local call `this.mediaService.stopSharingProducer(e.producerID)`: `stopSharingThisScreenRemote(e){ e && (this.mediaService.stopSharingP | 1969578 (send), 1919818 (menu + isP gate); ours apps/room/src/lib/components/ScreenTabs.svelte; apps/room/src/routes/+page.svelte |
 | `getDebugLog` | request: this.user (whole target-user object, unwrapped). response: {requestor:xe.requestor,log:V1} | 996046, 996125, 996159, 2066906, 2080323, 2080377, 901835, 902041, 2598895, 2100230, 2100717 |
 | `kickUser` | {user:r,msg:o,ban:i,kickAllInstances:!1} | 996192, 1011338, 1356154, 1356645, 1394202, 1394693, 2067021, 2067126, 2078315, 2078633, 2079420, 2596752 (kickPage subscriber), 990391 (sen |
 | `notyping` | {c:o,uid:this.appService.globals.user.userXrefID,pm:null,pu:null} | 1016497, 1435915, 2382177 |
-| `playVideoForAll` | SEND (two call sites, same method): {url: e, videoPlayTime: i} where i = new Date(ii('#video-start-datetime').val()).getTime()  — and {url: e, videoPlayTime: null} for "Play now". RECEIVE: case "playVideoForAll": this.guiEventBus. | 1024587, 1024627, 1931423, 1966711, 1980807, 1981613, 1981761; ours apps/room/src/lib/components/VideoPlayer.svelte:119, :133, :156; apps/ro |
+| `playVideoForAll` | SEND (two call sites, same method): {url: e, videoPlayTime: i} where i = new Date(ii('#video-start-datetime').val()).getTime()  — and {url: e, videoPlayTime: null} for "Play now". RECEIVE: case "playVideoForAll": this.guiEventBus. | 1024587, 1024627, 1931423, 1966711, 1980807, 1981613, 1981761; ours apps/room/src/lib/components/VideoPlayer.svelte — three call sites; apps/ro |
 | `playYTForAll` | SEND: {url: this.youtubeURL} (byte 2297009, inside playYtVideo()). RECEIVE: case "playYTForAll": this.guiEventBus.emit("playYTForAll", {url: i.url}). The bus subscriber ALSO reads e.startTime - it is not on the live command, it is | 1024137, 1024174, 1503049, 1964799, 1964893, 1964970, 1965054, 1965264, 2297009; opener gate 1426579; ours apps/room/src/routes/+page.svelte |
 | `presAreaTabs-recordings` | — | 1917052, 1917216, 1930515, 1994257 (consts 25/59/60/140), 2016835, 2017632, 1959447, 1959845, 2522147, 2467847, 2468673 |
 | `remoteRestartAudio` | this.user (the whole target-user object, passed unwrapped as the second argument to sendServerAdminCommand) | 995974, 996014, 1119300, 1130127, 1133537, 2066784, 2080401, 2080462, 2095322, 990391 |
-| `restoreMobileAppTokens` | {} — literally empty: this.appService.sendServerCommand("restoreMobileAppTokens",{}) | 2438516, 2444920, 2444980; tab wiring at 2456305; titles at 2433777 and 2433841. Ours: src/lib/components/ModalHost.svelte:5327-5362 has exa |
+| `restoreMobileAppTokens` | {} — literally empty: this.appService.sendServerCommand("restoreMobileAppTokens",{}) | 2438516, 2444920, 2444980; tab wiring at 2456305; titles at 2433777 and 2433841. Ours: src/lib/components/ModalHost.svelte has exa |
 | `sendSalesImageToChat` | {url: i, sessID: this.appService.globals.sessionID} where i = the prompt value .trim() | 1015180, 1015228, 1015321, 2147273, 2173100, 2173284, 2502019; gate at 2155567; alert at 2173371. Ours: the three buttons and the URL prompt |
 | `sendUsersToURL` | {url:o,sessID:e.appService.globals.sessionID} | 1015357, 1015399, 1015486, 2147408, 2173465, 2173666, 2502469 |
 | `setUserProfilePic` | {user: i.user, profilePic: l.data.link} — the WHOLE roster user object plus the returned CDN URL, sent via sendServerAdminCommand | 2087041 (the send), 2084700 (adminUploadProfilePic), 2085404 (dialog title), 2067826 (the button), 2065610/2068821 (gTe bounds), 2155567-adj |
 | `stopOBStream` | None. `yield e.appService.sendServerAdminCommand("stopOBStream")` with no second argument -> {cmd:"stopOBStream", data:{}}. Its partner is an INVOKE not a transmit: `let i = yield e.appService.invokeAdminCmd("startOBStream"); e.st | 2170467 (stopOBStream), 2170289 (startOBStream), 2144976 + 2145560 (SDe buttons and its useMTX gate); ours apps/room/src/lib/components/Moda |
 | `stopRecMsg` | {data} — a string, used verbatim as the toast text, the Notification title and the Notification body | 1014265, 1014300 (dispatch), 2505283 (the subscriber). Ours: `stopRecMsg` has zero occurrences in src/; the cmds handler at src/routes/+page |
-| `stopYTForAll` | SEND, two distinct shapes: (a) {url: this.youtubeURL} from playYtVideo() at byte 2296932 - a stop-then-play sequence, the url is passed but the stop does not need it; (b) NO payload from the ytplayer's own stopYTForAll() at byte 1 | 1024212, 1024249, 1502899, 1503220, 1503275, 1503339, 1965152, 2296932; ours apps/room/src/routes/+page.svelte:7033, :12300; apps/room/src/l |
+| `stopYTForAll` | SEND, two distinct shapes: (a) {url: this.youtubeURL} from playYtVideo() at byte 2296932 - a stop-then-play sequence, the url is passed but the stop does not need it; (b) NO payload from the ytplayer's own stopYTForAll() at byte 1 | 1024212, 1024249, 1502899, 1503220, 1503275, 1503339, 1965152, 2296932; ours apps/room/src/routes/+page.svelte — two call sites; apps/room/src/l |
 | `streamPlayerDisabled` | none — the command carries no fields; the handler reads only globals.isPlayer | 1013009 (the handler), 2508792 (the subscriber and its alert at 2508887), 1191994 (isPlayer = decodedPassedToken.isPTRPlayer), 2498622 (the  |
 | `unarchiveLogs` | chat: {type:"chat",roomID:this.appService.globals.sessData.roomID,archiveID:this.logId}   alerts: {type:"alerts",roomID:this.appService.globals.sessData.roomID,archiveID:this.logId} | 2304724, 2312024, 2300500-2307600(chat modal read whole), 2307800-2315000(alerts modal read whole), 2304507(getArchiveList chat), 2311806(ge |
 | `unmuteChat` | {user:this.user} | 996325, 1430505, 2080257, 2376996, 2080259 (the send) |
@@ -177,15 +177,15 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 
 | reference name | ours |
 | --- | --- |
-| `muteChat` | src/routes/+page.server.ts:2884 (messageAction op 'mute24'), src/lib/server/db/schema.ts:582 (chat_mutes), src/routes/+page.server.ts:1382 (enforced in sendMessage), src/routes/+page.server.ts:686 (chatMutedTill), src/ro |
-| `presAreaTabs-videoplayer` | apps/room/src/lib/types.ts:6; apps/room/src/routes/+page.svelte:11294-11316 (tab); apps/room/src/routes/+page.svelte:11820-11831 (pane); apps/room/src/lib/components/VideoPlayer.svelte:1-407 |
-| `refreshRoster` | src/routes/+page.svelte:3479, src/lib/components/ModalHost.svelte:3877, src/lib/server/room-events.ts:291 |
-| `reloadSessionConfig` | apps/room/src/routes/+page.svelte:3459 |
-| `savedSessionPolls` | src/routes/+page.server.ts:2434 (savePoll), src/routes/+page.server.ts:2459 (deleteSavedPoll), src/routes/+page.server.ts:637 (loader), src/lib/server/db/schema.ts:281 (saved_polls table), src/lib/components/PollPanel.sv |
-| `setWelcomwMatSessionNote` | src/routes/+page.server.ts:960 (setWelcomeMatNoteTab action, same name as the reference's send), src/lib/server/notes-repository.ts:214 (setWelcomeMatNote, with the exclusivity enforced in a transaction and scoped to the |
-| `startWebcam` | apps/room/src/routes/+page.svelte:4296 (addRemoteWebcam) and :8023 (media.on('newProducer', ...)); apps/room/src/lib/media/session.ts:597 (produceWebcam) and apps/room/src/lib/media/signalling.ts:145 (newProducer: Produc |
-| `updateChatMsg` | src/routes/+page.server.ts:2599 (messageAction), :2794 (operation === 'edit', including the body_html rewrite), :2720 (operation === 'reaction', toggling clickedBy); src/lib/server/reactions.ts:16 (parseReactions); src/r |
-| `updatedSessionNote` | src/routes/+page.server.ts:852 (saveSessionNote action, the reference's exact command name), src/lib/server/notes-repository.ts:91 (saveNote), src/lib/notes-command.ts:13 (schema) |
+| `muteChat` | src/routes/+page.server.ts (messageAction op 'mute24'), src/lib/server/db/schema.ts (chat_mutes), src/routes/+page.server.ts (enforced in sendMessage), src/routes/+page.server.ts (chatMutedTill), src/ro |
+| `presAreaTabs-videoplayer` | apps/room/src/lib/types.ts; apps/room/src/routes/+page.svelte (tab); apps/room/src/routes/+page.svelte (pane); apps/room/src/lib/components/VideoPlayer.svelte |
+| `refreshRoster` | src/routes/+page.svelte, src/lib/components/ModalHost.svelte, src/lib/server/room-events.ts |
+| `reloadSessionConfig` | apps/room/src/routes/+page.svelte |
+| `savedSessionPolls` | src/routes/+page.server.ts (savePoll), src/routes/+page.server.ts (deleteSavedPoll), src/routes/+page.server.ts (loader), src/lib/server/db/schema.ts (saved_polls table), src/lib/components/PollPanel.sv |
+| `setWelcomwMatSessionNote` | src/routes/+page.server.ts (setWelcomeMatNoteTab action, same name as the reference's send), src/lib/server/notes-repository.ts (setWelcomeMatNote, with the exclusivity enforced in a transaction and scoped to the |
+| `startWebcam` | apps/room/src/routes/+page.svelte — `addRemoteWebcam` and `media.on('newProducer', …)`; apps/room/src/lib/media/session.ts (produceWebcam) and apps/room/src/lib/media/signalling.ts (newProducer: Produc |
+| `updateChatMsg` | src/routes/+page.server.ts — `messageAction`, its `operation === 'edit'` branch (including the `body_html` rewrite) and its `operation === 'reaction'` branch (toggling `clickedBy`); src/lib/server/reactions.ts (parseReactions); src/r |
+| `updatedSessionNote` | src/routes/+page.server.ts (saveSessionNote action, the reference's exact command name), src/lib/server/notes-repository.ts (saveNote), src/lib/notes-command.ts (schema) |
 
 **`presAreaTabs-videoplayer` is the instructive one.** We key that tab `'videoplayer'`; the
 reference keys it `'presAreaTabs-videoplayer'`. The audit's identifier search missed our

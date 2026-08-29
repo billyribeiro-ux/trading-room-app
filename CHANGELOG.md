@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 21:05 UTC — 44 stale citations in the tracker, converted to symbols and gated
+
+**Runtime impact: none.** A maintainability fix on the document `feature-coverage-contract.test.ts`
+calls *"the tracker"* for everything the reference has and this room does not.
+
+#### The measurement
+
+`TODO.md` recorded the problem and its consequence: *"a reader who follows one of its line numbers,
+finds unrelated code, and concludes the feature is gone will be wrong."* Measured:
+
+* **44 `path:line` citations**, of which **23 named a line that no longer exists**. The videoplayer
+  row cited `+page.svelte:11294-11316` for a file now under 1,500 lines. The `restoreMobileAppTokens`
+  row cited `ModalHost.svelte:5327-5362`, which — checked while building that very feature earlier
+  today — is now the alerts advanced-search modal.
+* **2 were absolute paths** into the author's home directory, which no clone can resolve at all.
+
+#### The fix is the document's own recommendation
+
+Its method section already said it: *cite symbols and verbatim strings, which survive refactors.* All
+44 are now a path plus a symbol.
+
+**The 200 byte offsets are untouched and that distinction is the point.** They cite the SHA-256'd
+bundle, which cannot drift. A byte offset is evidence; a line number is a guess about a file somebody
+else will edit.
+
+#### What this closes that another gate says it cannot see
+
+`doc-citation-contract.test.ts` checks that a `path:line` citation lands inside the file it names,
+and its docblock states its own limit plainly: *"a citation that still lands INSIDE the file can
+still point at the wrong line — after a decomposition most of them do, and this gate calls them fine.
+It catches the loud half only. The quiet half is what the 'cite symbols' convention is for, and no
+assertion replaces it."*
+
+For this one document, an assertion now does replace it — because the convention can be stated
+absolutely here: no line numbers at all. `missing-command-census-contract.test.ts` refuses a
+`path:line` citation, a dangling `, :133` continuation left by a naive strip, an absolute path, and —
+as its vacuity floor — the loss of the byte offsets.
+
+**Four negative controls seen RED**, one per rule.
+
+#### Verification
+
+`svelte-check` 0/0. `eslint` clean. Room **207 files, 3,317 passed, 1 skipped**.
+
 ### 2026-08-29 20:45 UTC — The settings enumeration is fully triaged, and the count that said otherwise is gone
 
 **Runtime impact: none.** A measurement, two corrections and a guard.

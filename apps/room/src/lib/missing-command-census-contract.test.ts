@@ -169,6 +169,48 @@ describe('the triage document tells the truth about what is built', () => {
     );
   });
 
+  it('cites symbols and paths, never line numbers or somebody machine', () => {
+    /*
+      THE DOCUMENT'S OWN RECOMMENDATION, enforced. Its method section says to *"cite symbols and
+      verbatim strings, which survive refactors"* — and `doc-citation-contract.test.ts` quotes that
+      sentence as the convention it cannot itself check, because a citation that still lands INSIDE
+      a file can point at the wrong line and that gate calls it fine.
+
+      It was not being followed here. Measured 2026-08-29: **44 `path:line` citations**, of which 23
+      named a line that no longer exists — `+page.svelte:11294` in a file now under 1,500 lines,
+      `ModalHost.svelte:5327` which is now the alerts advanced-search modal. `TODO.md` recorded the
+      consequence exactly: *"a reader who follows one of its line numbers, finds unrelated code, and
+      concludes the feature is gone will be wrong."*
+
+      Two of them were absolute paths into the author's home directory, which no clone can resolve
+      at all.
+
+      All 44 are now paths plus symbols. **Byte offsets are untouched and must stay** — 200 of them —
+      because those cite the SHA-256'd bundle, which cannot drift: a byte offset is evidence, a line
+      number is a guess about a file somebody else will edit.
+    */
+    const doc = readFileSync(TRIAGE, 'utf8');
+
+    const lineCitations = [
+      ...doc.matchAll(/[A-Za-z0-9_.[\]+-]+\.(?:ts|svelte|mjs|js|sql):\d+/g)
+    ].map((match) => match[0]);
+    expect(
+      lineCitations,
+      'cite the symbol, not the line — this document is the tracker, and a stale line number sends ' +
+        'a reader to unrelated code and lets them conclude the feature is gone'
+    ).toEqual([]);
+
+    /* The continuations a naive strip leaves behind: `Foo.svelte, :133, :156`. */
+    const dangling = [...doc.matchAll(/[\s(]:\d{2,}/g)].map((match) => match[0]);
+    expect(dangling, 'a line number left without the path it belonged to').toEqual([]);
+
+    const absolute = [...doc.matchAll(/\/Users\/[^\s`|]+/g)].map((match) => match[0]);
+    expect(absolute, 'an absolute path from one machine, which no clone can resolve').toEqual([]);
+
+    /* And the vacuity floor: the byte offsets that ARE the evidence must still be here. */
+    expect((doc.match(/\b\d{6,7}\b|\d,\d{3},\d{3}/g) ?? []).length).toBeGreaterThan(100);
+  });
+
   it('states a headline that matches its own rows', () => {
     /*
       The counts at the top of the document are what a reader actually reads, and they were the half
