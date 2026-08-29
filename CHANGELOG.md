@@ -33,6 +33,70 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 02:20 UTC — Eleven controller verifiers were enforced by nobody, and now CI runs them
+
+**Runtime impact: NO** to what the site serves — and a real change to what a pull request means.
+
+#### What was found
+
+`quality.yml` ran the controller's `test:unit` alone. Its comment said the verifiers left out *"run
+in the pre-merge full gate"*. Checked against the workflows themselves: **no workflow in this
+repository runs the controller's `test`.** The "pre-merge full gate" was a person remembering.
+
+So eleven verifiers were enforced by nobody on a pull request:
+
+`schema:verify` · `backend:migrations:verify` · `backend:release:verify` · `evidence:verify` ·
+`privacy:verify` · `breakpoints:verify` · `manage:styles` · `account:contract` · `home:contract` ·
+`fonts:verify` · `room-login:contract`
+
+`quality.yml:34` states that the PR gate is the only verification a production deploy ever gets. So
+"enforced by nobody on a pull request" means enforced by nobody — including the room-settings schema
+pin, the migration and release-artifact checks, the evidence layout, and the privacy boundary.
+
+**This also makes an earlier claim of mine precise.** The 01:50 and 02:12 entries above say the
+wired-count prose is *"checked on every run"*. That meant every run of `pnpm test` — which CI did not
+perform. As of this commit the sentence is literally true; before it, it was true only of a run
+somebody chose to do.
+
+#### Why exactly one step stays out
+
+`runtime:http` makes live HTTP requests to a deployed preview and opens a PostgreSQL connection —
+measured here as `ECONNREFUSED 127.0.0.1:5432`. A gate that depends on a running deployment reports
+somebody else's outage as this revision's failure, so it stays out, which is what the original
+comment was right about.
+
+The other eleven are local. That is not assumed: each was **run individually** in this container,
+which has no PostgreSQL and no preview, and all eleven passed.
+
+#### The shape: a prefix, not a subtraction
+
+`test:gates` is the eleven entries of `test` before `runtime:http` — a literal prefix. Written that
+way rather than as "test minus runtime:http" because a prefix is checkable by string comparison, and
+because the order carries meaning: `schema:verify` runs first so a stale generated schema fails
+before anything spends time on it.
+
+`src/lib/package-scripts-contract.test.ts` asserts it. The failure it guards is quiet: add a twelfth
+local verifier to `test`, forget `test:gates`, and CI silently stops covering it — the same shape as
+the defect above, and equally invisible, because both scripts still pass. It also asserts that
+`quality.yml` still invokes `test:gates`, matched on the **run line with comments stripped**, so the
+paragraph explaining why the script exists cannot satisfy the check that it is used.
+
+It deliberately does **not** assert that every entry is hermetic. Nothing in a test can prove a script
+will not open a socket; that was established by running them, and is recorded here rather than
+claimed by an assertion that could not honestly make it.
+
+#### Verified
+
+* **Four negative controls, each firing on the right assertion:** a verifier added to `test` but not
+  `test:gates`; the two scripts reordered against each other; `test:gates` silently swallowing
+  `runtime:http`; and CI no longer invoking `test:gates`.
+* `pnpm run test:gates` — **exit 0**, all eleven.
+* Controller suite — **97 files passed / 5 skipped; 1,023 passed / 21 skipped** (up 7 from the new
+  contract).
+* `quality.yml` parses as valid YAML and its `Unit tests` step reads `pnpm run test:gates` then
+  `pnpm run test:unit`.
+* `eslint` — clean.
+
 ### 2026-08-29 02:12 UTC — A duplication audit of this session's own gates, and the four holes it found in them
 
 **Runtime impact: NO.** Documentation and gate corrections.

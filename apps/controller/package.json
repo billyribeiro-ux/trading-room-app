@@ -17,6 +17,7 @@
     "format:check": "prettier --check \"src/**/*.{svelte,ts,js}\" \"scripts/**/*.mjs\" \"e2e/**/*.ts\" \"*.{js,ts,json,yaml,yml}\"",
     "test": "pnpm run schema:verify && pnpm run backend:migrations:verify && pnpm run backend:release:verify && pnpm run evidence:verify && pnpm run privacy:verify && pnpm run breakpoints:verify && pnpm run manage:styles && pnpm run account:contract && pnpm run home:contract && pnpm run fonts:verify && pnpm run room-login:contract && pnpm run runtime:http && pnpm run test:unit && node scripts/verify-documented-test-counts.mjs --report .vitest-report.json",
     "test:counts": "node scripts/verify-documented-test-counts.mjs",
+    "test:gates": "pnpm run schema:verify && pnpm run backend:migrations:verify && pnpm run backend:release:verify && pnpm run evidence:verify && pnpm run privacy:verify && pnpm run breakpoints:verify && pnpm run manage:styles && pnpm run account:contract && pnpm run home:contract && pnpm run fonts:verify && pnpm run room-login:contract",
     "test:unit": "vitest run --coverage --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:e2e": "playwright test",
     "audit:js": "pnpm audit --audit-level high",

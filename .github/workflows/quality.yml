@@ -162,17 +162,27 @@ jobs:
 
       - name: Unit tests
         working-directory: apps/${{ matrix.app }}
-        # `test:unit` for the controller rather than `test`, and the difference is deliberate. Its
-        # `test` script chains fourteen verifiers, and one of them — `runtime:http` — makes live
-        # HTTP requests to a DEPLOYED preview. A gate that depends on a running deployment reports
-        # somebody else's outage as this revision's failure. The room's `test` is entirely local
+        # `test:gates && test:unit` for the controller rather than `test`, and the split is
+        # deliberate. Its `test` script chains fourteen verifiers, and exactly ONE of them —
+        # `runtime:http` — makes live HTTP requests to a DEPLOYED preview and opens a PostgreSQL
+        # connection. A gate that depends on a running deployment reports somebody else's outage as
+        # this revision's failure, so that one stays out. The room's `test` is entirely local
         # (`privacy:verify`, `schema:verify`, `vitest run`), so it runs whole.
         #
-        # The verifiers left out here are not unowned: they run in the pre-merge full gate. Naming
-        # that boundary is the point — a green check on this workflow means lint, types, units and a
-        # build, and does not claim to mean the evidence verifiers passed.
+        # THIS LINE USED TO RUN `test:unit` ALONE, and the comment here claimed the eleven verifiers
+        # left out "run in the pre-merge full gate". Measured 2026-08-29: no workflow in this
+        # repository runs the controller's `test`, so that gate was a person remembering. Eleven
+        # verifiers — the schema pin, the migration and release checks, the evidence layout, the
+        # privacy boundary, the font and room-login contracts — were enforced by nobody on a pull
+        # request, which is the only verification a production deploy gets (`quality.yml:34`).
+        #
+        # `test:gates` is exactly those eleven: a provable PREFIX of `test`, which
+        # `package-scripts-contract.test.ts` asserts so the two cannot drift apart. Everything is
+        # local — each was run individually in a container with no PostgreSQL and no preview, and all
+        # eleven passed — so nothing here can go red because something else is down.
         run: |
           if [ "${{ matrix.app }}" = "controller" ]; then
+            pnpm run test:gates
             pnpm run test:unit
           else
             pnpm run test
