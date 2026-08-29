@@ -94,6 +94,18 @@ const SCOPING_HELPERS: Readonly<Record<string, readonly string[]>> = {
     subscriber map bounds. `requireNotesAccess` is the one that is new, and it is required HERE
     rather than trusted from the client, because the room's own `canManage` is a flag the room owns.
   */
+  /*
+    The chat archive's channel check. `presenterRoom()` is the room and the role; the second term is
+    the one that makes this an indirection worth admitting rather than a bare call — the channel is a
+    name the CALLER chose, and `memberChatChannels` is the only thing that says which names this
+    account holds. A helper that took the room and skipped that would let a presenter sweep a badge
+    channel they cannot see.
+  */
+  presenterChannel: [
+    'presenterRoom()',
+    'memberChatChannels(request, room, user)',
+    'isMemberChatChannel(allowed, channel)'
+  ],
   roomForNotesOn: [
     'presenterRoom()',
     'requireRoomMember(subjectUserId, room)',

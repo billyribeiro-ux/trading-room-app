@@ -653,7 +653,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It goes DOWN if the `privChat` or `cmds` transcriptions ever find a module of their own, which
       is where the next real extraction in this file is. It does not go up again.
     */
-    max: 935,
+    /*
+      DOWN 8 on 2026-08-30, while GAINING a handler. The chat archive added a `chatArchiveChanged`
+      arm, and the four recording commands left for `recording-commands.ts` in the same change: they
+      were four near-identical blocks doing a media call, the same preference test and a sound.
+      Collapsing them is not about the count — the capture has a QUIRK in exactly that mapping
+      (`resumeRec` plays the START sound behind the STOP preference) and a table is where a reader
+      cannot skim past it, which four separate blocks were not.
+    */
+    max: 927,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -999,6 +1007,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 152,
     why: 'the follow-chat colour and size editor - five inputs, a live example, three callbacks'
+  },
+  {
+    file: 'lib/components/LogArchiveModals.svelte',
+    /*
+      The two log-archive modals, together because they are the same surface twice and the ASYMMETRY
+      between them is the thing worth seeing: the chat half is built, the alerts half is a
+      placeholder because its sweep is gated on `deleteAlertPW` — one of the seven credential-shaped
+      settings that never reach this room. It owns the archive state itself rather than receiving it,
+      which is what the ratchet argued for when threading a thirty-seventh state class through three
+      capped files was refused at all three.
+    */
+    max: 148,
+    why: 'the chat and alerts archive modals, and the credential that separates them'
+  },
+  {
+    file: 'lib/components/ChatArchivePane.svelte',
+    /*
+      The archives browser and the sweep dialog. Replaced a hardcoded "There are no archived chats at
+      this time" and a `Reload Log List` button that carried no `onclick` at all.
+    */
+    max: 147,
+    why: 'the chat archives browser - a date, a channel picker, two sweeps and a restore per row'
   },
   {
     file: 'lib/components/RoomOverlays.svelte',
@@ -2039,6 +2069,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the Admin Notes wire - four remote functions adapted to positional arguments'
   },
   {
+    file: 'lib/room/chat-archive.svelte.ts',
+    /*
+      The chat archive client-side: upstream's confirm strings verbatim, its `isNaN` guard, and
+      `$state.raw` because every mutation answers with the server's whole list.
+    */
+    max: 183,
+    why: 'the chat archive - three calls, four dialogs, and the list they replace'
+  },
+  {
+    file: 'lib/room/chat-archive-port.ts',
+    /* The three remote calls, adapted to positional arguments. Same shape as `user-notes-port.ts`. */
+    max: 19,
+    why: 'the chat archive wire - three remote functions'
+  },
+  {
+    file: 'lib/room/recording-commands.ts',
+    /*
+      The four recording commands as a TABLE, lifted out of `events.svelte.ts`. It exists so the
+      capture's own quirk — `resumeRec` plays the start sound behind the stop preference — sits in a
+      row that visibly disagrees with its neighbours instead of being one word inside the fourth of
+      four near-identical handlers.
+    */
+    max: 44,
+    why: 'the four recording commands and the sound each plays, quirk included'
+  },
+  {
     file: 'lib/room/notes-access.svelte.ts',
     max: 141,
     why: "the notes-password door — upstream's `allowToManageNotes` and the two-call check that sets it"
@@ -2769,6 +2825,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       Capped at its created size. A new field per command is what this file is for, so the number
       moves down only when a command leaves the wire.
+    */
+    /*
+      Unchanged. `chatArchiveChanged` carries no fields, so it added none — a note explaining that
+      was written here and then removed, because a paragraph about a field that does not exist, in a
+      file of field declarations, is the kind of thing that goes stale first. The producer says it.
     */
     max: 59,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
