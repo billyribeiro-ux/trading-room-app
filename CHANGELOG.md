@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 03:05 UTC — The duplication audit's verdict: 24 assertions, one true duplicate
+
+**Runtime impact: NO.** One duplicated assertion removed; everything else kept, with reasons.
+
+#### The per-assertion sweep
+
+An independent pass read all five of this session's new or changed gates and asked, of **each
+individual assertion**, whether breaking the thing it guards would also turn another existing test
+red. **24 assertions: 19 have no companion anywhere in the corpus; 5 overlap.** Every one of the five
+came back `keep-both`.
+
+#### The adversarial layer earned its place
+
+Each claimed duplication was then put to **two independent skeptics**, both prompted to refute and
+both required to read the two sites. Of the verdicts returned, **five of six refuted the claim** —
+including one that caught an arithmetic error in the finding itself, the same 52-versus-51 slip
+already corrected here by hand.
+
+That is the whole argument for the adversarial stage. A duplication report acted on without it would
+have deleted working gates; this repository has measured its own **21% false-finding rate** on
+unverified enumeration, and this run's rate was higher.
+
+#### The one true duplicate, and why it was resolved that way
+
+`user-actions.svelte.test.ts` ended with
+
+```ts
+expect([...TOAST_ONLY_ACTIONS].sort()).toEqual(['restart-audio', 'save-permissions']);
+```
+
+— **character-identical** to the assertion `user-action-intent.test.ts` makes on the same imported
+constant. Removed from the behavioural test, not from the catalog's own: that docblock carries the
+history of the number — twelve, then four, then three, then two — and what each removal meant, so it
+is where the assertion belongs.
+
+The two `.not.toContain` assertions above it are **not** duplicates and stay. They are behavioural:
+`handle` consults `EXACT_ALERTS` last, so re-adding either entry would make the branch above it dead,
+and only a test that exercises the handler can see that.
+
+**Coverage was proved to survive rather than assumed.** A third entry added to `EXACT_ALERTS` still
+fails — in `user-action-intent.test.ts`'s *"is TWO, and neither of them is a liar any more"* — and
+the tree goes green again when it is removed.
+
+#### What was deliberately NOT done
+
+* **No cross-reference for the CHANGELOG's repeated measurements.** Six were reported. A changelog is
+  a chronological record; an entry stating a number that an older entry also stated is the format
+  working, not drift. Drift is two *live* documents disagreeing.
+* **No shared module for the comment-stripping helper**, which exists in 34+ copies. Extracting it
+  would touch dozens of files to remove a duplication whose only measured cost is already fixed and
+  tripwired. The `.svelte`-aware version lives with the gate that needs it and is named there.
+* **No shared component-discovery helper.** Six copies exist and their subject sets genuinely differ
+  by purpose — `lib/components/` only, all files including fixtures, all files excluding them. A
+  shared discoverer would invite the wrong subject set to be used, which is worse than six honest
+  globs. The one thing they truly share, the fixture list, is already cross-checked by assertion
+  between the two gates that use it.
+
+#### Verified
+
+* Room **190 files, 3,109 passed, 1 skipped**; `svelte-check` **1,334 files, 0/0**; `eslint` clean.
+* The dedup control: a third `EXACT_ALERTS` entry still caught, by name, after the removal.
+
 ### 2026-08-29 02:55 UTC — Eight stale or self-contradicting claims across the trackers, and a gate that was only reading half the repository
 
 **Runtime impact: NO.** Tracker corrections, one comment repointed in shipping source, and a widened

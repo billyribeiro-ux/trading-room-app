@@ -472,11 +472,22 @@ describe('the dispatcher', () => {
     expect(TOAST_ONLY_ACTIONS).not.toContain('mute-chat-24');
     expect(TOAST_ONLY_ACTIONS).not.toContain('mute-chat-indefinitely');
     /*
-      What is LEFT in that table, named so the count cannot drift silently: two entries, and both are
-      honest — each announces a real send, and the reference raises both alerts too. There are no
-      liars left in it.
+      WHAT IS LEFT IN THAT TABLE IS ASSERTED ONCE, AND NOT HERE.
+
+      This block used to end with a second, character-identical
+      `expect([...TOAST_ONLY_ACTIONS].sort()).toEqual(['restart-audio', 'save-permissions'])`, the
+      same assertion `user-action-intent.test.ts` makes on the same imported constant. Found by a
+      duplication audit on 2026-08-29 and removed here rather than there, because the catalog's own
+      test is where that assertion belongs: its docblock carries the history of the number — twelve,
+      then four, then three, then two — and what each removal meant.
+
+      The two `.not.toContain` assertions above are NOT duplicates and stay. They are behavioural:
+      `handle` consults `EXACT_ALERTS` last, so re-adding either entry would make the branch above
+      dead, and only a test that exercises the handler can see that.
+
+      A third entry arriving is the thing to look at, because it would be the first liar back in the
+      room — and `user-action-intent.test.ts` is where that fails.
     */
-    expect([...TOAST_ONLY_ACTIONS].sort()).toEqual(['restart-audio', 'save-permissions']);
   });
 
   it('surfaces a refused unmute rather than dropping it', async () => {
