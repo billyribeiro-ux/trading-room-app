@@ -125,7 +125,13 @@ describe('every internal route verifies the credential its job needs', () => {
     carried; this list is where that was decided rather than copied.
   */
   const WRITES = ['room-ban', 'room-mute', 'room-permissions', 'room-setting', 'stream-ingest'];
-  const READS = ['room-config', 'room-entry', 'mobile-pin', 'stream-read'];
+  /*
+    `room-notes-auth` joined 2026-08-29. It POSTs a candidate the controller compares against
+    `needPasswordForUserNotes` and answers two booleans; nothing on the controller changes, which is
+    what puts it here rather than in WRITES. The same shape as `room-entry` beside it — the
+    credential stays and the question travels.
+  */
+  const READS = ['room-config', 'room-entry', 'room-notes-auth', 'mobile-pin', 'stream-read'];
 
   it.each(WRITES)('%s verifies a WRITE capability', async (route) => {
     const source = await sourceOf(route);

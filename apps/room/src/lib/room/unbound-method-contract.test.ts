@@ -10,6 +10,7 @@ import { RoomTradeAlerts } from './trade-alerts.svelte';
 import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
+import { RoomNotesAccess } from './notes-access.svelte';
 import { RoomEventStream } from './events.svelte';
 import { RoomGates } from './gates';
 import { RoomLocalCapture } from './local-capture.svelte';
@@ -94,6 +95,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   composer: RoomComposer,
   feeds: RoomFeeds,
   messageActions: RoomMessageActions,
+  notesAccess: RoomNotesAccess,
   screens: RoomScreens,
   mediaTransport: RoomMediaTransport,
   localCapture: RoomLocalCapture,

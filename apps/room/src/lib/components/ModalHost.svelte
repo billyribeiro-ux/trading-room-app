@@ -201,6 +201,13 @@
     onMuteToggle: (user: ModalTargetUser) => void;
     onUserAction: (action: string, user: ModalTargetUser) => void;
     /**
+     * Upstream's `allowToManageNotes`. It gates two things there — `pTe`, the password panel below,
+     * while false, and `fTe`, the member's own notes with a delete per row, while true. Only the
+     * first exists here: `notes` is room-scoped, keyed by `room_short_code` with no member column,
+     * so there are no per-member notes to list. That is a schema change and its own feature.
+     */
+    canManageNotes?: boolean;
+    /**
      * Save the five permission checkboxes — the one control here that carries a PAYLOAD.
      *
      * `onUserAction` takes a name and a target and nothing else, so the ticked boxes had no way out
@@ -409,6 +416,7 @@
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
+    canManageNotes = false,
     onSavePermissions,
     streamingType,
     onManagedUserRemoval,
@@ -2531,15 +2539,22 @@
               { show: userInfoTab === 'notes', active: userInfoTab === 'notes' }
             ]}
           >
-            <div>
-              <p>To be able to manage user's notes, please enter the password.</p>
-              <button
-                class="btn btn-outline-light"
-                onclick={() => onUserAction('admin-notes-password', targetUser)}
-              >
-                Enter Password
-              </button>
-            </div>
+            <!--
+              Upstream's own gate: `pTe` is the false branch of `allowToManageNotes`. Until
+              2026-08-29 this panel rendered ALWAYS and its button alerted "Wrong password!" whatever
+              was typed; the comparison is real now and clearing it visibly does something.
+            -->
+            {#if !canManageNotes}
+              <div>
+                <p>To be able to manage user's notes, please enter the password.</p>
+                <button
+                  class="btn btn-outline-light"
+                  onclick={() => onUserAction('admin-notes-password', targetUser)}
+                >
+                  Enter Password
+                </button>
+              </div>
+            {/if}
           </div>
         </div>
       </div>

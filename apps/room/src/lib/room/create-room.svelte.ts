@@ -868,13 +868,13 @@ export function createRoom(deps: RoomDeps) {
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
+    notesCheck: checkNotesPassword,
     commands: {
       presenter: presenterCommand,
       editUsername,
       muteChat,
       muteChatIndefinitely,
       unmuteChat,
-      checkNotesPassword,
       forceReload,
       restartAudio,
       kickUser,

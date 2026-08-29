@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 5,979 | no |
+| 1 | `lib/components/ModalHost.svelte` | 5,994 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
 | 3 | `routes/+page.svelte` | 1,425 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,162 | no |
@@ -82,7 +82,7 @@ guessed.
 | 6 | `lib/components/PresentationArea.svelte` | 957 | no |
 | 7 | `lib/components/RoomNavbar.svelte` | 921 | no |
 | 8 | `lib/components/PollPanel.svelte` | 824 | no |
-| 9 | `lib/components/RoomOverlays.svelte` | 820 | no |
+| 9 | `lib/components/RoomOverlays.svelte` | 822 | no |
 | 10 | `lib/components/RoomSidebar.svelte` | 777 | no |
 | 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `routes/logout/+page.svelte` | 31 | no |
 | 55 | `routes/+layout.svelte` | 27 | no |
 
-**2 of 55 surfaces audited · 1,059 of 27,290 lines · 3.9%.**
+**2 of 55 surfaces audited · 1,059 of 27,307 lines · 3.9%.**
 
 ## The honest scoping statement
 

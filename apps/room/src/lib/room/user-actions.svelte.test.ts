@@ -81,9 +81,33 @@ const make = (
   const indefiniteMutesSent: { targetUserId: number }[] = [];
   let permsFails = false;
 
+  /*
+    The notes-password door, as a controllable stub.
+
+    `notesAnswers` is a QUEUE rather than one value, because the control makes TWO calls per
+    interaction — an empty candidate to ask whether a password is required at all, then the typed
+    one — and a stub that answered the same thing to both could not tell the two apart. Every case
+    below states exactly what the controller says, in order.
+  */
+  const notesAsked: { candidate: string }[] = [];
+  /*
+    `null` means REJECT that call. The control makes two round trips and each has its own catch, so a
+    stub that could only fail every call left the second one untested — which is exactly what the
+    negative control for it reported: it did not fire.
+  */
+  let notesAnswers: ({ required: boolean; ok: boolean } | null)[] = [];
+  let notesFails = false;
+
   const actions = new RoomUserActions<User>({
     dialogs,
     toasts,
+    notesCheck: (payload: { candidate: string }) => {
+      notesAsked.push(payload);
+      if (notesFails) return Promise.reject(new Error('controller unreachable'));
+      const next = notesAnswers.shift();
+      if (next === null) return Promise.reject(new Error('controller unreachable'));
+      return Promise.resolve(next ?? { required: true, ok: false });
+    },
     commands: {
       presenter: (payload) =>
         presenterFails
@@ -156,6 +180,13 @@ const make = (
     actions,
     dialogs,
     toasts,
+    notesAsked,
+    setNotesAnswers: (answers: ({ required: boolean; ok: boolean } | null)[]) => {
+      notesAnswers = answers;
+    },
+    failNotesCheck: () => {
+      notesFails = true;
+    },
     sent,
     opened,
     mentioned,
@@ -455,6 +486,124 @@ describe('the dispatcher', () => {
     actions.handle('restart-audio', TARGET);
     expect(audioRestarts).toEqual([TARGET.id]);
     expect(dialogs.alert).toBe('Audio restart request sent OK');
+  });
+
+  it('grants notes management WITHOUT prompting when no password is configured', async () => {
+    /*
+      Upstream's first branch, at bundle byte 2,081,768:
+      `needPasswordForUserNotes && !allowToManageNotes ? bootbox.prompt(...) : allowToManageNotes = !0`.
+
+      A room with nothing configured never sees a dialog. The room cannot make that decision itself —
+      the setting is credential-shaped and never crosses — so it asks with an EMPTY candidate and the
+      controller answers `required:false`. That round trip is what this asserts, including that no
+      prompt was raised.
+    */
+    const { actions, dialogs, notesAsked, setNotesAnswers } = make();
+    setNotesAnswers([{ required: false, ok: true }]);
+
+    actions.handle('admin-notes-password', TARGET);
+    await vi.waitFor(() => expect(actions.canManageNotes).toBe(true));
+
+    expect(notesAsked).toEqual([{ candidate: '' }]);
+    expect(dialogs.prompt, 'upstream raises no dialog when nothing is configured').toBeNull();
+    expect(dialogs.alert).toBeNull();
+  });
+
+  it('prompts when a password IS configured, and grants on the right one', async () => {
+    const { actions, dialogs, notesAsked, setNotesAnswers } = make();
+    setNotesAnswers([
+      { required: true, ok: false }, // the empty probe: configured, so prompt
+      { required: true, ok: true } //  the typed value: correct
+    ]);
+
+    actions.handle('admin-notes-password', TARGET);
+    await vi.waitFor(() => expect(dialogs.prompt).not.toBeNull());
+    expect(dialogs.prompt?.title).toBe("Please enter the password to manage user's notes:");
+    expect(actions.canManageNotes, 'not granted before anything is typed').toBe(false);
+
+    dialogs.prompt?.onconfirm('  hunter2  ');
+    await vi.waitFor(() => expect(actions.canManageNotes).toBe(true));
+
+    /*
+      The typed value REACHES the server untrimmed. Trimming is the controller's job — it reproduces
+      upstream's `e.trim() === needPasswordForUserNotes`, where the candidate is trimmed and the
+      stored value is not — and doing it in both places is how the two would later disagree.
+    */
+    expect(notesAsked).toEqual([{ candidate: '' }, { candidate: '  hunter2  ' }]);
+    expect(dialogs.alert).toBeNull();
+  });
+
+  it('says "Wrong password!" on the wrong one, and grants nothing', async () => {
+    const { actions, dialogs, setNotesAnswers } = make();
+    setNotesAnswers([
+      { required: true, ok: false },
+      { required: true, ok: false }
+    ]);
+
+    actions.handle('admin-notes-password', TARGET);
+    await vi.waitFor(() => expect(dialogs.prompt).not.toBeNull());
+    dialogs.prompt?.onconfirm('nope');
+
+    // The reference's exact string, and the one thing about this control that was always right.
+    await vi.waitFor(() => expect(dialogs.alert).toBe('Wrong password!'));
+    expect(actions.canManageNotes).toBe(false);
+  });
+
+  it('an EMPTY answer closes the prompt and says nothing, as upstream does', async () => {
+    /*
+      `e && (…)` upstream: dismissing the dialog is not a failed attempt. Telling a presenter they
+      typed the wrong password when they typed nothing would be a second lie in the control that just
+      lost its first.
+    */
+    const { actions, dialogs, notesAsked, setNotesAnswers } = make();
+    setNotesAnswers([{ required: true, ok: false }]);
+
+    actions.handle('admin-notes-password', TARGET);
+    await vi.waitFor(() => expect(dialogs.prompt).not.toBeNull());
+    dialogs.prompt?.onconfirm('   ');
+
+    expect(dialogs.prompt).toBeNull();
+    expect(dialogs.alert).toBeNull();
+    expect(actions.canManageNotes).toBe(false);
+    expect(notesAsked, 'nothing is sent for an empty answer').toEqual([{ candidate: '' }]);
+  });
+
+  it('an unreachable controller neither grants NOR claims the password was wrong', async () => {
+    /*
+      A DIVERGENCE from the reference, and the assertion that pins it. Upstream has no network in
+      this path at all — it compares a value it already holds — so "could not ask" is a third outcome
+      that only exists here. Collapsing it into the refusal would reproduce the exact defect this
+      control was repaired for: telling a presenter their correct password was wrong.
+    */
+    const { actions, dialogs, failNotesCheck } = make();
+    failNotesCheck();
+
+    actions.handle('admin-notes-password', TARGET);
+    await vi.waitFor(() => expect(dialogs.alert).not.toBeNull());
+
+    expect(dialogs.alert).not.toBe('Wrong password!');
+    expect(actions.canManageNotes, 'a network failure must not grant').toBe(false);
+  });
+
+  it('a controller that fails on the SECOND call also refuses to grant or blame', async () => {
+    /*
+      The other half of the unreachable case, and it exists because its negative control did not
+      fire. The first test fails the empty PROBE, which is caught in `#askToManageNotes`; the typed
+      submission is caught in `#submitNotesPassword`, a different branch that nothing reached. A
+      control that cannot fail is worse than no control, and this is the test that answer produced.
+    */
+    const { actions, dialogs, setNotesAnswers } = make();
+    setNotesAnswers([{ required: true, ok: false }, null]);
+
+    actions.handle('admin-notes-password', TARGET);
+    await vi.waitFor(() => expect(dialogs.prompt).not.toBeNull());
+    dialogs.prompt?.onconfirm('hunter2');
+
+    await vi.waitFor(() => expect(dialogs.alert).not.toBeNull());
+    expect(dialogs.alert, 'a network failure must not read as a wrong password').not.toBe(
+      'Wrong password!'
+    );
+    expect(actions.canManageNotes).toBe(false);
   });
 
   it('NEITHER mute is one of the controls that only talk any more', () => {

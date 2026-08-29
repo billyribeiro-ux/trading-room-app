@@ -1045,7 +1045,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       once and handing it down. `=== true` is the fail-closed read every optional control-plane field
       takes here.
     */
-    max: 821,
+    max: 823,
+    /*
+      821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
+      one-line note saying only the class that asked the controller can know it.
+    */
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
@@ -1552,7 +1556,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and the rule that its ceiling only moves with a reason written down is what has taken it from
       6,021 to here.
     */
-    max: 5980,
+    max: 5995,
+    /*
+      5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
+      upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
+      gate exists here: `fTe`, the member's own notes with a delete per row, needs a member column
+      that `notes` does not have.
+
+      Not extracted, and the reason is honest rather than an excuse: pulling a four-line `{#if}` into
+      a component to dodge fifteen lines would add an indirection nobody asked for while leaving
+      5,980 lines behind it.
+    */
     why: 'every modal in the room, in one component'
   },
   {
@@ -1706,6 +1720,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/menus.svelte.ts',
     max: 187,
     why: 'the eleven floating menus and the two closers that deliberately differ'
+  },
+  {
+    file: 'lib/room/notes-access.svelte.ts',
+    max: 141,
+    why: "the notes-password door — upstream's `allowToManageNotes` and the two-call check that sets it"
   },
   {
     file: 'lib/room/polls.svelte.ts',
@@ -2179,7 +2198,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Raised under the same standing "get it done" as the entry above, and reversible on the same
       terms: the peer media commands are a coherent slice.
     */
-    max: 780,
+    max: 803,
+    /*
+      780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
+
+      `admin-notes-password` was row W's last lying control: it raised the reference's prompt and then
+      set 'Wrong password!' unconditionally, never receiving the typed value at all. Wiring it added
+      98 lines here, which this ratchet refused — so the logic left, as `RoomChatMute`, `RoomKicks`
+      and `RoomSessionControl` did before it, into `RoomNotesAccess`.
+
+      What remains is the seam: a field, a getter, an import, one constructor line, the branch that
+      calls it, and the note saying where it went. Extracting the seam too would mean a class that
+      dispatches to a class that dispatches.
+    */
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
@@ -2541,7 +2572,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every gate in this repository. It is declared beside the `prefs` it reads and returned so the
       page uses the same one, which is what makes a second copy impossible rather than merely unwise.
     */
-    max: 1205,
+    max: 1207,
+    /*
+      1205 -> 1207, 2026-08-29. Two lines: the `notes-auth.remote` import and `notesCheck:` passed to
+      `RoomUserActions`. Passed BESIDE `commands` rather than inside it because it is not a
+      presenter-to-member command — it is a question about this room's configuration.
+    */
     why: 'the composition root - 37 constructions and their citations, assembly and nothing else'
   },
   {

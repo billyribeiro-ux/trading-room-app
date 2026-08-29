@@ -22,6 +22,7 @@ import { RoomChatMute } from './chat-mute';
 import type { UserActionCommands } from './user-action-commands';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomKicks } from './kicks';
+import { RoomNotesAccess, type NotesAccessCheck } from './notes-access.svelte';
 import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control';
 import type { RoomToasts } from './toasts.svelte';
@@ -128,6 +129,8 @@ export class RoomUserActions<
     dialogs: RoomDialogs;
     toasts: RoomToasts;
     commands: UserActionCommands;
+    /** The notes-password door — NOT a presenter-to-member command, so not in `UserActionCommands`. */
+    notesCheck: NotesAccessCheck;
     session: () => UserActionSession<User>;
     isPresenter: () => boolean;
     /** `media.talking` — who has a microphone open, which is what "mute all" acts on. */
@@ -197,6 +200,7 @@ export class RoomUserActions<
     });
 
     this.#managed = new RoomManagedUsers(options.defaultFollowStyle);
+    this.#notes = new RoomNotesAccess(options.dialogs, options.notesCheck);
     this.#kicks = new RoomKicks<User>({
       dialogs: options.dialogs,
       commands: options.commands,
@@ -225,6 +229,17 @@ export class RoomUserActions<
 
   get selectedUserId() {
     return this.#selectedUserId;
+  }
+
+  /**
+   * The notes-password door — see `RoomNotesAccess`. It lived here, pushed this class 98 lines past
+   * its ceiling, and left the way the ratchet asks: extract rather than raise. The fourth slice out,
+   * after `RoomChatMute`, `RoomKicks` and `RoomSessionControl`.
+   */
+  readonly #notes: RoomNotesAccess;
+
+  get canManageNotes(): boolean {
+    return this.#notes.granted;
   }
 
   get selectedMessageUser() {
@@ -628,14 +643,22 @@ export class RoomUserActions<
     if (this.#kicks.handle(action, user)) return;
 
     if (action === 'admin-notes-password') {
-      this.#dialogs.prompt = {
-        title: "Please enter the password to manage user's notes:",
-        value: '',
-        onconfirm: () => {
-          this.#dialogs.prompt = null;
-          this.#dialogs.alert = 'Wrong password!';
-        }
-      };
+      /*
+        ROW W'S LAST LYING CONTROL, WIRED 2026-08-29.
+
+        This branch used to raise the prompt and then set `'Wrong password!'` UNCONDITIONALLY — its
+        `onconfirm` took no parameter, so the typed value was never received, not merely uncompared.
+        A presenter typing the correct password was told it was wrong every time.
+
+        The primitive was never at fault: `RoomPrompt.onconfirm` is `(value: string) => void` and
+        `BootboxDialog.svelte` calls `onconfirm?.(promptResult())`. The value arrived and was thrown
+        away. What was missing was somewhere for it to go — see `routes/notes-auth.remote.ts`.
+
+        Fire-and-forget because `handle` is synchronous for every other action and the answer lands
+        in a dialog, not in this call's return. `void` rather than a floating promise so the intent
+        is declared: nothing here awaits, and the rejection path is handled inside.
+      */
+      void this.#notes.ask();
       return;
     }
 

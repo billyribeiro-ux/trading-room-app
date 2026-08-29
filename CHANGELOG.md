@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 04:00 UTC — `admin-notes-password` compared nothing; row W's last liar is wired
+
+**Runtime impact: YES.** A presenter typing the **correct** notes password was told it was wrong,
+every time. It is compared now — on the controller, where the password lives.
+
+#### The defect
+
+`RoomUserActions.handle` raised the reference's own prompt and then set `'Wrong password!'`
+**unconditionally**. Its `onconfirm` took no parameter, so the typed value was never received — not
+merely uncompared.
+
+The primitive was never at fault. `RoomPrompt.onconfirm` is `(value: string) => void` and
+`BootboxDialog.svelte:42` calls `onconfirm?.(promptResult())`: the value arrived and was discarded.
+**What was missing was somewhere for it to go.**
+
+#### Why the comparison had to move machines
+
+Upstream compares in the browser (bundle byte 2,081,768) because its `sessData` already holds the
+password:
+
+```js
+manageAdminNotes(){
+  this.appService.globals.sessData.needPasswordForUserNotes && !this.allowToManageNotes
+    ? bootbox.prompt({ …, callback: e => { e && (e.trim() === …needPasswordForUserNotes
+        ? this.allowToManageNotes = !0 : bootbox.alert("Wrong password!")) } })
+    : this.allowToManageNotes = !0
+}
+```
+
+`needPasswordForUserNotes` is one of the **seven credential-shaped settings that may never reach the
+room**. So the credential stays and the QUESTION travels — the split `internal/room-entry` already
+makes for the room passwords.
+
+**One endpoint answers both questions, and that is what makes the behaviour match.** Upstream's first
+branch never prompts when nothing is configured. A room that cannot see the setting cannot decide
+that locally, and inventing a second crossing boolean would put a credential-derived fact on the wire.
+So `required` is returned beside `ok`: the room asks once with an **empty candidate** — upstream's own
+pre-prompt branch, asked of the only machine that can answer it — and again with what was typed.
+
+#### What shipped
+
+| | |
+| --- | --- |
+| `internal/room-notes-auth/[code]/+server.ts` | compares, constant-time over equal-length buffers, and trims the **candidate** not the stored value — upstream's `e.trim() === …` reproduced rather than tidied |
+| `roomNotesAuthUrl` · `checkNotesPasswordRemotely` | the room-side client, which **throws** rather than resolving false when the controller is unreachable |
+| `routes/notes-auth.remote.ts` | `command` with `z.strictObject`; the room comes from `presenterRoom()`, never the caller |
+| `lib/room/notes-access.svelte.ts` | `RoomNotesAccess` — the flag and the two-call check |
+| `ModalHost.svelte` | the password panel is now `{#if !canManageNotes}`, upstream's own `pTe` gate |
+
+**The extraction was the ratchet's doing.** Wiring it inline pushed `user-actions.svelte.ts` 98 lines
+past its ceiling, and `source-size-contract.test.ts` answers that with one instruction: extract rather
+than raise. `RoomNotesAccess` is the fourth slice to leave that class, after `RoomChatMute`,
+`RoomKicks` and `RoomSessionControl`. The four small raises that remain are argued at their entries.
+
+#### What is NOT built, stated rather than implied
+
+Upstream gates **two** things on `allowToManageNotes`: the password panel while false, and `fTe` —
+the member's own notes with a delete per row — while true. **Only the first exists here.** `notes` is
+room-scoped, keyed by `room_short_code` with **no member column**, so there are no per-member notes to
+list. That is a schema change and its own feature. What is fixed is the lie.
+
+`DIALOG_ONLY_ACTIONS` is now **empty** — this was its last entry.
+
+#### Verified
+
+* **Six behaviour tests**, and **six negative controls each proved to have applied**: grant-without-
+  prompt removed; the refusal string changed; the empty-answer guard removed; the probe made
+  non-empty; and the network-failure path collapsed into `'Wrong password!'` — **twice**, because the
+  first attempt at that control **did not fire**. It only failed the empty probe, caught in one
+  branch, while the typed submission is caught in another that nothing reached. That gap produced a
+  sixth test and a stub that can reject a chosen call.
+* One more control: swapping the endpoint's `verifyConfigReadToken` for the write verifier fails
+  *"room-notes-auth verifies a READ capability"*, so the seam gate genuinely polices the new route.
+* Room **190 files, 3,122 passed, 1 skipped**; `svelte-check` **1,336 files 0/0**; `eslint` clean.
+* Controller **97 files, 1,024 passed, 21 skipped**; `svelte-check` **1,543 files 0/0**.
+
+#### The Svelte MCP was unavailable, and what stood in for it
+
+`CLAUDE.md` makes it mandatory for `.svelte`/`.svelte.ts` work; it is installed for the org but not
+enabled in this chat. With the owner's explicit authorisation to proceed, the substitutes were: the
+**official SvelteKit remote-functions documentation read directly** from `svelte.dev` before writing
+the `command`, `eslint-plugin-svelte`'s `recommended` set (already configured here), `svelte-check`,
+and this repository's own contract tests. **`svelte-autofixer` was not run on any file in this
+change** — stated plainly rather than implied by the green checks above.
+
 ### 2026-08-29 03:35 UTC — The backend suite runs for the first time here, and the regression it found
 
 **Runtime impact: NO** to what the site serves. One Rust test fixture repaired; the binary it belongs

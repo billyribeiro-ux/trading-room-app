@@ -307,15 +307,21 @@ describe('every dispatched action has exactly one disposition', () => {
     `saveCloseMessage`, and its action name is no longer dispatched at all: the editor's text cannot
     travel on an action STRING, so `ModalHost` calls a receiver instead.
 
-    `admin-notes-password` is the last entry, and its stated blocker is corrected here: the setting is
-    `needPasswordForUserNotes`, not `deleteAlertPW` — the two share only the string "Wrong password!",
-    which occurs nine times in the bundle. It also needs more than the comparison: the Notes tab
-    behind it contains ONLY the prompt, so unlocking it today reveals nothing.
+    **`admin-notes-password` LEFT IT ON 2026-08-29, and the table is now EMPTY.** It was the last
+    entry, and its own text named what it needed: *"needs `needPasswordForUserNotes` compared on the
+    CONTROLLER, and a notes pane behind it to unlock."* The first half is built —
+    `internal/room-notes-auth/[code]` compares, `notes-auth.remote.ts` asks, and
+    `RoomUserActions` grants — so the branch reaches a server command and is no longer dialog-only.
+
+    The second half is NOT built and is not pretended to be. Upstream gates two things on
+    `allowToManageNotes`: the password panel (rendered while false) and the member's own notes with a
+    delete per row (rendered while true). Only the first exists here, because `notes` is room-scoped —
+    keyed by `room_short_code` with no member column — so there are no per-member notes to list. That
+    is a schema change and its own feature. What is fixed is the LIE: the control compared nothing and
+    said "Wrong password!" to a correct password, and now it compares and the panel it gates goes
+    away. An empty table is the honest state, not a placeholder for the next entry.
   */
-  const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {
-    'admin-notes-password':
-      'alerts "Wrong password!" HARDCODED, never comparing — needs needPasswordForUserNotes compared on the CONTROLLER, and a notes pane behind it to unlock'
-  };
+  const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {};
 
   it('a handled branch that only raises a dialog is DECLARED, not silently counted as handled', () => {
     /*
@@ -380,6 +386,14 @@ describe('every dispatched action has exactly one disposition', () => {
       'this.#announceThenSend',
       'this.#updateUsername',
       'this.#unmuteChat',
+      /*
+        `admin-notes-password`, wired 2026-08-29. Its branch calls one private method because the
+        control delegates to RoomNotesAccess, which makes two server round trips — an empty candidate to learn whether a password is
+        configured at all, which is upstream's own pre-prompt branch, then the typed one — and
+        `handle` is synchronous. Adding it here is the gate doing its job: it refused the wiring
+        until the new effect was declared, which is exactly what it refuses a dead control for.
+      */
+      'this.#notes.',
       'this.muteAllNonAdmins',
       'localStorage.setItem',
       'playSoundEffect'

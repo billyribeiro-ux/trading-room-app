@@ -66,7 +66,15 @@ const READERS = [
   'fetchRoomConfig',
   'requestMobilePin',
   'requestStreamReadToken',
-  'decideRoomEntryRemotely'
+  'decideRoomEntryRemotely',
+  /*
+    `checkNotesPasswordRemotely` — the second question-shaped POST, added 2026-08-29. It sends a
+    candidate the controller compares against `needPasswordForUserNotes` and answers two booleans;
+    nothing on the controller changes, which is what decides the capability. The same shape as
+    `decideRoomEntryRemotely` immediately above, for the same reason: the credential stays where it
+    was configured and the QUESTION travels.
+  */
+  'checkNotesPasswordRemotely'
 ];
 
 describe('the capability minted for each controller call', () => {
