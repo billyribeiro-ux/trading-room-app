@@ -42,6 +42,22 @@ export interface UserActionCommands extends ChatMuteCommands {
     cmd: 'sendSalesImageToChat' | 'sendUsersToURL';
     url: string;
   }) => Promise<unknown>;
+  /**
+   * `checkNotesPassword` — may this presenter manage a member's notes?
+   *
+   * The ONE command here whose answer is a decision rather than an effect, and the shape is forced.
+   * `needPasswordForUserNotes` is credential-shaped, so it may never reach the room; the reference
+   * compares it in the browser only because its `sessData` already holds it (bundle byte 2,081,768).
+   * Here the candidate travels and two booleans come back — `required`, which is upstream's own
+   * "prompt at all?" branch, and `ok`.
+   *
+   * REJECTS rather than resolving false when the controller cannot be reached. "I could not ask" is
+   * not "no": resolving false would tell a presenter their correct password was refused, and
+   * resolving true would grant on a network error.
+   */
+  checkNotesPassword: (payload: {
+    candidate: string;
+  }) => Promise<{ required: boolean; ok: boolean }>;
   /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
   forceReload: (targetUserId: number) => Promise<unknown>;
   /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */

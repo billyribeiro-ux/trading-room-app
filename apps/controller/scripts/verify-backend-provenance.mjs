@@ -186,10 +186,22 @@ const DIVERGED_FROM_IMPORT = new Map([
     The rule is split into a pure `validate_tenant_policies` so it can be exercised without standing
     up a PostgreSQL 17 cluster, with seven unit tests, and the evidence it returns is reported rather
     than merely checked.
+
+    RE-PINNED 2026-08-29. That change added `tenant_policies` to `AttestationEvidence` and did not
+    update the "pass" fixture in this file's own tests, so the binary's test target stopped
+    compiling. Nothing reported it: `cargo test` cannot build in a container without egress —
+    `mediasoup-sys` fetches libsrtp from github and the agent proxy answers 403 — so the suite had
+    not run locally since. It compiled again once the meson subprojects were vendored over git, and
+    failed on this immediately.
+
+    The fixture's values are MEASURED against a real cluster rather than invented: PostgreSQL 16.13
+    with the full chain applied reports 22 relations with row-level security FORCED, 22 policies over
+    them — the 1:1 this evidence exists to state — and exactly two distinct `USING` expressions, the
+    general tenant predicate and `room_events`' member-scoped one.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '542c4e136a0d08dfa18ab4211bda7d5e31b70ec546e27a62330515da512c2bf1'
+    '04eaa8613989ebe0e7f4764d43bb730290b5185bb97bd8446aa1579d007ade51'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test

@@ -121,6 +121,22 @@ export function roomEntryUrl(shortCode: string): string | null {
 }
 
 /**
+ * `POST {control}/internal/room-notes-auth/{shortCode}` — the second question-shaped read.
+ *
+ * A SIBLING of `roomEntryUrl`, not of the setting reads, and the shape is the argument: both send a
+ * candidate the controller compares against a credential it holds and never returns. The room learns
+ * one boolean and the password stays where it was configured.
+ *
+ * It exists because `needPasswordForUserNotes` is one of the seven credential-shaped settings that
+ * may never appear in `ROOM_VISIBLE_SETTINGS`, and the reference compares it in the browser
+ * (bundle byte 2,081,768) because its `sessData` already holds it. See the endpoint's own header.
+ */
+export function roomNotesAuthUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-notes-auth/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * The one WRITE: `POST {control}/internal/room-setting/{shortCode}`.
  *
  * This module described the room's controller surface as two reads, and for every setting but one

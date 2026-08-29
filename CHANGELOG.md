@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 03:35 UTC — The backend suite runs for the first time here, and the regression it found
+
+**Runtime impact: NO** to what the site serves. One Rust test fixture repaired; the binary it belongs
+to could not compile.
+
+#### The build was blocked by an egress policy, and git got round it
+
+`cargo test` had never run in this container. `mediasoup-sys v0.14.2`'s build script downloads eight
+meson subprojects from `github.com`, and the agent proxy answers **HTTP 403**, retrying to
+exhaustion. Two of eight were already cached; the other six were vendored by **git clone**, which the
+proxy does allow, plus the two WrapDB patches that carry the meson build files (wrapdb answers 301,
+not 403). Two upstream repositories needed a hand: `unordered_dense` declares no dependency object at
+its v4.8.1 tag — WrapDB's release archive differs from the git tag — so the header-only
+`declare_dependency` was written out, and its `subdir('test')` guarded behind `meson.is_subproject()`.
+
+**None of that touches this repository.** It is all inside `/root/.cargo/registry`, and it is
+recorded here so the next person is not blocked for the same hour.
+
+#### What it found the moment it compiled
+
+```
+error[E0063]: missing field `tenant_policies` in initializer of `AttestationEvidence`
+  --> api/src/bin/postgres-release-attestation.rs:2536:9
+```
+
+Commit `85981bd` — *"Twenty-one tenant tables were attested by their ROLE and never by their
+PREDICATE"* — added `tenant_policies` to the struct and did not update the **"pass" fixture in its own
+tests**. The binary's test target has not compiled since. Nothing said so, because the only machine
+that could say so could not build.
+
+The fixture's values are **measured, not invented**: PostgreSQL 16.13 with the full chain applied
+reports **22** relations with row-level security FORCED, **22** policies over them — the 1:1 that
+evidence exists to state — and exactly **two** distinct `USING` expressions, the general tenant
+predicate and `room_events`' member-scoped one. Both are written out verbatim.
+
+#### The suite's result, and the one failure that is not a defect
+
+**252 passed, 1 failed.**
+
+```
+inspect MAINTAIN on public.enterprises: unrecognized privilege type: "MAINTAIN"
+  api/tests/migrations.rs:81
+```
+
+`MAINTAIN` is a **PostgreSQL 17** privilege. This container has **16.13**. The repository requires 17
+— `REQUIRED_POSTGRES_MAJOR: i32 = 17`, `postgres:17` pinned by digest in `backend-quality.yml`, and
+`migrations.rs:801` lists `MAINTAIN` among the privileges that must remain denied. So the failure is
+**the version I have, not the code**, and on the pinned cluster it would pass. Stated rather than
+smoothed over: this suite has **not** been run against PostgreSQL 17 here.
+
+#### Verified
+
+* `cargo test --locked --workspace --features testing` — **252 passed / 1 failed**, the failure
+  diagnosed above.
+* `cargo fmt --all -- --check` — clean.
+* `cargo clippy --locked -p tradingroom-api --bins --features testing -- -D warnings` — clean. The
+  workspace-wide clippy re-triggers the mediasoup build in a separate directory and hits the same
+  403; the crate that changed is linted.
+* `verify-backend-provenance.mjs` **refused the edit until it was re-pinned**, exactly as `CLAUDE.md`
+  requires, and then passed: *98 imported (74 untouched + 24 diverged, each pinned) + 2 authored
+  here*.
+
 ### 2026-08-29 03:15 UTC — The tenancy kernel proven on a real cluster, and the retirement migration that must not be written
 
 **Runtime impact: NO.** No code changed. A tracker row corrected with measurements, and a planned

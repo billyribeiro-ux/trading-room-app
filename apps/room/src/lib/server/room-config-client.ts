@@ -25,6 +25,7 @@ import {
   mobilePinUrl,
   roomConfigUrl,
   roomEntryUrl,
+  roomNotesAuthUrl,
   roomBanUrl,
   roomMuteUrl,
   roomPermissionsUrl,
@@ -1321,4 +1322,69 @@ export async function decideRoomEntryRemotely(
 
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
   return (await response.json()) as RoomEntryDecision;
+}
+
+/** What `internal/room-notes-auth` answers. */
+export interface NotesPasswordDecision {
+  /** Whether the room has a notes password configured at all. False means upstream never prompts. */
+  readonly required: boolean;
+  /** Whether this attempt may manage a member's notes. */
+  readonly ok: boolean;
+}
+
+/**
+ * Ask the controller whether a notes password is required, and whether this one is right.
+ *
+ * ## Why it FAILS CLOSED by throwing, like {@link decideRoomEntryRemotely}
+ *
+ * A thrown `RoomConfigUnavailable` is the only honest answer when the controller cannot be reached:
+ * the room does not hold `needPasswordForUserNotes` and cannot decide locally, so "I could not ask"
+ * must not be mistaken for "yes". Returning `{ok:false}` on a network error would be worse in the
+ * other direction too — it would tell a presenter their correct password was wrong.
+ *
+ * Two calls per interaction, and the first carries an EMPTY candidate. That is not a probe for the
+ * password; it is the reference's own first branch — `needPasswordForUserNotes && !allowToManageNotes`
+ * — asked of the only machine that can answer it. The endpoint returns `required:false` when nothing
+ * is configured, which is what lets the room grant access without prompting, exactly as upstream does.
+ */
+export async function checkNotesPasswordRemotely(
+  shortCode: string,
+  candidate: string
+): Promise<NotesPasswordDecision> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomNotesAuthUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ candidate }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the notes-password check failed or timed out after ${TIMEOUT_MS}ms`,
+      { cause }
+    );
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const decision = (await response.json()) as NotesPasswordDecision;
+  /*
+    Validated rather than trusted, because this value decides access. A controller that answered
+    `{}` — a deploy mid-rollout, a proxy returning an error page as JSON — would otherwise read as
+    `ok: undefined`, which is falsy here but would be truthy under any later `!== false` refactor.
+  */
+  if (typeof decision?.ok !== 'boolean' || typeof decision?.required !== 'boolean') {
+    throw new RoomConfigUnavailable('the controller answered an unrecognised notes-auth shape');
+  }
+  return { required: decision.required, ok: decision.ok };
 }

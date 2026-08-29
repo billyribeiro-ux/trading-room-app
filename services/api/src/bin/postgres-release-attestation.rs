@@ -2573,6 +2573,28 @@ mod tests {
                     })
                     .collect(),
             },
+            /*
+               ADDED 2026-08-29, and it is a REGRESSION FIX rather than a new assertion.
+
+               `85981bd` added `tenant_policies` to `AttestationEvidence` and did not update this
+               fixture, so this binary's test target stopped compiling. Nothing said so here: the
+               backend suite cannot build in a container without egress — `mediasoup-sys` downloads
+               libsrtp from github and the proxy answers 403 — so `cargo test` had not run locally
+               since. It compiled again once the subprojects were vendored, and failed on this.
+
+               The values are MEASURED, not invented: PostgreSQL 16.13 with the full chain applied
+               reports 22 tables with row-level security FORCED, 22 policies over them — the 1:1 this
+               evidence exists to state — and exactly these two distinct `USING` expressions, the
+               general tenant predicate and `room_events`' member-scoped one.
+            */
+            tenant_policies: TenantPolicyEvidence {
+                forced_relations: 22,
+                policies: 22,
+                distinct_using_expressions: vec![
+                    r#"((enterprise_id = (current_setting('app.enterprise_id'::text, true))::uuid) AND ((current_setting('app.member_id'::text, true) = ''::text) OR ((sender_member_id)::text = current_setting('app.member_id'::text, true)) OR ((recipient_member_id)::text = current_setting('app.member_id'::text, true))))"#.into(),
+                    r#"(enterprise_id = (NULLIF(current_setting('app.enterprise_id'::text, true), ''::text))::uuid)"#.into()
+                ],
+            },
             room_events: RoomEventsEvidence {
                 relation: "public.room_events",
                 owner: EXPECTED_MIGRATOR_ROLE.into(),

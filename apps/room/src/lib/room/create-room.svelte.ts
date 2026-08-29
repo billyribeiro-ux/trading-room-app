@@ -58,6 +58,7 @@ import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
 import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';
+import { checkNotesPassword } from '../../routes/notes-auth.remote';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -873,6 +874,7 @@ export function createRoom(deps: RoomDeps) {
       muteChat,
       muteChatIndefinitely,
       unmuteChat,
+      checkNotesPassword,
       forceReload,
       restartAudio,
       kickUser,
