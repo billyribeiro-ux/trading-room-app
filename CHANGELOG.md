@@ -33,6 +33,35 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 21:20 UTC — Three stale claims in the streaming docs, and the row reporting two of them was stale about the third
+
+**Runtime impact: none.** Documentation, corrected against the code rather than against itself.
+
+`TODO.md` row R recorded that `apps/room/docs/streaming-choices.md` carried two stale lines and that
+they *"should be corrected when somebody next opens it"*. Both confirmed by reading:
+
+* Its header said *"Nothing here is implemented except the entry marked DONE"* — the only entry so
+  marked being row 1. Untrue since rows 2 and 4 shipped: the recorder picks VP9 at 8 Mbps
+  (`recording-codec.ts`) and the screen track carries `contentHint = 'detail'`.
+* Its "What is already true" table recorded `Screen track contentHint` as **unset**.
+
+**The row's own citation for the second was also stale**, and that is the part worth recording. It
+said `contentHint` *"is set in `apps/room/src/lib/room/media-transport.svelte.ts`"*. Measured:
+`contentHint` has **zero occurrences** in that file. The line is in `local-capture.svelte.ts`'s
+`startScreenSharing`, which took the produce paths when it was extracted.
+
+A third stale pointer of exactly the kind the 44 in `missing-commands-triage.md` were, found the same
+way — by verifying the row before acting on it rather than after.
+
+The correction also carries what the code already records and the doc did not: `contentHint` is set
+on the SCREEN capture only, never the camera path, and it is a **divergence** — the capture sets it
+on its alert-overlay canvas stream and never on the raw screen track. Its cost is unmeasured.
+
+Rows 6, 8 and 10 remain open and each still needs a human at an OS screen picker, because
+`getDisplayMedia` cannot be automated and headless returns a synthetic gradient.
+
+Room **207 files, 3,317 passed**; controller **97 files, 1,026 passed**.
+
 ### 2026-08-29 21:05 UTC — 44 stale citations in the tracker, converted to symbols and gated
 
 **Runtime impact: none.** A maintainability fix on the document `feature-coverage-contract.test.ts`

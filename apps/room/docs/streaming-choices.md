@@ -1,6 +1,18 @@
 # Streaming quality — every option, ranked
 
-Written 2026-08-05. Nothing here is implemented except the entry marked DONE.
+Written 2026-08-05.
+
+> **Superseded 2026-08-29.** This line read *"Nothing here is implemented except the entry marked
+> DONE"*, and the only entry so marked is row 1. It has been untrue since **rows 2 and 4 shipped**:
+> the recorder picks VP9 at 8 Mbps (`apps/room/src/lib/recording-codec.ts`) and the screen track
+> carries `contentHint = 'detail'` (`apps/room/src/lib/room/local-capture.svelte.ts`, in
+> `startScreenSharing`). `TODO.md` row R had recorded that this line needed correcting *"when
+> somebody next opens it"*; this is that.
+
+**Implemented as of 2026-08-29: rows 1, 2 and 4.** Rows 6, 8 and 10 remain open and each needs the
+measurement named in its own entry — rows 6 and 8 need a human at an OS screen picker, because
+`getDisplayMedia` cannot be automated and headless returns a synthetic gradient that compresses too
+easily to show any difference.
 
 **Read the "Evidence" column before acting on any row.** Some entries are backed by measurements
 taken on this machine; others are reasoning from a spec and are labelled as such. The difference
@@ -20,7 +32,7 @@ Measured, not assumed:
 | Codec pinned by client               | none — `produceScreen` passes no `codec`, so the router's first offer wins                                                          |
 | Encodings sent                       | `undefined` — matches the capture's `useSharingSimulcast = !1`                                                                      |
 | `videoGoogleStartBitrate`            | `100_000` — matches the capture's `1e5`                                                                                             |
-| Screen track `contentHint`           | **unset**                                                                                                                           |
+| Screen track `contentHint`           | **`'detail'`** — set in `local-capture.svelte.ts`'s `startScreenSharing`, on the SCREEN capture only, never the camera path. Recorded as `unset` here until 2026-08-29, which was stale from the moment row 2 shipped |
 | Canvas/overlay re-encode in the path | none                                                                                                                                |
 | Browser                              | Chrome 150.0.7871.187                                                                                                               |
 | Screen share SENT (presenter)        | 1920×1080 @19, ~525 kbps, `qualityLimitationReason: none`, `encoderImplementation: libvpx`, `scalabilityMode: L1T1`                 |
