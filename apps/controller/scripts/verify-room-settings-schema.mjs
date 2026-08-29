@@ -643,7 +643,6 @@ try {
     `wired-count prose verified in ${COUNT_CLAIMS.length} documents; ${unwired} unwired; roster of ${listed.length} names matches`
   );
 
-
   console.log(`room-settings schema verified: 268 extracted + 1 reviewed deviation = 269 total; ${wired.length} wired`);
 } finally {
   rmSync(tempDirectory, { recursive: true, force: true });

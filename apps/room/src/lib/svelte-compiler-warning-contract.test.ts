@@ -148,7 +148,8 @@ describe('every compiler warning is argued', () => {
     const stale: string[] = [];
     for (const [file, codes] of Object.entries(ARGUED)) {
       for (const code of Object.keys(codes)) {
-        if (!findings.some((f) => f.file === file && f.code === code)) stale.push(`${file}: ${code}`);
+        if (!findings.some((f) => f.file === file && f.code === code))
+          stale.push(`${file}: ${code}`);
       }
     }
     expect(stale, stale.join(', ')).toEqual([]);

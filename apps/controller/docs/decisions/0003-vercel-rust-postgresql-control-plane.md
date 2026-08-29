@@ -82,18 +82,18 @@ describes, `src/lib/server/db/private-sqlite.ts`, has been deleted. None of it i
 current claim; access control for the store is now the database server's own.
 
 > Local SQLite accepts only the exact canonical `<root>/.data/control.sqlite`
-shape. The direct root must be canonical, process-owned, and not group- or
-other-writable. On supported POSIX hosts, bootstrap creates `.data`
-non-recursively, repairs a newly created directory after even a restrictive
-umask, and validates the directory and database through no-follow, nonblocking
-descriptors. An inaccessible pre-existing mode-`0000` directory fails for manual
-owner repair. The boundary requires a regular single-link database and exact
-post-repair modes `0700`/`0600`, but repairs only accessible existing files. A
-pre-existing owner-inaccessible mode-`0000` database, WAL, or SHM fails closed
-unchanged for manual owner repair. SQLite opens with `fileMustExist`, verifies
-writable WAL mode and foreign-key enforcement, and revalidates accessible
-existing WAL/SHM files after WAL initialization. The application and seed script
-share this one opener.
+> shape. The direct root must be canonical, process-owned, and not group- or
+> other-writable. On supported POSIX hosts, bootstrap creates `.data`
+> non-recursively, repairs a newly created directory after even a restrictive
+> umask, and validates the directory and database through no-follow, nonblocking
+> descriptors. An inaccessible pre-existing mode-`0000` directory fails for manual
+> owner repair. The boundary requires a regular single-link database and exact
+> post-repair modes `0700`/`0600`, but repairs only accessible existing files. A
+> pre-existing owner-inaccessible mode-`0000` database, WAL, or SHM fails closed
+> unchanged for manual owner repair. SQLite opens with `fileMustExist`, verifies
+> writable WAL mode and foreign-key enforcement, and revalidates accessible
+> existing WAL/SHM files after WAL initialization. The application and seed script
+> share this one opener.
 
 The locked bundled SQLite Unix VFS derives sidecar modes from the database mode,
 so this boundary does not read or mutate the process umask. These checks contain

@@ -76,8 +76,26 @@
     purpose: this script exists to read the exporter, not to run it.
   */
   const DENY = [
-    'delete', 'remove', 'upload', 'play', 'stop', 'send', 'save', 'submit', 'export', 'download',
-    'import', 'load', 'reset', 'ban', 'kick', 'clear', 'pause', 'invite', 'regen', 'rotate'
+    'delete',
+    'remove',
+    'upload',
+    'play',
+    'stop',
+    'send',
+    'save',
+    'submit',
+    'export',
+    'download',
+    'import',
+    'load',
+    'reset',
+    'ban',
+    'kick',
+    'clear',
+    'pause',
+    'invite',
+    'regen',
+    'rotate'
   ];
 
   const isForbidden = (el) => {
@@ -128,15 +146,27 @@
     { needle: 'exportListToCSV', why: 'Users → Export. Capture line 34. Expected: CSV.' },
     { needle: 'exportStatsToCSV', why: 'User Stats → Export. Capture line 916. Expected: CSV.' },
     { needle: 'downloadMontlyStats', why: 'Monthly report. Capture line 919. Note the reference misspells "Monthly".' },
-    { needle: 'exportSettingsToJSON', why: 'Settings → Export Settings. Capture line 985. THE one JSON export — does the body agree with the name?' },
-    { needle: 'loadSettingsFromJSON', why: 'Capture line 986, inside an HTML comment. Does the function still exist in the bundle?' },
-    { needle: 'removeBadgesForUsers', why: 'Badges. Capture line 91. Not an export — confirming there is no badge export hiding near it.' },
+    {
+      needle: 'exportSettingsToJSON',
+      why: 'Settings → Export Settings. Capture line 985. THE one JSON export — does the body agree with the name?'
+    },
+    {
+      needle: 'loadSettingsFromJSON',
+      why: 'Capture line 986, inside an HTML comment. Does the function still exist in the bundle?'
+    },
+    {
+      needle: 'removeBadgesForUsers',
+      why: 'Badges. Capture line 91. Not an export — confirming there is no badge export hiding near it.'
+    },
     { needle: 'openChatTabsWithBadgesEditor', why: 'Badges editor. Capture line 2081.' },
     { needle: 'text/csv', why: 'Every place the app declares a CSV MIME type.' },
     { needle: 'application/json', why: 'Every place it declares a JSON MIME type.' },
     { needle: '.csv', why: 'Every literal .csv filename or extension.' },
     { needle: '.json', why: 'Every literal .json filename or extension.' },
-    { needle: 'createObjectURL', why: 'The download mechanism itself — whatever builds the blob decides the extension.' },
+    {
+      needle: 'createObjectURL',
+      why: 'The download mechanism itself — whatever builds the blob decides the extension.'
+    },
     { needle: 'Blob(', why: 'Same, from the other end.' }
   ];
 
@@ -186,7 +216,8 @@
       for (const rule of rules) {
         if (!rule.selectorText) continue;
         try {
-          if (el.matches(rule.selectorText)) matched.push({ href: sheet.href, selector: rule.selectorText, css: rule.cssText });
+          if (el.matches(rule.selectorText))
+            matched.push({ href: sheet.href, selector: rule.selectorText, css: rule.cssText });
         } catch {
           /* a selector this browser cannot parse is not a finding about the app */
         }
@@ -204,7 +235,19 @@
 
       const style = getComputedStyle(el);
       const props = {};
-      for (const p of ['display', 'visibility', 'background-color', 'background-image', 'color', 'border', 'font-size', 'padding', 'margin', 'width', 'height']) {
+      for (const p of [
+        'display',
+        'visibility',
+        'background-color',
+        'background-image',
+        'color',
+        'border',
+        'font-size',
+        'padding',
+        'margin',
+        'width',
+        'height'
+      ]) {
         props[p] = style.getPropertyValue(p);
       }
 
@@ -234,7 +277,10 @@
   out.tabsVisited.push('(as loaded)');
 
   const tabLinks = [...document.querySelectorAll('.nav-tabs a, .nav-tabs button')];
-  if (tabLinks.length === 0) out.gaps.push('no .nav-tabs links found — the tab strip did not render for this role, so only the loaded pane was captured');
+  if (tabLinks.length === 0)
+    out.gaps.push(
+      'no .nav-tabs links found — the tab strip did not render for this role, so only the loaded pane was captured'
+    );
 
   for (const link of tabLinks) {
     const label = (link.textContent || '').trim();
@@ -257,7 +303,8 @@
   }
 
   for (const label of TAB_LABELS) {
-    if (!out.tabsVisited.includes(label)) out.gaps.push(`tab "${label}" never rendered — nothing from it is in this capture`);
+    if (!out.tabsVisited.includes(label))
+      out.gaps.push(`tab "${label}" never rendered — nothing from it is in this capture`);
   }
 
   if (out.controls.length === 0) {

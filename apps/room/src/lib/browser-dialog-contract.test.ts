@@ -186,9 +186,8 @@ describe('the browser dialog primitives never reach a member', () => {
     expect(violationsIn('room', 'sample.ts', sample)).toEqual([]);
 
     /* And the thing it MUST flag, so this test cannot pass by flagging nothing at all. */
-    expect(violationsIn('room', 'sample.ts', "window.alert('x'); confirm('y');").map((v) => v.callee)).toEqual([
-      'window.alert',
-      'confirm'
-    ]);
+    expect(
+      violationsIn('room', 'sample.ts', "window.alert('x'); confirm('y');").map((v) => v.callee)
+    ).toEqual(['window.alert', 'confirm']);
   });
 });

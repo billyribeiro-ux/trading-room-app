@@ -54,10 +54,7 @@ describe('the controller manifest declares both scripts', () => {
   });
 
   it('has a test:gates script', () => {
-    expect(
-      scripts['test:gates'],
-      '`test:gates` is what CI runs for this app — see quality.yml'
-    ).toBeTruthy();
+    expect(scripts['test:gates'], '`test:gates` is what CI runs for this app — see quality.yml').toBeTruthy();
   });
 
   it('found a plausible number of steps, so the comparison below is not vacuous', () => {

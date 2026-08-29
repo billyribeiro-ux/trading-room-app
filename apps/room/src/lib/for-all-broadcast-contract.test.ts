@@ -485,7 +485,10 @@ describe('the client receives, so it reaches another browser', () => {
     */
     const GATE = '{#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}';
     const occurrences = (source: string) => source.split(GATE).length - 1;
-    const strip = readFileSync(new URL('./components/MainTabStrip.svelte', import.meta.url), 'utf8');
+    const strip = readFileSync(
+      new URL('./components/MainTabStrip.svelte', import.meta.url),
+      'utf8'
+    );
     const panes = readFileSync(
       new URL('./components/PresentationArea.svelte', import.meta.url),
       'utf8'

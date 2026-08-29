@@ -217,7 +217,10 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
   ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
   ['services/api/tests/migrations.rs', 'da2739797a45c6eb27beb61d55fd000a500357bfa6ad3b373931bd3ba7165136'],
-  ['services/docker/postgres/10-provision-roles.sh', '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'],
+  [
+    'services/docker/postgres/10-provision-roles.sh',
+    '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
+  ],
   ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
   /*
     Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half

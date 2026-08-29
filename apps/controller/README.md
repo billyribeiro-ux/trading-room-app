@@ -170,8 +170,8 @@ found in the tooling along the way and what each would have caused.
 166 entries remain `wired: false`: the controller can store them, but the room does
 not yet consume them. The flag changes only with a real consumer and its test.
 
-> **Superseded 2026-08-29.** This paragraph read *"33 of 269 settings are wired … the other 257
-> entries remain `wired: false`"*. Both halves were wrong: the count had tripled without the sentence
+> **Superseded 2026-08-29.** This paragraph read _"33 of 269 settings are wired … the other 257
+> entries remain `wired: false`"_. Both halves were wrong: the count had tripled without the sentence
 > moving, and 33 + 257 is 290 rather than 269, so the arithmetic never described this schema at all.
 
 Superseded numbers are kept in a blockquote, here and in the three sibling documents. That is a

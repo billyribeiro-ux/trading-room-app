@@ -165,12 +165,7 @@
           tag: el.tagName.toLowerCase(),
           id: el.id || null,
           className: el.className || null,
-          text: (el.childNodes.length === 1 && el.firstChild.nodeType === 3
-            ? el.textContent
-            : ''
-          )
-            .trim()
-            .slice(0, 200),
+          text: (el.childNodes.length === 1 && el.firstChild.nodeType === 3 ? el.textContent : '').trim().slice(0, 200),
           rect: { x: r.x, y: r.y, w: r.width, h: r.height },
           style: computed(el),
           rules: matchingRules(el)
@@ -189,7 +184,8 @@
     el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
     el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
     const changed = {};
-    for (const k of Object.keys(before)) if (before[k] !== during[k]) changed[k] = { rest: before[k], hover: during[k] };
+    for (const k of Object.keys(before))
+      if (before[k] !== during[k]) changed[k] = { rest: before[k], hover: during[k] };
     return {
       label,
       selectorText: el.className || el.tagName.toLowerCase(),
@@ -215,10 +211,7 @@
   /* ── 1. resting baselines, so this file is comparable to ptr1 ──────────── */
   out.states.restingEditable = snapshot(document.querySelector('.editable-click'), 'editable at rest');
   out.states.restingEmpty = snapshot(document.querySelector('.editable-empty'), 'editable-empty at rest');
-  out.states.restingCaret = snapshot(
-    document.querySelector('.btn .caret, .caret'),
-    'caret at rest'
-  );
+  out.states.restingCaret = snapshot(document.querySelector('.btn .caret, .caret'), 'caret at rest');
   step('resting baselines captured');
 
   /* ── 2. hover, which ptr1 has none of ──────────────────────────────────── */
@@ -238,9 +231,7 @@
   } else {
     click(toggle, 'open a dropdown');
     await wait(350);
-    const menu =
-      toggle.parentElement?.querySelector('.dropdown-menu') ??
-      document.querySelector('.dropdown-menu');
+    const menu = toggle.parentElement?.querySelector('.dropdown-menu') ?? document.querySelector('.dropdown-menu');
     out.states.openDropdown = snapshotTree(menu, 'open .dropdown-menu');
     if (!menu) gap('open dropdown-menu', 'the toggle was clicked but no .dropdown-menu appeared');
 
@@ -283,9 +274,7 @@
 
   /* ── 5. #filesModal — the whole reason for this script ─────────────────── */
   const filesOpener = [...document.querySelectorAll('a,button,[ng-click]')].find(
-    (el) =>
-      /files/i.test(`${el.textContent ?? ''} ${el.getAttribute('ng-click') ?? ''}`) &&
-      safeToClick(el)
+    (el) => /files/i.test(`${el.textContent ?? ''} ${el.getAttribute('ng-click') ?? ''}`) && safeToClick(el)
   );
   if (!filesOpener) {
     gap(
@@ -308,7 +297,9 @@
         if (!safeToClick(tab)) continue;
         tab.querySelector('a')?.click();
         await wait(300);
-        out.states.filesModalTabs.push(snapshotTree(modal.querySelector('.panel-body'), `tab: ${tab.textContent.trim()}`, 200));
+        out.states.filesModalTabs.push(
+          snapshotTree(modal.querySelector('.panel-body'), `tab: ${tab.textContent.trim()}`, 200)
+        );
       }
       step('#filesModal captured', `${out.states.filesModal.count} nodes`);
       const close = modal.querySelector('.close, [ng-click*="closeModal"]');

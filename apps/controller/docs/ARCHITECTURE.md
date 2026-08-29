@@ -125,7 +125,7 @@ every run by `scripts/verify-room-settings-schema.mjs`, which fails if this sent
 disagree. The wired names are encoded explicitly in the generator rather than recovered from a
 previous generated file.
 
-> **Superseded 2026-08-29.** This line read *"Current state: 33 of 269 wired; 236 unwired"*. A line
+> **Superseded 2026-08-29.** This line read _"Current state: 33 of 269 wired; 236 unwired"_. A line
 > labelled "Current state" is the one that most needs a gate, because it is read as current by
 > definition.
 

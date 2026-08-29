@@ -75,10 +75,10 @@
    * against a wider set there — which means a "23 -> 23" result could never have been trusted even
    * if the click had worked.
    */
-  const FIELD_SELECTOR =
-    'input, select, textarea, [editable-text], [editable-checkbox], [editable-select]';
+  const FIELD_SELECTOR = 'input, select, textarea, [editable-text], [editable-checkbox], [editable-select]';
 
-  const DENY = /\b(delete|remove|upload|play|stop|send|save|submit|post|ban|kick|clear|reset|launch|archive|pay|invite|email)\b/i;
+  const DENY =
+    /\b(delete|remove|upload|play|stop|send|save|submit|post|ban|kick|clear|reset|launch|archive|pay|invite|email)\b/i;
 
   /**
    * Whether an element is STRUCTURALLY incapable of mutating anything.
@@ -93,11 +93,7 @@
    * enforced by there being no code path that clicks one.
    */
   function isDisclosureOnly(element) {
-    const toggle = (
-      element.getAttribute('data-toggle') ||
-      element.getAttribute('data-bs-toggle') ||
-      ''
-    ).toLowerCase();
+    const toggle = (element.getAttribute('data-toggle') || element.getAttribute('data-bs-toggle') || '').toLowerCase();
     if (toggle === 'dropdown' || toggle === 'tab' || toggle === 'collapse' || toggle === 'pill') {
       return true;
     }
@@ -205,10 +201,33 @@
   }
 
   const STYLE_PROPS = [
-    'display', 'visibility', 'position', 'width', 'height', 'margin', 'padding', 'border',
-    'font-family', 'font-size', 'font-weight', 'line-height', 'color', 'background-color',
-    'background-image', 'background', 'text-align', 'opacity', 'box-shadow', 'border-radius',
-    'flex-direction', 'justify-content', 'align-items', 'gap', 'overflow', 'z-index', 'cursor'
+    'display',
+    'visibility',
+    'position',
+    'width',
+    'height',
+    'margin',
+    'padding',
+    'border',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'line-height',
+    'color',
+    'background-color',
+    'background-image',
+    'background',
+    'text-align',
+    'opacity',
+    'box-shadow',
+    'border-radius',
+    'flex-direction',
+    'justify-content',
+    'align-items',
+    'gap',
+    'overflow',
+    'z-index',
+    'cursor'
   ];
 
   function computed(element) {
@@ -249,8 +268,8 @@
   /* ─── gap 11: the Settings pane, in full, with NO cap ───────────────────── */
 
   async function captureSettings() {
-    const tab = Array.from(document.querySelectorAll('a, button, li')).find(
-      (element) => /^\s*Settings\s*$/i.test(element.textContent || '')
+    const tab = Array.from(document.querySelectorAll('a, button, li')).find((element) =>
+      /^\s*Settings\s*$/i.test(element.textContent || '')
     );
     if (!tab) {
       note('gap 11: no "Settings" tab found on this page — is this the Manage page?');
@@ -305,7 +324,7 @@
 
     OUT.targets.settings = {
       note: 'No node cap and no html truncation. The previous capture stopped at index 900 and cut html at 120,000 chars.',
-      paneSelector: pane === document.body ? 'body (fallback)' : (pane.className || pane.id),
+      paneSelector: pane === document.body ? 'body (fallback)' : pane.className || pane.id,
       paneChanged,
       previousPaneSelector: before ? before.className || before.id : null,
       previousPaneFieldCount: beforeFields,
@@ -362,7 +381,9 @@
       return;
     }
     if (after <= before) {
-      note(`gap 9: clicking the disclosure revealed no new fields (${before} → ${after}). NOT captured; do not treat an empty result as evidence.`);
+      note(
+        `gap 9: clicking the disclosure revealed no new fields (${before} → ${after}). NOT captured; do not treat an empty result as evidence.`
+      );
       OUT.targets.dontTouch = { opened: false, fieldsBefore: before, fieldsAfter: after };
       return;
     }
@@ -438,7 +459,10 @@
 
     // Open menus: dropdown toggles are disclosures, so they are safe to click.
     const menus = [];
-    for (const toggle of Array.from(document.querySelectorAll('[data-toggle=dropdown], .dropdown-toggle')).slice(0, 6)) {
+    for (const toggle of Array.from(document.querySelectorAll('[data-toggle=dropdown], .dropdown-toggle')).slice(
+      0,
+      6
+    )) {
       if (!safeClick(toggle, 'open a dropdown menu')) continue;
       await sleep(400);
       const menu = toggle.parentElement && toggle.parentElement.querySelector('.dropdown-menu, ul');
@@ -454,7 +478,8 @@
       safeClick(toggle, 'close the dropdown menu again');
       await sleep(200);
     }
-    if (menus.length === 0) note('gap 10: no dropdown menus were opened; none matched [data-toggle=dropdown] or .dropdown-toggle.');
+    if (menus.length === 0)
+      note('gap 10: no dropdown menus were opened; none matched [data-toggle=dropdown] or .dropdown-toggle.');
     OUT.targets.openMenus = menus;
   }
 
@@ -527,7 +552,9 @@
     }
   }).length;
   if (crossOrigin > 0) {
-    note(`${crossOrigin} stylesheet(s) are cross-origin and their rules could not be read; any rule they carry is missing from every \`rules\` array.`);
+    note(
+      `${crossOrigin} stylesheet(s) are cross-origin and their rules could not be read; any rule they carry is missing from every \`rules\` array.`
+    );
   }
 
   const json = JSON.stringify(OUT, null, 2);

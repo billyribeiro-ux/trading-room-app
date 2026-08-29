@@ -429,27 +429,33 @@
             : 'dropdown-menu dropdown-menu-end'}
         >
           <li>
-            <button type="button" class="dropdown-item" onclick={() => {
+            <button
+              type="button"
+              class="dropdown-item"
+              onclick={() => {
                 setBufferSize(1);
                 menus.set('streamBuffer', false);
-              }}
-              >Normal</button
+              }}>Normal</button
             >
           </li>
           <li>
-            <button type="button" class="dropdown-item" onclick={() => {
+            <button
+              type="button"
+              class="dropdown-item"
+              onclick={() => {
                 setBufferSize(2);
                 menus.set('streamBuffer', false);
-              }}
-              >Increased</button
+              }}>Increased</button
             >
           </li>
           <li>
-            <button type="button" class="dropdown-item" onclick={() => {
+            <button
+              type="button"
+              class="dropdown-item"
+              onclick={() => {
                 setBufferSize(3);
                 menus.set('streamBuffer', false);
-              }}
-              >Maximum</button
+              }}>Maximum</button
             >
           </li>
         </ul>

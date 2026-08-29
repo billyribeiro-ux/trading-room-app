@@ -89,9 +89,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
   const attempt = (await request.json()) as { candidate?: unknown };
   const candidate = typeof attempt.candidate === 'string' ? attempt.candidate : '';
 
-  const configured = String(
-    resolveRoomConfig(await readSettings(room.id)).values.needPasswordForUserNotes ?? ''
-  );
+  const configured = String(resolveRoomConfig(await readSettings(room.id)).values.needPasswordForUserNotes ?? '');
 
   if (configured === '') {
     /*

@@ -46,3 +46,21 @@ evidence-tooltips-manage-2026-08-12.json
 # artifacts, and do not check their formatting either.
 src/lib/content/api-post-routes.ts
 src/lib/content/emoji-picker.ts
+
+# THE DECODED CAPTURES, 73 files. Evidence, and the largest single reason `format:check` had drifted
+# to 88 failing files while nothing in CI ran it.
+#
+# `docs/reference/pieces/INDEX.md` states what these are in its own first paragraph: two reference
+# captures of the live original "decoded into one file per component", each carrying "every
+# attribute verbatim" and "resolved absolute computed styles". Reformatting them changes the bytes
+# the implementation is checked against, which is the same rule `CLAUDE.md` states for the capture
+# directories and that the evidence entries above already apply file by file.
+#
+# Added 2026-08-29 alongside the first repository-wide `format:check` measurement. The alternative -
+# reformatting them - was refused rather than deferred: prettier rewrites tables and wraps prose,
+# and a verbatim attribute table is not prose.
+docs/reference/
+
+# Written by `scripts/extract-*`; each carries its own generated header. Same rule as
+# `.vitest-report.json` and the two generated sources above.
+docs/generated/

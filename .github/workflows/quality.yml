@@ -152,6 +152,34 @@ jobs:
         # than being silently rewritten into something nobody reviewed.
         run: pnpm install --frozen-lockfile
 
+      - name: Formatting
+        working-directory: apps/${{ matrix.app }}
+        # ADDED 2026-08-29, and it closed a real drift rather than a hypothetical one.
+        #
+        # Both apps have carried a `format:check` script for months and NOTHING RAN IT. That is what
+        # an ungated script becomes - a convention a person has to remember - and it is the same
+        # failure the `test:gates` note below records for the controller's eleven verifiers.
+        #
+        # The measurement, because the first number written here was the wrong one. Under the
+        # scripts as they were declared, the drift was 11 files in the room and FIVE in the
+        # controller. A repository-wide `prettier --check .` reported 88 for the controller, and
+        # the gap between those two figures was the real finding: the controller's `format:check`
+        # was scoped to `src/**`, `scripts/**/*.mjs`, `e2e/**` and root config, so seven `.js`
+        # collectors under `scripts/` and every markdown file in the app were outside the gate it
+        # declared. Both apps now check `.`, so the scope is one thing and `.prettierignore` is the
+        # single place an exemption is recorded.
+        #
+        # Fixing the drift was NOT a blanket rewrite. 73 of the 88 were the decoded captures under
+        # `docs/reference/`, which carry "every attribute verbatim" by their own first paragraph -
+        # evidence, which `CLAUDE.md` says never to reformat. Those and the two generated
+        # `docs/generated/` artifacts joined `.prettierignore` with the reason written beside them,
+        # in the shape that file already uses; the 18 authored files and the room's 11 were
+        # formatted.
+        #
+        # First, because it is the cheapest answer in the log and a formatting failure tells you
+        # nothing about the code that a later step would explain better.
+        run: pnpm run format:check
+
       - name: Lint
         working-directory: apps/${{ matrix.app }}
         run: pnpm run lint

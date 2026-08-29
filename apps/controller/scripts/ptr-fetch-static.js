@@ -46,13 +46,31 @@
    * HARD DENYLIST. Checked before every single fetch. Any match aborts all. *
    * ---------------------------------------------------------------------- */
   const FORBIDDEN = [
-    'delete', 'remove', 'destroy', 'drop',
-    'upload', 'save', 'submit', 'send', 'post',
-    'play', 'stop', 'start', 'kill',
-    'ban', 'mute', 'kick',
-    'reset', 'clear', 'wipe',
-    'create', 'add', 'invite', 'clone',
-    'logout', 'signout'
+    'delete',
+    'remove',
+    'destroy',
+    'drop',
+    'upload',
+    'save',
+    'submit',
+    'send',
+    'post',
+    'play',
+    'stop',
+    'start',
+    'kill',
+    'ban',
+    'mute',
+    'kick',
+    'reset',
+    'clear',
+    'wipe',
+    'create',
+    'add',
+    'invite',
+    'clone',
+    'logout',
+    'signout'
   ];
 
   const ORIGIN = 'https://protradingroom.com';
@@ -64,28 +82,33 @@
   const cverSource = window.__cver ? 'window.__cver (live)' : 'FALLBACK: value from meta.json capture';
 
   const TARGETS = [
-    ['T1-1',  'app.min.js',            `${ORIGIN}/public/dist/app.min.js?v=${CVER}`,           'text'],
-    ['T1-2',  'vendor.min.js',         `${ORIGIN}/public/dist/vendor.min.js?v=2.18.100`,       'text'],
-    ['T1-4',  'styles.css',            `${ORIGIN}/public/app/css/styles.css`,                  'text'],
-    ['T1-5',  'API_Documentation.md',  `${ORIGIN}/public/html/POST_ROUTE_API_DOCUMENTATION.md`,'text'],
-    ['T1-5b', 'api-docs source alt',   `${ORIGIN}/public/html/API_Documentation.md`,           'text'],
-    ['T1-6',  'glyphicons.woff2',      `${ORIGIN}/public/app/fonts/glyphicons-halflings-regular.woff2`, 'b64'],
-    ['T1-6',  'glyphicons.woff',       `${ORIGIN}/public/app/fonts/glyphicons-halflings-regular.woff`,  'b64'],
-    ['T1-6',  'glyphicons.ttf',        `${ORIGIN}/public/app/fonts/glyphicons-halflings-regular.ttf`,   'b64'],
-    ['T1-7',  'fontawesome.woff2',     `${ORIGIN}/public/vendor/font-awesome/fonts/fontawesome-webfont.woff2?v=4.3.0`, 'b64'],
-    ['T1-8',  'theme.css',             `${ORIGIN}/public/css/compiled/theme.css`,              'text'],
-    ['T1-8',  'vendor-animate.css',    `${ORIGIN}/public/css/vendor/animate.css`,              'text'],
-    ['T1-8',  'main.css',              `${ORIGIN}/public/css/main.css?v1.0`,                   'text'],
-    ['T1-9',  'protradingroom_icon.png',      `${ORIGIN}/public/images/protradingroom_icon.png`,      'b64'],
-    ['T1-9',  'protradingroom_icon_dark.png', `${ORIGIN}/public/images/protradingroom_icon_dark.png`, 'b64'],
-    ['T1-9',  'ptr_descrived_perspective.png',`${ORIGIN}/public/images/ptr_descrived_perspective.png`,'b64'],
-    ['T1-9',  'user_comments.png',     `${ORIGIN}/public/images/user_comments.png`,            'b64'],
-    ['T1-9',  'ss3.png',               `${ORIGIN}/public/images/ss3.png`,                      'b64'],
-    ['T1-9',  'icon-locked.png',       `${ORIGIN}/public/images/circle-icons/one-color/locked.png`,  'b64'],
-    ['T1-9',  'icon-cloud.png',        `${ORIGIN}/public/images/circle-icons/one-color/cloud.png`,   'b64'],
-    ['T1-9',  'icon-browser.png',      `${ORIGIN}/public/images/circle-icons/one-color/browser.png`, 'b64'],
-    ['T1-10', 'room styles.css',       `${ORIGIN}/styles.d622cb9ed2bbc221.css`,                'text'],
-    ['T1-10', 'room main.js',          `${ORIGIN}/main.d6d3c112b59b7d0d.js`,                   'text']
+    ['T1-1', 'app.min.js', `${ORIGIN}/public/dist/app.min.js?v=${CVER}`, 'text'],
+    ['T1-2', 'vendor.min.js', `${ORIGIN}/public/dist/vendor.min.js?v=2.18.100`, 'text'],
+    ['T1-4', 'styles.css', `${ORIGIN}/public/app/css/styles.css`, 'text'],
+    ['T1-5', 'API_Documentation.md', `${ORIGIN}/public/html/POST_ROUTE_API_DOCUMENTATION.md`, 'text'],
+    ['T1-5b', 'api-docs source alt', `${ORIGIN}/public/html/API_Documentation.md`, 'text'],
+    ['T1-6', 'glyphicons.woff2', `${ORIGIN}/public/app/fonts/glyphicons-halflings-regular.woff2`, 'b64'],
+    ['T1-6', 'glyphicons.woff', `${ORIGIN}/public/app/fonts/glyphicons-halflings-regular.woff`, 'b64'],
+    ['T1-6', 'glyphicons.ttf', `${ORIGIN}/public/app/fonts/glyphicons-halflings-regular.ttf`, 'b64'],
+    [
+      'T1-7',
+      'fontawesome.woff2',
+      `${ORIGIN}/public/vendor/font-awesome/fonts/fontawesome-webfont.woff2?v=4.3.0`,
+      'b64'
+    ],
+    ['T1-8', 'theme.css', `${ORIGIN}/public/css/compiled/theme.css`, 'text'],
+    ['T1-8', 'vendor-animate.css', `${ORIGIN}/public/css/vendor/animate.css`, 'text'],
+    ['T1-8', 'main.css', `${ORIGIN}/public/css/main.css?v1.0`, 'text'],
+    ['T1-9', 'protradingroom_icon.png', `${ORIGIN}/public/images/protradingroom_icon.png`, 'b64'],
+    ['T1-9', 'protradingroom_icon_dark.png', `${ORIGIN}/public/images/protradingroom_icon_dark.png`, 'b64'],
+    ['T1-9', 'ptr_descrived_perspective.png', `${ORIGIN}/public/images/ptr_descrived_perspective.png`, 'b64'],
+    ['T1-9', 'user_comments.png', `${ORIGIN}/public/images/user_comments.png`, 'b64'],
+    ['T1-9', 'ss3.png', `${ORIGIN}/public/images/ss3.png`, 'b64'],
+    ['T1-9', 'icon-locked.png', `${ORIGIN}/public/images/circle-icons/one-color/locked.png`, 'b64'],
+    ['T1-9', 'icon-cloud.png', `${ORIGIN}/public/images/circle-icons/one-color/cloud.png`, 'b64'],
+    ['T1-9', 'icon-browser.png', `${ORIGIN}/public/images/circle-icons/one-color/browser.png`, 'b64'],
+    ['T1-10', 'room styles.css', `${ORIGIN}/styles.d622cb9ed2bbc221.css`, 'text'],
+    ['T1-10', 'room main.js', `${ORIGIN}/main.d6d3c112b59b7d0d.js`, 'text']
   ];
 
   /* The denylist matches on the PATH only. Without this, `/public/dist/app.min.js` trips on
@@ -160,7 +183,14 @@
     try {
       const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok) {
-        out.assets.push({ gapId, name, url, ok: false, status: res.status, note: 'HTTP error — recorded as an honest gap, not retried with a guessed path' });
+        out.assets.push({
+          gapId,
+          name,
+          url,
+          ok: false,
+          status: res.status,
+          note: 'HTTP error — recorded as an honest gap, not retried with a guessed path'
+        });
         console.warn(`  ${res.status}  ${name}`);
         continue;
       }
@@ -182,7 +212,12 @@
         const peek = new TextDecoder('utf-8', { fatal: false }).decode(buf).toLowerCase();
         if (peek.includes(SOFT_404)) {
           out.assets.push({
-            gapId, name, url, ok: false, status: res.status, bytes: buf.byteLength,
+            gapId,
+            name,
+            url,
+            ok: false,
+            status: res.status,
+            bytes: buf.byteLength,
             note: 'SOFT 404 — server returned HTTP 200 with its "not the page you are looking for" body. The asset is NOT deployed at this path. Recorded as an honest gap; do NOT treat as fetched.'
           });
           console.warn(`  soft-404  ${name}  (HTTP ${res.status}, ${buf.byteLength}B)`);

@@ -125,8 +125,9 @@ const tsCodeOf = (source: string) =>
 const svelteCodeOf = (source: string) =>
   source
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2>)/g, (_match, open, _tag, body, close) =>
-      open + tsCodeOf(body) + close
+    .replace(
+      /(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2>)/g,
+      (_match, open, _tag, body, close) => open + tsCodeOf(body) + close
     );
 
 const isRoute = (path: string) => /(^|\/)\+(page|layout|error)\.svelte$/.test(path);
@@ -199,7 +200,9 @@ describe('the render graph is walkable at all', () => {
       .map(([path]) => path);
     const mounted = globSync('**/*.ts', { cwd: ROOT })
       .filter((relative) => !relative.includes('.test.'))
-      .filter((relative) => /\bmount\(/.test(tsCodeOf(readFileSync(`${ROOT}/${relative}`, 'utf8'))));
+      .filter((relative) =>
+        /\bmount\(/.test(tsCodeOf(readFileSync(`${ROOT}/${relative}`, 'utf8')))
+      );
 
     expect(
       [...dynamic, ...mounted],

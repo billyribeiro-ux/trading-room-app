@@ -696,7 +696,9 @@ describe("TODO.md row 4's census still describes this code", () => {
     */
     const claimedSilent = /only `([a-z-]+)` sends nothing/.exec(TODO)?.[1];
     expect(
-      claimedSilent && TOAST_ONLY_ACTIONS.includes(claimedSilent) ? [] : [claimedSilent].filter(Boolean),
+      claimedSilent && TOAST_ONLY_ACTIONS.includes(claimedSilent)
+        ? []
+        : [claimedSilent].filter(Boolean),
       `${claimedSilent} is named as sending nothing, but it is not in EXACT_ALERTS any more`
     ).toEqual([]);
   });

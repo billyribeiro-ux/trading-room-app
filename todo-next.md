@@ -87,7 +87,7 @@ guessed.
 | 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 13 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
-| 14 | `lib/components/StreamingView.svelte` | 591 | no |
+| 14 | `lib/components/StreamingView.svelte` | 597 | no |
 | 15 | `lib/components/FilesPane.svelte` | 556 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 554 | no |
 | 17 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `routes/logout/+page.svelte` | 31 | no |
 | 55 | `routes/+layout.svelte` | 27 | no |
 
-**2 of 55 surfaces audited · 1,059 of 27,396 lines · 3.9%.**
+**2 of 55 surfaces audited · 1,059 of 27,402 lines · 3.9%.**
 
 ## The honest scoping statement
 

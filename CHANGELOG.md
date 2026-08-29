@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 16:10 UTC — The Svelte MCP gate, and a formatting gate that existed but ran nowhere
+
+**Runtime impact: NO.** Formatting, one CI step, one latent bug found in a gate written yesterday.
+
+#### The Svelte MCP obligation, discharged
+
+`CLAUDE.md` makes `svelte-autofixer` the mandatory last gate on every `.svelte` / `.svelte.ts` file,
+every time. The MCP was unavailable for the work in the three commits before this one, so it was run
+now over every changed file and region: `menus.svelte.ts`, `ScreenVolumeControl.svelte`,
+`StreamingView.svelte`, and the changed regions of `RoomNavbar.svelte`, `ModalHost.svelte`,
+`PollPanel.svelte` and `+page.svelte`. **All clean, no suggestions.**
+
+#### `format:check` existed in both apps and nothing ran it
+
+CI runs `lint`, `check`, the unit suites and `build`. It has never run `format:check`, and the drift
+that produced is measured rather than estimated:
+
+| gate as declared | drifted |
+| --- | --- |
+| room `format:check` (`prettier --check .`) | **11 files** |
+| controller `format:check` (scoped to `src/**`, `scripts/**/*.mjs`, `e2e/**`, root config) | **5 files** |
+| a repository-wide `prettier --check .` in the controller | **88 files** |
+
+**The gap between 5 and 88 was the real finding.** The controller's `format:check` was scoped in a
+way that excluded seven `.js` collectors under `scripts/` and every markdown file in the app — a gate
+that reported success over a third of what it appeared to cover. Both apps now check `.`, so the
+scope is one thing and `.prettierignore` is the single place an exemption is recorded. The controller
+also gained the `format` script it was missing; it had the checker and not the fixer.
+
+#### The drift was not fixed by rewriting everything
+
+**73 of the controller's 88 are the decoded captures under `docs/reference/`.** Their own index says
+what they are — two captures of the live original "decoded into one file per component", carrying
+"every attribute verbatim" and "resolved absolute computed styles". That is evidence, and `CLAUDE.md`
+says never to reformat it; prettier rewrites tables and wraps prose, and a verbatim attribute table is
+not prose. Those and the two generated `docs/generated/` artifacts joined `.prettierignore` with the
+reason written beside them, in the shape that file already uses for its other eight exemptions. The
+18 authored files and the room's 11 were formatted.
+
+Both apps now pass `format:check`, and a **Formatting** step runs first in the `frontend` job.
+
+#### A bug in yesterday's gate, found by `eslint`
+
+`eslint` reported `SHEETS` in `img-dimensions-contract.test.ts` as assigned but used only as a type.
+The lazy fix is an underscore. The honest one is that a value nothing reads at runtime is not
+carrying its weight — so the list is now **read**: every sheet must exist and be non-empty, and
+`app.css` must still import the other three.
+
+**That assertion immediately failed, on a real defect in my own file.** `SHEETS[0]` was
+`css/complete-app-styles.css`, but the paths are relative to `src/` and that stylesheet lives *beside*
+`src/`, at `apps/room/css/`. Nothing had noticed because no `SIZED_BY_CSS` entry happens to point at
+that sheet — the rules that size images live in `app.css` and the captured component sheet — so the
+wrong path was never dereferenced. A list the gate merely typed over had been wrong since it was
+written. Negative control seen RED: removing `app.css`'s import of the captured component sheet.
+
+**Verified:** room — `format:check` clean, `eslint` clean, `svelte-check` 1,343 files / 0 errors,
+**196 files / 3,157 tests green**, and the **8-spec browser suite green** (re-run because
+`e2e/handoff.ts` was reformatted). Controller — `format:check` clean, `eslint` clean, **97 files /
+1,024 tests green**, `test:gates` all eleven verifiers passing, plus `backend:provenance:verify`,
+`schema:verify` and `privacy:verify` run individually because their scripts were reformatted. The
+workflow was parsed to confirm the new step is wired into the `frontend` job.
+
 ### 2026-08-29 15:05 UTC — A browser confirms the dropdowns open, and refutes a defect I had started bisecting
 
 **Runtime impact: NO.** One end-to-end spec. No application code changed.

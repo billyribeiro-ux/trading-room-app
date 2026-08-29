@@ -365,10 +365,7 @@ describe('the compositor reproduces the reference numbers', () => {
     expect(source).toContain(
       "if (!context || typeof canvas.captureStream !== 'function') return null;"
     );
-    const consumer = readFileSync(
-      new URL('./room/screen-overlay.ts', import.meta.url),
-      'utf8'
-    );
+    const consumer = readFileSync(new URL('./room/screen-overlay.ts', import.meta.url), 'utf8');
     expect(consumer).toContain('if (!handle) return unwrapped;');
   });
 });

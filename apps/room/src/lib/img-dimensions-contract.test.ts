@@ -49,9 +49,17 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
-/** The sheets that actually ship, in cascade order - `app.css` imports the first three. */
+/**
+ * The sheets that actually ship, in cascade order - `app.css` imports the first three.
+ *
+ * Paths are relative to `src/`, which is why the first one climbs out of it: the captured stylesheet
+ * lives BESIDE `src/`, at `apps/room/css/`. That `../` was missing when this list was first written
+ * and nothing noticed, because no `SIZED_BY_CSS` entry happens to point at that sheet - the rules
+ * that size images live in `app.css` and in the captured component sheet. The test below reads every
+ * entry in this list, which is what turned a latent wrong path into a failure.
+ */
 const SHEETS = [
-  'css/complete-app-styles.css',
+  '../css/complete-app-styles.css',
   'lib/styles/tokens.css',
   'lib/styles/captured-runtime-components.css',
   'app.css'
@@ -203,7 +211,10 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
     }
   },
   'lib/components/RoomOverlays.svelte': {
-    '{pastePreviewUrl}': { count: 1, why: 'a pasted swing-alert screenshot, bounded by `.img-fluid`.' },
+    '{pastePreviewUrl}': {
+      count: 1,
+      why: 'a pasted swing-alert screenshot, bounded by `.img-fluid`.'
+    },
     '{dayTradePastePreviewUrl}': {
       count: 1,
       why: 'a pasted day-trade screenshot, bounded by `.img-fluid`.'
@@ -306,6 +317,31 @@ const ALL_IMAGES = COMPONENTS.flatMap((file) =>
 );
 
 describe('every <img> has a box before its bytes arrive', () => {
+  it('reads the sheets that actually ship, and every one of them exists', () => {
+    /*
+      `SHEETS` is the cascade this file reasons about, and asserting it here is what stops it being
+      a decorative list. `app.css` imports the other three - so if one is renamed or dropped, a
+      `SIZED_BY_CSS` entry pointing at it would fail with a confusing "no rule for that selector"
+      rather than with the truth, which is that the sheet is gone.
+
+      `eslint` is what turned this from a comment into a test: `SHEETS` was used only as the source
+      of a TypeScript union, and `no-unused-vars` was right that a value nothing reads at runtime is
+      not carrying its weight.
+    */
+    for (const sheet of SHEETS) {
+      const contents = readFileSync(`${ROOT}${sheet}`, 'utf8');
+      expect(contents.length, `${sheet} is empty`).toBeGreaterThan(0);
+    }
+
+    /* And that `app.css` is still what pulls the other three in, which is why they are "shipped". */
+    const appCss = readFileSync(`${ROOT}app.css`, 'utf8');
+    for (const sheet of SHEETS.filter((name) => name !== 'app.css')) {
+      expect(appCss, `app.css no longer imports ${sheet}`).toContain(
+        sheet.startsWith('../') ? sheet : `./${sheet}`
+      );
+    }
+  });
+
   it('finds images at all, and finds them as ELEMENTS rather than as text', () => {
     /*
       The floor that stops this whole file from passing vacuously. If the parser walk breaks - a
@@ -363,7 +399,10 @@ describe('every <img> has a box before its bytes arrive', () => {
 
     const stale = catalogued
       .filter(([file, src, count]) => live.get(`${file} ${src}`) !== count)
-      .map(([file, src, count]) => `${file}  ${src}  catalogued ${count}, found ${live.get(`${file} ${src}`) ?? 0}`);
+      .map(
+        ([file, src, count]) =>
+          `${file}  ${src}  catalogued ${count}, found ${live.get(`${file} ${src}`) ?? 0}`
+      );
 
     expect(
       stale,
@@ -387,7 +426,9 @@ describe('every <img> has a box before its bytes arrive', () => {
             if (node.type === 'decl') declarations.set(node.prop, node.value);
         });
 
-        expect(seen, `${entry.sheet} no longer carries a rule for \`${entry.selector}\``).toBe(true);
+        expect(seen, `${entry.sheet} no longer carries a rule for \`${entry.selector}\``).toBe(
+          true
+        );
         expect(declarations.get('width'), `${entry.selector} width`).toBe(entry.width);
         expect(declarations.get('height'), `${entry.selector} height`).toBe(entry.height);
 
@@ -399,7 +440,9 @@ describe('every <img> has a box before its bytes arrive', () => {
         */
         if (entry.requiresAncestor) {
           const images = ALL_IMAGES.filter((i) => i.file === file && i.src === src);
-          expect(images.length, `${file} no longer renders an img with src=${src}`).toBe(entry.count);
+          expect(images.length, `${file} no longer renders an img with src=${src}`).toBe(
+            entry.count
+          );
           for (const image of images)
             expect(
               image.ancestors,

@@ -20,11 +20,7 @@ import { E2E_SECRET } from '../playwright.config';
  */
 
 const base64url = (value: Buffer | string) =>
-  Buffer.from(value)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  Buffer.from(value).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 export interface HandoffOptions {
   name?: string;

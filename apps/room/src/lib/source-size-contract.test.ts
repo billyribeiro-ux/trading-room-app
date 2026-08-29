@@ -3034,7 +3034,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/components/StreamingView.svelte',
     /*
-      561 -> 592, 2026-08-29, for the two dropdowns that could not be opened.
+      561 -> 598, 2026-08-29, for the two dropdowns that could not be opened.
 
       `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
       JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
@@ -3043,13 +3043,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       three `setBufferSize` handlers that a repair the day before had made callable without
       noticing nothing could reach them.
 
-      Here it is the `menus` prop and its import, the trigger, the class expression, and three entries that each grew from one line to four because selecting a level now closes the menu — which Bootstrap used to do.
+      Here it is the `menus` prop and its import, the trigger, the class expression, and three entries that each grew from one line to four because selecting a level now closes the menu — which Bootstrap used to do. Six more when `prettier` reformatted those three handlers, which is why the number is 598 rather than 592: the repository's own formatter owns that shape, not me.
 
       The prose that would otherwise have landed here was moved into
       `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
       nineteenth dropdown arrives without a way to open it.
     */
-    max: 592,
+    max: 598,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {

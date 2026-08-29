@@ -64,7 +64,10 @@ const measured = new Map(
   globSync('**/*.svelte', { cwd: ROOT })
     .map((relative) => relative.replaceAll('\\', '/'))
     .filter((relative) => !relative.includes('.test.') && !FIXTURES.includes(relative))
-    .map((relative) => [relative, readFileSync(`${ROOT}/${relative}`, 'utf8').split('\n').length - 1])
+    .map((relative) => [
+      relative,
+      readFileSync(`${ROOT}/${relative}`, 'utf8').split('\n').length - 1
+    ])
 );
 
 const tracker = readFileSync(TRACKER, 'utf8');
@@ -159,7 +162,9 @@ describe('every row still describes the file it names', () => {
 
 describe('the headline totals match the rows', () => {
   const stated =
-    /\*\*(\d+) of (\d+) surfaces audited · ([\d,]+) of ([\d,]+) lines · ([\d.]+)%\.\*\*/.exec(tracker);
+    /\*\*(\d+) of (\d+) surfaces audited · ([\d,]+) of ([\d,]+) lines · ([\d.]+)%\.\*\*/.exec(
+      tracker
+    );
 
   it('states its own totals in a form that can be checked', () => {
     expect(stated, 'the summary line under the inventory is missing or reworded').not.toBeNull();

@@ -53,7 +53,14 @@ const DATED: Record<string, string> = {
 };
 
 /** Where a repo-relative-ish citation might actually live, longest-shot last. */
-const ROOTS = ['', 'apps/room/', 'apps/controller/', 'apps/room/src/', 'apps/controller/src/', 'services/'];
+const ROOTS = [
+  '',
+  'apps/room/',
+  'apps/controller/',
+  'apps/room/src/',
+  'apps/controller/src/',
+  'services/'
+];
 
 /*
   MARKDOWN **AND SOURCE COMMENTS**, the second added 2026-08-29.

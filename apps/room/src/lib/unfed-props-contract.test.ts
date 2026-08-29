@@ -194,7 +194,7 @@ const DELIBERATELY_UNSUPPLIED: Readonly<Record<string, Readonly<Record<string, s
       'the inline style a CLOSED modal keeps. Every modal in this room closes to the stylesheet’s ' +
       'own `display: none`, so the default is the answer; the prop exists for a captured modal that ' +
       'carries its own closed geometry, and none does yet.'
-  },
+  }
 };
 
 describe('every component prop is supplied by somebody, or explained here', () => {
