@@ -154,7 +154,8 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
       reconnectAudio: () => (audioReconnects.push(true), Promise.resolve()),
       collectDebugLog: () => 'log',
       sendDebugLog: () => {},
-      debugLogReceived: () => {}
+      debugLogReceived: () => {},
+      profilePictureChanged: () => {}
     })
     /*
       Records the message AND whether the stream was already closed when it arrived. That second
@@ -320,7 +321,8 @@ const hiddenTabStream = (missed: true[]) =>
       reconnectAudio: () => Promise.resolve(),
       collectDebugLog: () => '',
       sendDebugLog: () => {},
-      debugLogReceived: () => {}
+      debugLogReceived: () => {},
+      profilePictureChanged: () => {}
     })
   });
 

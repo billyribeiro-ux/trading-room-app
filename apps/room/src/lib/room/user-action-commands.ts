@@ -51,6 +51,12 @@ export interface UserActionCommands extends ChatMuteCommands {
    * presenter learns the answer by the modal filling. See `routes/debug-log.remote.ts`.
    */
   requestDebugLog: (targetUserId: number) => Promise<unknown>;
+  /**
+   * `adminUploadProfilePic` — a presenter sets ONE member's avatar. Presenter-gated on the server,
+   * and the only presenter command whose target is also checked for MEMBERSHIP of the room, because
+   * it is the only one that writes a durable row keyed on the target alone.
+   */
+  uploadProfilePicture: (payload: { targetUserId: number; file: File }) => Promise<unknown>;
   /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */
   restartAudio: (targetUserId: number) => Promise<unknown>;
   /**

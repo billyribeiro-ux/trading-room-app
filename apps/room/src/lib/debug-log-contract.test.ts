@@ -196,7 +196,8 @@ describe('the receiver refuses a malformed frame', () => {
       reconnectAudio: () => Promise.resolve(),
       collectDebugLog: () => 'the log',
       sendDebugLog: (log) => received.push({ sent: log }),
-      debugLogReceived: (from) => received.push(from)
+      debugLogReceived: (from) => received.push(from),
+      profilePictureChanged: () => {}
     });
   }
 

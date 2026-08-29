@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 18:20 UTC — `upload-profile-picture`, and the tenancy check every command before it got for free
+
+**Runtime impact: YES.** A presenter can set a member's avatar. **Zero inert controls now represent unbuilt work.**
+
+#### A disposition that was wrong
+
+`TODO.md` filed this as *"durable, so it belongs with the controller like `writeRoomBan`"*. Measured:
+**the controller's `users` table has no avatar column** — `id`, `email`, `display_name`, and the only
+avatar-shaped thing in that app is `gravatar.ts`, which derives a URL and stores nothing. The room's
+own `users.avatar_url` is the authority: it is what `connection.ts` backfills, what the roster reads,
+and what every `senderAvatarUrl` in the chat log joins to.
+
+A ban belongs with the controller because a ban is room *configuration*. An avatar is a property of a
+person, and this application is where that person's row lives.
+
+#### The security property, which is new
+
+Every presenter command written before this one ends in `publishToUsers(room, [targetUserId], …)`.
+Delivery is scoped to the room's subscriber map, so naming a stranger's id sends a frame nobody
+receives — **tenancy was enforced by the transport without anyone having to remember it.**
+
+**This is the first that writes a durable row keyed on the target alone**, and a `db.update` has no
+such scoping. Without a check, a presenter of room A could set the avatar of a member of room B by
+guessing an integer. `requireRoomMember` is that check; the contract test asserts it runs *before*
+both the row write and the file store, because a check after the side effect is not protecting it.
+
+Membership is a **session for this room**, not presence in the live roster — a member who reloads
+leaves the roster, and a presenter mid-upload would get a 404 for somebody plainly present.
+`SESSION_ABSOLUTE_TTL_MS` moved to `auth.ts` so the membership check and the login lookup share one
+definition of "live"; a test asserts `connection.ts` has not regrown its own copy.
+
+#### A bug the first draft had
+
+`publishRosterToRoom` alone does **not** carry the new avatar. `RosterUser.avatarUrl` is captured
+into the subscriber context at *subscribe time*, so the publish re-pushes the old URL while the
+durable row already disagrees. `setRosterAvatar` patches the snapshot first — and it shares a body
+with `setRosterLocation`, which was written for the identical problem.
+
+#### Two self-inflicted failures, both recorded
+
+**`accept="image/*"` deleted a third of `ModalHost`.** The literal puts a slash-star pair in the
+file, opening a comment window for the whole-file regex fifty-five test files use. Measured: opened
+at line 2,559, closed at 5,687 — **120,987 characters of markup gone**, taking `AlertQaModal`,
+`BootboxDialog` and `CompactMessageRow` with them. Three contract tests went red for markup still on
+disk. `PostAlertModal` carries the same literal safely only because nothing closes its window — luck,
+not design. The value is now assembled, byte-identical in the DOM.
+
+**Then the paragraph explaining that quoted the closing sequence**, terminating its own docblock and
+making the component unparseable. `CLAUDE.md` already says a comment must not contain the syntax it
+describes; the rule earned its place twice in one edit.
+
+#### `svelte-autofixer`
+
+Zero issues, two suggestions, **both declined and recorded against the ruling they contradict**:
+`SvelteDate` (the Date is constructed, read once, discarded — `RoomAlerts` declines the same one),
+and replacing `bind:this` with an attachment — which `dom-reference-contract.svelte.test.ts` refuses
+outright, quoting `svelte/bind`: *"To get a reference to a DOM node, use `bind:this`."* An attachment
+is admitted only for three structural reasons, and this node has none of them.
+
+`bind:this` on a plain `let` was itself a mistake I made and the compiler caught —
+`non_reactive_update`, which `svelte-check --fail-on-warnings` would have refused in CI.
+
+#### The census
+
+`TODO.md` row 4: **5 inert → 4**, and **39 dispatched → 38**, because this control now takes its own
+prop rather than `onUserAction` — the call `save-permissions` already made. Of the four still inert,
+**none is unbuilt work**: the recording pair needs a server-side recorder, `disable-private-chat`
+matches a reference that wires nothing to it, and `get-my-token` is a deliberate security divergence.
+
+**Verified:** `format:check`, `eslint`, `svelte-check` 1,350 files / 0 errors / 0 warnings, **198
+files / 3,198 tests green**, **8-spec browser suite green**. **Five negative controls seen RED**: the
+membership check removed; moved after the durable write; the roster snapshot published unpatched;
+`connection.ts` regrowing its own TTL constant; the receiver's url validation removed.
+
+**Not verified:** no two-browser run. The round trip is asserted at every seam in isolation; the e2e
+job drives one browser and this needs two members.
+
 ### 2026-08-29 17:05 UTC — `debug-log` is built, and it is the one command that could not be transcribed
 
 **Runtime impact: YES.** A presenter can pull one member's console log. One inert control leaves the table.

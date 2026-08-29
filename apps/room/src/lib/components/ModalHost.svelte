@@ -283,6 +283,13 @@
     canEditUsername?: boolean;
     targetUser: ModalTargetUser;
     /**
+     * `adminUploadProfilePic` — a presenter sets this member's avatar.
+     *
+     * Its own prop, not an `onUserAction` case: see the note at the button. The `File` crosses to
+     * the server as a real `File`, which `uploadComposerImage` already relies on and documents.
+     */
+    onUploadProfilePicture: (user: ModalTargetUser, file: File) => void;
+    /**
      * The debug log this presenter last received, or null.
      *
      * Both fields are filled by the SERVER from the replying member's own session — a member cannot
@@ -443,6 +450,7 @@
     canEditUsername = false,
     targetUser,
     debugLog = null,
+    onUploadProfilePicture,
     mutedUsers,
     followedUsers,
     targetMessage,
@@ -1275,6 +1283,62 @@
   function setAutoplayAttribute(node: HTMLVideoElement) {
     node.setAttribute('autoplay', 'autoplay');
   }
+
+  /**
+   * The hidden picker behind the "Upload Profile Picture" button.
+   *
+   * `$state`, and the first draft of this had it as a plain `let` with a comment arguing that
+   * nothing renders from it. THE COMPILER DISAGREED — `non_reactive_update`: *"`profilePictureInput`
+   * is updated, but is not declared with `$state(...)`"* — and it is right, because `bind:this` is
+   * a WRITE, performed on mount and again with `undefined` on teardown. A plain `let` holds a
+   * detached node after the modal is re-rendered, and `svelte-check --fail-on-warnings` (this app's
+   * own `check` script) would have refused it in CI.
+   *
+   * `| undefined` rather than `| null` because that is what `bind:this` writes on teardown for this
+   * shape — measured by `BindThisProbe.svelte`, which exists to answer exactly that question rather
+   * than have each site guess.
+   *
+   * `svelte-autofixer` returns zero issues and one suggestion here — *"The usage of `bind:this` can
+   * often be replaced with an easier to read `action` or even better an `attachment`."* DECLINED,
+   * recorded rather than ignored, because this repository has already ruled on the question with the
+   * docs in hand. `dom-reference-contract.svelte.test.ts` quotes `svelte/bind` verbatim — *"To get a
+   * reference to a DOM node, use `bind:this`"* — and admits a capture attachment only for three
+   * STRUCTURAL reasons: crossing a component boundary, fanning one node to two owners, or a node
+   * that has no single lvalue. This node is read in the same file, by one owner, inside an event
+   * handler. An attachment here would be the hand-rolled `bind:this` that gate calls unsanctioned.
+   */
+  let profilePictureInput = $state<HTMLInputElement | undefined>();
+
+  /**
+   * The picker filter: `image` then a slash then a wildcard — ASSEMBLED, not written as a literal.
+   *
+   * This is not obfuscation and it is not style. Writing that attribute value directly puts a
+   * slash-star pair in the file, and slash-star opens a comment window for the whole-file regex that
+   * fifty-five test files here use to strip comments before reading markup.
+   *
+   * Measured when the first draft did exactly that: the window opened at line 2,559 and the next
+   * star-slash closed it at line 5,687 — **120,987 characters of markup deleted**, taking
+   * `AlertQaModal`, `BootboxDialog`, `CompactMessageRow` and the rest with them. Three contract
+   * tests went red for markup that was still on disk.
+   *
+   * `orphan-component-contract.test.ts` catches that class and its message offers two resolutions:
+   * move the render out of the window, or give every reader a Svelte-aware stripper. Neither fits a
+   * 6,000-line host with fifty-five readers. Not emitting the sequence is the third, and it costs
+   * one line and this paragraph.
+   *
+   * `PostAlertModal.svelte` carries the literal safely because nothing closes its window — an
+   * unclosed one matches nothing and deletes nothing. That is luck, not design, and this file has
+   * none of it.
+   *
+   * A SECOND self-inflicted failure is recorded here because it cost a run: the first version of
+   * this very paragraph quoted the closing sequence, which terminated the docblock early and made
+   * the whole component unparseable. `CLAUDE.md` already says a comment must not contain the syntax
+   * it is describing; this is that rule earning its place twice in one edit.
+   *
+   * The value is byte-identical to the attribute the capture renders; only how it reaches the DOM
+   * has changed.
+   */
+  const IMAGE_ACCEPT = `image/${'*'}`;
 
   function setReadonlyAttribute(node: HTMLTextAreaElement) {
     node.setAttribute('readonly', 'readonly');
@@ -2516,10 +2580,36 @@
                   onclick={() => onUserAction('disable-private-chat', targetUser)}
                   ><i class="icon fa fa-comment-slash"></i> Disable Private Chat</button
                 >
+                <!--
+                  WIRED 2026-08-29, and it takes ITS OWN PROP rather than a widened `onUserAction`.
+
+                  That is the call `save-permissions` already paid for and `focusOnSessionNote`
+                  before it: `onUserAction` carries an action name and a user, and a control that
+                  needs to carry a FILE too would have to widen it for every other action as well.
+                  A prop shared between two different acts is what lets a control look wired while
+                  doing something else.
+
+                  Upstream's `adminUploadProfilePic($event)` takes the click event, so the picker is
+                  the button's own. The input is hidden rather than styled because the capture
+                  renders a `<button>` here and nothing else — a visible file input would be a
+                  control the reference does not have.
+                -->
+                <input
+                  type="file"
+                  accept={IMAGE_ACCEPT}
+                  class="d-none"
+                  bind:this={profilePictureInput}
+                  onchange={(event) => {
+                    const picked = event.currentTarget.files?.[0];
+                    // Reset FIRST, so choosing the same file twice still fires a change.
+                    event.currentTarget.value = '';
+                    if (picked) onUploadProfilePicture(targetUser, picked);
+                  }}
+                />
                 <button
                   type="button"
                   class="btn btn-block btn-outline-light"
-                  onclick={() => onUserAction('upload-profile-picture', targetUser)}
+                  onclick={() => profilePictureInput?.click()}
                   ><i class="icon fa fa-user-circle"></i> Upload Profile Picture</button
                 >
                 <!--

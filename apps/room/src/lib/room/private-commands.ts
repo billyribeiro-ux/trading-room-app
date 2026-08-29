@@ -66,6 +66,13 @@ export interface AddressedCommand {
   fromUserId?: unknown;
   fromName?: unknown;
   log?: unknown;
+  /**
+   * `updateProfilePic` only — this member's new avatar, chosen by a presenter.
+   *
+   * The row was written before this frame was published, so this is a live update rather than the
+   * authority: a reload reaches the same value from `users.avatar_url`.
+   */
+  avatarUrl?: unknown;
 }
 
 export class RoomPrivateCommands {
@@ -106,6 +113,13 @@ export class RoomPrivateCommands {
     sendDebugLog: (log: string) => void;
     /** `debugLogResp` — a member this presenter asked has answered. */
     debugLogReceived: (from: { fromUserId: number; fromName: string; log: string }) => void;
+    /**
+     * `updateProfilePic` — a presenter set THIS member's avatar.
+     *
+     * Upstream sets two globals and emits `preferenceChanged {key:"profilePic"}`. Here the page owns
+     * where an avatar is rendered, so this class reports the new URL and decides nothing.
+     */
+    profilePictureChanged: (avatarUrl: string) => void;
   }) {
     this.#viewerId = options.viewerId;
     this.#chatMute = options.chatMute;
@@ -115,6 +129,7 @@ export class RoomPrivateCommands {
     this.#collectDebugLog = options.collectDebugLog;
     this.#sendDebugLog = options.sendDebugLog;
     this.#debugLogReceived = options.debugLogReceived;
+    this.#profilePictureChanged = options.profilePictureChanged;
   }
 
   readonly #viewerId: () => number;
@@ -125,6 +140,7 @@ export class RoomPrivateCommands {
   readonly #collectDebugLog: () => string;
   readonly #sendDebugLog: (log: string) => void;
   readonly #debugLogReceived: (from: { fromUserId: number; fromName: string; log: string }) => void;
+  readonly #profilePictureChanged: (avatarUrl: string) => void;
 
   /**
    * Route one addressed frame.
@@ -258,6 +274,23 @@ export class RoomPrivateCommands {
         fromName: command.fromName,
         log: command.log
       });
+      return true;
+    }
+
+    if (command.cmd === 'updateProfilePic') {
+      /*
+        `case "updateProfilePic"` at byte 2,067,826: upstream sets `globals.preferences.profilePic`
+        AND `globals.user.profilePic`, then emits `preferenceChanged {key:"profilePic", value}`.
+
+        ONE receiver here rather than two writes, because this room does not keep an avatar in a
+        preferences bag: `users.avatar_url` is the column, it was written before this frame was sent,
+        and the page's own copy is what this updates. A reload reaches the same value from the row.
+
+        Validated rather than trusted, like `debugLogResp` above: a frame missing the URL would
+        otherwise blank the member's own avatar to `undefined`.
+      */
+      if (typeof command.avatarUrl !== 'string' || command.avatarUrl.length === 0) return false;
+      this.#profilePictureChanged(command.avatarUrl);
       return true;
     }
 

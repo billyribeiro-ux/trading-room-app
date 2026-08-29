@@ -276,7 +276,8 @@ export type RoomEvent =
           | 'muteChat'
           | 'remoteRestartAudio'
           | 'getDebugLog'
-          | 'debugLogResp';
+          | 'debugLogResp'
+          | 'updateProfilePic';
         targetUserId?: number;
         msg?: string;
         mutedTill?: string;
@@ -295,6 +296,13 @@ export type RoomEvent =
         fromUserId?: number;
         fromName?: string;
         log?: string;
+        /*
+          `updateProfilePic` only — the member's new avatar, already stored and already written to
+          `users.avatar_url` before this frame is published. The row is the authority; this rides
+          along so the member's own page updates without a reload, exactly as `recName` rides with
+          `startRec`.
+        */
+        avatarUrl?: string;
       };
     };
 
@@ -518,13 +526,51 @@ function heldBy(listeners: Map<Subscriber, ListenerContext>, userId: number): bo
  * happened to pick unchanged.
  */
 export function setRosterLocation(room: string, userId: number, locStr: string): boolean {
+  return patchRosterUser(room, userId, { locStr });
+}
+
+/**
+ * Attaches a new avatar to every connection this person holds, and reports whether anything changed.
+ *
+ * ## Why the roster needs telling at all
+ *
+ * `RosterUser.avatarUrl` is captured into the subscriber context at SUBSCRIBE TIME, from the row as
+ * it read then (`sess/[room]/events/+server.ts`). So a presenter changing `users.avatar_url` writes
+ * the durable half and leaves every open roster showing the old picture until each member happens to
+ * reconnect — which was true of the first draft of `uploadProfilePicture`, whose comment claimed the
+ * roster push carried the new URL. It did not; it re-pushed the snapshot.
+ *
+ * This is the same problem `setRosterLocation` was written for and it now shares its body. Two
+ * copies of "patch one field on every connection this person holds, deduping by user id" is how one
+ * of them ends up not deduping.
+ */
+export function setRosterAvatar(room: string, userId: number, avatarUrl: string): boolean {
+  return patchRosterUser(room, userId, { avatarUrl });
+}
+
+/**
+ * Patch fields on every connection one person holds, reporting whether anything actually changed.
+ *
+ * Keyed by user id rather than by listener because one person may hold several tabs and the roster
+ * dedupes by id — updating only the tab that reported would leave whichever entry `roomRoster`
+ * happened to pick unchanged.
+ *
+ * The equality check is what makes the `changed` answer worth having: both callers use it to decide
+ * whether to publish, and a geolocation lookup that answers with the city it already had must not
+ * cost the room a roster broadcast.
+ */
+function patchRosterUser(room: string, userId: number, patch: Partial<RosterUser>): boolean {
   const listeners = subscribers.get(room);
   if (!listeners) return false;
   let changed = false;
   for (const [listener, context] of listeners) {
     const { user } = context;
-    if (!user || user.id !== userId || user.locStr === locStr) continue;
-    listeners.set(listener, { ...context, user: { ...user, locStr } });
+    if (!user || user.id !== userId) continue;
+    const differs = Object.entries(patch).some(
+      ([key, value]) => user[key as keyof RosterUser] !== value
+    );
+    if (!differs) continue;
+    listeners.set(listener, { ...context, user: { ...user, ...patch } });
     changed = true;
   }
   return changed;

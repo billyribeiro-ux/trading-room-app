@@ -302,8 +302,19 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     could push text into any presenter's modal. `sendDebugLog` takes no requestor argument at all;
     the server remembers who asked. See `routes/debug-log.remote.ts`.
   */
-  'upload-profile-picture':
-    'ModalHost.svelte:2379 — wire IS captured: adminUploadProfilePic sends, member applies case"updateProfilePic" setting preferences.profilePic AND user.profilePic then emitting preferenceChanged',
+  /*
+    `upload-profile-picture` IS GONE FROM THIS TABLE — built 2026-08-29.
+
+    A CORRECTION worth keeping: `TODO.md` said it "belongs with the controller like `writeRoomBan`"
+    because it is durable. Measured, that is wrong — the controller's `users` table has NO avatar
+    column, and the room's own `users.avatar_url` is what the roster reads and every chat message
+    joins to. A ban is room CONFIGURATION, which the controller owns; an avatar is a property of a
+    person, and this application is where that person's row lives.
+
+    It is also the first presenter command that writes a durable row keyed on the TARGET alone, so it
+    is the first that needed `requireRoomMember`: every other one is scoped by `publishToUsers`, and
+    a row update is not. See `routes/profile-picture.remote.ts`.
+  */
 
   /*
     Three more found in the same 2026-08-23 diff, none previously recorded.

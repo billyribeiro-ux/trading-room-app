@@ -67,6 +67,7 @@ const make = (
   const urlsSent: { cmd: string; url: string }[] = [];
   const mutesSent: { targetUserId: number }[] = [];
   const debugLogsAsked: number[] = [];
+  const profilePicturesSent: { targetUserId: number; file: File }[] = [];
   const audioRestarts: number[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
@@ -77,6 +78,7 @@ const make = (
   let reloaded = 0;
   let unmuteFails = false;
   let presenterFails = false;
+  let profilePictureFails = false;
   /* The five checkboxes as they left the class, and a switch to make the control plane refuse. */
   const permsSent: { targetUserId: number; granted: string[] }[] = [];
   const indefiniteMutesSent: { targetUserId: number }[] = [];
@@ -120,6 +122,11 @@ const make = (
         debugLogsAsked.push(targetUserId),
         Promise.resolve(null)
       ),
+      /* Records the payload AND can be made to refuse, which is what the failure path is asserted on. */
+      uploadProfilePicture: (payload: { targetUserId: number; file: File }) =>
+        profilePictureFails
+          ? Promise.reject(new Error('That is not an image.'))
+          : (profilePicturesSent.push(payload), Promise.resolve(null)),
       muteChat: (payload: { targetUserId: number }) => (
         mutesSent.push(payload),
         Promise.resolve(null)
@@ -202,6 +209,8 @@ const make = (
     urlsSent,
     mutesSent,
     debugLogsAsked,
+    profilePicturesSent,
+    failProfilePicture: () => (profilePictureFails = true),
     indefiniteMutesSent,
     audioRestarts,
     permsSent,

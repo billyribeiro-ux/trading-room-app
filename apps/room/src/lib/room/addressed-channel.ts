@@ -43,6 +43,13 @@ export function addressedChannelFor(deps: {
     send: (log: string) => void;
     received: (from: { fromUserId: number; fromName: string; log: string }) => void;
   };
+  /**
+   * A presenter set this member's own avatar.
+   *
+   * The PAGE's, because where an avatar is rendered is the page's business and not this module's —
+   * the same reasoning `forceReloadRequested` and `kicked` carry for their dialogs.
+   */
+  profilePictureChanged: (avatarUrl: string) => void;
 }): RoomPrivateCommands {
   return new RoomPrivateCommands({
     viewerId: deps.viewerId,
@@ -57,6 +64,7 @@ export function addressedChannelFor(deps: {
     reconnectAudio: deps.reconnectAudio,
     collectDebugLog: deps.debugLog.collect,
     sendDebugLog: deps.debugLog.send,
-    debugLogReceived: deps.debugLog.received
+    debugLogReceived: deps.debugLog.received,
+    profilePictureChanged: deps.profilePictureChanged
   });
 }

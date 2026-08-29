@@ -1083,7 +1083,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 834,
+    /*
+      834 -> 835, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      One line, forwarding the upload to `RoomUserActions`.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 835,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1624,7 +1635,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 6028,
+    /*
+      6028 -> 6118, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is the hidden picker, its prop, and TWO paragraphs that are the larger half: why this control takes its own prop rather than widening `onUserAction`, and why `accept` is assembled rather than written - a literal `image/` wildcard in this template opened a comment window that deleted 120,987 characters of markup from the whole-file stripper fifty-five test files use; plus the two `svelte-autofixer` suggestions declined at the code, with the ruling each was declined against.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 6118,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2298,7 +2320,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 823,
+    /*
+      823 -> 861, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is a method rather than a dispatch branch - the call `save-permissions` already made, because this control carries a FILE and `onUserAction` carries an action name and a user. Plus the note on why success is silent and failure is not.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 861,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -2415,7 +2448,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 79,
+    /*
+      79 -> 85, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is one command whose docblock records the thing that makes it different from every other presenter command: its target is checked for MEMBERSHIP, because it is the only one that writes a durable row keyed on the target alone.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 85,
     why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
   },
   {
@@ -2463,7 +2507,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 63,
+    /*
+      63 -> 71, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is a sixth callback, `profilePictureChanged`, which the page answers with a refetch rather than a parallel copy.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 71,
     why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
   },
   {
@@ -2531,7 +2586,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 267,
+    /*
+      267 -> 300, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is the `updateProfilePic` receiver and the frame field it validates. Validated rather than trusted, like `debugLogResp` beside it: a frame missing the url would blank the member's own avatar to `undefined`.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 300,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
@@ -2731,7 +2797,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
       each of them does.
     */
-    max: 1254,
+    /*
+      1254 -> 1265, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is one import, one command in the surface, and the receiver that answers with `invalidate('room:data')` - the row being the authority, a refetch reaches the same value the next reload would.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    max: 1265,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

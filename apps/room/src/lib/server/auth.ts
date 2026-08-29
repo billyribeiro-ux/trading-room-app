@@ -1,7 +1,7 @@
 import { error, redirect, type Cookies } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, or } from 'drizzle-orm';
 import { db } from './db';
 import { sessions, users, type User } from './db/schema';
 import { verifyPassword } from './password';
@@ -83,6 +83,78 @@ export function presenterRoom(): string {
   const { locals } = getRequestEvent();
   if (!isPresenterRole(requireUser(locals).role)) error(403, 'Presenters only.');
   return requireRoomShortCode(locals);
+}
+
+/**
+ * How long a session row stays valid, however long its cookie says.
+ *
+ * The longest cookie this app issues is 30 days (`THIRTY_DAYS` below, used when "remember me" is
+ * ticked). No session should outlive the cookie it was issued with.
+ *
+ * Until this was added there was no expiry check anywhere: `sessions.lastSeenAt` was written on
+ * every request and never read, and `createdAt` was never consulted, so a row stayed valid
+ * indefinitely. A cookie's `maxAge` is a client-side hint only - it tells a browser when to stop
+ * sending the value, and does nothing about a value that has been copied. The practical effect was
+ * that a stolen session cookie authenticated forever, and declining "remember me" bought no
+ * server-side protection at all.
+ *
+ * EXPORTED since 2026-08-29, when `requireRoomMember` below became a second reader. It began in
+ * `connection.ts`; two definitions of "a live session" is how one of them quietly stops matching
+ * the other.
+ */
+export const SESSION_ABSOLUTE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+
+/**
+ * The target of a presenter's action is IN THIS ROOM, or the action is refused.
+ *
+ * ## The gap this closes, which `presenterRoom()` alone does not
+ *
+ * `presenterRoom()` proves two things: the caller may command, and which room they may command. It
+ * says nothing about the TARGET. For every presenter command written before this one that was
+ * enough, because each of them ends in `publishToUsers(room, [targetUserId], …)` — delivery is
+ * scoped to the room's own subscriber map, so naming a stranger's id simply sends a frame nobody
+ * receives. The durable half of `kickUser` is scoped the same way, by the controller call.
+ *
+ * `uploadProfilePicture` is the first that writes a DURABLE ROW keyed on the target alone. A row
+ * update is not scoped by a subscriber map, so without this check a presenter of room A could set
+ * the avatar of a member of room B by guessing an integer — the 2026-08-07 privilege escalation
+ * arriving through a feature rather than through a token.
+ *
+ * ## Membership is a SESSION for this room, not presence in the roster
+ *
+ * The live roster (`roomRoster`) was the other candidate and is weaker: a member who reloads, or
+ * whose laptop sleeps for a moment, leaves it — and a presenter mid-upload would get a 404 for
+ * somebody who is plainly in the room. `sessions.roomShortCode` is written when the handoff is
+ * accepted and outlives a disconnect, which matches what a presenter means by "this member".
+ *
+ * The validity rules are the SAME ONES `getSessionUser` applies — an unexpired row whose account
+ * can still authenticate — restated here rather than shared, because sharing would mean exporting a
+ * query whose shape is deliberately private to the connection path. A drift between the two is a
+ * membership that outlives a login, so `authorization-contract.test.ts` asserts both use the same
+ * TTL constant.
+ */
+export function requireRoomMember(targetUserId: number, room: string): void {
+  const oldestValidCreatedAt = new Date(Date.now() - SESSION_ABSOLUTE_TTL_MS);
+  const membership = db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(
+      and(
+        eq(sessions.userId, targetUserId),
+        eq(sessions.roomShortCode, room),
+        or(eq(users.authSource, 'handoff'), isNotNull(users.passwordHash)),
+        gt(sessions.createdAt, oldestValidCreatedAt)
+      )
+    )
+    .get();
+
+  /*
+    404 AND NOT 403, deliberately. A presenter is allowed to act on members of their own room, so
+    "you may not" is the wrong sentence; the honest one is that this room has no such member. It
+    also declines to confirm that the id exists somewhere else, which is what a 403 would do.
+  */
+  if (!membership) error(404, 'No such member in this room.');
 }
 
 function setSessionCookie(cookies: Cookies, sessionId: string, remember: boolean) {

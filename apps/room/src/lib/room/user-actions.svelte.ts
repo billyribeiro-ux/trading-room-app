@@ -742,6 +742,14 @@ export class RoomUserActions<
     }
 
     /*
+      `upload-profile-picture` reaches `uploadProfilePicture` BELOW rather than a branch here, and
+      that is not an inconsistency — it is the same call `save-permissions` makes. This dispatcher
+      carries an action name and a user; a control that also carries a FILE cannot use it without
+      widening the signature for every other action, and a prop shared between two different acts is
+      what lets a control look wired while doing something else.
+    */
+
+    /*
       `test-follow-sound` — WIRED 2026-08-23, and the sound is `pling` because the reference says so.
 
       This sat in `INERT_ACTIONS` reading *"which sound the reference plays here is not evidenced"*.
@@ -818,5 +826,35 @@ export class RoomUserActions<
     this.#announceThenSend(userActionAlert('save-permissions') ?? '', () =>
       this.#commands.savePermissions({ targetUserId: user.id, granted: [...granted] })
     );
+  }
+
+  /**
+   * `adminUploadProfilePic` — a presenter sets one member's avatar.
+   *
+   * ## No announcement, and a FAILURE that is shown
+   *
+   * `#announceThenSend` is what `save-permissions` above uses, and it is wrong here in both
+   * directions. Upstream raises no alert on success — the picture simply changes, which is its own
+   * confirmation — so announcing one would be inventing the `EXACT_ALERTS` shape this repository has
+   * spent five commits removing.
+   *
+   * A failure IS raised, because this one can fail in ways the presenter must see and cannot infer:
+   * the file is not an image, it is over the 25Mb limit, or the member has left the room. The
+   * silence on success and the noise on failure are deliberately asymmetric — an upload that quietly
+   * did nothing looks exactly like one that worked.
+   *
+   * The modal stays OPEN. `savePermissions` closes it because saving is the end of that dialog;
+   * a presenter who has just set a picture may well set another, and closing would be a small
+   * divergence with no evidence behind it.
+   */
+  uploadProfilePicture(user: ModalTargetUser, file: File): void {
+    void this.#commands
+      .uploadProfilePicture({ targetUserId: user.id, file })
+      .catch((cause: unknown) => {
+        this.#dialogs.alert =
+          cause instanceof Error && cause.message
+            ? cause.message
+            : 'That profile picture could not be uploaded.';
+      });
   }
 }

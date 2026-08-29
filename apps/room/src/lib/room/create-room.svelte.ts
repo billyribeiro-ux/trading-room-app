@@ -87,6 +87,7 @@ import {
   requestDebugLog,
   sendDebugLog as sendDebugLogCommand
 } from '../../routes/debug-log.remote';
+import { uploadProfilePicture } from '../../routes/profile-picture.remote';
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
@@ -888,6 +889,7 @@ export function createRoom(deps: RoomDeps) {
       unmuteChat,
       forceReload,
       requestDebugLog,
+      uploadProfilePicture,
       restartAudio,
       kickUser,
       sessionSendUrl,
@@ -988,6 +990,15 @@ export function createRoom(deps: RoomDeps) {
           void sendDebugLogCommand({ log }).catch(() => {});
         },
         received: (from) => debugLog.receive(from)
+      },
+      /*
+        A presenter set this member's avatar. REFETCH rather than a parallel copy: the row was
+        written before the frame was published, so `invalidate('room:data')` reaches the same value
+        the next reload would — and it updates every place the page renders an avatar at once,
+        instead of one field that would drift from the row on the first thing that forgot it.
+      */
+      profilePictureChanged: () => {
+        void invalidate('room:data').catch(() => {});
       }
     })
   });
