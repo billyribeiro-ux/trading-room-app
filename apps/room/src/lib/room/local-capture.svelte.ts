@@ -9,6 +9,7 @@ import {
   mediaCaptureErrorMessage,
   permissionForCapture
 } from '#lib/media-capture-error.js';
+import type { AutoRecordTrigger } from '#lib/auto-record.js';
 import type { MediaSession } from '#lib/media/session.js';
 import type { SignallingClient } from '#lib/media/signalling.js';
 import type { WebcamPresenter } from '#lib/types.js';
@@ -16,6 +17,7 @@ import type { WebcamPresenter } from '#lib/types.js';
 import type { RoomDialogs } from './dialogs.svelte';
 import type { RoomMedia } from './media.svelte';
 import type { TransportSession } from './media-transport.svelte';
+import type { RoomScreenOverlay, WrappedScreen } from './screen-overlay';
 import type { RoomScreens } from './screens.svelte';
 import type { RoomToasts } from './toasts.svelte';
 
@@ -135,10 +137,12 @@ export class RoomLocalCapture {
   readonly #toasts: RoomToasts;
   readonly #media: RoomMedia;
   readonly #screens: RoomScreens;
+  readonly #overlay: RoomScreenOverlay;
   readonly #session: () => TransportSession;
   readonly #beginSpeech: () => void;
   readonly #endSpeech: () => void;
   readonly #stopRecording: () => void;
+  readonly #autoRecord: (trigger: AutoRecordTrigger) => void;
   readonly #checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
   readonly #closeScreenMenu: () => void;
   readonly #videoDeviceId: () => string | undefined;
@@ -160,10 +164,20 @@ export class RoomLocalCapture {
     toasts: RoomToasts;
     media: RoomMedia;
     screens: RoomScreens;
+    overlay: RoomScreenOverlay;
     session: () => TransportSession;
     beginSpeech: () => void;
     endSpeech: () => void;
     stopRecording: () => void;
+    /**
+     * `autoRecord` / `dontStopRecOnMicMute` — this class REPORTS the three moments and decides
+     * nothing.
+     *
+     * `RoomRecording.autoRecord` reads the live state and applies `#lib/auto-record.ts`. Upstream
+     * reacts to `micMuted`, `startTalking` and `startScreenSharing` on two event buses; this room
+     * has no bus, so the three events are named at the three places they happen.
+     */
+    autoRecord: (trigger: AutoRecordTrigger) => void;
     checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
     closeScreenMenu: () => void;
     videoDeviceId: () => string | undefined;
@@ -176,10 +190,12 @@ export class RoomLocalCapture {
     this.#toasts = options.toasts;
     this.#media = options.media;
     this.#screens = options.screens;
+    this.#overlay = options.overlay;
     this.#session = options.session;
     this.#beginSpeech = options.beginSpeech;
     this.#endSpeech = options.endSpeech;
     this.#stopRecording = options.stopRecording;
+    this.#autoRecord = options.autoRecord;
     this.#checkPermissionState = options.checkPermissionState;
     this.#closeScreenMenu = options.closeScreenMenu;
     this.#videoDeviceId = options.videoDeviceId;
@@ -356,6 +372,8 @@ export class RoomLocalCapture {
         userID: this.#session().user.id,
         mediaValue: { name: this.#session().user.displayName }
       });
+      // `autoRecord` — upstream's `startTalking` subscriber, for our own user id.
+      this.#autoRecord('micOpened');
       this.#beginSpeech();
     } catch (error) {
       if (retryCount === 0) {
@@ -401,6 +419,17 @@ export class RoomLocalCapture {
       stopStream(this.#microphoneStream);
       this.#microphoneStream = null;
       this.#media.micMuted = true;
+      /*
+        BEFORE `stopTalking`, and the order is the rule rather than a preference.
+
+        `autoRecord`'s stop is gated on `talkingUsers.length <= 1` — "nobody ELSE has an open mic" —
+        and upstream evaluates that with the muting user still in the array, because its subscriber
+        runs on a gui event that precedes the server's `stopTalking` round trip. This room removes
+        the user locally and synchronously, so calling this afterwards would count one fewer and
+        stop the recording while somebody else is still speaking. `#lib/auto-record.ts` says the same
+        thing at the field it belongs to.
+      */
+      this.#autoRecord('micClosed');
       this.#media.stopTalking(this.#session().user.id);
       this.#endSpeech();
       return;
@@ -580,6 +609,13 @@ export class RoomLocalCapture {
     }
 
     let stream: MediaStream | null = null;
+    /*
+      Declared OUT HERE so the catch below can release it. An overlay allocates a canvas, a hidden
+      `<video>` and a 33ms interval before anything is published; a publish that then throws would
+      otherwise leave all three running with nothing pointing at them, drawing frames forever into a
+      stream nobody consumes.
+    */
+    let wrapped: WrappedScreen | null = null;
     try {
       stream =
         source === 'camera'
@@ -607,10 +643,23 @@ export class RoomLocalCapture {
                 frameRate: { max: 30 }
               }
             });
-      this.#screenStream = stream;
+      /*
+        `alertsOverlayOnScreenshare` — a CANVAS between this capture and the wire, when the room asked
+        for one. `#lib/room/screen-overlay.ts` decides; this line does not branch, because the
+        wrapper it returns carries the raw stream unchanged whenever no overlay was created.
+
+        The presenter's own preview follows the wrapped stream too, deliberately: a presenter who
+        cannot see the overlay cannot tell that alerts are being burned into what everybody else is
+        watching, and this is a setting whose whole effect is on other people's screens.
+      */
+      wrapped = await this.#overlay.wrap(stream, source, (producerId) =>
+        this.stopLocalScreen(producerId)
+      );
+
+      this.#screenStream = wrapped.stream;
       this.#media.screenSharing = true;
       this.#closeScreenMenu();
-      const track = stream.getVideoTracks()[0];
+      const track = wrapped.stream.getVideoTracks()[0];
 
       /*
         `contentHint = 'detail'` — `docs/streaming-choices.md` row 2, and the reasoning is the wire
@@ -657,14 +706,39 @@ export class RoomLocalCapture {
         try {
           const producer = await sessionForScreen.produceScreen(track, screenName);
           this.#localScreenProducerId = producer.id;
-          this.#localScreenStreams.set(producer.id, stream);
-          this.#addLocalScreen(producer.id, screenName, stream);
+          /*
+            The overlay learns its producer id HERE and not a line earlier, because until the publish
+            succeeded there was no share for the browser's own "Stop sharing" bar to end. `keep` is
+            what arms that path as well as what makes `stopLocalScreen` able to release the canvas.
+          */
+          wrapped.keep(producer.id);
+          this.#localScreenStreams.set(producer.id, wrapped.stream);
+          this.#addLocalScreen(producer.id, screenName, wrapped.stream);
           // Ending the capture - the browser's own "Stop sharing" bar - closes THIS screen only,
           // not every screen this presenter is sharing.
           track.addEventListener('ended', () => this.stopLocalScreen(producer.id), { once: true });
+          /*
+            `autoRecord` — upstream's `startScreenSharing` subscriber, narrowed to OUR OWN share.
+
+            After the produce, not before it: upstream reacts to a share that reached the room, and a
+            recording of a share nobody can see is the one outcome worse than no recording at all.
+          */
+          this.#autoRecord('screenShared');
         } catch (error) {
-          // The local preview still works; only the sharing half failed, and saying so beats a
-          // presenter believing the room can see them.
+          /*
+            The local preview still works; only the sharing half failed, and saying so beats a
+            presenter believing the room can see them.
+
+            THE OVERLAY GOES, AND THE RAW CAPTURE STAYS. Nothing was published, so nothing will ever
+            call `stopLocalScreen` for this share and nothing would ever release the canvas — the
+            33ms interval would draw for the rest of the page's life. `detach` releases exactly that
+            and leaves the raw tracks running, which is what the preview needs and what
+            `stopScreenSharing` reaches through `#screenStream`. Restoring `#screenStream` to the RAW
+            stream is the other half: left pointing at the canvas, the presenter's own "Stop" would
+            end the canvas and leave the browser still sharing their screen.
+          */
+          wrapped.detach();
+          this.#screenStream = stream;
           console.error('[media] the screen could not be published', error);
           this.#toasts.show({
             kind: 'error',
@@ -677,6 +751,10 @@ export class RoomLocalCapture {
       // Only this attempt failed. Screens already being shared are untouched, and `media.screenSharing`
       // stays true if any of them survive - flipping it off would hide the stop control for shares
       // that are still running.
+      // The overlay first: it holds the raw tracks as well as its own, so stopping it is what takes
+      // the browser's "sharing your screen" indicator down. `stopStream` after it is the unwrapped
+      // case and a no-op on tracks that are already ended.
+      wrapped?.abandon();
       stopStream(stream);
       this.#screenStream = this.#localScreenStreams.values().next().value ?? null;
       this.#media.screenSharing = this.#localScreenStreams.size > 0;
@@ -753,6 +831,10 @@ export class RoomLocalCapture {
 
         this.#localScreenStreams.set(producer.id, stream);
         this.#addLocalScreen(producer.id, screenName, stream);
+        // The overlay is keyed by producer id and the id just changed. Without this it stays keyed
+        // by one the SFU has closed, so the eventual `stopLocalScreen` releases nothing and the raw
+        // capture keeps running after the presenter has stopped sharing.
+        this.#overlay.rekey(oldProducerId, producer.id);
         track.addEventListener('ended', () => this.stopLocalScreen(producer.id), { once: true });
         if (this.#localScreenProducerId === oldProducerId) {
           this.#localScreenProducerId = producer.id;
@@ -805,6 +887,9 @@ export class RoomLocalCapture {
    */
   stopLocalScreen(producerId: string) {
     const stream = this.#localScreenStreams.get(producerId);
+    // Ends the draw interval and the raw capture behind it. A no-op for a share with no overlay,
+    // which is every share in a room that did not tick `alertsOverlayOnScreenshare`.
+    this.#overlay.release(producerId);
 
     // Close the producer before dropping the track: the server tears the room's consumers down
     // from `producerClosed`, so viewers lose the tab instead of keeping a frozen last frame.
@@ -855,7 +940,10 @@ export class RoomLocalCapture {
         id: producerId,
         name: this.#session().user.displayName,
         screenName,
-        avatarUrl: this.#session().user.avatarUrl
+        avatarUrl: this.#session().user.avatarUrl,
+        // Null, not this member's id: `RoomScreens.stop` asks `isLocalScreen` first, so a screen
+        // shared from here is stopped here and no frame is ever addressed for it.
+        ownerId: null
       }
     ]);
     this.#tabs.streams.set(producerId, stream);

@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, like } from 'drizzle-orm';
 
 import { db } from './db';
 import { messages, users } from './db/schema';
@@ -66,19 +66,80 @@ export const CHAT_LOG_PAGE_SIZE = 50;
 export const MAX_CHAT_LOG_PAGE = 2_000;
 
 /**
- * The channels this room renders, and therefore the channels worth reading.
+ * The channels EVERY room has, and the reason this is no longer the whole list.
  *
- * `messages.room` is a channel label rather than a foreign key, so an arbitrary string can be
- * written into it. Only these two are ever displayed — `ChatTab` in `#lib/types.js` is a closed union
- * of exactly these — so a row in any other channel is invisible today whatever this returns.
- * Reading only what is rendered is the same fail-closed rule the settings allow-list follows.
+ * It used to be, and it used to be defined here: `['main', 'off-topic'] as const` with a closed
+ * union over it, and the argument was that only those two are ever displayed so a row in any other
+ * channel is invisible. **`chatTabsWithBadges` ended that on 2026-08-28** — an owner can configure
+ * extra channels whose names come out of JSON at runtime, so the set is per ROOM and per MEMBER and
+ * cannot be a type.
+ *
+ * What replaces the union is not weaker, and this is the paragraph to read before widening anything
+ * here: the closed union protected against a TYPO, never against a member naming a channel they may
+ * not read. Every caller now asks `memberChatChannels` — which resolves the list on the server from
+ * the room's configuration and the member's badges — and passes what it got. A channel that is not
+ * on that list is refused, which is a stronger guarantee than the union ever made and is the one
+ * that matters.
+ *
+ * The constant itself lives in `#lib/chat-tabs.ts` because the parser there has to refuse an owner
+ * name that collides with a built-in, and that module is shared client code while this one is not.
  */
-export const CHAT_CHANNELS = ['main', 'off-topic'] as const;
+export { BUILT_IN_CHAT_TABS as CHAT_CHANNELS } from '#lib/chat-tabs.js';
 
-export type ChatChannel = (typeof CHAT_CHANNELS)[number];
+/**
+ * A channel name.
+ *
+ * A bare `string`, and deliberately: the value is only ever safe because a caller checked it against
+ * a member's own list, and a nominal type here would let a check somewhere prove the wrong thing.
+ * `isMemberChatChannel` in `#lib/server/chat-channels.ts` is that check.
+ */
+export type ChatChannel = string;
 
-export function isChatChannel(value: string): value is ChatChannel {
-  return (CHAT_CHANNELS as readonly string[]).includes(value);
+/**
+ * The projection and the join, shared by the two readers of this table.
+ *
+ * Extracted when `searchChatChannel` arrived. A second hand-written copy of twenty columns is a
+ * second place for `senderEmail` to be forgotten — and forgetting it does not fail to compile, it
+ * ships a message with no `senderEmailHash`, so the renderer falls back to a placeholder avatar for
+ * search results only. The `email -> hash` step below is the reason this pair travels together at
+ * all: the raw address must never reach a client, and one function is one place to enforce that.
+ */
+function chatRows() {
+  return db
+    .select({
+      id: messages.id,
+      room: messages.room,
+      senderId: messages.senderId,
+      body: messages.body,
+      isAdmin: messages.isAdmin,
+      backgroundColor: messages.backgroundColor,
+      fontColor: messages.fontColor,
+      answered: messages.answered,
+      replyToMessageId: messages.replyToMessageId,
+      replyToName: messages.replyToName,
+      replyToBody: messages.replyToBody,
+      reactionsJson: messages.reactionsJson,
+      createdAt: messages.createdAt,
+      bodyHtml: messages.bodyHtml,
+      senderName: users.displayName,
+      senderEmail: users.email,
+      senderAvatarUrl: users.avatarUrl,
+      senderRole: users.role,
+      senderStatus: users.status
+    })
+    .from(messages)
+    .innerJoin(users, eq(messages.senderId, users.id));
+}
+
+/** Rows as the client reads them: reactions parsed, and the address replaced by its hash. */
+function chatRowsToMessages<T extends { senderEmail: string; reactionsJson: string }>(
+  rows: readonly T[]
+) {
+  return rows.map(({ senderEmail, reactionsJson, ...message }) => ({
+    ...message,
+    reactions: parseReactions(reactionsJson),
+    senderEmailHash: hashEmail(senderEmail)
+  }));
 }
 
 /**
@@ -88,31 +149,8 @@ export function isChatChannel(value: string): value is ChatChannel {
  * before those, and so on backwards, which is the direction the scroll-up gesture asks for.
  */
 export function loadChatPage(roomShortCode: string, channel: ChatChannel, page = 0) {
-  return (
-    db
-      .select({
-        id: messages.id,
-        room: messages.room,
-        senderId: messages.senderId,
-        body: messages.body,
-        isAdmin: messages.isAdmin,
-        backgroundColor: messages.backgroundColor,
-        fontColor: messages.fontColor,
-        answered: messages.answered,
-        replyToMessageId: messages.replyToMessageId,
-        replyToName: messages.replyToName,
-        replyToBody: messages.replyToBody,
-        reactionsJson: messages.reactionsJson,
-        createdAt: messages.createdAt,
-        bodyHtml: messages.bodyHtml,
-        senderName: users.displayName,
-        senderEmail: users.email,
-        senderAvatarUrl: users.avatarUrl,
-        senderRole: users.role,
-        senderStatus: users.status
-      })
-      .from(messages)
-      .innerJoin(users, eq(messages.senderId, users.id))
+  return chatRowsToMessages(
+    chatRows()
       // `/sess/${sessionID}/chat/${channel}/` — this room's chat, and one channel of it.
       .where(and(eq(messages.roomShortCode, roomShortCode), eq(messages.room, channel)))
       /* Newest first so the LIMIT keeps the newest, with `id` breaking ties: two messages in the same
@@ -125,20 +163,101 @@ export function loadChatPage(roomShortCode: string, channel: ChatChannel, page =
       /* Back into chronological order, because every reader downstream — the renderer, the date
        separators, the autoscroll — assumes oldest-first. `loadThread` does the same. */
       .reverse()
-      .map(({ senderEmail, reactionsJson, ...message }) => ({
-        ...message,
-        reactions: parseReactions(reactionsJson),
-        senderEmailHash: hashEmail(senderEmail)
-      }))
   );
 }
 
-/** Page 0 of every rendered channel, which is what a page load needs. */
-export function loadNewestChatPages(roomShortCode: string) {
-  return CHAT_CHANNELS.flatMap((channel) => loadChatPage(roomShortCode, channel)).sort(
-    /* One array again, chronological across channels. The client filters by channel for display;
+/**
+ * `doChatLogSearch {searchTerm, channel, type:"chat"}` — the whole channel, not the loaded page.
+ *
+ * ## The gap this closes
+ *
+ * There was no chat search at all. The ALERTS toolbar has one and it is a deliberate local filter
+ * with a scope notice (`alert-toolbar-search-scope.ts` argues that at length, and the argument turns
+ * on a real server-side Advanced Search sitting one click away). The chat columns had neither: no
+ * field, no filter, and no way to reach a message older than the loaded fifty.
+ *
+ * Upstream asks the server, byte 1,439,114:
+ *
+ * ```js
+ * doSearchSubmit(e = !1) {
+ *   if (!this.chatSearchTerm) return;
+ *   let i = { searchTerm: this.chatSearchTerm.replace("$", "\\$"), channel: this.channel, type: "chat", del: e };
+ *   this.guiEventBus.emit("setSearchTerm", i);
+ *   this.appService.sendServerCommand("doChatLogSearch", i);
+ * }
+ * ```
+ *
+ * and its handler REPLACES the log with what comes back (`globals.chatSearchResults = i.data.reverse()`).
+ *
+ * ## This is `searchThread`'s shape, deliberately
+ *
+ * The private-chat search has asked the database since it was built, and its escaping, its ordering,
+ * its limit and its reverse are all decisions already argued in `private-chat.ts`. Two search
+ * implementations over two message tables is how one of them ends up with the wildcard bug the other
+ * fixed, so this is the same function with a different `where`.
+ *
+ * **`%` and `_` are LIKE wildcards** — a member searching for `100%` would otherwise match the whole
+ * log. Escaped here, and the backslash with them so an escape character cannot be smuggled in.
+ *
+ * ## What is NOT built, and it is a refusal rather than an omission
+ *
+ * The same command carries `del: true`, a BULK DELETE of everything the term matched — with the
+ * confirm *"Are you sure you want to DELETE the …"* and a `Delete Searched` button. It is not built
+ * here. A destructive operation whose blast radius is defined by a LIKE pattern the caller typed is
+ * a different risk from a search, needs its own authority argument and its own confirmation flow,
+ * and building it as a flag on this path would put both behind one endpoint. It stays on the
+ * missing-command census as its own row.
+ *
+ * ## `.replace("$", "\\$")` is upstream's and is NOT reproduced
+ *
+ * That call escapes only the FIRST `$` in the term — `String.replace` with a string pattern replaces
+ * one occurrence — and `$` is not special to SQL LIKE anyway. It is a client-side artefact of
+ * whatever its server does with the term, and reproducing it here would corrupt a search for a price.
+ */
+export function searchChatChannel(roomShortCode: string, channel: ChatChannel, term: string) {
+  const needle = term.trim();
+  if (!needle) return [];
+  return chatRowsToMessages(
+    chatRows()
+      .where(
+        and(
+          eq(messages.roomShortCode, roomShortCode),
+          eq(messages.room, channel),
+          like(messages.body, `%${needle.replace(/[%_\\]/g, '\\$&')}%`)
+        )
+      )
+      /*
+        Newest first so the LIMIT keeps the newest matches, with `id` breaking ties for the reason
+        `loadChatPage` gives: two rows in the same millisecond would otherwise order however SQLite
+        felt like that call, so a match could be delivered twice or not at all across two searches.
+      */
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(CHAT_LOG_PAGE_SIZE)
+      .all()
+  );
+}
+
+/**
+ * Page 0 of every channel THIS MEMBER may read, which is what a page load needs.
+ *
+ * ## The channel list is an ARGUMENT now, and that is the security change
+ *
+ * It used to be the module's own `CHAT_CHANNELS`, because every room had the same two. A badge
+ * channel is visible to some members and not others, so reading a fixed list here would have put a
+ * private channel's messages into the page payload of every member in the room — the SSR HTML
+ * included — with the client filtering them out for display. That is the shape of the private-chat
+ * defect `publishToUsers` was written to close, and it is a leak whatever the client renders.
+ *
+ * The caller resolves the list with `memberChatChannels`, on the server, from the room's
+ * configuration and the member's own badges.
+ */
+export function loadNewestChatPages(roomShortCode: string, channels: readonly string[]) {
+  return channels
+    .flatMap((channel) => loadChatPage(roomShortCode, channel))
+    .sort(
+      /* One array again, chronological across channels. The client filters by channel for display;
        everything else here — the popup, the mention rule, the unread counts — reads the whole set
        and expects it ordered. `getTime()` on the Date the driver already parsed. */
-    (left, right) => left.createdAt.getTime() - right.createdAt.getTime()
-  );
+      (left, right) => left.createdAt.getTime() - right.createdAt.getTime()
+    );
 }

@@ -158,6 +158,75 @@ const ROOM_CONSUMED = [
   'hideChatLog',
   'hideFiles',
   'hideMobileCredentials',
+  /* The gate on the Notes tab. Added 2026-08-28 — the note at the foot of this file says why it
+     arrived two weeks after its two siblings, `hideFiles` and `hideRecs`, which crossed together. */
+  'hideNotes',
+  /* The three ROOM DEFAULTS, added 2026-08-28 and crossing together because upstream they are three
+     consecutive clauses of one expression. See the foot of this file and `room-config.ts`.
+     NO APOSTROPHES IN THIS BLOCK. */
+  'darkThemeAsDefault',
+  'alertSoundOff',
+  'alertsChatOnBottom',
+  /* The room half of the REC-indicator tooltip, added 2026-08-28. It was implemented against a
+     viewer PREFERENCE that nothing writes, so the owner switch did nothing.
+     TWO CHARACTERS ARE FORBIDDEN IN COMMENTS INSIDE THIS ARRAY, and both have cost a run:
+     an apostrophe, and a closing square bracket. `room-config-boundary.test.ts` extracts these
+     names with a single-quote regex bounded by the first closing bracket, so one apostrophe
+     swallows the list and one bracket truncates it. The first draft of THIS warning contained the
+     bracket it warns about. */
+  'dontShowRecInfoToUsers',
+  /* The third reason the composer is off. Added 2026-08-28: the room had the chat mode and the
+     viewer mute and no owner policy, so trials could chat in a room that had turned that off. */
+  'chatDisabledForTrials',
+  /* The Q and A entitlement on alerts, added 2026-08-28. The button was drawn on every alert in
+     every room, gated on a prop that defaulted to true and was never passed. */
+  'hasQAOnAlerts',
+  /* The sidebar SEED and the captions entitlement, added 2026-08-28. See `room-config.ts` for the
+     one refusal that comes with the first and for the negation that makes the second live. */
+  'alwaysShowRoster',
+  'hasSpeechRecognitionDisabled',
+  /* The webcam OFF switch and the breathing REC badge, added 2026-08-28. See `room-config.ts`. */
+  'hideWebcamForRoom',
+  'blinkingRec',
+  /* The off-topic channel SEED and the sticky non-trade checkbox, added 2026-08-28. Note the
+     reference spelling of the second, which is kept because the controller stores that name. */
+  'autoSwitchToOfftopics',
+  'styckyNonTradeAlert',
+  /* The room title and the presenter-only moderator bar, added 2026-08-28. See `room-config.ts`;
+     the first has an enumeration artefact recorded against its read count. */
+  'name',
+  'modMessage',
+  /* The note editor colour button, added 2026-08-28. ONE occurrence in the bundle; the vendor
+     that renders the two button names it chooses between is NOT in the capture. See
+     `room-config.ts` for what the held evidence does and does not decide. */
+  'simplifiedEditor',
+  /* The moderation read behind the user-info modal, added 2026-08-28. It crosses so the SERVER can
+     refuse; see `room-config.ts`. */
+  'enablePrivateMessageHistory',
+  /* The roster row SHAPE, added 2026-08-28. Per row, not per viewer; see `room-config.ts`. */
+  'showOnlyUsernames',
+  /* The tip button, added 2026-08-28. Three settings, ONE conjunction; see `room-config.ts`. */
+  'tipMeBtnEnabled',
+  'tipMeBtnUrl',
+  'tipMeBtnTxt',
+  /* The room own favicon and stylesheet, added 2026-08-28. See `room-config.ts`: the second is
+     owner-authored code served to every member. */
+  'customFaviconURL',
+  'customCSS',
+  /* The owner own iframe in place of the screens pane, added 2026-08-28. See `room-config.ts`. */
+  'customPlayerURL',
+  /* The click-to-copy order marker in an alert, added 2026-08-28. See `room-config.ts`. */
+  'copyTrades',
+  /* The positions panel and its URL, added 2026-08-28. ONE feature, two settings; see
+     `room-config.ts`. */
+  'positionsIframe',
+  'positionsIframeUrl',
+  /* Member self-delete, added 2026-08-28. It crosses to CLOSE a hole, not to draw a control -
+     see `room-config.ts`. */
+  'usersCanDeleteOwnMsgs',
+  /* The typing indicator, added 2026-08-28. It gates the SEND as well as the display; see
+     `room-config.ts`. */
+  'hasTypingIndicator',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -259,6 +328,54 @@ const ROOM_CONSUMED = [
 
      NO SQUARE BRACKET AND NO APOSTROPHE ANYWHERE ABOVE, for the reason the notes further up give. */
   'alertLabels',
+  /* "List of chat tabs with badges" - extra chat CHANNELS behind an entitlement.
+
+     The fifth setting shipped as a string containing JSON. It crosses because the channel list is a
+     room policy with nothing to default from; a room that configures none has the two built-in tabs.
+
+     The raw JSON crosses and decides nothing. The reference evaluates the badge gate in the browser
+     and then subscribes the socket to the channel; here the room SERVER decides, in
+     memberChatChannels, and the member is told which tabs they have. */
+  'chatTabsWithBadges',
+  /* "Alt chat render" - the owner forcing the compact log on every member.
+
+     Three behaviours behind one checkbox, six reads. It forces the display mode to compact on chat,
+     alerts and the Q and A thread, writing the member preference as it goes, and it is one term of
+     the hide-avatar rule on chat and the Q and A thread but not on alerts.
+
+     It crosses because every occurrence is sessData dotted onto the name. It seeds rather than
+     locks: a member can still switch modes in the settings modal afterwards. */
+  'altChatRender',
+  /* "Alerts over screenshare?" - the last four alerts burned into the outgoing screen capture.
+
+     The reference does not draw these over the viewer video element. It puts a CANVAS between the
+     display capture and the wire and publishes the canvas instead, so the alerts are in the pixels
+     every member receives and in any recording made of them. That is why it is room policy and not
+     a viewer preference: one presenter ticking it changes what everybody else sees.
+
+     Every occurrence in the bundle is sessData dotted onto the name, and the compositor at byte
+     1,099,577 reads it as the gate on whether the wrap happens at all. */
+  'alertsOverlayOnScreenshare',
+  /* "Alert Scheduler?" - an alert written now and posted by the server later.
+
+     Three commands upstream and one gate on all of them: alertMsgLater (byte 2,130,937),
+     getScheduledAlerts (1,009,767, sent on session load when this flag is on) and
+     removeScheduledAlert (2,406,725). Every occurrence is sessData dotted onto the name.
+
+     It crosses as a POLICY and is enforced on the room server as well as drawn: a room with the
+     scheduler off refuses a schedule. The reference gates only the UI. */
+  'hasAlertScheduler',
+  /* "Auto Record?" and "Do not stop recording on mic mute?" - ONE feature, two settings.
+
+     They cross together because the second is inert without the first: autoRecord is read at three
+     sites (bytes 1,116,794 / 1,121,427 / 1,125,863) and gates the STOP as well as both starts, so a
+     room with it off never auto-stops on a mute whatever the second says.
+
+     A recording starts when this presenter opens their microphone while sharing a screen, or begins
+     sharing one with their microphone already open, and stops when they mute unless the second
+     setting is on or somebody else still has an open mic. */
+  'autoRecord',
+  'dontStopRecOnMicMute',
   /* Four gates that RoomMessage.svelte already implements and no room could switch on.
 
      Every occurrence of all four in the reference bundle is sessData dotted onto the name, so they
@@ -273,6 +390,16 @@ const ROOM_CONSUMED = [
   'enableReactions',
   'enableEditMessage',
   'enableEditAlerts',
+  /* "Enable QA Reactions?" - the same control on the Q and A thread.
+
+     One expression upstream at byte 1,335,445: reactions render when enableReactions and the log is
+     chat, OR when enableQAReactions and the log is alerts and the row sits inside the Q and A
+     thread. message-behavior.ts already transcribed it; the second half could never be true here
+     because the thread rendered its rows as chat behind a handler that did nothing.
+
+     Decided on the server as well as drawn: reactToQuestion refuses when the room did not enable
+     it. */
+  'enableQAReactions',
   /* "Recording Reminder If Speaking?" - the room POLICY term of the reminder banner.
 
      Two different values share this name upstream and only one is a setting. The gate at bundle
@@ -701,9 +828,131 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // truthy, so a room that configures no list has no entry point and no modal, and the room cannot
 // decide that for itself.
 //
+// 68 since 2026-08-28: `hideNotes` joined ROOM_CONSUMED, and it is the first entry added by the
+// SETTINGS ENUMERATION (`apps/room/gate/audit-setting-coverage.mjs`) rather than by somebody
+// building a feature and noticing a flag it needed. That is the whole reason the enumeration was
+// written: `hideFiles` and `hideRecs` crossed on 2026-08-14 with the panes they gate, `hideNotes`
+// did not, and nothing anywhere could see the omission — the Notes tab has always been built, so no
+// feature work would ever have reached this flag. An owner who ticked *"Hide Notes Section?"* got a
+// room that still showed the tab, silently, for two weeks.
+//
+// 71 since 2026-08-28: `darkThemeAsDefault`, `alertSoundOff` and `alertsChatOnBottom` joined
+// together, three clauses of one expression in the reference at bytes 1,149,414 / 1,149,637 /
+// 1,149,866. Each seeds a per-viewer preference ONCE and latches itself so it never becomes an
+// override; the latch lives in the room, because which member has already been given a default is a
+// fact about that member and not about the room. `#lib/room/room-defaults.ts` holds the rule and
+// `room-defaults.test.ts` holds the negative controls. Second find of the settings enumeration.
+//
+// 72 since 2026-08-28: `dontShowRecInfoToUsers`. Not a new feature — a CORRECTION. The room already
+// had the gate, transcribed correctly in a comment in `RoomNavbar.svelte` and implemented against
+// `prefs.loaded`, a viewer preference nothing has ever written. The owner switch did nothing and
+// every member saw the recording file name. Third find of the settings enumeration.
+//
+// 73 since 2026-08-28: `chatDisabledForTrials`, the third of three reasons the reference turns the
+// chat composer off. This room had the other two. Fourth find of the settings enumeration.
+//
+// 74 since 2026-08-28: `hasQAOnAlerts`. The ask-a-question button on every alert was gated on a
+// component prop defaulting to TRUE that nothing passed, so the entitlement defaulted open. Fifth
+// find of the settings enumeration, and the second of the same shape as `dontShowRecInfoToUsers`:
+// the surface was built, and the value never reached it.
+//
+// 76 since 2026-08-28: `alwaysShowRoster` and `hasSpeechRecognitionDisabled`. Two entitlements whose
+// consumer was already written here — the sidebar, and a `beginSpeechRecognition` whose docblock
+// quoted the capture's "disabled by preferences OR SESSION SETTINGS" while gating on preferences
+// alone. Sixth and seventh finds of the settings enumeration.
+//
+// 78 since 2026-08-28: `hideWebcamForRoom` and `blinkingRec`. Both are one term of a gate this room
+// already draws. Eighth and ninth finds of the settings enumeration.
+//
+// 80 since 2026-08-28: `autoSwitchToOfftopics` and `styckyNonTradeAlert`. Two SEEDS, both re-applied
+// where the reference re-applies them — the channel at chat init, the checkbox on every modal open.
+// Tenth and eleventh finds of the settings enumeration.
+//
+// 82 since 2026-08-28: `name` and `modMessage`. The room's own title finally reaches the browser
+// tab, and the presenter-only moderator bar exists. Twelfth and thirteenth finds of the settings
+// enumeration — and `name` is the one whose READ COUNT is noise while the setting is real.
+//
+// 99 since 2026-08-28: `altChatRender`. Thirtieth find, and the one that needed a whole second
+// RENDERER underneath it: this room had no compact display mode at all, so two of the setting's
+// three behaviours had nothing to act on. Building it shared the twelve-gate kebab menu out of
+// `RoomMessage.svelte` rather than copying it, and turned up a THIRD dead control on the way - both
+// Text Mode radio pairs were writing invented preference names nothing read.
+//
+// 98 since 2026-08-28: `chatTabsWithBadges`. Twenty-ninth find, and the first that turns a CLOSED
+// UNION into a runtime allow-list: the room had two hard-coded chat channels and a `ChatTab` type
+// over them. An owner can configure more, behind badges, so the set is per room and per member — and
+// the reference decides it in the BROWSER, which is why every read and write path here now asks the
+// server instead. It also made the chat fan-out audience-aware, which it was not.
+//
+// 97 since 2026-08-28: `enableQAReactions`. Twenty-eighth find, and the second CORRECTION of the
+// enumeration after `dontShowRecInfoToUsers`: the rule was already written in `message-behavior.ts`
+// and could never evaluate true, because the Q and A thread passed `kind="chat"` and an `onaction`
+// that did nothing. Wiring the flag alone would have lit a control that cannot act, so the thread
+// got a real handler, its entries got a stable id to react to, and the load stopped silently
+// dropping every question ever asked on a captured alert.
+//
+// 96 since 2026-08-28: `hasTypingIndicator`. Twenty-seventh find, and the first whose room half
+// needed a server-side registry of its own - ephemeral, in memory, swept on read.
+//
+// 95 since 2026-08-28: `usersCanDeleteOwnMsgs`. Twenty-sixth find, and the first that crosses to
+// CLOSE something: the room server was already letting a member delete their own message without
+// asking whether the room allowed it.
+//
+// 94 since 2026-08-28: `positionsIframe` and `positionsIframeUrl`. Twenty-fourth and twenty-fifth
+// finds, and the second pair on this list whose gate is a conjunction - so they cross together,
+// like the tip button trio, and the room conjoins them once.
+//
+// 92 since 2026-08-28: `copyTrades`. Twenty-third find, and the second in one day whose upstream
+// implementation is broken by String replace taking a string pattern rather than a global regex.
+//
+// 91 since 2026-08-28: `customPlayerURL`. Twenty-second find, and the second in a row whose value
+// is a URL the reference hands to a browser without checking it - here through an explicit
+// sanitiser bypass.
+//
+// 90 since 2026-08-28: `customFaviconURL` and `customCSS`. Twentieth and twenty-first finds, and
+// the first pair where crossing one of them means an owner can put CODE in every member browser -
+// so the boundary comment says so at the point somebody decides.
+//
+// 88 since 2026-08-28: `tipMeBtnEnabled`, `tipMeBtnUrl` and `tipMeBtnTxt`. Seventeenth, eighteenth
+// and nineteenth finds, and ONE feature - the gate upstream is the conjunction of all three, so
+// crossing one without the others would draw a nameless or inert button.
+//
+// 85 since 2026-08-28: `showOnlyUsernames`. The sixteenth find, and the one whose obvious reading
+// was the exact inverse of what the bundle does - the gate reads the ROW, not the viewer.
+//
+// 84 since 2026-08-28: `enablePrivateMessageHistory`. The fifteenth find, and the only one so far
+// that widens what a presenter may READ rather than what the room DRAWS - so it is checked on the
+// server, from the control plane, before a row is selected.
+//
+// 83 since 2026-08-28: `simplifiedEditor`. The fourteenth find, and the first whose downstream
+// vendor is absent from the capture — so the room reproduces the DECISION (foreground-only colour)
+// and records that the reference's exact markup for it is unevidenced.
+//
+// 100 since 2026-08-28: `alertsOverlayOnScreenshare`. Thirty-first find, and the first that reaches
+// the MEDIA path rather than the DOM: the value decides whether a canvas is spliced between
+// `getDisplayMedia` and the producer, so what it changes is the bytes on the wire. Its layout half
+// is pure and unit-tested against a stub text measurer; its plumbing half fails OPEN, because a
+// share that does not start is a worse outcome than a share without its overlay.
+//
+// 102 since 2026-08-28: `autoRecord` and `dontStopRecOnMicMute`. Thirty-second and thirty-third
+// finds, and the second BLOCKER on this list to be wrong rather than stale: the row said "a
+// server-side recorder, which does not exist", which is true of the reference and irrelevant here.
+// This room already records in the BROWSER, deliberately and with the reason recorded, so the two
+// settings had a recorder to drive all along. What the reading did change is the scope, and it is
+// written down: only this peer's own share can be auto-recorded, and the start is guarded on not
+// already recording because a second MediaRecorder would orphan the first.
+//
+// 103 since 2026-08-28: `hasAlertScheduler`. Thirty-fourth find, and the LAST buildable row of the
+// settings enumeration. Its recorded blocker named the wrong process: "a scheduler process in
+// services/api, and the crate's TEST targets cannot build here" is true of that crate and is not a
+// reason to put the scheduler in it. The reference's scheduler is its own Node server; this stack's
+// long-lived Node process is the ROOM, which cannot be serverless at all on two grounds already
+// documented, and which owns the alerts table and the fan-out. Durable rows, an ephemeral sweep
+// timer, and an atomic conditional UPDATE so firing is exactly-once.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 67 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 103 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

@@ -108,6 +108,18 @@ export function mobilePinUrl(shortCode: string): string | null {
 }
 
 /**
+ * `restoreMobileAppTokens`: `POST {control}/internal/mobile-restore/{shortCode}`.
+ *
+ * Beside the pin and separate from the config read for the same reason: it is asked for once, by one
+ * member, when they press a button — and unlike the config read it has consequences, so it must not
+ * be reachable as a side effect of loading a page.
+ */
+export function mobileRestoreUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/mobile-restore/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `internal/room-entry/<code>` — may this attempt into this room?
  *
  * The room asks rather than decides, because the answer needs `webinarPW`, `banIPList` and the
@@ -118,6 +130,22 @@ export function mobilePinUrl(shortCode: string): string | null {
 export function roomEntryUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/room-entry/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
+ * `POST {control}/internal/room-notes-auth/{shortCode}` — the second question-shaped read.
+ *
+ * A SIBLING of `roomEntryUrl`, not of the setting reads, and the shape is the argument: both send a
+ * candidate the controller compares against a credential it holds and never returns. The room learns
+ * one boolean and the password stays where it was configured.
+ *
+ * It exists because `needPasswordForUserNotes` is one of the seven credential-shaped settings that
+ * may never appear in `ROOM_VISIBLE_SETTINGS`, and the reference compares it in the browser
+ * (bundle byte 2,081,768) because its `sessData` already holds it. See the endpoint's own header.
+ */
+export function roomNotesAuthUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-notes-auth/${encodeURIComponent(shortCode)}` : null;
 }
 
 /**
@@ -165,6 +193,24 @@ export function roomPermissionsUrl(shortCode: string): string | null {
 export function roomBanUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/room-ban/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
+ * *" Mute Chat indefinately "* — the reference's own spelling: `POST {control}/internal/room-mute/{shortCode}`.
+ *
+ * A THIRD endpoint rather than a flag on the ban, because it answers a third question — not what a
+ * member may do, and not whether they may be here, but whether they may SPEAK — and it writes a
+ * different opcode.
+ *
+ * It does not belong beside the room's own 24-hour mute either, and that is the part worth knowing
+ * before touching it: the two durations live in two different stores. Twenty-four hours is a row in
+ * the room's SQLite `chat_mutes`; indefinite is `roomUsers.role = 3, muted = true` here. Upstream
+ * they are one command distinguished by `time` (`"24"` / `"0"`, bundle byte 2080089), and that
+ * unification is not available without moving one of the two stores.
+ */
+export function roomMuteUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-mute/${encodeURIComponent(shortCode)}` : null;
 }
 
 /**

@@ -2,7 +2,7 @@ import type { Cookies } from '@sveltejs/kit';
 import { createHash } from 'node:crypto';
 import { and, eq, gt, isNotNull, or } from 'drizzle-orm';
 import { db, ensureDatabase } from './db';
-import { SESSION_COOKIE } from './auth';
+import { SESSION_ABSOLUTE_TTL_MS, SESSION_COOKIE } from './auth';
 import { sessions, users, userSettings, type User } from './db/schema';
 
 interface ConnectedIdentity {
@@ -24,17 +24,14 @@ export function gravatarUrl(identity: string) {
 }
 
 /*
-  The longest cookie this app issues is 30 days (`THIRTY_DAYS` in auth.ts, used when
-  "remember me" is ticked). No session should outlive the cookie it was issued with.
+  `SESSION_ABSOLUTE_TTL_MS` MOVED TO `auth.ts` on 2026-08-29, and the move is the point rather than
+  tidying: `requireRoomMember` asks the same question this file's `getSessionUser` asks — is there a
+  live session — and two copies of "live" is how one of them ends up meaning something else. The
+  constant now lives with the other authority values, and both readers import it.
 
-  Until this was added there was no expiry check anywhere: `sessions.lastSeenAt` was
-  written on every request and never read, and `createdAt` was never consulted, so a row
-  stayed valid indefinitely. A cookie's `maxAge` is a client-side hint only - it tells a
-  browser when to stop sending the value, and does nothing about a value that has been
-  copied. The practical effect was that a stolen session cookie authenticated forever, and
-  declining "remember me" bought no server-side protection at all.
+  The direction is the only one available: this file already imports `SESSION_COOKIE` from `auth.ts`,
+  so defining it there and importing it here keeps the dependency one-way.
 */
-const SESSION_ABSOLUTE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
 function getSessionUser(sessionId: string | undefined) {
   if (!sessionId) return undefined;
@@ -104,6 +101,31 @@ function ensureSettings(userId: number, now: Date) {
       })
       .run();
   }
+}
+
+/**
+ * Does this session still exist and still authenticate?
+ *
+ * ## Why it delegates rather than re-querying
+ *
+ * "A session is valid" is three conditions — the row exists, the account can authenticate at all
+ * (`auth_source` plus a password hash for password accounts), and it is inside the absolute TTL —
+ * and `getSessionUser` is where all three live. A second query asking a narrower question would be a
+ * second definition of validity, and the two would drift in the direction that matters: a check that
+ * only asks "does the row exist" keeps a stream open on a session the ordinary request path has
+ * already stopped accepting.
+ *
+ * So this is a boolean over the same query, and the only thing it adds is that it does NOT write
+ * `lastSeenAt`. A liveness poll is not activity, and letting it count as activity would keep a
+ * session looking fresh purely because a stream was open.
+ *
+ * The caller is `sess/[room]/events`, which asks once a minute for the life of a connection — see
+ * `live-access.ts` for why an open stream has to ask about itself rather than be told.
+ */
+export function sessionStillAuthenticates(sessionId: string | undefined): boolean {
+  if (!sessionId) return false;
+  ensureDatabase();
+  return getSessionUser(sessionId) !== undefined;
 }
 
 export function resolveConnectedIdentity(cookies: Cookies): ConnectedIdentity {

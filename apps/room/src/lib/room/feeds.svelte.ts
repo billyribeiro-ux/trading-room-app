@@ -95,6 +95,20 @@ export class RoomFeeds<
 
   #evidence: Record<string, EvidencePatch>;
 
+  /*
+    `doChatLogSearch`'s answer, per column, or `null` when no search is running.
+
+    `$state.raw` because each is REPLACED wholesale by the server's next answer and no row in it is
+    ever mutated — a deep proxy would be paid on every read by the pipeline below and would buy
+    reactivity nothing asks for.
+
+    `null` and `[]` are different and both happen: `null` shows the log, `[]` shows that this term
+    matched nothing. Collapsing them would make a search that found nothing look like no search, and
+    a reader would read their whole log as the result.
+  */
+  #chatSearchResults = $state.raw<readonly Message[] | null>(null);
+  #extraChatSearchResults = $state.raw<readonly Message[] | null>(null);
+
   constructor(options: {
     alerts: RoomAlerts;
     chat: RoomChat;
@@ -244,7 +258,24 @@ export class RoomFeeds<
     pages this feature adds.
   */
   get visibleChat() {
-    return this.chatMessagesFor(this.#chat.tab);
+    return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);
+  }
+
+  /**
+   * What `doChatLogSearch` returned for a column, or `null` to put it back on its log.
+   *
+   * Written from the remote query's result. `RoomChat` clears it through its `searchCleared`
+   * receiver on an emptied box or a channel switch — see the note there for why the term lives on
+   * that class and these rows live here.
+   */
+  setChatSearchResults(column: 'main' | 'extra', rows: readonly Message[] | null): void {
+    if (column === 'main') this.#chatSearchResults = rows;
+    else this.#extraChatSearchResults = rows;
+  }
+
+  /** Whether either column is showing search results rather than its log. Drives the empty state. */
+  chatSearchActive(column: 'main' | 'extra'): boolean {
+    return (column === 'main' ? this.#chatSearchResults : this.#extraChatSearchResults) !== null;
   }
 
   /*
@@ -253,7 +284,7 @@ export class RoomFeeds<
     so the two columns cannot drift: a second derived would be a second copy of six steps.
   */
   get visibleExtraChat() {
-    return this.chatMessagesFor(this.#chat.extraTab);
+    return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);
   }
 
   /**
@@ -346,11 +377,39 @@ export class RoomFeeds<
     };
   }
 
-  chatMessagesFor(tab: ChatTab) {
+  /**
+   * @param searchResults when non-null, these rows REPLACE the log — `doChatLogSearch`'s behaviour.
+   *
+   * ## Search results go through the SAME filters, and upstream's do not
+   *
+   * The handler at byte 1,020,422 assigns straight to `globals.chatSearchResults` and renders that.
+   * It can afford to: upstream applies WEBINAR MODE as messages ARRIVE, dropping them before they
+   * ever reach a log — so its search results, which come from the server rather than from arrival,
+   * are simply not filtered by it at all.
+   *
+   * This room applies webinar mode as a VIEW filter, because it re-reads its log from the server on
+   * every invalidate and a drop-on-arrival would be undone by the next load (recorded below). Feeding
+   * search results in ahead of that filter rather than through it would therefore have handed a
+   * member, in webinar mode, every other member's messages — the exact thing the mode exists to
+   * hide, reachable by typing a letter into a search box.
+   *
+   * So the results enter the pipeline at the point the merged log leaves it, and everything after —
+   * hidden rows, webinar mode, evidence, badges — applies to both identically. **This is a
+   * divergence from the capture in the direction of the mode's own intent**, and it is the reason
+   * this parameter exists rather than a second getter that returns the raw rows.
+   *
+   * The trim and the older-page merge are skipped for a search, and that is not an omission: both
+   * are about the LIVE log's length and the reader's scroll position, and neither has any meaning
+   * for a result set the server bounded to one page.
+   */
+  chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {
     return (
-      trimChatLog(
-        mergeOlderChatMessages(this.#chatPages.older(tab), this.#session().messages),
-        this.#prefs.trimChatLogs
+      (
+        searchResults ??
+        trimChatLog(
+          mergeOlderChatMessages(this.#chatPages.older(tab), this.#session().messages),
+          this.#prefs.trimChatLogs
+        )
       )
         .filter((item) => item.room === tab && !this.#isHidden(item))
         /*

@@ -62,9 +62,11 @@ export function ensureDatabase() {
     CREATE TABLE IF NOT EXISTS alert_questions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       alert_id INTEGER NOT NULL,
+      room_short_code TEXT NOT NULL DEFAULT '',
       sender_id INTEGER NOT NULL REFERENCES users(id),
       body TEXT NOT NULL,
       answered_at INTEGER,
+      reactions_json TEXT NOT NULL DEFAULT '{}',
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS alert_questions_alert_created_idx
@@ -265,7 +267,21 @@ export function ensureDatabase() {
     CREATE TABLE IF NOT EXISTS room_state (
       room_short_code TEXT PRIMARY KEY,
       chat_mode TEXT NOT NULL DEFAULT 'g',
+      closed_message TEXT,
       updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS scheduled_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      sender_id INTEGER NOT NULL REFERENCES users(id),
+      sender_name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      non_trade INTEGER NOT NULL DEFAULT 0,
+      repeat_mode TEXT NOT NULL DEFAULT '',
+      ignore_weekends INTEGER NOT NULL DEFAULT 0,
+      send_on INTEGER NOT NULL,
+      claimed_at INTEGER,
+      created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -321,6 +337,23 @@ export function ensureDatabase() {
   }
   if (!sharedFileColumns.has('uploaded_by')) {
     sqlite.exec('ALTER TABLE shared_files ADD COLUMN uploaded_by INTEGER REFERENCES users(id)');
+  }
+
+  /*
+    `room_state.closed_message` — what a member is told when the room is closed.
+
+    Guarded rather than assumed, for the reason the whole of this bootstrap is: it is forward-only,
+    and a database created before this column existed has the table without it. `CREATE TABLE IF NOT
+    EXISTS` above will not add a column to a table that already exists, which is exactly the trap
+    this idiom is here for.
+  */
+  const roomStateColumns = new Set(
+    (sqlite.pragma('table_info(room_state)') as Array<{ name: string }>).map(
+      (column) => column.name
+    )
+  );
+  if (!roomStateColumns.has('closed_message')) {
+    sqlite.exec('ALTER TABLE room_state ADD COLUMN closed_message TEXT');
   }
 
   /*
@@ -478,6 +511,68 @@ export function ensureDatabase() {
   }
 
   /*
+    `alert_questions` gains the two columns the Q&A thread needs to be a real surface.
+
+    ## `reactions_json` — where a Q&A reaction lives
+
+    The reference stores it on the ALERT and addresses it by position:
+    `manageChatReactions(this.isQAMsg ? this.qaMsgID : this.msg._id, ..., this.msgIndex)` at bundle
+    byte 1,354,136, and the update comes back as the whole alert document, `qa` array included
+    (`h[f] = o`, byte 1,410,683). That is a document store's shape, not a relational one, and
+    reproducing it here would mean a JSON array indexed by ordinal — where deleting question 2 while
+    somebody reacts to question 3 moves the reaction onto question 4.
+
+    A column on the row the reaction belongs to has no such race, and the row already has the stable
+    identity the reference's `qa` entries lack. **DIVERGENCE, deliberate**, and it is the reason the
+    two commands in `alert-questions.remote.ts` take a question id rather than an alert id and an
+    index.
+
+    ## `room_short_code` — and this REVERSES a decision recorded in `alert-log.ts`
+
+    That file argued the column was unnecessary: `alert_questions` reaches its room through
+    `alert_id`, so an inner join to `alerts` applies the tenancy term without denormalising.
+
+    **That is true only for alerts that have a row.** Captured alerts carry NEGATIVE ids and live in
+    the fixture, and `askQuestion` accepts them — it resolves them through `capturedRoomItem` and
+    writes the question. The inner join then dropped every one of those rows on the way back out, so
+    a member could ask a question on a captured alert, be told nothing, and watch the thread go on
+    saying "There are no questions." The row was written and unreachable.
+
+    Worse than the loss: those rows had no room anchor at all. Two rooms both serving captured alert
+    -5 would have shared its questions the moment anything did read them.
+
+    So the fact is NOT derivable for every row, and a filter that silently drops what the write path
+    accepted is not a denormalisation the schema can avoid. The column is the anchor.
+
+    Backfilled from `alerts` for the rows that HAVE one, which is every row a room has ever
+    displayed. Rows on captured alerts stay '' — their room is genuinely unknowable after the fact,
+    and '' matches no room, so they remain exactly as invisible as they are today rather than
+    surfacing in a room that may not be where they were asked.
+  */
+  const alertQuestionColumns = new Set(
+    (sqlite.pragma('table_info(alert_questions)') as Array<{ name: string }>).map(
+      (column) => column.name
+    )
+  );
+  if (!alertQuestionColumns.has('reactions_json')) {
+    sqlite.exec("ALTER TABLE alert_questions ADD COLUMN reactions_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  if (!alertQuestionColumns.has('room_short_code')) {
+    sqlite.exec("ALTER TABLE alert_questions ADD COLUMN room_short_code TEXT NOT NULL DEFAULT ''");
+    sqlite.exec(`
+      UPDATE alert_questions
+         SET room_short_code = (
+               SELECT alerts.room_short_code FROM alerts WHERE alerts.id = alert_questions.alert_id
+             )
+       WHERE room_short_code = ''
+         AND EXISTS (SELECT 1 FROM alerts WHERE alerts.id = alert_questions.alert_id)
+    `);
+  }
+  sqlite.exec(
+    'CREATE INDEX IF NOT EXISTS alert_questions_room_alert_idx ON alert_questions (room_short_code, alert_id)'
+  );
+
+  /*
     The chat log's paging index.
 
     `loadChatPage` filters on (room_short_code, room) and orders by (created_at DESC, id DESC). The
@@ -499,6 +594,28 @@ export function ensureDatabase() {
   sqlite.exec(
     `CREATE INDEX IF NOT EXISTS alerts_paging_idx
        ON alerts(room_short_code, created_at DESC, id DESC)`
+  );
+
+  /*
+    THE SWEEP'S ONLY READ PATH, and the one query in this database that runs on a timer rather than
+    on a request.
+
+    `claimed_at IS NULL` first, then `send_on`: the sweep asks for the oldest UNCLAIMED row that is
+    due, across every room, and the partial index means the scan is over pending rows only. Without
+    it the sweep degrades with the number of alerts ever scheduled rather than with the number
+    currently pending, which is the shape `CLAUDE.md` asks about every new read path — at 10,000
+    delivered alerts a full scan every few seconds is the cost, and this bounds it to what is
+    actually waiting.
+  */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS scheduled_alerts_due_idx
+       ON scheduled_alerts(send_on) WHERE claimed_at IS NULL`
+  );
+
+  /* The manage modal's list: one room's pending alerts, soonest first. */
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS scheduled_alerts_room_idx
+       ON scheduled_alerts(room_short_code, send_on)`
   );
 
   /*

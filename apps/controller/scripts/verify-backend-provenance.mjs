@@ -166,10 +166,42 @@ const DIVERGED_FROM_IMPORT = new Map([
 
     The posture checks are unchanged and apply to whichever name is present, so a cluster
     mid-transition is held to exactly the same standard.
+
+    RE-PINNED 2026-08-28, and the reason is a gap this file's own subject had.
+
+    This binary asserted the tenant PREDICATE of exactly one table, `public.room_events`. The other
+    twenty-one tenant tables were attested only by the ROLE their policy targets. `0009` retargets
+    that role and never inspects a predicate — correctly, that is not its job — so a policy
+    hand-widened to `USING (true)` on any of the twenty-one passed the migration, passed the
+    migration's own parity assertion, and passed this attestation.
+
+    Reproduced against a live PostgreSQL 16 built from the shipped chain: widening `alert_media` to
+    `USING (true)`, then running `0009`, left the widened predicate in place while the migration
+    reported `0` residual references to the baseline role. On a multi-tenant fintech application that
+    is one tenant reading another tenant's rows, and nothing in the release evidence mentioned it.
+
+    `query_and_validate_tenant_policies` now reads every policy in `public` and asserts four things:
+    one policy per relation with row-level security forced, exactly one role and it is the runtime
+    login, a `USING` expression from the reviewed set, and a `WITH CHECK` that is absent or reviewed.
+    The rule is split into a pure `validate_tenant_policies` so it can be exercised without standing
+    up a PostgreSQL 17 cluster, with seven unit tests, and the evidence it returns is reported rather
+    than merely checked.
+
+    RE-PINNED 2026-08-29. That change added `tenant_policies` to `AttestationEvidence` and did not
+    update the "pass" fixture in this file's own tests, so the binary's test target stopped
+    compiling. Nothing reported it: `cargo test` cannot build in a container without egress —
+    `mediasoup-sys` fetches libsrtp from github and the agent proxy answers 403 — so the suite had
+    not run locally since. It compiled again once the meson subprojects were vendored over git, and
+    failed on this immediately.
+
+    The fixture's values are MEASURED against a real cluster rather than invented: PostgreSQL 16.13
+    with the full chain applied reports 22 relations with row-level security FORCED, 22 policies over
+    them — the 1:1 this evidence exists to state — and exactly two distinct `USING` expressions, the
+    general tenant predicate and `room_events`' member-scoped one.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    'fb39c4f0116511d9a9c5094e824efe4d869423a3de0e4d2e22397a37dea6fe2b'
+    '04eaa8613989ebe0e7f4764d43bb730290b5185bb97bd8446aa1579d007ade51'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -185,7 +217,10 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
   ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
   ['services/api/tests/migrations.rs', 'da2739797a45c6eb27beb61d55fd000a500357bfa6ad3b373931bd3ba7165136'],
-  ['services/docker/postgres/10-provision-roles.sh', '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'],
+  [
+    'services/docker/postgres/10-provision-roles.sh',
+    '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
+  ],
   ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
   /*
     Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half

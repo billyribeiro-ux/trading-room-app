@@ -107,10 +107,28 @@
   /* ─── serialisation ─────────────────────────────────────────────────────── */
 
   const STYLE_PROPS = [
-    'display', 'position', 'width', 'height', 'margin', 'padding', 'border', 'border-top',
-    'border-bottom', 'font-family', 'font-size', 'font-weight', 'line-height', 'color',
-    'background-color', 'background-image', 'text-align', 'box-shadow', 'border-radius', 'z-index',
-    'opacity', 'visibility'
+    'display',
+    'position',
+    'width',
+    'height',
+    'margin',
+    'padding',
+    'border',
+    'border-top',
+    'border-bottom',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'line-height',
+    'color',
+    'background-color',
+    'background-image',
+    'text-align',
+    'box-shadow',
+    'border-radius',
+    'z-index',
+    'opacity',
+    'visibility'
   ];
   const computed = (el) => {
     const cs = getComputedStyle(el);
@@ -202,9 +220,7 @@
       const rows = Array.from(table.querySelectorAll(':scope > tbody > tr'));
       return {
         tableClass: table.className,
-        tableRect: (({ x, y, width, height }) => ({ x, y, w: width, h: height }))(
-          table.getBoundingClientRect()
-        ),
+        tableRect: (({ x, y, width, height }) => ({ x, y, w: width, h: height }))(table.getBoundingClientRect()),
         rowCount: rows.length,
         /*
           `nth-of-type` counts EVERY `<tr>`, including ones hidden by `ng-hide`/`hidden` — which is
@@ -216,20 +232,14 @@
           nthOfType: i + 1,
           odd: (i + 1) % 2 === 1,
           hidden:
-            tr.hasAttribute('hidden') ||
-            /\bng-hide\b/.test(tr.className) ||
-            getComputedStyle(tr).display === 'none',
+            tr.hasAttribute('hidden') || /\bng-hide\b/.test(tr.className) || getComputedStyle(tr).display === 'none',
           backgroundColor: getComputedStyle(tr).backgroundColor,
           height: tr.getBoundingClientRect().height
         })),
         /* The `:hover` rules that MATCH these rows. A synthetic MouseEvent does not trigger :hover,
            so the rule is the evidence, not a computed snapshot. */
-        hoverRules: rows.length
-          ? matchingRules(rows[0]).filter((r) => /:hover/.test(r.selector))
-          : [],
-        stripeRules: rows.length
-          ? matchingRules(rows[0]).filter((r) => /nth-of-type|nth-child/.test(r.selector))
-          : []
+        hoverRules: rows.length ? matchingRules(rows[0]).filter((r) => /:hover/.test(r.selector)) : [],
+        stripeRules: rows.length ? matchingRules(rows[0]).filter((r) => /nth-of-type|nth-child/.test(r.selector)) : []
       };
     });
     const totalRows = OUT.striping.reduce((n, t) => n + t.rowCount, 0);
@@ -255,7 +265,11 @@
 
   const ng = window.angular;
   if (!ng) {
-    gap('window.angular is absent — no scope to read bootbox handlers from.', ['window.angular'], 'the handler half of T2-20.');
+    gap(
+      'window.angular is absent — no scope to read bootbox handlers from.',
+      ['window.angular'],
+      'the handler half of T2-20.'
+    );
   } else {
     /*
       ANCHOR DEEP, then walk up. This used to be
@@ -291,15 +305,30 @@
     }
     OUT.bootbox.scopesSearched = scopes.length;
     if (!scopes.length) {
-      gap('angular.element(…).scope() returned nothing — debug info disabled.', ['.ng-scope', '[ng-controller]'], 'the handler half of T2-20.');
+      gap(
+        'angular.element(…).scope() returned nothing — debug info disabled.',
+        ['.ng-scope', '[ng-controller]'],
+        'the handler half of T2-20.'
+      );
     } else {
       /* Named rather than enumerated blindly: these are the handlers the templates show opening a
          dialog. Their SOURCE names the template and the buttons, which is the thing T2-20 wants. */
       const WANTED = [
-        'manageBadges', 'updateManyUsersBadgePrompt', 'setNoteUser', 'editUsername', 'setUserPW',
-        'doInvite', 'doBatchInvite', 'setPermissions', 'manageApiKeyRestrictions',
-        'openStripeDetails', 'showAlerterAppTokens', 'getFCMTokens', 'manageMarketplaceSession',
-        'setCustomRoomURL', 'createNew'
+        'manageBadges',
+        'updateManyUsersBadgePrompt',
+        'setNoteUser',
+        'editUsername',
+        'setUserPW',
+        'doInvite',
+        'doBatchInvite',
+        'setPermissions',
+        'manageApiKeyRestrictions',
+        'openStripeDetails',
+        'showAlerterAppTokens',
+        'getFCMTokens',
+        'manageMarketplaceSession',
+        'setCustomRoomURL',
+        'createNew'
       ];
       for (const name of WANTED) {
         let hit = null;
@@ -432,7 +461,12 @@
       console.log('[watch] error state captured:', (el.textContent || '').trim().slice(0, 60));
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style']
+  });
 
   setTimeout(() => {
     observer.disconnect();
@@ -440,10 +474,18 @@
     OUT.summary.dialogsObserved = OUT.bootbox.observed.length;
     OUT.summary.errorsObserved = OUT.observedErrors.length;
     if (!OUT.bootbox.observed.length) {
-      gap('No dialog opened during the 120s window.', ['.bootbox', '.modal.in', '[role="dialog"]'], 'the rendered half of T2-20.');
+      gap(
+        'No dialog opened during the 120s window.',
+        ['.bootbox', '.modal.in', '[role="dialog"]'],
+        'the rendered half of T2-20.'
+      );
     }
     if (!OUT.observedErrors.length) {
-      gap('No error state appeared during the 120s window.', ['.alert-danger', '.has-error', '.text-danger'], 'the ERROR half of T2-22.');
+      gap(
+        'No error state appeared during the 120s window.',
+        ['.alert-danger', '.has-error', '.text-danger'],
+        'the ERROR half of T2-22.'
+      );
     }
     download(OUT, 'watched');
     console.log('[done] second file downloaded. The watcher has stopped. Nothing was submitted.');

@@ -33,7 +33,14 @@ const svelteConfig = { preprocess: vitePreprocess() };
 
 export default defineConfig(
   globalIgnores([
-    '.svelte-kit/**',
+    /*
+      ANY `.svelte-kit`, not just the app root's. `svelte-kit sync` writes its generated tree
+      relative to the cwd it is run from, and a tool invoked from `src/` leaves one at
+      `src/.svelte-kit` — which lint then reads, failing on generated code nobody wrote. That
+      happened three times on 2026-08-29 before the pattern was widened rather than the directory
+      deleted again.
+    */
+    '**/.svelte-kit/**',
     '.vercel/**',
     'build/**',
     'coverage/**',

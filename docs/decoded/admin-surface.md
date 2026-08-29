@@ -881,33 +881,59 @@ for reference behaviour.
 
 ### E.5 — The honest gap that is not a diff: `wired`
 
-Our schema carries a `wired` flag meaning "something actually consumes this value". **58 of 269 are
-wired. 211 are not.** They are stored and rendered faithfully, and today they do nothing.
+Our schema carries a `wired` flag meaning "something actually consumes this value". **103 of 269 are
+wired. 166 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
 
-Wired (58): `ssoJWTSecret`, `tokenExpiresIn`, `webinarPW`, `nickFilter`, `overwriteCashRegisterSound`,
-`allowedMemberships`, `allowedProducts`, `allowedPerms`, `rosterVisibleToViewers`, `hideWelcomeTo`,
-`loginErrorURL`, `loginErrorMsg`, `onlyPresentersVisibleToViewers`, `rosterCountVisibleToViewers`,
-`simUserCount`, `userPM`, `dingOnNewMessage`, `beepOnUserJoin`, `userJoinAndLeavePopup`,
-`hideAvatars`, `hideAppInfo`, `allowUsersToChangeUsername`, `disableEditingUsername`,
-`usernameInstructions`, `tawkPresenterSupport`, `userToPresenterPM`, `disableCopy`, `claimNickName`,
-`presenterMsgsOnTheRight`, `hideChatAlerts`, `disablePMForTrials`, `hideFiles`, `showArchivesToUsers`,
-`showArchivesToSpecificPresenters`, `isChatOnlyRoom`, `hideChatLog`, `userUploads`, `enableRTE`,
-`enableBadges`, `showBadgesToPresentersOnly`, `disableStarYears`, `hasRequiredPhoneInLogin`,
-`showPasswordField`, `hasBenzingaNews`, `altBenzingaLogoURL`, `altBenzingaLinkURL`, `hideRecs`,
-`overlayUserIdOnScreenshare`, `individualVolumeControls`, `customEnterDisclosure`, `useMediaMTX`,
-`hidePoweredBy`, `ptrMobileAppEnabled`, `freeTrialsGetApp`, `customMobileAppEnabled`,
-`customMobileAppIOSUrl`, `customMobileAppAndroidUrl`, `hideMobileCredentials`.
+**This section said "58 wired, 211 not" until 2026-08-29**, and listed those 58 by name. The count
+had nearly doubled underneath it. Both the number and the roster below are now regenerated from
+`scripts/verify-room-settings-schema.mjs`'s `EXPECTED_WIRED_SETTINGS`, which the schema itself is
+checked against on every run — and that verifier now fails if this paragraph disagrees with it, so a
+104th wired setting cannot land without this text moving.
 
-The 211 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+Wired (103), alphabetically:
+
+`alertLabels`, `alertSoundOff`, `alertsChatOnBottom`, `alertsOverlayOnScreenshare`,
+`allowUsersToChangeUsername`, `allowedMemberships`, `allowedPerms`, `allowedProducts`,
+`altBenzingaLinkURL`, `altBenzingaLogoURL`, `altChatRender`, `alwaysShowRoster`, `autoRecord`,
+`autoSwitchToOfftopics`, `beepOnUserJoin`, `blinkingRec`, `chatDisabledForTrials`,
+`chatTabsWithBadges`, `claimNickName`, `copyTrades`, `customCSS`, `customEnterDisclosure`,
+`customFaviconURL`, `customMobileAppAndroidUrl`, `customMobileAppEnabled`,
+`customMobileAppIOSUrl`, `customPlayerURL`, `darkThemeAsDefault`, `dingOnNewMessage`,
+`disableCopy`, `disableEditingUsername`, `disablePMForTrials`, `disableStarYears`,
+`dontShowRecInfoToUsers`, `dontStopRecOnMicMute`, `enableBadges`, `enableEditAlerts`,
+`enableEditMessage`, `enablePrivateMessageHistory`, `enableQAReactions`, `enableRTE`,
+`enableReactions`, `freeTrialsGetApp`, `hasAlertScheduler`, `hasBenzingaNews`,
+`hasDayTradeAlerts`, `hasQAOnAlerts`, `hasRequiredPhoneInLogin`, `hasSpeechRecognitionDisabled`,
+`hasSwingTradeAlerts`, `hasTypingIndicator`, `hideAppInfo`, `hideAvatars`, `hideChatAlerts`,
+`hideChatLog`, `hideFiles`, `hideMobileCredentials`, `hideNotes`, `hidePoweredBy`, `hideRecs`,
+`hideWebcamForRoom`, `hideWelcomeTo`, `individualVolumeControls`, `isChatOnlyRoom`,
+`loginErrorMsg`, `loginErrorURL`, `modAlertFilterList`, `modMessage`, `name`, `nickFilter`,
+`onlyPresentersVisibleToViewers`, `overlayUserIdOnScreenshare`, `overwriteCashRegisterSound`,
+`positionsIframe`, `positionsIframeUrl`, `presenterMsgsOnTheRight`, `ptrMobileAppEnabled`,
+`recordingReminder`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
+`showArchivesToSpecificPresenters`, `showArchivesToUsers`, `showBadgesToPresentersOnly`,
+`showOnlyUsernames`, `showPasswordField`, `simUserCount`, `simplifiedEditor`, `ssoJWTSecret`,
+`styckyNonTradeAlert`, `tawkPresenterSupport`, `tipMeBtnEnabled`, `tipMeBtnTxt`, `tipMeBtnUrl`,
+`tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
+`userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
+
+The 166 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
 `saveRecsToVimeo` and the four Vimeo fields), every streaming field (`obsBroadcastRoom`,
 `obsStreamKey`, `restreamToURL`, `restreamToURLKey`, `hasYTStreaming`), every SMS field
 (`twillioApiSID`, `twillioApiToken`, `twilioPhone`, `protextingSecretTok`, `protextingGroupIDs`),
-the whole channels group (`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`,
-`extraRegChannels`, `altGenChannelName`, `altOffTopicChannelName`, `chatTabsWithBadges`), the
-profanity filter (`hasProfanityFilter`, `ingnoreBadWordsList`, `additionalBadWordsList`), every
-linked-room push (`linkedRoomAlerts`, `linkedRoomSwingAlerts`, `linkedRoomSwingAlertsOther`,
+most of the channels group (`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`,
+`extraRegChannels`, `altGenChannelName`, `altOffTopicChannelName`), the profanity filter
+(`hasProfanityFilter`, `ingnoreBadWordsList`, `additionalBadWordsList`), every linked-room push
+(`linkedRoomAlerts`, `linkedRoomSwingAlerts`, `linkedRoomSwingAlertsOther`,
 `linkedRoomDayTradeAlerts`, `linkedRoomDayTradeAlertsOther`, `linkedRoomRecordings`,
 `linkedStreamsAPIKey`), all 49 DON'T TOUCH fields, and `apiSecret`.
+
+> **Superseded 2026-08-29.** This paragraph read *"The 211 unwired …"* and listed
+> `chatTabsWithBadges` inside the channels group. It has been wired since — `chat-tabs.ts`,
+> `ChatTabStrip.svelte` and `AlertChatArea.svelte` all consume it — so the group is now "most of"
+> rather than "the whole". The count and the roster above are both checked by
+> `apps/controller/scripts/verify-room-settings-schema.mjs`; this sentence was not, and it is what
+> the check caught on its first run.
 
 ### E.6 — Account-page diff
 

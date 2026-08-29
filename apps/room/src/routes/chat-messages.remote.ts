@@ -3,7 +3,8 @@ import { command, getRequestEvent } from '$app/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { MAX_MESSAGE_BODY } from '#lib/message-bounds.js';
-import { isChatTab, type ChatTab } from '#lib/types.js';
+import { MAX_CHAT_TAB_NAME } from '#lib/chat-tabs.js';
+import { isMemberChatChannel, memberChatChannels } from '#lib/server/chat-channels.js';
 import { stripHtmlToText } from '#lib/chat-plain-text.js';
 import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { capturedRoomItem } from '#lib/server/captured-room.js';
@@ -96,8 +97,15 @@ function announceChatMessage(
     them by name waited until they came back. Upstream keeps mentions alive on that branch —
     `visibilityChangeEnabled && !appHasFocus ? te.isMention && emit('chatMsg', te) : push(...)`.
   */
+  /*
+    The channel is now an ARGUMENT as well as a payload field, and the duplication is deliberate: the
+    hub reads it to decide WHO may receive the frame — a badge channel goes only to listeners
+    entitled to it — while the payload field is what the client keys its log by. Two readers, two
+    places, one value passed once.
+  */
   publishChatToRoom(
     shortCode,
+    channel,
     { senderId: user.id, senderEmailHash: hashEmail(user.email), room: channel },
     message
   );
@@ -123,20 +131,28 @@ function announceChatMessage(
  * so they cannot disagree. **That closes `TODO.md` row AF's first half**: two of the three copies of
  * this derivation were these; the third, `isEmptyChatHtml`, answers a different question and stays.
  *
- * ## The channel is checked
+ * ## The channel is checked, and against THIS MEMBER's list since 2026-08-28
  *
  * `messages.room` is a channel label, not a foreign key, so nothing in the schema stops an arbitrary
- * string being written. The client only ever renders the two channels in `ChatTab`, so a crafted
- * request could park messages in a channel nobody displays — invisible content that still occupies
- * the table and still arrives in every reader's payload on the next poll.
+ * string being written. A crafted request could park messages in a channel nobody displays —
+ * invisible content that still occupies the table and still arrives in every reader's payload.
+ *
+ * That check used to be `isChatTab`, the fixed pair, and it was the whole answer while every room
+ * had exactly those two channels. `chatTabsWithBadges` lets an owner configure extra channels behind
+ * badges, so a name being a channel SOMEWHERE stopped being evidence that this member may post to
+ * it — and posting is the direction that matters most, because a message in a badge channel is read
+ * by exactly the people the badge was meant to select.
+ *
+ * The schema now bounds the string and the AUTHORISATION happens in the body, against
+ * `memberChatChannels`. It cannot live in the schema: it needs the request's user and the room's
+ * configuration, and a Zod predicate has neither.
  */
 export const sendMessage = command(
   z.strictObject({
     body: z.string(),
     bodyHtml: z.string().optional(),
-    room: z.custom<ChatTab>((value) => typeof value === 'string' && isChatTab(value), {
-      message: 'Unknown channel.'
-    })
+    /* A bound, not an allow-list — the allow-list is in the body, and needs the request. */
+    room: z.string().min(1).max(MAX_CHAT_TAB_NAME)
   }),
   async ({ body: submittedBody, bodyHtml: submittedHtml, room }) => {
     ensureDatabase();
@@ -154,6 +170,13 @@ export const sendMessage = command(
     if (body.length > MAX_MESSAGE_BODY) error(400, 'That message is too long.');
 
     await refuseIfChatMuted(request, shortCode, user);
+
+    /*
+      The channel this member may actually post to — see the docblock. Refused with the same message
+      whatever the reason, so the refusal does not tell a member which private channels exist.
+    */
+    const channels = await memberChatChannels(request, shortCode, user);
+    if (!isMemberChatChannel(channels, room)) error(403, 'Unknown channel.');
 
     /*
       Both segments of `/sess/${sessionID}/chat/${channel}/`.
@@ -245,6 +268,21 @@ export const replyMessage = command(
 
     // Refuses a message id from another room, so a reply cannot quote across the boundary.
     if (!original) error(404, 'Message not found.');
+
+    /*
+      AND FROM A CHANNEL THIS MEMBER CANNOT SEE, added 2026-08-28 with `chatTabsWithBadges`.
+
+      The lookup above is scoped to the ROOM and not to a channel, which was the whole answer while a
+      room's channels were the same two for everybody. With badge channels it stopped being one: a
+      member could name the id of a message in a channel their badge does not open and post a reply
+      INTO that channel — the insert takes `original.room` — quoting the line they were replying to
+      back at the people who can read it.
+
+      Refused with the same 404 the cross-room case gets, deliberately: a 403 here would confirm that
+      the id exists, which is the enumeration the check is closing.
+    */
+    const channels = await memberChatChannels(request, shortCode, user);
+    if (!isMemberChatChannel(channels, original.room)) error(404, 'Message not found.');
 
     db.insert(messages)
       .values({

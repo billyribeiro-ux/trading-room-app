@@ -1,3 +1,4 @@
+import { isHttpError } from '@sveltejs/kit';
 import type { PageData } from '../../routes/$types';
 import type { RoomSessionSettings } from '#lib/server/room-config-client.js';
 import type { SplitPair } from '#lib/room/split.svelte.js';
@@ -22,7 +23,7 @@ import type { SplitPair } from '#lib/room/split.svelte.js';
     `mergeGlobalChatStyle`. Nine sites that previously held an inline arrow assigning to a page
     `let` now call one. That IS a rewrite, deliberately, and it is an improvement: the receiver is
     declared once with a name instead of being re-derived at each site.
-  * **Plain values** — `mtx`, `unreadQaAlertIds`, `settingsSplitPair` — pass straight through.
+  * **Plain values** — `mtx`, `unreadQaAlertIds` — pass straight through.
 
   **The template was not touched, and that is a measured fact rather than a hope:** none of the 13
   page `let`s that cross here is written by the template. Every write is script-side. Had even one
@@ -57,10 +58,12 @@ import { RoomMenus } from '#lib/room/menus.svelte.js';
 import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
-import { muteChat, unmuteChat } from '../../routes/chat-mute.remote';
+import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';
+import { checkNotesPassword } from '../../routes/notes-auth.remote';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
+  loadPeerPrivateMessageHistory as loadPeerPrivateMessageHistoryCommand,
   loadPrivateChatLog as loadPrivateChatLogCommand,
   sendPrivateMessage as sendPrivateMessageCommand
 } from '../../routes/private-chat.remote';
@@ -68,11 +71,13 @@ import {
   focusOnScreen,
   focusOnSessionNote,
   forceReload,
+  forceStopScreen,
   kickUser,
   presenterCommand,
   restartAudio
 } from '../../routes/presenter-commands.remote';
 import { sessionSendUrl, videoForAll, youtubeForAll } from '../../routes/for-all-broadcast.remote';
+import { searchChatMessages } from '../../routes/log-pages.remote';
 
 import {
   deleteFile as deleteFileCommand,
@@ -81,10 +86,20 @@ import {
 } from '../../routes/files-pane.remote';
 import { uploadComposerImage } from '../../routes/composer-image.remote';
 import { savePreference as savePreferenceCommand } from '../../routes/user-settings.remote';
+import {
+  requestDebugLog,
+  sendDebugLog as sendDebugLogCommand
+} from '../../routes/debug-log.remote';
+import { removeProfilePicture, uploadProfilePicture } from '../../routes/profile-picture.remote';
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
-import { askQuestion } from '../../routes/alert-questions.remote';
+import {
+  askQuestion,
+  deleteQuestion,
+  editQuestion,
+  reactToQuestion
+} from '../../routes/alert-questions.remote';
 import { postAlert as postAlertCommand } from '../../routes/post-alert.remote';
 import { messageAction } from '../../routes/message-actions.remote';
 
@@ -105,20 +120,23 @@ import { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
 import { RoomToasts } from '#lib/room/toasts.svelte.js';
 import { RoomFiles } from '#lib/room/files.svelte.js';
 import { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
+import { TypingSignal } from '#lib/room/typing-signal.js';
 import { RoomComposer } from '#lib/room/composer.svelte.js';
 import { RoomAlertsPane } from '#lib/room/alerts-pane.js';
 import { RoomFeedScroll } from '#lib/room/feed-scroll.js';
-import { RoomGates } from '#lib/room/gates.svelte.js';
+import { RoomGates } from '#lib/room/gates.js';
 import { RoomModals } from '#lib/room/modals.svelte.js';
 import { RoomNotes } from '#lib/room/notes.svelte.js';
 import { RoomFeeds } from '#lib/room/feeds.svelte.js';
 import { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
-import { RoomPrivateCommands } from '#lib/room/private-commands.svelte.js';
+import { addressedChannelFor } from '#lib/room/addressed-channel.js';
+import { RoomDebugLog } from '#lib/room/debug-log.svelte.js';
 import { RoomEventStream } from '#lib/room/events.svelte.js';
 import { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
 import { RoomRecording } from '#lib/room/recording.js';
 import { RoomWindowHandlers } from '#lib/room/window-handlers.js';
 import { RoomWebcams } from '#lib/room/webcams.js';
+import { RoomScreenOverlay } from '#lib/room/screen-overlay.js';
 import { RoomScreens } from '#lib/room/screens.svelte.js';
 import { RoomUserActions } from '#lib/room/user-actions.svelte.js';
 import {
@@ -130,9 +148,10 @@ import {
 } from '#lib/room/trade-alerts.svelte.js';
 
 import { RoomChat } from '#lib/room/chat.svelte.js';
+import { RoomChatSearch } from '#lib/room/chat-search.svelte.js';
 import { RoomMedia } from '#lib/room/media.svelte.js';
 
-import { RoomSplit, isRoomSplitDir } from '#lib/room/split.svelte.js';
+import { RoomSplit, isRoomSplitDir, splitPairFromValue } from '#lib/room/split.svelte.js';
 
 import { resolveNoteSurfaceGates } from '#lib/components/notes/note-gates.js';
 import { swingAlertsTabVisible } from '#lib/swing-alerts.js';
@@ -177,7 +196,6 @@ export interface RoomDeps {
   // ── Plain values. Not reactive, so they cross as themselves.
   mtx: MtxStreamTabs;
   unreadQaAlertIds: SvelteSet<number>;
-  settingsSplitPair: (key: string) => SplitPair | null;
   defaultFollowChatStyle: () => FollowChatStyle;
 }
 
@@ -204,7 +222,7 @@ export function createRoom(deps: RoomDeps) {
   const composerElement = $derived(deps.composerElement());
   const alertsScroller = $derived(deps.alertsScroller());
 
-  const { mtx, unreadQaAlertIds, settingsSplitPair, defaultFollowChatStyle } = deps;
+  const { mtx, unreadQaAlertIds, defaultFollowChatStyle } = deps;
 
   /*
     Every preference this viewer owns, in `#lib/room/prefs.svelte.ts`.
@@ -266,8 +284,9 @@ export function createRoom(deps: RoomDeps) {
       /*
             Applies the sizes the server rendered with, alongside the new direction. Each arrangement has
             its own pair of preference keys, so this brings back the geometry last chosen for THAT
-            arrangement rather than reinterpreting a width as a height. Only reached on a deliberate user
-            action, never on a page load.
+            arrangement rather than reinterpreting a width as a height. It said "never on a page load"
+            until 2026-08-28, when `applyRoomDefaults` began writing `roomSplitDir` from `onMount` for
+            a room that sets `alertsChatOnBottom` — once per viewer, latched, and the correct path.
           */
       if (key === 'roomSplitDir' && isRoomSplitDir(value)) {
         split.setDirection(value, settingsSplitPair);
@@ -308,7 +327,15 @@ export function createRoom(deps: RoomDeps) {
     the value as of construction, so turning the second column on mid-session would leave every
     mention routing to the main composer.
   */
-  const chat = new RoomChat({ extraColumnEnabled: () => prefs.extraChatColumn });
+  const chat = new RoomChat({
+    extraColumnEnabled: () => prefs.extraChatColumn,
+    autoSwitchToOffTopic: data.sessData?.autoSwitchToOfftopics === true,
+    /*
+      `feeds` is declared below this call — the closure runs on a reader's keystroke, long after it
+      exists. The same forward reference `focusSessionNote` makes further down, for the same reason.
+    */
+    search: new RoomChatSearch({ ended: (column) => feeds.setChatSearchResults(column, null) })
+  });
 
   /*
     The room's media STATE, in `#lib/room/media.svelte.ts`.
@@ -356,6 +383,33 @@ export function createRoom(deps: RoomDeps) {
   const loadedRoomSplitDir = isRoomSplitDir(prefs.loaded.roomSplitDir)
     ? prefs.loaded.roomSplitDir
     : 'ltr';
+  /**
+   * The server-persisted pane sizes, read over THIS function's own `prefs`.
+   *
+   * ## It used to arrive as a dep, and the room returned 500 on every load for eleven days
+   *
+   * `+page.svelte` declared `function settingsSplitPair(key) { return splitPairFromValue(prefs.loaded[key]) }`
+   * and passed it in — where `prefs` was the page's own binding, destructured from THIS function's
+   * return value. `RoomSplit`'s constructor calls its reader SYNCHRONOUSLY, seeding the geometry so
+   * the first paint already has the member's layout (its own docblock says why that eager read
+   * matters). So the reader ran while the page's `const { prefs, … } = createRoom({…})` was still in
+   * its temporal dead zone, and threw `ReferenceError: Cannot access 'prefs' before initialization`
+   * before a single pane was measured.
+   *
+   * Unconditional — no setting, no preference, no browser makes any difference — and invisible to
+   * everything that guards this repository: it type-checks, it lints, `svelte-check` is silent, and
+   * 3,085 unit assertions pass, because a class constructed with a stub reader in a test never
+   * touches the page's binding. **A browser found it in the first minute it was ever pointed at the
+   * room.** Introduced 2026-08-17 in `b981316`, the commit that created this file.
+   *
+   * The fix is not a reordering, which would leave the same shape one edit away from breaking again.
+   * The reader reads `prefs.loaded`, and `prefs` is created HERE, twelve lines above — so it is
+   * declared here too and the page has nothing to get wrong. `promoteLegacySplitSizes` on the page
+   * uses the one returned below, so there is a single reader rather than two that must agree.
+   */
+  const settingsSplitPair = (key: string): SplitPair | null =>
+    splitPairFromValue(prefs.loaded[key]);
+
   const split = new RoomSplit(loadedRoomSplitDir, settingsSplitPair);
 
   /*
@@ -417,6 +471,12 @@ export function createRoom(deps: RoomDeps) {
     stay assignments to state instead of becoming forty rewritten expressions.
   */
   const dialogs = new RoomDialogs();
+  /*
+    The room's own console log. Constructed here and INSTALLED by the page, not by this factory:
+    patching a global from a constructor would patch it in every unit test that builds a room. See
+    `RoomDebugLog.install`.
+  */
+  const debugLog = new RoomDebugLog();
 
   /*
     The screen VIEWER, in `#lib/room/screens.svelte.ts`.
@@ -443,7 +503,8 @@ export function createRoom(deps: RoomDeps) {
     sessionHandle: () => data.sessionHandle,
     isPresenter: () => isPresenter,
     followMyScreens: () => prefs.makeUsersFollowMyScreens,
-    focusOnScreen
+    focusOnScreen,
+    forceStopScreen
   });
 
   /*
@@ -563,7 +624,8 @@ export function createRoom(deps: RoomDeps) {
     commands: {
       loadLog: (payload) => loadPrivateChatLogCommand(payload),
       send: (payload) => sendPrivateMessageCommand(payload),
-      deleteLog: (payload) => deletePrivateChatLogCommand(payload)
+      deleteLog: (payload) => deletePrivateChatLogCommand(payload),
+      loadPeerHistory: (payload) => loadPeerPrivateMessageHistoryCommand(payload)
     },
     session: () => data,
     isPresenter: () => isPresenter,
@@ -614,11 +676,27 @@ export function createRoom(deps: RoomDeps) {
     — `screens`'s list thunk and its removal receiver — read `mediaTransport` through arrows, which
     is why the order only has to satisfy the compiler.
   */
+  /*
+    `alertsOverlayOnScreenshare` — the canvas that goes between a shared screen and the wire.
+
+    Constructed HERE rather than inside the transport because it has two consumers that never meet:
+    the local publisher wraps a capture with it, and the SSE router feeds it arriving alerts. The
+    setting is read through a thunk for the reason every other `data` read here is — the load can
+    replace the object, and an owner un-ticking it must stop the next share being wrapped.
+
+    `=== true` and not a truthy test: the field is optional on the wire, and a room-config response
+    that omitted it must leave the share alone rather than overlay it by accident.
+  */
+  const screenOverlay = new RoomScreenOverlay({
+    enabled: () => data.sessData?.alertsOverlayOnScreenshare === true
+  });
+
   const mediaTransport: RoomMediaTransport = new RoomMediaTransport({
     dialogs,
     toasts,
     media,
     screens,
+    overlay: screenOverlay,
     session: () => data,
     closeScreenMenu: () => menus.set('screen', false),
     videoDeviceId: () =>
@@ -627,6 +705,11 @@ export function createRoom(deps: RoomDeps) {
     beginSpeech: () => recording.beginSpeechRecognition(),
     endSpeech: () => recording.endSpeechRecognition(),
     stopRecording: () => recording.stopRecording(),
+    /*
+      `autoRecord` / `dontStopRecOnMicMute`. A thunk for the same reason `stopRecording` is one:
+      `recording` is constructed below this line.
+    */
+    autoRecord: (trigger) => recording.autoRecord(trigger),
     showScreensTab: () => deps.setMainTab('screens'),
     checkPermissionState: (kind, userAgent) => checkPermissionState(kind, userAgent),
     isPresenter: () => isPresenter,
@@ -712,6 +795,9 @@ export function createRoom(deps: RoomDeps) {
     session: () => data,
     sendOperation: (payload) => messageAction(payload),
     askQuestion: (payload) => askQuestion(payload),
+    reactToQuestion: (payload) => reactToQuestion(payload),
+    deleteQuestion: (payload) => deleteQuestion(payload),
+    editQuestion: (payload) => editQuestion(payload),
     replyMessage: (payload) => replyMessage(payload),
     openModal: (name) => modals.open(name),
     closeMessageMenu: () => menus.openMessageMenu(null),
@@ -737,7 +823,18 @@ export function createRoom(deps: RoomDeps) {
     menus,
     prefs,
     mediaTransport,
-    isPresenter: () => isPresenter
+    isPresenter: () => isPresenter,
+    // A thunk, and it must be: `gates` is constructed below this line.
+    speechRecognitionAvailable: () => gates.speechRecognitionAvailable,
+    /*
+      `=== true` on both, which is the fail-closed read every optional control-plane field takes
+      here: a room-config response that omitted them must record nothing automatically rather than
+      start a recording nobody asked for.
+    */
+    autoRecordSettings: () => ({
+      autoRecord: data.sessData?.autoRecord === true,
+      dontStopRecOnMicMute: data.sessData?.dontStopRecOnMicMute === true
+    })
   });
 
   /*
@@ -799,12 +896,17 @@ export function createRoom(deps: RoomDeps) {
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
+    notesCheck: checkNotesPassword,
     commands: {
       presenter: presenterCommand,
       editUsername,
       muteChat,
+      muteChatIndefinitely,
       unmuteChat,
       forceReload,
+      requestDebugLog,
+      uploadProfilePicture,
+      removeProfilePicture,
       restartAudio,
       kickUser,
       sessionSendUrl,
@@ -839,6 +941,24 @@ export function createRoom(deps: RoomDeps) {
     does not define the rebuild until `onMount` has run, and a `giveMicScreen` frame can arrive
     before that. Passing the value would capture `null` forever.
   */
+  /*
+    The two typing signals, one per composer. Separate instances rather than one with a parameter,
+    because each owns its own debounce timer and `amITyping` flag — a shared timer would let the
+    extra column's keystrokes keep the main column's announcement alive.
+  */
+  const typing = {
+    main: new TypingSignal({
+      channel: () => chat.tab,
+      announce: () => chat.announceTyping('main'),
+      clear: () => chat.clearTypingAnnouncement('main')
+    }),
+    extra: new TypingSignal({
+      channel: () => chat.extraTab,
+      announce: () => chat.announceTyping('extra'),
+      clear: () => chat.clearTypingAnnouncement('extra')
+    })
+  };
+
   const roomEvents = new RoomEventStream<PageData['connectedUsers'][number]>({
     prefs,
     toasts,
@@ -848,6 +968,10 @@ export function createRoom(deps: RoomDeps) {
     mtx,
     roster,
     privateChat,
+    /* The chat columns, for `typingUpdated`. Constructed above, so it is a value and not a thunk. */
+    chat,
+    /* Every arriving alert, burned into whatever this presenter is sharing. */
+    screenOverlay,
     userActions,
     session: () => data,
     isPresenter: () => isPresenter,
@@ -860,22 +984,42 @@ export function createRoom(deps: RoomDeps) {
       `notes` is initialised, so the forward reference is resolved by then.
     */
     focusSessionNote: (noteId) => notes.focusNote(noteId),
-    /*
-      THE WHOLE ADDRESSED CHANNEL, built here rather than inside the stream. Its three collaborators
-      are the page's — two dialogs, and the mute the presenter's buttons also hold — and the stream
-      routes to it rather than owning it.
-    */
-    privateCommands: new RoomPrivateCommands({
+    // Three frames end this page with a sentence: a revoked connection, a hard reset, an opened
+    // room. Why a reload and not a redirect is on `#lib/server/live-access.ts`.
+    alertThenReload: (message: string) => dialogs.alertThen(message, () => location.reload()),
+    // THE WHOLE ADDRESSED CHANNEL, whose four callbacks are built where the class that calls them is
+    // declared — see `addressedChannelFor`. The stream routes to it rather than owning it.
+    privateCommands: addressedChannelFor({
       viewerId: () => data.user.id,
-      // ONE instance, shared with the presenter's two buttons — see `RoomChatMute`.
       chatMute: userActions.chatMute,
-      // Byte 2597102, verbatim. Why `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
-      forceReloadRequested: () =>
-        dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
-      // The presenter's own message, as text. No page swap: see `private-commands.svelte.ts`.
-      kicked: (message: string) => (dialogs.alert = message),
-      // Audio only — narrower than a session restart on purpose. See `reconnectAudio`.
-      reconnectAudio: () => mediaTransport.reconnectAudio()
+      dialogs,
+      reconnectAudio: () => mediaTransport.reconnectAudio(),
+      /*
+        The console buffer, and the two directions of `getDebugLog`.
+
+        `send` is fire-and-forget on purpose and NOT awaited: nothing is shown to the member either
+        way (the capture's receiver raises no toast), and a rejected promise here would be an
+        unhandled rejection in a browser whose console this very feature is collecting.
+      */
+      debugLog: {
+        collect: () => debugLog.collect(),
+        send: (log) => {
+          void sendDebugLogCommand({ log }).catch(() => {});
+        },
+        received: (from) => debugLog.receive(from)
+      },
+      /*
+        A presenter set this member's avatar. REFETCH rather than a parallel copy: the row was
+        written before the frame was published, so `invalidate('room:data')` reaches the same value
+        the next reload would — and it updates every place the page renders an avatar at once,
+        instead of one field that would drift from the row on the first thing that forgot it.
+      */
+      profilePictureChanged: () => {
+        void invalidate('room:data').catch(() => {});
+      },
+      // A presenter ended one of this member's shares. Closing the producer is the whole of it —
+      // the SFU's `producerClosed` is what removes the tab everywhere else.
+      stopLocalScreen: (producerId) => mediaTransport.stopLocalScreen(producerId)
     })
   });
 
@@ -903,7 +1047,7 @@ export function createRoom(deps: RoomDeps) {
   });
 
   /*
-    WHAT THIS VIEWER MAY SEE, in `#lib/room/gates.svelte.ts`.
+    WHAT THIS VIEWER MAY SEE, in `#lib/room/gates.ts`.
 
     Phase 5 slice 27. Sixteen `$derived` predicates answering one question sixteen ways: given this
     room's configuration and this viewer's role, what is on screen.
@@ -916,7 +1060,6 @@ export function createRoom(deps: RoomDeps) {
     The RULES stay in `#lib/*-gates.ts` with their own tests. This asks them.
   */
   const gates = new RoomGates({
-    prefs,
     media,
     session: () => data,
     isPresenter: () => isPresenter,
@@ -983,6 +1126,52 @@ export function createRoom(deps: RoomDeps) {
     alertsLogKey: ALERTS_LOG
   });
 
+  /**
+   * `doChatLogSearch` — ask the server for the whole channel, and put the answer in front of the log.
+   *
+   * ## Why the term is not read from `chat` here
+   *
+   * It is passed in from the submit. Reading it back would make this a function of whatever the box
+   * holds when the promise settles, and a reader who keeps typing after pressing Enter would get
+   * results labelled with a term they have already changed.
+   *
+   * ## An empty term is a CLEAR, not a search
+   *
+   * `doSearchSubmit` returns early on an empty term (`if (!this.chatSearchTerm) return`) and
+   * `searchTermChanged` clears the results separately. Both paths end in the same place here, and
+   * routing them through `clearSearch` rather than through an empty query means no round trip for
+   * the commonest way a search ends.
+   *
+   * ## The failure is SHOWN
+   *
+   * A rejected search that silently left the log in place would be indistinguishable from a term
+   * that matched everything — the reader would read their whole log as the result. `RoomDialogs`
+   * carries the sentence, which is ours: upstream has no failure path here because its command is
+   * fire-and-forget over a socket.
+   */
+  function searchChat(column: 'main' | 'extra', term: string): void {
+    const channel = column === 'main' ? chat.tab : chat.extraTab;
+    if (!term.trim()) {
+      chat.search.clear(column);
+      return;
+    }
+    void searchChatMessages({ channel, searchTerm: term })
+      .then((rows) => {
+        /*
+          THE CHANNEL IS RE-CHECKED against the column's CURRENT tab before the rows are shown. A
+          reader can switch channels while the query is in flight, and `RoomChat` clears the search
+          on a switch — so without this, a late answer would repopulate a search the reader ended,
+          with another channel's messages. Dropping it is correct rather than defensive: the switch
+          already put the column back on its own log.
+        */
+        if ((column === 'main' ? chat.tab : chat.extraTab) !== channel) return;
+        feeds.setChatSearchResults(column, rows);
+      })
+      .catch((cause: unknown) => {
+        dialogs.alert = isHttpError(cause) ? cause.body.message : 'That search did not work.';
+      });
+  }
+
   /*
     WHICH OVERLAY IS SHOWING, in `#lib/room/modals.svelte.ts`.
 
@@ -1002,7 +1191,8 @@ export function createRoom(deps: RoomDeps) {
     messageActions,
     userActions,
     unreadQaAlertIds,
-    setTheme: deps.setTheme
+    setTheme: deps.setTheme,
+    debugLog
   });
 
   /*
@@ -1069,9 +1259,18 @@ export function createRoom(deps: RoomDeps) {
   */
   return {
     prefs,
+    /** `doChatLogSearch`, both columns. See the function for why the term is passed rather than read. */
+    searchChat,
+    /*
+      The ONE split reader. `promoteLegacySplitSizes` on the page takes this rather than declaring a
+      second one — see the declaration above for what the page's own copy of it cost.
+    */
+    settingsSplitPair,
     roomVolume,
     roster,
     chat,
+    /** The two typing signals, one per composer. See `TypingSignal`. */
+    typing,
     media,
     split,
     polls,
@@ -1105,7 +1304,27 @@ export function createRoom(deps: RoomDeps) {
     feedScroll,
     alertsPane,
     loadedChatStyle,
-    rosterViewer
+    /*
+      A THUNK, not the value — corrected 2026-08-29, and it was a live defect.
+
+      `rosterViewer` is `$derived` over `isPresenter` and `media.limitedPresenter`, and returning it
+      by value handed the page a SNAPSHOT taken at construction. `+page.svelte` destructures this
+      object, so `rowVisible()` filtered the roster with a viewer frozen before anyone could be
+      elevated — and `giveMicScreen` elevates a member to presenter mid-session. In a room with
+      `onlyPresentersVisibleToViewers` on, the new presenter kept a non-presenter's roster.
+
+      The Svelte compiler said so all along: `state_referenced_locally` on this line. `svelte-check`
+      reports 0 warnings for this file while `svelte.compileModule` reports three, which is why it
+      went unseen. `derived-return-probe.svelte.test.ts` measures the difference rather than arguing
+      it — by value stays 0 across a change, a getter and a thunk both move to 2.
+
+      A thunk rather than a getter because the consumer DESTRUCTURES: a destructured getter is read
+      once and is exactly as frozen. The probe asserts that too. It also matches how `gates` already
+      receives this same value, twelve hundred lines above.
+    */
+    rosterViewer: () => rosterViewer,
+    /* The room's console buffer and the received log. The PAGE installs it — see `RoomDebugLog`. */
+    debugLog
   } as const;
 }
 

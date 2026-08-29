@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { splitTradeOrders, tradeOrderId } from '#lib/copy-trades.js';
   import type { MessageAction, RoomMessageItem } from '#lib/types.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '#lib/emoji-data.js';
@@ -10,24 +11,26 @@
     type AlertLabel
   } from '#lib/alert-labels.js';
   import { safeChatHtml } from './chat-safe-html';
-  import { calculateMessageMenuPosition } from '#lib/message-menu-position.js';
   import { ngbTooltipWith } from '#lib/ngb-tooltip.js';
+  import MessageMenu from '#lib/components/MessageMenu.svelte';
   import {
     alertDateFormatter,
     chatTimeFormatter,
+    compactTimeFormatter,
     longDateFormatter
   } from '#lib/message-formatters.js';
-  import {
-    capturedMenuAllows,
-    MESSAGE_MENU_LABEL,
-    sourceMessageBehavior
-  } from '#lib/message-behavior.js';
+  import { messageMenuAllows, sourceMessageBehavior } from '#lib/message-behavior.js';
   import type { FollowChatStyle } from '#lib/types.js';
+  import { hideMessageAvatar, type ChatDisplayMode } from '#lib/chat-display-mode.js';
 
   type MessageKind = 'alert' | 'chat';
   interface MessageReactionPayload {
     key: string;
     emoji: string;
+  }
+  /** `#lib/types.ts`'s `TradeCopyPayload`, restated locally beside its sibling above. */
+  interface TradeCopyPayload {
+    text: string;
   }
 
   interface Props {
@@ -66,6 +69,8 @@
     enableEditMessage?: boolean;
     enableEditAlerts?: boolean;
     hideAvatars?: boolean;
+    /** The first term of `hideAvatar`. See `hideMessageAvatar`. */
+    altChatRender?: boolean;
     presenterMessagesOnTheRight?: boolean;
     /**
      * `preferences.chatGif` — whether an inline `.gif` plays, or shows a click-to-reveal placeholder.
@@ -79,12 +84,30 @@
     enableBadges?: boolean;
     showBadgesToPresentersOnly?: boolean;
     showNewIndicator?: boolean;
+    /**
+     * "Copy trades" — whether `[{( … )}]` in an ALERT becomes a click-to-copy order.
+     *
+     * On the chrome rather than per call site, for the reason that type exists: three components
+     * render a message, and a room setting handed to each separately is one that a component will
+     * stop being handed. Defaults `false`, so a room that never configured it renders the marker as
+     * the literal text it is.
+     */
+    copyTrades?: boolean;
     disableStarYears?: boolean;
+    /**
+     * `displayMode` — `'r'` renders the card, `'c'` renders the compact single line.
+     *
+     * A PROP rather than a preference read here, for the reason the whole chrome exists: the mode is
+     * resolved once per surface (`resolveChatDisplayMode`, which the owner's `altChatRender` can
+     * force) and handed down. A component that read the preference itself would be a second answer
+     * to a question the surface has already asked.
+     */
+    displayMode?: ChatDisplayMode;
     ontoggle: (id: number) => void;
     onaction: (
       action: MessageAction,
       item: RoomMessageItem,
-      payload?: MouseEvent | MessageReactionPayload
+      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
     ) => void;
   }
 
@@ -111,26 +134,26 @@
     enableReactions = false,
     enableQaReactions = false,
     isQaMessage = false,
-    hasQaOnAlerts = true,
+    hasQaOnAlerts = false,
     enableEditMessage = false,
     enableEditAlerts = false,
     hideAvatars = false,
+    altChatRender = false,
     presenterMessagesOnTheRight = false,
     chatGif = true,
     chatBadges = false,
     enableBadges = false,
     showBadgesToPresentersOnly = false,
     showNewIndicator = false,
+    copyTrades = false,
     disableStarYears = false,
+    displayMode = 'r',
     ontoggle,
     onaction
   }: Props = $props();
 
   let reactionPickerOpen = $state(false);
   let reactionPickerTrigger = $state<'menu' | 'pill' | null>(null);
-  let menuTriggerElement: HTMLAnchorElement | null = null;
-  let menuElement: HTMLDivElement | null = null;
-  const kebabText = '⠇ ';
 
   const isOwnMessage = $derived(item.senderId === currentUserId);
   const isAdminMessage = $derived(item.isAdmin === true);
@@ -155,41 +178,25 @@
       enableEditAlerts
     })
   );
-  const canDeleteMessage = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.delete, behavior.deleteMessage)
-  );
-  const canMuteMessage = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.mute, behavior.muteMessage)
-  );
-  const canOpenUserInfo = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.user, behavior.openUserInfo)
-  );
-  const canMention = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.mention, behavior.mention)
-  );
-  const canShowToAll = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.showAll, behavior.showToAll)
-  );
-  const canOpenAlertReport = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.report, behavior.openAlertReport)
-  );
-  const canPublicReply = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.reply, behavior.publicReply)
-  );
-  const canMarkAnswered = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.answered, behavior.markAnswered)
-  );
-  const canPrivateMessage = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.private, behavior.privateMessage)
-  );
-  const canReact = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.reaction, behavior.react)
-  );
-  const canEdit = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.edit, behavior.edit)
-  );
-  const canCopy = $derived(
-    capturedMenuAllows(capturedMenuItems, MESSAGE_MENU_LABEL.copy, behavior.copy)
+  /*
+    The twelve menu gates, as ONE object.
+
+    They were twelve near-identical three-line derivations here until 2026-08-28, when
+    `altChatRender` made a second renderer necessary and copying them would have meant twelve
+    entitlement rules written out twice. `messageMenuAllows` states the gate-to-label mapping once;
+    `MessageMenu.svelte` renders it.
+  */
+  const menuAllows = $derived(messageMenuAllows(behavior, capturedMenuItems));
+
+  /*
+    `hideAvatar` — `hideAvatars` is only one of its two terms.
+
+    The other is `altChatRender`, and it applies to CHAT and the Q&A thread and NOT to the alerts
+    log. That asymmetry is upstream's; `hideMessageAvatar` carries the transcription and the reason
+    it is reproduced rather than tidied.
+  */
+  const hideAvatar = $derived(
+    hideMessageAvatar({ altChatRender, hideAvatars, kind, isQaMessage })
   );
   const reverseMessage = $derived(
     item.evidenceDirection
@@ -325,10 +332,19 @@
   const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.jfif'];
 
   type BodySegment = {
-    kind: 'text' | 'stock' | 'link' | 'image' | 'label';
+    kind: 'text' | 'stock' | 'link' | 'image' | 'label' | 'trade';
     text: string;
     url?: string;
     label?: AlertLabel;
+    /**
+     * `trade` only — the element id `doTradeCopy` looks up, `id_<messageId>` for the first order.
+     *
+     * The order's own text lives in `children`, not in `text`, because the reference leaves the
+     * span's CONTENT to the later pipes: a `$TICKER` inside an order is still coloured. So a trade
+     * segment wraps segments rather than carrying a string.
+     */
+    tradeId?: string;
+    children?: BodySegment[];
   };
 
   /**
@@ -356,6 +372,37 @@
    * the easy mistake.
    */
   function parseBodySegments(value: string): BodySegment[] {
+    /*
+      TRADE ORDERS FIRST, and the order of these passes is the capture's.
+
+      `filterChatMessages` rewrites `[{( … )}]` into a span BEFORE the message reaches the renderer,
+      so `parseSymbols` and `parseStock` run over the already-wrapped string and colour tickers
+      INSIDE an order. Splitting orders last would put a `$TICKER` and an order in competition for
+      the same characters.
+
+      `kind === 'alert'` is part of the reference's gate (`"alerts" === i`), not an optimisation: a
+      `[{( … )}]` typed into chat stays literal, exactly as a `#label` does.
+    */
+    const pieces =
+      copyTrades && kind === 'alert'
+        ? splitTradeOrders(value)
+        : [{ kind: 'text' as const, text: value }];
+
+    return pieces.flatMap<BodySegment>((piece, index) =>
+      piece.kind === 'trade'
+        ? [
+            {
+              kind: 'trade',
+              text: piece.text,
+              tradeId: tradeOrderId(item.id, index),
+              children: parseLabelsTickersAndLinks(piece.text)
+            }
+          ]
+        : parseLabelsTickersAndLinks(piece.text)
+    );
+  }
+
+  function parseLabelsTickersAndLinks(value: string): BodySegment[] {
     const labelled =
       kind === 'alert' && alertLabels.length > 0
         ? splitAlertLabels(value, alertLabels)
@@ -408,7 +455,10 @@
     chat time only on the chat branch. Construction costs ~35x a `format()` call, and the objects
     are byte-identical every time because the locale and every option are literals.
   */
-  function runAction(action: MessageAction, payload?: MouseEvent | MessageReactionPayload) {
+  function runAction(
+    action: MessageAction,
+    payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+  ) {
     onaction(action, item, payload);
   }
 
@@ -421,61 +471,6 @@
   }
 
 
-  function hideMenuPosition() {
-    if (!menuElement) return;
-    menuElement.style.removeProperty('position');
-    menuElement.style.removeProperty('inset');
-    menuElement.style.removeProperty('margin');
-    menuElement.style.removeProperty('visibility');
-    menuElement.style.removeProperty('display');
-    menuElement.style.removeProperty('transform');
-    delete menuElement.dataset.popperPlacement;
-  }
-
-  function positionMenu() {
-    if (!menuOpen || !menuTriggerElement || !menuElement) return;
-
-    const triggerRect = menuTriggerElement.getBoundingClientRect();
-    const menuRect = menuElement.getBoundingClientRect();
-    const viewportWidth = document.documentElement.clientWidth;
-    const viewportHeight = document.documentElement.clientHeight;
-    const { left, top, placement } = calculateMessageMenuPosition(triggerRect, menuRect, {
-      width: viewportWidth,
-      height: viewportHeight,
-      devicePixelRatio: window.devicePixelRatio
-    });
-
-    menuElement.dataset.popperPlacement = placement;
-    menuElement.style.cssText =
-      `position: fixed; inset: 0px auto auto 0px; margin: 0px; visibility: visible; ` +
-      `display: block; transform: translate3d(${left}px, ${top}px, 0px);`;
-  }
-
-  $effect(() => {
-    if (!menuOpen) {
-      hideMenuPosition();
-      return;
-    }
-
-    if (menuElement) {
-      menuElement.style.cssText =
-        'position: fixed; inset: 0px auto auto 0px; visibility: hidden; display: block;';
-    }
-    const frame = window.requestAnimationFrame(positionMenu);
-    window.addEventListener('resize', positionMenu);
-    window.addEventListener('scroll', positionMenu, true);
-    const resizeObserver = new ResizeObserver(positionMenu);
-    if (menuTriggerElement) resizeObserver.observe(menuTriggerElement);
-    if (menuElement) resizeObserver.observe(menuElement);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', positionMenu);
-      window.removeEventListener('scroll', positionMenu, true);
-      resizeObserver.disconnect();
-      hideMenuPosition();
-    };
-  });
 
   // `.img-container` is `inline-flex` (shrink-to-fit) and `.uploaded-img` is `width: 100%`, so the
   // used width is circular and stays collapsed until the bytes arrive - the width/height
@@ -524,7 +519,32 @@
   -->
   <!-- eslint-disable-next-line svelte/require-each-key -->
   {#each segments as segment}
-    {#if segment.kind === 'label' && segment.label}<span
+    {#if segment.kind === 'trade'}<!--
+        `<span class="tradeColor" id="id_<messageId>">` — the element `doTradeCopy` looks up by id
+        and `copyTradeOnClick` compares against. `stopPropagation` is the reference's own: the
+        message row is itself clickable, so without it copying an order would also fire the row.
+
+        A BUTTON in a span's clothing. Upstream binds the click to the span and checks `tagName`
+        inside the handler; a span is not focusable and not reachable by keyboard, so this carries
+        the role and the key handler that make it a control. The class and the id are unchanged,
+        because both are what the captured stylesheet and the captured handler select on.
+      --><span
+        class="tradeColor"
+        id={segment.tradeId}
+        role="button"
+        tabindex="0"
+        title="Copy order"
+        onclick={(event) => {
+          event.stopPropagation();
+          runAction('copy-trade', { text: segment.text });
+        }}
+        onkeydown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          runAction('copy-trade', { text: segment.text });
+        }}>{@render bodySegments(segment.children ?? [])}</span
+      >{:else if segment.kind === 'label' && segment.label}<span
         class={ALERT_LABEL_BADGE_CLASS}
         style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
       >{:else if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}
@@ -562,186 +582,92 @@
       <a>{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}</a>
     </div>
   {/if}
-  <div class={messageBoxClass} style={messageBoxStyle}>
-    <div {...{ clas: 'd-flex flex-column  align-items-center w-100 ' } as Record<string, string>}>
-      <div class={messageRowClass}>
-        <div class={avatarRowClass}>
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_interactive_supports_focus -->
-          <a
-            bind:this={menuTriggerElement}
-            role="button"
-            id="dropdownMenuLink"
-            data-bs-toggle="dropdown"
-            aria-haspopup="true"
-            aria-expanded={menuOpen}
-            class="msgMenu dropright pt-1"
-            style={backgroundInversionStyle}
-            onclick={(event) => {
-              event.stopPropagation();
+  {#if displayMode === 'c'}
+    <!--
+      `app-st-compactmessage` — one line per message instead of a card.
+
+      TWO MIRRORED LAYOUTS, exactly as the capture has them, and they are not a theme with a
+      modifier: the admin row is `msg-box msg-box-adm` inside `w-100 h-100 d-flex flex-row-reverse`
+      with every part floated RIGHT (byte 1,395,475, template `z1e`), and the member row is plain
+      `msg-box` inside `w-100 h-100 d-inline-block` running the other way (`b_e`). Read them side by
+      side and the class lists share almost nothing but `msg-box`, which is why both are written out.
+
+      The MEMBER row is the richer one — it is the only place the trial badge, the new indicator and
+      the membership stars appear in compact mode, because upstream puts them only there.
+    -->
+    <div class={reverseMessage ? 'msg-box msg-box-adm' : 'msg-box'} style={messageBoxStyle}>
+      <div class={reverseMessage ? 'w-100 h-100 d-flex flex-row-reverse' : 'w-100 h-100 d-inline-block'}>
+        <div
+          class={[
+            'w-100 d-inline-flex align-items-center',
+            { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }
+          ]}
+        >
+          <MessageMenu
+            allows={menuAllows}
+            variant={reverseMessage ? 'compactAdmin' : 'compactMember'}
+            {menuOpen}
+            style={usernameStyle}
+            reactionPopoverId={reactionPickerOpen && reactionPickerTrigger === 'menu'
+              ? `message-reaction-popover-${kind}-${item.id}`
+              : undefined}
+            onaction={(action, event) => runAction(action, event)}
+            ontoggle={() => {
               reactionPickerOpen = false;
               reactionPickerTrigger = null;
               ontoggle(item.id);
-            }}>{kebabText}</a
-          >
-          <div
-            bind:this={menuElement}
-            aria-labelledby="dropdownMenuLink"
-            class={menuOpen
-              ? 'dropdown-menu users-dropdown-options show'
-              : 'dropdown-menu users-dropdown-options'}
-          >
-            {#if canDeleteMessage}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={(event) => runAction('delete', event)}
-                ><i class="fas fa-trash"></i>&nbsp;&nbsp;Delete Message</a
-              >
-              {#if canMuteMessage}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <!-- svelte-ignore a11y_missing_attribute -->
-                <a class="dropdown-item" onclick={() => runAction('mute')}
-                  ><i class="fa fa-comment-slash"></i>&nbsp;&nbsp;Mute Chat for 24hrs</a
-                >
-              {/if}
-              <div class="dropdown-divider"></div>
-            {/if}
-            {#if canOpenUserInfo}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('user')}
-                ><i class="fas fa-user"></i>&nbsp;&nbsp;User Info</a
-              >
-            {/if}
-            {#if canMention}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('mention')}
-                ><i class="fas fa-reply"></i>&nbsp;&nbsp;Mention</a
-              >
-            {/if}
-            {#if canShowToAll}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('show-all')}
-                ><i class="fas fa-envelope-open"></i>&nbsp;&nbsp;Show message to all</a
-              >
-            {/if}
-            {#if canOpenAlertReport}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a
-                data-bs-toggle="modal"
-                data-bs-target="#alert-send-report-modal"
-                class="dropdown-item"
-                onclick={() => runAction('report')}
-                ><i class="fas fa-chart-pie"></i>&nbsp;&nbsp;Alert Send Report
-              </a>
-            {/if}
-            {#if canPublicReply}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a
-                data-bs-toggle="modal"
-                data-bs-target="#replyModal"
-                class="dropdown-item"
-                onclick={() => runAction('reply')}
-                ><i class="fas fa-comment"></i>&nbsp;&nbsp;Reply</a
-              >
-            {/if}
-            {#if canMarkAnswered}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('answered')}
-                ><i class="fas fa-check"></i>&nbsp;&nbsp;Mark Answered
-              </a>
-            {/if}
-            {#if canReact}
-              <a
-                {...{
-                  container: 'body',
-                  autoClose: 'outside',
-                  popoverClass: 'popOverDiv'
-                } as Record<string, string>}
-                class="dropdown-item"
-                onclick={(event) => {
-                  event.stopPropagation();
-                  reactionPickerOpen = !reactionPickerOpen;
-                  reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
-                }}
-                aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'menu'
-                  ? `message-reaction-popover-${kind}-${item.id}`
-                  : undefined}
-              >
-                <i class="far fa-smile"></i>&nbsp;&nbsp;Add Reaction
-              </a>
-            {/if}
-            {#if canEdit}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('edit')}
-                ><i class="fas fa-edit"></i>&nbsp;&nbsp;Edit</a
-              >
-            {/if}
-            {#if canCopy}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('copy')}
-                ><i class="fas fa-copy"></i>&nbsp;&nbsp;Copy</a
-              >
-            {/if}
-            {#if canPrivateMessage}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a class="dropdown-item" onclick={() => runAction('private')}
-                ><i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat
-              </a>
-            {/if}
-          </div>
-          {#if !hideAvatars}
+            }}
+            onreactiontoggle={() => {
+              reactionPickerOpen = !reactionPickerOpen;
+              reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
+            }}
+          />
+          {#if !hideAvatar}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="avatar pl-1" onclick={() => runAction('user')}>
+            <div
+              class={reverseMessage
+                ? 'avatar ml-1 d-inline-block float-right align-baseline'
+                : 'avatar mr-1 d-inline-block'}
+              onclick={() => runAction('user')}
+            >
               <img alt="msg.avt" src={item.senderAvatarUrl} />
             </div>
           {/if}
-        </div>
-        <div class="w-100">
-          <div class="d-flex justify-content-between align-items-center w-100">
-            {#if reverseMessage}
-              <span
-                {...{ placement: 'top' } as Record<string, string>}
-                {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
-                class="created-at mx-2"
-                style={dateStyle}
-                >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}
-              </span>
-            {/if}
-            <div
-              class="d-flex align-items-center justify-content-between flex-nowrap"
-              style={kind === 'alert' ? bodyStyle : undefined}
+          <span class={reverseMessage ? 'd-inline-block float-right align-baseline' : 'd-inline-block align-baseline'}>
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <strong
+              class={reverseMessage ? 'username' : 'username mr-1 d-inline-block'}
+              style={usernameStyle}
+              onclick={() => runAction('mention')}
+              ondblclick={() => runAction('user')}
             >
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-              <strong
-                class={['username mx-1', { 'text-primary': kind === 'alert' && isAdminMessage && !item.evidenceKey }]}
-                style={usernameStyle}
-                onclick={() => runAction('mention')}
-                ondblclick={() => runAction('user')}
-              >
-                {item.senderName}
-              </strong>
+              {item.senderName}
+            </strong>
+          </span>
+          <!--
+            THE STAMP IS BRACKETED HERE and it is not in the regular renderer: ` [{h:mm a}] `
+            against the card's bare `hh:mm a`. Both are the capture's own — `Ct(29,27,e.msg.t,
+            "h:mm a")` wrapped in the literal brackets, versus `"hh:mm a"` unbracketed on the card —
+            so the two formats differ by a leading zero as well as by the brackets.
+          -->
+          <span
+            {...{ placement: 'top' } as Record<string, string>}
+            {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
+            class={reverseMessage
+              ? 'created-at ml-1 nowrap d-inline-block float-right align-baseline'
+              : 'created-at d-inline-block align-baseline'}
+            style={dateStyle}
+          >
+            [{item.evidenceTimestampText ?? compactTimeFormatter.format(item.createdAt)}]
+          </span>
+          {#if visibleBadges.length > 0}
+            <div
+              class={reverseMessage
+                ? 'd-inline-flex align-baseline float-right'
+                : 'd-inline-block align-baseline mr-1'}
+            >
               {#each visibleBadges as badge, badgeIndex (`${item.id}-${badgeIndex}`)}
                 {#if badge.imageUrl}
                   <img class="user-badge-img" src={badge.imageUrl} alt={badge.imageUrl} />
@@ -753,191 +679,324 @@
                   >
                 {/if}
               {/each}
-              {#if viewerIsPresenter && item.isTrial}
-                <span class="badge bg-danger trial-badge"> Trial </span>
-              {/if}
-              {#if showNewIndicator && viewerIsPresenter && item.isNew}
-                <span class="badge bg-warning new-badge">New</span>
-              {/if}
-              {#if !disableStarYears && kind === 'chat' && !isAdminMessage && item.membershipYears !== null && item.membershipYears !== undefined && chatBadges}
-                <span class="stars-container" style={dateStyle}>
-                  <i class="fas fa-star stars-icon"></i>
-                  <span class="stars-num">{item.membershipYears}</span>
-                </span>
-              {/if}
-              {#if item.sessionName}
-                <span class="ms-1 badge text-bg-secondary">[{item.sessionName}]</span>
-              {/if}
             </div>
-            {#if kind === 'alert'}
-              <div>
-                {#if !isQaMessage && hasQaOnAlerts}
-                  <button
-                    title="Ask a question"
-                    class={['btn btn-sm btn-secondary me-1 alert-qa', { 'btn-danger': Boolean(item.unreadQa), animated: Boolean(item.unreadQa), flash: Boolean(item.unreadQa) }]}
-                    style={bodyStyle}
-                    onclick={() => runAction('question')}
-                  >
-                    <!--
-                      The captured button keeps a literal space inside each span - `> (1) <` and
-                      `> ✅<` - and that space is what separates the checkmark from the icon.
-                      Svelte trims whitespace at element boundaries, so it has to be written as an
-                      expression to survive into the rendered output.
-                    -->
-                    {#if item.questionCount}
-                      <span class="me-1">{' '}({item.questionCount}){' '}</span>
-                    {/if}
-                    <i class="fas fa-question-circle"></i>
-                    {#if item.questionAnswered}<span>{' '}✅</span>{/if}
-                  </button>
-                {/if}
-                <span class="created-at mr-2" style={dateStyle}
-                  >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
-                >
-              </div>
-            {:else if !reverseMessage}
-              <span
-                {...{ placement: 'top' } as Record<string, string>}
-                {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
-                class="created-at mx-2"
-                style={dateStyle}
-                >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}
-              </span>
-            {/if}
-          </div>
-          <div class="d-flex">
+          {/if}
+          <!--
+            The three MEMBER-ONLY marks. The admin template has no node for any of them, which is
+            why they are gated on the layout as well as on their own rule rather than sharing one.
+          -->
+          {#if !reverseMessage && viewerIsPresenter && item.isTrial}
+            <span class="badge bg-danger trial-badge"> Trial </span>
+          {/if}
+          {#if !reverseMessage && showNewIndicator && viewerIsPresenter && item.isNew}
+            <span class="badge bg-warning new-badge">New</span>
+          {/if}
+          {#if !reverseMessage && !disableStarYears && kind === 'chat' && !isAdminMessage && item.membershipYears !== null && item.membershipYears !== undefined && chatBadges}
+            <span class="stars-container" style={dateStyle}>
+              <i class="fas fa-star stars-icon"></i>
+              <span class="stars-num">{item.membershipYears}</span>
+            </span>
+          {/if}
+          <div
+            class={reverseMessage
+              ? 'd-inline-flex msg-left preText ml-2 float-right align-baseline'
+              : 'd-inline-flex msg-left preText align-baseline'}
+          >
             {#if item.answered && kind !== 'alert'}
-              <div>✅</div>
+              <div class="answered-check">✅</div>
             {/if}
-            {#if item.replyToName && item.replyToBody}
+            {#if item.replyToBody}
               <div class="ms-1 private-reply">
-                <div
-                  class={['private-reply-message w-100', { 'private-reply-bg-light': theme === 'light', 'private-reply-bg-dark': theme === 'dark' }]}
-                >
-                  <strong class="d-block username" style={usernameStyle}>
-                    {item.replyToName}
-                  </strong>
-                  <div class={messageBodyClass} style={bodyStyle}>
-                    {@render bodySegments(replyStockSegments)}
-                  </div>
-                  <div class={messageBodyClass} style={bodyStyle}>
-                    {@render bodySegments(stockSegments)}
-                  </div>
-                </div>
+                <strong>{item.replyToName}</strong>
+                <div class="private-reply-message">{@render bodySegments(replyStockSegments)}</div>
+                <div>{@render bodySegments(stockSegments)}</div>
               </div>
             {:else}
-              <div class={messageBodyClass} style={bodyStyle}>
-                {#if item.evidenceBodySegments}
-                  <!-- Unkeyed for the same reason as `bodySegments` above: parsed, never reordered. -->
-                  <!-- eslint-disable-next-line svelte/require-each-key -->
-                  {#each item.evidenceBodySegments as segment}
-                    {#if segment.kind === 'stock'}
-                      <span class="stockColor" style={stockStyle}>{segment.text}</span>
-                    {:else if segment.kind === 'image' && segment.url}
-                      <div
-                        class="img-container"
-                        style={uploadWidthVariable(segment.width)}
-                        {@attach evidenceImageAttachment(segment.url)}
-                      >
-                        <!-- svelte-ignore a11y_missing_attribute -->
-                        <img
-                          class="uploaded-img"
-                          src={segment.url}
-                          width={segment.width}
-                          height={segment.height}
-                        /><br
-                          {...{ clear: 'both' } as Record<string, string>}
-                        />
-                      </div>
-                    {:else}{segment.text}{/if}
-                  {/each}
-                {:else if item.bodyHtml}
-                  <!--
-                    The rich-text branch, and it does NOT use Svelte's raw-html tag. That rule is
-                    asserted next door in `message-links-contract.test.ts` and is kept: markup
-                    reaches the DOM through an attachment that sanitises first, so there is no path
-                    where an unfiltered string is trusted. `item.bodyHtml` was already sanitised by
-                    the server on the way in, and is sanitised AGAIN here before insertion.
-
-                    (This comment names no raw-html tag on purpose. That contract reads SOURCE TEXT,
-                    so a comment mentioning the literal fails it just as code would — which is
-                    exactly what happened on the first draft.)
-
-                    Twice is not belt-and-braces for its own sake. The server pass is the control —
-                    it is what a crafted request cannot bypass. The browser pass covers the rows
-                    that already existed when the allow-list was narrower, which is the case that
-                    bit the notes table: `notes-repository` re-sanitises historical rows on read for
-                    exactly this reason, and its test says so.
-
-                    The segment parser is deliberately NOT applied here. It exists to find links,
-                    tickers and images in PLAIN text; run over markup it would rewrite the author's
-                    own tags.
-                  -->
-                  <span {@attach safeChatHtml(item.bodyHtml)}></span>
-                {:else}
-                  {@render bodySegments(stockSegments)}
-                  {#if kind === 'alert' && item.targetUrl}
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <div
-                      class="img-container"
-                      style={uploadWidthVariable(item.targetWidth)}
-                      onclick={(event) => runAction('image', event)}
-                    >
-                      <!-- svelte-ignore a11y_missing_attribute -->
-                      <img
-                        class="uploaded-img"
-                        src={item.targetUrl}
-                        width={item.targetWidth ?? undefined}
-                        height={item.targetHeight ?? undefined}
-                      /><br
-                        {...{ clear: 'both' } as Record<string, string>}
-                      />
-                    </div>
-                  {/if}
-                {/if}
+              <div
+                class={reverseMessage
+                  ? 'msg-left preText ml-2 d-inline-block float-right align-baseline'
+                  : 'msg-left preText d-inline-block align-baseline'}
+                style={bodyStyle}
+              >
+                {@render bodySegments(stockSegments)}
               </div>
             {/if}
           </div>
-          {#if canReact && reactions.length > 0}
-            <span class={{ 'presenter-reactions-right': presenterMessagesOnTheRight }} style={bodyStyle}>
+          {#if menuAllows.reaction && reactions.length > 0}
+            <span class="reactions-container" style={bodyStyle}>
               {#each reactions as [reactionKey, reaction] (reactionKey)}
                 {#if reaction.clickedBy.length > 0}
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <span
                     class={['badge chat-reaction', { 'chat-reaction-added': reaction.clickedBy.includes(currentUserEmailHash) }]}
-                    onclick={() =>
-                      runAction('reaction', {
-                        key: reactionKey,
-                        emoji: reaction.emoji
-                      })}
+                    onclick={() => runAction('reaction', { key: reactionKey, emoji: reaction.emoji })}
                   >
                     {reaction.emoji}
                     {reaction.clickedBy.length}
                   </span>
                 {/if}
               {/each}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <span
-                class="badge chat-reaction chat-reaction-hover"
-                aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
-                  ? `message-reaction-popover-${kind}-${item.id}`
-                  : undefined}
-                onclick={() => {
-                  reactionPickerOpen = !reactionPickerOpen;
-                  reactionPickerTrigger = reactionPickerOpen ? 'pill' : null;
-                }}
-              >
-                <i class="far fa-smile"></i>
-              </span>
             </span>
           {/if}
         </div>
       </div>
     </div>
-  </div>
+  {:else}
+
+    <div class={messageBoxClass} style={messageBoxStyle}>
+      <div {...{ clas: 'd-flex flex-column  align-items-center w-100 ' } as Record<string, string>}>
+        <div class={messageRowClass}>
+          <div class={avatarRowClass}>
+            <MessageMenu
+              allows={menuAllows}
+              variant="regular"
+              {menuOpen}
+              style={backgroundInversionStyle}
+              reactionPopoverId={reactionPickerOpen && reactionPickerTrigger === 'menu'
+                ? `message-reaction-popover-${kind}-${item.id}`
+                : undefined}
+              onaction={(action, event) => runAction(action, event)}
+              ontoggle={() => {
+                reactionPickerOpen = false;
+                reactionPickerTrigger = null;
+                ontoggle(item.id);
+              }}
+              onreactiontoggle={() => {
+                reactionPickerOpen = !reactionPickerOpen;
+                reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
+              }}
+            />
+            {#if !hideAvatar}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div class="avatar pl-1" onclick={() => runAction('user')}>
+                <img alt="msg.avt" src={item.senderAvatarUrl} />
+              </div>
+            {/if}
+          </div>
+          <div class="w-100">
+            <div class="d-flex justify-content-between align-items-center w-100">
+              {#if reverseMessage}
+                <span
+                  {...{ placement: 'top' } as Record<string, string>}
+                  {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
+                  class="created-at mx-2"
+                  style={dateStyle}
+                  >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}
+                </span>
+              {/if}
+              <div
+                class="d-flex align-items-center justify-content-between flex-nowrap"
+                style={kind === 'alert' ? bodyStyle : undefined}
+              >
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <strong
+                  class={['username mx-1', { 'text-primary': kind === 'alert' && isAdminMessage && !item.evidenceKey }]}
+                  style={usernameStyle}
+                  onclick={() => runAction('mention')}
+                  ondblclick={() => runAction('user')}
+                >
+                  {item.senderName}
+                </strong>
+                {#each visibleBadges as badge, badgeIndex (`${item.id}-${badgeIndex}`)}
+                  {#if badge.imageUrl}
+                    <img class="user-badge-img" src={badge.imageUrl} alt={badge.imageUrl} />
+                  {:else}
+                    <span
+                      class="badge px-1 mx-1 user-badge"
+                      style="background-color: {badge.backgroundColor}; color: {badge.color};"
+                      >{badge.text}</span
+                    >
+                  {/if}
+                {/each}
+                {#if viewerIsPresenter && item.isTrial}
+                  <span class="badge bg-danger trial-badge"> Trial </span>
+                {/if}
+                {#if showNewIndicator && viewerIsPresenter && item.isNew}
+                  <span class="badge bg-warning new-badge">New</span>
+                {/if}
+                {#if !disableStarYears && kind === 'chat' && !isAdminMessage && item.membershipYears !== null && item.membershipYears !== undefined && chatBadges}
+                  <span class="stars-container" style={dateStyle}>
+                    <i class="fas fa-star stars-icon"></i>
+                    <span class="stars-num">{item.membershipYears}</span>
+                  </span>
+                {/if}
+                {#if item.sessionName}
+                  <span class="ms-1 badge text-bg-secondary">[{item.sessionName}]</span>
+                {/if}
+              </div>
+              {#if kind === 'alert'}
+                <div>
+                  {#if !isQaMessage && hasQaOnAlerts}
+                    <button
+                      title="Ask a question"
+                      class={['btn btn-sm btn-secondary me-1 alert-qa', { 'btn-danger': Boolean(item.unreadQa), animated: Boolean(item.unreadQa), flash: Boolean(item.unreadQa) }]}
+                      style={bodyStyle}
+                      onclick={() => runAction('question')}
+                    >
+                      <!--
+                        The captured button keeps a literal space inside each span - `> (1) <` and
+                        `> ✅<` - and that space is what separates the checkmark from the icon.
+                        Svelte trims whitespace at element boundaries, so it has to be written as an
+                        expression to survive into the rendered output.
+                      -->
+                      {#if item.questionCount}
+                        <span class="me-1">{' '}({item.questionCount}){' '}</span>
+                      {/if}
+                      <i class="fas fa-question-circle"></i>
+                      {#if item.questionAnswered}<span>{' '}✅</span>{/if}
+                    </button>
+                  {/if}
+                  <span class="created-at mr-2" style={dateStyle}
+                    >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
+                  >
+                </div>
+              {:else if !reverseMessage}
+                <span
+                  {...{ placement: 'top' } as Record<string, string>}
+                  {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
+                  class="created-at mx-2"
+                  style={dateStyle}
+                  >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}
+                </span>
+              {/if}
+            </div>
+            <div class="d-flex">
+              {#if item.answered && kind !== 'alert'}
+                <div>✅</div>
+              {/if}
+              {#if item.replyToName && item.replyToBody}
+                <div class="ms-1 private-reply">
+                  <div
+                    class={['private-reply-message w-100', { 'private-reply-bg-light': theme === 'light', 'private-reply-bg-dark': theme === 'dark' }]}
+                  >
+                    <strong class="d-block username" style={usernameStyle}>
+                      {item.replyToName}
+                    </strong>
+                    <div class={messageBodyClass} style={bodyStyle}>
+                      {@render bodySegments(replyStockSegments)}
+                    </div>
+                    <div class={messageBodyClass} style={bodyStyle}>
+                      {@render bodySegments(stockSegments)}
+                    </div>
+                  </div>
+                </div>
+              {:else}
+                <div class={messageBodyClass} style={bodyStyle}>
+                  {#if item.evidenceBodySegments}
+                    <!-- Unkeyed for the same reason as `bodySegments` above: parsed, never reordered. -->
+                    <!-- eslint-disable-next-line svelte/require-each-key -->
+                    {#each item.evidenceBodySegments as segment}
+                      {#if segment.kind === 'stock'}
+                        <span class="stockColor" style={stockStyle}>{segment.text}</span>
+                      {:else if segment.kind === 'image' && segment.url}
+                        <div
+                          class="img-container"
+                          style={uploadWidthVariable(segment.width)}
+                          {@attach evidenceImageAttachment(segment.url)}
+                        >
+                          <!-- svelte-ignore a11y_missing_attribute -->
+                          <img
+                            class="uploaded-img"
+                            src={segment.url}
+                            width={segment.width}
+                            height={segment.height}
+                          /><br
+                            {...{ clear: 'both' } as Record<string, string>}
+                          />
+                        </div>
+                      {:else}{segment.text}{/if}
+                    {/each}
+                  {:else if item.bodyHtml}
+                    <!--
+                      The rich-text branch, and it does NOT use Svelte's raw-html tag. That rule is
+                      asserted next door in `message-links-contract.test.ts` and is kept: markup
+                      reaches the DOM through an attachment that sanitises first, so there is no path
+                      where an unfiltered string is trusted. `item.bodyHtml` was already sanitised by
+                      the server on the way in, and is sanitised AGAIN here before insertion.
+
+                      (This comment names no raw-html tag on purpose. That contract reads SOURCE TEXT,
+                      so a comment mentioning the literal fails it just as code would — which is
+                      exactly what happened on the first draft.)
+
+                      Twice is not belt-and-braces for its own sake. The server pass is the control —
+                      it is what a crafted request cannot bypass. The browser pass covers the rows
+                      that already existed when the allow-list was narrower, which is the case that
+                      bit the notes table: `notes-repository` re-sanitises historical rows on read for
+                      exactly this reason, and its test says so.
+
+                      The segment parser is deliberately NOT applied here. It exists to find links,
+                      tickers and images in PLAIN text; run over markup it would rewrite the author's
+                      own tags.
+                    -->
+                    <span {@attach safeChatHtml(item.bodyHtml)}></span>
+                  {:else}
+                    {@render bodySegments(stockSegments)}
+                    {#if kind === 'alert' && item.targetUrl}
+                      <!-- svelte-ignore a11y_click_events_have_key_events -->
+                      <!-- svelte-ignore a11y_no_static_element_interactions -->
+                      <div
+                        class="img-container"
+                        style={uploadWidthVariable(item.targetWidth)}
+                        onclick={(event) => runAction('image', event)}
+                      >
+                        <!-- svelte-ignore a11y_missing_attribute -->
+                        <img
+                          class="uploaded-img"
+                          src={item.targetUrl}
+                          width={item.targetWidth ?? undefined}
+                          height={item.targetHeight ?? undefined}
+                        /><br
+                          {...{ clear: 'both' } as Record<string, string>}
+                        />
+                      </div>
+                    {/if}
+                  {/if}
+                </div>
+              {/if}
+            </div>
+            {#if menuAllows.reaction && reactions.length > 0}
+              <span class={{ 'presenter-reactions-right': presenterMessagesOnTheRight }} style={bodyStyle}>
+                {#each reactions as [reactionKey, reaction] (reactionKey)}
+                  {#if reaction.clickedBy.length > 0}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <span
+                      class={['badge chat-reaction', { 'chat-reaction-added': reaction.clickedBy.includes(currentUserEmailHash) }]}
+                      onclick={() =>
+                        runAction('reaction', {
+                          key: reactionKey,
+                          emoji: reaction.emoji
+                        })}
+                    >
+                      {reaction.emoji}
+                      {reaction.clickedBy.length}
+                    </span>
+                  {/if}
+                {/each}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span
+                  class="badge chat-reaction chat-reaction-hover"
+                  aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
+                    ? `message-reaction-popover-${kind}-${item.id}`
+                    : undefined}
+                  onclick={() => {
+                    reactionPickerOpen = !reactionPickerOpen;
+                    reactionPickerTrigger = reactionPickerOpen ? 'pill' : null;
+                  }}
+                >
+                  <i class="far fa-smile"></i>
+                </span>
+              </span>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
   {#if reactionPickerOpen}
     <EmojiPicker
       popoverId={`message-reaction-popover-${kind}-${item.id}`}

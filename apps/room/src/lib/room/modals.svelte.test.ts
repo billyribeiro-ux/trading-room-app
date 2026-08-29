@@ -28,15 +28,21 @@ vi.mock('../../routes/user-settings.remote', () => ({ saveTheme: vi.fn(async () 
 const make = () => {
   const managed: true[] = [];
   const themes: string[] = [];
+  const debugLogsCleared: true[] = [];
   const modals = new RoomModals({
     menus: { closeForModal: () => {}, set: () => {}, closeFloating: () => {} } as never,
     polls: {} as never,
     messageActions: { clearSelected: () => {}, selected: null },
     userActions: { loadManaged: () => managed.push(true) },
     unreadQaAlertIds: { clear: () => {}, delete: () => true },
-    setTheme: (next) => themes.push(next)
+    setTheme: (next) => themes.push(next),
+    debugLog: {
+      clearReceived: () => {
+        debugLogsCleared.push(true);
+      }
+    }
   });
-  return { modals, managed, themes };
+  return { modals, managed, themes, debugLogsCleared };
 };
 
 /** Read inside an effect root, mutate inside it, assert on the result outside. */
@@ -138,5 +144,30 @@ describe('opening a modal does the work that goes with it', () => {
     const { modals, themes } = make();
     modals.setTheme('dark');
     expect(themes).toEqual(['dark']);
+  });
+
+  it('forgets a received debug log when its modal closes', () => {
+    /*
+      A presenter who opens the Debug Log modal again must not be shown whoever answered LAST, under
+      whatever title that answer carried - it reads as a fresh reply and is not one. The clear lives
+      in `closeActive` beside the poll and Q&A cleanups rather than at the call site, because
+      `ModalHost` has ONE `onclose` for every modal it hosts.
+    */
+    const { modals, debugLogsCleared } = make();
+    modals.open('debug');
+    expect(debugLogsCleared).toEqual([]);
+    modals.closeActive();
+    expect(debugLogsCleared).toEqual([true]);
+
+    /*
+      And NOT on an unrelated close, which is what makes the `=== 'debug'` guard load-bearing.
+
+      `qa` rather than `poll`: this file's `polls` is `{} as never`, so closing a poll would throw on
+      a stub rather than exercise the guard. `qa`'s own cleanup short-circuits on a null selection,
+      which is what makes it the neutral close here.
+    */
+    modals.open('qa');
+    modals.closeActive();
+    expect(debugLogsCleared).toEqual([true]);
   });
 });

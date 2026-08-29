@@ -62,6 +62,7 @@ const make = (
     prefs: { doNotDisturbOn: false, chatSoundOn: true },
     commands: {
       loadLog: (payload) => (loaded.push(payload), Promise.resolve(incoming)),
+      loadPeerHistory: () => Promise.resolve({ nick: '', messages: [], truncated: false }),
       send: (payload) =>
         options.sendFails
           ? Promise.reject(new Error('refused'))
@@ -369,6 +370,7 @@ describe('paging', () => {
       prefs: { doNotDisturbOn: false, chatSoundOn: false },
       commands: {
         loadLog: () => Promise.reject(new Error('down')),
+        loadPeerHistory: () => Promise.resolve({ nick: '', messages: [], truncated: false }),
         send: () => Promise.resolve(null),
         deleteLog: () => Promise.resolve(null)
       },

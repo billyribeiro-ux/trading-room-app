@@ -145,7 +145,7 @@ describe('the composition root re-derives from its thunks', () => {
       );
       /*
         `gates.recordingTooltip` returns '' when the room hides the recording name from members and
-        this viewer is not a presenter (`gates.svelte.ts:128-131`). Chosen because it reads
+        this viewer is not a presenter (`gates.ts:128-131`). Chosen because it reads
         `isPresenter` THROUGH a gate rather than echoing the thunk back, so a captured value cannot
         fake it — and because it ALSO reads `prefs` and `media`, both built inside the root, so a
         pass here exercises the wiring between three of the thirty-six rather than one in isolation.

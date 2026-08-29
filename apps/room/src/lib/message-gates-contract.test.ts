@@ -2,27 +2,71 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /*
-  Four gates that existed, defaulted false, and were never fed.
+  FIVE gates that existed on the component and were never fed.
 
-  `RoomMessage.svelte` has carried `usersPublicReply`, `enableReactions`, `enableEditMessage` and
-  `enableEditAlerts` as props since it was written. Each defaults `false`, each feeds
-  `sourceMessageBehavior()`, and `+page.svelte` passed none of them — so public reply, reactions and
-  both edit entries were dead in every room however the owner configured the Manage page.
+  `RoomMessage.svelte` has carried `usersPublicReply`, `enableReactions`, `enableEditMessage`,
+  `enableEditAlerts` and `hasQaOnAlerts` as props since each was written. Every one feeds
+  `sourceMessageBehavior()` or a template gate, and `+page.svelte` passed none of them.
 
-  That failure is INVISIBLE. Nothing throws, nothing logs, no test that renders a message with the
-  defaults notices, and the Manage page happily stores a value the room will never read. The only
-  way it surfaces is somebody asking why a control does nothing, which is how it survived this long.
+  **The fifth failed the OTHER way, and that is why it is worth naming separately.** The first four
+  default `false`, so public reply, reactions and both edit entries were dead in every room however
+  the owner configured the Manage page. `hasQaOnAlerts` defaulted **`true`**, so the ask-a-question
+  button appeared on every alert in every room whether or not Q&A had been bought, and pressing it
+  opened the modal. A gate that defaults open is not a gate; it was corrected to `false` on
+  2026-08-28 when the setting finally crossed the boundary.
+
+  That failure is INVISIBLE in both directions. Nothing throws, nothing logs, no test that renders a
+  message with the defaults notices, and the Manage page happily stores a value the room will never
+  read. The only way it surfaces is somebody asking why a control does nothing — or, for the fifth,
+  nobody asking at all, because a control that works looks correct.
 
   So the assertions below are deliberately about the WIRE — the value leaving `sessData` and
   arriving at both call sites — rather than about the behaviour, which was already correct and was
   never the broken half.
 */
 
+/**
+ * Each gate as a PAIR: the prop name on the component, and the setting name on the wire.
+ *
+ * They were the same string for the first four, so the list used to be four bare names. `sessData`
+ * spells the fifth `hasQAOnAlerts` and this room spells the prop `hasQaOnAlerts` — the reference's
+ * own capitalisation of an acronym, kept rather than normalised, because the wire name has to match
+ * what the controller sends and the prop name has to match this repository's own convention.
+ * Writing them as one string would have hidden which of the two a future assertion is checking.
+ */
 const GATES = [
-  'usersPublicReply',
-  'enableReactions',
-  'enableEditMessage',
-  'enableEditAlerts'
+  { prop: 'usersPublicReply', setting: 'usersPublicReply', via: 'behavior' },
+  { prop: 'enableReactions', setting: 'enableReactions', via: 'behavior' },
+  { prop: 'enableEditMessage', setting: 'enableEditMessage', via: 'behavior' },
+  { prop: 'enableEditAlerts', setting: 'enableEditAlerts', via: 'behavior' },
+  { prop: 'hasQaOnAlerts', setting: 'hasQAOnAlerts', via: 'template' },
+  /*
+    The five that joined on 2026-08-28, found by asking which of `RoomMessage`'s thirty-five props no
+    call site supplies. Every one already had its value crossing the boundary; nothing passed it.
+  */
+  { prop: 'userPrivateMessaging', setting: 'userPM', via: 'behavior' },
+  { prop: 'userToPresenterPrivateMessaging', setting: 'userToPresenterPM', via: 'behavior' },
+  { prop: 'disablePrivateMessagingForTrials', setting: 'disablePMForTrials', via: 'behavior' },
+  { prop: 'hideAvatars', setting: 'hideAvatars', via: 'template' },
+  /*
+    `altChatRender` is the OTHER term of `hideAvatar`, and it is `via: template` for the same reason
+    `hideAvatars` is: it gates an element in the message's own markup rather than a menu entry. Its
+    display-mode half does not travel on the chrome at all — that is resolved per SURFACE on the page
+    and arrives as `displayMode`.
+  */
+  { prop: 'altChatRender', setting: 'altChatRender', via: 'template' },
+  /*
+    Added 2026-08-28. `copyTrades` gates the click-to-copy order marker on an ALERT body;
+    `allowDeleteOwnMessage` is the ROOM's half of `canDeleteOwnMessage` (byte 1,158,799) and is
+    named for the PROP it feeds rather than for the setting it comes from — the chrome is applied
+    with `{...messageChrome}`, so a field whose name does not match the prop feeds nothing.
+
+    That second one crossed to CLOSE a hole rather than to draw a control: the delete endpoint was
+    already letting a member remove their own message without asking whether the room allowed it,
+    and the menu entry it feeds had been defaulting off the whole time, so nothing showed the gap.
+  */
+  { prop: 'copyTrades', setting: 'copyTrades', via: 'template' },
+  { prop: 'allowDeleteOwnMessage', setting: 'usersCanDeleteOwnMsgs', via: 'behavior' }
 ] as const;
 
 const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
@@ -35,25 +79,54 @@ const pane = readFileSync(new URL('./components/AlertChatArea.svelte', import.me
 const component = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
 const strip = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+const chrome = readFileSync(new URL('./room-message-chrome.ts', import.meta.url), 'utf8');
 const pageCode = strip(page);
+const chromeCode = strip(chrome);
 const paneCode = strip(pane);
 const componentCode = strip(component);
 
-describe('the four message gates are read from the room, not decided locally', () => {
-  it.each(GATES)('%s comes off sessData and nowhere else', (gate) => {
-    expect(pageCode).toContain(`const ${gate} = $derived(data.sessData?.${gate} === true);`);
+describe('the nine message gates are read from the room, not decided locally', () => {
+  /*
+    ANCHORED TO THE MODULE THAT DECIDES, and re-pointed twice in one day for reasons worth keeping.
+
+    First it required the literal line `const <gate> = $derived(data.sessData?.<gate> === true);` in
+    the page. That went red when those consts were inlined into the object that was their only
+    reader — a correct change to code the assertion had pinned by spelling.
+
+    Then the whole construction moved into `buildMessageChrome`, which is where it belongs: "which
+    settings does a message read" is that module's question, not the page's. So the reads are
+    asserted THERE now, and what is asserted of the page is only that it calls the builder and hands
+    the result on. Each assertion sits in the file that owns the thing it checks, which is the shape
+    that stops the next legitimate refactor from failing it for the wrong reason.
+
+    **This split is also what the change being guarded was about.** Six props sat on `RoomMessage`
+    with their values already on the wire and nothing passing them, precisely because the type and
+    the construction lived in different files and nothing compared them.
+  */
+  it.each(GATES)('$setting is read off sessData in the chrome builder', ({ setting }) => {
+    expect(chromeCode).toContain(`settings?.${setting} === true`);
+  });
+
+  it.each(GATES)('$prop is a field of RoomMessageChrome', ({ prop }) => {
+    expect(chromeCode).toContain(`readonly ${prop}: boolean;`);
   });
 
   it('compares with === true rather than trusting truthiness', () => {
     /*
       `sessData` is JSON off the wire. `=== true` means a string "false", a 0 or a stray object
-      cannot switch a capability on, which matters because three of these four unlock an action a
+      cannot switch a capability on, which matters because five of these nine unlock an action a
       member can take on somebody else's message.
     */
-    for (const gate of GATES) {
-      expect(pageCode).not.toContain(`$derived(Boolean(data.sessData?.${gate}))`);
-      expect(pageCode).toContain(`data.sessData?.${gate} === true`);
+    for (const { setting } of GATES) {
+      expect(chromeCode).not.toContain(`Boolean(settings?.${setting})`);
+      expect(chromeCode).toContain(`settings?.${setting} === true`);
     }
+  });
+
+  it('the page builds the chrome through that module and hands it on', () => {
+    expect(pageCode).toContain('buildMessageChrome({');
+    expect(pageCode).toContain('sessData: data.sessData');
+    expect(pageCode).toContain('{messageChrome}');
   });
 });
 
@@ -89,24 +162,103 @@ describe('both message lists receive all four', () => {
     expect(pageCode).toContain('{messageChrome}');
   });
 
-  it.each(GATES)('%s is in the chrome that both call sites spread', (gate) => {
-    const from = pageCode.indexOf('const messageChrome');
-    expect(from, 'messageChrome is not built in +page.svelte').toBeGreaterThan(-1);
-    const chrome = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-    expect(chrome, `${gate} is not in messageChrome`).toContain(gate);
+  it.each(GATES)('$prop is set by the builder both call sites spread', ({ prop, setting }) => {
+    const from = chromeCode.indexOf('export function buildMessageChrome');
+    expect(from, 'buildMessageChrome is not exported').toBeGreaterThan(-1);
+    const body = chromeCode.slice(from);
+    // The field and its source, on one line — so a field wired to the wrong setting fails here.
+    expect(body, `${prop} is not built from ${setting}`).toContain(
+      `${prop}: settings?.${setting} === true`
+    );
+  });
+});
+
+/*
+  THE TWO VIEWER FACTS, which are not settings and so are not in `GATES`.
+
+  They were unfed alongside the four settings above and each broke a different rule, so they get
+  their own assertions rather than being left to the settings table's shape:
+
+    viewerIsLimitedPresenter   `showToAll` is `viewerIsPresenter && !viewerIsLimitedPresenter`. With
+                               it absent, a member handed mic and screen by `giveMicScreen` kept the
+                               Show To All entry that gate exists to take away. It comes from
+                               `media.limitedPresenter`, NEVER from the role — `media-elevation.ts`
+                               is the module that argues why those two must not be collapsed.
+
+    currentUserIsTrial         the trial half of the private-message rule. With it absent the
+                               `disablePMForTrials` term could never fire, so wiring that setting
+                               without this one would have looked complete and done nothing.
+*/
+describe('the two viewer facts a message needs', () => {
+  it('takes the limited-presenter elevation from media, not from the role', () => {
+    expect(chromeCode).toContain('viewerIsLimitedPresenter: sources.viewerIsLimitedPresenter');
+    expect(pageCode).toContain('viewerIsLimitedPresenter: media.limitedPresenter');
+    // The role is still the role. If these two ever became one expression the gate would be gone.
+    expect(chromeCode).toContain(
+      "viewerIsPresenter: sources.user.role === 'staff' || sources.user.role === 'admin'"
+    );
+  });
+
+  it('takes the trial flag from the loaded user, fail-closed', () => {
+    expect(chromeCode).toContain('currentUserIsTrial: sources.user.isFT === true');
+  });
+
+  it('hands the component both, through the same chrome the settings ride on', () => {
+    expect(chromeCode).toContain('readonly viewerIsLimitedPresenter: boolean;');
+    expect(chromeCode).toContain('readonly currentUserIsTrial: boolean;');
+    expect(componentCode).toContain('viewerIsLimitedPresenter?: boolean;');
+    expect(componentCode).toContain('currentUserIsTrial?: boolean;');
   });
 });
 
 describe('the component end of the wire', () => {
-  it.each(GATES)('%s is still a prop that defaults false', (gate) => {
-    expect(componentCode).toContain(`${gate}?: boolean;`);
-    expect(componentCode).toContain(`${gate} = false,`);
+  /*
+    DEFAULTS FALSE, all five, and the fifth is the reason this assertion earns its place.
+
+    `hasQaOnAlerts` defaulted `true` until 2026-08-28 and nothing passed it, so the ask-a-question
+    button was on in every room. `ModalHost`'s Q&A thread still renders `RoomMessage` without the
+    chrome, so the default is not decorative — it is what a call site gets when it forgets.
+  */
+  it.each(GATES)('$prop is still a prop that defaults false', ({ prop }) => {
+    expect(componentCode).toContain(`${prop}?: boolean;`);
+    expect(componentCode).toContain(`${prop} = false,`);
   });
 
-  it('feeds all four into sourceMessageBehavior rather than reading them ad hoc', () => {
+  it('feeds the menu gates into sourceMessageBehavior rather than reading them ad hoc', () => {
+    /*
+      `via` says which of the two mechanisms each gate uses, and the split is real rather than
+      bookkeeping. Seven decide MENU ENTRIES and go through `sourceMessageBehavior`, the pure rule
+      module with its own tests. Two — `hasQaOnAlerts` and `hideAvatars` — gate ELEMENTS in the
+      message's own markup and are read in the template, so pretending they pass through the
+      behaviour function would make this test lie about where their rule lives. Each `via: template`
+      gate has its own assertion below naming the line it guards.
+    */
     const call = componentCode.slice(componentCode.indexOf('sourceMessageBehavior({'));
     const args = call.slice(0, call.indexOf('})'));
-    for (const gate of GATES) expect(args).toContain(gate);
+    for (const { prop, via } of GATES) {
+      if (via !== 'behavior') continue;
+      expect(args).toContain(prop);
+    }
+  });
+
+  it('gates the two template props at the elements they belong to', () => {
+    // `O(1, !e.isQAMsg && sessData.hasQAOnAlerts ? 1 : -1)` — bundle byte 1,339,784, both terms.
+    expect(componentCode).toContain('{#if !isQaMessage && hasQaOnAlerts}');
+    /*
+      `(sessData.altChatRender && ("chat" === logType || isQAMsg) || sessData.hideAvatars) &&
+      (this.hideAvatar = !0)` — byte 1,349,126.
+
+      BOTH TERMS SINCE 2026-08-28. This used to assert `{#if !hideAvatars}` and record the first term
+      as a gap while `altChatRender` was unbuilt. The rule is now `hideMessageAvatar` in
+      `#lib/chat-display-mode.ts`, which owns the transcription — including which surfaces the first
+      term covers, chat and the Q&A thread and NOT the alerts log — and the component reads its
+      answer. `chat-display-mode-contract.test.ts` executes the rule; this asserts the component
+      consults it rather than re-deriving.
+    */
+    expect(componentCode).toContain(
+      'hideMessageAvatar({ altChatRender, hideAvatars, kind, isQaMessage })'
+    );
+    expect(componentCode).toContain('{#if !hideAvatar}');
   });
 
   it('keeps edit as TWO gates, because upstream gates chat and alerts apart', () => {

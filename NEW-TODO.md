@@ -14,68 +14,45 @@ established it says so.
 
 ---
 
-# PART 1 — Flaws in the original we are fixing, not matching
+# PART 1 — BOTH BUILT, 2026-08-27
 
-Both were raised by the owner 2026-08-15. Both are revenue leaks.
+Both revenue leaks are closed. What follows is the record of what was built and the decisions taken,
+kept because the divergences are deliberate and a future reader must not "fix" them back.
 
-## 1.1 An expired subscription keeps receiving alerts 🔴
+**1.1 An expired subscription keeps receiving alerts — CLOSED.** The room now re-checks entitlement
+on the OPEN realtime connection, once a minute, and closes it with a stated reason. The check goes
+on the SSE stream because that is the cheapest correct place — a long-lived per-member connection the
+server already owns — exactly as this file proposed. Token lifetimes were NOT shortened: that makes
+the window smaller without making the check live, and degrades everybody's experience to half-fix one
+case.
 
-**The flaw:** in the original, entitlement is checked when someone ENTERS a room. Once they are in,
-nothing re-checks. A customer whose subscription lapsed keeps receiving alerts for as long as their
-session lives.
+**1.2 One account, one active session — CLOSED.** `createSessionFor` deletes the account's other
+sessions and inserts the new one in one synchronous transaction. **Newest login wins**, which is
+self-service: the real subscriber logs in again and evicts the freeloader.
 
-**Where ours stands today, measured:**
+**The three decisions this file said to take first, and the answers:**
 
-- `integrations/wordpress/` checks WooCommerce membership at the SSO handoff — that is entry only.
-- `apps/controller/src/lib/server/stream-ingest.ts` documents the identical shape for playback and is
-  honest about it: *"a member banned right now keeps the ability to fetch the playlist until their
-  token expires"*, with `READ_TOKEN_TTL_SECONDS = 43_200` (12 hours).
-- So **we currently reproduce the flaw.**
+| decision | answer |
+| --- | --- |
+| Newest wins, or oldest holds? | **Newest.** Oldest-holds turns every shared password into a support ticket |
+| Per account, or per account per room? | **Per account, globally.** Per-room would let one shared login serve two rooms at the same moment |
+| Presenter exemption? | **None, for any role.** Put to the owner on 2026-08-27 with the laptop-and-phone case named; answered "everything, no exception". Asserted in `session-limit-contract.test.ts` so adding a role test later is a visible policy change |
+| How does the evicted device find out? | The SSE channel pushes `sessionRevoked` with the reason — the shared plumbing this file predicted, and both features do use it |
+| What happens when the controller is unreachable? | **Bounded grace**, chosen by the owner over closing immediately and over never closing. Three minutes without a confirmed answer ends the stream; a definite lapse ends it in under one |
 
-**What closing it means.** A live entitlement check on the paths that deliver value, not only at the
-door. Three decisions to make before writing code, and they are the whole design:
+**Where it lives:** `apps/room/src/lib/server/live-access.ts` (the rule, pure), the poll in
+`sess/[room]/events/+server.ts`, `createSessionFor` in `server/auth.ts`,
+`sessionStillAuthenticates` in `server/connection.ts`, and the receiver through
+`create-room.svelte.ts`. Covered by `live-access-contract.test.ts` (10),
+`session-limit-contract.test.ts` (8, against a real database),
+`entitlement-recheck-contract.test.ts` (7) and two cases in `events.svelte.test.ts` — all
+negative-controlled.
 
-1. **Where the check goes.** On the SSE alert stream is the cheapest correct place — it is already a
-   long-lived per-member connection the server owns, so it can be closed. Re-checking on every alert
-   fan-out is more precise and more expensive.
-2. **How fresh it has to be.** A per-member `entitlement_checked_at` with a TTL, re-validated against
-   the controller, is the shape `stream-ingest.ts` already suggests for the token case: *"a
-   room-level epoch in the claim checked against a cached counter — not a per-segment membership
-   query."*
-3. **What the member sees.** Silent disconnect is hostile. A stated reason — "your subscription has
-   lapsed" — is the honest version, and it is also the one that gets them to renew.
-
-**Do not** implement this by shortening token lifetimes alone. That makes the window smaller without
-making the check live, and it degrades everybody's experience to half-fix one case.
-
-## 1.2 One account, one active session 🔴
-
-**The flaw:** the original lets one login be used from many devices at once. Customers share
-credentials, and one subscription serves several people.
-
-**Where ours stands today, measured.** `apps/room/src/lib/server/auth.ts:81` —
-`createSessionFor()` does a plain `INSERT` into `sessions` and **deletes nothing**. There is no
-per-user session limit anywhere. **We reproduce the flaw exactly.**
-
-**What closing it means.** The `sessions` table already has everything needed: `id`, `user_id`,
-`created_at`, `last_seen_at`, `room_short_code`. Adding "newest login wins" is a delete-then-insert
-inside one transaction.
-
-Decisions to make first:
-
-1. **Newest wins, or oldest holds?** Newest-wins is what streaming services do and it is
-   self-service: the real owner logs in again and evicts the freeloader. Oldest-holds turns every
-   shared password into a support ticket.
-2. **Scope — per account, or per account per room?** A presenter legitimately using a laptop and a
-   phone in the same room is a real case. Per-account-globally is stricter and simpler; per-room is
-   friendlier and more code.
-3. **How the evicted device finds out.** The SSE channel can push a `sessionRevoked` command, which
-   is the same mechanism 1.1 needs — **build these two together, they share the plumbing.**
-4. **Presenters may need an exemption.** Confirm with the owner before assuming.
-
-**Note for both:** these are the first features in this repository whose reference is deliberately
-*not* the original. Every divergence elsewhere is documented at the code with a WHY, and these need
-the same treatment — a comment saying we knowingly do not match, and the reason.
+**One thing this could not do, stated rather than left to be discovered:** a REVOCATION CANNOT BE
+PUSHED here, and the pushed design looks correct. `publishToUsers` addresses a user id, and after a
+newest-wins eviction the revoked connection and the one that replaced it share one; and the event hub
+is process-local, so a push would silently miss every connection held on another instance. A
+connection that asks about ITSELF has neither problem.
 
 ---
 
@@ -149,32 +126,80 @@ do NOT fall back to the other field.
 **Both tokens already exist** in `css/complete-app-styles.css` and `src/app.css`. Build against the
 token names.
 
-## 2.2 Benzinga News — small, decoded
+## 2.2 Benzinga News — BUILT, 2026-08-29 ✅
 
-A nav `<li>` linking out, beside "Reopen Alerts / Chat" and "Recording" (`mPe`/`pPe`/`fPe`):
+The outstanding decode pass is done, and it produced a finding this section did not contain:
+**Benzinga renders in TWO places upstream, not one.**
 
-- `href` = `benzingaUrl`
-- renders `<img src="{{sessData.altBenzingaLogoURL}}">` when that is set, **else** icon + the text
-  **"Benzinga News"**
-- assets: `/assets/images/benzinga-logo.png`; classes `benzinga-li`, `benzinga-logo`,
-  `benzinga-logo-alt`
+| | where | consts | image | fallback |
+| --- | --- | --- | --- | --- |
+| sidebar | `mPe` 2,467,533 and `_Re` 2,563,731 — the same component compiled twice | `nav-link sidebar-item ps-1` / `benzinga-logo-alt` / `fas fa-newspaper` | `altBenzingaLogoURL` | icon + the words "Benzinga News" |
+| **navbar** | **`PPe` 2,473,150** | `90 [1,"nav-item","animated","fadeIn","benzinga-li"]`, `141 ["target","_blank","title","Benzinga News",1,"nav-link"]`, `142 [1,"benzinga-logo","animated","fadeIn",3,"src"]` | `altBenzingaLogoURL \|\| "/assets/images/benzinga-logo.png"` | **none — image only** |
 
-**`altBenzingaLogoURL` is per-room** — the same customer-branding pattern as the theme tokens.
+Only the sidebar one existed here. The navbar one shipped on 2026-08-29
+(`benzinga-navbar-contract.test.ts`, 9 tests, 5 negative controls seen red).
 
-**Still needed:** the const table entries for exact classes on the `<li>`, `<a>` and `<img>`, and
-where `benzingaUrl` is set.
+**The const indices were parsed with a string-aware walker, not counted by eye** — an index is per
+component, and the sidebar's `li` is index 32 of a *different* table, where it is a generic
+`nav-item` shared with "Manage Muted Users".
 
-## 2.5 Mobile app — the other half of the v4 delta
+**Two divergences, both measured and both recorded at the code:**
 
-New strings: `mobile-app-container`, `mobile`, `restoreMobileAppTokens`, `fa-mobile-alt`.
+- `/assets/images/benzinga-logo.png` is **not in this repository** (`find -iname "*benzinga*"`
+  returns nothing), so the navbar item renders only when the room supplies a logo. Transcribing the
+  fallback faithfully would put a broken `<img>` in every unconfigured room's navbar — the
+  `playing.gif` defect again. The sidebar's icon-and-text answer is not available here: that branch
+  exists in the sidebar's capture and not in this one, and inventing it would be inventing evidence.
+- The default `benzingaUrl` is not reproduced. It is built from three values this room does not
+  have — see `gates.ts`, which has recorded that since before this pass.
 
-`docs/MOBILE-APP.md` already exists in this repository — **read it before decoding anything**, it may
-already answer most of this.
+## 2.5 Mobile app — BUILT, 2026-08-29 ✅
 
-## 2.6 Removed upstream — check whether we built it
+All four new v4 strings are accounted for: `mobile-app-container` and `fa-mobile-alt` are the pane
+and the tab icon, `restoreMobileAppTokens` is the command, and `mobile` is the tab key.
 
-`"Connectivity/Mic Troubleshooter"` is in our older bundle and **gone** from the current v4. If we
-built it, it should probably come out. If we did not, do not build it.
+`docs/decoded/mobile-app-decoded.md` had already decoded the surface end to end, so nothing here
+needed a fresh read of the bundle — only a decision on the two things that document deliberately left
+open, and the server half, which is not in evidence at all.
+
+**Shipped:** the Mobile App tab in `#webrtc-troubleshooter-modal`, `MobileRestorePane.svelte`,
+`restoreMobileAppTokens` in `mobile-pin.remote.ts`, `restoreMobileTokens` in `room-config-client.ts`
+and `internal/mobile-restore/[code]` on the controller. `mobile-restore-contract.test.ts`, 16 tests,
+6 negative controls seen red.
+
+**Row 24 was already closed.** The doc records `freeTrialsGetApp` as *"absent from the doc, from
+`room-settings-schema.ts` and from `room-config-client.ts`"*. Measured 2026-08-29: it is in
+`room-settings-schema.ts:333` (`wired: true`), `room-config.ts:271`, `room-config-client.ts:123` and
+consumed at `gates.ts:306`. It is now also re-checked on the new controller route.
+
+**Row 26 — the gate anomaly — decided.** The doc asks for a deliberate decision rather than a copy.
+Upstream renders this tab with no gate at all; ours renders it on `mobileAppAvailable`, because a
+room with no app configured would otherwise show a tab whose only button answers 409 every time.
+
+**What the server does was DERIVED, and that is stated rather than implied.** There is no inbound
+handler anywhere in the bundle — the switch at 1,020,600–1,022,200 was read in full — so the
+reference's server is not in evidence. The pane's own copy is: *"restore your mobile app connectivity
+and get a test notification on your device"*, shown to somebody who *"is not getting notifications"*.
+With a token store that has one honest meaning, and `sendTestPushToMember` already did it for the
+Manage page.
+
+**The one thing deliberately not transcribed:** upstream's `bootbox.alert("Command sent
+successfully…")` fires on the statement after the transmit, with no callback and no error path — it
+says that to a member with no paired device just as readily as to one with three. Ours composes the
+sentence from what happened, keeping the captured string for the case it is true of.
+
+## 2.6 Removed upstream — THE CLAIM WAS FALSE, closed 2026-08-29 ✅
+
+This row read: *"`Connectivity/Mic Troubleshooter` is in our older bundle and **gone** from the
+current v4. If we built it, it should probably come out."* We did build it, so the row's instruction
+was to delete a working feature — four tabs of `#webrtc-troubleshooter-modal`.
+
+**Counted in the current v4 bundle with `String.indexOf`, not `grep -c`:** `Connectivity/Mic` 2,
+`webrtc-troubleshooter` 8, `troubleshooter-tabs` 6. Nothing about it was removed.
+
+Pinned by `troubleshooter-retained-contract.test.ts` against the SHA-256'd bundle, because deleting
+the row stops a reader acting on it but does not stop the claim being re-derived from one bad grep —
+and a silently deleted modal breaks no type, no lint rule and no other test here.
 
 ---
 
@@ -216,10 +241,24 @@ custom properties**, and every colour in the new sort-bar rules is a `var(--…)
 
 # PART 5 — Three alert features found 2026-08-15 by ENUMERATION, not by asking
 
-Full spec: `docs/decoded/alert-scheduler-filter-labels.md`.
+**All three are BUILT, and their sections are removed from this file — 2026-08-29.**
 
-**How they were found is the point.** `audit-feature-coverage.mjs` was written after Swing and Day
-Trade — two whole tabs — turned out to have been in the bundle from day one with nothing ever
+| | shipped as | contract |
+|---|---|---|
+| **5.1 Alert Filter** | `alert-filter.ts`, persisted through `savePreference('alertFilterFor')`, consumed in `alerts.svelte.ts`, `alerts-pane.ts` and `create-room.svelte.ts` | `alert-filter-contract.test.ts` — 26 tests |
+| **5.2 Alert Labels** | `alert-labels.ts`, rendered by `RoomMessage.svelte` and configured in `ModalHost.svelte` | `alert-labels-contract.test.ts` |
+| **5.3 Alert Scheduler** | `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte`, and the sweeper `startAlertScheduler`; `hasAlertScheduler` is `wired: true` | `scheduled-alert-contract.test.ts` — with 5.2, 50 tests |
+
+**Why they are removed rather than re-marked.** The three sections here were a SUMMARY of
+`docs/decoded/alert-scheduler-filter-labels.md`, which carries the same evidence — the byte offsets,
+the verbatim strings, the two 2026-08-15 corrections — roughly five times over. Two places recording
+one thing is how one of them goes stale, and it is exactly what happened: on 2026-08-29 §5.3 still
+carried a 🔴 and still said *"`hasAlertScheduler` … is NOT in `room-settings-schema.ts`"*, while the
+entitlement had been wired and all four modules shipped. **The decoded document is the spec. This
+file tracks what is left to build, and none of this is.**
+
+**How they were found is still the point.** `audit-feature-coverage.mjs` was written after Swing and
+Day Trade — two whole tabs — turned out to have been in the bundle from day one with nothing ever
 enumerating the reference's features. Running it after the Swing build reported 47/88 wire commands
 present, and four of the missing ones were alert-related. All four returned **zero hits across
 `docs/`, `TODO.md` and `NEW-TODO.md`**: no spec, no row, no mention anywhere.
@@ -227,85 +266,31 @@ present, and four of the missing ones were alert-related. All four returned **ze
 Same failure mode as Swing, caught by the same mechanism, eleven hours later. **Run that audit after
 every feature lands.**
 
-## 5.1 Alert Filter — each viewer chooses whose alerts they see 🟡
-
-Smallest of the three and the only one that changes what an ordinary member sees. One command in
-both directions, one modal, no entitlement flag found.
-
-- `updateAlertFilter` — send `{alertFilterFor, userXrefID}` (byte 1,221,491); the response sets
-  `user.alertFilterFor` and **re-fetches `getAlertsLog {page:0}`** (byte 1,017,535).
-- **CORRECTED 2026-08-15: the filtering is CLIENT-side, in three places** — the live SSE stream
-  (1,004,533), `getAlertsLog` (1,017,070) and the alerts search results (1,020,817), all with one
-  identical guard. An earlier version of this row said the server owns it; building to that would
-  have produced an architecture the reference does not have. The command is for PERSISTENCE.
-- **Consequence worth deciding on:** every alert reaches every browser and some are hidden after
-  arrival, so this is a display preference and **not** an access control. Filtering server-side
-  instead would be a real improvement and a deliberate divergence — record it as one if taken.
-- `preferences.showAlertsFrom` **inverts the meaning** — the same selection is an allow-list when
-  true and a deny-list when false. Treating it as a display toggle gets the semantics backwards.
-- Buttons verbatim, spaces included: `" Unselect All "`, `" Select All "`, `" Save"` — the last has a
-  leading space and no trailing one, unlike its neighbours.
-
-## 5.2 Alert Labels — per-room hashtags prefixed onto alert text 🟢
-
-**Not a wire feature at all**: `getAlertLabels` / `saveAlertLabels` / `updateAlertLabels` /
-`hasAlertLabels` are all 0 occurrences. Configuration plus a text transform.
-
-- `sessData.alertLabels` is a **string containing JSON**, trimmed then `JSON.parse`d, every entry
-  given `checked = false` (byte 1,147,292). `chatTabsWithBadges` and `modAlertFilterList` use the
-  identical shape — **three room settings shipped as JSON strings.**
-- **CORRECTED 2026-08-15: an entry is `{hash, name, bgcolor, color}`, not `{hash}`** — and the labels
-  have a **SECOND consumer** the first pass missed entirely. `parseSymbols` (byte 1,328,216) replaces
-  `#hash` in ALERT text with a coloured `span.badge` showing `name`. Chat and Q&A messages are
-  excluded. `hash` is what goes in the text; `name` is what the reader sees.
-- **`bgcolor` and `color` are interpolated RAW into a `style` attribute** while only `name` is
-  sanitised. Owner-controlled in the reference, so not member-facing — but **do not reproduce that
-  shape**; validate the colours or bind them as custom properties, and record the divergence.
-- `processAlertLabels` prefixes `" #" + hash` per checked label, **newline after the last and a space
-  after the others** (byte 2,131,295). Called from **four** sites, not one.
-- Checkboxes are cleared in **three** places, not one: after a successful prepend, on `doCloseModal`,
-  and on `clearInputFields`. Selection never survives leaving the composer by any route.
-
-## 5.3 Alert Scheduler — post an alert later, optionally repeating 🔴
-
-The largest. An entitlement, three commands, a modal with a table, repeat semantics, and a
-**server-side scheduler this project has no equivalent for** — that part is a design decision, not a
-port.
-
-- **Entitlement `sessData.hasAlertScheduler`** (8 occurrences). It is NOT in `room-settings-schema.ts`
-  and its manage-page control was not located. Per the per-client-entitlement pattern one should
-  exist — **not invented; recorded as a gap.**
-- `alertMsgLater` (byte 2,130,937) · `getScheduledAlerts`, null payload (bytes 1,009,797 / 1,021,836)
-  · `removeScheduledAlert` `{scheduledAlertID}` (byte 2,407,145), whose response splices by id.
-- **`ignoreWeekends` is not the checkbox value** — it is sent as
-  `"daily" === repeatScheduledAlert && ignoreWeekends`, so a weekly repeat always sends false.
-- Component `app-scheduled-alerts-modal`, modal id `scheduledAlertsModal`, `decls: 27`. Row cells:
-  `sendOn | date:"short"`, `alert.n`, `alert.txt`, `repeat || "off"`, a `" Remove "` button, plus a
-  conditional `"no weekends"` span when daily and ignoring weekends.
-- Strings verbatim: `"Alert scheduled OK."`, `"Please enter some alert text..."`, and a remove
-  confirm built by CONCATENATION with a full stop before `text:` and **no closing question mark**.
-
-**Honest gaps** (also in the spec): the `hasAlertScheduler` manage control, the three `ngClass` class
-names on the repeat badge, the modal's own 27-declaration layout, and what the server does with
-`sendLaterAsNick` / `sendLaterAsEmail` / `dontCrossPost`.
-
 ---
 
 # Suggested order
 
 **Built since this list was written, and removed from it:** 2.3 Swing Alerts, 2.4 Day Trade Alerts,
-and the four "For All" broadcast commands — which were not a missing feature but three SHIPPED
-controls that said "For All" and moved one browser. See `CHANGELOG.md`.
+the four "For All" broadcast commands — which were not a missing feature but three SHIPPED controls
+that said "For All" and moved one browser — and, on 2026-08-29, **all three of PART 5**: the Alert
+Filter, the Alert Labels and the Alert Scheduler. See `CHANGELOG.md`, and `PART 5` above for where
+each landed.
 
 **Re-specified because "fully decoded" was not:** 2.1, the Files sort bar. Three errors found on
 re-reading, one of which ships a control that looks right and behaves wrong. Build from
 `docs/decoded/files-sort-bar.md`, not from §2.1.
 
-1. **1.1 + 1.2 together** — they share the SSE revocation plumbing, and they are the two that cost
-   money every day they are open.
-2. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
-   to end.
-3. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
+**Removed from this order on 2026-08-29 because they are built:** *1.1 + 1.2 together* (PART 1
+records them CLOSED on 2026-08-27), *5.1 Alert Filter*, *5.2 Alert Labels* and *5.3 Alert Scheduler*
+(PART 5 above). The order below was still scheduling all five, which is how a plan outlives the work
+it was planning.
+
+1. ~~2.1 the sort bar~~ — **BUILT, and all three of the re-spec's corrections landed.** Verified by
+   reading `lib/file-sort.ts` on 2026-08-29: ONE shared `direction` (line 29), a field switch that
+   resets to that field's default (`field === 'date' ? 'desc' : 'asc'`, line 189), and
+   `INITIAL_FILE_SORT = { field: 'date', direction: 'desc' }`. The labels keep their leading and
+   trailing spaces, cited at `FilesPane.svelte:328`. This entry was still scheduling it.
+2. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
    onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
    Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller
    tables, none matching. Our Recordings is a different thing: `recording-codec.ts` records the
@@ -316,13 +301,7 @@ re-reading, one of which ships a control that looks right and behaves wrong. Bui
    Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
    repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
    `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
-4. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
-   three that changes what an ordinary member sees.
-5. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
-6. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-7. **5.3 Alert Scheduler** — needs an entitlement whose manage-page control was NOT located, and a
-   server-side scheduler that does not exist here.
-8. **Part 3 v5** — when an account is cleared for it.
+3. **Part 3 v5** — when an account is cleared for it.
 
 **Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
 complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,
@@ -330,10 +309,17 @@ complete list of what the reference has and we do not. Moderation (`kickUser`, `
 Five media-server admin commands are deliberately parked as UNCLEAR: whether a presenter should be
 able to reset shared media infrastructure is a product and safety decision, not a porting question.
 
-## Evidence, all committed
+## Evidence — two of these four are NOT committed, corrected 2026-08-29
 
-- `apps/room/docs/source-v4-2026-08-15/` — the current v4, three files + `sha256sums.txt` + a README
-  recording how it was verified and what changed
-- `apps/room/scripts/collect-app-versions.js` — the read-only version collector
-- `v5.md` — the version measurements and the retraction
-- `apps/room/docs/source/` — the OLDER v4, SHA-256 pinned, untouched
+This heading read **"Evidence, all committed"**. Measured with `git ls-files` and on disk:
+
+| | tracked | present here | |
+|---|---|---|---|
+| `apps/room/docs/source-v4-2026-08-15/` | **5 files** | yes | the current v4: three artifacts + `sha256sums.txt` + a README recording how it was verified and what changed. All three verified `OK` against that file on 2026-08-29 |
+| `v5.md` | **yes** | yes | the version measurements and the retraction |
+| `apps/room/scripts/collect-app-versions.js` | **0** | **no** | the read-only version collector. `.gitignore` excludes `/apps/room/scripts/` whole, deliberately — the collectors in it reach the reference application and this repository is public. `docs/UNPUBLISHED-SCRIPTS.md` records what is in there |
+| `apps/room/docs/source/` | **0** | **no** | the OLDER v4. Gitignored for the same reason, and its absence is why **42 evidence-bound test files are excluded from every run in a fresh clone** — `gate/evidence-bound-tests.mjs` prints that on every invocation |
+
+The correction matters more than the two entries do: a list headed "all committed" is read as *a
+clone has these*, and a clone has half of them. What a clone actually holds is the v4 bundle and
+`v5.md`; everything reconstructed from a DOM capture needs the author's machine.

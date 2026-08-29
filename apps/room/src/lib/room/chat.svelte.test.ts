@@ -16,6 +16,46 @@ const roomWith = (extraColumn: boolean) => {
   return { chat, prefs };
 };
 
+/**
+ * THE OFF-TOPIC SEED, and why it is a value rather than a thunk.
+ *
+ * `ngOnInit: sessData.autoSwitchToOfftopics && (this.channel = "offTopic", …)` — byte 1,407,102, read
+ * ONCE when the component initialises. This class reads it once too, in its constructor, and both
+ * assertions below are about the difference between that and a derivation: the tab must move when
+ * the room asks, and must still be movable back afterwards.
+ *
+ * The extra column has the same clause upstream at 2,359,803, gated on `preferences.extraChatColumn`
+ * — and it is a no-op in both applications, because that column already defaults to off-topic. Its
+ * default is asserted here so nobody wires the setting a second time into a column that is already
+ * there.
+ */
+describe('the off-topic seed', () => {
+  it('leaves the main column on main when the room says nothing', () => {
+    expect(roomWith(false).chat.tab).toBe('main');
+  });
+
+  it('opens the main column on off-topic when the room asks', () => {
+    const chat = new RoomChat({ extraColumnEnabled: () => false, autoSwitchToOffTopic: true });
+    expect(chat.tab).toBe('off-topic');
+  });
+
+  /*
+    A SEED, not a lock. If this were a `$derived` the member could not get back to the main channel,
+    and the column would re-switch on every five-second invalidate.
+  */
+  it('is still a tab the member can move', () => {
+    const chat = new RoomChat({ extraColumnEnabled: () => false, autoSwitchToOffTopic: true });
+    chat.tab = 'main';
+    expect(chat.tab).toBe('main');
+  });
+
+  it('leaves the EXTRA column alone, because it already defaults to off-topic', () => {
+    expect(roomWith(true).chat.extraTab).toBe('off-topic');
+    const seeded = new RoomChat({ extraColumnEnabled: () => true, autoSwitchToOffTopic: true });
+    expect(seeded.extraTab).toBe('off-topic');
+  });
+});
+
 describe('the mention router, which reads three fields to answer one question', () => {
   /*
     `preferences.extraChatColumn && (this.extraChatMsg || 'textAreaTxtExtra' === globals.chatInputFocus)`

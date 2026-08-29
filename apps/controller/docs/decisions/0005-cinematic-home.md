@@ -23,13 +23,13 @@ was never the product's face. The owner has now directed the product to have its
 `/` is an original composition, built from the technologies the product itself is proudest of, and
 **it renders no raster imagery at all**:
 
-| Layer | Technology | What it does |
-| --- | --- | --- |
-| Hero scene | Threlte 8 / three.js | 2,700 instanced candlesticks as a breathing market skyline; one draw call; pauses offscreen; loads only after a WebGL probe, via dynamic import |
-| Choreography | GSAP 3 + ScrollTrigger | split-character headline rise, scroll reveals, stat decode, magnetic CTAs |
-| Live tape | D3 (scale/shape/array) | a seeded simulated feed streamed through a real reactive pipeline, labeled **Simulated feed** wherever it appears |
-| Product mocks | pure CSS/SVG | the desk and the phone drawn in markup — illustrations that cannot rot out of sync with the product |
-| Type | self-hosted Roboto 300 + system stacks | the exact binary pinned by the font contract; zero new font bytes |
+| Layer         | Technology                             | What it does                                                                                                                                    |
+| ------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hero scene    | Threlte 8 / three.js                   | 2,700 instanced candlesticks as a breathing market skyline; one draw call; pauses offscreen; loads only after a WebGL probe, via dynamic import |
+| Choreography  | GSAP 3 + ScrollTrigger                 | split-character headline rise, scroll reveals, stat decode, magnetic CTAs                                                                       |
+| Live tape     | D3 (scale/shape/array)                 | a seeded simulated feed streamed through a real reactive pipeline, labeled **Simulated feed** wherever it appears                               |
+| Product mocks | pure CSS/SVG                           | the desk and the phone drawn in markup — illustrations that cannot rot out of sync with the product                                             |
+| Type          | self-hosted Roboto 300 + system stacks | the exact binary pinned by the font contract; zero new font bytes                                                                               |
 
 Structural rules, each enforced by `scripts/verify-home-contract.mjs`:
 

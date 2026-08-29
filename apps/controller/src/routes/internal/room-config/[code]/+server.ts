@@ -4,7 +4,7 @@ import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, badges, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { parseBadgeIds, readPermissions, readSettings } from '#lib/server/rooms.js';
-import { roomVisibleConfig } from '#lib/room-config.js';
+import { resolveRoomConfig, roomVisibleConfig } from '#lib/room-config.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { createHash } from 'node:crypto';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
@@ -98,7 +98,8 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     error(404, 'Room not found');
   }
 
-  const resolved = roomVisibleConfig(await readSettings(room.id));
+  const roomSettings = await readSettings(room.id);
+  const resolved = roomVisibleConfig(roomSettings);
 
   /*
     The member, when the caller names one.
@@ -182,8 +183,67 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     memberBadges[hash] = ids;
   }
 
+  /*
+    "Play chat message sound for" — the SETTING STAYS HERE; only the hashes travel.
+
+    The reference stores a comma-separated list of member EMAIL ADDRESSES and hashes them in the
+    browser on `globalsLoaded` (bundle byte 2,595,225):
+
+      sessData.playChatMessageSoundFor.replace(" ", "").split(",")
+        -> hashEmail(each) -> globals.playChatMessageSoundFor
+
+    …then compares that list against `e.avt`, the sender's email HASH, on every arriving message
+    (byte 1,431,949). So the raw addresses are shipped to every member's browser to be turned into
+    hashes the room could have been given directly.
+
+    **They are not shipped here.** `playChatMessageSoundFor` is NOT on `ROOM_VISIBLE_SETTINGS`; this
+    endpoint hashes the list and sends the digests, which is the only form the room's comparison
+    actually needs. Same reasoning, same `md5(email.trim().toLowerCase())` and same precedent as
+    `memberBadges` directly above: the room needs to MATCH a member, not to learn anybody's address,
+    and this response is serialised into SSR HTML on every load.
+
+    `.split(/[\s,]+/)` rather than the reference's `.replace(" ", "").split(",")`. **That is a fix,
+    and it is a one-character-class fix for a real defect**: `String.replace` with a STRING pattern
+    replaces the FIRST occurrence only, so upstream a list of `a@example.test, b@example.test, c@example.test` loses the
+    space before `b` and keeps the one before `c`, and ` c@example.test` hashes to something no sender
+    will ever match. MEASURED, not reasoned: the first two entries of any list are always fine and
+    every entry from the THIRD on is dead, so a five-address list loses three of five.
+  */
+  /*
+    READ FROM THE UNFILTERED CONFIG, AND THAT IS THE FIX RATHER THAN A SHORTCUT.
+
+    This used to read `resolved.values.playChatMessageSoundFor` — and `resolved` is
+    `roomVisibleConfig(...)`, which projects onto `ROOM_VISIBLE_SETTINGS`. `playChatMessageSoundFor`
+    is deliberately NOT on that list, precisely because the raw addresses must never cross. So the
+    read was permanently `undefined`, the list was permanently empty, and **"play chat sound for
+    these members" has never made a sound for anybody.**
+
+    It failed CLOSED, which is why nothing noticed: no address leaked, no error was thrown, and the
+    room received a well-formed empty array. That is the quiet half of a dead feature — the loud half
+    is a control an owner types addresses into that does nothing.
+
+    Found by a security review of this branch, filed as a correctness note rather than a
+    vulnerability, and verified here before being believed: `playChatMessageSoundFor` occurs zero
+    times in `room-config.ts`, so it cannot be on the allow-list.
+
+    `resolveRoomConfig` is called a SECOND time rather than widening `roomVisibleConfig` to return
+    unfiltered values. Two passes over a settings object cost nothing beside the database reads above,
+    and the alternative — a function whose job is to narrow, handing back the un-narrowed set — is the
+    exact shape that turns one careless spread into the leak the projection exists to prevent. The
+    allow-list stays in one place and keeps one meaning.
+
+    The privacy property is unchanged and is the whole point: only md5 hashes leave this function.
+  */
+  const chatSoundForEmailHashes = String(resolveRoomConfig(roomSettings).values.playChatMessageSoundFor ?? '')
+    .split(/[\s,]+/)
+    .map((address) => address.trim().toLowerCase())
+    .filter((address) => address.length > 0)
+    .map((address) => createHash('md5').update(address).digest('hex'));
+
   return json({
     badges: { definitions: badgeDefinitions, byEmailHash: memberBadges },
+    /* Derived from `playChatMessageSoundFor`, which itself never crosses. See above. */
+    chatSoundForEmailHashes: [...new Set(chatSoundForEmailHashes)],
     room: {
       shortCode: room.shortCode,
       name: room.name,

@@ -6,6 +6,7 @@ import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
 import { createSessionFor } from '#lib/server/auth.js';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
+import { closedRoomMessage } from '#lib/server/closed-room-message.js';
 import { verifyHandoffToken } from '#lib/server/handoff-token.js';
 import { hashEmail } from '#lib/server/connection.js';
 import {
@@ -237,7 +238,23 @@ async function verifyEntry(request: Request, token: string | null, shortCode: st
 
   if (roomConfig && isShutOutByRoomState(roomConfig.room.state, membership)) {
     console.warn('[session] refused entry to a closed room', { room: shortCode });
-    error(403, 'This room is closed.');
+    /*
+      THE PRESENTER'S OWN CLOSE MESSAGE, if they have written one.
+
+      This is the reader that stops `saveCloseMessage` being storage nothing consults — the reference
+      shows us the editor and never the display, so WHERE the message appears is this room's decision
+      and it is recorded as one on that command. A closed room turning somebody away is the one
+      moment the message is for.
+
+      The fallback is not cosmetic: the column is nullable precisely so "never set" stays different
+      from "set to empty", and a presenter who has written nothing must not be able to hand a member
+      a blank refusal. `?? ` on a value already normalised to `null` when empty, so a trimmed-empty
+      save also falls back.
+
+      Read here rather than passed in, because this refusal happens BEFORE the page data is
+      assembled and the room short code is the only key it needs.
+    */
+    error(403, closedRoomMessage(shortCode));
   }
 
   return { claims, roomConfig, membership };

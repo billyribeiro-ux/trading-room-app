@@ -7,7 +7,7 @@
    *
    * | variant | const | where |
    * | --- | --- | --- |
-   * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | app-room 104 | the navbar — already built, `+page.svelte:6824` |
+   * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | app-room 104 | the navbar — already built, `RoomNavbar.svelte:663` |
    * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]` | app-presentationarea 90 | HERE, the screen tab bar's `ms-auto` cluster |
    *
    * Decoded from `docs/source/components/app-presentationarea.render-helpers.js:264-459`
@@ -78,6 +78,14 @@
     ontogglepresenter: (user: TalkingPresenter) => void;
     /** `adjustVolPres($event, user)` — the per-presenter slider's `change` and `input`. */
     onpresentervolume: (user: TalkingPresenter, rawValue: string) => void;
+    /**
+     * Whether the dropdown is open — the `.show` Bootstrap's JavaScript used to add, and which
+     * nothing added here until 2026-08-29, so this control could not be opened at all. See
+     * `bootstrap-dropdown-contract.test.ts`.
+     */
+    open: boolean;
+    /** The trigger's click. Owned by `RoomMenus` so the window-click closer reaches this too. */
+    ontoggle: () => void;
   };
 
   let {
@@ -90,7 +98,9 @@
     onmute,
     onunmute,
     ontogglepresenter,
-    onpresentervolume
+    onpresentervolume,
+    open,
+    ontoggle
   }: Props = $props();
 
   /**
@@ -110,7 +120,14 @@
   Const 90. Gated on `viewerOnlyMode` alone — `O(3, e.appService.globals.viewerOnlyMode ? 3 : -1)`.
 -->
 {#if viewerOnlyMode}
-  <button type="button" id="dropdownVolume" data-bs-toggle="dropdown" class="btn btn-sm btn-dark">
+  <button
+    type="button"
+    id="dropdownVolume"
+    data-bs-toggle="dropdown"
+    aria-expanded={open}
+    class="btn btn-sm btn-dark"
+    onclick={ontoggle}
+  >
     <!--
       Three independent conditionals, exactly as `hSe` emits them. At audioVolume === 50 and
       audioVolume === 4 every branch is false and the button is empty; that is the reference's
@@ -128,16 +145,30 @@
   </button>
 {/if}
 
-<!-- Const 91. No gate in the reference; Bootstrap's `.dropdown-menu` hides it until `.show`. -->
-<div aria-labelledby="dropdownVolume" class="dropdown-menu volumeControl">
+<!--
+  Const 91. No gate in the reference: created unconditionally, hidden by `.dropdown-menu` until
+  `.show` lands. Upstream Bootstrap's JavaScript adds that; this app ships none, so it comes from
+  `RoomMenus` — as the navbar's twin of this control always did.
+-->
+<div
+  aria-labelledby="dropdownVolume"
+  class={open ? 'dropdown-menu volumeControl show' : 'dropdown-menu volumeControl'}
+>
   <h4>
     Volume
     <!--
       Const 92 — a `span[data-bs-toggle=dropdown]` INSIDE the h4, which is how the reference closes
       the menu: toggling the same dropdown a second time collapses it. It carries no handler of its
-      own (`d(7,'span',92), T(8,'i',93)` with no `x('click', …)`).
+      own (`d(7,'span',92), T(8,'i',93)` with no `x('click', …)`) because Bootstrap's JavaScript
+      reads the attribute — and NOTHING reads it here, so this closed nothing until 2026-08-29.
+
+      `ontoggle` rather than a bare close: the reference's mechanism IS a second toggle, and the
+      menu is necessarily open when this is visible, so the two are the same act. The tag stays the
+      reference's `<span>`; the `svelte-ignore`s record that rather than silence it.
     -->
-    <span data-bs-toggle="dropdown" class="float-right mr-2">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <span data-bs-toggle="dropdown" class="float-right mr-2" onclick={ontoggle}>
       <i class="fas fa-times"></i>
     </span>
   </h4>

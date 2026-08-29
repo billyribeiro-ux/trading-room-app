@@ -337,6 +337,450 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hideChatAlerts',
   /*
+    "Hide Notes Section?" — the THIRD of a trio whose other two have been on this list since it was
+    written, and the one that was missed.
+
+    `hideFiles` and `hideStreams` both cross, and both are applied by the reference the same way: a
+    `hidden` binding on the tab's `li` AND on the pane, so the tab and its content can never
+    disagree. `hideNotes` is applied identically —
+
+      this.hideNotes = sessData.hideNotes || globals.viewerOnlyMode          byte 1955694
+      z('hidden', o.hideNotes)   on the notes `li`                          byte 2016630
+      ('hidden', o.hideNotes)    on the notes pane                          byte 2017506
+
+    — and it was not on this list, so an owner who ticked "Hide Notes Section?" on the Manage page
+    got a room that still rendered the Notes tab. Configurable and inert, which is the specific
+    defect this file's neighbours call dead scaffolding.
+
+    FOUND BY ENUMERATION, not by looking: `gate/audit-setting-coverage.mjs` asks the pinned bundle
+    which settings the reference reads in its own browser that this room does not, and `hideNotes`
+    came back on that list beside 57 others. Nobody had noticed the trio was a pair.
+
+    Not a credential, and not a policy the room could infer: a per-room preference an owner ticks,
+    and the room is where the tab is drawn.
+
+    **The `|| viewerOnlyMode` half is NOT sent**, and that is deliberate rather than an omission: the
+    room already knows whether it is in viewer-only mode, so ORing it here would be the control plane
+    answering a question the room answers better. The room composes the two, exactly as it already
+    does for the reference's `hideFiles || videoOnlyMode`.
+  */
+  'hideNotes',
+  /*
+    THE THREE ROOM DEFAULTS — the settings that seed a new member's own preferences ONCE.
+
+    They cross together because upstream they ARE one thing: three consecutive clauses of a single
+    expression in `loadSessionData`, bytes 1,149,414 / 1,149,637 / 1,149,866 of the pinned v4
+    bundle. Each has the same three parts — the room setting below, a per-viewer LATCH preference,
+    and a write:
+
+      darkThemeAsDefault && !preferences.defaultDarkTheme
+        -> preferences.theme = "darkTheme",  setPreference("defaultDarkTheme", true)
+      alertSoundOff && !preferences.defaultAlertSoundOff
+        -> preferences.alertSoundOn = false, setPreference("defaultAlertSoundOff", true)
+      alertsChatOnBottom && !preferences.defaultAlertsChatOnBottom
+        -> preferences.roomSplitDir = "btt", setPreference("defaultAlertsChatOnBottom", true)
+
+    **The latch is why these are DEFAULTS and not overrides**, and it is the reason they belong on
+    this list rather than being folded into anything the controller decides. Which member has
+    already been given the room's default is a fact about that member's preference blob, which lives
+    on the room side; the controller only knows what the OWNER asked for. Send the setting, let the
+    room own the once-ness — `#lib/room/room-defaults.ts` and its test.
+
+    Found by `gate/audit-setting-coverage.mjs` on 2026-08-28, in the same pass that found
+    `hideNotes`. Not credentials, not policy the room could infer.
+
+    ONE THING THIS DOES NOT CHANGE, stated because the next reader will wonder. `classify()` above
+    calls `darkThemeAsDefault` a `default` (it matches `AsDefault$`) and the other two `room-only`
+    (they match neither pattern), even though the evidence says all three are defaults a member may
+    override. That disagreement is real and it is also inert: `resolveRoomConfig` treats `default`
+    and `room-only` identically unless the name is in `USER_OVERRIDABLE`, and neither of the two has
+    a `UserPreferences` key to be overridden BY — the preferences they seed (`alertSoundOn`,
+    `roomSplitDir`) live in the room's own blob, not in the controller's six-field model. Widening
+    the pattern or the map would be adding a branch nothing reaches, which this repository treats as
+    a defect in its own right. The once-ness lives in the room, where the latch is.
+  */
+  'darkThemeAsDefault',
+  'alertSoundOff',
+  'alertsChatOnBottom',
+  /*
+    "Don't show recording info to users" — the room half of the [ REC ] tooltip.
+
+    `RoomNavbar.svelte` has carried the correct transcription in a comment since it was written,
+    read at bundle byte 2,474,213:
+
+      ngbTooltip = (sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName
+        ? "" : "Recording to: " + decodedRecName()
+
+    and `RoomGates.recordingTooltip` implemented that shape against `prefs.loaded` — a per-VIEWER
+    preference key that nothing in this room has ever written. So the owner switch did nothing and
+    every member saw the recording FILE NAME, which is the one thing the setting exists to hide.
+    The comment was right and the code was reading the wrong side of the boundary; found by
+    `gate/audit-setting-coverage.mjs` on 2026-08-28.
+
+    Not a credential and not inferable: the owner decides whether members see the file name.
+  */
+  'dontShowRecInfoToUsers',
+  /*
+    "Chat disabled for trials?" — the THIRD reason the reference turns the composer off.
+
+      globals.user.isFT && sessData.chatDisabledForTrials && (this.chatEnabled = !1)
+
+    at bundle byte 1,437,810, the last of three assignments to one flag. This room had the other two
+    — the chat mode and this viewer's own mute — and no term for the owner policy, so a room that
+    had turned trial chat off served every trial a working composer. Wired 2026-08-28 with
+    `chatComposerAvailable`, which now holds all three in one place because splitting them is how
+    one goes missing.
+
+    Not a credential. It is policy about a CLASS of member, which is exactly the kind of thing that
+    belongs on this list: the room knows who is on a trial, and only the owner knows the policy.
+  */
+  'chatDisabledForTrials',
+  /*
+    "Q&A on alerts?" — the entitlement behind the ask-a-question button on every alert.
+
+      O(1, !e.isQAMsg && sessData.hasQAOnAlerts ? 1 : -1)          byte 1,339,784
+      if ("alerts" != this.logType || !sessData.hasQAOnAlerts) return;   byte 1,408,769
+
+    `RoomMessage.svelte` has drawn that button since it was written, gated on a prop that
+    **defaulted to `true` and was never passed** — so the affordance appeared on every alert in every
+    room, bought or not, and pressing it opened the Q&A modal. An entitlement that defaults open is
+    not an entitlement; this list is what closes it.
+
+    The second reader has no counterpart here and that is recorded rather than approximated: the
+    reference re-checks the flag inside `updateAlertMsg`, and this room has no such receiver — the
+    Q&A counters arrive through the feed and the `unreadQa` set.
+  */
+  'hasQAOnAlerts',
+  /*
+    "Always show roster?" — the sidebar opens on arrival and stays open.
+
+      sessData.alwaysShowRoster && (this.showSidebar = !0, this.alwaysShowRoster = !0,
+        setTimeout(() => this.appService.loadRoster(), 500))
+
+    at bundle bytes 1,499,261 and 2,566,991 — the room component and its popout, the same three
+    statements in both. It is a SEED, not a lock: `toggleSideBarUsersCount` still closes the sidebar
+    afterwards, so a member can put it away.
+
+    ONE consumer here and one deliberate refusal. The seed is built. The reference ALSO adds the flag
+    as a third OR-term to the mobile-app icon's slot (byte 2,487,668) so the slot stays occupied when
+    no app is configured — while `getMyPinAndDoInfo` keeps the two-term gate (2,529,070). Reproducing
+    that would put a button in this navbar that opens a modal reading `N/A` forever, which is a
+    control that does nothing; the refusal is recorded at `RoomGates.mobileAppAvailable`.
+  */
+  'alwaysShowRoster',
+  /*
+    "Speech recognition disabled?" — the room half of the captions gate, and NOTE THE NEGATION.
+
+      globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0     byte 1,147,900
+
+    Unlike `h264Enabled`, whose `|| !0` makes it unconditionally true and dead, the `!` here makes
+    this one live: an absent setting leaves recognition ON, which is the right default and is what
+    every unset setting means everywhere else in this payload.
+
+    Three consumers upstream and the first is the one that matters: `startSpeechRecognition()` returns
+    early on `!preferences.doSpeechReco || !globals.hasSpeechRecognition` (byte 1,110,427). This
+    room's `beginSpeechRecognition` has quoted that message — "disabled by preferences or session
+    settings" — in its docblock since it was written while implementing only the PREFERENCES half.
+  */
+  'hasSpeechRecognitionDisabled',
+  /*
+    "Hide webcam for room?" — the webcam control disappears for everybody.
+
+      O(27, sessData.hideWebcamForRoom
+            || !(isPresenter || user.hasCam || isLimitedPresenter)
+            || isNonPresenterAdmin || mediaService.camLaunching ? -1 : 27)      byte 2,489,228
+
+    ONE term of five, and the only one this room could not evaluate. It is a room-wide OFF switch
+    rather than a per-viewer capability, which is why it belongs on this list: the others are facts
+    the room already holds about the viewer and their devices.
+  */
+  'hideWebcamForRoom',
+  /*
+    "Blinking REC?" — whether the recording badge breathes.
+
+      z('ngClass', Kn(6, iPe, roomState.isRecording && sessData.blinkingRec, isRecordingStarting))
+      iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })                byte 2,477,678
+
+    `breathing-rec` is a REAL class with a real rule — a `50% { opacity: 0 }` keyframe, carried in
+    `captured-runtime-components.css:4281`. Unlike `smallImagePreview`, whose class styles nothing in
+    any of the 52 stylesheets and which is therefore answered as NOT A GAP, this one has somewhere
+    to land.
+  */
+  'blinkingRec',
+  /*
+    "Auto switch to off-topic?" — the MAIN chat column opens on the off-topic channel.
+
+      ngOnInit: sessData.autoSwitchToOfftopics && (this.channel = "offTopic",
+        this.appEventBus.emit("switchChatChannel", this.channel))              byte 1,407,102
+
+    A SEED, like `alwaysShowRoster`: the channel tabs still switch back. The EXTRA column has the
+    same clause at 2,359,803, additionally gated on `preferences.extraChatColumn` — and it is a
+    no-op there in both applications, because that column already defaults to off-topic.
+  */
+  'autoSwitchToOfftopics',
+  /*
+    "Sticky non-trade alert?" — the alert composer's Non-Trade checkbox starts ticked.
+
+      this.nonTradeAlert = sessData.styckyNonTradeAlert || !1                  byte 2,124,407
+
+    `styckyNonTradeAlert` is the reference's own spelling and is kept: the name has to match what
+    the controller stores, and correcting it here would silently stop reading the setting an owner
+    has already configured.
+
+    It is re-applied on EVERY open of the modal, which is what "sticky" means — the reference sets it
+    inside `doAlertsModal`, beside the other per-open resets, not once at construction.
+  */
+  'styckyNonTradeAlert',
+  /*
+    "Room Title" — the room's own name, and the document title.
+
+      globals.sessionName = r.name                                   byte 1,149,312
+      this.titleService.setTitle(this.appService.globals.sessionName)  byte 2,594,952
+
+    The name reaches three places upstream: the browser tab, the transcript window's `&name=`
+    parameter, and the private-chat notification flasher that alternates the tab between
+    `"<sender> messaged you - <room>"` and the room name. The tab is built here; the other two are
+    recorded as gaps rather than approximated.
+
+    NOTE THE ENUMERATION ARTEFACT. `gate/audit-setting-coverage.mjs` reports a high read count for
+    this name and almost all of it is noise — the bundle is full of unrelated `this.name` on
+    `UnsubscriptionError`, `ObjectUnsubscribedError` and Angular's own reflection. The single real
+    read is the assignment above. `docs/decoded/missing-settings-triage.md` records why the number is
+    not evidence of anything.
+  */
+  'name',
+  /*
+    "Moderator message" — a bar only the PRESENTER sees, above the presentation area.
+
+      O(2, e.modMessage && globals.isPresenter ? 2 : -1)              byte 2,493,284
+      this.modMessage = this.appService.globals.sessData.modMessage    byte 2,498,699
+      closeModMessage() { this.modMessage = "" }                       byte 2,532,005
+
+    Dismissed LOCALLY and not persisted — the reference clears its own field and writes nothing back,
+    so the bar returns on the next load. That is reproduced rather than improved: a dismissal that
+    outlived the page would need a preference the reference does not have, and inventing one would be
+    inventing a decision.
+
+    Its three classes — `mod-msg-container`, `mod-msg-btn`, `mod-msg` — all carry real rules in
+    `captured-runtime-components.css`, which is the check `blinkingRec` passed and
+    `smallerImagePreview` failed.
+  */
+  'modMessage',
+  /*
+    "Simplified Note Editor?" - which of the two Summernote colour buttons the note toolbar gets.
+
+      this.isSimplifiedEditor = this.appService.globals.sessData.simplifiedEditor
+        ? "forecolor"
+        : "color"                                                     byte 1,468,503
+      the toolbar group at the same object spends it as: color, then a one-member array
+      holding `this.isSimplifiedEditor`
+
+    ONE OCCURRENCE IN THE WHOLE BUNDLE, and it was read rather than searched for and assumed. The
+    value is not a boolean anywhere downstream: it is a STRING naming a toolbar button, and the only
+    thing the reference does with the setting is choose between those two names.
+
+    WHAT THE CAPTURE DOES NOT CONTAIN, stated because the next reader will look for it: Summernote
+    itself. The vendor that turns `"forecolor"` and `"color"` into DOM is a separate bundle we do not
+    hold, so the exact markup each name produces is NOT evidenced here. What IS evidenced is in
+    `styles.ee2a710065b60389.css`: `.note-color-all .note-dropdown-menu { min-width: 337px }` beside
+    `.note-color .note-dropdown-menu .note-palette { width: 160px }` and a
+    a `.note-palette:first-child` rule. Two 160px palettes side by side in a 337px menu, and an
+    `-all` suffix that means nothing unless a not-all case exists. The decision taken from that, and
+    its reasoning, is at `apps/room/src/lib/components/notes/note-gates.ts`.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK. The boundary test parses this array
+    with a single-quote regex bounded by the first closing bracket, so either one truncates the whole
+    list silently. Both traps have now been hit here; the first draft of this comment hit the second.
+  */
+  'simplifiedEditor',
+  /*
+    "Private message history?" - a MODERATION read, and the widest one this room performs.
+
+      O(102, e.appService.globals.sessData.enablePrivateMessageHistory ? 102 : -1)   byte 2,068,640
+      hTe: a button, click showPrivateMessages(), targeting the all-user-pm-modal
+      showPrivateMessages() emits doUserPMModal with peerID and nick               byte 2,087,336
+      the modal then calls invokeAdminCmd getAllUserPM with that peerID            byte 2,417,900
+
+    A presenter reading it sees the members OWN private conversations with everybody, not the thread
+    they share with the presenter. That is what the reference does and what the setting is named for,
+    and it is written out here because a setting that widens a read this far should not be crossed by
+    somebody skimming a list of names.
+
+    IT CROSSES SO THE SERVER CAN REFUSE. `loadPeerPrivateMessageHistory` checks the role AND this
+    setting from the control plane before it reads a row; the markup gate is the convenience for the
+    person clicking. A room that has not enabled it hands out nothing, however the button is reached.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'enablePrivateMessageHistory',
+  /*
+    "Show only usernames?" - which SHAPE a roster row draws in.
+
+      O(1, !this.appService.globals.sessData.showOnlyUsernames || e.isP ? 1 : 2)   byte 2,035,670
+
+    Slot 1 is the full row - avatar, badges, kebab, years, location. Slot 2 is four nodes: a
+    fa-user icon and the nick, keeping both handlers.
+
+    READ WHICH `e` THIS IS. It is the roster iterations own row, not the viewer, so a room with this
+    on draws PRESENTERS in full and MEMBERS as bare names, for everybody. The obvious reading -
+    members see only usernames - is the exact inverse and would have produced a room where
+    presenters lose their members avatars. That is why the predicate takes no viewer at all.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'showOnlyUsernames',
+  /*
+    The "tip me" button - ONE feature spelled as three settings, crossing together.
+
+      isTipEnabled = sessData.tipMeBtnEnabled && sessData.tipMeBtnUrl && sessData.tipMeBtnTxt
+                                                                            byte 2,509,187
+      doTipToUser() { sessData.tipMeBtnUrl && window.open(sessData.tipMeBtnUrl, "_blank") }
+                                                                            byte 2,531,907
+
+    A CONJUNCTION, not three gates. The switch alone draws a button with no label and no
+    destination; a URL with no text draws a nameless one. Upstream computes the three into one field
+    in its constructor and both render sites read that field, so `tipButtonFor` in the room does the
+    same and the markup never sees the three settings separately.
+
+    THE URL IS CHECKED IN THE ROOM, not trusted. The reference opens whatever is stored; this room
+    refuses anything that is not http or https, because a javascript URL there would run in every
+    member page with the room origin and a settings form is not where that guarantee should come
+    from. Recorded as a divergence at `tip-button.ts`; no legitimate tip destination is affected.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'tipMeBtnEnabled',
+  'tipMeBtnUrl',
+  'tipMeBtnTxt',
+  /*
+    The room OWN favicon and stylesheet, applied together on globalsLoaded.
+
+      sessData.customFaviconURL && this.changeFavicon(sessData.customFaviconURL)   byte 2,594,998
+      sessData.customCSS && this.addCustomCSS(sessData.customCSS)                  byte 2,595,119
+      changeFavicon                                                                byte 2,602,147
+      addCustomCSS                                                                 byte 2,602,486
+
+    THE SECOND ONE IS OWNER-AUTHORED CODE running in every member browser of that owner own room.
+    That is the reference feature and it is the same bargain a site theme makes, but it is written
+    down here rather than left implicit, because a settings list is where somebody decides to cross
+    something and this one deserves a sentence at that moment.
+
+    It is inlined as a TEXT NODE, and the reason is NOT the obvious one - a first draft of this
+    comment said a text node stops a closing style tag turning into executable script, and that was
+    MEASURED AND REFUTED: a style element is RAWTEXT, so innerHTML there is not a breakout either.
+    The real reason is that ordinary Svelte interpolation escapes, which would hand the CSS parser
+    entities instead of selectors. `room-branding.ts` records both the refuted claim and the real
+    one, together with the fix for the upstream substring check that decides whether a value is a
+    URL or a stylesheet body.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'customFaviconURL',
+  'customCSS',
+  /*
+    "Custom player URL" - an owner OWN iframe INSTEAD of the whole screens pane.
+
+      O(38, sessData.customPlayerURL ? 38 : 39)                       byte 2,017,248
+      eSe: div.d-flex.align-items-start.justify-content-center.w-100.h-100 wrapping an
+           iframe width 100 percent, height 95 percent, allow autoplay, allowfullscreen
+                                                                      byte 1,918,589
+
+    Slot 39 is everything else in that pane INCLUDING the save-data switch, so setting this takes
+    away the tab strip, the panes and the message together. That is the same all-or-nothing shape
+    disableVideo already has one level down, and the reason is the same: a tab strip with no video
+    under it would still be requesting streams.
+
+    THE REFERENCE BYPASSES ITS OWN SANITISER for this value - the binding runs through
+    bypassSecurityTrustResourceUrl. Svelte has no such guard to opt out of, so the room writes the
+    check: http and https only, parsed rather than pattern matched. See `custom-player.ts`, which
+    also records what the check does NOT do, namely bound what the framed page can do once loaded.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'customPlayerURL',
+  /*
+    "Copy trades" - a bracketed order inside an ALERT becomes one click to copy.
+
+      filterChatMessages rewrites the open and close markers into a tradeColor span   byte 1,414,924
+      copyTradeOnClick then doTradeCopy writes the span textContent to the clipboard  the same class
+      app-roomscroller template is O(0, sessData.copyTrades ? 0 : 1) between two row
+      lists whose consts differ ONLY by a click binding                               byte 1,419,447
+
+    ALERTS ONLY. The transform is gated on the log type as well as the setting, so the same markers
+    typed into chat stay literal - the same shape the alert-label substitution has.
+
+    NOTE THE DIVERGENCE, recorded at `copy-trades.ts`: the reference uses String replace with a
+    string pattern for both markers, so only the FIRST order in a message is ever made copyable. The
+    room splits every balanced pair. That is the second first-occurrence defect of this kind found in
+    the bundle today.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'copyTrades',
+  /*
+    "Positions iframe" and its URL - ONE feature spelled as two settings, crossing together.
+
+      O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)   byte 2,493,364
+      app-positions-container, refreshed every 30 seconds                      byte 2,329,246
+      loadPositionsContainer appends t=Date.now with the right separator       byte 2,330,000
+
+    A CONJUNCTION like the tip button, and it crosses as a pair for the same reason: the switch
+    without a URL draws a button that opens an empty panel. The room conjoins them once, on the
+    page, and the component receives one boolean.
+
+    THE TIMER IS BEHIND A SECOND, PER-VIEWER GATE - preferences.updatePositionsIframe - and the two
+    are ANDed. A member who never opens the panel must not have a background timer fetching an owner
+    page every thirty seconds, which is why the room half names that conjunction as a predicate
+    rather than writing it inline.
+
+    Scheme-checked in the room, which the reference is not: this binding is another
+    bypassSecurityTrustResourceUrl.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'positionsIframe',
+  'positionsIframeUrl',
+  /*
+    "Users can delete own messages?" - a MEMBER removing their own chat message or alert.
+
+      canDeleteOwnMessage(e) {
+        if (!globals.sessData.usersCanDeleteOwnMsgs || !e) return !1;
+        const i = this.getCurrentUserEmailHash(), o = globals.user?.userXrefID;
+        return i && i === e.avt || o && o === e.uid
+      }                                                                        byte 1,158,799
+
+      O(8, !e.isP && e.canDeleteOwnMsg ? 8 : -1)     the menu entry            byte 1,335,129
+
+    THIS ONE CROSSES TO CLOSE A HOLE RATHER THAN TO DRAW A CONTROL. The room server already let a
+    member delete their own message - the authorisation rule there is "a presenter may remove
+    anything, anyone else only what is theirs" - and it never asked whether the room allowed it. The
+    menu entry was unfed and defaulted off, so nothing in the UI showed the gap, which is exactly why
+    a control nobody can see is not a control nobody can reach.
+
+    A presenter is unaffected: removing anything is a different authority and is not conditioned on
+    this setting upstream either.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'usersCanDeleteOwnMsgs',
+  /*
+    "Typing indicator" - who is typing, per chat channel.
+
+      this.showTyping = this.appService.globals.sessData.hasTypingIndicator     byte 1,437,168
+      O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)   the display slot  byte 1,454,281
+      updateLastTypedTime sends typing once per burst                           byte 1,435,993
+      refreshTypingStatus sends notyping on empty, blur or 5 seconds idle       byte 1,435,666
+
+    TWO FRAMES PER BURST, not one per keystroke, which is what makes broadcasting it affordable.
+
+    IT GATES THE SEND AS WELL AS THE DISPLAY. A room that has not bought this must not have members
+    broadcasting their keystroke state to each other, so `setTyping` checks it on the server before
+    it records anything. A display-only gate would leave the traffic flowing and only hide it.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'hasTypingIndicator',
+  /*
     The two ROOM halves of the join/leave announcements (`app-room.full.js:2134-2155`).
 
     Each effect is gated twice, on a room setting AND a per-viewer preference:
@@ -494,6 +938,91 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'alertLabels',
   /*
+    "List of chat tabs with badges" — extra chat CHANNELS behind an entitlement.
+
+    The FIFTH setting shipped as a string containing JSON, after `alertLabels`, `modAlertFilterList`
+    and the two the note above names. Its shape is in its own help text: a list of objects of name
+    and badges, where each badge is one of the ids `badges.definitions` already carries.
+
+    It crosses because the channel list is a room POLICY and there is nothing to default from. A room
+    that configures none has the two built-in tabs, which is what every room had before this existed,
+    so the absent case needs no value.
+
+    THE RAW JSON CROSSES AND DECIDES NOTHING. The reference evaluates the badge gate in the BROWSER
+    against globals dot user dot badges and then subscribes the socket to the channel, so a member
+    who edits that list in a console gets the channel. Here the ROOM SERVER decides, in
+    `memberChatChannels`, and the member is told which tabs they have. What travels is a list of
+    names and badge ids the room already holds beside it, never a decision.
+
+    Read by `#lib/chat-tabs.ts` and `#lib/server/chat-channels.ts`.
+  */
+  'chatTabsWithBadges',
+  /*
+    "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with it.
+
+    THREE behaviours behind one checkbox, read from six sites. It forces the display mode to compact
+    on the chat columns, the alerts log and the Q and A thread — writing the member preference as it
+    goes — and it is the first term of the hide-avatar rule on chat and the Q and A thread but NOT on
+    the alerts log. That last asymmetry is upstream own and is reproduced with the reason recorded.
+
+    It crosses because every occurrence is sessData dotted onto the name: per-room policy, nothing
+    the room can infer. It is a SEED rather than a lock, exactly as upstream applies it — a member
+    can still switch modes afterwards in the settings modal, and re-deriving would put the owner
+    value back on every refresh.
+
+    Read by `#lib/chat-display-mode.ts` and `#lib/room/display-modes.svelte.ts`.
+  */
+  'altChatRender',
+  /*
+    "Alerts over screenshare?" — the last four alerts burned into the outgoing screen capture.
+
+    The reference does not draw this over the video element for the viewer; it puts a CANVAS between
+    the display capture and the wire and publishes the canvas instead, so the alerts are in the
+    pixels every member receives and in any recording made of them. That is why it is a room policy
+    and not a viewer preference: one presenter ticking it changes what everybody else sees.
+
+    Every occurrence in the reference bundle is sessData dotted onto the name, and the compositor at
+    bundle byte 1,099,577 reads it as the gate on whether the wrap happens at all. Nothing the room
+    can infer for itself: it depends on how the owner intends the room to be recorded.
+
+    Read by `#lib/room/screen-overlay.svelte.ts`, which wraps the capture, and by
+    `#lib/room/events.svelte.ts`, which feeds it each arriving alert.
+  */
+  'alertsOverlayOnScreenshare',
+  /*
+    "Alert Scheduler?" — an alert written now and posted by the server later.
+
+    Three commands upstream and one gate on all of them: `alertMsgLater` (bundle byte 2,130,937),
+    `getScheduledAlerts` (1,009,767, sent on session load when this flag is on) and
+    `removeScheduledAlert` (2,406,725). Every occurrence is sessData dotted onto the name.
+
+    It crosses as a POLICY and is enforced on the room server, not only drawn: a room whose owner has
+    the scheduler off refuses a schedule. The reference gates only the UI, which is a gate anyone can
+    step past from a console.
+
+    Read by `#lib/scheduled-alert.ts`, `#lib/server/scheduled-alerts.ts` and
+    `routes/scheduled-alerts.remote.ts`.
+  */
+  'hasAlertScheduler',
+  /*
+    "Auto Record?" and "Do not stop recording on mic mute?" — ONE feature, two settings.
+
+    They cross together because the second is inert without the first. `autoRecord` is read at three
+    sites (bundle bytes 1,116,794 / 1,121,427 / 1,125,863) and is a gate on the STOP as well as on
+    both starts, so a room with it off never auto-stops on a mute no matter what the second says.
+    Crossing one without the other would give an owner a control whose effect depends on a value
+    they cannot see.
+
+    The rules: a recording starts when this presenter opens their microphone while sharing a screen,
+    or begins sharing one with their microphone already open; and it stops when they mute, unless
+    dontStopRecOnMicMute is set or somebody else still has an open mic.
+
+    Both are sessData dotted onto the name at every occurrence: per-room policy, nothing a browser
+    can infer. Read by `#lib/auto-record.ts` and `#lib/room/recording.ts`.
+  */
+  'autoRecord',
+  'dontStopRecOnMicMute',
+  /*
     FOUR gates the room already implemented and could never switch on.
 
     `RoomMessage.svelte` has carried all four props since it was written, each defaulting false,
@@ -510,6 +1039,24 @@ export const ROOM_VISIBLE_SETTINGS = [
   'enableReactions',
   'enableEditMessage',
   'enableEditAlerts',
+  /*
+    "Enable QA Reactions?" — the SAME control on a different surface, and a fifth setting of the
+    shape above.
+
+    The rule is one expression upstream (bundle byte 1,335,445): reactions render when
+    enableReactions and the log is chat, OR when enableQAReactions and the log is alerts and the row
+    is being drawn inside the Q and A thread. `message-behavior.ts` has carried that transcription
+    since it was written, and the second half could never be true here, because the thread rendered
+    its rows as chat with a handler that did nothing.
+
+    It crosses for the reason the four above do: every occurrence in the reference is sessData dotted
+    onto the name, so it is per-room policy and nothing the room can infer. And it is DECIDED ON THE
+    SERVER as well as drawn — reactToQuestion refuses when the room did not enable it, because a gate
+    that only removes a menu entry is not a gate.
+
+    Read by `room-message-chrome.ts` and by `routes/alert-questions.remote.ts`.
+  */
+  'enableQAReactions',
   /*
     "Recording Reminder If Speaking?" - the POLICY half of the reminder banner.
 

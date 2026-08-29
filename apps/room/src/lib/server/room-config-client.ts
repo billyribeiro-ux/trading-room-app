@@ -23,9 +23,12 @@ import { ROOM_JWT_SECRET } from '$app/env/private';
 import {
   controlPlaneOrigin,
   mobilePinUrl,
+  mobileRestoreUrl,
   roomConfigUrl,
   roomEntryUrl,
+  roomNotesAuthUrl,
   roomBanUrl,
+  roomMuteUrl,
   roomPermissionsUrl,
   roomSettingUrl,
   streamIngestUrl,
@@ -165,6 +168,211 @@ export interface RoomSessionSettings {
    * honest gap recorded for {@link hideFiles}.
    */
   hideChatAlerts?: boolean;
+  /**
+   * "Hide Notes Section?" — the room-wide half of the notes tab's `hidden` binding.
+   *
+   * The THIRD of the trio with `hideFiles` and `hideStreams`, and the one that was missing from
+   * `ROOM_VISIBLE_SETTINGS` until 2026-08-28. Composed with viewer-only mode by `RoomGates.notesHidden`,
+   * which is where the reference composes it too (bundle byte 1955694).
+   */
+  hideNotes?: boolean;
+  /**
+   * THE THREE ROOM DEFAULTS — settings that seed a NEW member's own preferences once and then stop.
+   *
+   * Three clauses of one expression in the reference's `loadSessionData`, bytes 1,149,414 /
+   * 1,149,637 / 1,149,866, so they arrive together. Each is paired with a latch preference that
+   * records this viewer has already had it, which is what makes it a default rather than an
+   * override: without the latch, a room with `alertSoundOff` would re-silence a member's alerts on
+   * every page load and their own switch would look broken.
+   *
+   * The rule, the latches and the two recorded divergences are in `#lib/room/room-defaults.js`.
+   */
+  darkThemeAsDefault?: boolean;
+  /** See {@link RoomSessionSettings.darkThemeAsDefault} — seeds `alertSoundOn = false`. */
+  alertSoundOff?: boolean;
+  /** See {@link RoomSessionSettings.darkThemeAsDefault} — seeds `roomSplitDir = 'btt'`. */
+  alertsChatOnBottom?: boolean;
+  /**
+   * "Don't show recording info to users" — the ROOM half of the REC-indicator tooltip.
+   *
+   * `(sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName` blanks the tooltip
+   * (bundle byte 2,474,213). `RoomGates.recordingTooltip` implemented that shape against a viewer
+   * PREFERENCE of the same name until 2026-08-28 — a key nothing writes — so the owner switch did
+   * nothing and every member saw the recording file name.
+   */
+  dontShowRecInfoToUsers?: boolean;
+  /**
+   * "Chat disabled for trials?" — the THIRD reason the reference turns the chat composer off.
+   *
+   * `globals.user.isFT && sessData.chatDisabledForTrials && (this.chatEnabled = !1)`, bundle byte
+   * 1,437,810. This room had the chat MODE and this viewer's own MUTE and no term for the owner
+   * policy, so a room that had turned trial chat off served every trial a working composer.
+   * `chatComposerAvailable` in `#lib/chat-mode.js` now holds all three.
+   */
+  chatDisabledForTrials?: boolean;
+  /**
+   * "Q&A on alerts?" — the entitlement behind the ask-a-question button on an alert.
+   *
+   * `O(1, !isQAMsg && sessData.hasQAOnAlerts ? 1 : -1)` at bundle byte 1,339,784, which is
+   * `RoomMessage.svelte:774` here. That button has been drawn since the component was written,
+   * gated on a prop that **defaulted to `true` and was never passed**, so it appeared on every alert
+   * in every room whether or not the owner had bought Q&A.
+   */
+  hasQAOnAlerts?: boolean;
+  /**
+   * "Always show roster?" — the sidebar opens on arrival.
+   *
+   * `sessData.alwaysShowRoster && (showSidebar = true, …, loadRoster())` at bundle bytes 1,499,261
+   * and 2,566,991. A SEED, not a lock: the toggle still closes it afterwards.
+   */
+  alwaysShowRoster?: boolean;
+  /**
+   * "Speech recognition disabled?" — the room half of the captions gate, and note the NEGATION.
+   *
+   * `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0`, byte 1,147,900.
+   * Absent leaves recognition on, which is what an absent setting means everywhere in this payload.
+   */
+  hasSpeechRecognitionDisabled?: boolean;
+  /**
+   * "Hide webcam for room?" — the webcam control disappears for everybody.
+   *
+   * The FIFTH term of `O(27, sessData.hideWebcamForRoom || !(isPresenter || user.hasCam ||
+   * isLimitedPresenter) || isNonPresenterAdmin || camLaunching ? -1 : 27)`, byte 2,489,228, and the
+   * only one this room could not evaluate for itself.
+   */
+  hideWebcamForRoom?: boolean;
+  /**
+   * "Blinking REC?" — whether the recording badge breathes.
+   *
+   * `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })` bound with
+   * `roomState.isRecording && sessData.blinkingRec`, byte 2,477,678. `breathing-rec` carries a real
+   * `50% { opacity: 0 }` keyframe in `captured-runtime-components.css`.
+   */
+  blinkingRec?: boolean;
+  /**
+   * "Auto switch to off-topic?" — the MAIN chat column opens on the off-topic channel.
+   *
+   * `sessData.autoSwitchToOfftopics && (this.channel = "offTopic", …)` at byte 1,407,102. A seed:
+   * the channel tabs still switch back. The extra column has the same clause and it is a no-op
+   * there in both applications, because that column already defaults to off-topic.
+   */
+  autoSwitchToOfftopics?: boolean;
+  /**
+   * "Sticky non-trade alert?" — the alert composer's Non-Trade checkbox starts ticked.
+   *
+   * `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1`, byte 2,124,407, inside
+   * `doAlertsModal` — so it is re-applied on EVERY open, which is what sticky means. The reference's
+   * spelling is kept: the name has to match what the controller stores.
+   */
+  styckyNonTradeAlert?: boolean;
+  /**
+   * "Room Title" — the room's own name, and the browser tab.
+   *
+   * `globals.sessionName = r.name` (byte 1,149,312), then
+   * `titleService.setTitle(globals.sessionName)` (2,594,952). Two further consumers are recorded as
+   * gaps rather than approximated: the transcript window's `&name=` parameter, and the private-chat
+   * notification flasher that alternates the tab between `"<sender> messaged you - <room>"` and the
+   * room name.
+   */
+  name?: string;
+  /**
+   * "Moderator message" — a bar only the PRESENTER sees, above the presentation area.
+   *
+   * `O(2, e.modMessage && globals.isPresenter ? 2 : -1)` (byte 2,493,284). Dismissed locally and not
+   * persisted, exactly as `closeModMessage()` does it (2,532,005).
+   */
+  modMessage?: string;
+  /**
+   * "Simplified Note Editor?" — foreground-only colour on the note editor's toolbar.
+   *
+   * `this.isSimplifiedEditor = sessData.simplifiedEditor ? "forecolor" : "color"` (byte 1,468,503),
+   * spent as the single member of the toolbar's `["color", [...]]` group. The reference turns those
+   * two names into markup inside Summernote, which is NOT in the capture — see
+   * `#lib/components/notes/note-gates.ts` for what that means the room can and cannot claim.
+   */
+  simplifiedEditor?: boolean;
+  /**
+   * "Private message history?" — the moderation read behind the user-info modal.
+   *
+   * `O(102, sessData.enablePrivateMessageHistory ? 102 : -1)` (byte 2,068,640) draws a
+   * "Show private messages" button whose click reaches `getAllUserPM` for that peer. It crosses so
+   * that `loadPeerPrivateMessageHistory` can refuse on the SERVER; the markup gate is the
+   * convenience, not the authority.
+   */
+  enablePrivateMessageHistory?: boolean;
+  /**
+   * "Show only usernames?" — presenters draw in full, members as an icon and a name.
+   *
+   * `O(1, !sessData.showOnlyUsernames || e.isP ? 1 : 2)` (byte 2,035,670), where `e` is the ROW.
+   * See `rosterRowIsFull` for why that distinction is the whole setting.
+   */
+  showOnlyUsernames?: boolean;
+  /**
+   * The "tip me" button — ONE feature, three settings, and the gate is the conjunction of all three.
+   *
+   * `isTipEnabled = tipMeBtnEnabled && tipMeBtnUrl && tipMeBtnTxt` (byte 2,509,187), drawn at two
+   * sites in the sidebar and opened with `window.open(tipMeBtnUrl, "_blank")` (2,531,907). They
+   * cross together because one without the others draws a nameless or inert button; `tipButtonFor`
+   * holds the rule and the URL scheme check.
+   */
+  tipMeBtnEnabled?: boolean;
+  /** See {@link RoomSessionSettings.tipMeBtnEnabled}. `http:`/`https:` only, checked in the room. */
+  tipMeBtnUrl?: string;
+  /** See {@link RoomSessionSettings.tipMeBtnEnabled}. The label AND the `title` attribute. */
+  tipMeBtnTxt?: string;
+  /**
+   * The room's own favicon, applied on `globalsLoaded` (byte 2,594,998) by `changeFavicon`
+   * (2,602,147). `app.html`'s icon link carries `type="image/x-icon"` for exactly this reason.
+   */
+  customFaviconURL?: string;
+  /**
+   * The room's own stylesheet — a URL to link, or CSS to inline. `addCustomCSS` (byte 2,602,486).
+   *
+   * OWNER-AUTHORED CODE served to every member of that owner's room. `room-branding.ts` records
+   * what that does and does not mean, and fixes the `indexOf("https")` check that decides which of
+   * the two forms a value is.
+   */
+  customCSS?: string;
+  /**
+   * "Custom player URL" — an owner's own iframe INSTEAD of the whole `#screens` pane.
+   *
+   * `O(38, sessData.customPlayerURL ? 38 : 39)` (byte 2,017,248). Checked for scheme in the room by
+   * `customPlayerUrl`; the reference binds it through an explicit sanitiser bypass.
+   */
+  customPlayerURL?: string;
+  /**
+   * "Copy trades" — `[{( … )}]` in an ALERT becomes one click-to-copy order.
+   *
+   * Rewrite at byte 1,414,924, click beside it, and the scroller's whole template is
+   * `O(0, sessData.copyTrades ? 0 : 1)` between two row lists differing only by a click binding
+   * (1,419,447). `copy-trades.ts` carries the argument and the one divergence.
+   */
+  copyTrades?: boolean;
+  /**
+   * "Positions iframe" and its URL — ONE feature, two settings, and the gate is their conjunction.
+   *
+   * `O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)` (byte 2,493,364) draws
+   * the Show/Hide Positions buttons; `app-positions-container` (2,329,246) is the panel they open,
+   * refreshed every thirty seconds when the viewer's own `updatePositionsIframe` preference is on.
+   */
+  positionsIframe?: boolean;
+  /** See {@link RoomSessionSettings.positionsIframe}. Scheme-checked by `positionsIframeSrc`. */
+  positionsIframeUrl?: string;
+  /**
+   * "Users can delete own messages?" — a MEMBER removing their own chat message or alert.
+   *
+   * `canDeleteOwnMessage(msg)` at byte 1,158,799, whose first term is this setting and whose second
+   * is `hash === msg.avt || xrefID === msg.uid`. Enforced on the SERVER in
+   * `routes/message-actions.remote.ts`; the menu entry is the convenience.
+   */
+  usersCanDeleteOwnMsgs?: boolean;
+  /**
+   * "Typing indicator" — `showTyping = sessData.hasTypingIndicator` (byte 1,437,168).
+   *
+   * Gates the display AND the send: `setTyping` refuses on the server, so a room without it does not
+   * have members broadcasting their keystroke state to each other either.
+   */
+  hasTypingIndicator?: boolean;
   /**
    * "Tawk Presenter Support?" — the room half of the support widget
    * (`app-room.render-helpers.js:1417-1422`, `full.js:2224`).
@@ -334,6 +542,80 @@ export interface RoomSessionSettings {
    */
   alertLabels?: string;
   /**
+   * "List of chat tabs with badges" — extra chat CHANNELS behind an entitlement.
+   *
+   * The FOURTH setting shipped as a string containing JSON, beside `alertLabels`,
+   * `modAlertFilterList` and the two above. Its shape is in its own help text:
+   * `[ { "name": "easy channel", "badges": ["61eafd…"] }, … ]`.
+   *
+   * It crosses because the channel list is a ROOM's own configuration and there is nothing to
+   * default from — a room that configures none has the two built-in tabs, which is what every room
+   * had before this existed.
+   *
+   * **The raw JSON crossing does not decide anything.** Upstream evaluates the badge gate in the
+   * BROWSER; here the ROOM SERVER does, in `memberChatChannels`, and the member is told which tabs
+   * they have. The badge IDS in this value are already the owner's own and name nothing private —
+   * `badges.definitions` crosses in full beside it — so what travels is a list of names and ids the
+   * room already holds, and never a decision.
+   */
+  chatTabsWithBadges?: string;
+  /**
+   * "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with
+   * it.
+   *
+   * THREE behaviours behind one checkbox, read from six sites in the reference. It forces
+   * `displayMode = 'c'` on the chat columns (byte 1,434,685), the alerts log (2,047,129) and the
+   * Q&A thread (2,335,599) — writing the preference as it goes — and it is the first term of
+   * `hideAvatar` on chat and the Q&A thread but NOT on alerts (1,349,065).
+   *
+   * It crosses because every occurrence is `sessData.<name>`: per-room policy, nothing the room can
+   * infer. `#lib/chat-display-mode.ts` holds the rules and the preference-key collision that comes
+   * with them.
+   */
+  altChatRender?: boolean;
+  /**
+   * "Alerts over screenshare?" — the last four alerts burned into the outgoing screen capture.
+   *
+   * The reference does not draw these over the viewer's `<video>`. It puts a CANVAS between
+   * `getDisplayMedia` and the producer and publishes the canvas instead (compositor at byte
+   * 1,099,577), so the alerts are in the pixels every member receives and in any recording made of
+   * them — which is what the setting's own help text says it is for.
+   *
+   * It crosses because every occurrence is `sessData.<name>`, and because it is not a viewer
+   * preference in any sense: one presenter ticking it changes what everybody else sees.
+   * `#lib/room/screen-overlay.ts` is the gate and the lifecycle;
+   * `#lib/alert-overlay-layout.ts` is the geometry, and it is pure.
+   */
+  alertsOverlayOnScreenshare?: boolean;
+  /**
+   * "Alert Scheduler?" — an alert a presenter writes now and the SERVER posts later.
+   *
+   * Three commands upstream (`alertMsgLater`, `getScheduledAlerts`, `removeScheduledAlert`) and one
+   * gate on all of them. `#lib/scheduled-alert.ts` holds the repeat arithmetic and says which parts
+   * are transcribed and which are a decision; `#lib/server/scheduled-alerts.ts` holds the store, the
+   * atomic claim and the sweep.
+   *
+   * It crosses because every occurrence is `sessData.<name>`, and it is checked on the SERVER as
+   * well as drawn: a room with the scheduler off REFUSES a schedule rather than merely not offering
+   * one, which is the correction `enableQAReactions` was made under.
+   */
+  hasAlertScheduler?: boolean;
+  /**
+   * "Auto Record?" and "Do not stop recording on mic mute?" — a recording that starts and stops on
+   * its own.
+   *
+   * ONE feature and two settings, and they cross together because the second is inert without the
+   * first: every one of `autoRecord`'s three read sites is a gate on the stop as well as on the
+   * start, so a room with `autoRecord` off never auto-stops either. `#lib/auto-record.ts` holds all
+   * four bundle citations, the `talkingUsers.length <= 1` ordering trap, and the two divergences
+   * this room's browser-side recorder forces.
+   *
+   * Both cross because every occurrence in the reference is `sessData.<name>` — per-room policy,
+   * nothing a browser can infer.
+   */
+  autoRecord?: boolean;
+  dontStopRecOnMicMute?: boolean;
+  /**
    * Four per-room gates that `RoomMessage.svelte` already implements.
    *
    * Each was a prop defaulting `false` that the page never passed, so the feature was unreachable.
@@ -342,6 +624,15 @@ export interface RoomSessionSettings {
    */
   usersPublicReply?: boolean;
   enableReactions?: boolean;
+  /**
+   * "Enable QA Reactions?" — the SAME control, on the Q&A thread rather than on chat.
+   *
+   * The reference states both halves as one expression (bundle byte 1,335,445), which is why they
+   * are two settings and one rule: `sourceMessageBehavior.react`. Read by `buildMessageChrome` for
+   * the menu and by `reactToQuestion` for the write, because a gate that only removes a menu entry
+   * is not a gate.
+   */
+  enableQAReactions?: boolean;
   /** Chat and alerts are gated SEPARATELY upstream, which is why this is not one setting. */
   enableEditMessage?: boolean;
   enableEditAlerts?: boolean;
@@ -395,6 +686,17 @@ export interface RoomBadges {
 
 export interface RoomConfig {
   badges?: RoomBadges;
+  /**
+   * "Play chat message sound for" — the member email HASHES an arriving message is checked against.
+   *
+   * DERIVED, not crossed. The setting itself holds raw email addresses and stays off
+   * `ROOM_VISIBLE_SETTINGS`; `internal/room-config/[code]` splits and hashes it, because a hash is
+   * the only form this room's comparison needs — messages carry `senderEmailHash`, never an address.
+   * Same reasoning and the same digest as `badges.byEmailHash` beside it.
+   *
+   * Absent for a room that configured none, which reads the same as an empty list.
+   */
+  chatSoundForEmailHashes?: string[];
   room: {
     shortCode: string;
     name: string;
@@ -570,6 +872,73 @@ export async function requestMobilePin(shortCode: string, memberEmail: string): 
   return payload.pin;
 }
 
+/** What a restore did, in the only terms the room needs to compose a sentence. */
+export interface MobileRestoreResult {
+  /** Registrations this member had before the sweep. Zero means the app was never paired. */
+  registrations: number;
+  /** Devices the push actually reached. */
+  sent: number;
+  failed: number;
+  /** Dead registrations removed. This is the half that RESTORES anything. */
+  pruned: number;
+}
+
+/**
+ * `restoreMobileAppTokens` — push to every device this member has, and drop the dead ones.
+ *
+ * Modelled on {@link requestMobilePin} above, down to the capability and the timeout, because it is
+ * the same shape: a POST to the controller, for one named member, triggered by one button.
+ *
+ * **The counts are validated rather than trusted.** The room turns them into a sentence a member
+ * reads, and a `NaN` in that sentence would be worse than an error — it would look like an answer.
+ * The controller is ours, which is exactly why this is checked here: a boundary that only validates
+ * what it does not control is a boundary that stops being one the first time both sides move.
+ */
+export async function restoreMobileTokens(
+  shortCode: string,
+  memberEmail: string
+): Promise<MobileRestoreResult> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = mobileRestoreUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', memberEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${configReadToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the restore failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  const count = (key: keyof MobileRestoreResult): number => {
+    const value = payload[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new RoomConfigUnavailable(`the controller returned no ${key}`);
+    }
+    return value;
+  };
+
+  return {
+    registrations: count('registrations'),
+    sent: count('sent'),
+    failed: count('failed'),
+    pruned: count('pruned')
+  };
+}
+
 /**
  * Writing one setting back: `POST {control}/internal/room-setting/{shortCode}`.
  *
@@ -731,6 +1100,58 @@ export async function writeRoomBan(
     membership row moved between the authority read and the write — a correct answer about a race,
     not a control plane that is down, and one the presenter should see as "that did not apply".
   */
+  if (response.status === 403 || response.status === 404 || response.status === 409) {
+    throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * The indefinite chat mute: `POST {control}/internal/room-mute/{shortCode}`.
+ *
+ * `writeRoomBan`'s shape exactly, one opcode over. It is separate rather than a flag on that call
+ * because the two answer different questions and write different roles, and because a single
+ * function taking `banned` and `muted` would have a fourth state — both true — that the role column
+ * cannot represent.
+ *
+ * The controller refuses a self-target and refuses the room's owner; see the endpoint for why the
+ * second is stricter than anything the reference states. Refusals are DISTINGUISHED from outages for
+ * the reason `writeRoomPermissions` gives: a 403 is a correct answer that retrying will not change.
+ */
+export async function writeRoomMute(
+  shortCode: string,
+  callerEmail: string,
+  targetEmail: string,
+  muted: boolean
+): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomMuteUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', callerEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ targetEmail, muted }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the write failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  // 409 joins 403 and 404 as a REFUSAL rather than an outage — the membership moved between the
+  // authority read and the write. See `writeRoomBan`.
   if (response.status === 403 || response.status === 404 || response.status === 409) {
     throw new RoomPermissionsRefused(`the controller answered ${response.status}`);
   }
@@ -969,4 +1390,69 @@ export async function decideRoomEntryRemotely(
 
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
   return (await response.json()) as RoomEntryDecision;
+}
+
+/** What `internal/room-notes-auth` answers. */
+export interface NotesPasswordDecision {
+  /** Whether the room has a notes password configured at all. False means upstream never prompts. */
+  readonly required: boolean;
+  /** Whether this attempt may manage a member's notes. */
+  readonly ok: boolean;
+}
+
+/**
+ * Ask the controller whether a notes password is required, and whether this one is right.
+ *
+ * ## Why it FAILS CLOSED by throwing, like {@link decideRoomEntryRemotely}
+ *
+ * A thrown `RoomConfigUnavailable` is the only honest answer when the controller cannot be reached:
+ * the room does not hold `needPasswordForUserNotes` and cannot decide locally, so "I could not ask"
+ * must not be mistaken for "yes". Returning `{ok:false}` on a network error would be worse in the
+ * other direction too — it would tell a presenter their correct password was wrong.
+ *
+ * Two calls per interaction, and the first carries an EMPTY candidate. That is not a probe for the
+ * password; it is the reference's own first branch — `needPasswordForUserNotes && !allowToManageNotes`
+ * — asked of the only machine that can answer it. The endpoint returns `required:false` when nothing
+ * is configured, which is what lets the room grant access without prompting, exactly as upstream does.
+ */
+export async function checkNotesPasswordRemotely(
+  shortCode: string,
+  candidate: string
+): Promise<NotesPasswordDecision> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomNotesAuthUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ candidate }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the notes-password check failed or timed out after ${TIMEOUT_MS}ms`,
+      { cause }
+    );
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const decision = (await response.json()) as NotesPasswordDecision;
+  /*
+    Validated rather than trusted, because this value decides access. A controller that answered
+    `{}` — a deploy mid-rollout, a proxy returning an error page as JSON — would otherwise read as
+    `ok: undefined`, which is falsy here but would be truthy under any later `!== false` refactor.
+  */
+  if (typeof decision?.ok !== 'boolean' || typeof decision?.required !== 'boolean') {
+    throw new RoomConfigUnavailable('the controller answered an unrecognised notes-auth shape');
+  }
+  return { required: decision.required, ok: decision.ok };
 }

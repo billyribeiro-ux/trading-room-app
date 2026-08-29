@@ -54,12 +54,10 @@ const ROOM_FULL_COMPACT = compact(ROOM_FULL);
 const ROOM_HELPERS_COMPACT = compact(ROOM_HELPERS);
 const PAGE_COMPACT = compact(PAGE);
 /*
-  The sixteen view gates moved to `room/gates.svelte.ts` in Phase 5 slice 27. A DECLARATION is
+  The sixteen view gates moved to `room/gates.ts` in Phase 5 slice 27. A DECLARATION is
   asserted there; a USE stays on the page or in a pane and carries the `gates.` prefix.
 */
-const GATES_COMPACT = compact(
-  readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8')
-);
+const GATES_COMPACT = compact(readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8'));
 /*
   The `beforeunload` BODY moved to `RoomWindowHandlers` in Phase 5 slice 18; the binding stayed on
   `<svelte:window>`. So the post is asserted in the module and the listener in the page - both

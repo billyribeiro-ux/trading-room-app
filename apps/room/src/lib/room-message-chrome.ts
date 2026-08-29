@@ -21,9 +21,20 @@ import type { FollowChatStyle, Theme } from '#lib/types.js';
  * * **`followedStyle`** — per message, looked up from the sender's hash.
  * * **`alertLabels`** — the alerts column only. Putting it here would hand a chat message a parsed
  *   label table it never reads.
- * * **the Q&A modal's subset.** `ModalHost` renders Q&A entries with FOUR of these and no badges,
- *   no reactions and no edit controls. Spreading the full chrome there would silently turn those on
- *   inside a modal that has never shown them, so it is left spelling its four.
+ *
+ * ## THE Q&A THREAD USED TO BE ON THAT LIST, and taking it off was the right call
+ *
+ * This entry read: *"the Q&A modal's subset. `ModalHost` renders Q&A entries with FOUR of these and
+ * no badges, no reactions and no edit controls. Spreading the full chrome there would silently turn
+ * those on inside a modal that has never shown them, so it is left spelling its four."*
+ *
+ * That was correct while the thread was INERT — it rendered `kind="chat"` behind an `onaction` that
+ * did nothing, so anything the chrome switched on would have been a control that could not act. The
+ * thread acts now (`AlertQaModal.svelte`), and it renders `kind="alert"` because that is what the
+ * reference does, so the full chrome is exactly what makes its menu the menu the reference draws.
+ *
+ * `alertLabels` stays out, and there it is the REFERENCE's own choice rather than ours: the body
+ * pipe receives `e.isQAMsg ? null : alertLabels`, so a hash inside a question stays text.
  *
  * ## A `$derived` object rather than sixteen getters, and the trade
  *
@@ -67,6 +78,197 @@ export type RoomMessageChrome = {
   readonly presenterMessagesOnTheRight: boolean;
   readonly usersPublicReply: boolean;
   readonly enableReactions: boolean;
+  /**
+   * "Enable QA Reactions?" — the second half of ONE rule, and the half that could never be true.
+   *
+   * `sourceMessageBehavior.react` has read both since it was written: reactions on chat when
+   * `enableReactions`, reactions on an alert row drawn INSIDE the Q&A thread when this one. The
+   * thread rendered its rows as `kind="chat"` behind a handler that did nothing, so the second
+   * clause was unreachable no matter what the owner ticked.
+   */
+  readonly enableQaReactions: boolean;
+  /**
+   * "Q&A on alerts?" — whether an alert carries the ask-a-question button at all.
+   *
+   * On the CHROME rather than passed per call site, for the reason this whole type exists: three
+   * components render a message, and a room setting handed to each of them separately is a room
+   * setting one of them will stop being handed. `RoomMessage` declares it with a `false` default
+   * now; before 2026-08-28 it defaulted to `true` and nothing passed it, which is how an
+   * entitlement ended up on in every room.
+   */
+  readonly hasQaOnAlerts: boolean;
   readonly enableEditMessage: boolean;
   readonly enableEditAlerts: boolean;
+
+  /*
+    ── FIVE MORE THE MESSAGE NEVER RECEIVED, added 2026-08-28 ──────────────────────────────────────
+
+    Every one of these was already a prop on `RoomMessage`, already fed into `sourceMessageBehavior`,
+    and already had its value crossing the boundary — `userPM`, `userToPresenterPM`,
+    `disablePMForTrials` and `hideAvatars` have been on `ROOM_VISIBLE_SETTINGS` for weeks, and
+    `user.isFT` and `media.limitedPresenter` are facts this room has always held. **Nothing passed
+    them.** They were found by asking which of `RoomMessage`'s thirty-five props no call site
+    supplies, which is a question nothing had asked.
+
+    What each one being absent actually did:
+
+      userPrivateMessaging               `privateMessage` collapsed to `viewerIsPresenter`, so the
+      userToPresenterPrivateMessaging    kebab's Private Message entry was PRESENTER-ONLY in every
+      disablePrivateMessagingForTrials   room — while the chat header's PM button and the roster
+      currentUserIsTrial                 kebab, which read the same three settings from their own
+                                         copies of the rule, offered it to members. Three
+                                         implementations, one of them unfed, and the disagreement
+                                         was invisible because each looked right on its own.
+
+      hideAvatars                        an owner who hid avatars got them anyway on every message.
+
+      viewerIsLimitedPresenter           `showToAll` is `viewerIsPresenter && !viewerIsLimited`, so a
+                                         member handed mic and screen by `giveMicScreen` kept the
+                                         Show To All entry that gate exists to take away.
+
+    They are on the CHROME and not per call site for the reason the whole type exists, and the three
+    PM values travel together because `sourceMessageBehavior` needs all three to evaluate one rule:
+    handing it two of them would produce a confident wrong answer rather than an error.
+  */
+  readonly userPrivateMessaging: boolean;
+  readonly userToPresenterPrivateMessaging: boolean;
+  readonly disablePrivateMessagingForTrials: boolean;
+  readonly currentUserIsTrial: boolean;
+  readonly hideAvatars: boolean;
+  /**
+   * "Alt chat render" — and it is on the chrome for its SECOND behaviour, not its first.
+   *
+   * The display MODE it forces is resolved once per surface on the page and travels as
+   * `displayMode`, because the alerts log and the chat columns keep separate modes. What travels
+   * here is the term it contributes to `hideAvatar`, which is per MESSAGE — chat and the Q&A thread
+   * only, never the alerts log. `hideMessageAvatar` in `#lib/chat-display-mode.ts` states the rule.
+   */
+  readonly altChatRender: boolean;
+  readonly viewerIsLimitedPresenter: boolean;
+  /**
+   * "Copy trades" — whether `[{( … )}]` in an ALERT becomes a click-to-copy order.
+   *
+   * On the chrome for this type's own reason: three components render a message, and a room setting
+   * handed to each of them separately is a room setting one of them will stop being handed.
+   */
+  readonly copyTrades: boolean;
+  /**
+   * "Users can delete own messages?" — the first term of `canDeleteOwnMessage` (byte 1,158,799).
+   *
+   * NAMED FOR THE PROP IT FEEDS, not for the setting it comes from. The chrome is applied with
+   * `{...messageChrome}`, so a field whose name does not match the prop feeds nothing and says
+   * nothing — which is the failure this whole type was written to end. The other two terms of that
+   * gate are per MESSAGE and per VIEWER, and `RoomMessage` computes both; only the room's half is
+   * here.
+   */
+  readonly allowDeleteOwnMessage: boolean;
 };
+
+/**
+ * The settings a message reads, as they arrive from `internal/room-config/[code]`.
+ *
+ * Declared structurally rather than importing `RoomSessionSettings`, and that is deliberate: this
+ * module is shared client code and that type lives behind `$lib/server`. Listing the keys out is
+ * also the more honest shape — it says on its face exactly which settings a message depends on, and
+ * one more cannot be added without appearing here.
+ *
+ * It said "the eleven keys" and "a twelfth" until 2026-08-28, when there were fourteen. A count in
+ * prose beside the list it counts is a second copy of the same fact, and it is the copy nobody
+ * updates; the list is the fact.
+ */
+export interface MessageChromeSettings {
+  readonly showBadgesToPresentersOnly?: boolean;
+  readonly disableStarYears?: boolean;
+  readonly usersPublicReply?: boolean;
+  readonly enableReactions?: boolean;
+  readonly enableQAReactions?: boolean;
+  readonly hasQAOnAlerts?: boolean;
+  readonly enableEditMessage?: boolean;
+  readonly enableEditAlerts?: boolean;
+  readonly userPM?: boolean;
+  readonly userToPresenterPM?: boolean;
+  readonly disablePMForTrials?: boolean;
+  readonly hideAvatars?: boolean;
+  readonly altChatRender?: boolean;
+  readonly copyTrades?: boolean;
+  readonly usersCanDeleteOwnMsgs?: boolean;
+}
+
+export interface MessageChromeSources {
+  /** The viewer, from the load. `role` decides presenter status; `isFT` is the trial flag. */
+  readonly user: {
+    readonly id: number;
+    readonly emailHash: string;
+    readonly displayName: string;
+    readonly role?: string;
+    readonly isFT?: boolean;
+  };
+  /** The room's settings, or absent — every read below treats absent as off. */
+  readonly sessData: MessageChromeSettings | null | undefined;
+  readonly theme: Theme;
+  readonly chatStyle: FollowChatStyle;
+  /** This viewer's own two message preferences. */
+  readonly chatGif: boolean;
+  readonly chatBadges: boolean;
+  /**
+   * The two rules that live on `RoomGates` rather than being re-read here.
+   *
+   * `enableBadges` is the first term of a four-term gate and `presenterMessagesOnTheRight` is the
+   * second; both are transcribed, cited and tested there. Reading `sessData` for them again would
+   * put a second copy of a rule in the file whose whole job is to stop copies.
+   */
+  readonly enableBadges: boolean;
+  readonly presenterMessagesOnTheRight: boolean;
+  /** `media.limitedPresenter` — the elevation, which is NOT the role. See the note above. */
+  readonly viewerIsLimitedPresenter: boolean;
+}
+
+/**
+ * Build the chrome from the room's own objects.
+ *
+ * ## Why this is a function and not twenty-two lines on the page
+ *
+ * It was twenty-two lines in `+page.svelte`, and every one of them was `data.sessData?.x === true`
+ * or a field lifted off an object the page already had. That is not a decision the PAGE is making —
+ * it is the answer to "which settings does a message read", which is the question this module
+ * exists to answer. Keeping the list here means a new message setting is one edit in one file
+ * instead of a type here and a field there, and it is why five props could sit on the component
+ * unfed for weeks: the type and the construction were in different files and nothing compared them.
+ *
+ * `=== true` on every setting, and that is the fail-closed rule this repository applies everywhere:
+ * `sessData` is JSON off the wire, so a string `"false"`, a `0` or a stray object must not switch a
+ * capability on. Four of these unlock an action a member can take on somebody else's message.
+ */
+export function buildMessageChrome(sources: MessageChromeSources): RoomMessageChrome {
+  const settings = sources.sessData;
+  return {
+    currentUserId: sources.user.id,
+    currentUserEmailHash: sources.user.emailHash,
+    currentUserName: sources.user.displayName,
+    // The ROLE, never the media elevation — see the note at the top of this file.
+    viewerIsPresenter: sources.user.role === 'staff' || sources.user.role === 'admin',
+    viewerIsLimitedPresenter: sources.viewerIsLimitedPresenter,
+    currentUserIsTrial: sources.user.isFT === true,
+    theme: sources.theme,
+    chatStyle: sources.chatStyle,
+    chatGif: sources.chatGif,
+    chatBadges: sources.chatBadges,
+    enableBadges: sources.enableBadges,
+    presenterMessagesOnTheRight: sources.presenterMessagesOnTheRight,
+    showBadgesToPresentersOnly: settings?.showBadgesToPresentersOnly === true,
+    disableStarYears: settings?.disableStarYears === true,
+    usersPublicReply: settings?.usersPublicReply === true,
+    enableReactions: settings?.enableReactions === true,
+    enableQaReactions: settings?.enableQAReactions === true,
+    hasQaOnAlerts: settings?.hasQAOnAlerts === true,
+    enableEditMessage: settings?.enableEditMessage === true,
+    enableEditAlerts: settings?.enableEditAlerts === true,
+    userPrivateMessaging: settings?.userPM === true,
+    userToPresenterPrivateMessaging: settings?.userToPresenterPM === true,
+    disablePrivateMessagingForTrials: settings?.disablePMForTrials === true,
+    hideAvatars: settings?.hideAvatars === true,
+    altChatRender: settings?.altChatRender === true,
+    copyTrades: settings?.copyTrades === true,
+    allowDeleteOwnMessage: settings?.usersCanDeleteOwnMsgs === true
+  };
+}

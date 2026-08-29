@@ -50,6 +50,10 @@ const WRITERS = [
   'writeRoomSetting',
   'writeRoomPermissions',
   'writeRoomBan',
+  // The indefinite chat mute — opcode 3 on the controller. Added 2026-08-27, and this list is where
+  // the test insisted the capability be decided rather than inherited from whichever call it was
+  // copied from.
+  'writeRoomMute',
   'requestStreamIngestKey'
 ];
 
@@ -62,7 +66,28 @@ const READERS = [
   'fetchRoomConfig',
   'requestMobilePin',
   'requestStreamReadToken',
-  'decideRoomEntryRemotely'
+  'decideRoomEntryRemotely',
+  /*
+    `checkNotesPasswordRemotely` — the second question-shaped POST, added 2026-08-29. It sends a
+    candidate the controller compares against `needPasswordForUserNotes` and answers two booleans;
+    nothing on the controller changes, which is what decides the capability. The same shape as
+    `decideRoomEntryRemotely` immediately above, for the same reason: the credential stays where it
+    was configured and the QUESTION travels.
+  */
+  'checkNotesPasswordRemotely',
+  /*
+    `restoreMobileTokens` — added 2026-08-29, and the one entry in this list whose call is NOT
+    free of consequence: the controller sends a push notification and may delete a dead registration.
+    It is a READER anyway, and the reason is the split's actual subject.
+
+    This split is about the room's CONFIGURATION. Every writer above changes a room's stored settings
+    from the room. This changes none: it is the same shape as `requestMobilePin` four lines up — a
+    POST, on demand, for one named member, reached only when that member presses a button about
+    their own device — and `requestMobilePin` MINTS a pair code, so "read" here has never meant "no
+    side effect". What both assert is that the room may ask this question, not that the answer is
+    free.
+  */
+  'restoreMobileTokens'
 ];
 
 describe('the capability minted for each controller call', () => {

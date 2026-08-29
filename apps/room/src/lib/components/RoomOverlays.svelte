@@ -1,4 +1,6 @@
 <script lang="ts">
+  import RoomBranding from '#lib/components/RoomBranding.svelte';
+  import { saveCloseMessageThen } from '#lib/room/close-message.js';
   import type { SvelteSet } from 'svelte/reactivity';
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
@@ -7,6 +9,8 @@
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
   import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
   import ImageUploadDialog from '#lib/components/ImageUploadDialog.svelte';
@@ -23,6 +27,7 @@
   import type { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
   import type { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
   import type { RoomModals } from '#lib/room/modals.svelte.js';
+  import type { RoomDebugLog } from '#lib/room/debug-log.svelte.js';
   import type { RoomPolls } from '#lib/room/polls.svelte.js';
   import type { RoomPrefs } from '#lib/room/prefs.svelte.js';
   import type { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
@@ -100,11 +105,18 @@
 
     // Page state this layer renders from. Only these two are written back.
     isPresenter,
+    messageChrome,
+    alertsDisplayMode,
+    chatLogDisplayMode,
+    onDisplayModeChange,
     unreadQaAlertIds,
     modals,
+    debugLog,
     chatMode,
     globalChatStyle,
     mobilePin,
+    mobileAppAvailable,
+    onrestoremobiletokens,
     theme,
 
     /*
@@ -122,6 +134,7 @@
       function — a remote command plus `invalidateAll()` — and belongs to no class here.
       `saveAlertFilter` is `RoomAlertsPane`'s, and that object is NOT a prop of this component, so
       passing it to remove one callback would add one.
+
     */
     changeChatMode,
     saveAlertFilter
@@ -148,15 +161,43 @@
     /** Resolved on the SERVER from `data.user.role`. Read here only to decide who gets a toast. */
     isPresenter: boolean;
     /**
+     * The chrome every rendered message shares, built ONCE on the page.
+     *
+     * Passed straight through to `ModalHost`, which spreads it onto each Q&A thread entry. It is a
+     * prop rather than rebuilt here for the reason `room-message-chrome.ts` exists at all: a second
+     * construction is a second answer to which settings a message reads.
+     */
+    messageChrome: RoomMessageChrome;
+    /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
+    alertsDisplayMode: ChatDisplayMode;
+    chatLogDisplayMode: ChatDisplayMode;
+    onDisplayModeChange: (surface: ChatDisplaySurface, mode: ChatDisplayMode) => void;
+    /**
      * The page's INSTANCE, not a copy — `RoomFeeds` reads it for the badge and `RoomModals`
      * clears it, so a second set would be a second answer to which alerts are unread.
      */
     unreadQaAlertIds: SvelteSet<number>;
     /** Which overlay is showing, and how it is configured. Owned by the class, not by props. */
     modals: RoomModals;
+    /**
+     * The room's console log — the buffer this browser fills and the one a presenter received.
+     *
+     * The CLASS rather than its value, because both ends are read here: the markup passes
+     * `debugLog.received` down to `ModalHost`, and the page's own effect opens the modal when it
+     * arrives. Passing the value alone would mean a second prop for the arrival.
+     */
+    debugLog: RoomDebugLog;
     chatMode: ChatMode;
     globalChatStyle: FollowChatStyle;
     mobilePin: string;
+    /** Gates the troubleshooter's Mobile App tab — see the note on `ModalHost`'s own prop. */
+    mobileAppAvailable: boolean;
+    onrestoremobiletokens: () => Promise<{
+      registrations: number;
+      sent: number;
+      failed: number;
+      pruned: number;
+    }>;
     theme: Theme;
     changeChatMode: (mode: ChatMode) => void;
     /* It takes the NEXT filter - `ModalHost` calls it with the pair the modal collected. */
@@ -485,11 +526,27 @@
 >
   Conected<i class="fas fa-check"></i>
 </div>
+<!-- The close message takes NO new prop: `data`, `dialogs` and `prefs` are already here. The rule,
+     and the six callbacks deleted under it on 2026-08-18, are in the props docblock above. -->
+<!--
+  The room's own favicon and stylesheet, applied on `globalsLoaded` upstream (byte 2,594,998). Here
+  rather than on the page because this component already holds `data`; `RoomBranding` explains why
+  two of its three pieces are `<svelte:head>` and the other two are done by hand.
+-->
+<RoomBranding
+  customFaviconURL={data.sessData?.customFaviconURL}
+  customCSS={data.sessData?.customCSS}
+/>
+<!-- `canManageNotes` is upstream's `allowToManageNotes`: only the class that asked knows. -->
 <ModalHost
   name={modals.modal}
   mediaIceServers={media.iceServers}
   {mobilePin}
+  {mobileAppAvailable}
+  {onrestoremobiletokens}
   modAlertFilterList={data.sessData?.modAlertFilterList}
+  stickyNonTradeAlert={data.sessData?.styckyNonTradeAlert === true}
+  schedulerAvailable={data.sessData?.hasAlertScheduler === true}
   bind:alertFilterFor={alerts.filterFor}
   bind:showAlertsFrom={alerts.showFrom}
   onsavealertfilter={saveAlertFilter}
@@ -503,7 +560,10 @@
   canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
   alertSearchFilter={feeds.alertSearchFilter}
   {chatMode}
+  closedMessage={data.closedMessage ?? ''}
   onChatModeChange={(mode) => void changeChatMode(mode)}
+  onSaveCloseMessage={(message, then) =>
+    void saveCloseMessageThen(message, then, { dialogs, savePreference: prefs.save })}
   canUseRTE={composer.canUseRTE}
   rteDraft={composer.rteDraft}
   rteIsEditing={composer.rteIsEditing}
@@ -551,6 +611,12 @@
   onReplySend={messageActions.sendReplyMessage}
   onQuestionSend={messageActions.sendAlertQuestion}
   alertQuestions={data.alertQuestions}
+  {messageChrome}
+  {alertsDisplayMode}
+  {chatLogDisplayMode}
+  {onDisplayModeChange}
+  onQaAction={(action, item, payload) =>
+    messageActions.handle('alert', action, item, payload, false, 'qa')}
   onMentionUser={(name) => messageActions.mention(name)}
   onPrivateChat={(user) => {
     userActions.selectedMessageUser = user;
@@ -560,12 +626,24 @@
   onFollowStyleChange={(user, style) => userActions.applyFollowStyle(user, style)}
   onMuteToggle={(user) => userActions.requestMuteToggle(user)}
   onUserAction={(action, user) => userActions.handle(action, user)}
+  canManageNotes={userActions.canManageNotes}
   onSavePermissions={(user, granted) => userActions.savePermissions(user, granted)}
   streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}
   targetUser={userActions.target}
+  debugLog={debugLog.received}
+  onUploadProfilePicture={(user, file) => userActions.uploadProfilePicture(user, file)}
+  onRemoveProfilePicture={(user) => userActions.removeProfilePicture(user)}
+  privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
+  onShowPrivateMessages={(user) => {
+    modals.open('all-private');
+    void privateChat.showPeerHistory(user.id);
+  }}
+  peerHistory={privateChat.peerHistory}
+  peerHistoryLoading={privateChat.peerHistoryLoading}
+  peerHistoryError={privateChat.peerHistoryError}
   mutedUsers={userActions.mutedUsers}
   followedUsers={userActions.followedUsers}
   targetMessage={messageActions.selected}

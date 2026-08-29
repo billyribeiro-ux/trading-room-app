@@ -158,11 +158,84 @@ describe('the allow-list itself', () => {
       Mobile App Info and Benzinga unbuildable for the wrong reason. What matters is a URL that IS
       a secret — a webhook or a post endpoint whose only protection is that nobody knows it.
     */
+    /*
+      `Password` JOINED THE PATTERN 2026-08-29, and it needed the type check beside it.
+
+      `TODO.md` row 2 recorded the hole and named it exactly: `needPasswordForUserNotes` — the
+      setting whose VALUE a presenter types to unlock user notes — matched NONE of the patterns
+      above. `PW$` catches `deleteAlertPW` and `allRoomsWelcomeMatPW` because the reference
+      abbreviates; this one it spells out, so the tripwire meant to catch a credential crossing to
+      the room would have watched this one go past.
+
+      **A bare `/[Pp]assword/` is the wrong fix**, and measuring said so before it was written:
+      `showPasswordField` is already on `ROOM_VISIBLE_SETTINGS` and is a BOOLEAN — whether the login
+      page draws a password box. Blocking it would repeat the mistake the note above records about
+      `URL$`, where a rule that read the name instead of the thing kept two buildable features out.
+
+      What separates them is not the name, it is the SHAPE: a `checkbox` cannot hold a secret,
+      whatever it is called. The schema already says which is which and is already imported for the
+      wired check above, so the rule asks it rather than encoding `(?!Field)` and hoping the next
+      credential is spelled the same way.
+    */
     const credentialShaped =
-      /PW$|PW\d|Secret|secret|Token|token|ApiKey|apiKey|KeyID|KeySecret|[Ww]ebhook|WebHook|_url$|PostURL$|Email$|banIPList|LoginList/;
+      /PW$|PW\d|[Pp]assword|Secret|secret|Token|token|ApiKey|apiKey|KeyID|KeySecret|[Ww]ebhook|WebHook|_url$|PostURL$|Email$|banIPList|LoginList/;
+
+    /** Settings whose value is a flag. A boolean is not a credential however it is named. */
+    const booleanSettings = new Set(
+      ROOM_SETTINGS.filter((setting) => setting.type === 'checkbox').map((setting) => setting.name)
+    );
+
     for (const name of ROOM_VISIBLE_SETTINGS) {
+      if (booleanSettings.has(name)) continue;
       expect(name, `${name} reads like a credential`).not.toMatch(credentialShaped);
     }
+  });
+
+  it('the credential tripwire would catch the one that got past it', () => {
+    /*
+      A POSITIVE control on the tripwire itself, which the assertion above cannot give: it passes
+      when the allow-list is clean, which is also exactly what it does when the pattern matches
+      nothing at all. `TODO.md` row 2 is the case in point — the pattern was clean and blind at the
+      same time, for as long as the row went unread.
+
+      Both halves are asserted. `needPasswordForUserNotes` must be caught, and `showPasswordField`
+      must be exempt on its TYPE rather than its name, because a rule that catches everything is a
+      rule somebody deletes the first time it blocks real work.
+    */
+    const credentialShaped =
+      /PW$|PW\d|[Pp]assword|Secret|secret|Token|token|ApiKey|apiKey|KeyID|KeySecret|[Ww]ebhook|WebHook|_url$|PostURL$|Email$|banIPList|LoginList/;
+
+    expect('needPasswordForUserNotes', 'the hole row 2 named').toMatch(credentialShaped);
+    expect('deleteAlertPW').toMatch(credentialShaped);
+    expect('allRoomsWelcomeMatPW').toMatch(credentialShaped);
+
+    /*
+      `showPasswordField` DOES match the pattern and crosses to the room anyway. That is the whole
+      reason the loop above consults the schema, so it is asserted here rather than left implicit —
+      if this ever stops being a checkbox, the exemption stops being safe and this fails.
+    */
+    expect('showPasswordField').toMatch(credentialShaped);
+    expect([...ROOM_VISIBLE_SETTINGS]).toContain('showPasswordField');
+    const showPasswordField = ROOM_SETTINGS.find((s) => s.name === 'showPasswordField');
+    expect(showPasswordField?.type, 'the exemption depends on this').toBe('checkbox');
+
+    /*
+      ONE CONTROL ON THIS FILE DID NOT FIRE, and it is recorded rather than left implied.
+
+      Replacing the loop's `booleanSettings.has(name)` with `name === 'showPasswordField'` keeps
+      every assertion here green. So this file pins the OUTCOME — that flag stays visible, that
+      credential does not — and not the MECHANISM.
+
+      The type-based form was kept anyway, and the reason is that it is the one that survives: a
+      name exemption is an allow-list of one, and the next `...Password...` checkbox somebody adds
+      would be blocked by a rule that had already decided the answer for a different setting.
+
+      It is not asserted because it CANNOT be, honestly. `showPasswordField` is the only entry on
+      `ROOM_VISIBLE_SETTINGS` that is both credential-shaped and a checkbox — measured, all ninety —
+      so a test that the rule generalises would need a second setting invented to prove it, and an
+      invented fixture proving a rule about real settings is the hollow coverage this repository
+      keeps catching. The day a second one exists, it belongs here.
+    */
   });
 
   it('every entry is a setting some room code actually reads', () => {
@@ -226,6 +299,190 @@ describe('the allow-list itself', () => {
         two buttons at :8643 and :8652. Neither is a name on a list with nothing behind it.
       */
       hideFiles: 'filesSectionHidden() — hides the Files tab AND the #files pane together',
+      /*
+        Verified in the room before being written here, like its neighbours: `RoomGates.notesHidden`
+        ORs it with viewer-only mode exactly as the reference does
+        (`this.hideNotes = sessData.hideNotes || globals.viewerOnlyMode`, bundle byte 1,955,694), the
+        page passes it at `src/routes/+page.svelte:1217`, and `PresentationArea.svelte` binds it to
+        the Notes TAB and the Notes PANE together — the same pair-or-nothing shape `hideFiles` has,
+        and for the same reason: hiding one of the two leaves a tab that opens onto nothing.
+      */
+      hideNotes: 'RoomGates.notesHidden — hides the Notes tab AND the notes pane together',
+      /*
+        The three ROOM DEFAULTS share ONE consumer, and that is the honest way to name them: they
+        are three clauses of one expression upstream and one loop in `applyRoomDefaults` here.
+        Verified in the room before being written, as the note above requires — `+page.svelte` calls
+        it inside `onMount`, and `room-defaults.test.ts` asserts the six writes the loop makes in
+        the order the reference makes them.
+      */
+      darkThemeAsDefault: 'applyRoomDefaults() — seeds the dark theme once, then latches',
+      alertSoundOff: 'applyRoomDefaults() — seeds alertSoundOn=false once, then latches',
+      alertsChatOnBottom: 'applyRoomDefaults() — seeds roomSplitDir=btt once, then latches',
+      /*
+        Verified in the room before being written here: `RoomGates.recordingTooltip` returns the
+        empty string — no tooltip — when this setting is on and the viewer is not a presenter, and
+        `RoomNavbar.svelte:305` binds that value to the [ REC ] indicator. The gate already existed;
+        what changed on 2026-08-28 is WHICH SIDE it reads. It was `prefs.loaded`, a viewer
+        preference nothing in this room writes, so the owner switch did nothing at all.
+      */
+      dontShowRecInfoToUsers: 'RoomGates.recordingTooltip — blanks the [ REC ] tooltip for members',
+      /*
+        Verified in the room before being written here: `chatComposerAvailable` in
+        `#lib/chat-mode.js` takes it as one of four inputs and `+page.svelte` passes
+        `data.sessData?.chatDisabledForTrials === true` into the `chatEnabled` derivation that gates
+        every composer in the room. It is the third of the reference's three reasons; this room had
+        the other two and no term for the owner policy.
+      */
+      chatDisabledForTrials: 'chatComposerAvailable() — the third reason the composer is off',
+      /*
+        Verified in the room before being written here: `RoomMessage.svelte:774` gates the
+        ask-a-question button on `!isQaMessage && hasQaOnAlerts`, and that prop now arrives on
+        `RoomMessageChrome` — ONE derivation on the page, spread into the three call sites that
+        render a message. Its default also changed from `true` to `false` in the same commit: an
+        entitlement whose prop defaults open is not an entitlement.
+      */
+      hasQAOnAlerts: 'RoomMessage — the ask-a-question button on an alert, through RoomMessageChrome',
+      /*
+        TWO consumers, and naming only the first would have been the mistake this whole map exists to
+        prevent. `message-behavior.ts` already carried the rule — reactions on a row drawn inside the
+        Q&A thread — and it could never evaluate true, because that thread passed `kind="chat"` and
+        an `onaction` that did nothing. The gate on the SERVER is the one that makes the setting
+        binding: `reactToQuestion` reads the room's own configuration and refuses when it is off, so
+        an owner who left it off gets a room where the reaction cannot be recorded, not one where the
+        button is merely hidden.
+      */
+      /*
+        The raw JSON crosses; the ENTITLEMENT does not. That distinction is the whole reason this map
+        entry is worth reading: the reference evaluates the badge gate in the browser against
+        `globals.user.badges` and then subscribes the socket to the channel, so a member who edits
+        that list in a console gets it. Here the room server decides — `memberChatChannels` — and
+        every path that could reach a channel asks it: the page load, the send, the reply, the older-
+        pages query and the realtime fan-out.
+      */
+      /*
+        Its DISPLAY-MODE half never reaches a message: the mode is resolved once per surface on the
+        page and travels as `displayMode`, so a component cannot read this setting and decide for
+        itself. What travels on the chrome is the one term it contributes to the hide-avatar rule.
+      */
+      /*
+        The only consumer on this map that is not a DOM read: it decides whether a canvas is spliced
+        between `getDisplayMedia` and the producer. `RoomScreenOverlay` is the gate and the
+        lifecycle; the SSE router feeds it each arriving alert, including this presenter's own, which
+        is the one frame the router must not skip on the own-sender guard.
+      */
+      /*
+        ONE feature, two names. `autoRecord` is the gate on the stop as well as on both starts, so
+        `dontStopRecOnMicMute` decides nothing on its own — which is why they are listed as one
+        consumer rather than two.
+      */
+      autoRecord: 'autoRecordAction decides all three moments, and RoomRecording applies it',
+      dontStopRecOnMicMute: 'autoRecordAction reads it on the stop path, and only when autoRecord is on',
+      /*
+        The only setting on this map whose consumer runs on a TIMER rather than on a request, and the
+        only one enforced by a server the reference gates in the browser alone.
+      */
+      hasAlertScheduler:
+        'scheduled-alerts.remote.ts refuses all three commands without it, and the sweep in server/scheduled-alerts.ts posts what it allowed',
+      alertsOverlayOnScreenshare:
+        'RoomScreenOverlay wraps the display capture with it, and the SSE router feeds every arriving alert to it',
+      altChatRender: 'RoomDisplayModes seeds the compact mode from it, and hideMessageAvatar reads it as one term',
+      chatTabsWithBadges: 'chat-tabs.ts parses it, and memberChatChannels decides which channels each member holds',
+      enableQAReactions:
+        'RoomMessageChrome — reactions inside the Q&A thread — and reactToQuestion, which refuses when the room has it off',
+      /*
+        Both verified in the room before being written here. `alwaysShowRoster` seeds `sidebarOpen`
+        in `+page.svelte`, which `RoomSidebar` and `RoomNavbar` both read; the reference's SECOND use
+        of it — a third OR-term on the mobile-app icon — is deliberately refused, with the reason at
+        `RoomGates.mobileAppAvailable`. `hasSpeechRecognitionDisabled` reaches
+        `RoomGates.speechRecognitionAvailable`, which `RoomRecording.beginSpeechRecognition` asks
+        before starting; its docblock has quoted that half of the capture's refusal since it was
+        written while implementing only the preferences half.
+      */
+      alwaysShowRoster: 'seeds sidebarOpen — the sidebar opens on arrival and can still be closed',
+      hasSpeechRecognitionDisabled: 'RoomGates.speechRecognitionAvailable — the room half of the captions gate',
+      /*
+        Both verified in the navbar before being written here. `hideWebcamForRoom` is the fifth term
+        of the webcam control's `{#if}`, and the only one this room could not evaluate — the other
+        four are facts it already holds about the viewer and their devices. `blinkingRec` gates the
+        `breathing-rec` class, which unlike `smallImagePreview`'s dead class has a real keyframe rule
+        in `captured-runtime-components.css`.
+      */
+      hideWebcamForRoom: 'RoomNavbar — the webcam control disappears for the whole room',
+      blinkingRec: 'RoomNavbar — the REC badge breathes while recording',
+      /*
+        Both verified in the room before being written here, and both are SEEDS re-applied where the
+        reference re-applies them: `autoSwitchToOfftopics` seeds `RoomChat`'s main-column channel at
+        construction, and `styckyNonTradeAlert` re-ticks the composer's Non-Trade box on EVERY open
+        of the modal, which is what sticky means and where `doAlertsModal` puts it.
+      */
+      autoSwitchToOfftopics: 'RoomChat — the main chat column opens on the off-topic channel',
+      styckyNonTradeAlert: 'PostAlertModal — the Non-Trade checkbox starts ticked on every open',
+      /*
+        Both verified in the room before being written here. `name` becomes the document title
+        through `+page.svelte`'s `<svelte:head>`, which is what a page's head is for;
+        `ModeratorMessage.svelte` draws the presenter-only bar with the reference's three captured
+        classes, all of which have real rules in `captured-runtime-components.css`.
+      */
+      name: 'the browser tab — <svelte:head><title> on the room page',
+      modMessage: 'ModeratorMessage — a presenter-only bar above the presentation area',
+      /*
+        Verified in the room before being written here. It is a field of `NoteSurfaceGates` rather
+        than a fourth prop, because `noteGates` already crosses to `PresentationArea` whole — and the
+        module that resolves it is also where the honest gap lives: the Summernote build that turns
+        the reference's two button names into DOM is not in the capture.
+      */
+      simplifiedEditor: 'resolveNoteSurfaceGates — foreground-only colour on the NoteEditor toolbar',
+      /*
+        Verified in the room before being written here, and the consumer named is the SERVER one on
+        purpose: `loadPeerPrivateMessageHistory` refuses before it selects a row. The button in the
+        user-info modal reads the same setting, but a markup gate is not what stops a direct call.
+      */
+      enablePrivateMessageHistory:
+        'loadPeerPrivateMessageHistory — refuses the getAllUserPM read unless the room enabled it',
+      /*
+        Verified in the room before being written here. `rosterRowIsFull` sits with the other roster
+        predicates rather than as an `{#if}` in the sidebar, because those are the functions that
+        decide what one member sees of another and they are tested as such.
+      */
+      showOnlyUsernames: 'rosterRowIsFull — which shape a roster row draws in',
+      /*
+        Verified in the room before being written here. All three name the SAME consumer, which is
+        the honest entry: `tipButtonFor` is where the conjunction lives, and none of the three has a
+        reader of its own. A row here that named three different consumers would be describing three
+        gates the reference does not have.
+      */
+      tipMeBtnEnabled: 'tipButtonFor — the tip button, all three settings or none',
+      tipMeBtnUrl: 'tipButtonFor — the tip button, all three settings or none',
+      tipMeBtnTxt: 'tipButtonFor — the tip button, all three settings or none',
+      /*
+        Verified in the room before being written here. `RoomBranding` owns both, and the second is
+        deliberately named with what it IS rather than with what it does: owner-authored code in
+        every member's page is the fact a reader of this table should meet first.
+      */
+      customFaviconURL: 'RoomBranding — the room’s own favicon, replacing the shell’s',
+      customCSS: 'RoomBranding — owner-authored CSS, linked or inlined as a text node',
+      /*
+        Verified in the room before being written here. It replaces the entire screens pane, so the
+        consumer named is the pane rather than a helper — that is what a reader of this table needs
+        to know first about a setting that can remove the room's whole video surface.
+      */
+      customPlayerURL: 'PresentationArea #screens — an owner iframe instead of the whole pane',
+      copyTrades: 'buildMessageChrome — the click-to-copy order marker on an ALERT body',
+      /*
+        Verified in the room before being written here. Both name the SAME consumer, which is the
+        honest entry for a conjunction: the switch and the URL only ever mean anything together, and
+        `PresentationArea` conjoins them once before anything downstream sees either.
+      */
+      positionsIframe: 'PresentationArea — the Show/Hide Positions buttons and the panel they open',
+      positionsIframeUrl: 'PresentationArea — the Show/Hide Positions buttons and the panel they open',
+      /*
+        Verified in the room before being written here, and the consumer named is the SERVER one:
+        `messageAction`'s delete branch refuses a non-presenter unless the room enabled it. The menu
+        entry reads the same setting through the chrome, but a markup gate is not what stops a direct
+        call — and in this case the markup gate was defaulting off while the endpoint was open.
+      */
+      usersCanDeleteOwnMsgs: 'messageAction delete — refuses a member self-delete unless enabled',
+      hasTypingIndicator: 'setTyping — refuses to record or broadcast unless the room enabled it',
       overwriteCashRegisterSound:
         'alertSoundButtonFor() — picks Set / Remove as alert sound, or neither, per audio row',
       userPM: 'canPM in the roster kebab',

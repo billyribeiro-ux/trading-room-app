@@ -31,6 +31,7 @@ import { hashEmail, publicSessionHandle } from '#lib/server/connection.js';
 // `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
 // `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
 import { loadNewestChatPages } from '#lib/server/chat-log.js';
+import { memberChatChannels } from '#lib/server/chat-channels.js';
 import { loadAlertPage, loadQuestionsForAlerts } from '#lib/server/alert-log.js';
 // `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
 import { parseReactions } from '#lib/server/reactions.js';
@@ -467,7 +468,20 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     `loadOlderChatMessages` and held in client state, so nothing became unreachable; see
     `#lib/server/chat-log.ts` for why a bare LIMIT would have been worse than the bug.
   */
-  const messageRows = loadNewestChatPages(requireRoomShortCode(locals));
+  /*
+    THE CHANNELS THIS MEMBER MAY READ, resolved before a single row is selected.
+
+    `chatTabsWithBadges` makes a chat channel an entitlement, so the set is per room AND per member.
+    Reading a fixed list here would have put a private channel's messages into every member's page
+    payload — SSR HTML included — with the client filtering them for display, which is not a filter,
+    it is a leak with a rendering step after it. `#lib/chat-tabs.ts` has the rule; this is the read.
+  */
+  const chatChannels = await memberChatChannels(request, requireRoomShortCode(locals), {
+    email: requireUser(locals).email,
+    role: requireUser(locals).role
+  });
+
+  const messageRows = loadNewestChatPages(requireRoomShortCode(locals), chatChannels);
 
   /*
     THE NEWEST PAGE, not every alert the room has ever posted.
@@ -483,10 +497,22 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     reasoning, because the module that owns how alerts are PAGED is the one that owns what bounds
     their questions.
   */
-  const questionRows = loadQuestionsForAlerts(
-    requireRoomShortCode(locals),
-    alertRows.map((alert) => alert.id)
-  );
+  const questionRows = loadQuestionsForAlerts(requireRoomShortCode(locals), [
+    /*
+      CAPTURED ALERT IDS TRAVEL TOO, added 2026-08-28.
+
+      `askQuestion` accepts a negative alert id — it resolves the fixture through `capturedRoomItem`
+      and writes a real row — so a captured alert can have questions. This list used to hold only
+      `alertRows`, and `loadQuestionsForAlerts` used to reach its room by joining `alerts`, so those
+      rows were dropped twice over: absent from the id list, and unjoinable if they had been in it.
+      A member asking a question on a captured alert got no error and an empty thread.
+
+      Filtered by `isVisible` for the same reason the merge below is: an alert hidden in this room
+      does not get to bring its questions back.
+    */
+    ...capturedRoom.alerts.filter(isVisible).map((alert) => alert.id),
+    ...alertRows.map((alert) => alert.id)
+  ]);
 
   // The Q&A button has three states and `alert_questions.answered_at` is the only source of truth
   // for which one an alert is in. Deriving them here means the button cannot disagree with the
@@ -645,6 +671,20 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         .from(roomState)
         .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
         .get()?.chatMode ?? 'g',
+    /*
+      What a member is told when the room is closed, so the presenter's editor opens on what is
+      actually stored rather than on an empty box.
+
+      `''` and not `null` for the CLIENT, because a textarea binds to a string; the distinction
+      between "never written" and "cleared" is the column's job and the refusal's, not the editor's.
+      Room state, so it comes from the row — every other reader of this value is on the server.
+    */
+    closedMessage:
+      db
+        .select({ closedMessage: roomState.closedMessage })
+        .from(roomState)
+        .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
+        .get()?.closedMessage ?? '',
     chatMutedTill:
       db
         .select({ expiresAt: chatMutes.expiresAt })
@@ -658,6 +698,8 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         )
         .orderBy(desc(chatMutes.expiresAt))
         .get()?.expiresAt ?? null,
+    /** The tab strip, in the order it is drawn — resolved above. `#lib/chat-tabs.ts` has the rest. */
+    chatTabs: chatChannels,
     alertQuestions: questionRows,
     files: db
       .select()
@@ -769,6 +811,13 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
      * here and nothing identifying in it.
      */
     badges: roomConfig.badges ?? { definitions: {}, byEmailHash: {} },
+    /**
+     * "Play chat message sound for" — the member hashes an arriving message is checked against.
+     *
+     * Hashes and never addresses: the setting holds raw emails and does not cross at all. See
+     * `RoomConfig.chatSoundForEmailHashes` for why the derivation is the controller's job.
+     */
+    chatSoundForEmailHashes: roomConfig.chatSoundForEmailHashes ?? [],
     /** Settings the owner is enforcing. A locked control must not render as a flippable toggle. */
     lockedSettings: roomConfig.locked,
     /** This room, as the controller describes it. */

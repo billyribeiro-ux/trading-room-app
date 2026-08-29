@@ -2,7 +2,11 @@ import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
-import { readRoomConfig, requestMobilePin } from '#lib/server/room-config-client.js';
+import {
+  readRoomConfig,
+  requestMobilePin,
+  restoreMobileTokens
+} from '#lib/server/room-config-client.js';
 
 /*
   The pairing pin for the mobile app, and the second remote function here.
@@ -53,5 +57,68 @@ export const getMyMobilePin = command(async () => {
     // Loud, not a placeholder: showing a pin that was never issued is worse than saying so.
     console.error('[getMyMobilePin] the controller could not issue a pin', cause);
     error(502, 'Could not get an app pin right now.');
+  }
+});
+
+/**
+ * `restoreMobileAppTokens` — the Mobile App tab's one button.
+ *
+ * ## The whole reference implementation, and what is missing from it
+ *
+ * Byte 2,444,920:
+ *
+ * ```js
+ * restoreMobileAppTokens(){
+ *   this.appService.sendServerCommand("restoreMobileAppTokens",{}),
+ *   bootbox.alert("Command sent successfully, check your mobile device for a test notification")
+ * }
+ * ```
+ *
+ * **It sends `{}`** — the server knows the caller from the session — and there is no inbound handler
+ * anywhere in the bundle. So this takes no argument either, and the member is resolved from
+ * `locals`, never from the request. What the controller does with it is argued at
+ * `internal/mobile-restore`.
+ *
+ * ## THE ALERT IS UNCONDITIONAL UPSTREAM, AND THAT IS THE DIVERGENCE
+ *
+ * `bootbox.alert` is the next statement after the transmit. It has no callback and no error path, so
+ * the reference tells the member *"Command sent successfully, check your mobile device for a test
+ * notification"* **whether or not anything was sent, and whether or not they have ever paired a
+ * device** — the decoded note records that it fires even if the transmit inside `send()` threw.
+ *
+ * This room does not reproduce that. The member pressing this button is, by the pane's own copy,
+ * somebody who *is not getting notifications*; telling them a notification is on its way when zero
+ * devices were reached leaves them waiting for a buzz that cannot come, and sends them to support
+ * with "the app says it worked". A control that reports success it did not achieve is the defect
+ * class this repository fixes most often — see `EXACT_ALERTS`.
+ *
+ * So the counts come back and the page composes the sentence from them. The verbatim string is kept
+ * for the case it is actually true of: at least one device reached.
+ *
+ * ## The gate is `getMyMobilePin`'s
+ *
+ * Re-checked here rather than trusted from the tab, because the tab has NO gate upstream — that is
+ * the anomaly `docs/decoded/mobile-app-decoded.md` §3 row 26 records, verified by reading the whole
+ * troubleshooter component and counting: `ptrMobileAppEnabled` occurs five times in the bundle and
+ * none of them is in that range. A surface with no gate is exactly the one whose endpoint must have
+ * one.
+ */
+export const restoreMobileAppTokens = command(async () => {
+  ensureDatabase();
+
+  const { request, locals } = getRequestEvent();
+  const user = requireUser(locals);
+  const shortCode = requireRoomShortCode(locals);
+
+  const { settings } = await readRoomConfig(request, shortCode, user.email);
+  const appEnabled =
+    settings.ptrMobileAppEnabled === true || settings.customMobileAppEnabled === true;
+  if (!appEnabled) error(409, 'This room has no mobile app configured.');
+
+  try {
+    return await restoreMobileTokens(shortCode, user.email);
+  } catch (cause) {
+    console.error('[restoreMobileAppTokens] the controller could not restore', cause);
+    error(502, 'Could not reach your devices right now.');
   }
 });

@@ -1,7 +1,8 @@
 import { command } from '$app/server';
 import { z } from 'zod';
 import { presenterRoom } from '#lib/server/auth.js';
-import { ensureDatabase } from '#lib/server/db/index.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { roomState } from '#lib/server/db/schema.js';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
 
 /*
@@ -113,3 +114,120 @@ export const softReset = command(z.void(), async () => {
   ensureDatabase();
   publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'softResetDone' } });
 });
+
+/**
+ * `hardReset` — every client drops its media and RELOADS.
+ *
+ * The heavier sibling of `softReset`, and the difference is what the client does after: a soft reset
+ * rebuilds the media session in place, a hard reset takes the whole page down and back up.
+ *
+ * Receiver, read whole at bundle bytes 2596540-2597340:
+ *
+ * ```js
+ * subscribe("hardReset", () => { disconnectAll(),
+ *   bootbox.alert("The room is being reset by an administrator. Click OK to continue...",
+ *                 () => location.reload()) })
+ * ```
+ *
+ * and the sender frame at byte 1013595 is `case "hardReset": emit("hardReset"), this.disconnect()`
+ * — **emit THEN disconnect**, which is the opposite order to `changeUserPerms` two cases below it.
+ * That asymmetry is upstream's and is reproduced rather than normalised; it reads correctly in both
+ * directions, because a frame that must reach the screen cannot race its own transport being torn
+ * down.
+ *
+ * ## What was actually missing, and it was not the receiver
+ *
+ * `TODO.md` row 10 recorded this as a missing RECEIVER for two sessions running. It is not:
+ * `RoomDialogs.alertThen` has existed since `forceReload` was built, and the four upstream callback
+ * receivers were already transcribed in that file. What was missing is a SENDER — the room's
+ * `session-hard-reset` button wrote a PREFERENCE and told nobody, so every other client sat there
+ * while the presenter's own page reloaded.
+ *
+ * The preference write STAYS. It is what makes the reset survive a client that was not connected to
+ * hear the frame, and it is read by the next page load either way. This adds the half that reaches
+ * the people who ARE connected.
+ */
+export const hardReset = command(z.void(), async () => {
+  ensureDatabase();
+  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'hardReset' } });
+});
+
+/**
+ * `openSession` — the room has been opened; everybody waiting outside may come in.
+ *
+ * ```js
+ * bootbox.alert("The session is now open, click here to reload the page and enter",
+ *               () => location.reload())
+ * ```
+ *
+ * with the sender at byte 1013476, `case "openSession": this.openSession()`.
+ *
+ * **The message is addressed to people who are NOT in the room yet**, which is what makes the reload
+ * the whole point rather than a refresh: a member turned away by `isShutOutByRoomState` is sitting
+ * on a refusal page, and the reload is what re-runs the door check that now says yes. So this frame
+ * is worth sending even though every recipient is about to leave the page.
+ *
+ * Same as `hardReset`: the preference write stays and this is the half that reaches the connected.
+ */
+export const openSession = command(z.void(), async () => {
+  ensureDatabase();
+  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'openSession' } });
+});
+
+/**
+ * `saveCloseMessage` — what a member is told when this room is closed.
+ *
+ * ## Two buttons offered to save it and neither did
+ *
+ * *" Just Save Close Message "* raised `Message Saved` and wrote nothing — its whole handler body was
+ * one alert — and its sibling *" Save Message and Close Session "* only wrote `sessionOpen: false`,
+ * so the message half of its own label was a lie too. Nothing in `apps/room/src` persisted a close
+ * message at all, and `ModalHost.svelte` rendered the literal string `undefined` where the editor
+ * belongs. `TODO.md` row 7(b) and row W both carried it.
+ *
+ * ## What is evidenced, and what is not
+ *
+ * EVIDENCED: the payload key `closedMsg`, the round trip, and the host element the reference binds
+ * into — `#summernoteClosedMsg`, at bundle byte 2154583, a Summernote editor whose content is
+ * `closedTxt`.
+ *
+ * NOT EVIDENCED, and stated rather than papered over: **where the reference's server keeps it.** That
+ * server is not in the capture, so per-session against per-room, and which column, cannot be read out
+ * of anything held here. This room keeps it per ROOM, on `room_state`, because that table is already
+ * keyed that way and a message that reset at the end of every session is one the presenter would
+ * rewrite on every close.
+ *
+ * NOT EVIDENCED EITHER: **where it is SHOWN.** The capture shows the editor, never the reader. This
+ * room shows it on the refusal a closed room gives — `session/+page.server.ts`, in place of its own
+ * "This room is closed." — which is a decision recorded as one. It is also what stops this being
+ * storage nothing reads, which this repository forbids more firmly than it forbids a divergence.
+ *
+ * The message is stored as TEXT and rendered as TEXT. Upstream's host is a rich-text editor and this
+ * room's field is a plain textarea: a close message is delivered inside an HTTP error body, and
+ * sending presenter-authored HTML through that path would be an injection surface bought for
+ * italics. Recorded so nobody "restores" the editor without moving the display first.
+ */
+export const saveCloseMessage = command(
+  z.strictObject({
+    /*
+      Bounded and trimmed, in that order. This is presenter-authored text that ends up in a response
+      body, so it gets a length it cannot exceed rather than being trusted. Empty is ALLOWED and is
+      how a presenter clears it — the refusal then falls back to its own sentence, which is why the
+      column is nullable rather than defaulted to ''.
+    */
+    message: z.string().trim().max(2000)
+  }),
+  async ({ message }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    const now = new Date();
+    db.insert(roomState)
+      .values({ roomShortCode: room, closedMessage: message || null, updatedAt: now })
+      /* One row per room; a second save UPDATES rather than appending a second opinion. */
+      .onConflictDoUpdate({
+        target: roomState.roomShortCode,
+        set: { closedMessage: message || null, updatedAt: now }
+      })
+      .run();
+  }
+);

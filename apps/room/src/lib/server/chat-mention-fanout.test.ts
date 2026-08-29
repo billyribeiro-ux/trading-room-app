@@ -61,6 +61,7 @@ describe('the hub decides per recipient, not per room', () => {
     const { received, stop } = roomWith([member(1, 'Ada'), member(2, 'Grace')]);
     publishChatToRoom(
       'mention-room',
+      'main',
       { senderId: 3, senderEmailHash: 'h3', room: 'main' },
       { body: 'hey @ada can you look at this', fromAdmin: false }
     );
@@ -80,10 +81,16 @@ describe('the hub decides per recipient, not per room', () => {
     const { received, stop } = roomWith([member(1, 'Bob')]);
     publishChatToRoom(
       'mention-room',
+      'main',
       { senderId: 3 },
       { body: 'ask @BOB about it', fromAdmin: false }
     );
-    publishChatToRoom('mention-room', { senderId: 3 }, { body: '@bobby is out', fromAdmin: false });
+    publishChatToRoom(
+      'mention-room',
+      'main',
+      { senderId: 3 },
+      { body: '@bobby is out', fromAdmin: false }
+    );
     stop();
 
     const chat = received[0].filter((e) => e.channel === 'chat');
@@ -95,8 +102,18 @@ describe('the hub decides per recipient, not per room', () => {
     // Without it a presenter addressing the room mentions no one; with it a member cannot ping
     // everybody by typing three characters.
     const { received, stop } = roomWith([member(1, 'Ada')]);
-    publishChatToRoom('mention-room', { senderId: 9 }, { body: '@all standup', fromAdmin: true });
-    publishChatToRoom('mention-room', { senderId: 9 }, { body: '@all lunch?', fromAdmin: false });
+    publishChatToRoom(
+      'mention-room',
+      'main',
+      { senderId: 9 },
+      { body: '@all standup', fromAdmin: true }
+    );
+    publishChatToRoom(
+      'mention-room',
+      'main',
+      { senderId: 9 },
+      { body: '@all lunch?', fromAdmin: false }
+    );
     stop();
 
     const chat = received[0].filter((e) => e.channel === 'chat');
@@ -117,6 +134,7 @@ describe('the hub decides per recipient, not per room', () => {
     const { received, stop } = roomWith([null]);
     publishChatToRoom(
       'mention-room',
+      'main',
       { senderId: 3 },
       { body: 'hello @ada there', fromAdmin: true }
     );
@@ -143,6 +161,7 @@ describe('the message text never reaches the wire', () => {
     const secret = 'the admin channel body that must not travel @ada';
     publishChatToRoom(
       'mention-room',
+      'main',
       { senderId: 3, senderEmailHash: 'h3', room: 'admin' },
       { body: secret, fromAdmin: true }
     );
@@ -166,6 +185,7 @@ describe('the message text never reaches the wire', () => {
     const { received, stop } = roomWith([member(1, 'Ada'), member(2, 'Grace')]);
     publishChatToRoom(
       'mention-room',
+      'main',
       { senderId: 3, senderEmailHash: 'h3', room: 'main' },
       // A TRAILING SPACE, because `@ada` at the very end of a message does not match - the
       // reference chose that false negative over pinging every `@adam`, and `isMentionOf` keeps it.

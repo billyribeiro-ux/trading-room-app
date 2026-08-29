@@ -16,6 +16,7 @@ const [
   contract,
   packageJson,
   pnpmWorkspace,
+  rootPackageJson,
   pnpmLock
 ] = await Promise.all([
   readFile(fontPath),
@@ -34,6 +35,7 @@ const [
     font assertion ran.
   */
   readFile(new URL('../../../pnpm-workspace.yaml', import.meta.url), 'utf8'),
+  readFile(new URL('../../../package.json', import.meta.url), 'utf8').then(JSON.parse),
   readFile(new URL('../../../pnpm-lock.yaml', import.meta.url), 'utf8')
 ]);
 
@@ -67,11 +69,27 @@ assert.match(
 );
 
 /*
-  Pinned deliberately, and bumped 2026-08-13 from 11.18.0 to match `package.json` and the repo root,
-  which both read `pnpm@11.21.0`. pnpm was upgraded and this pin was not moved with it, so the font
-  contract failed on the package manager rather than on anything about fonts.
+  Pinned deliberately — and it has now drifted TWICE in the same way, which is why the second
+  assertion below exists.
+
+  Bumped 2026-08-13 from 11.18.0 to 11.21.0 to match `package.json` and the repo root. Then on
+  2026-08-26 every dependency in this repository was taken to registry-latest and the two
+  `packageManager` fields went to 11.24.0 — and this literal did not move with them, so `pnpm test`
+  failed HERE, on the package manager, for anything about fonts. That is twice out of two upgrades.
+  Corrected to 11.24.0 on 2026-08-28.
+
+  The literal stays, because its job is to make a package-manager change a REVIEWED change rather
+  than a silent one. What it could not catch is the two manifests disagreeing with each other, which
+  is the shape both drifts actually had — so that is asserted separately, against the repo root, and
+  needs no maintenance at all.
 */
-assert.equal(packageJson.packageManager, 'pnpm@11.21.0');
+assert.equal(packageJson.packageManager, 'pnpm@11.24.0');
+assert.equal(
+  packageJson.packageManager,
+  rootPackageJson.packageManager,
+  'the controller and the repo root must pin the SAME package manager; one moving without the other ' +
+    'is how this pin has gone stale on both upgrades so far'
+);
 assert.equal(packageJson.dependencies['font-awesome'], '4.3.0');
 assert.equal(packageJson.dependencies['@fortawesome/fontawesome-free'], '5.8.1');
 assert.equal(packageJson.dependencies['@fontsource/roboto'], undefined);
@@ -84,14 +102,16 @@ assert.equal(packageJson.dependencies['@fontsource-variable/roboto'], undefined)
 assert.match(pnpmWorkspace, /packages:\s*\n\s*- 'apps\/\*'/);
 // better-sqlite3 is pinned to `false` on purpose — see the comment in pnpm-workspace.yaml.
 // Asserting it stays declined stops the retired SQLite driver being silently rebuilt.
-assert.match(pnpmWorkspace, /*
+assert.match(
+  pnpmWorkspace /*
     `better-sqlite3: true`, not false. The verifier asserted `false` and the comment beside it said
     it was "pinned to false on purpose" — but `git log -p pnpm-workspace.yaml` shows the value has
     been `true` since the initial commit `cbfb4b9`. The expectation was carried over from the room's
     own workspace file and never matched this repository, so this assertion has been RED from the
     day it was written. Corrected to what the workspace actually says.
-  */
-  /allowBuilds:[\s\S]*?better-sqlite3:\s*true[\s\S]*?esbuild:\s*true/);
+  */,
+  /allowBuilds:[\s\S]*?better-sqlite3:\s*true[\s\S]*?esbuild:\s*true/
+);
 assert.match(pnpmLock, /lockfileVersion:/);
 await assert.rejects(access(new URL('package-lock.json', root)), /ENOENT/);
 

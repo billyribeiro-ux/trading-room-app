@@ -36,9 +36,11 @@
  */
 
 /** One realtime message, mirroring the capture's channel-per-topic shape. */
+import { BUILT_IN_CHAT_TABS } from '../chat-tabs';
 import { isMentionOf } from '../mention';
 
 import type { PrivateChatMessage } from './private-chat';
+import { typistsIn } from './typing';
 
 export type RoomEvent =
   /** `/sess/{id}/alerts/` - the capture pushes the alert row and emits `alertMsg`. */
@@ -59,6 +61,19 @@ export type RoomEvent =
    * body never leaves the process.
    */
   | { channel: 'chat'; data: unknown; isMention?: boolean }
+  /**
+   * `typingUpdated` — who is typing in one chat channel, right now.
+   *
+   * Upstream this arrives as a map of every channel at once (`e[this.channel]`, byte 1,433,553) and
+   * each chat component picks its own out. This publishes ONE channel per frame, because the
+   * recipient set is the same either way and a per-channel frame is the smaller thing to send.
+   *
+   * **The names are already filtered for the recipient**, which is why this is published with
+   * `publishTypingToRoom` rather than `publishToRoom`: a viewer must never be shown their own name,
+   * and doing it once on the server beats every client filtering itself out and one of them
+   * forgetting. That is the same argument `publishChatToRoom` makes for `isMention` above.
+   */
+  | { channel: 'typing'; data: { chatChannel: string; names: string[] } }
   /**
    * `/sess/{id}/cmds/` - the room's command channel.
    *
@@ -150,6 +165,21 @@ export type RoomEvent =
          * upstream that carries no payload at all. Validated at the page, same as `muser`.
          */
         data?: unknown;
+        /**
+         * `sessionRevoked` — the one command on this channel that is OURS rather than the
+         * reference's, and the only one sent to a single CONNECTION rather than to a room or a user.
+         *
+         * The reference has no equivalent because it never ends a live connection: entitlement is
+         * checked at the door and one login serves any number of devices. Both are deliberate
+         * divergences recorded in `NEW-TODO.md` Part 1, and `live-access.ts` is where the rule lives.
+         *
+         * It is delivered by `sess/[room]/events` writing to its OWN listener, never through
+         * `publishToRoom` or `publishToUsers` — after a newest-wins eviction the revoked connection
+         * and the one that replaced it share a user id, so an addressed publish would revoke both.
+         * The fields are typed here so the client cannot read a message the server does not send.
+         */
+        reason?: 'session-ended' | 'entitlement-lapsed' | 'unconfirmed';
+        message?: string;
       };
     }
   /**
@@ -239,10 +269,58 @@ export type RoomEvent =
   | {
       channel: 'privCmds';
       data: {
-        cmd: 'forceReload' | 'unmuteChat' | 'kickUser' | 'muteChat' | 'remoteRestartAudio';
+        cmd:
+          | 'forceReload'
+          | 'unmuteChat'
+          | 'kickUser'
+          | 'muteChat'
+          | 'remoteRestartAudio'
+          | 'getDebugLog'
+          | 'debugLogResp'
+          | 'updateProfilePic'
+          | 'forceStopScreen';
         targetUserId?: number;
         msg?: string;
         mutedTill?: string;
+        /*
+          `debugLogResp` only, and THE ONLY FRAME ON THIS CHANNEL THAT TRAVELS MEMBER -> PRESENTER.
+
+          All three are filled by the SERVER from the replying member's own session. Upstream lets
+          that member choose its recipient — `{requestor: xe.requestor}` — which is the one thing
+          this pair could not be ported with, because it would let any member push text into any
+          presenter's Debug Log modal. `routes/debug-log.remote.ts` resolves the recipient from a
+          request the server recorded when the presenter asked, and `sendDebugLog` takes no
+          requestor argument at all.
+
+          `getDebugLog` itself carries nothing but the target, like `forceReload` beside it.
+        */
+        fromUserId?: number;
+        fromName?: string;
+        log?: string;
+        /*
+          `updateProfilePic` only — the member's new avatar, already stored and already written to
+          `users.avatar_url` before this frame is published. The row is the authority; this rides
+          along so the member's own page updates without a reload, exactly as `recName` rides with
+          `startRec`.
+        */
+        avatarUrl?: string;
+        /*
+          `forceStopScreen` only — WHICH of this member's screens to stop, as the producer id every
+          peer already knows the share by.
+
+          The frame is addressed to the SHARER, not to the room. Upstream's server closes the
+          producer itself (`sendServerAdminCommand("forceStopScreen", {id: e._id})` at bundle byte
+          1,969,578, and there is no `case "forceStopScreen"` anywhere in the bundle), which this
+          room cannot reproduce: the SFU accepts `closeProducer` from the session that owns the
+          producer and from nobody else. So the ask travels to the owner's browser, which closes its
+          own producer, and the SFU's `producerClosed` notification tears the tab down everywhere —
+          the same path a sharer clicking their own Stop already takes.
+
+          The id is a producer id and NOT a user id on purpose: a member may be sharing several
+          screens at once, and the reference's menu item stops exactly the one whose gear was
+          opened.
+        */
+        producerId?: string;
       };
     };
 
@@ -358,7 +436,36 @@ export type RosterUser = {
  * nowhere else: an SSE hub IS process-local state by definition, and the alternative - a database
  * poll per client - is the thing being replaced. The cost is stated above rather than hidden.
  */
-const subscribers = new Map<string, Map<Subscriber, RosterUser | null>>();
+const subscribers = new Map<string, Map<Subscriber, ListenerContext>>();
+
+/**
+ * What the hub knows about ONE connection.
+ *
+ * `user` is who it belongs to, or `null` for a subscriber that joined before an identity was known.
+ * That has been the map's value since the roster was served from here.
+ *
+ * `chatChannels` joined it on 2026-08-28 with `chatTabsWithBadges`, and it is an entitlement rather
+ * than a preference: a badge channel is readable by some members of a room and not others, so a
+ * chat frame is no longer something the whole room is entitled to. `publishChatToRoom` and
+ * `publishTypingToRoom` both consult it.
+ *
+ * ONE MAP, not two. A parallel `Map<Subscriber, Set<string>>` would have to be added and deleted in
+ * step with this one at four sites, and the failure of that pattern is silent: a stale entry means
+ * a closed connection's entitlement outliving it.
+ */
+type ListenerContext = {
+  user: RosterUser | null;
+  /*
+    Resolved on the SERVER when the stream opens, from the room's configuration and this member's
+    badges — never asserted by the client. `memberChatChannels` is the one function that answers it,
+    here and at the three other call sites.
+
+    A subscriber that opened before the list could be resolved gets the two built-in channels, which
+    is what every room had before badge channels existed and is the fail-closed answer: it can never
+    widen access, only withhold a channel the member would have been allowed.
+  */
+  chatChannels: ReadonlySet<string>;
+};
 
 /**
  * Adds a listener; the returned function removes it. Always call it from the stream's `cancel`.
@@ -374,7 +481,13 @@ const subscribers = new Map<string, Map<Subscriber, RosterUser | null>>();
 export function subscribeToRoom(
   room: string,
   listener: Subscriber,
-  user: RosterUser | null = null
+  user: RosterUser | null = null,
+  /*
+    The chat channels this connection is entitled to receive. Defaults to the built-in pair rather
+    than to "everything": a caller that forgets to resolve them withholds a badge channel, which is
+    the direction a mistake here has to fail in.
+  */
+  chatChannels: readonly string[] = BUILT_IN_CHAT_TABS
 ): () => void {
   let listeners = subscribers.get(room);
   if (!listeners) {
@@ -394,7 +507,7 @@ export function subscribeToRoom(
     and the reference's payload is `{nick, userXrefID}`.
   */
   const alreadyHere = user !== null && heldBy(listeners, user.id);
-  listeners.set(listener, user);
+  listeners.set(listener, { user, chatChannels: new Set(chatChannels) });
   if (user !== null && !alreadyHere) {
     publishToRoom(room, {
       channel: 'roster',
@@ -416,9 +529,9 @@ export function subscribeToRoom(
 }
 
 /** Whether any remaining listener in this room belongs to that person. */
-function heldBy(listeners: Map<Subscriber, RosterUser | null>, userId: number): boolean {
+function heldBy(listeners: Map<Subscriber, ListenerContext>, userId: number): boolean {
   for (const held of listeners.values()) {
-    if (held?.id === userId) return true;
+    if (held.user?.id === userId) return true;
   }
   return false;
 }
@@ -431,12 +544,51 @@ function heldBy(listeners: Map<Subscriber, RosterUser | null>, userId: number): 
  * happened to pick unchanged.
  */
 export function setRosterLocation(room: string, userId: number, locStr: string): boolean {
+  return patchRosterUser(room, userId, { locStr });
+}
+
+/**
+ * Attaches a new avatar to every connection this person holds, and reports whether anything changed.
+ *
+ * ## Why the roster needs telling at all
+ *
+ * `RosterUser.avatarUrl` is captured into the subscriber context at SUBSCRIBE TIME, from the row as
+ * it read then (`sess/[room]/events/+server.ts`). So a presenter changing `users.avatar_url` writes
+ * the durable half and leaves every open roster showing the old picture until each member happens to
+ * reconnect — which was true of the first draft of `uploadProfilePicture`, whose comment claimed the
+ * roster push carried the new URL. It did not; it re-pushed the snapshot.
+ *
+ * This is the same problem `setRosterLocation` was written for and it now shares its body. Two
+ * copies of "patch one field on every connection this person holds, deduping by user id" is how one
+ * of them ends up not deduping.
+ */
+export function setRosterAvatar(room: string, userId: number, avatarUrl: string): boolean {
+  return patchRosterUser(room, userId, { avatarUrl });
+}
+
+/**
+ * Patch fields on every connection one person holds, reporting whether anything actually changed.
+ *
+ * Keyed by user id rather than by listener because one person may hold several tabs and the roster
+ * dedupes by id — updating only the tab that reported would leave whichever entry `roomRoster`
+ * happened to pick unchanged.
+ *
+ * The equality check is what makes the `changed` answer worth having: both callers use it to decide
+ * whether to publish, and a geolocation lookup that answers with the city it already had must not
+ * cost the room a roster broadcast.
+ */
+function patchRosterUser(room: string, userId: number, patch: Partial<RosterUser>): boolean {
   const listeners = subscribers.get(room);
   if (!listeners) return false;
   let changed = false;
-  for (const [listener, user] of listeners) {
-    if (!user || user.id !== userId || user.locStr === locStr) continue;
-    listeners.set(listener, { ...user, locStr });
+  for (const [listener, context] of listeners) {
+    const { user } = context;
+    if (!user || user.id !== userId) continue;
+    const differs = Object.entries(patch).some(
+      ([key, value]) => user[key as keyof RosterUser] !== value
+    );
+    if (!differs) continue;
+    listeners.set(listener, { ...context, user: { ...user, ...patch } });
     changed = true;
   }
   return changed;
@@ -453,7 +605,7 @@ export function roomRoster(room: string): RosterUser[] {
   const listeners = subscribers.get(room);
   if (!listeners) return [];
   const byId = new Map<number, RosterUser>();
-  for (const user of listeners.values()) {
+  for (const { user } of listeners.values()) {
     if (user && !byId.has(user.id)) byId.set(user.id, user);
   }
   return [...byId.values()];
@@ -554,7 +706,7 @@ export function publishRosterToRoom(room: string): void {
     canEditNotes: false
   }));
 
-  for (const [listener, viewer] of listeners) {
+  for (const [listener, { user: viewer }] of listeners) {
     try {
       listener({
         channel: 'roster',
@@ -598,17 +750,33 @@ export function publishRosterToRoom(room: string): void {
  */
 export function publishChatToRoom(
   room: string,
+  channel: string,
   data: unknown,
   message: { body: string | null | undefined; fromAdmin: boolean }
 ): void {
   const listeners = subscribers.get(room);
   if (!listeners) return;
-  for (const [listener, user] of listeners) {
+  for (const [listener, context] of listeners) {
+    /*
+      THE SECOND THING THIS FAN-OUT DECIDES PER RECIPIENT, added 2026-08-28.
+
+      `chatTabsWithBadges` makes a chat channel an ENTITLEMENT: a room's badge channels are readable
+      by some of its members and not others. This frame carries no body — the mention bit above is
+      the whole reason it is built per listener — but it does carry the sender's id, their email hash
+      and the channel name, and it is what makes a client refetch. Sent to everyone, it would tell a
+      member without the badge that a private channel exists and that somebody just posted in it,
+      and their refetch would ask for a page the load has already refused them.
+
+      The entitlement is the one `memberChatChannels` resolved when the stream opened. A listener
+      that has none of it — an anonymous subscriber, or one that opened before the list was known —
+      holds the two built-in channels, so this skips it for a badge channel and never for `main`.
+    */
+    if (!context.chatChannels.has(channel)) continue;
     try {
       listener({
         channel: 'chat',
         data,
-        isMention: isMentionOf(message.body, user?.displayName, message.fromAdmin)
+        isMention: isMentionOf(message.body, context.user?.displayName, message.fromAdmin)
       });
     } catch (error) {
       console.error('[room-events] subscriber failed', error);
@@ -658,7 +826,7 @@ export function publishToUsers(room: string, userIds: readonly number[], event: 
   if (!listeners) return;
   const addressed = new Set(userIds);
 
-  for (const [listener, user] of listeners) {
+  for (const [listener, { user }] of listeners) {
     if (user === null || !addressed.has(user.id)) continue;
     try {
       listener(event);
@@ -672,4 +840,36 @@ export function publishToUsers(room: string, userIds: readonly number[], event: 
 /** Listener count, for tests and for proving fan-out actually happened. */
 export function roomSubscriberCount(room: string): number {
   return subscribers.get(room)?.size ?? 0;
+}
+
+/**
+ * Fan a typing update out, deciding per recipient which names they see.
+ *
+ * One frame per listener, because the answer differs per listener: their own name is removed. The
+ * shape follows `publishRosterToRoom` directly — same reason, same structure.
+ */
+export function publishTypingToRoom(room: string, chatChannel: string): void {
+  const listeners = subscribers.get(room);
+  if (!listeners) return;
+  for (const [listener, context] of listeners) {
+    /*
+      Same entitlement as the chat fan-out above, and it matters as much: a typing frame names the
+      people typing in a channel, so sending a badge channel's to the whole room would leak both the
+      channel's existence and who is active in it. See `publishChatToRoom`.
+    */
+    if (!context.chatChannels.has(chatChannel)) continue;
+    try {
+      listener({
+        channel: 'typing',
+        /*
+          `context.user` is the listener's own `RosterUser`, or null for a subscriber that joined
+          before one was known. A null user gets the UNFILTERED list, which is correct rather than a
+          shortcut: it has no identity to remove, and `-1` matches no real user id.
+        */
+        data: { chatChannel, names: typistsIn(room, chatChannel, context.user?.id ?? -1) }
+      });
+    } catch (error) {
+      console.error('[room-events] typing subscriber failed', error);
+    }
+  }
 }

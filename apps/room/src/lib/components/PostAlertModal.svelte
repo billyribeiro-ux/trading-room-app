@@ -9,6 +9,7 @@
   } from '#lib/post-alert-behavior.js';
   import BootboxDialog from './BootboxDialog.svelte';
   import Modal from './Modal.svelte';
+  import ScheduledAlerts from './ScheduledAlerts.svelte';
 
   interface Props {
     open: boolean;
@@ -18,9 +19,36 @@
     onalert: (message: string) => void;
     onpost: (submission: PostAlertSubmission) => Promise<boolean>;
     onpastepost: (submission: PastedImageSubmission) => Promise<boolean>;
+    /**
+     * "Sticky non-trade alert?" — whether the Non-Trade checkbox starts ticked, on every open.
+     *
+     * `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1` inside `doAlertsModal`, byte
+     * 2,124,407. It defaults `false` rather than being required, because `ModalHost` is rendered by
+     * tests that predate this prop and a composer that starts un-ticked is the state every one of
+     * them was written against.
+     */
+    stickyNonTradeAlert?: boolean;
+    /**
+     * `sessData.hasAlertScheduler` — whether this room may schedule alerts for later.
+     *
+     * A prop rather than a read here, for the reason every other room setting reaches this component
+     * as one: the page owns `data.sessData` and resolves it once, so a component cannot read a
+     * setting and decide for itself. Defaults `false`, which is the fail-closed direction.
+     */
+    schedulerAvailable?: boolean;
   }
 
-  let { open, tab, onclose, ontab, onalert, onpost, onpastepost }: Props = $props();
+  let {
+    open,
+    tab,
+    onclose,
+    ontab,
+    onalert,
+    onpost,
+    onpastepost,
+    stickyNonTradeAlert = false,
+    schedulerAvailable = false
+  }: Props = $props();
 
   let alertText = $state('');
   let alertUrl = $state('');
@@ -33,6 +61,10 @@
   let keepOpen = $state(false);
   let postOnX = $state(false);
   let dontPush = $state(false);
+  /* `false` here and seeded in `beginOpenState`, which the `$effect` below runs on every transition
+     to open — including the first. Seeding the declaration too would capture the prop's initial
+     value, which is what `state_referenced_locally` warns about, and would buy nothing: the modal
+     is never read before it opens. */
   let nonTradeAlert = $state(false);
   let legalDisclosure = $state(false);
   let legalDisclosureText = $state(POST_ALERT_LEGAL_DISCLOSURE);
@@ -55,10 +87,18 @@
     if (fileInput) fileInput.value = '';
   }
 
+  /*
+    Every open, not once at construction — which is what "sticky" means.
+
+    `doAlertsModal` sets `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1` beside its other
+    per-open resets (byte 2,124,407), so a presenter who unticks the box for one alert gets it back
+    on the next. Seeding only the initial `$state` would make it sticky for the first alert of a
+    session and never again.
+  */
   function beginOpenState() {
     clearInputFields();
     postOnX = false;
-    nonTradeAlert = false;
+    nonTradeAlert = stickyNonTradeAlert;
   }
 
   function selectTab(next: AlertTab, event: MouseEvent) {
@@ -435,6 +475,24 @@
               bind:value={legalDisclosureText}
             />
           </div>
+        {/if}
+        <!--
+          `hasAlertScheduler` — the send-later pane, and the manage table reached from it.
+
+          Rendered only when the room has the scheduler, matching where upstream puts it (inside
+          `app-post-alert-modal`, gated on `sessData.hasAlertScheduler`). The gate is drawn here AND
+          enforced on the server: `scheduled-alerts.remote.ts` refuses all three commands without the
+          setting, because a gate that only removes a control is not a gate.
+        -->
+        {#if schedulerAvailable}
+          <ScheduledAlerts
+            body={alertText}
+            {nonTradeAlert}
+            onscheduled={() => {
+              if (!keepOpen) onclose();
+              else clearInputFields();
+            }}
+          />
         {/if}
       </div>
       <div class="text-right">

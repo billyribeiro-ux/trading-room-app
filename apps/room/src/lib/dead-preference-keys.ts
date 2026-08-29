@@ -35,6 +35,10 @@
  * `showSpeechRecoOverlay`), plus `disableVideo`; their element ids stay on this list precisely
  * BECAUSE they were written under the old name before that, so the stale copy is still out there.
  *
+ * Two entries at the end of the list are NOT element ids and say so where they sit: they are the two
+ * invented preference names the Text Mode radios wrote before those radios were wired to the
+ * reference's own keys.
+ *
  * Deliberately absent: `pm-window-layout`, which looks like one of these and is not. It has its own
  * handler (`requestPmWindowLayout`) and has always persisted under `pmLogsOnRight`, a real name.
  * `settings-app-donot-disturb` is also absent — it returns early and never reaches persistence.
@@ -58,7 +62,23 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
   'chat-mem-clear',
   'small-image-preview',
   'extra-chat-column',
-  'visibility-change-enabled'
+  'visibility-change-enabled',
+  /*
+    TWO OF A DIFFERENT KIND, added 2026-08-28, and they are not element ids.
+
+    The settings modal's two Text Mode radio pairs wrote `alertDisplayMode` and `chatDisplayMode`
+    with the values `'regular'` and `'compact'` — three invented names against the reference's own
+    `alertsMode` / `chatMode` keys and its `'r'` / `'c'` values — and nothing in this room read
+    either. The radios were seeded from a constant too, so reopening the modal showed Regular
+    whatever had been picked. Same shape as the room's chat-mode radio, which this file's header
+    describes; different cause, since these were never produced by the id fallback.
+
+    They are dead in the strongest sense the header asks for: every occurrence was read, both are
+    gone from the source, and the keys they wrote can never be revived — the live feature uses the
+    reference's names, which are different strings. `chat-display-mode.ts` holds the wiring.
+  */
+  'alertDisplayMode',
+  'chatDisplayMode'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);

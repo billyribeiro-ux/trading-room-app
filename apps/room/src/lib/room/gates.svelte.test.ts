@@ -2,7 +2,7 @@
 import { flushSync } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
 
-import { RoomGates } from './gates.svelte';
+import { RoomGates } from './gates';
 
 /*
   `viewerOnlyMode` reads `page.url` from `$app/state`, which is a SvelteKit-owned rune with no
@@ -85,9 +85,8 @@ class Sources {
 }
 
 /** The class under test, wired to those five the way `+page.svelte` wires it. */
-const gatesOver = (state: Sources, dontShowRecInfoToUsers = false) =>
+const gatesOver = (state: Sources) =>
   new RoomGates({
-    prefs: { loaded: { dontShowRecInfoToUsers } } as never,
     media: {
       get roomRecordingName() {
         return state.recordingName;
@@ -224,13 +223,84 @@ describe('the gates themselves answer what the reference says they answer', () =
     expect(gates.mobileAppAvailable).toBe(true);
   });
 
-  it('recordingTooltip is suppressed for a member when the room says to hide it', () => {
-    const { state } = make();
-    const gates = gatesOver(state, true);
+  /*
+    THE SETTING IS READ OFF `sessData`, and that is the whole point of this test since 2026-08-28.
+
+    ## The post-mortem, kept here because this is the test that could not have caught it
+
+    `dontShowRecInfoToUsers` is a ROOM setting — `(sessData.dontShowRecInfoToUsers && !isPresenter)
+    || !roomState.recName` blanks the tooltip, bundle byte 2,474,213, and `RoomNavbar.svelte:305`
+    has carried that transcription in a comment since it was written. `RoomGates.recordingTooltip`
+    implemented exactly that shape against `prefs.loaded.dontShowRecInfoToUsers`: a per-VIEWER
+    preference key that nothing in this room has ever written.
+
+    So the value was `undefined` in every room, the owner switch did nothing, and every member saw
+    the recording FILE NAME — the one thing the setting exists to hide.
+
+    **Every gate in this repository passed over it.** It compiled. `svelte-check` was clean. The
+    docblock beside it explained, wrongly, that the setting *"is not captured in our session data"*.
+    And THIS TEST passed, because the helper handed the flag in through `prefs.loaded` — the same
+    wrong source the code read. A test that supplies the code's own mistake is not a test of the
+    rule; it is a mirror. That is the failure mode to watch for here, and it is why the helper no
+    longer takes the flag at all: the only way to set it now is on the session, where it lives.
+
+    It was found by `gate/audit-setting-coverage.mjs`, which asks the pinned bundle which settings
+    the reference reads that this room does not. Nothing else could have: a room setting implemented
+    against a preference looks identical to a working one from every direction except that one.
+  */
+  it('recordingTooltip is suppressed for a member when the ROOM says to hide it', () => {
+    const { gates, state } = make();
+    state.session = {
+      sessData: { dontShowRecInfoToUsers: true },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
     state.recordingName = 'session-42';
     expect(gates.recordingTooltip).toBe('');
     state.isPresenter = true;
     expect(gates.recordingTooltip).toBe('Recording to: session-42');
+  });
+
+  /* The negative control's positive twin: with the room setting OFF, a member sees the name. */
+  it('leaves the tooltip alone for a member when the room does not hide it', () => {
+    const { gates, state } = make();
+    state.recordingName = 'session-42';
+    expect(gates.recordingTooltip).toBe('Recording to: session-42');
+  });
+
+  /*
+    THE CAPTIONS ENTITLEMENT, and the negation that decides the default.
+
+    `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0` (byte 1,147,900).
+    Absent means NOT disabled, so a room that has never configured captions has them — and the
+    `!== true` below is what makes that true for the `undefined` an omitted setting produces.
+
+    The consumer is `RoomRecording.beginSpeechRecognition`, whose docblock quoted the capture's
+    "disabled by preferences or session settings" while gating on preferences alone. An owner who
+    turned captions off got them anyway, from every presenter, for everybody.
+  */
+  it('speechRecognitionAvailable is ON unless the room disabled it', () => {
+    const { gates, state } = make();
+    expect(gates.speechRecognitionAvailable, 'an unset setting must leave captions on').toBe(true);
+
+    state.session = {
+      sessData: { hasSpeechRecognitionDisabled: true },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
+    expect(gates.speechRecognitionAvailable).toBe(false);
+  });
+
+  it('treats a truthy-but-not-true setting as NOT disabling captions', () => {
+    // `=== true` everywhere else on this class, and the negation makes it `!== true` here. A string
+    // off the wire must not switch a feature off any more than it may switch one on.
+    const { gates, state } = make();
+    state.session = {
+      sessData: { hasSpeechRecognitionDisabled: 'yes' },
+      user: { isFT: false },
+      streamRead: null
+    } as never;
+    expect(gates.speechRecognitionAvailable).toBe(true);
   });
 
   it('tawkAvailable needs the presenter, the room setting AND a configured property id', () => {

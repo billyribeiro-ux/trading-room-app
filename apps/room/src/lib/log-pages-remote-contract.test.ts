@@ -44,9 +44,7 @@ describe('both are queries, and both are pure', () => {
     expect(remoteCode).not.toContain('db.insert');
     expect(remoteCode).not.toContain('db.update');
     expect(remoteCode).not.toContain('db.delete');
-    expect(remoteCode).toContain(
-      'return loadChatPage(requireRoomShortCode(locals), channel, page);'
-    );
+    expect(remoteCode).toContain('return loadChatPage(shortCode, channel, page);');
     expect(remoteCode).toContain('return loadAlertPage(requireRoomShortCode(locals), page);');
   });
 
@@ -73,37 +71,69 @@ describe('the page bound survived the move', () => {
 });
 
 describe('the channel is validated, not trusted', () => {
-  it('keeps the deny-by-default allow-list', () => {
-    // Without it the field is an arbitrary string reaching a WHERE clause — parameterised, so not
-    // injectable, but enough to enumerate whether messages exist under any label a caller guesses.
-    expect(remoteCode).toContain('isChatChannel(value)');
+  /*
+    THIS BLOCK USED TO ASSERT `isChatChannel(value)` INSIDE THE SCHEMA, and the predicate is gone.
+
+    It was a deny-by-default allow-list over the fixed pair `['main', 'off-topic']`, and while every
+    room had exactly those two it was the whole check. `chatTabsWithBadges` ended that on 2026-08-28:
+    an owner can configure extra channels behind badges, so a name being a channel SOMEWHERE stopped
+    being evidence that this member may read it.
+
+    The check did not weaken — it moved, and it got stronger. The schema keeps a BOUND, and the
+    authorisation happens in the body against `memberChatChannels`, which resolves the list on the
+    server from the room configuration and this member's own badges. It cannot live in the schema
+    because it needs the request's user, and a Zod predicate has none.
+  */
+  it('bounds the channel at the schema and AUTHORISES it in the body', () => {
+    expect(remoteCode).toContain('z.string().min(1).max(MAX_CHAT_TAB_NAME)');
+    expect(remoteCode).toContain('memberChatChannels(request, shortCode, user)');
+    expect(remoteCode).toContain('isMemberChatChannel(channels, channel)');
   });
 
-  it('checks the value is a string BEFORE the allow-list', () => {
+  it('refuses with the same message a nonexistent channel gets', () => {
     /*
-      `z.custom` hands its predicate `unknown`; the argument comes off the wire and could be a
-      number or an object. `isChatChannel` is declared over `string`. Dropping the `typeof` means
-      handing a non-string to `.includes` and trusting the answer — and it type-errors, which is how
-      this was caught rather than shipped.
+      A distinct refusal for "exists but not yours" would confirm that a private channel exists,
+      which is the enumeration the check is closing. One message, both cases.
     */
-    expect(remoteCode).toContain("typeof value === 'string' && isChatChannel(value)");
+    expect(remoteCode).toContain("error(403, 'No such channel.')");
   });
 });
 
 describe('the room comes from the session, never the request', () => {
-  it('takes the room short code from locals in both', () => {
+  /*
+    A COUNT, not a spot check, and the count is the assertion: this module exports three readers of
+    the room's logs, and every one of them has to take its room from the session. It was two until
+    `searchChatMessages` arrived on 2026-08-29, and this test going red is how that arrival was
+    forced to be looked at rather than assumed — a new export inheriting the file's reputation is
+    exactly how the third one would have shipped taking a room from its caller.
+  */
+  const READERS = 3;
+
+  it('takes the room short code from locals in every one', () => {
     /*
-      A `roomShortCode` field on either argument would be the 2026-08-07 privilege escalation again
-      in a new place. `strictObject` is what stops one being accepted silently if somebody adds it
-      to the client call.
+      A `roomShortCode` field on any of the arguments would be the 2026-08-07 privilege escalation
+      again in a new place. `strictObject` is what stops one being accepted silently if somebody
+      adds it to the client call.
     */
-    expect((remoteCode.match(/requireRoomShortCode\(locals\)/g) ?? []).length).toBe(2);
+    expect((remoteCode.match(/requireRoomShortCode\(locals\)/g) ?? []).length).toBe(READERS);
     expect(remoteCode).toContain('z.strictObject({');
     expect(remoteCode).not.toContain('roomShortCode:');
   });
 
-  it('still requires a user on both', () => {
-    expect((remoteCode.match(/requireUser\(locals\);/g) ?? []).length).toBe(2);
+  it('still requires a user in every one', () => {
+    expect((remoteCode.match(/requireUser\(locals\);/g) ?? []).length).toBe(READERS);
+  });
+
+  it('checks the channel against THIS member list wherever a channel is named', () => {
+    /*
+      The two channel-scoped readers — the page loader and the search. A search is the shape that
+      makes such a leak useful, since it takes a term as well as a channel, so it is asserted
+      alongside rather than trusted to have copied the gate.
+    */
+    expect((remoteCode.match(/memberChatChannels\(request, shortCode, user\)/g) ?? []).length).toBe(
+      2
+    );
+    expect((remoteCode.match(/isMemberChatChannel\(channels, channel\)/g) ?? []).length).toBe(2);
   });
 });
 

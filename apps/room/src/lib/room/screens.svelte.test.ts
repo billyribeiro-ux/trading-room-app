@@ -30,9 +30,13 @@ const make = (
   } = {}
 ) => {
   const dialogs = new RoomDialogs();
-  let list: SharedScreen[] = options.screens ?? [{ id: 'a' }, { id: 'b' }];
+  let list: SharedScreen[] = options.screens ?? [
+    { id: 'a', ownerId: 7 },
+    { id: 'b', ownerId: 8 }
+  ];
   const stoppedLocal: string[] = [];
   const focused: string[] = [];
+  const forceStopped: { targetUserId: number; producerId: string }[] = [];
   const reselected: string[] = [];
   const params = new URLSearchParams(options.params ?? {});
 
@@ -47,10 +51,19 @@ const make = (
     sessionHandle: () => 'room-1',
     isPresenter: () => options.isPresenter ?? false,
     followMyScreens: () => options.follow ?? false,
-    focusOnScreen: (id) => (focused.push(id), Promise.resolve(null))
+    focusOnScreen: (id) => (focused.push(id), Promise.resolve(null)),
+    forceStopScreen: (target) => (forceStopped.push(target), Promise.resolve(null))
   });
 
-  return { screens, dialogs, stoppedLocal, focused, reselected, list: () => list };
+  return {
+    screens,
+    dialogs,
+    stoppedLocal,
+    focused,
+    reselected,
+    forceStopped,
+    list: () => list
+  };
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -115,7 +128,7 @@ describe('stopping a screen', () => {
   });
 
   it('falls back to null when the last screen goes', () => {
-    const { screens } = make({ screens: [{ id: 'a' }] });
+    const { screens } = make({ screens: [{ id: 'a', ownerId: 7 }] });
     screens.selectedTab = 'a';
     screens.stop('a');
     expect(screens.selectedTab).toBeNull();

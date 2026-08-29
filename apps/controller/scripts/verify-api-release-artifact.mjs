@@ -835,11 +835,7 @@ async function verifyContract() {
     separately below. Together they pin the same two facts the original did — WHICH script is
     invoked, and that all four reports are passed to it in one bounded invocation.
   */
-  if (
-    !buildScript.includes(
-      'verifier="${repository_root}/apps/controller/scripts/verify-api-release-artifact.mjs"'
-    )
-  ) {
+  if (!buildScript.includes('verifier="${repository_root}/apps/controller/scripts/verify-api-release-artifact.mjs"')) {
     fail('build script must resolve the release-policy evaluator from apps/controller/scripts');
   }
   const evaluatorStart = buildScript.indexOf('node "${verifier}" --evaluate');

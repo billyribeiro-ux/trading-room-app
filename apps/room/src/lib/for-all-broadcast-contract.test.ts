@@ -43,7 +43,18 @@ const BUNDLE = readFileSync(
 );
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+/*
+  THE RECEIVERS MOVED, 2026-08-27, and this constant moved with them rather than being deleted.
+
+  All eight "For All" branches left `events.svelte.ts` for `for-all-broadcasts.ts` when the two
+  page-ending frames pushed that file over its ceiling. They lift out cleanly because they are the
+  one group on the `cmds` channel that shares a collaborator — every branch reaches `RoomBroadcasts`.
+
+  Re-pointed rather than loosened, which is this repository's own rule paid for four times: a
+  positive assertion fails loudly when a region moves, and a `not.toContain` starts passing for the
+  wrong reason. Both forms below are read from the file that now owns the code.
+*/
+const EVENTS = readFileSync(new URL('./room/for-all-broadcasts.ts', import.meta.url), 'utf8');
 /*
   The three "for all" broadcasts moved to `RoomBroadcasts` in Phase 5 slice 12. The senders and the
   receivers went with them; what stays in `+page.svelte` is the DISPATCH — which command maps to
@@ -440,14 +451,14 @@ describe('the client receives, so it reaches another browser', () => {
       dropped: what it guards is that a play sets BOTH the url and the flag that lets a member see
       the tab at all, and `videoStarted` is where that pair now lives.
     */
-    expect(eventsCode).toContain('this.#broadcasts.videoStarted(command.url);');
+    expect(eventsCode).toContain('broadcasts.videoStarted(command.url);');
     const started = functionBody(BROADCASTS, 'videoStarted(url: string)');
     expect(started).toContain('this.#videoPlayerUrl = url;');
     expect(started, 'hideVideoPlayer is what lets a MEMBER see the tab').toContain(
       'this.#hideVideoPlayer = true;'
     );
     // `mainTab` is the PAGE's, so the stream reaches it through a receiver rather than owning it.
-    expect(eventsCode).toContain("if (!this.#isPresenter()) this.#showTab('videoplayer');");
+    expect(eventsCode).toContain("if (!isPresenter()) showTab('videoplayer');");
 
     expect(eventsCode).toContain("if (command?.cmd === 'stopVideoForAll') {");
     /*
@@ -459,20 +470,31 @@ describe('the client receives, so it reaches another browser', () => {
     expect(stopped).toContain('this.clearScheduledVideoTimer();');
     expect(stopped).toContain("this.#videoPlayerUrl = '';");
     expect(stopped).toContain('this.#hideVideoPlayer = false;');
-    expect(eventsCode).toContain("if (!this.#isPresenter()) this.#showTab('screens');");
+    expect(eventsCode).toContain("if (!isPresenter()) showTab('screens');");
   });
 
   it('the member’s tab and pane carry the captured gate, not `isPresenter` alone', () => {
-    // Without the `hideVideoPlayer` term a member is moved to a tab that renders nothing.
-    const paneCode = readFileSync(
+    /*
+      Without the `hideVideoPlayer` term a member is moved to a tab that renders nothing.
+
+      `broadcasts.hideVideoPlayer` since 2026-08-18 — the flag is read off the object that owns it
+      rather than off a prop the page copied out of it. Still BOTH halves, and since 2026-08-28 they
+      live in two files: the TAB went to `MainTabStrip.svelte` with the rest of `ul#mainTabs`, and
+      the PANE stayed with its siblings. This used to count two occurrences in one file and would
+      have passed with both halves in either one; naming a file per half is what it meant all along.
+    */
+    const GATE = '{#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}';
+    const occurrences = (source: string) => source.split(GATE).length - 1;
+    const strip = readFileSync(
+      new URL('./components/MainTabStrip.svelte', import.meta.url),
+      'utf8'
+    );
+    const panes = readFileSync(
       new URL('./components/PresentationArea.svelte', import.meta.url),
       'utf8'
     );
-    // `broadcasts.hideVideoPlayer` since 2026-08-18 — the flag is read off the object that owns it
-    // rather than off a prop the page copied out of it. Still BOTH places: the tab and the pane.
-    expect(
-      paneCode.split('{#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}').length - 1
-    ).toBe(2);
+    expect(occurrences(strip), 'the video-player TAB lost its gate').toBe(1);
+    expect(occurrences(panes), 'the video-player PANE lost its gate').toBe(1);
   });
 
   it('the stop cancels an armed play sent by ANOTHER presenter', () => {
@@ -480,7 +502,7 @@ describe('the client receives, so it reaches another browser', () => {
     const body = eventsCode.slice(from, eventsCode.indexOf('return;', from));
     // The stop's four writes are one receiver now, so the invariant cannot be half-applied by a
     // caller holding setters. The dispatch calls it; the receiver is asserted to do all of it.
-    expect(body).toContain('this.#broadcasts.videoStopped();');
+    expect(body).toContain('broadcasts.videoStopped();');
     const stopped = functionBody(BROADCASTS, 'videoStopped()');
     expect(
       stopped,
@@ -494,7 +516,7 @@ describe('the client receives, so it reaches another browser', () => {
   it('tears the overlay down on stop, everywhere', () => {
     expect(eventsCode).toContain("if (command?.cmd === 'playYTForAll') {");
     expect(eventsCode).toContain(
-      "if (typeof command.url === 'string') this.#broadcasts.youtubeStarted(command.url);"
+      "if (typeof command.url === 'string') broadcasts.youtubeStarted(command.url);"
     );
     expect(eventsCode).toContain("if (command?.cmd === 'stopYTForAll') {");
   });
@@ -739,7 +761,7 @@ describe('the youtube overlay confines every url to the youtube origin', () => {
 /*
   THE TWO RECEIVERS, AND THE GUARD THAT KEEPS A PRESENTER OUT OF THEM.
 
-  Added 2026-08-26 because a negative control came back GREEN: deleting `!this.#isPresenter()` from
+  Added 2026-08-26 because a negative control came back GREEN: deleting `!isPresenter()` from
   the `sendSalesImageToChat` branch — which is what pins the image over the SENDER'S own chat column
   and, on the sibling branch, navigates the sender out of the room they are running — failed nothing
   in 2,881 tests.
@@ -749,13 +771,19 @@ describe('the youtube overlay confines every url to the youtube origin', () => {
   species of line this file exists to hold in place — the same reason the youtube-origin assertions
   above were written.
 */
-const RECEIVERS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
+const RECEIVERS = readFileSync(new URL('./room/for-all-broadcasts.ts', import.meta.url), 'utf8');
 
 const receiverBranch = (cmd: string): string => {
   const at = RECEIVERS.indexOf(`command?.cmd === '${cmd}'`);
-  expect(at, `${cmd} has no receiver branch in events.svelte.ts`).toBeGreaterThan(-1);
-  const end = RECEIVERS.indexOf('\n        }', at);
-  expect(end, 'the branch must close at eight-space indent').toBeGreaterThan(at);
+  expect(at, `${cmd} has no receiver branch in for-all-broadcasts.ts`).toBeGreaterThan(-1);
+  /*
+    FOUR-space indent since the extraction, not eight: the branches are one nesting level shallower
+    in a module function than they were inside the router's channel test. Stated because getting it
+    wrong does not fail — it returns a longer slice that happens to contain the right text, and every
+    assertion below would keep passing while checking the wrong region.
+  */
+  const end = RECEIVERS.indexOf('\n  }', at);
+  expect(end, 'the branch must close at two-space indent').toBeGreaterThan(at);
   return RECEIVERS.slice(at, end);
 };
 
@@ -766,7 +794,7 @@ describe('the room-wide "send" receivers exclude the presenter who sent them', (
       whole-file `toContain` would pass with the guard deleted from exactly the two places it
       matters.
     */
-    expect(receiverBranch(cmd)).toContain('!this.#isPresenter()');
+    expect(receiverBranch(cmd)).toContain('!isPresenter()');
   });
 
   it.each(['sendSalesImageToChat', 'sendUsersToURL'])('%s refuses an empty url', (cmd) => {

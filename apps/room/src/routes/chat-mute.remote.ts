@@ -5,8 +5,9 @@ import { z } from 'zod';
 import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { applyChatMute } from '#lib/server/chat-mute.js';
-import { chatMutes } from '#lib/server/db/schema.js';
+import { chatMutes, users } from '#lib/server/db/schema.js';
 import { publishToUsers } from '#lib/server/room-events.js';
+import { writeRoomMute } from '#lib/server/room-config-client.js';
 
 /*
   `unmuteChat` — the lift, and the half of the pair that was never built.
@@ -89,6 +90,73 @@ export const muteChat = command(unmuteChatArgs, async ({ targetUserId }) => {
   if (!isPresenterRole(caller.role)) error(403, 'Presenters only.');
 
   applyChatMute(roomShortCode, targetUserId, caller.id);
+});
+
+/**
+ * *" Mute Chat indefinately "* — the reference's own spelling, and the LAST control in this room that
+ * reported success and sent nothing.
+ *
+ * ## What it was
+ *
+ * A key of `EXACT_ALERTS` with no branch anywhere: the presenter clicked it, read the capture's own
+ * *"user chat muted"*, and the member kept posting. It stayed there deliberately while its neighbour
+ * `mute-chat-24` was fixed, with the reason recorded rather than guessed — an indefinite mute ALREADY
+ * exists in this system as the controller's opcode 3, and the missing piece was a door from the room
+ * to it. `internal/room-mute` is that door and this is the room's half.
+ *
+ * ## Why it does not just write a very long `chat_mutes` row
+ *
+ * Because that would be a different fact wearing the same label. `refuseIfChatMuted` reads TWO
+ * sources — the room's SQLite row for the 24-hour mute, and `member.muted` off the membership the
+ * controller hands over on every load — and only the second survives a room restart, a second
+ * instance, or a look at the manage page. A member muted "indefinitely" in SQLite would show as
+ * unmuted everywhere the owner actually administers their room.
+ *
+ * ## The target crosses the seam by EMAIL
+ *
+ * `users.id` here and `users.id` on the controller are different rows in different databases. This
+ * resolves the address the same way `kickUser` does for its ban, and refuses a self-target here as
+ * well as there — the controller refuses it regardless, and refusing early saves a member's click a
+ * round trip.
+ *
+ * The alert is raised by the caller through `#announceThenSend`, as it is for every other control in
+ * this family: the reference alerts immediately, not on the response.
+ */
+export const muteChatIndefinitely = command(unmuteChatArgs, async ({ targetUserId }) => {
+  ensureDatabase();
+
+  const { locals } = getRequestEvent();
+
+  // Identical authority to its two neighbours, from data the server owns. A member POSTing this
+  // endpoint directly gets a 403 rather than the power to silence somebody permanently.
+  const roomShortCode = requireRoomShortCode(locals);
+  const caller = requireUser(locals);
+  if (!isPresenterRole(caller.role)) error(403, 'Presenters only.');
+
+  const target = db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, targetUserId))
+    .get();
+  if (!target) error(404, 'No such user.');
+  if (target.email.trim().toLowerCase() === caller.email.trim().toLowerCase()) {
+    error(403, 'You cannot mute yourself.');
+  }
+
+  await writeRoomMute(roomShortCode, caller.email, target.email, true);
+
+  /*
+    The member is TOLD, on the same channel and with the same frame the 24-hour mute uses.
+
+    Without this the composer stays open until something else happens to invalidate the load, and the
+    member types a message into a box that will refuse it. `muteChat` is the capture's own command
+    name and `RoomChatMute.muted` is the receiver; `mutedTill` is absent because there is no expiry,
+    which is the one honest difference between the two mutes and is what the receiver renders.
+  */
+  publishToUsers(roomShortCode, [targetUserId], {
+    channel: 'privCmds',
+    data: { cmd: 'muteChat', targetUserId }
+  });
 });
 
 export const unmuteChat = command(unmuteChatArgs, async ({ targetUserId }) => {

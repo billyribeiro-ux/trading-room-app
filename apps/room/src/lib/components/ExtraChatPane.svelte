@@ -33,10 +33,13 @@
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
+  import ChatSearchBar from './ChatSearchBar.svelte';
+  import ChatTabStrip from './ChatTabStrip.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type {
     ChatTab,
     FollowChatStyle,
@@ -53,6 +56,15 @@
      * owns the value so that paging and unread counts can be keyed by channel across both columns.
      */
     tab: ChatTab;
+    /**
+     * The channel strip this column draws, decided on the SERVER.
+     *
+     * Both columns get the SAME list — a member's entitlement does not depend on which column they
+     * are looking at — and it arrives with the page as `data.chatTabs`. See `#lib/chat-tabs.ts`.
+     */
+    chatTabs: readonly string[];
+    /** The chat surfaces' display mode, resolved on the page. `#lib/chat-display-mode.ts`. */
+    displayMode: ChatDisplayMode;
     /** `#textAreaTxtExtra`'s value. Bindable for the same reason the main composer is. */
     composer: string;
     /** Already filtered to `tab` by the page, so this component never decides what it may show. */
@@ -117,6 +129,12 @@
     onaction: (action: MessageAction, message: RoomMessageItem, event?: MessageActionEvent) => void;
     /** `onTextareaFocus(e, 'textAreaTxtExtra')` — reports which composer the viewer is in. */
     onfocus: () => void;
+    /** One keystroke here — `updateLastTypedTime()`. This column has its OWN signal and channel. */
+    ontyped: (value: string) => void;
+    /** `!i.is(":focus")` — one of the three `notyping` conditions. */
+    onstoppedtyping: () => void;
+    /** The names typing in THIS column's channel, already excluding this viewer. */
+    typists: readonly string[];
     onsend: () => void;
     onscroll: (scroller: HTMLElement) => void;
     /**
@@ -141,7 +159,23 @@
     onstopreadinghistory: () => void;
     onscrolltobottom: (scroller: HTMLElement) => void;
     onprivatechat: () => void;
+    /**
+     * The magnifier. The PAGE decides what it does — see `ExtraChatPane`'s own note below.
+     *
+     * It opened the Chat Logs modal until 2026-08-29 and now toggles the search bar, which is what
+     * upstream's `toggleChatToolbarSearchOnly()` does and what this room's alerts column already did.
+     * The modal is still reached from the sidebar.
+     */
     onsearch: () => void;
+    /** Whether the search bar under the header is showing — `RoomChat.searchBarOpen('extra')`. */
+    searchOpen: boolean;
+    /** The term. A plain prop plus a handler rather than a binding, because the setter on
+     * `RoomChat` does work — emptying the box drops the results with no round trip — and a binding
+     * would let a caller assign the field while skipping it. */
+    searchTerm: string;
+    onsearchinput: (value: string) => void;
+    onsearchsubmit: () => void;
+    onsearchclear: () => void;
     onsettings: () => void;
     onimageupload: () => void;
     onrte: () => void;
@@ -150,6 +184,8 @@
 
   let {
     tab = $bindable('off-topic'),
+    chatTabs,
+    displayMode,
     composer = $bindable(''),
     messages,
     doNotDisturbOn,
@@ -166,6 +202,9 @@
     onmenutoggle,
     onaction,
     onfocus,
+    ontyped,
+    onstoppedtyping,
+    typists,
     onsend,
     onscroll,
     follow,
@@ -175,6 +214,11 @@
     onscrolltobottom,
     onprivatechat,
     onsearch,
+    searchOpen,
+    searchTerm,
+    onsearchinput,
+    onsearchsubmit,
+    onsearchclear,
     onsettings,
     onimageupload,
     onrte,
@@ -292,33 +336,7 @@
             <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
           {/if}</a
         >
-        <ul
-          role="tablist"
-          class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs"
-        >
-          <li class="nav-item">
-            <!-- svelte-ignore a11y_interactive_supports_focus -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_missing_attribute -->
-            <a
-              data-bs-toggle="tab"
-              role="tab"
-              class={['nav-link', { active: tab === 'main' }]}
-              onclick={() => (tab = 'main')}>Main Chat</a
-            >
-          </li>
-          <li class="nav-item">
-            <!-- svelte-ignore a11y_interactive_supports_focus -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_missing_attribute -->
-            <a
-              data-bs-toggle="tab"
-              role="tab"
-              class={['nav-link', { active: tab === 'off-topic' }]}
-              onclick={() => (tab = 'off-topic')}>Off Topic</a
-            >
-          </li>
-        </ul>
+        <ChatTabStrip tabs={chatTabs} bind:active={tab} />
         <ul class="nav ml-auto align-items-center">
           <!-- `O(9, o.showPMBtn ? 9 : -1)` — the same gate the main pane's PM button uses. -->
           {#if showPmButton}
@@ -357,6 +375,15 @@
       </nav>
     </div>
 
+    {#if searchOpen}
+      <ChatSearchBar
+        term={searchTerm}
+        oninput={onsearchinput}
+        onsubmit={onsearchsubmit}
+        onclear={onsearchclear}
+      />
+    {/if}
+
     <!--
       `app-extra-roomscroller` — its own element, not the main pane's. The reference gives the extra
       column a separate scroller component for the same reason it gives it a separate chat
@@ -370,6 +397,7 @@
       <div>
         {#each messages as item, index (item.id)}
           <RoomMessage
+            {displayMode}
             {item}
             kind="chat"
             {...chrome}
@@ -407,6 +435,19 @@
     {/if}
 
     <!-- `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`. -->
+    <!--
+      `O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)` at byte 2,400,312 — the extra column's
+      own copy of the indicator, and it reads its OWN channel. Same markup and the same omission as
+      the main column's; see `AlertChatArea.svelte` for why the animated dots are not reproduced.
+    -->
+    {#if typists.length > 0}
+      <div>
+        <div class="d-flex align-items-center typing-indicator-container">
+          <strong class="users-count me-1">[{typists.length}]</strong>
+          <span class="users-typing"><em class="mx-1">{typists.join(',')}</em></span>
+        </div>
+      </div>
+    {/if}
     {#if !chatEnabled}
       <div class="chatDisabled d-flex align-items-center">
         <h5 class="pl-3">
@@ -434,6 +475,8 @@
               class="txt-area form-control border-0"
               bind:value={composer}
               {onfocus}
+              oninput={(event) => ontyped(event.currentTarget.value)}
+              onblur={onstoppedtyping}
               onkeydown={submitOnEnter}></textarea>
           </div>
           <div

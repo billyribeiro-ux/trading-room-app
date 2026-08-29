@@ -45,6 +45,23 @@ export const chatTimeFormatter = new Intl.DateTimeFormat('en-US', {
 });
 
 /**
+ * The time on a COMPACT line — "9:31", and the difference from the one above is a leading zero.
+ *
+ * Angular's `date:'h:mm a'` against the card's `date:'hh:mm a'`, both the capture's own:
+ * `Ct(29, 27, e.msg.t, "h:mm a")` at byte 1,395,475's template versus `"hh:mm a"` in
+ * `app-st-message`. The compact renderer also wraps it in literal brackets, which is markup rather
+ * than format and so lives at the call site.
+ *
+ * Its own formatter rather than a parameter on the one above, because these are built ONCE at module
+ * scope and that is the entire reason this file exists — constructing one per render is what it was
+ * written to stop. Two constants cost two objects for the life of the process.
+ */
+export const compactTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit'
+});
+
+/**
  * Angular's `date:'medium'` pipe, which for en-US is `MMM d, y, h:mm:ss a` — the Files pane's
  * uploaded-at column.
  *
@@ -105,4 +122,25 @@ export function sameCalendarDay(current: Date, previous?: Date) {
     current.getMonth() === previous.getMonth() &&
     current.getDate() === previous.getDate()
   );
+}
+
+/**
+ * The sentence a muted member is shown, ASSEMBLED FROM CAPTURED FRAGMENTS rather than composed.
+ *
+ * Upstream renders `bootbox.alert(xe.msg)`, and that `msg` is built by a server which is not in the
+ * capture — so no sentence is guessed here. What crosses the wire is the INSTANT, and the two pieces
+ * of text are the ones this repository did read off the reference: the `Chat Disabled` block in
+ * `AlertChatArea.svelte`, and `formatChatMutedTill`, which is Angular's `EEE @ h:mm a` from the
+ * ` till ` span beside it. The dialog therefore says exactly what the composer will say once the
+ * page reloads, which is the whole point of telling them at all.
+ *
+ * A malformed instant falls back to the bare captured words. The frame carries an ISO string, so
+ * that is possible in a way it would not be with a `Date`, and the alternatives are both worse: an
+ * "Invalid Date" in front of a member, or silence about a mute already in force.
+ */
+export function chatMutedMessage(mutedTill: unknown): string {
+  if (typeof mutedTill !== 'string') return 'Chat Disabled';
+  const till = new Date(mutedTill);
+  if (Number.isNaN(till.getTime())) return 'Chat Disabled';
+  return `Chat Disabled till ${formatChatMutedTill(till)}`;
 }

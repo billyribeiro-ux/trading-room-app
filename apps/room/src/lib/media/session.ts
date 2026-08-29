@@ -357,7 +357,8 @@ export type MediaSessionOptions = {
  * Deliberately holds no UI state and touches no DOM: it hands back `MediaStream`s and lets the room
  * decide where they go. That is what keeps it independently testable, and it is why nothing here
  * knows about `msRemAudio-{userID}` (the capture's audio sink convention, byte 1092900, which the
- * app's master-volume handler already assumes at `src/routes/+page.svelte:1760-1766`).
+ * app's master-volume handler already assumes — `lib/room/volume.svelte.ts`, rendered through
+ * `lib/components/RemoteAudioSinks.svelte`).
  */
 export class MediaSession {
   readonly #signalling: SignallingClient;
@@ -558,7 +559,7 @@ export class MediaSession {
       // (cam), 1104332 (screen). The library's own default is true (`lib/Transport.d.ts:244`
       // destructures it; the bundle's signature at byte 2714540 shows `stopTracks=!0`), so
       // this is an override, and it is what lets the app keep muting by `track.enabled`
-      // (`src/routes/+page.svelte:1814-1817`) rather than re-acquiring the device.
+      // (`lib/room/local-capture.svelte.ts`) rather than re-acquiring the device.
       stopTracks: false,
       appData
     });

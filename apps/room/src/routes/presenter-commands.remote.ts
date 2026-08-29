@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom, requireUser } from '#lib/server/auth.js';
+import { presenterRoom, requireRoomMember, requireUser } from '#lib/server/auth.js';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
@@ -379,6 +379,90 @@ export const giveMicScreen = command(
     publishToUsers(room, [targetUserId], {
       channel: 'cmds',
       data: { cmd: 'giveMicScreen', targetUserId, give }
+    });
+  }
+);
+
+/**
+ * `forceStopScreen` — a presenter ends SOMEBODY ELSE'S screen share, for the whole room.
+ *
+ * ## The control existed and stopped nothing but the presenter's own tab
+ *
+ * `ScreenTabs.svelte` has rendered "Stop This Screen" in the per-screen gear menu, presenter-gated,
+ * since the tab bar was built. Its handler is `RoomScreens.stop`, which branches:
+ *
+ * ```ts
+ * if (this.#isLocalScreen(screenId)) { this.#stopLocalScreen(screenId); return }
+ * this.#removeScreen(screenId);                     // somebody else's — drop the tab and stop
+ * ```
+ *
+ * So on the presenter's OWN screen it worked, and on the one the menu is actually for — a member's —
+ * it removed the presenter's tab and left the share running for the presenter and for every other
+ * viewer, who never even saw a flicker. The member kept broadcasting their desktop believing a
+ * presenter had stopped them.
+ *
+ * `missing-commands-triage.md` recorded this row as built, citing `ScreenTabs.svelte:211,227` — the
+ * BUTTON. That document's own contested-verdict section warns about exactly this: *"The refuter
+ * matched the BUTTON. The brief asked it to match the BEHAVIOUR."* It happened again, in the same
+ * file, to the row two lines below the warning.
+ *
+ * ## The wire, read rather than designed
+ *
+ * Sender at bundle byte 1,969,578, and the menu that reaches it at 1,919,002 (`sSe`, gated
+ * `O(11, i.isP ? 11 : -1)`):
+ *
+ * ```js
+ * stopSharingThisScreenRemote(e){
+ *   e && (this.mediaService.stopSharingProducer(e.producerID),
+ *         setTimeout(() => { this.appService.sendServerAdminCommand("forceStopScreen", {id: e._id}) }, 2e3))
+ * }
+ * ```
+ *
+ * **There is no `case "forceStopScreen"` in the bundle** — the presenter's client tears down its own
+ * consumer and the SERVER closes the producer. This room cannot do the second half: the SFU accepts
+ * `closeProducer` from the session that owns the producer and refuses every other session, which is
+ * the property that stops one member closing another's stream. So the ask is delivered to the
+ * SHARER, whose browser closes its own producer; the SFU's `producerClosed` notification then
+ * reaches every viewer, which is what makes the stop room-wide rather than local.
+ *
+ * **The 2,000 ms timer is NOT reproduced**, and that is a decision rather than an omission. Upstream
+ * needs it because two things are closing the same producer from opposite ends — its own
+ * `stopSharingProducer` and the server — and the delay keeps them from racing. Here only the owner
+ * closes anything, so there is nothing to sequence, and a two-second wait would be latency invented
+ * to imitate a workaround.
+ *
+ * ## Two server-side checks, because the payload names a person
+ *
+ * `presenterRoom()` decides the authority from the session's own role, and `requireRoomMember`
+ * refuses a target who is not in that room — the same pair `uploadProfilePicture` uses, and for the
+ * same reason: `publishToUsers` is scoped to a room, but a frame published into room A naming a
+ * member of room B would otherwise be an attempt worth refusing rather than silently dropping.
+ *
+ * The producer id is NOT checked against anything, and cannot be: the SFU owns the producer table
+ * and this server has never seen it. That is safe because the id is only ever handed to the owner's
+ * own client, which closes it only if it is one of its OWN local screens — `stopLocalScreen` is a
+ * lookup in `localScreenStreams`, so an id belonging to anybody else is a miss and nothing happens.
+ * The check that matters is therefore on the receiving end, and it is a lookup rather than a
+ * comparison somebody has to remember to write.
+ */
+export const forceStopScreen = command(
+  z.strictObject({
+    targetUserId: z.number().int().positive(),
+    /*
+      A mediasoup producer id is a UUID. Bounded rather than exact, because the id is minted by the
+      SFU and this server should not encode that library's id format as a validation rule — but an
+      unbounded string on a frame that is fanned out to a browser is not something to wave through.
+    */
+    producerId: z.string().min(1).max(128)
+  }),
+  async ({ targetUserId, producerId }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    requireRoomMember(targetUserId, room);
+
+    publishToUsers(room, [targetUserId], {
+      channel: 'privCmds',
+      data: { cmd: 'forceStopScreen', targetUserId, producerId }
     });
   }
 );

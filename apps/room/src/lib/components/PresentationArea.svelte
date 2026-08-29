@@ -42,7 +42,12 @@
   import { NEUTRAL_PAN, captureVideoImage } from '#lib/screen-zoom.js';
   import DayTradeAlertsPane from '#lib/components/day-trade-alerts/DayTradeAlertsPane.svelte';
   import FilesPane from '#lib/components/FilesPane.svelte';
+  import MainTabStrip from '#lib/components/MainTabStrip.svelte';
+  import ModeratorMessage from '#lib/components/ModeratorMessage.svelte';
+  import PositionsContainer from '#lib/components/PositionsContainer.svelte';
+  import PositionsControls from '#lib/components/PositionsControls.svelte';
   import NotesPane from '#lib/components/notes/NotesPane.svelte';
+  import type { NoteSurfaceGates } from '#lib/components/notes/note-gates.js';
   import ScreenPane from '#lib/components/ScreenPane.svelte';
   import ScreenTabs from '#lib/components/ScreenTabs.svelte';
   import WebcamStrip from '#lib/components/WebcamStrip.svelte';
@@ -177,7 +182,28 @@
     screenVolume: Snippet;
 
     // ── #streams ───────────────────────────────────────────────────────────────
+    /**
+     * `sessData.customPlayerURL`, already checked — an owner's own iframe INSTEAD of the whole
+     * screens pane. `null` for a room that set none or set something unusable.
+     */
+    customPlayerSrc: string | null;
+    /**
+     * "Positions iframe" — `sessData.positionsIframe && sessData.positionsIframeUrl`, already
+     * conjoined. False means the room configured no positions page and the buttons do not render.
+     */
+    positionsAvailable: boolean;
+    /** `sessData.positionsIframeUrl`, raw. `PositionsContainer` checks it. */
+    positionsIframeUrl?: string;
+    /** `preferences.updatePositionsIframe` — the viewer's thirty-second refresh switch. */
+    positionsAutoRefresh: boolean;
     hideStreams: boolean;
+    /** `sessData.modMessage` — the presenter-only bar. Empty means no bar, which is the usual case. */
+    modMessage: string;
+    /** `preferences.bufferSizeLevel` and its writer — the streaming view's hls.js buffer control. */
+    bufferSizeLevel: number;
+    onBufferSizeChange: (level: number) => void;
+    /** "Hide Notes Section?" ORed with viewer-only mode — see `RoomGates.notesHidden`. */
+    hideNotes: boolean;
     streamServerMTX: string;
     mtxToken: string;
     selectStreamTabByUser: (streamId: string) => void;
@@ -185,7 +211,8 @@
     toggleLockStreamMtx: (streamId: string) => void;
 
     // ── #notes ─────────────────────────────────────────────────────────────────
-    noteGates: { surfaceVisible: boolean; editorMounted: boolean };
+    /* The type, imported rather than restated - a second spelling of a shape is a second shape. */
+    noteGates: NoteSurfaceGates;
     giphyApiKey: string;
     /**
      * The notes surface, whole — `#lib/room/notes.svelte.ts`.
@@ -278,7 +305,15 @@
     mediaTransport,
     volume,
     screenVolume,
+    customPlayerSrc,
+    positionsAvailable,
+    positionsIframeUrl,
+    positionsAutoRefresh,
     hideStreams,
+    modMessage,
+    bufferSizeLevel,
+    onBufferSizeChange,
+    hideNotes,
     streamServerMTX,
     mtxToken,
     selectStreamTabByUser,
@@ -295,6 +330,13 @@
     openModal,
     setAutoplayAttribute
   }: Props = $props();
+
+  /*
+    `globals.showPositions`, local. See the citation at the container's call site for why a flag with
+    three readers in one column is not a room-level store.
+  */
+  let showPositions = $state(false);
+  let positionsPanel = $state<{ reload: () => void } | null>(null);
 
   /*
     THE SFU SPATIAL LAYER FOLLOWS THE SELECTED TAB.
@@ -354,6 +396,22 @@
     static `app-presenter-cams` the template appears to hold, and why the ids carry the presenter
     suffix — went WITH the markup they explain.
   -->
+  <!-- `$4e`, rendered inside this same split area before `app-presentationarea` (byte 2,493,284). -->
+  <ModeratorMessage message={modMessage} {isPresenter} />
+  <!--
+    `O(3, globals.showPositions ? 3 : -1)` — `app-positions-container` is node 3 of the presentation
+    split area, between the moderator bar and the area itself, and the buttons are node 5 AFTER it
+    (byte 2,493,364). `showPositions` is local because upstream's `globals.showPositions` has exactly
+    three readers and all three are in this column: the container's gate, the button's gate and the
+    toggle. A room-level store for a flag nobody else reads would be a wider thing than the feature.
+  -->
+  {#if positionsAvailable && showPositions}
+    <PositionsContainer
+      url={positionsIframeUrl}
+      autoRefresh={positionsAutoRefresh}
+      bind:this={positionsPanel}
+    />
+  {/if}
   <WebcamStrip
     visible={previewWindowsVisible}
     presenters={mediaTransport.webcamPresenters}
@@ -382,286 +440,31 @@
         />
       {/if}
       <!--
-                  `z('hidden', o.appService.globals.viewerOnlyMode)` on this `ul`
-                  (`app-presentationarea.compiled.js:3154-3155`, and const 3 at `:1598` declares the
-                  `hidden` binding it feeds). Viewer-only mode is a room reduced to the screen: the
-                  whole main tab strip goes, which is also why `.viewer-only-screen-tab` sets
-                  `max-height: calc(-40px + 100vh)` — the 40px it reclaims is this strip.
-                -->
-      <ul id="mainTabs" class="nav nav-tabs mainTabset" role="tablist" hidden={viewerOnlyMode}>
-        <li role="presentation" class="nav-item">
-          <a
-            id="screens-tab"
-            class={['nav-link', { active: mainTab === 'screens' }]}
-            role="tab"
-            tabindex={mainTab === 'screens' ? undefined : -1}
-            aria-controls="screens"
-            aria-selected={mainTab === 'screens'}
-            data-bs-toggle="tab"
-            data-bs-target="#screens"
-            onclick={() => (mainTab = 'screens')}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') mainTab = 'screens';
-            }}
-          >
-            <div class="d-flex">
-              <div><i class="fas fa-desktop"></i><span class="ml-1">Screens</span></div>
-            </div>
-          </a>
-        </li>
-        <!--
-                    `z('hidden', o.hideStreams)` on the `li` (`app-presentationarea.full.js:5357`),
-                    the same flag the pane below uses. This carried a hardcoded `hidden` and no
-                    click handler until `useMediaMTX` reached the room — a tab that could never
-                    open, in every room, whether or not it had MediaMTX.
-                  -->
-        <li role="presentation" class="nav-item" hidden={hideStreams}>
-          <a
-            id="streams-tab"
-            class={['nav-link', { active: mainTab === 'streams' }]}
-            role="tab"
-            tabindex={mainTab === 'streams' ? undefined : -1}
-            aria-controls="streams"
-            aria-selected={mainTab === 'streams'}
-            data-bs-toggle="tab"
-            data-bs-target="#streams"
-            onclick={() => (mainTab = 'streams')}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') mainTab = 'streams';
-            }}
-          >
-            <div class="d-flex">
-              <div><i class="fas fa-podcast"></i><span class="ml-1">Streams</span></div>
-            </div>
-          </a>
-        </li>
-        <li role="presentation" class="nav-item">
-          <a
-            id="notes-tab"
-            class={['nav-link presAreaTabs-notes', { active: mainTab === 'notes' }]}
-            role="tab"
-            tabindex={mainTab === 'notes' ? undefined : -1}
-            aria-controls="notes"
-            aria-selected={mainTab === 'notes'}
-            data-bs-toggle="tab"
-            data-bs-target="#notes"
-            onclick={() => (mainTab = 'notes')}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') mainTab = 'notes';
-            }}
-          >
-            <div class="d-flex align-items-center">
-              <div>
-                <i id="noteChangeIndicator" class="fas fa-edit"></i><span class="mx-1">Notes</span>
-              </div>
-              <div class="dropdown">
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <span
-                  id="dropdownMenuNotes"
-                  data-bs-toggle="dropdown"
-                  aria-expanded={menus.notes}
-                  class="dropdown-toggle"
-                  onclick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    menus.toggle('notes');
-                  }}
-                  onkeydown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') menus.toggle('notes');
-                  }}
-                >
-                  <i class="fas fa-cog"></i>
-                </span>
-                <ul
-                  aria-labelledby="dropdownMenuButton"
-                  class={['dropdown-menu', { show: menus.notes }]}
-                  {@attach (menu: HTMLUListElement) => notes.mountNewNoteLink(menu)}
-                ></ul>
-              </div>
-            </div>
-          </a>
-        </li>
-        <!--
-                    The captured gate, verbatim, on both the tab (slot 25, byte 2,016,864) and its
-                    pane (slot 47, byte 2,017,661):
+        `ul#mainTabs` is `MainTabStrip.svelte` since 2026-08-28 — 282 lines, the debt this file's
+        own ceiling note recorded when it was raised for the `hideNotes` gate.
 
-                      O(25, (o.hideVideoPlayer && !o.isP) || o.isP ? 25 : -1)
+        The header above argues the seven tab PANES stay together because `mainTab` is one value
+        every tab reads and writes. That never covered the STRIP: it writes `mainTab` and reads
+        nothing a pane produces, so the coupling runs one way and stops at this boundary. The two
+        transcriptions that matter most — why an entitlement gets `{#if}` and a room setting gets
+        `hidden`, and that they are not interchangeable — went WITH the markup they explain.
 
-                    i.e. a presenter always sees it, and a member sees it only while a video is
-                    playing for the room. `hideVideoPlayer` is now modelled - `playVideoForAll`
-                    sets it and `stopVideoForAll` clears it, both on the `cmds` channel.
-
-                    Two earlier states of this gate, kept because each was a real defect: the tab
-                    once rendered with NO gate, so every member saw it; it was then reduced to
-                    `isPresenter`, correct only for as long as nothing could set the other term.
-                    Now that the broadcast exists, dropping the term would force-switch a member to
-                    a tab that renders nothing.
-
-                    Evidence, stated as what was observed and no further: the owner's own MEMBER
-                    capture of `#mainTabs` has this tab collapsed to an empty Angular comment
-                    anchor, so the gate was false for that member at that moment. No member capture
-                    taken WHILE a video was playing exists, so the true branch is transcribed from
-                    the bundle above rather than from a rendered page.
-                  -->
-        {#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}
-          <li role="presentation" class="nav-item">
-            <a
-              id="videoplayer-tab"
-              class={['nav-link', { active: mainTab === 'videoplayer' }]}
-              data-bs-toggle="tab"
-              data-bs-target="#videoplayer"
-              role="tab"
-              aria-controls="videoplayer"
-              aria-selected={mainTab === 'videoplayer'}
-              tabindex={mainTab === 'videoplayer' ? undefined : -1}
-              onclick={() => (mainTab = 'videoplayer')}
-              onkeydown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') mainTab = 'videoplayer';
-              }}
-            >
-              <div class="d-flex align-items-center">
-                <div><i class="fas fa-video"></i><span class="mx-1">VideoPlayer</span></div>
-              </div>
-            </a>
-          </li>
-        {/if}
-        <!--
-                    Swing Alerts — `XCe`, gated on the room setting rather than on presenter status:
-
-                      O(26, o.hasSwingTradeAlerts ? 26 : -1)
-
-                    `{#if}` and not `hidden`, because `-1` is `ɵɵconditional`'s "instantiate
-                    nothing". An entitlement that ships hidden markup has already told the member
-                    the feature exists, and this one is what a room pays for.
-
-                    The icon is `fas fa-bell` (const 64), shared with the Day Trades tab.
-                  -->
-        {#if swingAlerts.enabled}
-          <li role="presentation" class="nav-item">
-            <a
-              id="swingAlerts-tab"
-              class={['nav-link', { active: mainTab === 'swingAlerts' }]}
-              data-bs-toggle="tab"
-              data-bs-target="#swingAlerts"
-              role="tab"
-              aria-controls="swingAlerts"
-              aria-selected={mainTab === 'swingAlerts'}
-              tabindex={mainTab === 'swingAlerts' ? undefined : -1}
-              onclick={() => (mainTab = 'swingAlerts')}
-              onkeydown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') mainTab = 'swingAlerts';
-              }}
-            >
-              <div class="d-flex align-items-center">
-                <div>
-                  <i class="fas fa-bell"></i><span class="mx-1">Swing Alerts</span>
-                </div>
-              </div>
-            </a>
-          </li>
-        {/if}
-        <!--
-                    Day Trades — `JCe`, byte 1,917,906, the `<li>` immediately after the Swing one
-                    and gated the same way, on its own room setting rather than on presenter status:
-
-                      O(27, o.hasDayTradeAlerts ? 27 : -1)
-
-                    A conditional block and not a `hidden` attribute, because `-1` is
-                    `ɵɵconditional`'s "instantiate nothing". An entitlement that ships hidden markup has
-                    already told the member the feature exists, and this one is what a room pays for.
-
-                    The label is `Day Trades` (byte 1,918,110), NOT "Day Trade Alerts" — the pane's
-                    own heading says "Latest Day Trade Alerts" and the tab says the short form. The
-                    icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
-                  -->
-        {#if dayTradeAlerts.enabled}
-          <li role="presentation" class="nav-item">
-            <a
-              id="dayTradeAlerts-tab"
-              class={['nav-link', { active: mainTab === 'dayTradeAlerts' }]}
-              data-bs-toggle="tab"
-              data-bs-target="#dayTradeAlerts"
-              role="tab"
-              aria-controls="dayTradeAlerts"
-              aria-selected={mainTab === 'dayTradeAlerts'}
-              tabindex={mainTab === 'dayTradeAlerts' ? undefined : -1}
-              onclick={() => (mainTab = 'dayTradeAlerts')}
-              onkeydown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') mainTab = 'dayTradeAlerts';
-              }}
-            >
-              <div class="d-flex align-items-center">
-                <div>
-                  <i class="fas fa-bell"></i><span class="mx-1">Day Trades</span>
-                </div>
-              </div>
-            </a>
-          </li>
-        {/if}
-        <!--
-                    "Hide Files Section?" - `z('hidden', o.hideFiles)` on this `li`
-                    (app-presentationarea.full.js:5375) and on the `#files` pane (5410-5413). Both,
-                    because either one alone leaves a tab that opens nothing or a pane still
-                    reachable from a tab that is gone.
-
-                    The reference feeds the binding `sessData.hideFiles || globals.videoOnlyMode`
-                    (2289-2290). Only the first term is implemented, and `filesSectionHidden` in
-                    `#lib/files-gates.js` says why: the second is not a setting but the recording-bot
-                    client global, set from the `r` query parameter, and this room has no media.recording
-                    bot to model.
-                  -->
-        <li role="presentation" class="nav-item" hidden={files.filesHidden}>
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a
-            class={['nav-link', { active: mainTab === 'files' }]}
-            role="tab"
-            tabindex={mainTab === 'files' ? undefined : -1}
-            aria-controls="files"
-            aria-selected={mainTab === 'files'}
-            data-bs-toggle="tab"
-            data-bs-target="#files"
-            onclick={() => (mainTab = 'files')}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') mainTab = 'files';
-            }}
-          >
-            <div class="d-flex align-items-center">
-              <div><i class="fas fa-folder"></i><span class="mx-1">Files</span></div>
-              <div>
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <span
-                  id="dropdownMenuFiles"
-                  data-bs-toggle="dropdown"
-                  aria-expanded={menus.files}
-                  class="dropdown-toggle"
-                  onclick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    mainTab = 'files';
-                    menus.set('notes', false);
-                    menus.toggle('files');
-                  }}
-                  onkeydown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      mainTab = 'files';
-                      menus.set('notes', false);
-                      menus.toggle('files');
-                    }
-                  }}
-                >
-                  <i class="fas fa-cog"></i>
-                </span>
-                <ul
-                  aria-labelledby="dropdownMenuFiles"
-                  class={['dropdown-menu', { show: menus.files }]}
-                  {@attach (menu: HTMLUListElement) => notes.mountUploadFileLink(menu)}
-                ></ul>
-              </div>
-            </div>
-          </a>
-        </li>
-      </ul>
-
+        `main-tab-strip-contract.test.ts` renders THIS component's parent, so it went on proving the
+        strip end to end across the move without being touched.
+      -->
+      <MainTabStrip
+        bind:mainTab
+        {viewerOnlyMode}
+        {isPresenter}
+        {hideStreams}
+        {hideNotes}
+        {menus}
+        {notes}
+        {broadcasts}
+        {files}
+        {swingAlerts}
+        {dayTradeAlerts}
+      />
       <div id="mainTabsContent" class="tab-content">
         <div
           id="screens"
@@ -685,7 +488,28 @@
                       That is the point: a tab strip with no video under it would still be
                       requesting streams.
                     -->
-          {#if videoDisabled}
+          <!--
+            `O(38, sessData.customPlayerURL ? 38 : 39)` — byte 2,017,248, the two children of
+            `div#screens`. Slot 38 is `eSe` (byte 1,918,589) with consts 21 and 68; slot 39 is
+            everything below, INCLUDING the save-data switch above. An owner who sets this URL
+            replaces the WHOLE pane, which is deliberate and is the same all-or-nothing shape
+            `disableVideo` has one level down: a tab strip with no video under it would still be
+            requesting streams. `custom-player.ts` carries the argument and the URL check.
+          -->
+          {#if customPlayerSrc}
+            <div class="d-flex align-items-start justify-content-center w-100 h-100">
+              <iframe
+                src={customPlayerSrc}
+                title="Custom player"
+                width="100%"
+                height="95%"
+                scrolling="no"
+                frameborder="no"
+                allow="autoplay"
+                allowfullscreen
+              ></iframe>
+            </div>
+          {:else if videoDisabled}
             <h3 class="text-center mt-4">Video off to preserve data...</h3>
           {:else}
             <!--
@@ -885,6 +709,9 @@
                       userXrefID={data.user.userXrefID}
                       audioVolume={volume / 100}
                       {doNotDisturbOn}
+                      {bufferSizeLevel}
+                      {onBufferSizeChange}
+                      {menus}
                     />
                   </div>
                 </div>
@@ -892,15 +719,19 @@
             </div>
           {/if}
         </div>
+        <!-- The PANE takes the same `hidden` as its tab (byte 2017506). Both, or a hidden tab
+             whose pane is still active leaves notes on screen nobody can navigate away from. -->
         <div
           id="notes"
           class={mainTab === 'notes' ? 'tab-pane active show' : 'tab-pane'}
           role="tabpanel"
           aria-labelledby="notes-tab"
+          hidden={hideNotes}
         >
           {#if noteGates.surfaceVisible}
             <NotesPane
               canEdit={noteGates.editorMounted}
+              simplifiedEditor={noteGates.simplifiedEditor}
               focusedNoteId={notes.focusedNoteId}
               onBringEveryone={(noteId) => notes.bringEveryoneTo(noteId)}
               {giphyApiKey}
@@ -1111,4 +942,17 @@
       ></audio>
     </div>
   </app-presentationarea>
+  <!--
+    NODE 5 of the split area, AFTER `app-presentationarea` — `W4e` at byte 2,492,892, gated on
+    `O(5, sessData.positionsIframe && sessData.positionsIframeUrl ? 5 : -1)` (2,493,364). The
+    conjunction arrives already made as `positionsAvailable`, because two settings that only ever
+    mean anything together should not be two props a call site can get half right.
+  -->
+  {#if positionsAvailable}
+    <PositionsControls
+      {showPositions}
+      ontoggle={() => (showPositions = !showPositions)}
+      onrefresh={() => positionsPanel?.reload()}
+    />
+  {/if}
 </as-split-area>

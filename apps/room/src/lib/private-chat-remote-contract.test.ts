@@ -55,15 +55,21 @@ const send = () =>
 const deleteLog = () => slice('export const deletePrivateChatLog = command(', '');
 
 describe('all three are commands, including the read', () => {
-  it('declares three commands and no query', () => {
+  it('declares four commands and no query', () => {
     /*
       `loadThread` and `searchThread` are pure SELECTs, so the read looks like a `query`. It must not
       be one: `switchChatToUser` calls it with the SAME argument every time a conversation is opened
       and the answer REPLACES the held log, so a cache hit is a stale conversation. `command` runs
       every time by construction, and correctness that depends on when a cache entry happens to be
       released is not correctness.
+
+      THE FOURTH, added 2026-08-28, is `loadPeerPrivateMessageHistory`, and the same rule reaches it
+      by a second route. It is a MODERATION read whose whole purpose is to be current — a presenter
+      opening the modal on a member twice wants what that member has sent since — and it is also the
+      one read here that a room can revoke, because the entitlement is checked on the server. A
+      cached answer would survive an owner turning the setting off.
     */
-    expect((remoteCode.match(/= command\(/g) ?? []).length).toBe(3);
+    expect((remoteCode.match(/= command\(/g) ?? []).length).toBe(4);
     expect(remoteCode).not.toContain('query(');
   });
 

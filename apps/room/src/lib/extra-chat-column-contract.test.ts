@@ -220,9 +220,15 @@ describe('both columns share one pipeline, and that is the point', () => {
       A second derived would have been a second copy of merge, trim, hide, badge and the webinar
       filter — five steps that must agree, in two places that would drift.
     */
-    expect(feedsModule).toContain('chatMessagesFor(tab: ChatTab) {');
-    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.tab);');
-    expect(feedsModule).toContain('return this.chatMessagesFor(this.#chat.extraTab);');
+    expect(feedsModule).toContain(
+      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+    );
+    expect(feedsModule).toContain(
+      'return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);'
+    );
+    expect(feedsModule).toContain(
+      'return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);'
+    );
   });
 
   it('the paging state is shared, because it is keyed by CHANNEL', () => {
@@ -302,9 +308,15 @@ describe('mentions reach the column you are in', () => {
 
   it('the insert goes into the composer that was chosen', () => {
     expect(messageActionsModule).toContain('mention(name: string, toExtraColumn = false) {');
-    expect(chatClass).toContain(
-      "this.#extraComposer += `${this.#extraComposer ? ' ' : ''}@${name} `;"
-    );
+    /*
+      The insert itself moved to `#lib/mention-insert.ts` on 2026-08-28, when the Q&A thread became a
+      THIRD receiver of it — its composer lives inside `ModalHost`, so routing that one through this
+      class would have inserted the name into the column behind the modal. What this test still owns
+      is the ROUTING: which composer the class writes to. `qa-thread-contract.test.ts` owns the two
+      spaces.
+    */
+    expect(chatClass).toContain('this.#extraComposer = appendMention(this.#extraComposer, name);');
+    expect(chatClass).toContain('this.#composer = appendMention(this.#composer, name);');
   });
 });
 

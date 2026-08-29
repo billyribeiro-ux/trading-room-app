@@ -48,6 +48,7 @@ function editor(props: {
       onUploadImages: async () => [],
       onVersionHistoryOpenChange: () => undefined,
       showVersionHistory: props.showVersionHistory ?? false,
+      simplifiedEditor: false,
       versions: props.versions ?? []
     }
   }).body;

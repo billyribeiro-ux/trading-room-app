@@ -15,14 +15,21 @@ export type MainTab =
    */
   | 'dayTradeAlerts';
 export type FileTab = 'files' | 'images' | 'sounds';
-export type ChatTab = 'main' | 'off-topic';
-
-/** The only channels a message may be written to. */
-export const CHAT_TABS: readonly ChatTab[] = ['main', 'off-topic'];
-
-export function isChatTab(value: string): value is ChatTab {
-  return (CHAT_TABS as readonly string[]).includes(value);
-}
+/**
+ * A chat channel's name, which is also its tab label and its `messages.room` value.
+ *
+ * IT WAS A CLOSED UNION of `'main' | 'off-topic'` until 2026-08-28, with `CHAT_TABS` and `isChatTab`
+ * beside it, and `chatTabsWithBadges` is what ended that: an owner can configure extra channels
+ * whose names come out of JSON at runtime, so the set is per ROOM and per MEMBER and cannot be a
+ * type. `#lib/chat-tabs.ts` holds the two built-ins and the parser.
+ *
+ * WHAT THE UNION ACTUALLY BOUGHT, so that nothing is mourned that was not there: a typo in a
+ * comparison became a compile error. It never protected against a member naming a channel they may
+ * not read — that check did not exist until the same day, and it lives on the server now, where
+ * every caller asks `memberChatChannels` and refuses anything not on the answer. The client's own
+ * list arrives with the page as `data.chatTabs`, already decided.
+ */
+export type ChatTab = string;
 export type SettingsTab = 'app' | 'alerts' | 'chat' | 'presenter';
 export type AlertTab = 'text' | 'url' | 'media';
 
@@ -371,7 +378,15 @@ export type MessageAction =
   | 'question'
   | 'image'
   | 'edit'
-  | 'reaction';
+  | 'reaction'
+  /**
+   * "Copy trades" — one `[{( … )}]` order copied to the clipboard.
+   *
+   * Its own action rather than a second use of `copy`: `copy` takes the WHOLE message, and the
+   * whole point here is that a member gets the order and nothing else. The payload carries the
+   * text, because the segment that was clicked is the only thing that knows which order it was.
+   */
+  | 'copy-trade';
 
 /**
  * One entry per user with a live camera — the room's `webcamingUsers`.
@@ -433,5 +448,10 @@ export interface MessageActionItem {
   }>;
 }
 
-/** What rides with a message action: a click, or a reaction pill. */
-export type MessageActionEvent = MouseEvent | MessageReactionPayload | undefined;
+/** The text of one `[{( … )}]` order, emitted with the `copy-trade` action. */
+export interface TradeCopyPayload {
+  text: string;
+}
+
+/** What rides with a message action: a click, a reaction pill, or one copyable order. */
+export type MessageActionEvent = MouseEvent | MessageReactionPayload | TradeCopyPayload | undefined;

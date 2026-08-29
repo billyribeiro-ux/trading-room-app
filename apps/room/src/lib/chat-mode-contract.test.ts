@@ -251,8 +251,30 @@ describe('what each mode does', () => {
       never told — so a muted member typed, pressed send, and watched nothing happen.
     */
     expect(serverCode).toContain('chatMutedTill:');
+    expect(pageCode).toContain('mutedUntil: selfMutedUntil');
+  });
+
+  /*
+    ALL THREE reasons reach the one derivation, asserted as three arguments rather than as one
+    source line.
+
+    This used to pin the line verbatim —
+    `const chatEnabled = $derived(chatComposerEnabled(chatMode) && selfMutedUntil === null);` — and
+    that pin did its job twice over: it went red the moment the third reason was added on
+    2026-08-28, which is exactly when somebody should look. What it could not do is say WHY, or
+    notice a term quietly disappearing from a rewritten expression that still parsed.
+
+    So it asks for the three inputs by name instead. The rule itself, its transcription and its truth
+    table are in `chat-mode.ts` and `chat-mode.test.ts`; what this file guards is that the PAGE still
+    feeds it all three, which is the half a unit test cannot see.
+  */
+  it('feeds the composer gate all three of the reference reasons', () => {
+    expect(pageCode).toContain('chatComposerAvailable({');
+    expect(pageCode).toContain('mode: chatMode');
+    expect(pageCode).toContain('mutedUntil: selfMutedUntil');
+    expect(pageCode).toContain('isFreeTrial: data.user.isFT === true');
     expect(pageCode).toContain(
-      'const chatEnabled = $derived(chatComposerEnabled(chatMode) && selfMutedUntil === null);'
+      'chatDisabledForTrials: data.sessData?.chatDisabledForTrials === true'
     );
   });
 

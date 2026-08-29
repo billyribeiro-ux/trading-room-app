@@ -176,9 +176,27 @@
      ══════════════════════════════════════════════════════════════════════════ */
 
   const STYLE_PROPS = [
-    'display', 'visibility', 'position', 'width', 'height', 'margin', 'padding', 'border',
-    'font-family', 'font-size', 'font-weight', 'line-height', 'color', 'background-color',
-    'background-image', 'text-align', 'opacity', 'box-shadow', 'border-radius', 'overflow', 'z-index'
+    'display',
+    'visibility',
+    'position',
+    'width',
+    'height',
+    'margin',
+    'padding',
+    'border',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'line-height',
+    'color',
+    'background-color',
+    'background-image',
+    'text-align',
+    'opacity',
+    'box-shadow',
+    'border-radius',
+    'overflow',
+    'z-index'
   ];
 
   function computed(el) {
@@ -448,7 +466,10 @@
         OUT.templatesFetched.push({ url, ok: false, error: String(e) });
       }
     }
-    if (!urls.size) note('The handler source names no .html template — the modal is likely inline (bootbox/`template:`), so its markup is in the source string itself.');
+    if (!urls.size)
+      note(
+        'The handler source names no .html template — the modal is likely inline (bootbox/`template:`), so its markup is in the source string itself.'
+      );
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -472,7 +493,9 @@
     */
     const selectors = OUT.stripeBlock.rules.map((r) => r.selector).join(' ');
     OUT.stripeBlock.inertClassCheck = {
-      'stripe-mini': /\.stripe-mini\b/.test(selectors) ? 'HAS A RULE — our reading was incomplete' : 'no matching rule, as read',
+      'stripe-mini': /\.stripe-mini\b/.test(selectors)
+        ? 'HAS A RULE — our reading was incomplete'
+        : 'no matching rule, as read',
       'mb-xs': /\.mb-xs\b/.test(selectors) ? 'HAS A RULE — our reading was incomplete' : 'no matching rule, as read'
     };
     console.log('[stripe-mini]', OUT.stripeBlock.inertClassCheck);
@@ -485,8 +508,7 @@
   const detailsLink = block
     ? Array.from(block.querySelectorAll('a')).find(
         (a) =>
-          /openStripeDetails/.test(a.getAttribute('ng-click') || '') ||
-          /^\s*Details\s*$/i.test(a.textContent || '')
+          /openStripeDetails/.test(a.getAttribute('ng-click') || '') || /^\s*Details\s*$/i.test(a.textContent || '')
       )
     : null;
 

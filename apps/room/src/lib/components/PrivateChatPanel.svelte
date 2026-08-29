@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { panelDragResize } from '#lib/panel-drag.js';
 
   /*
@@ -103,10 +103,7 @@
     searching: boolean;
     searchTerm: string;
     draft: string;
-    /** Renders a body with its URLs linkified. Owned by the page, which owns the same rule for chat. */
-    body: Snippet<[string]>;
     /** A short local time against each row, as `app-st-compactmessage` shows it. */
-    formatTime: (at: number) => string;
     onclosepeer: () => void;
     ondeletethis: () => void;
     onclose: () => void;
@@ -129,8 +126,6 @@
     searching,
     searchTerm = $bindable(),
     draft = $bindable(),
-    body,
-    formatTime,
     onclosepeer,
     ondeletethis,
     onclose,
@@ -363,19 +358,7 @@
                   </div>
                 {/if}
                 {#each log as message (message._id)}
-                  <app-st-compactmessage id="pcm-{message._id}">
-                    <div class="msg-box pb-1">
-                      <div class="d-flex justify-content-between align-items-center w-100">
-                        <strong class={['username mx-1', { presUser: message.isA }]}
-                          >{message.n}</strong
-                        >
-                        <span class="msg-time mr-1">{formatTime(message.t)}</span>
-                      </div>
-                      <div class="msg-left text-formated preText ml-2 mr-2 p-0">
-                        {@render body(message.txt)}
-                      </div>
-                    </div>
-                  </app-st-compactmessage>
+                  <CompactMessageRow {message} />
                 {/each}
               </div>
             </app-privchatscroller>

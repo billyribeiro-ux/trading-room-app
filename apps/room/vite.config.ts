@@ -204,6 +204,12 @@ export default defineConfig({
       '**/dist/**',
       '**/build/**',
       'new-room-control/**',
+      /*
+        `e2e/` is Playwright's, not Vitest's. Its specs import `@playwright/test`, which throws
+        outside a Playwright runner — so without this line `vitest run` reports a failed test FILE
+        for a suite that is perfectly healthy, and the failure names the wrong tool.
+      */
+      'e2e/**',
       ...evidenceBoundExclusions
     ]
   }

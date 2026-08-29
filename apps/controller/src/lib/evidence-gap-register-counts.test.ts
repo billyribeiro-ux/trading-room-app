@@ -127,8 +127,7 @@ function bucket(id: string, cells: string[], header: string[]): Bucket {
   const status = cell.toUpperCase();
   /* CLOSED still wins WITHIN the cell: a closure note quotes the wording it replaced. */
   if (status.includes('CLOSED')) return 'CLOSED';
-  if (status.includes("WON'T FIX") || status.includes('WON\u2019T FIX') || status.includes('PARKED'))
-    return 'PARKED';
+  if (status.includes("WON'T FIX") || status.includes('WON\u2019T FIX') || status.includes('PARKED')) return 'PARKED';
   if (/\bOPEN\b/.test(status)) return 'OPEN';
   return 'UNCLASSIFIED';
 }

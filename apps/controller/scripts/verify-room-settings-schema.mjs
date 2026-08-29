@@ -9,14 +9,108 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '..');
+/**
+ * The REPOSITORY root, distinct from `REPO_ROOT` above — which, despite its name, is this APP.
+ *
+ * Introduced 2026-08-29 after a duplication audit pointed at `verify-backend-provenance.mjs`, whose
+ * sibling `DOCUMENTED_COUNT_SITES` list is the same mechanism as `COUNT_CLAIMS` below and whose
+ * docblock records what that list cost: paths that resolved from `apps/controller/` "happened to
+ * work for the wrong reason", and repairing one broke two others — *"the FOURTH instance of one
+ * original bug, which is why every path in this file now resolves from a single explicit root."*
+ *
+ * `COUNT_CLAIMS` had exactly that shape: three entries app-relative, two escaping upward with
+ * `../../`. It worked, and it produced error messages naming `../../docs/decoded/admin-surface.md`,
+ * which is not a path anyone can paste. Every site is now written from the repository root, so the
+ * list reads as locations rather than as directions.
+ */
+const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '../../..');
 const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, FIFTY-FOUR by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
   through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
   `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 67.
+  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 103.
+
+  89 -> 90 on 2026-08-28: hasAlertScheduler. The last buildable row of the settings enumeration, and
+  the third blocker in a day that named the wrong obstacle: the scheduler does not need the Rust
+  crate, it needs a long-lived process, and the room already is one because it cannot be serverless.
+
+  87 -> 89 on 2026-08-28: autoRecord and dontStopRecOnMicMute. ONE feature and two settings, crossing
+  together because the second is inert without the first - autoRecord gates the stop as well as both
+  starts. Filed BLOCKED on a server-side recorder that this room deliberately does not have and does
+  not need: it records in the browser, so the settings had something to drive all along.
+
+  86 -> 87 on 2026-08-28: alertsOverlayOnScreenshare. The first on this list that changes the BYTES
+  ON THE WIRE rather than the DOM: a canvas is spliced between the display capture and the producer,
+  so the alerts are burned into the frames every member receives and into any recording of them. It
+  is room policy for that reason - one presenter ticking it changes what everybody else sees.
+
+  85 -> 86 on 2026-08-28: altChatRender. The compact log, and the room had no compact renderer at
+  all — two of the setting's three behaviours had nothing to act on until one existed.
+
+  84 -> 85 on 2026-08-28: chatTabsWithBadges. Extra chat channels behind badges. The room decides who
+  sees which on the SERVER — the reference decides it in the browser against a list the browser holds
+  — so the raw JSON crosses and the ENTITLEMENT never does.
+
+  83 -> 84 on 2026-08-28: enableQAReactions. A CORRECTION rather than a new gate — the rule was
+  already transcribed in `message-behavior.ts` and could never evaluate true, because the Q&A thread
+  rendered its rows as chat behind an `onaction` that did nothing. Decided on the server too:
+  `reactToQuestion` refuses when the room did not enable it.
+
+  82 -> 83 on 2026-08-28: hasTypingIndicator. It gates the SEND as well as the display — a room
+  without it must not have members broadcasting their keystroke state to each other, which a
+  display-only gate would leave happening.
+
+  81 -> 82 on 2026-08-28: usersCanDeleteOwnMsgs. The first setting on this list that crosses to CLOSE
+  a hole rather than to draw a control — the room's delete endpoint already permitted a member to
+  remove their own message and never asked whether the room allowed it.
+
+  79 -> 81 on 2026-08-28: positionsIframe and positionsIframeUrl — ONE feature. The second pair here
+  whose gate is a conjunction, after the tip button, and they cross together for the same reason: the
+  switch without a URL draws a button that opens an empty panel.
+
+  78 -> 79 on 2026-08-28: copyTrades, which turns a bracketed order inside an ALERT into one click
+  to copy. It reaches the message through `buildMessageChrome` rather than per call site, because
+  three components render a message and a setting handed to each separately is one that a component
+  will stop being handed.
+
+  77 -> 78 on 2026-08-28: customPlayerURL, which replaces the room's whole screens pane with an
+  owner-supplied iframe. Checked in the room for scheme, which the reference explicitly is not — its
+  binding runs through `bypassSecurityTrustResourceUrl`.
+
+  75 -> 77 on 2026-08-28: customFaviconURL and customCSS. They cross together because the reference
+  applies them on the same line, and the second is the first setting on this list whose value is
+  CODE the owner writes and every member's browser runs.
+
+  72 -> 75 on 2026-08-28: tipMeBtnEnabled, tipMeBtnUrl and tipMeBtnTxt — ONE feature. They cross as
+  a group because the gate is their conjunction, and a settings list that lets them cross separately
+  is a list that will one day let two of the three across.
+
+  71 -> 72 on 2026-08-28: showOnlyUsernames, which decides the SHAPE of a roster row. It joins the
+  other roster gates in `roster-gates.ts` rather than being an inline condition, for the reason that
+  module's header gives: these are the predicates that decide what one member sees of another.
+
+  70 -> 71 on 2026-08-28: enablePrivateMessageHistory. The first setting to cross that widens a READ
+  rather than a rendering — a presenter sees one member's private conversations with everybody — so
+  the room checks it on the SERVER, from the control plane, before selecting a row.
+
+  69 -> 70 on 2026-08-28: simplifiedEditor, which picks one of two Summernote toolbar button names
+  for the note editor's colour control. The FIRST setting to cross whose downstream vendor is not in
+  the capture at all, so what crosses is the decision and not a transcription of markup; the room
+  records that distinction at `notes/note-gates.ts` rather than letting it read as evidenced.
+
+  55 -> 58 on 2026-08-28: darkThemeAsDefault, alertSoundOff and alertsChatOnBottom, the three room
+  defaults that seed a member's own preferences once. Three clauses of one expression upstream, so
+  they crossed together; the latch that keeps a default from becoming an override lives in the room.
+
+  58 -> 59 on 2026-08-28: dontShowRecInfoToUsers, the room half of the [ REC ] tooltip. A correction
+  rather than a feature — the gate existed and read a viewer preference nothing writes.
+
+  54 -> 55 on 2026-08-28: hideNotes, the Notes tab's gate. Its two siblings `hideFiles` and
+  `hideRecs` crossed on 2026-08-14 and this one did not; the settings enumeration found it, not a
+  feature. See the note at the foot of the generator.
 
   53 -> 54 on 2026-08-15: recordingReminder, the POLICY half of the reminder banner. The name is
   shared upstream by a room setting and a local runtime flag, and the gate at bundle byte 2,477,770
@@ -140,6 +234,64 @@ const EXPECTED_WIRED_SETTINGS = [
   'hideChatLog',
   'hideFiles',
   'hideMobileCredentials',
+  'hideNotes',
+  /*
+    Added 2026-08-28: the three ROOM DEFAULTS, which cross together because upstream they are three
+    consecutive clauses of one expression in `loadSessionData` (bytes 1,149,414 / 1,149,637 /
+    1,149,866). Each seeds a per-viewer preference the FIRST time a member arrives and latches
+    itself so it never becomes an override. The latch lives in the room — which member has already
+    been given a default is a fact about that member, not about the room — in
+    `apps/room/src/lib/room/room-defaults.ts`, with its negative controls beside it.
+  */
+  'darkThemeAsDefault',
+  'alertSoundOff',
+  'alertsChatOnBottom',
+  /* Added 2026-08-28: the room half of the REC-indicator tooltip, which was reading a viewer
+     preference nothing writes. See `room-config.ts`. No apostrophe and no closing square bracket in
+     comments inside this array — `sso-boundary.test.ts` extracts these names the same way
+     `room-config-boundary.test.ts` extracts the generator list, and either character breaks it. */
+  'dontShowRecInfoToUsers',
+  /* Added 2026-08-28: the third reason the chat composer is off. See `room-config.ts`. */
+  'chatDisabledForTrials',
+  /* Added 2026-08-28: the Q and A entitlement on alerts. See `room-config.ts`. */
+  'hasQAOnAlerts',
+  /* Added 2026-08-28: the sidebar seed and the captions entitlement. See `room-config.ts`. */
+  'alwaysShowRoster',
+  'hasSpeechRecognitionDisabled',
+  /* Added 2026-08-28: the webcam OFF switch and the breathing REC badge. */
+  'hideWebcamForRoom',
+  'blinkingRec',
+  /* Added 2026-08-28: the off-topic channel seed and the sticky non-trade checkbox. */
+  'autoSwitchToOfftopics',
+  'styckyNonTradeAlert',
+  /* Added 2026-08-28: the room title and the presenter-only moderator bar. */
+  'name',
+  'modMessage',
+  /* Added 2026-08-28: the note editor colour button. NO APOSTROPHES IN THIS BLOCK - the parser that
+     reads this list is a single-quote regex, and one closes the string. */
+  'simplifiedEditor',
+  /* Added 2026-08-28: the moderation read behind the user-info modal. */
+  'enablePrivateMessageHistory',
+  /* Added 2026-08-28: which shape a roster row draws in. */
+  'showOnlyUsernames',
+  /* Added 2026-08-28: the tip button. Three settings, one conjunction. */
+  'tipMeBtnEnabled',
+  'tipMeBtnUrl',
+  'tipMeBtnTxt',
+  /* Added 2026-08-28: the room own favicon and stylesheet. */
+  'customFaviconURL',
+  'customCSS',
+  /* Added 2026-08-28: the owner own iframe in place of the screens pane. */
+  'customPlayerURL',
+  /* Added 2026-08-28: the click-to-copy order marker in an alert. */
+  'copyTrades',
+  /* Added 2026-08-28: the positions panel and its URL. */
+  'positionsIframe',
+  'positionsIframeUrl',
+  /* Added 2026-08-28: member self-delete, enforced on the server. */
+  'usersCanDeleteOwnMsgs',
+  /* Added 2026-08-28: the typing indicator, which gates the send too. */
+  'hasTypingIndicator',
   'hidePoweredBy',
   'hideRecs',
   'hideWelcomeTo',
@@ -214,8 +366,15 @@ const EXPECTED_WIRED_SETTINGS = [
     owner typed, with nothing to default from.
   */
   'alertLabels',
+  'alertsOverlayOnScreenshare',
+  'hasAlertScheduler',
+  'autoRecord',
+  'dontStopRecOnMicMute',
+  'altChatRender',
+  'chatTabsWithBadges',
   'usersPublicReply',
   'enableReactions',
+  'enableQAReactions',
   'enableEditMessage',
   'enableEditAlerts',
   'recordingReminder'
@@ -287,6 +446,202 @@ try {
   if (!canonical.equals(first)) {
     fail(`generated schema is stale (${digest(canonical)} != ${digest(first)}); run pnpm schema:extract`);
   }
+
+  /*
+    ── EVERY DOCUMENT THAT STATES THE WIRED COUNT STATES THE RIGHT ONE ─────────────────────────────
+
+    ## What this is for
+
+    `wired.length` is pinned above against `EXPECTED_WIRED_SETTINGS`, so the SCHEMA cannot drift
+    unnoticed. Five documents also quote the number in prose, and on 2026-08-29 four of them were
+    measured for the first time in months:
+
+      apps/controller/README.md          "33 of 269 settings are wired … the other 257"
+      apps/controller/docs/OUTSTANDING.md "only 33 of 269 settings have a consumer"
+      apps/controller/docs/ARCHITECTURE.md "Current state: 33 of 269 wired; 236 unwired"
+      docs/decoded/admin-surface.md       "58 of 269 are wired. 211 are not." + all 58 names
+      v5.md                               quoting OUTSTANDING.md's 33
+
+    The real number was 103. The README's was worse than stale — 33 + 257 is 290, so its arithmetic
+    never described a 269-setting schema at all, on any day.
+
+    The direction of the error is what makes it worth a gate rather than a correction: every one of
+    them UNDERSTATED the work. A reader of the controller's own README was told a third of the
+    shipped settings worked. "Current state:" in ARCHITECTURE.md is precisely the sentence that is
+    read as current by definition, and precisely the one nothing was checking.
+
+    ## Why here
+
+    This script already computes `wired.length` and already fails on drift. Checking the prose costs
+    one read per file and puts the assertion where the number is known, rather than in a test that
+    would have to re-derive it — which is how two sources of one truth start disagreeing.
+  */
+  const COUNT_CLAIMS = [
+    'apps/controller/README.md',
+    'apps/controller/docs/OUTSTANDING.md',
+    'apps/controller/docs/ARCHITECTURE.md',
+    'docs/decoded/admin-surface.md',
+    'v5.md',
+    /*
+      `TODO.md` joined on 2026-08-29, and how it was missed is the reason it is worth a note.
+
+      The first pass of this check found five documents by searching for the phrasings it already
+      knew — "N of 269", "N wired" — and corrected all five. `TODO.md:206` states the same property
+      in a SIXTH phrasing, *"marks 170 of them `wired: false`"*, which none of those patterns match,
+      and it was found only when a separate audit read the trackers by hand.
+
+      That is the failure mode of a pinned list of sites: it grows by whoever notices, and what
+      nobody notices stays unpinned. The list is still the right shape — the alternative is a
+      repo-wide number hunt with a false-positive rate the "20 of 269" incident already measured —
+      but it earns this paragraph, because the next stale count will be in a seventh file phrased a
+      seventh way.
+    */
+    'TODO.md'
+  ];
+
+  /**
+   * A document's LIVE text — every line that is not a Markdown blockquote.
+   *
+   * SUPERSEDED NUMBERS LIVE IN A BLOCKQUOTE, and that convention is load-bearing rather than
+   * stylistic. Correcting these five documents also recorded what each had said before, and two of
+   * those notes necessarily quote the old numbers — *"33 of 269 … the other 257"*, *"33 wired; 236
+   * unwired"*. The checks below found them on their first run and failed, correctly by their own
+   * rule and wrongly in substance: a history note is not a claim about today.
+   *
+   * The alternative was to loosen the checks until the old numbers slipped through, which would have
+   * loosened them for a genuinely stale number too. A blockquote is instead a mark a READER also
+   * sees — the sentence is visibly quoted as former — so one convention serves both audiences, and
+   * the gate stays exact.
+   */
+  const liveText = (text) =>
+    text
+      .split('\n')
+      .filter((line) => !/^\s*>/.test(line))
+      .join('\n');
+
+  /**
+   * The same text with every run of whitespace collapsed to one space, for PHRASE matching only.
+   *
+   * These files wrap prose at 100 columns, so a phrase can straddle a newline: the controller
+   * README's own sentence is `The other\n166 entries remain`. The phrase patterns below matched a
+   * literal space, so that claim was invisible to them — found because its negative control FAILED
+   * TO FIRE, which is the only reason the hole was caught rather than shipped. A phrase check over
+   * wrapped Markdown must never depend on where the wrap happens to fall.
+   *
+   * Kept SEPARATE from `liveText` rather than replacing it: the roster parse below is anchored on
+   * blank lines and a trailing `.\n`, and collapsing whitespace made it unparsable — which the run
+   * after that change said in as many words. One transform per question.
+   */
+  const livePhrases = (text) => liveText(text).replace(/\s+/g, ' ');
+
+  for (const relative of COUNT_CLAIMS) {
+    const path = resolve(REPOSITORY_ROOT, relative);
+    const text = livePhrases(readFileSync(path, 'utf8'));
+    /*
+      "<n> of 269" WHERE THE WORD `wired` IS NEARBY, and the narrowing was measured rather than
+      chosen.
+
+      A first version matched every "<n> of 269" in the file, on the argument that a claim added
+      lower down should be covered on the day it is added. Its first run failed on
+      `docs/ARCHITECTURE.md:88` — *"They overlap on 20 of 269 settings"* — which is a DIFFERENT
+      statistic, about settings two components both write, and had nothing to do with wiring. A gate
+      that reports a correct sentence as a defect is worse than no gate: it teaches whoever meets it
+      to widen the exemption rather than read the finding.
+
+      So the window is required to mention `wired`. The cost is stated rather than hidden: a wiring
+      claim phrased without that word is not caught. That is the right side to err on here, because
+      every one of the five real claims uses it, and a missed claim is a stale sentence while a false
+      one is a broken build.
+    */
+    const claims = [...text.matchAll(/(\d+)(?: of| \/) 269/g)]
+      .filter((match) => /wired|have a consumer/i.test(text.slice(match.index - 120, match.index + 160)))
+      .map((match) => Number(match[1]));
+    const wrong = claims.filter((claimed) => claimed !== wired.length);
+    if (wrong.length > 0) {
+      fail(
+        `${relative} states "${wrong.join(' of 269", "')} of 269" but ${wired.length} settings are wired. ` +
+          `This paragraph is read as the current state; correct it rather than this check.`
+      );
+    }
+  }
+
+  /*
+    THE UNWIRED HALF, AND THE ROSTER — both added 2026-08-29, in the same hour as the check above,
+    because a duplication audit of that check found it had reproduced the defect it was fixing.
+
+    Correcting the five documents wrote a SECOND number beside the first in four of them — "the other
+    166 entries", "the remaining 166", "166 unwired", "166 are not" — and the check above matches only
+    `<n> of 269`, so none of those was guarded. Wire a 104th setting and every one of them would read
+    "104 of 269 … the other 166": the guarded half moves, the unguarded half does not, and the
+    paragraph is wrong in a new way. That is the same shape as the drift being repaired, introduced by
+    the repair.
+
+    `docs/decoded/admin-surface.md` additionally lists every wired setting BY NAME. A count check
+    forces that paragraph to be edited when the count moves, but nothing made the edit correct, so the
+    roster is compared against `EXPECTED_WIRED_SETTINGS` element by element.
+  */
+  const unwired = 269 - wired.length;
+
+  for (const relative of COUNT_CLAIMS) {
+    const path = resolve(REPOSITORY_ROOT, relative);
+    const text = livePhrases(readFileSync(path, 'utf8'));
+    /*
+      The four phrasings actually used, named rather than generalised. A loose "any number near the
+      word unwired" would sweep in `hasSwingTradeAlerts`'s row number 1166 from the manage-page table
+      in `admin-surface.md`, which is a row id and not a count — measured, on this check's first run.
+    */
+    const stated = [
+      ...text.matchAll(/(?:the other|the remaining) (\d+) entries?/gi),
+      ...text.matchAll(/(?:the other|the remaining) (\d+) are/gi),
+      ...text.matchAll(/(\d+) unwired/gi),
+      ...text.matchAll(/(\d+) are not\.\*\*/gi),
+      // `TODO.md:206`'s phrasing: "marks **166** of them `wired: false`".
+      ...text.matchAll(/marks \*?\*?(\d+)\*?\*? of them `?wired: false/gi)
+    ].map((match) => Number(match[1]));
+    /*
+      CASE-INSENSITIVE, because prose starts sentences. Both surviving phrasings begin one — *"The
+      other 166 entries remain"*, *"The remaining 166 are stored"* — and with `/g` alone neither
+      matched, so two of this block's four patterns guarded nothing. Found the same way as the line
+      break above: their negative controls did not fire. Two holes in one small block, both invisible
+      to a run that passes, is the argument for controlling every pattern separately rather than
+      once for the block.
+    */
+
+    const wrong = stated.filter((claimed) => claimed !== unwired);
+    if (wrong.length > 0) {
+      fail(
+        `${relative} states ${wrong.join(', ')} unwired but 269 - ${wired.length} = ${unwired}. ` +
+          `The wired half of this sentence is checked; this is the half beside it.`
+      );
+    }
+  }
+
+  /*
+    The roster in `admin-surface.md`, compared name by name. Alphabetical because that is how it is
+    written there, and because a roster in schema order would silently reorder on every regeneration.
+  */
+  const ROSTER_DOC = 'docs/decoded/admin-surface.md';
+  const rosterText = liveText(readFileSync(resolve(REPOSITORY_ROOT, ROSTER_DOC), 'utf8'));
+  const rosterBlock = /Wired \(\d+\), alphabetically:\n\n([\s\S]*?)\.\n/.exec(rosterText);
+  if (!rosterBlock) {
+    fail(`${ROSTER_DOC} no longer carries a parsable "Wired (n), alphabetically:" roster`);
+  }
+  const listed = [...rosterBlock[1].matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+  const expected = [...EXPECTED_WIRED_SETTINGS].sort();
+  if (JSON.stringify(listed) !== JSON.stringify(expected)) {
+    const missing = expected.filter((name) => !listed.includes(name));
+    const extra = listed.filter((name) => !expected.includes(name));
+    fail(
+      `${ROSTER_DOC}'s wired roster disagrees with EXPECTED_WIRED_SETTINGS` +
+        (missing.length > 0 ? `; missing: ${missing.join(', ')}` : '') +
+        (extra.length > 0 ? `; listed but not wired: ${extra.join(', ')}` : '') +
+        (missing.length === 0 && extra.length === 0 ? '; same names, different order' : '')
+    );
+  }
+
+  console.log(
+    `wired-count prose verified in ${COUNT_CLAIMS.length} documents; ${unwired} unwired; roster of ${listed.length} names matches`
+  );
 
   console.log(`room-settings schema verified: 268 extracted + 1 reviewed deviation = 269 total; ${wired.length} wired`);
 } finally {

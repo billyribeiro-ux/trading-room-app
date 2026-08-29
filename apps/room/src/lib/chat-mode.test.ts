@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHAT_MODES,
+  chatComposerAvailable,
   chatComposerEnabled,
   isChatMode,
   isWebinarMode,
@@ -52,6 +53,75 @@ describe('the three modes', () => {
     expect(isWebinarMode('p')).toBe(true);
     expect(isWebinarMode('g')).toBe(false);
     expect(isWebinarMode('d')).toBe(false);
+  });
+});
+
+/**
+ * THE THREE REASONS THE COMPOSER IS OFF, and the one that was missing.
+ *
+ * Upstream these are three assignments to one flag. This room had two of them — the chat mode and
+ * this viewer's own mute — and no term for `chatDisabledForTrials`, so a room that had turned trial
+ * chat off served every trial a working composer until 2026-08-28. The setting was not on
+ * `ROOM_VISIBLE_SETTINGS` and nothing here asked for it.
+ *
+ * The table below is the whole truth table, and the two rows that matter most are the LAST two:
+ * a trial in a room that disables trial chat is refused, and a non-trial in the same room is not.
+ */
+describe('chatComposerAvailable — the three reasons the composer is off', () => {
+  const open = {
+    mode: 'g' as const,
+    mutedUntil: null,
+    isFreeTrial: false,
+    chatDisabledForTrials: false
+  };
+
+  it('is available when none of the three applies', () => {
+    expect(chatComposerAvailable(open)).toBe(true);
+    expect(chatComposerAvailable({ ...open, mode: 'p' })).toBe(true);
+  });
+
+  it("is refused by the ROOM's mode, which applies to everyone", () => {
+    expect(chatComposerAvailable({ ...open, mode: 'd' })).toBe(false);
+    expect(chatComposerAvailable({ ...open, mode: 'd', isFreeTrial: true })).toBe(false);
+  });
+
+  it("is refused by THIS VIEWER's own mute", () => {
+    expect(chatComposerAvailable({ ...open, mutedUntil: new Date(0) })).toBe(false);
+  });
+
+  /*
+    The rule that was missing. Both halves are asserted, because a gate that refuses everybody is as
+    wrong as one that refuses nobody — and refusing everybody is the likelier mistake here, since
+    `isFreeTrial` is false for most of the room.
+  */
+  it('is refused for a TRIAL when the owner has disabled trial chat', () => {
+    expect(chatComposerAvailable({ ...open, isFreeTrial: true, chatDisabledForTrials: true })).toBe(
+      false
+    );
+  });
+
+  it('leaves a non-trial alone in the same room', () => {
+    expect(
+      chatComposerAvailable({ ...open, isFreeTrial: false, chatDisabledForTrials: true })
+    ).toBe(true);
+  });
+
+  it('leaves a trial alone in a room that has not disabled trial chat', () => {
+    expect(
+      chatComposerAvailable({ ...open, isFreeTrial: true, chatDisabledForTrials: false })
+    ).toBe(true);
+  });
+
+  /* Every reason turns it OFF and none can turn it back on, which is why order carries no meaning. */
+  it('stays refused when reasons stack', () => {
+    expect(
+      chatComposerAvailable({
+        mode: 'd',
+        mutedUntil: new Date(0),
+        isFreeTrial: true,
+        chatDisabledForTrials: true
+      })
+    ).toBe(false);
   });
 });
 

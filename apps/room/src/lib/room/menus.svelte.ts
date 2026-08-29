@@ -40,10 +40,30 @@ export type TopMenu = 'recording' | 'soundcloud' | 'screen';
 
 /** Every flag-shaped menu. The union is the allow-list a bare assignment never had. */
 export type MenuName =
-  TopMenu | 'volume' | 'rosterSort' | 'archives' | 'notes' | 'files' | 'emoji' | 'giphy';
+  | TopMenu
+  | 'volume'
+  | 'screenVolume'
+  | 'streamBuffer'
+  | 'rosterSort'
+  | 'archives'
+  | 'notes'
+  | 'files'
+  | 'emoji'
+  | 'giphy';
 
 export class RoomMenus {
   #volume = $state(false);
+  /*
+    The two dropdowns that had no state at all until 2026-08-29, so neither could be opened. Why,
+    and what else it broke, is in `bootstrap-dropdown-contract.test.ts`, which now enforces it.
+
+    They join this class rather than growing a private `$state` each, which is what makes the
+    window-click closer below cover them for free. `screenVolume` is SEPARATE from `volume` on
+    purpose: two different dropdowns, the navbar's and the presentation area's, and one flag would
+    open both at once.
+  */
+  #screenVolume = $state(false);
+  #streamBuffer = $state(false);
   #recording = $state(false);
   #soundcloud = $state(false);
   #screen = $state(false);
@@ -60,6 +80,12 @@ export class RoomMenus {
 
   get volume(): boolean {
     return this.#volume;
+  }
+  get screenVolume(): boolean {
+    return this.#screenVolume;
+  }
+  get streamBuffer(): boolean {
+    return this.#streamBuffer;
   }
   get recording(): boolean {
     return this.#recording;
@@ -121,6 +147,8 @@ export class RoomMenus {
    */
   set(menu: MenuName, open: boolean): void {
     if (menu === 'volume') this.#volume = open;
+    else if (menu === 'screenVolume') this.#screenVolume = open;
+    else if (menu === 'streamBuffer') this.#streamBuffer = open;
     else if (menu === 'recording') this.#recording = open;
     else if (menu === 'soundcloud') this.#soundcloud = open;
     else if (menu === 'screen') this.#screen = open;
@@ -160,6 +188,8 @@ export class RoomMenus {
    */
   closeForModal(): void {
     this.#volume = false;
+    this.#screenVolume = false;
+    this.#streamBuffer = false;
     this.#rosterSort = false;
     this.#archives = false;
     this.#notes = false;
@@ -173,6 +203,8 @@ export class RoomMenus {
   /** What `closeFloatingMenus` closed. Leaves the emoji and GIF pickers open — same note. */
   closeFloating(): void {
     this.#volume = false;
+    this.#screenVolume = false;
+    this.#streamBuffer = false;
     this.#recording = false;
     this.#soundcloud = false;
     this.#screen = false;

@@ -18,11 +18,13 @@ import {
   userActionAlert
 } from '#lib/user-action-intent.js';
 
-import { RoomChatMute } from './chat-mute.svelte';
+import { RoomChatMute } from './chat-mute';
+import type { UserActionCommands } from './user-action-commands';
 import type { RoomDialogs } from './dialogs.svelte';
-import { RoomKicks } from './kicks.svelte';
+import { RoomKicks } from './kicks';
+import { RoomNotesAccess, type NotesAccessCheck } from './notes-access.svelte';
 import { RoomManagedUsers } from './managed-users.svelte';
-import { RoomSessionControl } from './session-control.svelte';
+import { RoomSessionControl } from './session-control';
 import type { RoomToasts } from './toasts.svelte';
 
 /** The load values every one of these actions reads, taken as a thunk. */
@@ -33,51 +35,6 @@ export interface UserActionSession<User> {
 }
 
 /** The two wire commands this class sends, injected so it needs no route import. */
-export interface UserActionCommands {
-  /**
-   * The three mute sub-commands, as the union the server accepts.
-   *
-   * Typed as `string` first, which pushed the mismatch to the construction site and made it read
-   * as the page's problem. The server re-checks the caller either way; this is about the class
-   * declaring what it can actually send.
-   */
-  presenter: (payload: {
-    subCmd: 'mutemic' | 'mutecam' | 'mutescreens' | 'restartScreen';
-    targetUserId: number;
-  }) => Promise<unknown>;
-  editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
-  /** *" Mute Chat for 24hrs "* — presenter-gated on the server, like its opposite. */
-  muteChat: (payload: { targetUserId: number }) => Promise<unknown>;
-  unmuteChat: (payload: { targetUserId: number }) => Promise<unknown>;
-  /** A presenter's url to every OTHER browser — the receiver excludes the sender. */
-  sessionSendUrl: (payload: {
-    cmd: 'sendSalesImageToChat' | 'sendUsersToURL';
-    url: string;
-  }) => Promise<unknown>;
-  /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
-  forceReload: (targetUserId: number) => Promise<unknown>;
-  /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */
-  restartAudio: (targetUserId: number) => Promise<unknown>;
-  /**
-   * `kickUser` — removes ONE member. Presenter-gated on the server, like `forceReload`.
-   *
-   * NO `ban` FIELD, deliberately. The reference's payload carries `ban` and `kickAllInstances`; a ban
-   * needs somewhere durable to record that the person may not return, and this room has none. Taking
-   * the flag and dropping it would be the same defect this command was added to fix — see
-   * `presenter-commands.remote.ts`.
-   */
-  kickUser: (payload: { targetUserId: number; message: string }) => Promise<unknown>;
-  /**
-   * `saveCustomPerms` — the five checkboxes, written through to the CONTROLLER.
-   *
-   * The only command here that changes something durable rather than broadcasting; see
-   * `permissions.remote.ts` for why it is a module of one.
-   */
-  savePermissions: (payload: {
-    targetUserId: number;
-    granted: RoomPermissionKey[];
-  }) => Promise<unknown>;
-}
 
 /*
   Everything a presenter or a member can DO to a user, and the selection every one of those acts on.
@@ -172,6 +129,8 @@ export class RoomUserActions<
     dialogs: RoomDialogs;
     toasts: RoomToasts;
     commands: UserActionCommands;
+    /** The notes-password door — NOT a presenter-to-member command, so not in `UserActionCommands`. */
+    notesCheck: NotesAccessCheck;
     session: () => UserActionSession<User>;
     isPresenter: () => boolean;
     /** `media.talking` — who has a microphone open, which is what "mute all" acts on. */
@@ -241,6 +200,7 @@ export class RoomUserActions<
     });
 
     this.#managed = new RoomManagedUsers(options.defaultFollowStyle);
+    this.#notes = new RoomNotesAccess(options.dialogs, options.notesCheck);
     this.#kicks = new RoomKicks<User>({
       dialogs: options.dialogs,
       commands: options.commands,
@@ -269,6 +229,17 @@ export class RoomUserActions<
 
   get selectedUserId() {
     return this.#selectedUserId;
+  }
+
+  /**
+   * The notes-password door — see `RoomNotesAccess`. It lived here, pushed this class 98 lines past
+   * its ceiling, and left the way the ratchet asks: extract rather than raise. The fourth slice out,
+   * after `RoomChatMute`, `RoomKicks` and `RoomSessionControl`.
+   */
+  readonly #notes: RoomNotesAccess;
+
+  get canManageNotes(): boolean {
+    return this.#notes.granted;
   }
 
   get selectedMessageUser() {
@@ -672,14 +643,22 @@ export class RoomUserActions<
     if (this.#kicks.handle(action, user)) return;
 
     if (action === 'admin-notes-password') {
-      this.#dialogs.prompt = {
-        title: "Please enter the password to manage user's notes:",
-        value: '',
-        onconfirm: () => {
-          this.#dialogs.prompt = null;
-          this.#dialogs.alert = 'Wrong password!';
-        }
-      };
+      /*
+        ROW W'S LAST LYING CONTROL, WIRED 2026-08-29.
+
+        This branch used to raise the prompt and then set `'Wrong password!'` UNCONDITIONALLY — its
+        `onconfirm` took no parameter, so the typed value was never received, not merely uncompared.
+        A presenter typing the correct password was told it was wrong every time.
+
+        The primitive was never at fault: `RoomPrompt.onconfirm` is `(value: string) => void` and
+        `BootboxDialog.svelte` calls `onconfirm?.(promptResult())`. The value arrived and was thrown
+        away. What was missing was somewhere for it to go — see `routes/notes-auth.remote.ts`.
+
+        Fire-and-forget because `handle` is synchronous for every other action and the answer lands
+        in a dialog, not in this call's return. `void` rather than a floating promise so the intent
+        is declared: nothing here awaits, and the rejection path is handled inside.
+      */
+      void this.#notes.ask();
       return;
     }
 
@@ -741,6 +720,34 @@ export class RoomUserActions<
       this.#announceThenSend('Reload request sent OK', () => this.#commands.forceReload(user.id));
       return;
     }
+
+    /*
+      `debug-log` — WIRED 2026-08-29, and it leaves `INERT_ACTIONS` with this branch.
+
+      NO ANNOUNCEMENT, deliberately, and it is the difference between this and `force-reload`
+      directly above. The capture's sender is one line with no `bootbox` after it:
+
+        getDebugLog(){ this.appService.sendServerAdminCommand("getDebugLog", this.user) }   // 2080323
+
+      so `#announceThenSend` would be inventing an alert the reference does not raise — which is the
+      `EXACT_ALERTS` shape four commits have been removing, arriving from the other direction.
+
+      The modal is opened by the ANSWER rather than by the click, for the same reason: there is
+      nothing to show until a log arrives, and an empty textarea that appears immediately would read
+      as "this member has no log" rather than as "waiting".
+    */
+    if (action === 'debug-log') {
+      void this.#commands.requestDebugLog(user.id);
+      return;
+    }
+
+    /*
+      `upload-profile-picture` reaches `uploadProfilePicture` BELOW rather than a branch here, and
+      that is not an inconsistency — it is the same call `save-permissions` makes. This dispatcher
+      carries an action name and a user; a control that also carries a FILE cannot use it without
+      widening the signature for every other action, and a prop shared between two different acts is
+      what lets a control look wired while doing something else.
+    */
 
     /*
       `test-follow-sound` — WIRED 2026-08-23, and the sound is `pling` because the reference says so.
@@ -819,5 +826,70 @@ export class RoomUserActions<
     this.#announceThenSend(userActionAlert('save-permissions') ?? '', () =>
       this.#commands.savePermissions({ targetUserId: user.id, granted: [...granted] })
     );
+  }
+
+  /**
+   * `adminUploadProfilePic` — a presenter sets one member's avatar.
+   *
+   * ## A CORRECTION: this DOES announce, and the first version was wrong to be silent
+   *
+   * The first version of this method carried a paragraph arguing that *"upstream raises no alert on
+   * success — the picture simply changes, which is its own confirmation"*. **That was reasoning
+   * carried over from `getDebugLog`, where it is true, and it was never checked here.** The
+   * reference is explicit, at bundle byte 2,086,100:
+   *
+   * ```js
+   * beforeSend: … bootbox.alert(`Uploading: ${e.name}... Please wait...`)
+   * success:     … bootbox.alert("Profile picture uploaded successfully for " + (user.nick||user.name))
+   * error:       … bootbox.alert("Upload Failed...")
+   * ```
+   *
+   * Three alerts, one per outcome, and the sentences are transcribed rather than composed. That is
+   * the opposite of the `EXACT_ALERTS` defect this repository has spent commits removing: those were
+   * alerts raised over NOTHING, and these are raised over a real round trip.
+   *
+   * The progress alert is dropped and that IS a divergence, recorded rather than hidden: upstream's
+   * is a bootbox that `bootbox.hideAll()` closes from the success and error callbacks, and this
+   * room's `alert` primitive is a single string the member dismisses. Showing "Uploading…" would
+   * require the presenter to dismiss it before they could read the result.
+   *
+   * The failure sentence is the SERVER's when there is one — "That is not an image", the size limit,
+   * or the member having left the room — falling back to upstream's `"Upload Failed..."` verbatim.
+   * A specific reason beats a transcribed one; the transcription is what happens when there is no
+   * specific reason to give.
+   *
+   * The modal stays OPEN. `savePermissions` closes it because saving is the end of that dialog; a
+   * presenter who has just set a picture may well set another.
+   */
+  uploadProfilePicture(user: ModalTargetUser, file: File): void {
+    void this.#commands
+      .uploadProfilePicture({ targetUserId: user.id, file })
+      .then(() => {
+        // Verbatim, byte 2,086,100 — including that it names the member rather than the file.
+        this.#dialogs.alert = `Profile picture uploaded successfully for ${user.nick}`;
+      })
+      .catch((cause: unknown) => {
+        this.#dialogs.alert =
+          cause instanceof Error && cause.message ? cause.message : 'Upload Failed...';
+      });
+  }
+
+  /**
+   * Clear a member's picture. The mirror of {@link uploadProfilePicture}, and deliberately so.
+   *
+   * Silent on success and loud on failure, for that method's reason: the avatar changing IS the
+   * confirmation, and the ways this can fail — the member has left the room — are ones a presenter
+   * cannot infer from a control that did nothing.
+   *
+   * NO CONFIRM DIALOG. The reference's button raises none, and the act is reversible by the upload
+   * beside it; asking twice for something undoable in one click is friction, not safety.
+   */
+  removeProfilePicture(user: ModalTargetUser): void {
+    void this.#commands.removeProfilePicture(user.id).catch((cause: unknown) => {
+      this.#dialogs.alert =
+        cause instanceof Error && cause.message
+          ? cause.message
+          : 'That profile picture could not be removed.';
+    });
   }
 }

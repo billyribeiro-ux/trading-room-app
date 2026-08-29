@@ -89,7 +89,12 @@ const render = (over: {
     // The overlay this pane renders from. `null` is the ordinary case — no image pinned —
     // and the dismiss receiver is never reached by these assertions.
     broadcasts: { salesImageUrl: null, salesImageDismissed: noop },
-    chat: { tab: 'main', composer: '', focused: noop },
+    chat: {
+      tab: 'main',
+      composer: '',
+      focused: noop,
+      search: { isOpen: () => false, term: () => '', setTerm: noop, toggle: noop, clear: noop }
+    },
     polls: { minimized: false, active: null },
     menus: { messageId: null, openMessageMenu: noop, emoji: false, giphy: false, set: noop },
     isPresenter: false,
@@ -144,7 +149,12 @@ const render = (over: {
     onarchivealerts: noop,
     onmessageaction: noop,
     onprivatechat: noop,
+    onchatsearch: noop,
     onexpandcomposer: noop,
+    /* The typing indicator. Empty typists reads the same as nobody typing, which is the default. */
+    ontyped: noop,
+    onstoppedtyping: noop,
+    typists: [],
     onsend: noop,
     onimageupload: noop,
     onrte: noop,

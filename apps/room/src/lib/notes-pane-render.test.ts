@@ -25,6 +25,7 @@ function renderNotes(notes: readonly RoomNote[]): string {
       giphyApiKey: '',
       newNoteOpen: false,
       notes,
+      simplifiedEditor: false,
       ...callbacks
     }
   }).body;

@@ -10,8 +10,9 @@ import { RoomTradeAlerts } from './trade-alerts.svelte';
 import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
+import { RoomNotesAccess } from './notes-access.svelte';
 import { RoomEventStream } from './events.svelte';
-import { RoomGates } from './gates.svelte';
+import { RoomGates } from './gates';
 import { RoomLocalCapture } from './local-capture.svelte';
 import { RoomMediaTransport } from './media-transport.svelte';
 import { RoomAlertsPane } from './alerts-pane';
@@ -22,14 +23,19 @@ import { RoomScrollFollow } from './scroll-follow';
 import { RoomWebcams } from './webcams';
 import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
-import { RoomChatMute } from './chat-mute.svelte';
-import { RoomKicks } from './kicks.svelte';
-import { RoomPrivateCommands } from './private-commands.svelte';
+import { RoomChatMute } from './chat-mute';
+import { RoomChatSearch } from './chat-search.svelte';
+import { RoomKicks } from './kicks';
+import { RoomPrivateCommands } from './private-commands';
 import { RoomManagedUsers } from './managed-users.svelte';
-import { RoomSessionControl } from './session-control.svelte';
+import { RoomSessionControl } from './session-control';
 import { RoomUserActions } from './user-actions.svelte';
 import { RoomChat } from './chat.svelte';
+import { RoomDisplayModes } from './display-modes.svelte';
+import { RoomScreenOverlay } from './screen-overlay';
+import { TypingSignal } from './typing-signal';
 import { RoomDialogs } from './dialogs.svelte';
+import { RoomDebugLog } from './debug-log.svelte.js';
 import { RoomLogPages } from './log-pages.svelte';
 import { RoomMedia } from './media.svelte';
 import { RoomMenus } from './menus.svelte';
@@ -82,6 +88,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   // Phase 5 services
   toasts: RoomToasts,
   dialogs: RoomDialogs,
+  debugLog: RoomDebugLog,
   prefs: RoomPrefs,
   roomVolume: RoomVolume,
   broadcasts: RoomBroadcasts,
@@ -91,18 +98,40 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   composer: RoomComposer,
   feeds: RoomFeeds,
   messageActions: RoomMessageActions,
+  notesAccess: RoomNotesAccess,
   screens: RoomScreens,
   mediaTransport: RoomMediaTransport,
   localCapture: RoomLocalCapture,
   recording: RoomRecording,
   roomEvents: RoomEventStream,
   chatMute: RoomChatMute,
+  chatSearch: RoomChatSearch,
   privateCommands: RoomPrivateCommands,
   kicks: RoomKicks,
   managedUsers: RoomManagedUsers,
   sessionControl: RoomSessionControl,
   userActions: RoomUserActions,
   gates: RoomGates,
+  /*
+    Added 2026-08-28 with the typing indicator, and it was the completeness check below that asked
+    for it rather than anybody remembering — which is the whole reason that check exists.
+
+    TWO of them, one per composer, so the map name is the shape of the export rather than a single
+    instance. `typed` and `stop` are both passed as `(value) => typing.main.typed(value)` at their
+    call sites and never bare, which is what this file is guarding against.
+  */
+  'typing.main': TypingSignal,
+  'typing.extra': TypingSignal,
+  /*
+    Added 2026-08-28 with the compact renderer, and again because the completeness check asked rather
+    than because anybody remembered.
+
+    `set` is the one to watch: it is handed to `ModalHost` through `RoomOverlays` as
+    `onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}` — wrapped, never
+    bare — and passing it by reference is exactly what this file exists to refuse.
+  */
+  displayModes: RoomDisplayModes,
+  screenOverlay: RoomScreenOverlay,
   /*
     The Phase 1 classes, added when the completeness check below refused a map that covered only the
     new ones. Every one of these is handed to a component as a prop — `roster` and `menus` go whole

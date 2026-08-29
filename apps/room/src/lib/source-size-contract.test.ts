@@ -329,7 +329,220 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines than the proxied declarations took. Not a saving worth chasing - recorded because a
       ceiling that moves for a reason nobody wrote down is the thing this file exists to prevent.
     */
-    max: 1406,
+    /*
+      1395 -> 1390 on 2026-08-28, and it is worth saying what those five lines were because they are
+      not code. Thirteen SURPLUS BLANK LINES were removed from inside `<script>` — debris left by
+      earlier extractions, in a file that `.prettierignore` deliberately excludes so nothing was
+      collapsing them — and eight went back as the `applyRoomDefaults` call and its note. Whitespace
+      only, and inside the script block, so the pixel-diff reason this file is unformatted does not
+      apply: no text node moved.
+    */
+    /*
+      1390 -> 1387 on 2026-08-28. `hasQaOnAlerts` arrived on the message chrome (+2) and five
+      single-use `$derived` consts went inline in the object that reads them (-5): each was a name
+      whose only reader was one field below it, and each was its own signal inside an object that is
+      already `$derived`, recomputing independently to feed one that recomputes anyway. The two
+      docblocks that explained those five separately are now one, because they were one subject.
+    */
+    /*
+      1387 -> 1375 on 2026-08-28, and this one is an EXTRACTION rather than a trim. The
+      twenty-two-line `messageChrome` object left for `buildMessageChrome` in
+      `room-message-chrome.ts`, beside the type it satisfies. "Which settings does a message read"
+      was never the page's question, and keeping the answer in two files is exactly why six props
+      sat on `RoomMessage` unfed with their values already on the wire: nothing compared the type to
+      the construction. Two stray `$derived` consts feeding that object went with it.
+    */
+    /*
+      1375 -> 1377 for the buffer preference's two lines and their comment. See the `PresentationArea` entry: a live
+      control that could not act is worth one line more than a ceiling.
+    */
+    /*
+      1377 -> 1379 for TWO lines: the sidebar seed's `svelte-ignore` and the blank the formatter puts
+      after it. The seed itself replaced the `$state(false)` that was already there.
+
+      The reason was on the directive line for one run — `// svelte-ignore state_referenced_locally
+      -- a SEED; …` — and eslint refused it: Svelte reads everything after the code as MORE codes, so
+      `svelte/no-unused-svelte-ignore` reported four ignores that warn about nothing. Recorded
+      because it is a trap the next person will hit: that directive takes codes and nothing else.
+
+      The transcription and the seed-versus-lock argument live in
+      `always-show-roster-contract.test.ts` rather than here, which is why the page pays two lines
+      and not a paragraph.
+    */
+    /*
+      1379 -> 1380 for `hideWebcamForRoom` and `blinkingRec` reaching `RoomNavbar` — two values
+      forwarded, one line net after the formatter.
+
+      FOURTH raise of the day on this file, and the pattern is worth naming rather than repeating
+      silently: every one has been a room setting travelling from `data.sessData` to a component,
+      and each costs the page a line whatever the destination does with it. The structural answer
+      already exists and was applied where it paid — `buildMessageChrome` took twenty-two such lines
+      out in one move, and the page fell 1,387 -> 1,375. A second such builder for the navbar would
+      collapse its five `gates.*` settings and these two, and that is the shape to reach for if this
+      number climbs again. Two props do not justify it today.
+    */
+    /*
+      1380 -> 1390, 2026-08-28, and this raise OWES THE NOTE ABOVE AN ANSWER, because that note named
+      the navbar builder as the thing to reach for the next time this number climbed. This is the
+      next time. The builder was measured rather than assumed, and it was not built:
+
+      Seven values would move - five `gates.*` and the two `sessData` reads - and they cross exactly
+      ONE component. `buildMessageChrome` paid because sixteen values crossed THREE, so each was
+      declared, destructured and forwarded three times over; the saving there was structural and it
+      found six unfed props on the way. Here the saving is six lines on this file against changing
+      the prop surface of the largest navbar in the room and re-pointing every read inside it. That
+      is a worse trade than the raise, and pretending otherwise would be an extraction invented to
+      satisfy a number - the exact thing the `PresentationArea` entry refused twice.
+
+      So the debt is RE-STATED WITH A THRESHOLD instead of promised again: the navbar builder is
+      worth doing when a SECOND component needs these values, or when the navbar's settings pass
+      ten. Neither holds today. A promise with no trigger is how a note gets re-broken every time.
+
+      WHAT THE TEN LINES ARE: `<svelte:head>` with the room's own name in it - three lines of
+      markup, four of comment and the blank the formatter puts after - plus `modMessage` reaching
+      `PresentationArea`. `name` and `modMessage` are the twelfth and thirteenth settings answered by
+      building rather than by triage. The transcriptions are NOT here and NOT on the page: they are
+      in `moderator-message-contract.test.ts`, following the roster seed three entries up, which is
+      why the title costs four comment lines instead of a paragraph.
+    */
+    /*
+      1390 -> 1387, 2026-08-28, and this one goes DOWN, which is the direction this file prefers.
+
+      `noteGates` was built on the page from a six-line object literal naming which fields of `data`
+      the notes surface reads. That was never the PAGE's question. `resolveNoteSurfaceGates` now
+      declares `NoteSurfaceSources` structurally and takes `data` itself, so the construction is one
+      line and a third field could be added to the notes surface without the page hearing about it.
+
+      Precedent and argument are `buildMessageChrome`'s, three entries up: which facts a surface
+      depends on belongs beside that surface, and a page that lists them is a page that will be
+      edited every time the list changes. It paid for the `simplifiedEditor` wire outright.
+    */
+    /*
+      1387 -> 1366, 2026-08-28, and TWENTY-ONE lines left in one change without a single one being
+      deleted. `bodySegmentsPrivate` — a fourteen-line snippet splitting a message body on URLs,
+      plus its two props at the `PrivateChatPanel` call site — moved into
+      `CompactMessageRow.svelte`, because a second surface (the all-user private-message modal)
+      renders the same row and the snippet would have had to be threaded through two more components
+      to reach it.
+
+      The pattern is now three for three on this file: every large fall here has been a decision
+      moving to the thing that owns it — `buildMessageChrome`, `resolveNoteSurfaceGates`, and now the
+      row. None was an extraction invented to satisfy a number, and that is why each one stuck.
+    */
+    /*
+      1366 -> 1367, 2026-08-28. ONE line: `rowIsFull={(entry) => rosterRowIsFull(entry, rosterSession)}`
+      at the sidebar call site, beside the four roster gates already resolved there.
+
+      Recorded rather than absorbed, because the standing rule is that every raise is a conversation
+      however small — and because this one has a shape worth naming: the roster's gates are the ONE
+      family on this page that has grown line by line and is still right to. Each is a predicate in
+      `roster-gates.ts` with its own test, resolved once here from `rosterSession` and handed down.
+      Collapsing them into an object would save four lines and lose the property that makes them
+      safe, which is that each is separately named at the point a reviewer reads the call site.
+    */
+    /*
+      1367 -> 1369, 2026-08-28. Two lines: the `tipButtonFor` import and `tip={tipButtonFor(data.sessData)}`
+      at the sidebar call site.
+
+      ONE line for THREE settings, and that is the argument for resolving the conjunction in a module
+      rather than in the markup. Spelled separately this would have been three props here, three
+      declarations on the sidebar and a three-way condition in two places — and the reference itself
+      computes them into one field precisely once.
+    */
+    /*
+      1369 -> 1371, 2026-08-28. Two lines: the `customPlayerUrl` import and the checked prop at the
+      `PresentationArea` call site.
+
+      THE CHECK IS ON THE PAGE and not in the component, which is the shape every other owner URL in
+      this room now has — `tipButtonFor` and `customFaviconHref` are resolved here too. A component
+      that received the raw setting would be a second place the scheme could be forgotten, and this
+      one governs whether the room shows any video at all.
+    */
+    /*
+      1371 -> 1375, 2026-08-28. Four lines: the `positionsIframe` conjunction, the raw URL and the
+      viewer's refresh preference, at the `PresentationArea` call site.
+
+      THE CONJUNCTION IS MADE HERE and the component receives one boolean, which is the same shape
+      `tipButtonFor` takes for its three settings. Two settings that only ever mean anything together
+      should not be two props a call site can get half right.
+    */
+    /*
+      1375 -> 1382, 2026-08-28 — the typing indicator. Seven lines: `typing` on the `createRoom` destructure and three props at each of the two chat
+      call sites. Two columns means two of everything at this level, and that is the feature rather
+      than duplication — each column reads its OWN channel, so a shared prop would put the extra
+      column's typists under the main column's composer.
+    */
+    /*
+      1382 -> 1383, 2026-08-28. ONE line: `messageChrome` reaching `RoomOverlays`, and through it the
+      Q&A thread's entries.
+
+      One line and not five, because the chrome is already built here for the alerts column — that
+      is the whole reason `room-message-chrome.ts` exists, and the alternative was a second
+      construction inside the overlay layer, which is a second answer to which settings a message
+      reads.
+    */
+    /*
+      1383 -> 1385, 2026-08-28. TWO lines: `chatTabs={data.chatTabs}` at each of the two chat call
+      sites.
+
+      Two and not one because there are two columns, and that is the feature rather than duplication
+      — the strip is drawn twice and each column tracks its own open tab. The list itself is the
+      same for both, because an entitlement does not depend on which column a member is looking at.
+    */
+    /*
+      1385 -> 1401, 2026-08-28, for the display mode: the `RoomDisplayModes` instance, the seed call,
+      and two props at each of the three surfaces that render a message.
+
+      SIXTEEN AND NOT FIFTY-TWO because the ratchet refused the first attempt, which had the seeding
+      loop and the preference write inline here. Those went to `#lib/room/display-modes.svelte.ts`,
+      which is the right home for the same reason `room-defaults.ts` is: the seed, the write-back and
+      the member's later change are one rule with three parts, and split between a page loop and a
+      modal callback they were two halves that had to agree about a preference key.
+    */
+    /*
+      RAISED 1401 -> 1426 on 2026-08-28, and this one bought a fixed production defect.
+
+      The `createRoom(...)` call moved ~390 lines down, below the ten bindings its dependency thunks
+      close over, because on the SERVER a `$derived` evaluates immediately — so the composition root
+      read `deps.isPresenter()` while the page's `isPresenter` was still in its temporal dead zone,
+      and **every room render returned 500**. The growth is the paragraph at the call explaining why
+      it sits there, plus the note on `globalChatStyle`, which seeds from a value the root returns.
+
+      Moving the CALL rather than the ten declarations is the point: reordering consts leaves the same
+      shape one edit away from breaking again, where a root constructed after everything it composes
+      cannot have this bug at all. The full account is at the call site and in `app.html`'s sibling
+      finding.
+    */
+    /*
+      1426 -> 1428, 2026-08-29: two lines, `open` and `ontoggle` on `ScreenVolumeControl`, whose
+      dropdown could not be opened at all. See `bootstrap-dropdown-contract.test.ts`.
+    */
+    /*
+      1428 -> 1463, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is the install and its teardown, the effect that opens the modal when an answer arrives, and the two notes that matter most: why the buffer is installed in `onMount` rather than in `createRoom`, and why it is installed BEFORE the stream subscribes.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      RAISED 1463 -> 1470 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    /*
+      RAISED 1470 -> 1472 on 2026-08-29: two props for the navbar's Benzinga item. Assembly only —
+      the argument is on `RoomNavbar.svelte`.
+    */
+    /*
+      RAISED 1472 -> 1474 on 2026-08-29, for `restoreMobileAppTokens` — the Mobile App tab. Argued because the
+      rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
+      `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
+    */
+    max: 1474,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -410,14 +623,38 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       937 -> 955, 2026-08-26 — `sendSalesImageToChat` / `sendUsersToURL`, the two receivers whose senders
       shipped on 2026-08-23. Two dispatch branches, guarded and transcribed.
 
-      Raised on the same grounds recorded at `lib/room/session-control.svelte.ts` in this file: the
+      Raised on the same grounds recorded at `lib/room/session-control.ts` in this file: the
       growth is the captured code and the reason the presenter is EXCLUDED from both frames
       (`isPresenter ||` is a guard, not a truthiness shorthand), which is the single most likely
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
       The CODE backstop is unaffected.
     */
-    max: 956,
-    why: 'the SSE router - six channels of transcription, and the one block that did not route has gone'
+    /*
+      860 -> 892, 2026-08-28 — the typing indicator. The `typing` dispatch branch, the `TypingSink` type and the optional collaborator. It is handled
+      BEFORE the `senderId` guard, and the comment says why: a typing frame has no sender — it is a
+      per-recipient snapshot rather than somebody's message — so the guard that stops a member
+      refetching on their own post would have dropped every one of them.
+    */
+    /*
+      RAISED 892 -> 935 on 2026-08-28, for `alertsOverlayOnScreenshare`, and argued here because the
+      rule at the top of this file says a raise is a conversation and not a number to edit.
+
+      What arrived is a SEVENTH channel this router recognises — `alerts` — a structural
+      `ScreenOverlaySink`, and the paragraph explaining why the branch sits BEFORE the own-sender
+      guard. That last part is the whole value of the diff and is the reason it was not shortened:
+      the presenter posting an alert is usually the presenter sharing the screen, so an author who
+      later "tidies" this branch below the guard would silently stop the overlay drawing the alerts
+      that matter most, with every test still green and nothing to read that says why it was there.
+
+      The alternative on offer was a second router, or an `$effect` on the page watching `data.alerts`
+      — one of which invents a module to satisfy a number and the other of which grows the file this
+      ratchet cares about most. Six channels were already routed here; the seventh belongs with them.
+
+      It goes DOWN if the `privChat` or `cmds` transcriptions ever find a module of their own, which
+      is where the next real extraction in this file is. It does not go up again.
+    */
+    max: 935,
+    why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
     file: 'lib/room/webcams.ts',
@@ -440,7 +677,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       exists - they hold what the alerts ARE and which of them are visible. This holds the
       actions, and reads both.
     */
-    max: 291,
+    /*
+      291 -> 304, 2026-08-27, and the rule above says a raise is a conversation. This is the third
+      exception this file records, after `private-commands.ts` and `RoomOverlays.svelte`.
+
+      WHAT THE THIRTEEN LINES ARE: one import and one getter, `searchScopeNotice`. They close a SILENT
+      CORRECTNESS GAP — the alerts toolbar filters the fifty rows the page holds while its field is
+      ported verbatim from a reference that sends `doChatLogSearch` to a server, so a reader searching
+      for last week got an empty list and no indication the log was never asked.
+
+      WHY IT LANDED HERE rather than anywhere cheaper. It needs two things at once: the search term,
+      which is `RoomAlerts`'s, and the set the toolbar actually filters, which is
+      `feeds.searchableAlerts`. This class is the only one holding both. It was written into
+      `feeds.svelte.ts` first, where the count available was the RAW loaded list — which includes
+      alerts the viewer's own trader filter hides, so the notice would have named a number larger
+      than anything the search could reach. The move fixed a wrong number as well as a ceiling.
+
+      WHY NOT AN EXTRACTION: the rule already IS extracted. `alert-toolbar-search-scope.ts` is the
+      pure decision with the whole account on it, and what remains here is the two values it needs.
+      Extracting a getter that reads two private fields would mean handing both out.
+    */
+    max: 304,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -491,7 +748,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the functions were leaving and their state was not. That difference is what the dependency
       scan makes visible before the code is written rather than after.
     */
-    max: 244,
+    /*
+      244 -> 260, 2026-08-29, for the third per-modal cleanup in `closeActive`.
+
+      The poll's and the Q&A's were already there; the Debug Log's joins them rather than sitting at
+      the call site, because `ModalHost` has ONE `onclose` for every modal it hosts — a per-modal
+      clear written there would have to re-derive which modal was closing, which is the thing this
+      method exists to know.
+
+      A STRUCTURAL type for the dependency (`{ clearReceived(): void }`), like `messageActions` and
+      `userActions` above it, so the modal registry does not learn the name of a feature it knows
+      nothing else about.
+    */
+    max: 260,
     why: 'the overlay state machine - five fields the template reads and this class alone writes'
   },
   {
@@ -527,8 +796,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the DEVICE, not of the wire: it starts and stops on the same events the recorder does and
       writes into the caption list rather than onto a producer.
     */
-    max: 341,
-    why: 'MediaRecorder, the preview window, the room-wide broadcast and the two speech calls'
+    /*
+      341 -> 358 on 2026-08-28, and the seventeen lines are the WHY rather than the work. The change
+      itself is two: a `speechRecognitionAvailable` thunk and one more term in the refusal.
+
+      What the rest records is the defect. `beginSpeechRecognition` has quoted the capture's own
+      message — "disabled by preferences OR SESSION SETTINGS" — in its docblock since the method was
+      written, while gating on the preferences half alone, because the room setting behind the other
+      half was not on `ROOM_VISIBLE_SETTINGS` and this room could not ask. An owner who turned
+      captions off got them anyway, from every presenter, for everybody. A comment that names two
+      sources beside code that reads one is exactly what this repository's standard is for, and the
+      correction is worth more than the number.
+    */
+    /*
+      RAISED 358 -> 406 on 2026-08-28, for `autoRecord` and `dontStopRecOnMicMute`, argued in place.
+
+      Almost all of it is `autoRecord()`, which reads five pieces of live state and calls one of two
+      methods. The DECISION is not here — `#lib/auto-record.ts` holds all four bundle citations, the
+      `talkingUsers.length <= 1` ordering trap and the two divergences a browser-side recorder
+      forces — and that split is the reason this raise is small: the rule that is easy to get wrong
+      is pure and tested, and what is left is the reading of state that only this class can see.
+
+      It goes DOWN if the preview window ever leaves for a module of its own, which is the next real
+      extraction here. It does not go up again.
+    */
+    max: 406,
+    why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
     file: 'lib/room/media-transport.svelte.ts',
@@ -591,7 +884,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       What did NOT change is the public surface. Every accessor the page, `RoomRecording`,
       `RoomEventStream` and eleven contract tests read is still on this class and now delegates.
     */
-    max: 1357,
+    /*
+      1357 -> 1359 on 2026-08-28: the `autoRecord` pass-through and its citation. Two lines, and this
+      class reads neither of them — see the note at the option itself for why it is passed rather
+      than held.
+    */
+    /*
+      RAISED 1359 -> 1365 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 1365,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -626,7 +929,53 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       From here it ratchets down like every other entry.
     */
-    max: 872,
+    /*
+      RAISED 872 -> 925 on 2026-08-28, for `alertsOverlayOnScreenshare`, and argued rather than edited.
+
+      The setting splices a CANVAS between `getDisplayMedia` and the producer, so the change lands in
+      the one method in this repository that cannot be exercised by any test in it: a screen capture
+      needs a human at a picker. That is precisely why the growth here is comment and why none of it
+      was trimmed. Four of the five hunks are a sentence saying what the line below it protects — why
+      `wrapped` is declared outside the `try` (an abandoned overlay keeps a 33ms interval alive
+      forever), why the preview follows the WRAPPED stream (a presenter who cannot see the overlay
+      cannot tell it is on), why `keep` is called after the publish and not before (there is no
+      producer id until then, and nothing for the browser's Stop-sharing bar to end), and why the
+      catch releases the overlay before `stopStream` (the overlay holds the raw tracks, so it is what
+      takes the browser's sharing indicator down).
+
+      THE PAYMENT IS REAL AND IT IS ELSEWHERE. 116 lines of lifecycle went to
+      `lib/room/screen-overlay.ts`, 253 to `lib/alert-overlay-compositor.ts` and 268 to the
+      pure `lib/alert-overlay-layout.ts`, which is the half that carries the tests. Had that gone in
+      here — which is how the reference does it, one 400-line method — this file would be past 1,200
+      and the geometry would be untestable. The ratchet did its job: it forced the split first.
+
+      +16 OF IT IS TWO LEAKS FOUND BY RE-READING THE DIFF, and they are the reason the raise is worth
+      it rather than a cost of it. A publish that failed after the wrap succeeded left a 33ms interval
+      drawing for the rest of the page's life, because nothing would ever call `stopLocalScreen` for
+      a share that was never published; and a reconnect re-publishing under a new producer id left
+      the overlay keyed by one the SFU had closed, so the eventual stop released nothing and the
+      browser kept saying the screen was still being shared. Neither is reachable from any test here
+      — a failed produce and a reconnect both need a real SFU — so what stands in their place is the
+      paragraph at each site saying what it protects.
+
+      RAISED AGAIN, 925 -> 957 on 2026-08-28, for `autoRecord`, and the shape of that raise is the
+      argument for it: THIS CLASS DECIDES NOTHING. It reports three moments — a microphone opened, a
+      microphone closed, a screen shared — and `RoomRecording` applies `#lib/auto-record.ts` to them.
+      Twenty-four of the thirty-two lines are the paragraph at the `micClosed` call site explaining
+      why it is raised BEFORE `stopTalking` and not after: upstream's `talkingUsers.length <= 1`
+      counts the muting user, and this room removes them synchronously, so the two orders differ by
+      one and the wrong one stops a recording while somebody else is still speaking. That is exactly
+      the class of subtlety this repository's standard says never to shorten.
+
+      It goes DOWN if `startScreenSharing`'s constraint transcription ever moves to the media module
+      that owns constraints. It does not go up again.
+    */
+    /*
+      RAISED 957 -> 960 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 960,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -669,8 +1018,214 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       One line, and it is the whole point of the raise — the five checkboxes now have a way out of
       `ModalHost`, which they did not before.
     */
-    max: 770,
+    /*
+      770 -> 777, 2026-08-27, and the rule directly above says a raise is a conversation. This is that
+      conversation, argued rather than quietly applied — and it is the second exception this file has
+      recorded, after `private-commands.ts`.
+
+      WHAT THE SEVEN LINES ARE. One import, one `closedMessage` taken off `data`, one callback, and a
+      two-line note saying why neither is a new prop. That is the whole cost of wiring the close
+      message — a feature that had storage, a command and a reader built for it the same day, and
+      whose two buttons had been claiming to save something for as long as they had existed.
+
+      WHY NOT AN EXTRACTION. There is nothing here to extract: seven lines of wiring in a composition
+      root is the root doing its job. The extraction that this change DID make went the other way and
+      is the reason the raise is defensible — `CloseSessionPane.svelte` took 56 lines out of
+      `ModalHost.svelte`, whose ceiling drops from 6022 to 6006 in the same commit. **The pair is 49
+      lines smaller.**
+
+      The alternative was contorting a props list to dodge a number, which this file's own opening
+      calls the tail wagging the dog.
+    */
+    /*
+      777 -> 778 for ONE line: `stickyNonTradeAlert` reaching `ModalHost` and the alert composer
+      behind it. This component already holds `data`, so the value is read here rather than crossing
+      the page — which is why the page paid nothing for this one.
+    */
+    /*
+      778 -> 786, 2026-08-28, for `enablePrivateMessageHistory`: the entitlement, the open-and-load
+      handler, and the three fields the all-user private-message modal renders.
+
+      HERE and not on the page, which is why the page paid nothing: this file already holds `data`,
+      `modals` and `privateChat`, so the handler is the two calls it actually is rather than a
+      callback threaded down from a component that would have to be handed all three. That is the
+      same reason `stickyNonTradeAlert` and `autoSwitchToOfftopics` cost the page nothing.
+
+      Three fields rather than one object because they are three ANSWERS, not three parts of one:
+      see the note at `RoomPrivateChat.#peerHistory` for why collapsing them shows a moderator the
+      previous member's messages under a spinner labelled with the new one.
+    */
+    /*
+      786 -> 796, 2026-08-28, for the room's own favicon and stylesheet: the import, the call site
+      and the eight-line citation above it.
+
+      HERE and not on the page for the reason this entry already gives twice over — this component
+      holds `data`. The alternative was three lines on `+page.svelte` plus a `<svelte:head>` block,
+      and the page is the file this repository keeps shrinking.
+
+      Ten lines is more than the two the tip button cost, and the difference is the citation: a
+      setting that puts OWNER-AUTHORED CODE in every member's browser gets its reasoning at the call
+      site as well as in its module, because this is the file somebody reads while wondering what
+      the room does to a member's page.
+    */
+    /*
+      796 -> 809, 2026-08-28, for the Q&A thread's menu: `messageChrome` arriving as a prop with its
+      docblock, and the `onQaAction` line that forwards a thread entry's action to the dispatcher
+      that owns it.
+
+      THE PROP IS PASSED THROUGH RATHER THAN BUILT, which is the whole argument for the raise. The
+      page already derives one `RoomMessageChrome` and the alerts column already receives it;
+      building a second here would be a second answer to which settings a message reads, and
+      `room-message-chrome.ts` exists because that question had four answers once.
+
+      What this component paid for was NOT paid by the page — `+page.svelte` is one line wider and
+      sits exactly on its ceiling. It was paid by `ModalHost.svelte`, which drops 164 lines in the
+      same commit: the Q&A modal it used to hold is `AlertQaModal.svelte` now, and that extraction is
+      what made room for the feature in the first place.
+    */
+    /*
+      809 -> 820, 2026-08-28. Eleven lines: the two display modes and the change callback arriving as
+      props with their docblock, and passed straight through to `ModalHost`.
+
+      A PASS-THROUGH, which is what this layer is for — the modal holds the Text Mode radios and the
+      Q&A thread, and neither the mode nor the setter belongs to it.
+    */
+    /*
+      820 -> 821 on 2026-08-28: one line, `schedulerAvailable={data.sessData?.hasAlertScheduler === true}`,
+      which is the composition root doing exactly what this file is for — resolving a room setting
+      once and handing it down. `=== true` is the fail-closed read every optional control-plane field
+      takes here.
+    */
+    /*
+      823 -> 834, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one prop, passed as the CLASS rather than its value because both ends are read — the markup forwards the received log and the page opens the modal on arrival.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      834 -> 835, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      One line, forwarding the upload to `RoomUserActions`.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      835 -> 836, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One line, forwarding the remove.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    /*
+      RAISED 836 -> 848 on 2026-08-29, for `restoreMobileAppTokens` — the Mobile App tab. Argued because the
+      rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
+      `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
+    */
+    max: 848,
+    /*
+      821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
+      one-line note saying only the class that asked the controller can know it.
+    */
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
+  },
+  {
+    file: 'lib/components/MessageMenu.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      It is the kebab on a message: the trigger, the dropdown, its twelve entries and the popper
+      placement that puts it on screen. 214 of these lines came out of `RoomMessage.svelte` in the
+      same commit, so the pair is smaller than the one file was.
+
+      Two things to check if this number climbs. Has it started DECIDING which entries to show? It
+      must not — it is handed twelve resolved booleans and `messageMenuAllows` owns the mapping. And
+      has a renderer-specific concern leaked in? The compact and regular renderers differ only in
+      `direction`, and a second such prop is the signal that the wrong thing is being shared.
+    */
+    /*
+      271 -> 293, 2026-08-28, in the commit that created it: the three captured trigger classes
+      became a pinned lookup rather than one composed string.
+
+      `msgMenu dropright pt-1`, `msgMenu dropleft float-right align-baseline` and
+      `msgMenu dropright float-left align-baseline` are not variations on a theme — the compact pair
+      mirrors and the regular one does neither — so composing them would have invented a pattern the
+      reference does not have. Twenty-two lines buys three exact strings a call site cannot add to.
+    */
+    max: 293,
+    why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
+  },
+  {
+    file: 'lib/components/ChatSearchBar.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The search bar under a chat column's header — `chatToolbar` and the `form#chat-settings`
+      inside it, transcribed from the const table at bundle byte 1,449,203.
+
+      IT WENT IN TWICE FIRST, once per pane, and this contract refused the second copy. That was the
+      right call and the reason is worth the line: the extra column's const table at 2,395,378 is
+      byte-identical to the main column's, so two hand-maintained transcriptions of one table is how
+      one of them loses an attribute with nothing to notice. The dangling
+      `aria-describedby="addon-search"` is the capture's own and now exists in exactly one place.
+    */
+    max: 89,
+    why: 'the chat columns search bar, transcribed once and rendered by both panes'
+  },
+  {
+    file: 'lib/components/ChatTabStrip.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      It is the channel strip above a chat column — nine lines of the capture's own markup and a
+      loop. It was those nine lines written out TWICE, once per column, with the two channels spelled
+      as two `<li>` blocks apiece; that was defensible while every room had exactly those two.
+      `chatTabsWithBadges` ended it: an owner configures extra channels behind badges and the SERVER
+      decides which of them a member gets, so both strips loop, and two loops over one list is one
+      too many.
+
+      If this number climbs, the thing to check is whether it has started DECIDING which tabs to
+      draw. It must not: it renders the list it is handed, and that list is an entitlement resolved
+      in `memberChatChannels`.
+    */
+    max: 56,
+    why: 'the chat channel strip - the captured markup, once, over a list the server decided'
+  },
+  {
+    file: 'lib/components/AlertQaModal.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is the rule this list learned the hard way.
+
+      It is `app-alert-qa-modal` — the Q&A thread on one alert — taken out of `ModalHost.svelte` on
+      2026-08-28 because that file's ceiling refused the raise the thread's new menu needed. 166
+      lines left the host and 348 arrived here, and the difference is the two docblocks the
+      extraction made it possible to write: what a thread ENTRY is (an alert that knows it is inside
+      this modal, which is the reference's own `isQAMsg = !0, logType = "alerts"`), and which two of
+      its menu actions this component keeps rather than forwarding.
+
+      If this number climbs, the thing to check is whether it has started DECIDING anything. It must
+      not: every authority question a thread entry raises — who may delete one, whether the room
+      allows a reaction — is answered on the server, and the two menu actions handled here are the
+      composer insert and its own open row. Both are this component's state and nothing else's.
+    */
+    /*
+      348 -> 359, 2026-08-28. Eleven lines: the `displayMode` prop and the docblock saying why the
+      thread renders in the ALERTS mode rather than one of its own — upstream's Q&A modal calls
+      `loadAlertsMode()`, the same function the alerts log calls.
+    */
+    max: 359,
+    why: 'app-alert-qa-modal - the Q&A thread on one alert, its composer and its own open menu row'
   },
   {
     file: 'lib/components/RemoteAudioSinks.svelte',
@@ -685,6 +1240,82 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 55,
     why: 'the hidden <audio> sink per remote peer - six lines of markup, the rest is why'
+  },
+  {
+    file: 'lib/components/notes/NoteEditor.svelte',
+    /*
+      CAPPED 2026-08-28, having been UNCAPPED at 1,546 lines — the second-largest Svelte file in the
+      repository after the page itself, and the exact failure `PresentationArea` below records in
+      its own entry: components are a hand-kept list, and a hand-kept list is how a file this size
+      goes a whole phase with nothing objecting. Found by touching it for a one-boolean wire.
+
+      Set at what it measures TODAY rather than at something aspirational, which is what that entry
+      argues for: the number's job is to stop the next 200 lines, not to pass judgement on the
+      existing 1,546. Most of the file is the toolbar — a dozen button groups, each transcribed
+      against captured markup — and the obvious extraction is the toolbar itself, which would take
+      this well under half. That is a real change with a real safety net (`note-editor-render`,
+      `note-version-history` and `simplified-note-editor-contract` all render it) and it is not
+      bundled with a settings wire.
+
+      If this number climbs, the thing to check is whether the editor has started DECIDING something.
+      It should not: `simplifiedEditor` arrives already resolved, and `resolveNoteSurfaceGates` is
+      where that kind of question is answered.
+    */
+    max: 1546,
+    why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
+  },
+  {
+    file: 'lib/components/notes/NotesPane.svelte',
+    /*
+      CAPPED 2026-08-28 alongside `NoteEditor` above, and for the same reason: it was uncapped.
+
+      It owns the tab strip, the rename and delete dialogs, and the version-restore confirmation —
+      the note actions that are NOT authoring. Everything it hands the editor it passes through
+      untouched, `simplifiedEditor` included. If this number climbs, the thing to check is whether a
+      prop has started being transformed on the way through rather than forwarded.
+    */
+    max: 447,
+    why: 'the note tab strip and the three confirmations; everything else passes through'
+  },
+  {
+    file: 'lib/components/PrivateChatPanel.svelte',
+    /*
+      CAPPED 2026-08-28, having been uncapped — the third component found without a ceiling in two
+      days, after `NoteEditor` and `NotesPane`. The hand-kept list is the problem and this entry does
+      not fix it; what it does is stop this file.
+
+      396 and FALLING: it was 425 before the row inside its scroller became
+      `CompactMessageRow.svelte`. The number below is the post-extraction measurement deliberately,
+      so the ceiling starts where the file actually is rather than licensing the twenty-nine lines
+      back.
+
+      If this number climbs, the thing to check is whether the panel has started deciding something.
+      It holds no state of its own beyond the drag/resize attachment: the thread, the tabs, the
+      search and the draft all belong to `RoomPrivateChat`.
+    */
+    max: 396,
+    why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
+  },
+  {
+    file: 'lib/components/RoomSidebar.svelte',
+    /*
+      CAPPED 2026-08-28, having been uncapped — the FOURTH component found without a ceiling in two
+      days, after `NoteEditor`, `NotesPane` and `PrivateChatPanel`. Four in two days is not four
+      oversights; it is the hand-kept list failing as a mechanism, and it is recorded here so that
+      the next person reads a pattern rather than a coincidence.
+
+      **The structural fix is known and is not this commit**: `lib/room/*.svelte.ts` modules are
+      discovered and capped automatically by gate 0b, and components are not. Extending that
+      discovery to `lib/components/**` would end this class of miss permanently, and would arrive
+      with a list of every remaining uncapped component rather than one more entry typed by hand.
+
+      778 lines: the roster, its search, the app-info block, the connectivity rows, Benzinga and now
+      the tip button. Every gate it draws arrives already decided — `rowVisible`, `rowIsFull`,
+      `benzingaVisible`, `tip` — and if this number climbs the thing to check is whether one of them
+      has started being computed here instead.
+    */
+    max: 778,
+    why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
     file: 'lib/components/RoomShell.svelte',
@@ -747,8 +1378,137 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       alternative on offer was an extraction invented to satisfy a number, which is the thing
       this file exists to prevent.
     */
-    max: 1115,
+    /*
+      1115 -> 1123, 2026-08-28. The rule above says a raise is a conversation; this is the fourth and
+      last exception this file records, and unlike the other three it names its own undoing.
+
+      WHAT THE EIGHT LINES ARE: the `hideNotes` prop, and the two `hidden` bindings the reference
+      applies — one on the notes `li` (bundle byte 2016630) and one on the notes pane (2017506) —
+      with the citation for each. `hideFiles` and `hideStreams` have carried exactly this shape here
+      since the component was written; `hideNotes` was the third of that trio and had no gate at all,
+      so an owner who ticked "Hide Notes Section?" got a room that still showed the tab.
+
+      THE PAIR IS SMALLER. `routes/+page.svelte` drops 1406 -> 1395 in the same commit, because
+      `hideStreams` moved out of it and into `RoomGates` to sit beside the `notesHidden` this change
+      added. Two tab-hiding gates in two places was the thing worth fixing.
+
+      THE FOLLOW-UP THIS RAISE IS BORROWING AGAINST, named so it is a debt and not a shrug: the
+      `<ul id="mainTabs">` strip is 275 lines of this file and is already covered end to end by
+      `main-tab-strip-contract.test.ts` — a contract test named after a component that does not exist
+      yet. Extracting `MainTabStrip.svelte` is a focused change with a safety net already in place,
+      and it takes this ceiling far below where it started. It was not bundled here because a
+      275-line extraction riding along with a settings fix is two changes wearing one diff.
+    */
+    /*
+      1123 -> 867 on 2026-08-28. THE DEBT ABOVE IS PAID, and by the change it named: `ul#mainTabs`
+      is `MainTabStrip.svelte` now — 282 lines out, one call site and its citation back in.
+
+      `main-tab-strip-contract.test.ts` renders the PARENT, so the safety net that was already in
+      place went on proving the strip end to end across the move without being touched. That is what
+      made a 282-line extraction a small change rather than a leap: the thing that could break was
+      already asserted before the first line moved.
+
+      What is left here is what the header always claimed the file was — the WIRING between a tab
+      strip and seven panes. If this number climbs again the question is whether a pane has started
+      deciding something rather than rendering it.
+    */
+    /*
+      867 -> 874 the same day, and it is worth six lines: `bufferSizeLevel` and `onBufferSizeChange`
+      now reach `StreamingView`, which has drawn a Buffer dropdown since it was written and could
+      never change anything — the prop was never passed, so every click called `undefined?.()`.
+    */
+    /*
+      874 -> 880 on 2026-08-28 for the moderator bar: an import, a documented prop, its destructure,
+      a one-line citation and the call site. Six lines, and four of them are the cost of a child
+      component existing at all rather than anything this file decides.
+
+      The bar is HERE and not on the page because the capture puts it here - `$4e` renders inside
+      this split area, before `app-presentationarea` - and because `isPresenter` is already a prop
+      here, so the gate's second term costs nothing to reach. The markup, the five consts, the byte
+      offsets and the argument for not persisting its dismissal are all in `ModeratorMessage.svelte`
+      and its contract file, which is why six lines land here and not twenty.
+    */
+    /*
+      880 -> 883, 2026-08-28, and THE PAIR IS NET ZERO: `routes/+page.svelte` falls 1390 -> 1387 in
+      the same commit, so the three lines moved rather than appeared.
+
+      Two of them are `simplifiedEditor` reaching `NotesPane`. The third replaced this file's inline
+      `{ surfaceVisible: boolean; editorMounted: boolean }` with the imported `NoteSurfaceGates` —
+      the same shape was written out in two files, and the second copy had already fallen a field
+      behind before anybody noticed. A type is a contract; a restatement of one is a second contract
+      that agrees today.
+    */
+    /*
+      883 -> 910, 2026-08-28, for `customPlayerURL`: a documented prop, its destructure, the eight
+      captured iframe attributes and their wrapper, and an eight-line citation.
+
+      TWENTY-SEVEN LINES FOR ONE SETTING is the most any single setting has cost this file, and the
+      reason is what it replaces: slot 39 upstream is the ENTIRE rest of this pane, including the
+      save-data switch. So the comment has to say that the gate belongs ABOVE `videoDisabled` rather
+      than inside it — which is exactly the mutation a negative control turned red, and exactly what
+      a future reader would otherwise "tidy" by nesting it with its neighbour.
+    */
+    /*
+      910 -> 958, 2026-08-28, for the positions panel: three props, the local toggle and the panel
+      reference, two call sites and their two citations.
+
+      NODE 3 AND NODE 5, and the split is why this is forty-eight lines rather than fifteen. Upstream
+      puts the container BETWEEN the moderator bar and `app-presentationarea`, and the buttons AFTER
+      it — so the two halves of one feature sit at opposite ends of this file, and each end needs the
+      citation that says the other exists. The alternative was one component holding both, which
+      would have had to render into two places.
+
+      The markup itself is `PositionsContainer` and `PositionsControls`; what lives here is the
+      wiring and the local `showPositions`, which is local because upstream's `globals.showPositions`
+      has exactly three readers and all three are in this column.
+    */
+    /*
+      958 -> 959, 2026-08-29: one line, `{menus}` forwarded to `StreamingView` so its buffer-size
+      dropdown can open at all. See `bootstrap-dropdown-contract.test.ts`.
+    */
+    max: 959,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
+  },
+  {
+    file: 'lib/components/ModeratorMessage.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, for the reason `WebcamStrip` and `MainTabStrip`
+      both give: components are a hand-kept list here, and a new one that ships without a number is
+      exactly how `PresentationArea` went uncapped for a whole phase.
+
+      74 lines, of which the markup and the props are TWELVE. The rest is the transcription - the
+      template function, its five resolved consts, the gate expression with its byte offset, and the
+      two paragraphs that will stop the next reader from "improving" the dismissal into a saved
+      preference. That ratio is correct for this file and is not slack to grow into: the component
+      renders one bar, reads two props and writes one boolean.
+
+      If this number climbs, the thing to check is whether the bar has started deciding WHO sees it.
+      It must not: the gate is a conjunction of a value and a ROLE, both handed to it already
+      decided, and a member seeing a moderator's private note is the failure this file exists to
+      prevent.
+    */
+    max: 74,
+    why: 'the presenter-only moderator bar - twelve lines of component, the rest is the citation'
+  },
+  {
+    file: 'lib/components/MainTabStrip.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, like `WebcamStrip` below and for the reason its
+      entry gives: a new component that ships without a number here is how `PresentationArea` went
+      uncapped for a whole phase.
+
+      372 lines by this file's count, and roughly a quarter of that is comment: the strip is eight `<li>` elements and
+      every one carries the byte offset of the gate it reproduces. The single most important thing
+      in the file is the distinction between `{#if}` for an ENTITLEMENT and `hidden` for a MODE or a
+      room SETTING — swapping them is invisible to every source-text instrument here and leaks what
+      a room has paid for, which is why `main-tab-strip-contract.test.ts` renders rather than greps.
+
+      If this number climbs, the thing to check is whether the strip has started DECIDING something.
+      Every gate it draws arrives already decided; it writes exactly one value, `mainTab`, and that
+      is what a tab strip is.
+    */
+    max: 372,
+    why: 'ul#mainTabs - eight tabs, two dropdowns, and a byte citation on every gate'
   },
   {
     file: 'lib/components/WebcamStrip.svelte',
@@ -834,12 +1594,203 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reader cannot see would only have moved the silent wrong answer from fifty rows to five
       hundred. The `alerts` prop it replaced was DELETED, which paid eight of the forty-one back.
     */
-    max: 6022,
+    /*
+      6006 -> 6010 for the `stickyNonTradeAlert` pass-through: a typed prop, its docblock, its
+      default in the destructuring, and one line at the call site. Four lines to carry one boolean
+      through a component that exists to carry things through, which is what this file's own note
+      calls the cost of `ModalHost` being 85 props wide.
+    */
+    /*
+      6010 -> 6101, 2026-08-28, and this is the largest single raise this file has taken. It is a
+      FEATURE arriving, not a wire, and the size is the honest measure of a triage row that was
+      wrong.
+
+      `enablePrivateMessageHistory` was filed in `missing-settings-triage.md` as WIRE — "one row in
+      the user-info modal". It is not. The button is one row; what it opens was a permanent
+      `Loading...` spinner with no fetch behind it, no list, no empty state and nothing that could
+      ever open it. Reading the reference end to end is what found that: `showPrivateMessages()`
+      emits `doUserPMModal`, a separate component subscribes and calls `getAllUserPM`, and NONE of
+      that half existed here.
+
+      WHAT THE NINETY-ONE LINES ARE: the gated button (13, most of it the citation), the modal body
+      as the reference's own two-way switch plus the two branches it does NOT have — a refusal, and
+      a notice when the answer was capped — and the six props carrying the answer in. The ROW is not
+      among them: `CompactMessageRow.svelte` is shared with `PrivateChatPanel`, which is what stopped
+      this from being a second copy of a transcription.
+
+      The extraction this file needs has not changed and is not this: it is the user-info modal
+      itself, which is the largest single surface in here and now has one more reason to leave.
+    */
+    /*
+      6101 -> 6126, 2026-08-28, and all but two of the twenty-five lines are the citation for a
+      two-word fix.
+
+      The `Trial` and `New` badges in the user-info modal were `{#if targetUser.isTrial}` and
+      `{#if targetUser.isNew}` — ONE term between them, where the capture has `isPresenter &&` on
+      both (byte 2,060,925). A member opening another member's info card could read their billing
+      status. The fix is `isPresenter &&` twice; the comment is long because it also has to record
+      why the THIRD term, `isNewIndicatorOn`, is deliberately absent — `isNew` has no supply
+      anywhere, and a gate with nothing to gate is not a consumer.
+
+      That is the standard this file exists to protect. A two-word fix with no recorded WHY is the
+      one that gets "simplified" back into the bug.
+    */
+    /*
+      6126 -> 5960, 2026-08-28, and it is a DROP of 166 — the largest this file has taken, and the
+      first one this ceiling caused rather than recorded.
+
+      The Q&A thread grew a menu that acts, which is what `enableQAReactions` needed underneath it,
+      and the raise was refused. So the thread left: `AlertQaModal.svelte` holds the modal, its three
+      pieces of state, its two derived timestamps and the three functions that were only ever its
+      own. Nothing else in here read any of them.
+
+      That is what this ratchet is for, stated as an outcome rather than as a rule: the answer to a
+      file outgrowing its ceiling is to take a self-contained piece out of it. The next candidate has
+      not changed and is named two entries up — the user-info modal.
+    */
+    /*
+      5960 -> 5976, 2026-08-28, and sixteen of the lines are a comment on a DELETION.
+
+      The two Text Mode radio pairs were dead: local `$state` seeded from a constant, writing
+      `alertDisplayMode` / `chatDisplayMode` with `'regular'` / `'compact'` — three invented names
+      against the reference's own keys and values — and nothing read any of them. The code shrank
+      (eight lines of handler became four one-liners); what grew is the paragraph recording the third
+      control of that exact shape found in this room, so the next reader does not have to rediscover
+      why the keys are on `dead-preference-keys.ts`.
+    */
+    /*
+      5976 -> 5980 on 2026-08-28: the `schedulerAvailable` prop, its default, its one-line docblock
+      and the forward to the composer. A pass-through and nothing more — this file reads the value
+      nowhere. Recorded rather than absorbed, because this is the largest component in the repository
+      and the rule that its ceiling only moves with a reason written down is what has taken it from
+      6,021 to here.
+    */
+    /*
+      5995 -> 6006, 2026-08-29, for the two gravatar avatars in the muted-users and followed-users
+      lists, which had no box and now have one.
+
+      Ten lines: `width`/`height` on each of two images, a five-line note on the first, and a
+      one-line cross-reference on the second - written as a cross-reference precisely because this
+      file's ceiling makes a second copy of the same paragraph cost something.
+
+      The number is small and the reason it is recorded anyway is that the WHY does not live here:
+      `?s=30` is gravatar's own size parameter, so the box is read off the URL rather than chosen,
+      and the full argument - including which images in this repository cannot be dimensioned and
+      why - sits in `img-dimensions-contract.test.ts`, which enforces it. That file is the
+      extraction that paid for this raise; without it these ten lines would have been ten lines of
+      prose in the largest component in the repository.
+    */
+    /*
+      6006 -> 6028, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one prop with its docblock, a title that names whose log is being read, and the note recording that `.debug-area` had two CSS rules and no wearer until now.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      6028 -> 6118, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is the hidden picker, its prop, and TWO paragraphs that are the larger half: why this control takes its own prop rather than widening `onUserAction`, and why `accept` is assembled rather than written - a literal `image/` wildcard in this template opened a comment window that deleted 120,987 characters of markup from the whole-file stripper fifty-five test files use; plus the two `svelte-autofixer` suggestions declined at the code, with the ruling each was declined against.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      6118 -> 6151, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One button, one prop, and the paragraph recording what was NOT read: the const table gives the button's class list verbatim and its binding position, and the handler its click reaches lives in a render function this pass did not locate — so the behaviour is inferred and says so.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    /*
+      6151 -> 6215, 2026-08-29, for the 125px downscale and the alerts — a CORRECTION, not a feature.
+
+      Here it is the canvas step and the paragraph on why it fails OPEN: four escape hatches, each handing the ORIGINAL file up, because a resize that refused the upload would replace the server's specific message with a vaguer one.
+
+      `upload-profile-picture` shipped earlier the same day without either, because
+      `docs/decoded/missing-commands-triage.md:93` — *"canvas-downscales the image to a 125px longest
+      edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
+      the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
+    */
+    /*
+      6215 -> 6275, 2026-08-29, for the troubleshooter's Mobile App TAB — and the PANE is not in this
+      number, which is the point of the raise being this small.
+
+      The pane went in here first and this contract refused it. The extraction to
+      `MobileRestorePane.svelte` bought more than a line count, and that is why it was the right
+      answer rather than a concession: the result message is now the PANE's state, so a tab change
+      unmounts it and "leaving the tab drops the last result" is structural instead of a line in
+      `onConnectivityTabChange` that a later reader deletes as redundant.
+
+      What is left here is the tab button (consts 9/10/11, with the one `fa-mobile-alt` in the whole
+      bundle), the `{:else if}` that mounts the pane, and two props. Most of the sixty lines are the
+      note on `mobileAppAvailable`: upstream renders this tab with NO gate — the anomaly
+      `mobile-app-decoded.md` §3 row 26 records, verified by reading the whole troubleshooter
+      component rather than by pattern — and gating it here is a deliberate decision, because a room
+      with no app would otherwise show a tab whose only button answers 409 every time.
+    */
+    max: 6275,
+    /*
+      5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
+      upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
+      gate exists here: `fTe`, the member's own notes with a delete per row, needs a member column
+      that `notes` does not have.
+
+      Not extracted, and the reason is honest rather than an excuse: pulling a four-line `{#if}` into
+      a component to dodge fifteen lines would add an indirection nobody asked for while leaving
+      5,980 lines behind it.
+    */
     why: 'every modal in the room, in one component'
   },
   {
     file: 'routes/+page.server.ts',
-    max: 1584,
+    /*
+      1584 -> 1589, 2026-08-28. Five lines: `chatSoundForEmailHashes` on the returned object and the
+      four-line docblock saying why it is hashes and never addresses.
+
+      A LOAD KEY IS THE RIGHT PLACE FOR THAT SENTENCE. This file is the list of everything the room
+      is handed, and the one thing a reader should learn about this entry is that the setting behind
+      it — a list of member email ADDRESSES — deliberately does not cross at all. Four lines here
+      buy that; a reader who has to follow two files to find out is a reader who will not.
+    */
+    /*
+      1589 -> 1601, 2026-08-28. Eleven lines, and ten of them are a comment on one array.
+
+      `loadQuestionsForAlerts` used to be handed `alertRows` alone. `askQuestion` accepts a NEGATIVE
+      alert id — it resolves the captured fixture and writes a real question row, deliberately, with
+      its own comment saying so — so a captured alert can have questions and none of them were ever
+      in that list. A member asked, was told nothing, and watched the thread go on saying "There are
+      no questions."
+
+      The fix is two spread elements. The paragraph beside them is what stops the fixture half being
+      dropped again by somebody tidying a list that looks redundant, which is exactly how it was
+      absent in the first place.
+    */
+    /*
+      1601 -> 1617, 2026-08-28, for `chatTabsWithBadges`: the per-member channel resolution and the
+      `chatTabs` key that carries its answer to the browser.
+
+      SIXTEEN LINES, and the paragraph is most of them because the thing it prevents is silent. The
+      channel list used to be a constant, and reading a constant here would have put a badge
+      channel's messages into every member's page payload with the client filtering them out for
+      display — which is not a filter. That sentence has to sit at the read, because the read is what
+      somebody would "simplify" back.
+
+      The `chatTabs` key's own docblock was trimmed to one line in the same pass, deliberately: it
+      was restating `#lib/chat-tabs.ts`, and two places recording one fact is how one of them goes
+      stale. What stayed is what is true HERE and nowhere else.
+    */
+    max: 1617,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
@@ -889,8 +1840,45 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'which rows in a wholesale-replaced list are new; a plain .ts on purpose'
   },
   {
+    file: 'lib/room/chat-search.svelte.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE.
+
+      `doChatLogSearch`'s two boxes. It arrived inside `RoomChat` and took that file from 260 to 397,
+      which is what asked for this extraction rather than a raise — and the split is real rather than
+      cosmetic: `RoomChat` is about which channel each column shows and what is typed in each
+      composer, and a search box is a third thing with its own rule about when it ends.
+
+      Most of the file is that rule and the two divergences it carries — `showChatToolbarExtended` is
+      not held because the controls it would gate are not built, and closing the bar ENDS the search
+      where upstream leaves a hidden bar filtering the log with nothing on screen saying so.
+    */
+    max: 124,
+    why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
+  },
+  {
     file: 'lib/room/chat.svelte.ts',
-    max: 179,
+    /*
+      179 -> 194 on 2026-08-28 for the off-topic SEED, and fourteen of the fifteen lines are why.
+
+      The executable change is one statement in the constructor. What the rest records is that this
+      is a SEED and not a lock — a VALUE rather than a thunk, read once exactly as `ngOnInit` reads
+      it once, because a derivation would re-switch the member's column on every invalidate — and
+      that the extra column's identical clause upstream is a no-op in both applications, since that
+      column already defaults to off-topic. Without the second half somebody wires it twice.
+    */
+    /*
+      194 -> 260, 2026-08-28 — the typing indicator. Two typist lists, two `amITyping` flags, `typingUpdated` and the two announce helpers. PER
+      COLUMN, which is why there are two of each: the frame carries the channel it belongs to and
+      the two columns can show different ones. Routing by channel rather than by column is what
+      makes a frame land in BOTH when they happen to show the same one, without needing a rule.
+    */
+    /*
+      RAISED 260 -> 283 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 283,
     why: 'the two chat columns and the mention routing that reads three of their fields at once'
   },
   {
@@ -935,13 +1923,77 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/menus.svelte.ts',
-    max: 187,
-    why: 'the eleven floating menus and the two closers that deliberately differ'
+    /*
+      187 -> 219, 2026-08-29, for the two dropdowns that could not be opened.
+
+      `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
+      JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
+      volume menu or the streaming view's buffer menu. Seventeen other dropdowns had already been
+      hand-driven from `RoomMenus`; these two were the two that were missed, and one of them hid
+      three `setBufferSize` handlers that a repair the day before had made callable without
+      noticing nothing could reach them.
+
+      Here it is two flags, their getters, two `set` branches and two lines in each closer — the closers being exactly why these live on this class rather than as private `$state` in two components.
+
+      The prose that would otherwise have landed here was moved into
+      `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
+      nineteenth dropdown arrives without a way to open it.
+    */
+    max: 219,
+    why: 'the thirteen floating menus and the two closers that deliberately differ'
+  },
+  {
+    file: 'lib/room/derived-return-probe.svelte.ts',
+    max: 30,
+    why: 'a PROBE: what a caller gets when a $derived is returned by value, by getter and by thunk'
+  },
+  {
+    file: 'lib/room/notes-access.svelte.ts',
+    max: 141,
+    why: "the notes-password door — upstream's `allowToManageNotes` and the two-call check that sets it"
   },
   {
     file: 'lib/room/polls.svelte.ts',
     max: 119,
     why: "the poll modal's four fields; the first of the room state classes"
+  },
+  {
+    file: 'lib/room/stream-buffer.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE.
+
+      Sixty-nine lines for a clamp, a default and three names, and the ratio is the point: the
+      executable part is six lines and the rest is why the clamp is stricter than the reference's own
+      `|| 3`. The value reaches hls.js as a buffer length out of a JSON blob a member's row carries,
+      so `"2"` and `7` are refused rather than coerced — a divergence, and one that is asserted in
+      `stream-buffer.test.ts` so it cannot be quietly removed.
+
+      If this number climbs, the question is whether hls.js CONFIGURATION has started arriving here.
+      It should not: this module answers what level and what it is called, and `StreamingView` owns
+      what a level does to a player.
+    */
+    max: 70,
+    why: 'the three buffer levels, their names, and the clamp that is stricter than upstream'
+  },
+  {
+    file: 'lib/room/room-defaults.ts',
+    /*
+      Created 2026-08-28 and capped in the same commit, at the size it landed.
+
+      191 lines for three rules, one decision function and one loop — and the ratio is the point
+      rather than an embarrassment. The executable part is under thirty lines; the rest is the
+      transcription of the three clauses it reproduces, the argument for why a latch cannot be a
+      derivation, and the two divergences: where this room stores a theme, and the settings-modal
+      radio expression upstream gets wrong that we decline to reproduce.
+
+      If this number climbs, the question to ask is whether a FOURTH room default arrived — that is
+      growth this module is for, and it costs about four lines plus its evidence — or whether
+      something that applies preferences generally has been folded in, which belongs with `RoomPrefs`
+      instead. The one thing it must never grow into is a place that decides WHICH members get a
+      default; that is the latch, and the latch is a fact about a member's own blob.
+    */
+    max: 191,
+    why: 'the three room defaults, their latches, and the transcription that earns them'
   },
   {
     file: 'lib/room/refresh.svelte.ts',
@@ -1081,7 +2133,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       445 -> 483, 2026-08-26 — `sendSalesImageToChat` / `sendUsersToURL`, the two receivers whose senders
       shipped on 2026-08-23. Two receiver methods plus the overlay's one-url state.
 
-      Raised on the same grounds recorded at `lib/room/session-control.svelte.ts` in this file: the
+      Raised on the same grounds recorded at `lib/room/session-control.ts` in this file: the
       growth is the captured code and the reason the presenter is EXCLUDED from both frames
       (`isPresenter ||` is a guard, not a truthiness shorthand), which is the single most likely
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
@@ -1099,7 +2151,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       seeding it on would drag a reader out of the history they are scrolled up into. This class held
       the field and the comparison and did not hold the reason until now.
     */
-    max: 621,
+    /*
+      621 -> 635 on 2026-08-28, ARGUED rather than absorbed, for the first NUMERIC preference this
+      class holds. `bufferSizeLevel` had to become real state here because `#loaded` is a plain
+      object — reading the blob through `prefs.loaded` would never re-render the control that sets
+      it, which is the trap `RoomGates.recordingTooltip` fell into with a different key.
+
+      Fourteen lines: a field, a seeded `$state`, a getter, one save branch and the two comments
+      saying why each is clamped. The RULE is not here — `stream-buffer.ts` owns the three levels,
+      their names and why a blob value outside them is refused rather than coerced, with its own
+      test — so what this file gained is a value, not a decision.
+    */
+    max: 635,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -1121,12 +2184,78 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/screens.svelte.ts',
     /* +11, slice 27: the popout test note, orphaned on the page, now above `detachedScreenId`. */
-    max: 370,
+    /*
+      370 -> 396, 2026-08-29, and this raise BOUGHT A CONTROL THAT WAS LYING.
+
+      `stop()` answered "Stop This Screen" on somebody else's share by removing the presenter's own
+      tab and returning, under a comment explaining that stopping their producer "is not ours to do".
+      Every clause was true of the code and false of the control: the member kept broadcasting, every
+      other viewer kept watching, and nothing reported it. The extra lines are the send, the owner
+      lookup, and the correction kept in place beside them — see `forceStopScreen` in
+      `presenter-commands.remote.ts` for the full argument and the byte offsets.
+    */
+    max: 396,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
     file: 'lib/room/message-actions.svelte.ts',
-    max: 474,
+    /*
+      474 -> 495, 2026-08-28, for the `copy-trade` handler and its citation.
+
+      TWENTY-ONE LINES FOR SIX OF CODE, and most of the rest answers one question a reader will
+      have: why this is not `copy` with a different argument. `copy` takes the WHOLE message; the
+      whole point of an order marker is that a member gets the order and nothing else, and the
+      TOAST differs for the same reason — "Copied to clipboard." would leave a member unsure which
+      of the two they got.
+    */
+    /*
+      495 -> 590, 2026-08-28, and it is the largest raise this entry has taken. Argued rather than
+      applied, because the rule above says a raise is a conversation.
+
+      WHAT THE NINETY-FOUR LINES ARE, and only about twenty-five are code:
+
+        * two constructor dependencies for the Q&A thread's commands, with the docblock saying why
+          they are separate from `sendOperation` — an `alert_questions` row is addressed by its own
+          id, and `messageAction`'s `{ kind, id }` target has no third value that would mean
+          "question";
+        * two branches in the dispatcher, each with the citation for the divergence it makes: the
+          reference sends the PARENT alert plus an ORDINAL, because its thread entries live inside
+          the alert document and have no identity of their own, and an ordinal moves when a
+          neighbour is deleted;
+        * `#muteSenderFor24Hours`, which is `mute24` leaving `#runOperation` — it is the one
+          operation that does not act on the row, and the `{ kind, id }` it was carrying was never
+          read;
+        * a guard on `#selectedMessage` and the paragraph explaining what it prevents, which is the
+          most important thing in the diff: that field holds the ALERT whose thread is open, and
+          `sendAlertQuestion` sends its id as the `alertId`. Overwriting it with the question that
+          was clicked would have repointed the composer at a row in the wrong table.
+
+      WHY NOT AN EXTRACTION. The alternative was a second dispatcher for the thread, and five of the
+      seven actions a thread entry offers are the SAME act as in the log — they work on the sender or
+      on the text. Two dispatchers would be five copies of a rule to keep in step, which is the
+      failure this class was assembled to end. The `surface` parameter is the smaller change and its
+      docblock says exactly which two branches read it.
+
+      What paid for it, in the same commit: `ModalHost.svelte` drops 166 lines, and `RoomMessage`'s
+      two unfed-prop exemptions are deleted rather than reworded.
+    */
+    /*
+      590 -> 630, 2026-08-29, for the Q&A `edit` arm — and this raise BOUGHT A CONTROL THAT WAS NEVER
+      DRAWN, which is a quieter defect than the ones the entries above paid for.
+
+      `message-behavior.ts` suppressed `edit` inside the Q&A thread under the claim that it, like
+      `showToAll` and `openAlertReport`, addresses `msg._id` — which a thread entry does not have.
+      True of those two. False of `edit`: byte 1,351,806 branches to
+      `editQAMessage {qaMsgID, msgIndex, newAlertMsg}`, which is the parent-plus-ordinal shape the
+      same docblock cites for the controls that DO work. A suppressed menu item raises nothing, sends
+      nothing, fails no test and leaves no `INERT_ACTIONS` row, so nothing here could have noticed.
+
+      The arm is ~35 lines and half of it is that argument, plus the two things a reader will
+      otherwise re-derive: why the title says "qa message" (it is the capture's own noun, from the
+      same expression that says "alert") and why there is no optimistic `#patchEvidence` (a thread
+      entry is never a fixture row — `askQuestion` writes a real one even for a captured alert).
+    */
+    max: 630,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -1155,14 +2284,35 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       computed at read time rather than stored. A filtered-out trader's alerts would have come back
       in search results and nowhere else. `searchableAlerts` stays; the alerts PANE still reads it.
     */
-    max: 403,
+    /*
+      403 -> 463, 2026-08-29, for `doChatLogSearch` — and this raise bought a REFUSAL as much as a
+      feature, which is why it is the one argued at length.
+
+      Upstream's handler assigns search results straight to `globals.chatSearchResults` and renders
+      that. It can afford to: it applies WEBINAR MODE as messages ARRIVE, dropping them before they
+      reach a log, so results coming back from a server are simply outside that filter. This room
+      applies webinar mode as a VIEW filter, because it re-reads its log from the server on every
+      invalidate and a drop-on-arrival would be undone by the next load — a difference this file
+      already recorded, for a different reason, before any of this.
+
+      Feeding search results in AHEAD of that filter, which is the shape a faithful port takes, would
+      therefore have handed a member in webinar mode every other member's messages: the exact thing
+      the mode exists to hide, reachable by typing one letter into a box. So the results enter the
+      pipeline where the merged log leaves it, and hidden rows, webinar mode, evidence and badges
+      apply to both identically.
+
+      Most of the 60 lines are that argument, on `chatMessagesFor`, plus the note on why `null` and
+      `[]` are different — no search, versus a search that matched nothing. Collapsing those two
+      would show a reader their whole log as the result of a search that found none of it.
+    */
+    max: 463,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
     file: 'lib/room/composer.svelte.ts',
     /*
       +20, slice 27: the RTE gate's own docblock, found ORPHANED on `+page.svelte` and swept into
-      `gates.svelte.ts` by the extraction before landing where it belongs. It is the longest of the
+      `gates.ts` by the extraction before landing where it belongs. It is the longest of the
       four because it records a deliberate NARROWING — upstream opens the editor for a member who
       owns a rich message and then refuses their save, so fewer people reach the editor here and
       everyone who reaches it can finish. `chat-rte-gate-contract.test.ts` executes that claim.
@@ -1171,7 +2321,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
-    file: 'lib/room/kicks.svelte.ts',
+    file: 'lib/room/kicks.ts',
     /*
       Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
 
@@ -1212,7 +2362,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the two viewer-local chat lists, muted and followed; localStorage in, localStorage out, no server'
   },
   {
-    file: 'lib/room/session-control.svelte.ts',
+    file: 'lib/room/session-control.ts',
     /*
       Born capped, 2026-08-23, as the destination of an extraction rather than a new feature.
 
@@ -1249,7 +2399,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       NOT changed here, because rewriting the ceiling model under deadline is how a gate ends up
       weaker than it was. Recorded as the owner's call, with the evidence attached.
     */
-    max: 151,
+    max: 103,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
@@ -1321,13 +2471,81 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Raised under the same standing "get it done" as the entry above, and reversible on the same
       terms: the peer media commands are a coherent slice.
     */
-    max: 824,
+    /*
+      803 -> 823, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one dispatch branch — two lines of code and a paragraph on why there is NO announcement, which is the difference between this control and `force-reload` directly above it.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      823 -> 861, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is a method rather than a dispatch branch - the call `save-permissions` already made, because this control carries a FILE and `onUserAction` carries an action name and a user. Plus the note on why success is silent and failure is not.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      861 -> 880, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One method, mirroring `uploadProfilePicture` — silent on success, loud on failure — plus the note on why there is no confirm dialog for an act one click undoes.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    /*
+      880 -> 896, 2026-08-29, for the 125px downscale and the alerts — a CORRECTION, not a feature.
+
+      Here it is two alerts and the correction that replaced a paragraph arguing for silence - reasoning carried over from `getDebugLog`, where it is true, and never checked here.
+
+      `upload-profile-picture` shipped earlier the same day without either, because
+      `docs/decoded/missing-commands-triage.md:93` — *"canvas-downscales the image to a 125px longest
+      edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
+      the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
+    */
+    max: 896,
+    /*
+      780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
+
+      `admin-notes-password` was row W's last lying control: it raised the reference's prompt and then
+      set 'Wrong password!' unconditionally, never receiving the typed value at all. Wiring it added
+      98 lines here, which this ratchet refused — so the logic left, as `RoomChatMute`, `RoomKicks`
+      and `RoomSessionControl` did before it, into `RoomNotesAccess`.
+
+      What remains is the seam: a field, a getter, an import, one constructor line, the branch that
+      calls it, and the note saying where it went. Extracting the seam too would mean a class that
+      dispatches to a class that dispatches.
+    */
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
   },
   {
     file: 'lib/room/private-chat.svelte.ts',
     /* +3, 2026-08-16: the same `#lib/*.js` import reflow as `files.svelte.ts` above. */
-    max: 524,
+    /*
+      524 -> 605, 2026-08-28, for the moderation read: `getAllUserPM`.
+
+      Three `$state` fields and their accessors, the `showPeerHistory` method, the `PeerHistory`
+      type and the fourth entry on `PrivateChatCommands`. Roughly half is the prose, and it is
+      earning its place: why the answer is `$state.raw`, why loading and error are separate fields
+      rather than variants of the value, why the entitlement is NOT re-checked here, and why this is
+      a second command rather than a flag on `loadLog`.
+
+      That last one is the important sentence in the file. `loadLog` reads a thread the caller is a
+      party to; this reads every conversation one member had. A flag would have made the narrow read
+      widen on a `true`, and the two would have shared a code path that only one of them is allowed
+      to take.
+    */
+    max: 605,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -1337,7 +2555,186 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
   {
-    file: 'lib/room/private-commands.svelte.ts',
+    file: 'lib/room/close-message.ts',
+    /*
+      THE TWO CLOSE-SESSION BUTTONS' one shared act, 2026-08-27.
+
+      Small on purpose: a remote command, an ordered pair of effects, and the rule that the close only
+      happens if the save succeeded — because closing a room on a refused save shuts members out
+      behind whatever the previous message said.
+    */
+    max: 49,
+    why: 'saves the close message, then closes only if the save succeeded'
+  },
+  {
+    file: 'lib/room/for-all-broadcasts.ts',
+    /*
+      THE EIGHT "FOR ALL" RECEIVERS, extracted 2026-08-27 and capped in the same commit.
+
+      The one group on the `cmds` channel that shares a collaborator: every branch reaches
+      `RoomBroadcasts`, and two also reach `showTab`. Everything else on that channel routes to a
+      different object each time, which is why the chain stayed a chain and these eight lifted out.
+
+      The precedent is `RoomPrivateCommands`, which took the whole addressed channel out of the same
+      router for the same reason.
+    */
+    max: 157,
+    why: 'the room-wide For All receivers; the one cmds group with a shared collaborator'
+  },
+  {
+    file: 'lib/room/session-room-commands.ts',
+    /*
+      THE FIVE SESSION ACTS THAT REACH THE SERVER, extracted 2026-08-27 and capped in the same commit.
+
+      `RoomSessionControl`'s nine actions divide on one question: does anybody outside this browser
+      learn about it. FOUR OF THESE FIVE SPENT MONTHS ON THE WRONG SIDE OF THAT LINE — two ran a
+      local `invalidateAll()` while promising a command had gone out, and two wrote a preference and
+      told nobody — which is the evidence that the seam is real rather than a line-count exercise.
+    */
+    max: 106,
+    why: 'the session acts that send; the four that only write a preference are a table'
+  },
+  {
+    file: 'lib/room/session-lock-writes.ts',
+    /*
+      THE THREE LOCK ACTIONS as what each WRITES and SAYS, 2026-08-27.
+
+      A table rather than three branches, and it makes visible what three branches hid: locking
+      writes two preferences and unlocking writes one. `sessionLockKick` is deliberately not cleared
+      on unlock — it configures the NEXT lock.
+    */
+    max: 44,
+    why: 'the preference writes behind the lock actions, as data'
+  },
+  {
+    file: 'lib/room/user-action-commands.ts',
+    /*
+      EVERY COMMAND THE USER-ACTION DISPATCHER CAN SEND, extracted 2026-08-27 and capped in the same
+      commit.
+
+      It was declared above the class in `user-actions.svelte.ts` and grew an entry per control as the
+      modal's dead buttons were wired. Extracting it was what the ratchet asked for when wiring the
+      last of them — *" Mute Chat indefinately "* — pushed that file over.
+
+      The number goes DOWN when a control is retired, not up per control wired: a new entry costs one
+      line, and the docblock that explains its payload belongs with the command that reads it.
+    */
+    /*
+      72 -> 79, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one command and its docblock, and the docblock is the larger half: why this one raises no alert when `forceReload` beside it does.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      79 -> 85, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is one command whose docblock records the thing that makes it different from every other presenter command: its target is checked for MEMBERSHIP, because it is the only one that writes a durable row keyed on the target alone.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      85 -> 87, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One command and a one-line docblock.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    max: 87,
+    why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
+  },
+  {
+    file: 'lib/room/cmds-frame.ts',
+    /*
+      THE `cmds` FRAME AS THE CLIENT READS IT, extracted 2026-08-27 and capped in the same commit.
+
+      It was an inline type literal inside the branch that reads it in `events.svelte.ts`, and it had
+      grown a field per command until it was longer than most of the handlers it serves. That growth
+      is what this ratchet exists to stop, and this is the extraction it asked for rather than the
+      raise it refuses.
+
+      It also has a job the inline version could not do: it is one HALF of a wire whose other half is
+      the `channel: 'cmds'` arm of `RoomEvent`, in a server-only module the client must not import.
+      Two declarations of one contract with nothing joining them — naming this one gives the drift
+      somewhere to be noticed.
+
+      Capped at its created size. A new field per command is what this file is for, so the number
+      moves down only when a command leaves the wire.
+    */
+    max: 59,
+    why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
+  },
+  {
+    file: 'lib/room/addressed-channel.ts',
+    /*
+      THE FOUR CALLBACKS OF THE ADDRESSED CHANNEL, extracted 2026-08-27 and capped in the same commit.
+
+      They were inline in `create-room.svelte.ts`, which put the description of what each command does
+      to the member — the verbatim capture byte for `forceReload`, why a kick shows text rather than
+      swapping the page — in the room's assembly factory rather than beside the class that calls them.
+
+      The move went through `private-commands.ts` first and was moved out again: appending 45
+      lines to a capped file is moving the problem, not solving it, and the ratchet said so
+      immediately. Its own module is where a thing this size belongs.
+    */
+    /*
+      46 -> 63, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is a fifth callback group, with the same justification as the four above it: the buffer belongs to `RoomDebugLog` and the send to a remote command, so neither can be built here without this module reaching for the whole room.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      63 -> 71, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is a sixth callback, `profilePictureChanged`, which the page answers with a refetch rather than a parallel copy.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      RAISED 71 -> 74 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 74,
+    why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
+  },
+  {
+    file: 'lib/room/debug-log.svelte.ts',
+    /*
+      Born capped, 2026-08-29, in the commit that created it.
+
+      Two halves of one feature: the console buffer every member fills, and the log a presenter
+      received. They look unrelated and are not — the same page is both ends, so splitting them by
+      role would have put one feature in two classes.
+
+      If this number climbs, the question is whether BUFFERING RULES have arrived in it. They must
+      not: `#lib/debug-log-buffer.ts` owns the bound, the truncation and the redaction, and is pure.
+    */
+    max: 109,
+    why: 'the console buffer and the received log; the rules are in the pure module beside it'
+  },
+  {
+    file: 'lib/room/private-commands.ts',
     /*
       THE ADDRESSED CHANNEL, created 2026-08-23 and capped in the same commit.
 
@@ -1375,11 +2772,64 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       From here it ratchets down again, and building a receiver should take it down: each of the
       three that remain replaces a paragraph describing it with a branch doing it.
     */
-    max: 198,
+    /*
+      198 -> 267, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is the two receivers and the frame fields they read. The larger half is the `debugLogResp` branch, which VALIDATES all three fields rather than trusting them — the only place in this router where a frame arrives from a member rather than from a presenter.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      267 -> 300, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is the `updateProfilePic` receiver and the frame field it validates. Validated rather than trusted, like `debugLogResp` beside it: a frame missing the url would blank the member's own avatar to `undefined`.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      300 -> 345, 2026-08-29, for `forceStopScreen` — and the note directly above says this cap goes
+      DOWN as receivers are built. It went down for exactly that reason and is going up now, so the
+      claim owes an answer rather than an edit.
+
+      THE ANSWER IS THAT THE NOTE MEANT SOMETHING NARROWER THAN IT SAID. What must never grow is the
+      GATE: a fifth copy of `targetUserId === viewerId` is what the extraction bought and what the
+      single early return makes impossible. A ninth RECEIVER is the opposite — it is the work the row
+      exists to record, and it inherits the gate for free, which is the property being protected.
+
+      Forty-five lines, and they are three things:
+
+      * A NEW RECEIVER, ~20 lines. `forceStopScreen` is the one frame on this channel with no
+        upstream `case` at all — upstream's server closes the producer, and this room's SFU refuses
+        `closeProducer` from any session but the owner's, so the ask has to reach the owner instead.
+        A reader who finds no `case "forceStopScreen"` in the bundle needs that written down or they
+        will conclude the receiver was invented.
+
+      * A CORRECTED CENSUS, ~18 lines. The module docblock said FIVE built and THREE left, having
+        been written before `getDebugLog`, `debugLogResp` and `updateProfilePic` were built. It is
+        now EIGHT and one, and the eleven cases are quoted WITH THEIR BYTE OFFSETS so the next reader
+        re-runs the count instead of trusting the sentence — which is what let this one go stale.
+        That is the second false census this file has had corrected (the first, at 180 -> 198, is
+        argued a few entries up), and the offsets are the fix for the pattern rather than the row.
+
+      * The frame's own field, ~6 lines.
+
+      Prose is most of it, and shortening it is what the rule forbids: the receiver's whole reason
+      for existing is a divergence from the capture, and a divergence with no recorded WHY is the
+      one that gets "simplified" back.
+    */
+    max: 345,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
-    file: 'lib/room/chat-mute.svelte.ts',
+    file: 'lib/room/chat-mute.ts',
     /*
       THE CHAT MUTE, both directions and both ends, created 2026-08-23 and capped in the same commit.
 
@@ -1397,8 +2847,50 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The cap is where it landed. It goes DOWN if the reasoning ever finds a better home, never up to
       accommodate a fifth half — a fifth half is the signal that something else needs extracting.
     */
-    max: 191,
+    max: 181,
     why: 'the chat mute: two senders, two receivers and the rule that they agree'
+  },
+  {
+    file: 'lib/room/display-modes.svelte.ts',
+    /*
+      Born capped, 2026-08-28, in the commit that created it — the rule this section states for every
+      destination module.
+
+      It holds `loadChatMode()` and `loadAlertsMode()`: the seed from the owner's `altChatRender` and
+      the member's stored preference, the write-back that upstream does on both branches, and the
+      member's later change from the settings radios. Four lines on `+page.svelte` before the ratchet
+      refused them, and the refusal was right — those four lines and the modal's callback were two
+      halves of one rule that had to agree about a preference key.
+
+      If this number climbs, the question is whether it has started DECIDING anything beyond which of
+      two renderers a surface uses. It must not: `chat-display-mode.ts` owns the rules, including the
+      preference-key collision with the room's own chat policy, and this only applies them.
+    */
+    max: 87,
+    why: 'which renderer each pair of surfaces uses; seeded once, then owned by the member'
+  },
+  {
+    file: 'lib/room/screen-overlay.ts',
+    /*
+      Born capped, 2026-08-28, in the commit that created it, and the cap moved once BEFORE it
+      landed: 117 -> 166, for `rekey` and the two-teardown split. Recorded rather than quietly set to
+      whatever the file measured, because a "born capped" number that was silently rewritten twice is
+      not evidence of anything. Both additions are defects this class had and the review found — see
+      `local-capture.svelte.ts`'s note for what each one leaked.
+
+      `alertsOverlayOnScreenshare` split into three because only one third of it can be tested here:
+      `lib/alert-overlay-layout.ts` is pure geometry and is exercised exhaustively against a stub
+      measurer; `lib/alert-overlay-compositor.ts` is canvas, video element, interval and
+      `captureStream`, and is as thin as it can be made; and THIS is what knows what a producer id
+      is — the setting gate, the map from producer to overlay, and the fan-out of an arriving alert
+      to every screen this presenter is sharing.
+
+      If this number climbs, the question is whether GEOMETRY or CANVAS work has arrived in it. Both
+      belong to the other two, and the reason the split exists is that neither can be tested from
+      where the other lives.
+    */
+    max: 166,
+    why: 'which shares carry an alert overlay, and for how long'
   },
   {
     file: 'lib/room/create-room.svelte.ts',
@@ -1469,18 +2961,628 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       root grows by construction whenever a receiver is built — the trade the extraction commit
       before this one bought sixty-two lines of headroom in `events.svelte.ts` to make.
     */
-    max: 1114,
-    why: 'the composition root - 36 constructions and their citations, assembly and nothing else'
+    /*
+      1114 -> 1110 on 2026-08-28. No code moved: the `roomSplitDir` side-effect comment said the
+      branch was "never [reached] on a page load", `applyRoomDefaults` made that false, and the
+      correction is shorter than the sentence it replaced because the reasoning now lives with the
+      rule in `room-defaults.ts`. A ceiling going DOWN on a correction is the intended direction.
+    */
+    /*
+      1110 -> 1111 for the `speechRecognitionAvailable` thunk handed to `RoomRecording`. Pure wiring,
+      which is what this file is; the thunk is a thunk because `gates` is constructed below it.
+    */
+    /*
+      1111 -> 1114 for the off-topic seed: `new RoomChat({ … })` went from one line to four when the
+      second argument arrived and the formatter reflowed it. Pure wiring, which is what this file is.
+    */
+    /*
+      1114 -> 1116, 2026-08-28. Two lines: the import of `loadPeerPrivateMessageHistory` and its
+      entry on the private-chat command bag. This file is the composition root, so a new command on
+      an existing class costs exactly the wiring and nothing else — which is what it is for.
+    */
+    /*
+      1116 -> 1139, 2026-08-28 — the typing indicator. The two `TypingSignal` instances and their wiring. Separate instances rather than one with a
+      parameter, because each owns its own debounce timer and announce flag — a shared timer would
+      let the extra column's keystrokes keep the main column's announcement alive.
+    */
+    /*
+      1,139 -> 1,141, 2026-08-28. Two lines, and both are construction: `reactToQuestion` and
+      `deleteQuestion` join `askQuestion` on the existing import line, and each is handed to
+      `RoomMessageActions` as a dependency.
+
+      The composition root grows by construction whenever a slice gains a collaborator. That is what
+      a composition root is for, and it is the smallest form that growth takes: two hand-offs and an
+      import that was already there.
+    */
+    /*
+      1141 -> 1160 on 2026-08-28: `new RoomScreenOverlay`, its two hand-offs, and the citation.
+
+      Assembly, which is what this file is for — the overlay has two consumers that never meet (the
+      local publisher wraps a capture with it, the SSE router feeds it alerts), so nowhere below this
+      file can construct it. The lines beyond the construction itself say why the setting is read
+      through a thunk and why the read is `=== true`, which is the fail-closed rule this repository
+      applies to every optional field arriving from the control plane.
+
+      1160 -> 1174 on 2026-08-28: the `autoRecord` thunk into `RoomRecording` and the pass-through
+      into the transport, both with the same `=== true` and the same reason — a room-config response
+      that omitted the pair must record nothing automatically rather than start a recording nobody
+      asked for.
+    */
+    /*
+      1174 -> 1205 on 2026-08-28: the split reader moved here from the page, with the account of what
+      its old position cost — a `ReferenceError` on every server render, for eleven days, invisible to
+      every gate in this repository. It is declared beside the `prefs` it reads and returned so the
+      page uses the same one, which is what makes a second copy impossible rather than merely unwise.
+    */
+    /*
+      1225 -> 1254, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is the buffer's construction, two imports, and the callback group wiring both directions of the frame.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    /*
+      1254 -> 1265, 2026-08-29, for `upload-profile-picture` — a presenter setting one member's avatar.
+
+      Here it is one import, one command in the surface, and the receiver that answers with `invalidate('room:data')` - the row being the authority, a refetch reaches the same value the next reload would.
+
+      The last inert control with a captured wire and no blocker. It also carried a WRONG
+      disposition: `TODO.md` filed it as belonging with the controller "because it is durable", and
+      the controller's `users` table has no avatar column — the room's own `users.avatar_url` is what
+      the roster reads and every chat message joins to. `profile-picture-contract.test.ts` holds the
+      security argument; these files carry only what each of them does.
+    */
+    /*
+      1265 -> 1266, 2026-08-29, for `remove-profile-picture-btn` — the other half of the avatar control.
+
+      One name in the command surface.
+
+      Found by ARITHMETIC rather than by reading the bundle: the class carried two rules in `app.css`
+      and had no wearer for the whole port, which `orphan-style-contract.test.ts` refuses. Its entry
+      in that catalog turned red the moment the button existed and has been deleted, which is the
+      declaration that it is done.
+    */
+    /*
+      RAISED 1266 -> 1271 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    /*
+      RAISED 1271 -> 1277 on 2026-08-29: the `editQuestion` wiring and its import, split across
+      lines by prettier. Assembly only — see the entry for `message-actions.svelte.ts`, which is
+      where that change actually lives.
+    */
+    /*
+      RAISED 1277 -> 1333 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 1333,
+    /*
+      1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
+      the other one.
+
+      `rosterViewer` was returned BY VALUE from the composition root, which handed `+page.svelte` a
+      snapshot of a `$derived` and made the roster filter stop following presenter elevation. It is a
+      thunk now — the same shape `gates` receives twelve hundred lines above. The reason is long
+      because the defect was invisible to `svelte-check` and visible to the compiler, and the next
+      person to shorten this return needs to know which of those to trust.
+    */
+    /*
+      1205 -> 1207, 2026-08-29. Two lines: the `notes-auth.remote` import and `notesCheck:` passed to
+      `RoomUserActions`. Passed BESIDE `commands` rather than inside it because it is not a
+      presenter-to-member command — it is a question about this room's configuration.
+    */
+    why: 'the composition root - 37 constructions and their citations, assembly and nothing else'
   },
   {
-    file: 'lib/room/gates.svelte.ts',
-    max: 390,
-    why: 'the sixteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
+    file: 'lib/room/gates.ts',
+    /*
+      Held at 390 on 2026-08-28, with the file one line under it. `recordingTooltip` stopped reading
+      `prefs.loaded` and started reading `sessData`, which is where the reference reads it — and that
+      was this class's ONLY use of `RoomPrefs`, so the collaborator went with it: seven injected
+      dependencies down to six. The post-mortem moved to `gates.svelte.test.ts`, beside the test that
+      could not have caught the bug, which is also what kept the correction inside this number.
+    */
+    /*
+      390 -> 421 on 2026-08-28, and the thirty-one lines are two additions with their evidence.
+
+      `speechRecognitionAvailable` is the room half of the captions gate — one expression, with the
+      two byte offsets and the argument for `!== true` rather than `=== false`, because absent means
+      NOT disabled and a payload that omits unset settings makes that the only safe reading.
+
+      The rest is a REFUSAL written down at the gate it would have widened. `alwaysShowRoster` has
+      two uses upstream; the seed is built, and the second — a third OR-term on the mobile-app icon,
+      byte 2,487,668, while the command behind it keeps the two-term gate at 2,529,070 — is declined,
+      because reproducing it would put a button in this navbar that opens a modal reading `N/A`
+      forever. A divergence that is not written down at the code is a divergence somebody
+      "corrects" later, and `always-show-roster-contract.test.ts` asserts that paragraph is still
+      there.
+    */
+    max: 421,
+    why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
+  },
+  {
+    file: 'lib/room/typing-signal.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — and, like every `lib/room/*.ts` module, the
+      discovery gate would have refused it without one.
+
+      100 lines for a debounce, and the bulk is why it is a debounce: every keystroke REPLACES the
+      pending timeout, which is what makes "five seconds since the last key" fall out rather than
+      needing the timestamp comparison the reference also carries. Two frames per burst is the whole
+      reason broadcasting this is affordable at all.
+
+      NOTE WHAT IS NOT CAPPED HERE. `lib/server/typing.ts` is the other half and has no entry,
+      because this catalog covers `lib/room/*` and `lib/components/**` and nothing under
+      `lib/server/`. That is a real gap in the ratchet — the same one components had until this
+      morning — and it is named rather than quietly worked around.
+    */
+    max: 100,
+    why: 'the send half of the typing indicator - a debounce that produces two frames per burst'
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',
     max: 337,
     why: 'ONE class, two instances; 9 of its 14 declaration pairs were byte-identical before the merge'
+  },
+  /*
+    ── THE SWEEP, 2026-08-28: THIRTY-SIX COMPONENTS THAT HAD NEVER BEEN CAPPED ────────────────────
+
+    Four components were found uncapped in two days — `NoteEditor` at 1,546, `NotesPane`,
+    `PrivateChatPanel` and `RoomSidebar` — each discovered by happening to touch it. The fourth
+    entry said that was not four oversights but a mechanism failing, and named the fix. This is it.
+
+    THE MEASUREMENT THAT MADE THE CASE. `lib/room/*.ts` modules are DISCOVERED by the block near the
+    foot of this file, so a module cannot exist without a ceiling. Components were a hand-kept list,
+    and the list was **12 of 48**. Three quarters of this application's components had no ceiling at
+    all, including `AlertChatArea` at 1,113 lines and `RoomMessage` at 949 — the second and fourth
+    largest Svelte files in the repository. Every Phase 5 slice that pushed work into any of them was
+    uncapped, which is exactly the growth this file exists to stop.
+
+    `every component is discovered and capped` now enforces the same rule components have needed all
+    along: a `.svelte` file under `lib/components/` cannot be added without saying what too big means
+    for it. Adding an entry by hand is no longer how a component gets covered; it is how a component
+    gets ADMITTED.
+
+    WHY THIRTY-SIX ENTRIES ARRIVE AT MEASURED SIZE AND NOT AT AN ARGUED ONE. Each is what the file
+    measures today, which is `PresentationArea`'s own rule — "the number's job is to stop the next
+    200 lines, not to pass judgement on the existing 1,181". Thirty-six invented targets would be
+    thirty-six numbers nobody could defend, and the first one that failed would be raised on the
+    grounds that it was arbitrary, which is how a ratchet dies. These are floors to descend from.
+
+    WHAT THIS SWEEP IS NOT. It is not a claim that any of these files is the right size. The three
+    worth naming are `AlertChatArea` (1,113 — the alerts/chat column, and the extraction the
+    `buildMessageChrome` note has been pointing at since it was written), `RoomMessage` (949 — the
+    component that type exists to serve) and `RoomNavbar` (922). Each of those is its own change
+    with its own evidence, and none is bundled here: a sweep that also refactored would be
+    impossible to review.
+
+    CORRECTION, 2026-08-28: this paragraph first called `RoomNavbar` "the ONE component with neither
+    a mount nor an SSR render test, which `todo-next.md` has carried for weeks". **That was false.**
+    `room-navbar-render.test.ts` and `room-navbar-contract.test.ts` both existed, and `TODO.md:679`
+    said so; `todo-next.md` carries the stale line and it was believed rather than checked. It is
+    corrected in place rather than deleted, because a wrong claim that simply disappears teaches
+    nobody why it was made. The navbar's real gap was a MOUNT test, and
+    `components/RoomNavbar.svelte.test.ts` closed it.
+  */
+  {
+    file: 'lib/components/AlertChatArea.svelte',
+    /*
+      1113 -> 1114, 2026-08-28. ONE line: the `onaction` payload widened from a two-member union to
+      the shared `MessageActionEvent`, which now also carries a copyable order.
+
+      Widening to the SHARED alias rather than adding a third member by hand is the fix that keeps
+      this from recurring — this file had its own copy of that union, and a fourth payload would
+      otherwise have to be added here too.
+    */
+    /*
+      1114 -> 1165, 2026-08-28 — the typing indicator. The indicator's markup, three props and the two composer handlers. Most of the growth is the
+      citation for what is NOT drawn: `app-typing-indicator-dots` and its `.typing-indicator` class
+      have no rule in any stylesheet this repository holds, so emitting three empty spans would be
+      markup with no consumer — the check `smallerImagePreview` failed.
+    */
+    /*
+      RAISED 1165 -> 1188 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 1188,
+    why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
+  },
+  {
+    file: 'lib/components/AttachDepsProbe.svelte',
+    max: 39,
+    why: 'a probe: proves {@attach} re-runs on dependency change, and nothing else'
+  },
+  {
+    file: 'lib/components/BindThisProbe.svelte',
+    max: 42,
+    why: 'a probe: proves bind:this resolves before the effect reads it'
+  },
+  {
+    file: 'lib/components/BootboxDialog.svelte',
+    max: 132,
+    why: 'the dialog primitive this repository uses in place of bootbox'
+  },
+  {
+    file: 'lib/components/CloseSessionPane.svelte',
+    max: 105,
+    why: 'the session-control close pane'
+  },
+  {
+    file: 'lib/components/CompactMessageRow.svelte',
+    max: 78,
+    why: 'app-st-compactmessage - one private-message row, shared by the panel and the modal'
+  },
+  {
+    file: 'lib/components/EmojiPicker.svelte',
+    max: 703,
+    why: 'the emoji chooser and its captured category strip'
+  },
+  {
+    file: 'lib/components/ExtraChatPane.svelte',
+    /*
+      543 -> 567, 2026-08-28 — the typing indicator. The extra column's own copy of the indicator and its two handlers. Its OWN channel, which is the
+      whole reason it is a second copy rather than a shared one.
+    */
+    /*
+      RAISED 567 -> 586 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
+      security-relevant half of the change; this entry carries its part.
+    */
+    max: 586,
+    why: 'the second chat column; thirteen of its props are message chrome passed through'
+  },
+  {
+    file: 'lib/components/FilesPane.svelte',
+    max: 557,
+    why: 'the Files tab - the list, the sort bar and the upload control'
+  },
+  {
+    file: 'lib/components/GifConfirmDialog.svelte',
+    max: 50,
+    why: 'the one confirmation between picking a GIF and posting it'
+  },
+  {
+    file: 'lib/components/GiphyPicker.svelte',
+    max: 153,
+    why: 'the GIF search grid'
+  },
+  {
+    file: 'lib/components/ImageUploadDialog.svelte',
+    max: 126,
+    why: 'the composer image dialog, instantiated per feature rather than shared'
+  },
+  {
+    file: 'lib/components/MobileRestorePane.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The troubleshooter's Mobile App pane — `PAe` @ 2,438,242, which is one paragraph and one
+      button and nothing else. It is 131 lines because almost all of it is why: the copy is verbatim
+      including its missing full stop, `.mobile-app-container` carries no rule anywhere and is worn
+      regardless, and the sentence this pane composes is the one thing here deliberately NOT
+      transcribed — upstream alerts "Command sent successfully…" on the statement after the transmit,
+      unconditionally, to a member who by this pane's own copy is not getting notifications.
+    */
+    max: 131,
+    why: 'the Mobile App pane; it composes the sentence upstream raises over nothing'
+  },
+  {
+    file: 'lib/components/Modal.svelte',
+    max: 158,
+    why: 'the modal shell every captured modal is rendered through'
+  },
+  {
+    file: 'lib/components/PollPanel.svelte',
+    max: 825,
+    why: 'the poll UI - author, vote and results in one captured component'
+  },
+  {
+    file: 'lib/components/PostAlertModal.svelte',
+    /*
+      RAISED 494 -> 522 on 2026-08-28, for `hasAlertScheduler`, and argued in place.
+
+      The send-later PANE is not here: `ScheduledAlerts.svelte` holds the date field, the repeat, the
+      weekend flag, the three command calls and the manage table, born capped in the same commit.
+      What this file gained is one `{#if schedulerAvailable}` block, one prop with its docblock, and
+      the paragraph saying why the gate is drawn here AND enforced on the server.
+
+      That is the shape this ratchet is meant to allow. The alternative was the reference's own
+      layout — the fields inline in the composer and a second modal beside it — which would have put
+      roughly two hundred lines into the file that was already one line from its ceiling.
+    */
+    max: 522,
+    why: 'the alert composer and its per-open resets'
+  },
+  {
+    file: 'lib/components/PositionsContainer.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — named by the discovery gate, not remembered.
+
+      75 lines for two elements, and the bulk is the timer's reasoning: why the stamp is `$state` and
+      not a `$derived` over `Date.now()` (a derivation would re-fetch the owner's page on every
+      unrelated invalidate, and this page invalidates every five seconds), and why the refresh is a
+      conjunction of two gates rather than one.
+
+      If this number climbs, the thing to check is whether it has started deciding WHETHER to show —
+      it is mounted behind that gate and only ever decides WHEN to reload.
+    */
+    max: 75,
+    why: 'app-positions-container - an owner iframe and its thirty-second reload'
+  },
+  {
+    file: 'lib/components/PositionsControls.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, beside its sibling above.
+
+      Two buttons whose only state is their label. The manual refresh is a prop callback rather than
+      state here, because the container owns the stamp and a button that owned it would be a second
+      thing deciding when an owner's page is fetched.
+    */
+    max: 45,
+    why: 'the Show/Hide Positions toggle and the manual reload beside it'
+  },
+  {
+    file: 'lib/components/PresenterMuteRows.svelte',
+    max: 143,
+    why: 'the per-presenter volume and mute rows'
+  },
+  {
+    file: 'lib/components/RichTextEditor.svelte',
+    max: 192,
+    why: 'the chat RTE, gated on three flags rather than one'
+  },
+  {
+    file: 'lib/components/RoomBranding.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — and this one did not need remembering, which is
+      the point of the change three commits ago. `every component is discovered and capped` failed
+      the moment this file appeared, named it, and would not go green until it had a number. That is
+      the first time this repository has been TOLD about an uncapped component rather than finding
+      one by accident.
+
+      92 lines, of which the markup is nine. The rest is the citation for `changeFavicon` and
+      `addCustomCSS`, the argument for why two of its three pieces are declarative and two are not,
+      and a refuted security claim kept in place rather than deleted.
+
+      If this number climbs, the thing to check is whether it has started DECIDING what to apply.
+      `room-branding.ts` resolves both settings; this file applies the answers.
+    */
+    max: 92,
+    why: 'the room favicon and stylesheet applied to document.head; nine lines of markup'
+  },
+  {
+    file: 'lib/components/RoomMessage.svelte',
+    /*
+      949 -> 1032, 2026-08-28, and eighty-three lines is the largest single addition this file has
+      taken. `copyTrades`.
+
+      WHAT THEY ARE: the trade branch of `bodySegments` (a span carrying `role`, `tabindex`, a click
+      and a keydown, plus its twelve-line citation), the `trade` member of `BodySegment` with the
+      `children` field that makes it a WRAPPER, the split of `parseBodySegments` into an outer pass
+      and `parseLabelsTickersAndLinks`, and the chrome prop.
+
+      TWO THINGS IN THERE ARE NOT TRANSCRIPTION AND ARE WHY THE COMMENTS ARE LONG. The order of the
+      passes is the capture's and is load-bearing — upstream rewrites the marker BEFORE the symbol
+      and link pipes run, so a `$TICKER` inside an order is still coloured, which is the whole
+      reason a trade segment wraps segments instead of carrying a string. And the span is a
+      keyboard-reachable control here where upstream binds a click to a bare `<span>` and checks
+      `tagName` inside the handler.
+
+      If this number climbs again the extraction is the same one it has always been: `bodySegments`
+      and its four parse functions are a module with a component wrapped around them.
+    */
+    /*
+      1032 -> 818, 2026-08-28, and it is the biggest single drop this entry has taken.
+
+      The kebab menu left: 143 lines of markup, the two element refs and the whole popper placement
+      effect, plus twelve near-identical three-line gate derivations collapsed into one call to
+      `messageMenuAllows`. It went because `altChatRender` needs a SECOND renderer whose menu is the
+      same twelve entries with the same twelve gates, and copying that block would have been twelve
+      entitlement rules written out twice.
+
+      **THE MOVE IS VERIFIED, not asserted.** `room-message-render.test.ts` pins all 18 captured
+      kebabs with their exact labels and source order, the `msgMenu dropright pt-1` class string and
+      `dropdown-menu users-dropdown-options`; it was run green immediately before the extraction and
+      immediately after. It could only be run at all because the same day's fix to
+      `gate/evidence-bound-tests.mjs` stopped excluding it over a comment.
+    */
+    /*
+      818 -> 1008 in the SAME commit that took it to 818, and the pair is one change rather than a
+      raise chasing a drop.
+
+      The kebab left (-214) and the COMPACT RENDERER arrived (+190). `altChatRender` forces
+      `app-st-compactmessage`, which is the same message laid out on one line in two mirrored
+      variants — `msg-box msg-box-adm` in `flex-row-reverse` for a presenter, plain `msg-box` running
+      the other way for a member — and the member row is the only place the trial badge, the new
+      indicator and the membership stars appear.
+
+      WHY IT IS A BRANCH HERE AND NOT A SECOND COMPONENT. Every value the compact layout renders is
+      already derived in this file: the behaviour, the twelve gates, the four styles, the parsed body
+      segments, the reactions, the badges. A sibling component would have taken ~35 props and
+      duplicated ~200 lines of derivation — which is the cost `room-message-chrome.ts` exists to
+      describe. What IS shared went out properly: `MessageMenu.svelte`, because the menu is the one
+      part with twelve entitlement gates on it.
+
+      **The file is smaller than it was this morning** (1032), and the captured-DOM contract that
+      pins the card layout ran green throughout.
+    */
+    max: 1008,
+    why: 'one message, thirty-five props, and the file the chrome type exists to serve'
+  },
+  {
+    file: 'lib/components/RoomNavbar.svelte',
+    /*
+      922 -> 935, 2026-08-29, and the thirteen lines are a BROKEN IMAGE and its replacement.
+
+      This file rendered `/assets/images/playing.gif` whenever SoundCloud was playing and that asset
+      is not in this repository - a sweep of every `/assets/**` reference found exactly one missing
+      file, this one. The string IS in the captured bundle, so the markup was a faithful
+      transcription; only the JavaScript and CSS were ever captured, never the images. Every member
+      saw a broken image in the navbar on every play.
+
+      What grew is the note, not the code: the element is still one line. The note records the
+      precedent it follows (`benzinga-logo.png`, resolved the same way in `RoomSidebar.svelte`), why
+      `fa-volume-up` is not a pick, and the ONE thing a future reader would otherwise redo - that
+      FA6's `fa-beat` fits and does not exist in the 5.8.1 that ships here, so reaching for it would
+      add a class with no effect. That is a rediscovery cost, which is what this repository's
+      comments are for.
+    */
+    /*
+      935 -> 1008, 2026-08-29, for the NAVBAR copy of Benzinga — a second render of the feature that
+      upstream has and this room had only half of.
+
+      `NEW-TODO.md` §2.2 listed one thing outstanding: the const-table classes. Reading them produced
+      a finding the row did not contain — there are THREE render functions in the bundle. Two are the
+      sidebar component compiled twice; the third, `PPe` at 2,473,150, is a different element with
+      different classes in a different container, and nothing here had it.
+
+      Seventy-three lines for eighteen of markup, and the rest is the two things a reader will
+      otherwise re-derive or undo: the const indices (parsed with a string-aware walker, because an
+      index is per component and the sidebar's `li` is index 32 of a table where that means a generic
+      `nav-item`), and the extra `&& benzingaLogoUrl` condition. Upstream's item is image-only with a
+      hard fallback to an asset this repository does not have, so the faithful transcription is a
+      broken image in every unconfigured room's navbar — the `playing.gif` defect that is fixed
+      forty lines further down this same file.
+    */
+    max: 1008,
+    why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
+  },
+  {
+    file: 'lib/components/ScreenPane.svelte',
+    max: 441,
+    why: 'the screenshare pane and its zoom/stack controls'
+  },
+  {
+    file: 'lib/components/ScheduledAlerts.svelte',
+    /*
+      Born capped, 2026-08-28, in the commit that created it.
+
+      `hasAlertScheduler`'s whole browser surface: the date, the repeat, the weekend flag, the three
+      command calls and the manage table. It exists so that `PostAlertModal.svelte` — one line from
+      its ceiling when this was written — took an `{#if}` block instead of two hundred lines.
+
+      The reference splits this in two (`app-post-alert-modal` and `app-scheduled-alerts-modal`) and
+      that split is deliberately not reproduced: both halves ask one question — what is already
+      scheduled — so two components would refetch the same list and disagree about it after a
+      removal. If this number climbs, the question is whether SCHEDULING RULES have arrived in it.
+      They must not: `#lib/scheduled-alert.ts` owns the arithmetic and is pure.
+    */
+    max: 274,
+    why: 'the send-later pane and the manage table; one question, one component'
+  },
+  {
+    file: 'lib/components/ScreenTabs.svelte',
+    /*
+      RAISED 295 -> 301 on 2026-08-29, for `forceStopScreen`, and argued here because the rule at the top of
+      this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
+      the largest share of it landed; this entry carries its part of the same change.
+    */
+    max: 301,
+    why: 'the screenshare tab strip'
+  },
+  {
+    file: 'lib/components/ScreenVolumeControl.svelte',
+    /*
+      197 -> 228, 2026-08-29, for the two dropdowns that could not be opened.
+
+      `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
+      JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
+      volume menu or the streaming view's buffer menu. Seventeen other dropdowns had already been
+      hand-driven from `RoomMenus`; these two were the two that were missed, and one of them hid
+      three `setBufferSize` handlers that a repair the day before had made callable without
+      noticing nothing could reach them.
+
+      Here it is an `open` prop and an `ontoggle`, the trigger wrapped onto six lines to carry them, the class turned into an expression, and a handler on the close control inside the heading — which had also never done anything.
+
+      The prose that would otherwise have landed here was moved into
+      `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
+      nineteenth dropdown arrives without a way to open it.
+    */
+    max: 228,
+    why: 'the per-screen volume slider and the dropdown that now opens it'
+  },
+  {
+    file: 'lib/components/ScreenZoomControls.svelte',
+    max: 237,
+    why: 'the zoom and pan controls over a shared screen'
+  },
+  {
+    file: 'lib/components/SpeechRecoOverlay.svelte',
+    max: 254,
+    why: 'the captions overlay and its transcript controls'
+  },
+  {
+    file: 'lib/components/StreamTabs.svelte',
+    max: 306,
+    why: 'the stream tab strip, including two fields upstream never writes'
+  },
+  {
+    file: 'lib/components/StreamingView.svelte',
+    /*
+      561 -> 598, 2026-08-29, for the two dropdowns that could not be opened.
+
+      `data-bs-toggle="dropdown"` is Bootstrap's whole mechanism and this app ships no Bootstrap
+      JavaScript, so `.dropdown-menu { display: none }` never lifted on the presentation area's
+      volume menu or the streaming view's buffer menu. Seventeen other dropdowns had already been
+      hand-driven from `RoomMenus`; these two were the two that were missed, and one of them hid
+      three `setBufferSize` handlers that a repair the day before had made callable without
+      noticing nothing could reach them.
+
+      Here it is the `menus` prop and its import, the trigger, the class expression, and three entries that each grew from one line to four because selecting a level now closes the menu — which Bootstrap used to do. Six more when `prettier` reformatted those three handlers, which is why the number is 598 rather than 592: the repository's own formatter owns that shape, not me.
+
+      The prose that would otherwise have landed here was moved into
+      `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
+      nineteenth dropdown arrives without a way to open it.
+    */
+    max: 598,
+    why: 'the hls.js player, its buffer control and the quality picker'
+  },
+  {
+    file: 'lib/components/ToastHost.svelte',
+    max: 65,
+    why: 'the toast container'
+  },
+  {
+    file: 'lib/components/VideoPlayer.svelte',
+    max: 414,
+    why: 'the video-only player'
+  },
+  {
+    file: 'lib/components/YoutubePlayerOverlay.svelte',
+    max: 62,
+    why: 'the YouTube-for-all overlay'
+  },
+  {
+    file: 'lib/components/day-trade-alerts/DayTradeAlertForm.svelte',
+    max: 357,
+    why: 'the day-trade alert composer form'
+  },
+  {
+    file: 'lib/components/day-trade-alerts/DayTradeAlertsPane.svelte',
+    max: 583,
+    why: 'the day-trade alerts tab'
+  },
+  {
+    file: 'lib/components/notes/NoteTabContent.svelte',
+    max: 151,
+    why: 'one note tab and its read-only view'
+  },
+  {
+    file: 'lib/components/swing-alerts/SwingAlertForm.svelte',
+    max: 327,
+    why: 'the swing alert composer form'
+  },
+  {
+    file: 'lib/components/swing-alerts/SwingAlertsPane.svelte',
+    max: 538,
+    why: 'the swing alerts tab'
   }
 ];
 
@@ -1569,6 +3671,74 @@ const codeLineCount = (file: string) => {
 const roomModules = readdirSync(new URL('lib/room/', SOURCE))
   .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
   .map((name) => `lib/room/${name}`);
+
+/*
+  COMPONENTS ARE DISCOVERED TOO, added 2026-08-28, and the delay is the finding.
+
+  The block below has discovered `lib/room/*.ts` since gate 0b, on the reasoning its own comment
+  gives: a hand-kept list means the nineteenth slice creates a file, nobody adds the row, and the cap
+  that was the whole point quietly does not exist. **Components were exactly that hand-kept list, and
+  it failed exactly that way.** Four were found uncapped in two days by happening to touch them, and
+  the measurement that prompted this found the real number: 12 of 48.
+
+  RECURSIVE, because components nest. `notes/`, `swing-alerts/` and `day-trade-alerts/` hold six
+  between them, and a non-recursive `readdirSync` would have declared victory while leaving them
+  exactly as uncovered as before — a gate that reports success over the thing it does not look at is
+  worse than no gate.
+
+  `.svelte` only. A `.ts` beside a component (`carousel.ts`, `note-gates.ts`, `safe-html.ts`) is a
+  module, and modules are capped by their own rule or not at all; sweeping them in here would be this
+  gate quietly claiming a jurisdiction nobody argued for.
+*/
+function svelteFilesUnder(dir: string): string[] {
+  const found: string[] = [];
+  for (const item of readdirSync(new URL(dir, SOURCE), { withFileTypes: true })) {
+    if (item.isDirectory()) found.push(...svelteFilesUnder(`${dir}${item.name}/`));
+    else if (item.name.endsWith('.svelte')) found.push(`${dir}${item.name}`);
+  }
+  return found;
+}
+
+const componentFiles = svelteFilesUnder('lib/components/').sort();
+
+describe('every component is discovered and capped', () => {
+  it('found the components it is meant to cap', () => {
+    /*
+      The vacuity guard, and it earns its place here more than anywhere else in this file: the whole
+      point of this block is that nobody has to remember to list a component, so an enumeration that
+      silently returned nothing would restore precisely the failure it was written to end — and
+      would do it while reporting green.
+    */
+    expect(componentFiles.length).toBeGreaterThan(40);
+    // …and it reaches into the subdirectories, which a non-recursive read would not.
+    expect(componentFiles.filter((file) => file.split('/').length > 3).length).toBeGreaterThan(0);
+  });
+
+  it('every component on disk has a declared ceiling', () => {
+    const capped = new Set(CEILINGS.map((entry) => entry.file));
+    const uncapped = componentFiles.filter((file) => !capped.has(file));
+    expect(
+      uncapped,
+      `${uncapped.join(', ')} exists under lib/components/ with no ceiling. A component cannot be added without saying what too big means for it — that is what four components found uncapped in two days, and 36 found uncapped by one measurement, cost. Add an entry to CEILINGS at the size it actually lands, with a why that says what the component IS.`
+    ).toEqual([]);
+  });
+
+  it('and every declared component ceiling still has a file', () => {
+    /*
+      The other direction, which the room-module block does not need because a deleted module leaves
+      its import broken. A deleted component leaves a ceiling entry that can never fail, and a
+      ceiling that cannot fail is the thing `SLACK` and this file exist to prevent.
+    */
+    const onDisk = new Set(componentFiles);
+    const stale = CEILINGS.map((entry) => entry.file)
+      .filter((file) => file.startsWith('lib/components/'))
+      .filter((file) => !onDisk.has(file));
+    expect(
+      stale,
+      `${stale.join(', ')} has a ceiling but no file. Remove the entry — a ceiling on a file that does not exist is a test that cannot fail.`
+    ).toEqual([]);
+  });
+});
 
 describe('every room module is discovered and capped', () => {
   it('found the modules it is meant to cap', () => {

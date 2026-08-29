@@ -50,6 +50,19 @@
     recordingReminderAllowed: boolean;
     /** The recording tooltip, already resolved: a member may not see the file name. */
     recordingTooltip: string;
+    /**
+     * Benzinga, the NAVBAR copy — a second, independent render of the same feature.
+     *
+     * `RoomSidebar` renders the sidebar's (consts 50/51/52: `nav-link sidebar-item ps-1`, and an
+     * icon-and-text fallback). This is `PPe` at bundle byte 2,473,150, gated by the same
+     * `O(15, sessData.hasBenzingaNews ? 15 : -1)` and sitting immediately before the talking
+     * indicator, which is where it is rendered below.
+     *
+     * The two are NOT the same markup and neither is a copy of the other — see the note at the
+     * element for the one branch this one does not have.
+     */
+    benzingaUrl: string | null;
+    benzingaLogoUrl: string | null | undefined;
     mobileAppAvailable: boolean;
     tawkAvailable: boolean;
     /** The viewer's own do-not-disturb, which greys the sound checks. */
@@ -114,6 +127,21 @@
     onstopsoundcloudforme: () => void;
     ontogglemicrophone: () => void;
     ontogglewebcam: () => void;
+    /**
+     * "Hide webcam for room?" — the fifth term of the webcam control's gate, and the only one this
+     * room could not evaluate: the other four are facts about the viewer and their devices.
+     */
+    hideWebcamForRoom: boolean;
+    /**
+     * "Blinking REC?" — whether the recording badge breathes while recording.
+     *
+     * DIVERGENCE, recorded rather than absorbed: the reference binds `breathing-rec` through a class
+     * MAP on the recording `ul` (`iPe`, byte 2,477,678), alongside `recIndicatorStart`. This navbar
+     * renders one `li` per recording state and carries `recIndicatorStart` as a class on the
+     * starting one, so the class lands on the `[ REC ]` item instead of its container. Same element
+     * breathing, one level down, because that is where this room's structure puts it.
+     */
+    blinkingRec: boolean;
     onpromptforscreenname: (source: 'screen' | 'camera') => void;
     onstopscreensharing: () => void;
     /**
@@ -149,6 +177,8 @@
     individualVolumeControls,
     recordingReminderAllowed,
     recordingTooltip,
+    benzingaUrl,
+    benzingaLogoUrl,
     mobileAppAvailable,
     tawkAvailable,
     doNotDisturbOn,
@@ -173,6 +203,8 @@
     onstopsoundcloudforme,
     ontogglemicrophone,
     ontogglewebcam,
+    hideWebcamForRoom,
+    blinkingRec,
     onpromptforscreenname,
     onstopscreensharing,
     onopensessioncontrol,
@@ -258,6 +290,63 @@
     class={mobileNavOpen ? 'collapse navbar-collapse show' : 'collapse navbar-collapse'}
   >
     <ul class="navbar-nav align-items-center ml-auto">
+      <!--
+        `H(15, PPe, 3, 2, "li", 90)` under `O(15, sessData.hasBenzingaNews ? 15 : -1)`, immediately
+        before the talking indicator below — the captured order, read at bundle byte 2,485,295.
+
+        Consts read with a string-aware parser rather than counted by eye, because a const index is
+        per component and the same numbers mean different things three tables away:
+
+          90  [1,"nav-item","animated","fadeIn","benzinga-li"]
+          141 ["target","_blank","title","Benzinga News",1,"nav-link"]
+          142 [1,"benzinga-logo","animated","fadeIn",3,"src"]
+
+        `animated fadeIn` are animate.css 3.7.2, which IS a dependency here, so these are worn
+        rather than dropped. `benzinga-li` carries no rule in either captured sheet and is worn
+        anyway: it is the capture's own hook and costs nothing.
+
+        THE ONE THING THIS ITEM DOES NOT DO, and it is the whole reason for the extra condition:
+        upstream's is IMAGE-ONLY with a hard fallback —
+
+          z("src", sessData.altBenzingaLogoURL || "/assets/images/benzinga-logo.png", Mt)
+
+        — and that asset is not in this repository. `find -iname "*benzinga*"` returns nothing.
+        Transcribing it faithfully would put a broken image in the navbar of every room with
+        Benzinga on and no custom logo, which is exactly the `playing.gif` defect fixed further
+        down this same file.
+
+        The sidebar's answer was an icon-and-text fallback, because ITS capture has one to copy
+        (const 52, `fas fa-newspaper`, plus the words "Benzinga News"). This one has no such branch
+        to copy, and inventing one would be inventing evidence — so the item renders when the room
+        supplies a logo and is absent otherwise. A room in that state still gets the sidebar item,
+        so the feature is reachable either way. Restore the second copy by adding the asset.
+      -->
+      {#if benzingaUrl && benzingaLogoUrl}
+        <li class="nav-item animated fadeIn benzinga-li">
+          <a
+            href={benzingaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Benzinga News"
+            class="nav-link"
+          >
+            <!--
+              `.benzinga-logo` is `max-height: 25px !important` in the captured sheet
+              (`css/complete-app-styles.css:7150`), so the height is CSS's. The attributes are here
+              because `img-dimensions-contract.test.ts` requires every `<img>` to carry intrinsic
+              dimensions or an aspect ratio, and a logo of unknown size with no reservation is a
+              layout shift on every load.
+            -->
+            <img
+              class="benzinga-logo animated fadeIn"
+              src={benzingaLogoUrl}
+              alt="Benzinga News"
+              width="120"
+              height="25"
+            />
+          </a>
+        </li>
+      {/if}
       {#if media.anyoneTalking && media.talking.length > 0}
         <li class="nav-item talkingIndicator animated fadeIn">
           <!-- svelte-ignore a11y_missing_attribute -->
@@ -312,7 +401,7 @@
           <a>[ REC PAUSED]</a>
         </li>
       {:else if media.roomRecording}
-        <li class="nav-item recIndicator animated fadeIn">
+        <li class={['nav-item recIndicator animated fadeIn', { 'breathing-rec': blinkingRec }]}>
           <!-- svelte-ignore a11y_missing_attribute -->
           <a title={recordingTooltip}>[ REC ]</a>
         </li>
@@ -462,8 +551,21 @@
             <i class="fab fa-2x fa-soundcloud"></i>
             <span class="ml-2">
               <span class="caret"></span>
+              <!--
+                THE ICON FORM: upstream renders `/assets/images/playing.gif` here and that asset is
+                not in this repository, so the faithful transcription rendered a BROKEN image in the
+                navbar on every play. Same case, and same resolution, as `benzinga-logo.png` in
+                `RoomSidebar.svelte`. `fa-volume-up` is not a pick - it is what this file already
+                uses for "audio is on" at the screen-volume control below.
+
+                Knowingly still: the reference's indicator animates and this one does not. FA 5.8.1
+                ships here and its only animations are `fa-spin`/`fa-pulse`, both spinners meaning
+                "working"; FA6's `fa-beat` would fit and does not exist in 5.8.1, so it would have
+                been a class with no effect. Restore the animation by adding the asset, not by
+                inventing a keyframe. Enforced by `img-dimensions-contract.test.ts`.
+              -->
               {#if media.soundCloudPlaying}
-                <img src="/assets/images/playing.gif" alt="" style="max-height: 25px;" />
+                <i class="fas fa-volume-up ml-1" title="Playing"></i>
               {/if}
             </span>
           </a>
@@ -599,7 +701,7 @@
             {/if}
           </ul>
         </li>
-        {#if !media.camLaunching}
+        {#if !media.camLaunching && !hideWebcamForRoom}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <li title="Start / Stop WebCam" class="nav-item" onclick={ontogglewebcam}>

@@ -9,6 +9,7 @@ import {
   PEER_SUBCMDS,
   TOAST_ONLY_ACTIONS
 } from './user-action-intent.js';
+import { SESSION_LOCK_WRITES } from './room/session-lock-writes.js';
 
 import { RoomDialogs } from './room/dialogs.svelte.js';
 import { RoomToasts } from './room/toasts.svelte.js';
@@ -92,24 +93,36 @@ function handledActions(): Set<string> {
     repository forbids. A gate that does not follow an extraction is worse than no gate, because it
     goes red on the refactor and green on the regression.
   */
-  const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
+  const session = readFileSync('src/lib/room/session-control.ts', 'utf8');
   /*
     `RoomKicks` joined them on 2026-08-23, when `kick` and `kick-duplicates` moved out under the
     owner's extraction ruling. Adding it here is not bookkeeping: this function's own note says a
     gate that does not follow an extraction "goes red on the refactor and green on the regression",
     and it did exactly that on this move — which is the second time that note has paid for itself.
   */
-  const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+  const kicks = readFileSync('src/lib/room/kicks.ts', 'utf8');
   // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
   // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
-  const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
+  const chatMute = readFileSync('src/lib/room/chat-mute.ts', 'utf8');
+  /*
+    `RoomSessionControl` SPLIT AGAIN on 2026-08-27 and the scanner followed it a THIRD time, which is
+    the third payment on the note above. Its nine actions divide on whether anybody outside this
+    browser learns about the act: five reach the server (`session-room-commands.ts`) and three write
+    a preference (`session-lock-writes.ts`, a table rather than branches). Reading only the class
+    would file eight live controls as dispatched into the void.
+
+    The LOCK table is read as text like the rest. Its keys are the action names, so a scan for the
+    string finds them — which is the property that makes a data table safe to move behind this gate,
+    and would not hold if the keys were computed.
+  */
+  const sessionCommands = readFileSync('src/lib/room/session-room-commands.ts', 'utf8');
   const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
   const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
   expect(
     tail,
     "handle()'s alert tail was not found — this scanner would read the whole file and mis-bucket the alert path"
   ).toBeGreaterThan(-1);
-  const dispatchBody = source.slice(0, tail) + session + kicks + chatMute;
+  const dispatchBody = source.slice(0, tail) + session + kicks + chatMute + sessionCommands;
   const literal = [...dispatchBody.matchAll(/action === '([a-z0-9-]+)'/g)].map((m) => m[1]);
 
   /*
@@ -127,7 +140,18 @@ function handledActions(): Set<string> {
     re-introduce the same fragility one level down, and the import fails loudly if the export is
     renamed — where a regex would silently match nothing and quietly under-report again.
   */
-  return new Set([...literal, ...Object.keys(PEER_SUBCMDS)]);
+  /*
+    A FIFTH FORM, and it is the FOURTH one again: `SESSION_LOCK_WRITES` is a table for exactly the
+    reason `PEER_SUBCMDS` is one — three lock actions differing only in which preferences they write.
+    Its keys are IMPORTED for the reason recorded directly above: a regex over the table's text would
+    re-introduce the fragility one level down and would silently match nothing on a rename, while an
+    import fails loudly.
+
+    This is the third extraction this scanner has had to follow, and the second table. The note at
+    the top of the function — a gate that does not follow an extraction "goes red on the refactor and
+    green on the regression" — has now paid for itself four times.
+  */
+  return new Set([...literal, ...Object.keys(PEER_SUBCMDS), ...Object.keys(SESSION_LOCK_WRITES)]);
 }
 
 describe('the dispatch surface is fully enumerated', () => {
@@ -278,12 +302,26 @@ describe('every dispatched action has exactly one disposition', () => {
     'invalid-restream-link': 'the caller already rejected the URL; this reports why'
   };
 
-  const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {
-    'admin-notes-password':
-      'alerts "Wrong password!" HARDCODED, never comparing — needs sessData.deleteAlertPW delivered to the room',
-    'session-save-close-message':
-      'alerts "Message Saved" and writes nothing — needs somewhere to save it'
-  };
+  /*
+    `session-save-close-message` LEFT this table on 2026-08-27 — it saves for real now, through
+    `saveCloseMessage`, and its action name is no longer dispatched at all: the editor's text cannot
+    travel on an action STRING, so `ModalHost` calls a receiver instead.
+
+    **`admin-notes-password` LEFT IT ON 2026-08-29, and the table is now EMPTY.** It was the last
+    entry, and its own text named what it needed: *"needs `needPasswordForUserNotes` compared on the
+    CONTROLLER, and a notes pane behind it to unlock."* The first half is built —
+    `internal/room-notes-auth/[code]` compares, `notes-auth.remote.ts` asks, and
+    `RoomUserActions` grants — so the branch reaches a server command and is no longer dialog-only.
+
+    The second half is NOT built and is not pretended to be. Upstream gates two things on
+    `allowToManageNotes`: the password panel (rendered while false) and the member's own notes with a
+    delete per row (rendered while true). Only the first exists here, because `notes` is room-scoped —
+    keyed by `room_short_code` with no member column — so there are no per-member notes to list. That
+    is a schema change and its own feature. What is fixed is the LIE: the control compared nothing and
+    said "Wrong password!" to a correct password, and now it compares and the panel it gates goes
+    away. An empty table is the honest state, not a placeholder for the next entry.
+  */
+  const DIALOG_ONLY_ACTIONS: Readonly<Record<string, string>> = {};
 
   it('a handled branch that only raises a dialog is DECLARED, not silently counted as handled', () => {
     /*
@@ -291,14 +329,19 @@ describe('every dispatched action has exactly one disposition', () => {
       toasts. The markers are the ways this class acts: a server command, the managed lists, a
       preference, a modal, a rename, a delegate method call, or writing its own selection state.
     */
-    const session = readFileSync('src/lib/room/session-control.svelte.ts', 'utf8');
-    const kicks = readFileSync('src/lib/room/kicks.svelte.ts', 'utf8');
+    const session = readFileSync('src/lib/room/session-control.ts', 'utf8');
+    const kicks = readFileSync('src/lib/room/kicks.ts', 'utf8');
     // `mute-chat-24` and `unmute-chat` moved into `RoomChatMute` on 2026-08-23. A scanner that does
     // not read it would file both as UNHANDLED and demand an `INERT_ACTIONS` entry for a live wire.
-    const chatMute = readFileSync('src/lib/room/chat-mute.svelte.ts', 'utf8');
+    const chatMute = readFileSync('src/lib/room/chat-mute.ts', 'utf8');
+    // The 2026-08-27 split of `RoomSessionControl`; the note above about a gate following an
+    // extraction, paid a third time. Both halves are read, or eight live controls read as inert.
+    const sessionCommands = readFileSync('src/lib/room/session-room-commands.ts', 'utf8');
+    const sessionLocks = readFileSync('src/lib/room/session-lock-writes.ts', 'utf8');
     const source = readFileSync('src/lib/room/user-actions.svelte.ts', 'utf8');
     const tail = source.indexOf('const fixedAlert = userActionAlert(action)');
-    const body = source.slice(0, tail) + session + kicks + chatMute;
+    const body =
+      source.slice(0, tail) + session + kicks + chatMute + sessionCommands + sessionLocks;
 
     /*
       THE MARKER LIST NEEDED A CATALOG HALF, and 2026-08-26 is when it cost something.
@@ -343,6 +386,14 @@ describe('every dispatched action has exactly one disposition', () => {
       'this.#announceThenSend',
       'this.#updateUsername',
       'this.#unmuteChat',
+      /*
+        `admin-notes-password`, wired 2026-08-29. Its branch calls one private method because the
+        control delegates to RoomNotesAccess, which makes two server round trips — an empty candidate to learn whether a password is
+        configured at all, which is upstream's own pre-prompt branch, then the typed one — and
+        `handle` is synchronous. Adding it here is the gate doing its job: it refused the wiring
+        until the new effect was declared, which is exactly what it refuses a dead control for.
+      */
+      'this.#notes.',
       'this.muteAllNonAdmins',
       'localStorage.setItem',
       'playSoundEffect'
@@ -511,8 +562,18 @@ describe('an inert action really does nothing, executed', () => {
       is broken, mis-wired, or silently throwing. If this one does not move, none of the others means
       anything at all.
     */
+    /*
+      IT WAS `session-save-close-message` UNTIL 2026-08-27, when that control was wired for real and
+      stopped being dispatched as an action at all. Re-pointed at another handled action rather than
+      deleted, because a positive control that goes away with the thing it happened to name leaves
+      every assertion below passing against a harness nobody checks.
+
+      `session-lock` is a good replacement for the same reason it was easy to get wrong: it is
+      handled through the `SESSION_LOCK_WRITES` table rather than an `action === '…'` branch, so a
+      harness that could not reach a table would fail here first.
+    */
     const { actions, dialogs } = make();
-    actions.handle('session-save-close-message', {
+    actions.handle('session-lock', {
       id: 5,
       nick: 'Bo',
       emailHash: 'h',
@@ -520,7 +581,7 @@ describe('an inert action really does nothing, executed', () => {
       status: 'online'
     } as never);
     expect(dialogs.alert, 'a handled action must produce its observable effect').toBe(
-      'Message Saved'
+      'Session Locked'
     );
   });
 
@@ -570,5 +631,75 @@ describe('an inert action really does nothing, executed', () => {
         `'${name}' raised a toast — it is no longer inert, remove its entry`
       ).toBe(0);
     }
+  });
+});
+
+/*
+  ── THE CENSUS IN `TODO.md` ROW 4 IS THE ONE THIS FILE COMPUTES ───────────────────────────────────
+
+  ## Why a prose sentence is asserted from a test
+
+  Row 4 of `TODO.md` carries a one-line disposition census, and row 4 ends by naming THIS FILE as the
+  authority — *"read it, not this row"*. That instruction was the whole enforcement: a reader who
+  followed it got the truth, and a reader who did not got whatever the row last said.
+
+  Row W, in the same file, records what that costs. Its own count of this family was written as
+  seven, then nine, then twelve, and it says why in as many words: *"each was arithmetic over a
+  previous number rather than a read"*. Row 4 then repeated the failure in a smaller way — its
+  census said **40 dispatched, 6 inert, 3 carrying a fixed alert**, with `mute-chat-indefinitely`
+  named as the one that sends nothing. That was true when written and stopped being true the SAME
+  DAY: the control was wired on 2026-08-27 and its `EXACT_ALERTS` entry deleted. Row W recorded the
+  change. Row 4 kept the superseded number, and the two rows contradicted each other in one file for
+  two days.
+
+  Measured 2026-08-29: **39 dispatched, 6 inert, 2 carrying a fixed alert, neither a liar.**
+
+  ## What makes this cheap rather than ceremonial
+
+  All three numbers are already computed above, for the buckets. Nothing new is measured here — the
+  assertion only forbids the row from disagreeing with what this file already knew. A count that
+  drifts now fails on the commit that drifts it, naming both numbers, instead of being discovered by
+  somebody re-deriving it by hand a fortnight later.
+*/
+describe("TODO.md row 4's census still describes this code", () => {
+  const TODO = readFileSync('../../TODO.md', 'utf8');
+  const stated =
+    /\*\*Disposition census, measured [\d-]+: (\d+) dispatched actions, (\d+) inert, (\d+) carrying a fixed alert/.exec(
+      TODO
+    );
+
+  it('states a census in a form that can be checked', () => {
+    /*
+      Reworded away and this goes red rather than silently passing — the failure mode that makes a
+      document-reading assertion worthless. `todo-next-coverage-contract.test.ts` guards its own
+      totals line the same way, for the same reason.
+    */
+    expect(stated, 'row 4 no longer states a machine-checkable census').not.toBeNull();
+  });
+
+  it('counts the dispatched actions correctly', () => {
+    expect(Number(stated![1])).toBe(dispatchedActions().size);
+  });
+
+  it('counts the inert actions correctly', () => {
+    expect(Number(stated![2])).toBe(INERT_ACTION_NAMES.length);
+  });
+
+  it('counts the actions carrying a fixed alert correctly', () => {
+    expect(Number(stated![3])).toBe(TOAST_ONLY_ACTIONS.length);
+  });
+
+  it('does not still name a control that has since been wired', () => {
+    /*
+      The specific way row 4 went stale, denied by name. `mute-chat-indefinitely` left `EXACT_ALERTS`
+      on 2026-08-27; a census still calling it silent is describing a control that now sends.
+    */
+    const claimedSilent = /only `([a-z-]+)` sends nothing/.exec(TODO)?.[1];
+    expect(
+      claimedSilent && TOAST_ONLY_ACTIONS.includes(claimedSilent)
+        ? []
+        : [claimedSilent].filter(Boolean),
+      `${claimedSilent} is named as sending nothing, but it is not in EXACT_ALERTS any more`
+    ).toEqual([]);
   });
 });

@@ -5,63 +5,150 @@
 Added 2026-08-16 14:21 EDT, in answer to the owner's question *"todo-next.md should have everything
 our app is missing and needs to be implemented in detail. did you get that right?"*
 
-**No. Not yet, and the honest number is 2 of 42.**
+**No. Not yet — and the honest number was itself wrong.**
 
-This file documents **every gap on the two surfaces that have been audited against our source**. It
-does NOT yet document what the other forty are missing, because those have not been compared to the
-reference at all. Treating it as a complete build spec would silently under-scope the work.
+## Corrected 2026-08-29 01:36 UTC, by measurement
 
-| | |
-|---|---|
-| Svelte surfaces in `apps/room/src` | **42**, ~30,000 lines |
-| audited against reference evidence | **2** — `routes/session/+page.svelte` (659) and the `<app-alert-qa-modal>` block of `ModalHost.svelte` (159 of 5,965) |
-| lines audited | **~818 of ~30,000 — 2.7%** |
+This section said **"2 of 42 surfaces, ~818 of ~30,000 lines"**. Every number in it was stale, and
+one was stale by a factor of five. What it claimed, against what `wc -l` said on the day it was
+corrected:
 
-## Audited — gaps documented in full
+> **This comparison is a FROZEN SNAPSHOT of 2026-08-29 and is deliberately never updated.** It exists
+> to record how far the map had drifted, which is a fact about that date. The **live** numbers are
+> the inventory further down, which is the only table here that a gate checks — and the reason this
+> one is frozen rather than maintained is the correction it is describing: two places recording the
+> same measurement is how one of them goes stale, and repeating these nine numbers in a second
+> maintained table would have reintroduced the defect this section exists to record.
 
-| surface | lines | where the gaps are | count |
-|---|---|---|---|
-| `routes/session/+page.svelte` + `+page.server.ts` | 659 + 402 | §17.8 | 18 divergences (A-1…A-18), 11 gaps (G-1…G-11), 6 defects (D-1…D-6) |
-| `ModalHost.svelte` `<app-alert-qa-modal>` (4781–4939, handlers 1751–1769) | 159 | §19.4, §19.3 | 10 items (QA-1…QA-10), 6 defects (Q-D1…Q-D6), **1 false comment** |
-| `alert-questions.remote.ts` | 138 | §19.2 | 0 — stronger than the reference |
+| the map said | measured 2026-08-29 | |
+| --- | --- | --- |
+| 42 Svelte surfaces, ~30,000 lines | **55 surfaces, 27,290 lines** | the count was never right |
+| `routes/+page.svelte` — 6,894 | **1,425** | off by 5,469; the page was decomposed and the row never moved |
+| `AlertChatArea.svelte` — 873 | **1,162** | |
+| `RoomSidebar.svelte` — 694 | **777** | |
+| `RoomMessage.svelte` — 936 | **1,007** | |
+| `PresentationArea.svelte` — 1,123 | **957** | |
+| `notes/NoteEditor.svelte` — 1,517 | **1,545** | |
+| `routes/session/+page.svelte` — 659 | **701** | and this one is an AUDITED surface |
+| `ModalHost.svelte` — 5,965 | **5,979** | |
 
-## NOT audited — no reference comparison has been run
+It also **omitted `RoomOverlays.svelte` entirely** — 820 lines, the fourth-largest component in the
+room — along with 26 other surfaces named nowhere in it. The old table named 30 files explicitly and
+gestured at "13 smaller"; the repository had 55 that day.
 
-Each of these may be complete, may be missing controls, or may carry invented values. **Nothing in
-this file says which, and no claim about them should be read into it.**
+**The lesson is not that the numbers drifted. It is that a documented measurement with no gate
+drifts silently, and this one was being read as scope.** The table below is now checked on every run
+by `apps/room/src/lib/todo-next-coverage-contract.test.ts`, which recomputes every line count and
+fails if any row, either total, or the surface list disagrees with the filesystem.
 
-| surface | lines | reference counterpart, where known |
-|---|---|---|
-| `routes/+page.svelte` | 6,894 | `app-room` — the room shell |
-| `ModalHost.svelte` (the other 5,806 lines) | 5,806 | ~18 further `app-*-modal` components; captures exist in `new-room/app-modals/` |
-| `notes/NoteEditor.svelte` | 1,517 | `app-notes` |
-| `PresentationArea.svelte` | 1,123 | `as-split-area.presentation-box` |
-| `RoomMessage.svelte` | 936 | `app-st-message` / `app-st-compactmessage` |
-| `RoomNavbar.svelte` | 904 | `nav.mainAppNav` |
-| `AlertChatArea.svelte` | 873 | `as-split-area.alert-chat-box` |
-| `PollPanel.svelte` | 804 | `app-poll-modal` |
-| `EmojiPicker.svelte` | 709 | `emoji-mart` |
-| `RoomSidebar.svelte` | 694 | `div.room-sidebar` |
-| `day-trade-alerts/*`, `swing-alerts/*` | 1,801 | — |
-| `FilesPane.svelte` | 556 | Files pane — partly evidenced in `more-fucking-evidence` |
-| `StreamingView`, `ScreenPane`, `ScreenTabs`, `StreamTabs`, `VideoPlayer`, `ScreenZoomControls`, `ScreenVolumeControl` | 2,237 | — |
-| `ExtraChatPane`, `PrivateChatPanel`, `NotesPane`, `PostAlertModal`, `RichTextEditor`, `GiphyPicker`, and 13 smaller | 2,600 | `app-post-alert-modal`, `app-user-pmmodal`, … |
+## The evidence constraint, which decides what CAN be audited here
 
-**Unread reference evidence that would feed the above**, sized: `account-page/` 930 KB ·
-`mising/` 798 KB · `must-match/` 535 KB · `gap-dump/` 171 KB · `app-modals/` ~250 KB across ~20
-files (`app-session-control-modal` alone is 92 KB, `app-user-settings-modal` 24 KB,
-`app-post-alert-modal` 21 KB) · 37 `.less` sources · `styes.css` 2,657–11,347 · the v4 rule-split
-(5,410 rules).
+**13 of the 14 reference-capture roots are absent from this checkout.** They are gitignored by
+design, and `gate/evidence-bound-tests.mjs` records why: the captures are dumps of a LIVE room
+carrying real names, addresses, gravatar hashes and in at least one case a live JWT, and this
+repository is public. Consequently **42 evidence-bound test files are excluded from every run here**,
+and the suite prints that on every invocation rather than implying full coverage.
 
+Missing: `docs/source`, `second-dump`, `new-evidence`, `alert-section`, `app-message-modal`,
+`app-modals`, `app-room`, `app-session`, `navbar-section`, `toast-container`, `preview`, `emojis`,
+`modal`. Present: `css`.
+
+So the only reference evidence readable in this checkout is the **v4 bundle**, and all three
+artifacts were verified against `sha256sums.txt` at 2026-08-29 01:26 UTC — `OK`, `OK`, `OK`:
+
+| artifact | bytes |
+| --- | ---: |
+| `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` | 2,891,205 |
+| `apps/room/docs/source-v4-2026-08-15/styles.ee2a710065b60389.css` | 444,793 |
+| `apps/room/docs/source-v4-2026-08-15/deployed-index.html` | 16,094 |
+
+That bundle settles **what the reference contains** — a class name, a handler, a literal, a default,
+an ordering — and it settles ABSENCE with a control, which is how `setting-option` and `toggle-row`
+were shown on 2026-08-29 to be ours alone (0 hits each, against 54 for `form-check-input`). It
+cannot settle **rendered geometry**: computed layout, spacing, and which of two layouts a given
+state produces live in the DOM captures, and those are not here. A surface gap that turns on
+measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
+guessed.
+
+## The inventory — all 55 surfaces, measured
+
+| # | surface | lines | audited against the reference? |
+|---:|---|---:|---|
+| 1 | `lib/components/ModalHost.svelte` | 6,273 | no |
+| 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
+| 3 | `routes/+page.svelte` | 1,473 | no |
+| 4 | `lib/components/AlertChatArea.svelte` | 1,187 | no |
+| 5 | `lib/components/RoomMessage.svelte` | 1,007 | no |
+| 6 | `lib/components/PresentationArea.svelte` | 958 | no |
+| 7 | `lib/components/RoomNavbar.svelte` | 1,006 | no |
+| 8 | `lib/components/PollPanel.svelte` | 824 | no |
+| 9 | `lib/components/RoomOverlays.svelte` | 847 | no |
+| 10 | `lib/components/RoomSidebar.svelte` | 777 | no |
+| 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
+| 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
+| 13 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
+| 14 | `lib/components/StreamingView.svelte` | 597 | no |
+| 15 | `lib/components/FilesPane.svelte` | 556 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 585 | no |
+| 17 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
+| 18 | `lib/components/PostAlertModal.svelte` | 521 | no |
+| 19 | `lib/components/notes/NotesPane.svelte` | 446 | no |
+| 20 | `lib/components/ScreenPane.svelte` | 440 | no |
+| 21 | `lib/components/VideoPlayer.svelte` | 413 | no |
+| 22 | `lib/components/PrivateChatPanel.svelte` | 393 | no |
+| 23 | `lib/components/MainTabStrip.svelte` | 371 | no |
+| 24 | `lib/components/AlertQaModal.svelte` | 358 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
+| 25 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 356 | no |
+| 26 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 326 | no |
+| 27 | `lib/components/StreamTabs.svelte` | 305 | no |
+| 28 | `lib/components/ScreenTabs.svelte` | 300 | no |
+| 29 | `lib/components/MessageMenu.svelte` | 292 | no |
+| 30 | `lib/components/ScheduledAlerts.svelte` | 271 | no |
+| 31 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
+| 32 | `lib/components/RoomShell.svelte` | 238 | no |
+| 33 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
+| 34 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
+| 35 | `lib/components/RichTextEditor.svelte` | 191 | no |
+| 36 | `lib/components/Modal.svelte` | 157 | no |
+| 37 | `lib/components/GiphyPicker.svelte` | 152 | no |
+| 38 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 39 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 40 | `lib/components/BootboxDialog.svelte` | 131 | no |
+| 41 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 42 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 43 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 44 | `lib/components/CloseSessionPane.svelte` | 104 | no |
+| 45 | `lib/components/RoomBranding.svelte` | 91 | no |
+| 46 | `lib/components/ChatSearchBar.svelte` | 88 | no |
+| 47 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 48 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 49 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 50 | `lib/components/ToastHost.svelte` | 64 | no |
+| 51 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 52 | `lib/components/ChatTabStrip.svelte` | 55 | no |
+| 53 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 54 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
+| 55 | `lib/components/PositionsControls.svelte` | 44 | no |
+
+**2 of 57 surfaces audited · 1,059 of 28,093 lines · 3.8%.**
+
+| 56 | `routes/logout/+page.svelte` | 31 | no |
+| 57 | `routes/+layout.svelte` | 27 | no |
 ## The honest scoping statement
 
-To make this file a complete build spec, **each of the forty unaudited surfaces needs the same
-treatment the two audited ones got**: read its reference component end to end at verified
-boundaries, transcribe every const by value, record every condition and handler, then measure our
-implementation against it and list what is missing.
+To make this file a complete build spec, **each unaudited surface needs the treatment the two
+audited ones got**: read the reference counterpart end to end at verified boundaries, transcribe
+every const by value, record every condition and handler, then measure ours and list what is
+missing.
 
-That is the remaining work, and it is large. It is written here as a number rather than implied,
-because "todo-next.md has everything" was not true and would have been discovered mid-build.
+Two things have changed about that statement since it was written, and both narrow it:
+
+1. **It is bounded by evidence, not only by effort.** With the DOM captures absent, a surface can be
+   audited against the bundle's *logic and literals* and no further. Every gap recorded from here on
+   names which of the two it rests on.
+2. **Both audited rows are now partly stale**, because the audited files kept changing after the
+   audit. An audit of a moving file needs the revision recorded beside it, which the rows above now
+   do.
 
 ---
 
@@ -5689,8 +5776,13 @@ canonical search-vs-read failure** (*"I searched for `st-fileSortBar`, got nothi
 in the capture'"*). So the first instinct is that something is missing again. **Check our source
 before writing that down — rule 6 — and it is the opposite:**
 
-- `apps/room/src/app.css:3089-3091` carries all three rules **verbatim as captured evidence**, and
-  `3110-3122` carries them expanded.
+- `apps/room/src/app.css` carries all three rules **verbatim as captured evidence** inside the
+  `The Files sort bar` docblock, and carries them expanded immediately below it as `.st-fileSortBar`,
+  `.st-fileSortName, .st-fileSortDate` and their `.active` pair. **Named by symbol rather than by
+  line, deliberately** — the line numbers this row used to carry (`3089-3091` and `3110-3122`) went
+  stale on 2026-08-29 when 185 lines of pre-decomposition panel CSS were deleted from that file, and
+  a citation past the end of its own file is exactly what `doc-citation-contract.test.ts` exists to
+  refuse.
 - `apps/room/src/lib/components/FilesPane.svelte:321-325` carries the markup with the decoded class
   lists (`d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar`,
   `btn btn-sm m-1 st-fileSortName`, `btn btn-sm m-1 st-fileSortDate`).
@@ -5786,8 +5878,8 @@ stylesheet under `src/lib/styles/` is derived from the artefact §16.8 just prov
 mechanically, and neither is recorded anywhere else:
 
 1. **It cannot contain anything the reference gained after 2026-07-30.** The Files sort bar is the
-   worked example — absent from its source, therefore absent from it, and `app.css:3110-3122` is
-   where those rules actually live instead. **Do not treat this file as a completeness check.**
+   worked example — absent from its source, therefore absent from it, and `app.css`'s own
+   `.st-fileSortBar` block is where those rules actually live instead. **Do not treat this file as a completeness check.**
 2. **Its values are browser serializations, not author values** (§16.8 property 3), because its
    source is. A colour read out of it is `rgb(…)` where the author wrote hex.
 

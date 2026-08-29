@@ -135,13 +135,19 @@ beforeAll(() => {
     .returning()
     .get();
   /*
-    A question on that alert. `alert_questions` is the ONE room-owned table with no
-    `room_short_code` column — it reaches its room through `alert_id` — which is exactly why its
-    read had no filter until 2026-08-14 and every room received every room's questions.
+    A question on that alert.
+
+    `alert_questions` used to be the ONE room-owned table with no `room_short_code` column — it
+    reached its room through `alert_id`, which is exactly why its read had no filter until
+    2026-08-14 and every room received every room's questions. It HAS the column since 2026-08-28,
+    because the join that supplied the room could not supply it for a question asked on a captured
+    alert; `alert-log.ts` carries the reasoning. The row is stamped with the other room here, which
+    is what makes this probe test the predicate rather than the join.
   */
   db.insert(alertQuestions)
     .values({
       alertId: otherRoomAlert.id,
+      roomShortCode: OTHER_ROOM,
       senderId: probe.id,
       body: 'another room’s question',
       createdAt: now

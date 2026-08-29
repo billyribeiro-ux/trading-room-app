@@ -3,8 +3,8 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { formatChatMutedTill } from '#lib/message-formatters.js';
-import { RoomChatMute } from './chat-mute.svelte';
-import { RoomPrivateCommands } from './private-commands.svelte';
+import { RoomChatMute } from './chat-mute';
+import { RoomPrivateCommands } from './private-commands';
 import { RoomEventStream } from './events.svelte';
 
 /*
@@ -87,7 +87,7 @@ afterEach(() => {
   (globalThis as { EventSource?: unknown }).EventSource = originalEventSource;
 });
 
-const make = () => {
+const make = (mediaTransport: Record<string, unknown> = {}) => {
   const missed: true[] = [];
   const tabs: string[] = [];
   const played: string[] = [];
@@ -98,6 +98,7 @@ const make = () => {
   */
   const reloadAsked: boolean[] = [];
   const kicked: { message: string; closedAlready: boolean }[] = [];
+  const revoked: string[] = [];
   /*
     A REAL `RoomChatMute`, not a stub. The sentence a muted member sees is assembled inside it, so a
     stub here would assert the wiring and let the wording drift — and the wording is the captured
@@ -107,7 +108,11 @@ const make = () => {
   const chatNotices: string[] = [];
   const audioReconnects: boolean[] = [];
   const chatMute = new RoomChatMute({
-    commands: { muteChat: () => Promise.resolve(null), unmuteChat: () => Promise.resolve(null) },
+    commands: {
+      muteChat: () => Promise.resolve(null),
+      muteChatIndefinitely: () => Promise.resolve(null),
+      unmuteChat: () => Promise.resolve(null)
+    },
     alert: (message) => chatMuted.push(message),
     notice: (message) => chatNotices.push(message),
     reload: () => Promise.resolve(),
@@ -120,7 +125,7 @@ const make = () => {
     // The broadcast receivers the video/YouTube/mp3 commands call, recorded so the dispatch can
     // be asserted to reach the right one.
     broadcasts: { videoStarted: (url: string) => played.push(url) } as never,
-    mediaTransport: {} as never,
+    mediaTransport: mediaTransport as never,
     mtx: {} as never,
     roster: { countArrived: () => {}, rosterArrived: () => {} },
     privateChat: { ingest: () => {} },
@@ -131,6 +136,9 @@ const make = () => {
     restartMediaSession: () => null,
     showTab: (tab) => tabs.push(tab),
     focusSessionNote: () => {},
+    // Recorded rather than stubbed: the MESSAGE is what a revoked member reads, so a stub would
+    // assert the routing and let the reason drift.
+    alertThenReload: (message: string) => revoked.push(message),
     chatMissedWhileHidden: () => missed.push(true),
     /*
       A REAL `RoomPrivateCommands`, not a stub. The addressing test is now ONE gate inside it, and a
@@ -143,7 +151,12 @@ const make = () => {
       forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true),
       kicked: (message: string) =>
         kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true }),
-      reconnectAudio: () => (audioReconnects.push(true), Promise.resolve())
+      reconnectAudio: () => (audioReconnects.push(true), Promise.resolve()),
+      collectDebugLog: () => 'log',
+      sendDebugLog: () => {},
+      debugLogReceived: () => {},
+      profilePictureChanged: () => {},
+      stopLocalScreen: () => {}
     })
     /*
       Records the message AND whether the stream was already closed when it arrived. That second
@@ -159,6 +172,7 @@ const make = () => {
     played,
     reloadAsked,
     kicked,
+    revoked,
     chatMuted,
     chatNotices,
     audioReconnects
@@ -288,12 +302,14 @@ const hiddenTabStream = (missed: true[]) =>
     restartMediaSession: () => null,
     showTab: () => {},
     focusSessionNote: () => {},
+    alertThenReload: () => {},
     chatMissedWhileHidden: () => missed.push(true),
     privateCommands: new RoomPrivateCommands({
       viewerId: () => 1,
       chatMute: new RoomChatMute({
         commands: {
           muteChat: () => Promise.resolve(null),
+          muteChatIndefinitely: () => Promise.resolve(null),
           unmuteChat: () => Promise.resolve(null)
         },
         alert: () => {},
@@ -303,7 +319,12 @@ const hiddenTabStream = (missed: true[]) =>
       }),
       forceReloadRequested: () => {},
       kicked: () => {},
-      reconnectAudio: () => Promise.resolve()
+      reconnectAudio: () => Promise.resolve(),
+      collectDebugLog: () => '',
+      sendDebugLog: () => {},
+      debugLogReceived: () => {},
+      profilePictureChanged: () => {},
+      stopLocalScreen: () => {}
     })
   });
 
@@ -507,6 +528,92 @@ describe('the two receivers reach the page', () => {
       })
     });
     expect(audioReconnects).toEqual([]);
+  });
+
+  it("a revoked session reaches the receiver with the SERVER's reason", () => {
+    /*
+      `NEW-TODO.md` Part 1, the client half. Both revenue leaks end the same way: the server closes
+      the connection and says why. The MESSAGE is the server's — three different things end a
+      connection and they are not interchangeable, so composing one here would tell some members the
+      wrong thing to do about it.
+    */
+    const { stream, revoked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'cmds',
+        data: {
+          cmd: 'sessionRevoked',
+          reason: 'entitlement-lapsed',
+          message: 'Your access to this room has ended.'
+        }
+      })
+    });
+    expect(revoked).toEqual(['Your access to this room has ended.']);
+  });
+
+  it('acts on NOTHING ELSE in a batch that also revokes', () => {
+    /*
+      The reason `sessionRevoked` is the FIRST branch in the chain rather than one more beside the
+      others. Anything acted on after it would be acted on for a member the server has just decided
+      is not entitled to it — which is the leak this whole feature closes, reopened by ordering.
+
+      Asserted by sending a frame that is BOTH: a real command name and the revocation. A chain that
+      tested `playVideoForAll` first would play the video into a revoked session.
+    */
+    const { stream, revoked, played, tabs } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({
+        channel: 'cmds',
+        data: {
+          cmd: 'sessionRevoked',
+          message: 'signed in elsewhere',
+          url: 'https://example.test/should-not-play.mp4'
+        }
+      })
+    });
+    expect(revoked).toEqual(['signed in elsewhere']);
+    expect(played).toEqual([]);
+    expect(tabs).toEqual([]);
+  });
+
+  it('a hard reset drops remote media and states the captured sentence', () => {
+    /*
+      `TODO.md` row 10 recorded this as a missing RECEIVER for two sessions. It was not — `alertThen`
+      has existed since `forceReload` was built. What was missing was the SENDER: the presenter's
+      button wrote a preference and reloaded their OWN page, so the reset read as working from the
+      only seat that could see it.
+    */
+    const dropped: true[] = [];
+    const { stream, revoked } = make({ dropRemoteMedia: () => dropped.push(true) });
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data: { cmd: 'hardReset' } })
+    });
+    expect(revoked).toEqual([
+      'The room is being reset by an administrator. Click OK to continue...'
+    ]);
+    /*
+      The MEDIA DROP is asserted beside the message because upstream disconnects before it alerts. A
+      reset that leaves every consumer attached while a modal waits for a click holds the SFU open for
+      exactly as long as nobody is looking at the screen.
+    */
+    expect(dropped).toEqual([true]);
+  });
+
+  it('an opened session states its own captured sentence, and a different one', () => {
+    /*
+      Two frames, two sentences, and they are NOT interchangeable: this one is addressed to people
+      who are not in the room yet — a member sitting on the "This room is closed." refusal, for whom
+      the reload is what re-runs the door check that now says yes.
+    */
+    const { stream, revoked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data: { cmd: 'openSession' } })
+    });
+    expect(revoked).toEqual(['The session is now open, click here to reload the page and enter']);
   });
 
   it('a room-wide video moves a non-presenter through the tab receiver', () => {

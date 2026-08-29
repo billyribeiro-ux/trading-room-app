@@ -1,8 +1,8 @@
 # 0004 — Where CSS lives: global sheets vs component `<style>`
 
 **Status:** accepted, 2026-08-09
-**Context:** raised by the owner — *"one of Svelte's main advantages is to be able to write css on its
-file without interfering with the main css… built for the next 10 years, not 10 minutes."*
+**Context:** raised by the owner — _"one of Svelte's main advantages is to be able to write css on its
+file without interfering with the main css… built for the next 10 years, not 10 minutes."_
 
 ---
 
@@ -11,19 +11,19 @@ file without interfering with the main css… built for the next 10 years, not 1
 Read from the official Svelte documentation on 2026-08-09, not from memory:
 
 1. **Component `<style>` is scoped by default.** Svelte adds a hash class (`svelte-123xyz`) to
-   affected elements, and *"styles will not apply to any elements on the page outside the component
-   in question."*
+   affected elements, and _"styles will not apply to any elements on the page outside the component
+   in question."_
 2. **Scoped selectors get a specificity increase of 0-1-0**, from the scoping class. The docs are
-   explicit about what this buys: *"a `p` selector defined in a component will take precedence over
+   explicit about what this buys: _"a `p` selector defined in a component will take precedence over
    a `p` selector defined in a global stylesheet, **even if the global stylesheet is loaded
-   later**."* Where the scoping class has to appear more than once it is added as
+   later**."_ Where the scoping class has to appear more than once it is added as
    `:where(.svelte-xyz123)` so specificity does not keep climbing.
 3. **`@keyframes` are scoped too**, by the same hash, and escape via a `-global-` name prefix.
-4. **`:root` custom properties in a global stylesheet are endorsed, not tolerated**: *"It's common to
+4. **`:root` custom properties in a global stylesheet are endorsed, not tolerated**: _"It's common to
    define custom properties on the `:root` element in a global stylesheet so that they apply to your
-   entire application."*
+   entire application."_
 5. **Styling a child component goes through CSS custom properties first**; `:global` is the fallback
-   *"if this is impossible (for example, the child component comes from a library)"*.
+   _"if this is impossible (for example, the child component comes from a library)"_.
 6. **`:global {...}` blocks** exist for groups, and the nested form is preferred over a trailing
    `:global` selector.
 7. **Current best-practice list** also says: prefer clsx-style arrays/objects in `class` over the
@@ -120,8 +120,7 @@ Partly automatable, and the honest split matters more than a claim of full cover
 
 **Checked by a gate today:**
 
-- `scripts/verify-breakpoints.mjs` — `public.css` must carry exactly the thresholds 767/768/991/992/
-  1200. Any new global rule that introduces a breakpoint fails it. (This is what forced the item I
+- `scripts/verify-breakpoints.mjs` — `public.css` must carry exactly the thresholds 767/768/991/992/ 1200. Any new global rule that introduces a breakpoint fails it. (This is what forced the item I
   additions to be fluid with no `@media` block at all.)
 - `scripts/verify-manage-styles.mjs` and `scripts/verify-home-fidelity.mjs` — pin the transcribed
   values, so a tier-2 edit that drifts from the capture is caught.
@@ -152,5 +151,5 @@ this decision adds a rule for new work and explicitly does not restate the trans
   impossible to leak, and needs no ancestor guarantee.
 - The global sheets stop growing except for genuinely shared primitives, so the item J failure mode
   shrinks over time rather than spreading.
-- Reviewers get one question to ask of any new rule — *"is this a token, a shared primitive, or one
-  component's business?"* — with a default answer for the last case.
+- Reviewers get one question to ask of any new rule — _"is this a token, a shared primitive, or one
+  component's business?"_ — with a default answer for the last case.

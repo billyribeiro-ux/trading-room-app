@@ -268,7 +268,22 @@ describe('the menu reproduces its consts attribute for attribute', () => {
     expect(attributesOf(CONSTS[menu])).toEqual({ 'aria-labelledby': 'dropdownVolume' });
     expect(classesOf(CONSTS[menu])).toEqual(['dropdown-menu', 'volumeControl']);
     expect(controlMarkup).toContain('aria-labelledby="dropdownVolume"');
-    expect(controlMarkup).toContain('class="dropdown-menu volumeControl"');
+    /*
+      OUR MARKUP DIVERGES HERE, deliberately, since 2026-08-29 - the class is an expression rather
+      than a literal, and the two classes above are still exactly the reference's.
+
+      The const table one line up is the evidence and it is unchanged: upstream renders
+      `class="dropdown-menu volumeControl"` and lets BOOTSTRAP'S JAVASCRIPT add `.show` on the
+      trigger's click. This app ships no Bootstrap JavaScript - only its captured CSS - so
+      `.dropdown-menu { display: none }` never lifted and this dropdown COULD NOT BE OPENED AT ALL.
+      `.show` now comes from `RoomMenus`, which is what the other eight dropdowns in this room
+      already did and what the navbar's twin of this very control has always done.
+
+      Asserted as both halves so the reference's two classes still cannot drift, while the third is
+      pinned as conditional rather than as absent.
+    */
+    expect(controlMarkup).toContain("'dropdown-menu volumeControl show'");
+    expect(controlMarkup).toContain("'dropdown-menu volumeControl'");
 
     // The `h4`'s own text node, spaces included: `v(6, ' Volume ')`.
     expect(HELPERS).toContain("v(6, ' Volume ')");
@@ -551,7 +566,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
       here. The gate itself, the other four writers and the two this room cannot model are covered
       by `chat-alerts-gates-contract.test.ts`.
     */
-    const GATES = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    const GATES = readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8');
     expect(GATES).toContain('this.viewerOnlyMode ||\n      this.#chatAlertsDetached()');
     expect(SHELL).toContain('{#if !hideChatAlerts}');
   });
@@ -759,7 +774,7 @@ describe('the cluster keeps the captured child order', () => {
     expect(PRESENTATION).toContain('volume={screenVolume}');
     expect(PAGE).toContain('{#snippet screenVolume()}');
     expect(PAGE).toContain('{screenVolume}');
-    const GATES_SOURCE = readFileSync(new URL('./room/gates.svelte.ts', import.meta.url), 'utf8');
+    const GATES_SOURCE = readFileSync(new URL('./room/gates.ts', import.meta.url), 'utf8');
     expect(GATES_SOURCE).toContain("page.url.searchParams.get('vo') === '1'");
     expect(GATES_SOURCE).toContain("page.url.searchParams.get('vo') === '2'");
     expect(controlMarkup).toContain('{#if viewerOnlyMode}');

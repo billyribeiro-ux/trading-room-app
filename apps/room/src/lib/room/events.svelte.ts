@@ -1,3 +1,4 @@
+import { arrivalSoundFor } from '#lib/chat-arrival-sound.js';
 import { invalidate, invalidateAll } from '$app/navigation';
 
 import { resolveArrivalAnnouncement } from '#lib/arrival-announcement.js';
@@ -7,7 +8,9 @@ import { formatUserLocation } from '#lib/roster-gates.js';
 import { playSoundEffect } from '#lib/sound-effects.js';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
-import type { AddressedCommand, RoomPrivateCommands } from './private-commands.svelte';
+import type { AddressedCommand, RoomPrivateCommands } from './private-commands';
+import type { CmdsFrame } from './cmds-frame';
+import { handleForAllBroadcast } from './for-all-broadcasts';
 import type { RoomMedia } from './media.svelte';
 import type { RoomMediaTransport } from './media-transport.svelte';
 import type { RoomPrefs } from './prefs.svelte';
@@ -15,6 +18,23 @@ import type { PrivateChatMessage } from './private-chat.svelte';
 import type { RoomToasts } from './toasts.svelte';
 
 /** What the stream reads off the loaded page data. Narrow on purpose: it consults, never owns. */
+/** The one method a typing frame needs. Narrow on purpose: this stream does not own the columns. */
+interface TypingSink {
+  typingUpdated(chatChannel: string, names: readonly string[]): void;
+}
+
+/**
+ * The screenshare overlay, seen as the one method this router uses.
+ *
+ * Structural rather than the class, for the reason `TypingSink` and `PrivateChatSink` are: the
+ * router recognises a channel and hands the frame over. What an overlay IS — a canvas, an interval,
+ * a producer-id map — is `#lib/room/screen-overlay.ts`'s business and no import of this file
+ * should be able to reach it.
+ */
+interface ScreenOverlaySink {
+  show(alert: { text: string; sender: string }): void;
+}
+
 interface EventStreamSession {
   room: { shortCode: string };
   user: { id: number };
@@ -23,6 +43,13 @@ interface EventStreamSession {
     beepOnUserJoin?: boolean;
     dingOnNewMessage?: boolean;
   } | null;
+  /**
+   * "Play chat message sound for" — member email HASHES, derived on the controller.
+   *
+   * Not on `sessData`, because it is not a setting: the setting holds raw addresses and never
+   * crosses. `internal/room-config/[code]` hashes it and the load passes the digests through.
+   */
+  chatSoundForEmailHashes?: readonly string[];
 }
 
 /** `setTimeout(…, 3e3)`. */
@@ -111,6 +138,10 @@ export class RoomEventStream<Entry> {
     mtx: MtxStreamTabs;
     roster: RosterSink<Entry>;
     privateChat: PrivateChatSink;
+    /** See `#chat`. Optional so existing constructions are unchanged. */
+    chat?: TypingSink;
+    /** See `#screenOverlay`. Optional for the same reason `chat` is. */
+    screenOverlay?: ScreenOverlaySink;
     userActions: FollowStyleSource;
     /** The loaded page data, through a thunk because the load can replace it. */
     session: () => EventStreamSession;
@@ -141,7 +172,14 @@ export class RoomEventStream<Entry> {
      */
     chatMissedWhileHidden: () => void;
     /**
-     * Every ADDRESSED command — `#lib/room/private-commands.svelte.ts`.
+     * Read this sentence, then reload the page. THREE frames end a browser's page this way — a
+     * revoked connection, a hard reset and a room being opened — and all three are a message plus a
+     * reload, so they share one receiver rather than three that differ in nothing. The message is
+     * always the SERVER'S: `#lib/server/live-access.ts` §"What the client does with it".
+     */
+    alertThenReload: (message: string) => void;
+    /**
+     * Every ADDRESSED command — `#lib/room/private-commands.ts`.
      *
      * One collaborator rather than three callbacks and a class. The router's job on this channel is
      * to recognise the channel and hand the frame over with a way to close the stream; deciding who
@@ -157,6 +195,8 @@ export class RoomEventStream<Entry> {
     this.#mtx = options.mtx;
     this.#roster = options.roster;
     this.#privateChat = options.privateChat;
+    this.#chat = options.chat;
+    this.#screenOverlay = options.screenOverlay;
     this.#userActions = options.userActions;
     this.#session = options.session;
     this.#isPresenter = options.isPresenter;
@@ -165,6 +205,7 @@ export class RoomEventStream<Entry> {
     this.#showTab = options.showTab;
     this.#chatMissedWhileHidden = options.chatMissedWhileHidden;
     this.#focusSessionNote = options.focusSessionNote;
+    this.#alertThenReload = options.alertThenReload;
     this.#privateCommands = options.privateCommands;
 
     /** Whether the SSE channel is up. The sidebar's "Chat" line reports it. */
@@ -193,6 +234,23 @@ export class RoomEventStream<Entry> {
   readonly #mtx: MtxStreamTabs;
   readonly #roster: RosterSink<Entry>;
   readonly #privateChat: PrivateChatSink;
+  /**
+   * The chat columns, for `typingUpdated` and nothing else.
+   *
+   * OPTIONAL, because `RoomChat` is constructed after this stream in `createRoom` and because every
+   * test in `events.svelte.test.ts` builds this class without one. A typing frame arriving before
+   * the columns exist is a frame with nowhere to land, which is the correct outcome and not an
+   * error — nobody is looking at a column that has not been made yet.
+   */
+  readonly #chat: TypingSink | undefined;
+  /**
+   * The screenshare overlay, for arriving alerts and nothing else.
+   *
+   * OPTIONAL for the same two reasons `#chat` is: it is constructed alongside this stream rather
+   * than before it, and an alert arriving with no overlay to draw on has nowhere to land, which is
+   * the correct outcome in every room that did not tick the setting.
+   */
+  readonly #screenOverlay: ScreenOverlaySink | undefined;
   readonly #userActions: FollowStyleSource;
   readonly #session: () => EventStreamSession;
   readonly #isPresenter: () => boolean;
@@ -200,6 +258,7 @@ export class RoomEventStream<Entry> {
   readonly #restartMediaSession: () => (() => Promise<void>) | null;
   readonly #showTab: (tab: 'screens' | 'videoplayer') => void;
   readonly #chatMissedWhileHidden: () => void;
+  readonly #alertThenReload: (message: string) => void;
   readonly #privateCommands: RoomPrivateCommands;
 
   get connected(): boolean {
@@ -266,30 +325,34 @@ export class RoomEventStream<Entry> {
         also why the authority to send it is checked on the server rather than here.
       */
       if (payload.channel === 'cmds') {
-        const command = payload.data as
-          | {
-              cmd?: string;
-              subCmd?: string;
-              targetUserId?: number;
-              recName?: string;
-              /** `giveMicScreen`'s payload: `{give: boolean}`. */
-              give?: boolean;
-              /** `playMP3ForAll`'s payload: `{url}`. Room-wide, so it carries no target. */
-              url?: string;
-              /** `focusOnScreen` — the producer id of the screen to move to. */
-              screenId?: string;
-              /** `focusOnSessionNote` — the note a presenter pulled the room to. */
-              noteId?: number;
-              /**
-               * `mtxStartStream` / `mtxStopStream` carry the stream under `muser` — the reference's
-               * own key (byte 1010826), and the reason `mtx-streams.ts` describes an MTX stream as
-               * "simply another muser". Typed `unknown` because `isMtxStream` is what decides.
-               */
-              muser?: unknown;
-              /** `getSessionMTXMediaState`'s full list. Same reason: validated, not asserted. */
-              data?: unknown;
-            }
-          | undefined;
+        const command = payload.data as CmdsFrame | undefined;
+
+        /*
+          FIRST in this chain, and the placement is load-bearing: anything below it acting on a frame
+          from the same batch would act for a member the server has just revoked. Why, in full:
+          `#lib/server/live-access.ts` §"What the client does with it".
+        */
+        if (command?.cmd === 'sessionRevoked') {
+          this.#alertThenReload(command.message ?? '');
+          return;
+        }
+
+        /*
+          The two ROOM-WIDE page-enders, whose senders shipped 2026-08-27 — the receivers were never
+          the missing half. Their strings are the capture's, at bytes 2596540-2597340, and
+          `hardReset` drops remote media first because upstream disconnects before it alerts.
+        */
+        if (command?.cmd === 'hardReset') {
+          this.#mediaTransport.dropRemoteMedia();
+          this.#alertThenReload(
+            'The room is being reset by an administrator. Click OK to continue...'
+          );
+          return;
+        }
+        if (command?.cmd === 'openSession') {
+          this.#alertThenReload('The session is now open, click here to reload the page and enter');
+          return;
+        }
 
         /*
           The room's media.recording state, for EVERYONE in it. Verbatim:
@@ -400,119 +463,8 @@ export class RoomEventStream<Entry> {
           return;
         }
 
-        /*
-          `playMP3ForAll` / `stopMp3ForAll` — a sound every browser in the room plays.
-
-          Room-wide, so unlike `giveMicScreen` there is no `targetUserId` to match on: everybody
-          who receives it plays it, which is the whole point of "For All".
-        */
-        if (command?.cmd === 'playMP3ForAll') {
-          this.#broadcasts.mp3Started(typeof command.url === 'string' ? command.url : null);
+        if (handleForAllBroadcast(command, this.#broadcasts, this.#showTab, this.#isPresenter))
           return;
-        }
-        if (command?.cmd === 'stopMp3ForAll') {
-          this.#broadcasts.mp3Stopped();
-          return;
-        }
-
-        /*
-          `sendSalesImageToChat` / `sendUsersToURL`, verbatim at bytes 1015180 and 1015357:
-
-            case "sendSalesImageToChat": if (!i || !i.url) return;
-              this.globals.isPresenter || this.appEventBus.emit("sendSalesImageToChat", i)
-
-          The senders shipped on 2026-08-23 and these did not, so both buttons raised
-          "Command send OK." over a frame nothing read. `TODO.md` row 7.
-
-          **`isPresenter ||` is a GUARD**: the receiver runs only for a NON-presenter, so a presenter
-          is neither shown their own image nor navigated out of the room they are running. That is
-          the opposite of `softResetDone` above, which returns to its sender on purpose.
-        */
-        if (command?.cmd === 'sendSalesImageToChat') {
-          if (typeof command.url === 'string' && command.url && !this.#isPresenter()) {
-            this.#broadcasts.salesImageShown(command.url);
-          }
-          return;
-        }
-        if (command?.cmd === 'sendUsersToURL') {
-          /*
-            The most destructive frame in the room: the member loses a half-typed message and a live
-            screenshare with no warning. Faithful — the reference's receiver is one statement with no
-            guard near it, and no confirm was found. Recorded in `TODO.md` row 7 as a divergence
-            candidate for the owner rather than invented here. `broadcastableUrl` already refused
-            anything but http/https on the way out.
-          */
-          if (typeof command.url === 'string' && command.url && !this.#isPresenter()) {
-            globalThis.location.href = command.url;
-          }
-          return;
-        }
-
-        /*
-          `playVideoForAll` / `stopVideoForAll`, verbatim (bytes 1,966,711 and 1,966,882):
-
-            subscribe("playVideoForAll", e => { this.videoPlayerUrl = e.url;
-              this.hideVideoPlayer = !0;
-              this.isP || this.onMainTabChange("presAreaTabs-videoplayer") })
-            subscribe("stopVideoForAll", () => { this.videoPlayerUrl = "";
-              this.scheduledVideo.videoURL = ""; this.scheduledVideo.videoPlayTime = null;
-              this.hideVideoPlayer = !1;
-              this.isP || this.onMainTabChange("presAreaTabs-screens") })
-
-          Room-wide, so no `targetUserId` to match on. The tab move is for NON-presenters only, and
-          the reason is visible in the gate it pairs with: a presenter is already able to reach the
-          VideoPlayer tab whenever they like, while a member's tab exists only while
-          `hideVideoPlayer` is true — dragging them there is what makes it reachable at all, and
-          putting them back on screens is what stops them staring at an empty pane afterwards.
-        */
-        if (command?.cmd === 'playVideoForAll') {
-          if (typeof command.url !== 'string') return;
-          this.#broadcasts.videoStarted(command.url);
-          if (!this.#isPresenter()) this.#showTab('videoplayer');
-          return;
-        }
-        if (command?.cmd === 'stopVideoForAll') {
-          /*
-            The armed timer dies here rather than in the sender, so that a stop sent by ANOTHER
-            presenter also cancels this browser's pending play. Clearing it only where the button
-            is pressed would leave the first presenter's video arriving minutes after the room was
-            told it had been removed.
-          */
-          this.#broadcasts.videoStopped();
-          if (!this.#isPresenter()) this.#showTab('screens');
-          return;
-        }
-
-        /*
-          `playYTForAll` / `stopYTForAll` — the floating overlay, on every screen in the room.
-
-            case "playYTForAll": this.guiEventBus.emit("playYTForAll", {url: i.url});
-            case "stopYTForAll": this.guiEventBus.emit("stopYTForAll");
-
-          THE SEEK POSITION IS DERIVED, NEVER SENT. The subscriber at byte 1,964,799 is
-
-            let i = 0;
-            if (e.startTime) { let o = Number(e.startTime); i = Math.round((Date.now() - o) / 1e3) }
-            else this.startTime = 0;
-
-          and `startTime` is absent from the live command above — it arrives only on the late-join
-          replay, `emit("playYTForAll", {url: roomState.ytURL, startTime: roomState.ytStartTime})`
-          at byte 1,965,054. That replay needs a persisted room video state, which this room does
-          not have, so the offset here is always the live command's 0 and no `start=` is appended.
-          The gap is recorded in `TODO.md`. What must NOT happen is a `startTime` invented onto the
-          wire to make the branch look implemented: the value is a function of when the room
-          started playing, and nothing here knows that.
-        */
-        if (command?.cmd === 'playYTForAll') {
-          if (typeof command.url === 'string') this.#broadcasts.youtubeStarted(command.url);
-          return;
-        }
-        if (command?.cmd === 'stopYTForAll') {
-          // No payload is read. A url rides with the stop that precedes a play (byte 2,296,932)
-          // and the reference's dispatch forwards none of it.
-          this.#broadcasts.youtubeStopped();
-          return;
-        }
 
         if (command?.cmd === 'changeChatMode') {
           /*
@@ -731,7 +683,7 @@ export class RoomEventStream<Entry> {
 
       /*
         `/privCmdsIn/{uid}-{id}/` — every command addressed to ONE member, in
-        `#lib/room/private-commands.svelte.ts`.
+        `#lib/room/private-commands.ts`.
 
         The whole channel left this router on 2026-08-23, ahead of the receivers `TODO.md` row 9
         still owes. Five channels here carry frames for the room; this one names a person, and the
@@ -761,6 +713,23 @@ export class RoomEventStream<Entry> {
 
         The message travels with the event, so nothing has to refetch a thread to learn one line.
       */
+      /*
+        `typingUpdated` — who is typing in one chat channel. The server has already removed this
+        viewer's own name, so nothing here filters; the frame is the answer.
+
+        Handled BEFORE the `senderId` guard below, because a typing frame has no sender: it is a
+        per-recipient snapshot rather than somebody's message, and the guard that stops a member
+        refetching on their own post would drop every one of these that happened to carry no id.
+      */
+      if (payload.channel === 'typing') {
+        const frame = payload.data as
+          { chatChannel?: string; names?: readonly string[] } | undefined;
+        if (typeof frame?.chatChannel === 'string') {
+          this.#chat?.typingUpdated(frame.chatChannel, frame.names ?? []);
+        }
+        return;
+      }
+
       if (payload.channel === 'privChat') {
         const priv = payload.data as
           { toUserId?: number; message?: PrivateChatMessage } | undefined;
@@ -774,44 +743,54 @@ export class RoomEventStream<Entry> {
         return;
       }
 
+      /*
+        `alertsOverlayOnScreenshare` — an arriving alert, handed to every screen this peer is sharing
+        so it is burned into the frames the room receives. `#lib/room/screen-overlay.ts` is
+        the gate; a room without the setting, or a presenter sharing nothing, fans out to nothing.
+
+        BEFORE the own-sender guard below, and that is the whole point rather than an accident of
+        ordering. The presenter posting the alert is usually the presenter sharing the screen, and
+        skipping their own alert would mean the one member who cannot see it is the room that
+        everybody else is watching. The guard exists to stop a REFETCH the poster already did; it
+        was never about what the poster may be shown.
+
+        The body travels on this channel already (`post-alert.remote.ts` publishes `body` and
+        `senderName`), so nothing here refetches to learn a line of text.
+      */
+      if (payload.channel === 'alerts') {
+        const alert = payload.data as { body?: string; senderName?: string } | undefined;
+        if (typeof alert?.body === 'string') {
+          this.#screenOverlay?.show({ text: alert.body, sender: alert.senderName ?? '' });
+        }
+      }
+
       // Our own post already refetched. Re-invalidating would refetch twice per alert.
       if (payload.data?.senderId === this.#session().user.id) return;
 
       /*
-        The chat ding, transcribed from `app-chat.compiled.js:112-137`:
+        THE CHAT DING. The rule is `#lib/chat-arrival-sound.ts`, which carries the transcription,
+        both upstream defects it does not reproduce, and the reason a rule with five inputs does not
+        belong inside a dispatcher only reachable through nine collaborators.
 
-          !preferences.doNotDisturbOn && preferences.chatSoundOn
-            ? userActions.followedUsers[e.avt].followChatStyle.playSound
-                ? pling.play()
-                : ((playChatMessageSoundFor.length && hashEmail(user.email) !== e.avt
-                     && playChatMessageSoundFor.includes(e.avt))
-                   || (sessData.dingOnNewMessage && hashEmail(user.email) !== e.avt))
-                  && followed.play()
-
-        Three things about it are worth stating, because each is easy to get wrong:
-
-        * **A followed user wins, and plays a DIFFERENT sound.** `pling`, not `followed` — the
-          per-user preference outranks the room-wide setting, and it is the only branch that does.
-        * **`followed` is the sound for an ordinary new message.** The name is the reference's, and
-          it is confusing: the sound file called "followed" is what the ROOM-WIDE ding uses, while
-          a followed user gets "pling".
-        * **Never for your own message.** The reference compares `hashEmail(user.email) !== e.avt`;
-          the `senderId` guard directly above already does that here, so the check is not repeated.
-
-        `playChatMessageSoundFor` — the per-email list — is NOT implemented. It is a room setting
-        holding member email addresses, and the reference compares it against `e.avt`, an email
-        HASH, so honouring it means the server sending hashed addresses rather than the raw list.
-        Sending raw member emails to every browser to decide a sound would be the wrong trade;
-        recorded rather than quietly skipped.
+        THE LOOKUP IS OPTIONAL, and that is the half of the fix that has to live HERE: upstream
+        reads `followedUsers[e.avt].followChatStyle` after checking only that the map is non-empty,
+        so it throws for every message from anyone a member does not follow. Resolving it at the
+        call site with `?.` is what makes that impossible; the module takes the answer, not the map.
       */
       if (payload.channel === 'chat' && !this.#prefs.doNotDisturbOn && this.#prefs.chatSoundOn) {
         const senderHash = (payload.data as { senderEmailHash?: string } | undefined)
           ?.senderEmailHash;
-        const followStyle = senderHash
-          ? this.#userActions.followedUsers[senderHash]?.followChatStyle
-          : undefined;
-        if (followStyle?.playSound) playSoundEffect('pling');
-        else if (this.#session().sessData?.dingOnNewMessage) playSoundEffect('followed');
+        const sound = arrivalSoundFor({
+          doNotDisturb: this.#prefs.doNotDisturbOn,
+          chatSoundOn: this.#prefs.chatSoundOn,
+          followedSenderPlaysSound:
+            senderHash !== undefined &&
+            this.#userActions.followedUsers[senderHash]?.followChatStyle?.playSound === true,
+          dingOnNewMessage: this.#session().sessData?.dingOnNewMessage === true,
+          senderEmailHash: senderHash,
+          chatSoundForEmailHashes: this.#session().chatSoundForEmailHashes
+        });
+        if (sound) playSoundEffect(sound);
       }
 
       /*

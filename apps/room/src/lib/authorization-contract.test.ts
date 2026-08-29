@@ -138,18 +138,35 @@ describe('session credential exposure', () => {
 });
 
 describe('write-action input validation', () => {
-  it('accepts only the channels the client can render', async () => {
-    const { isChatTab, CHAT_TABS } = await import('./types');
+  it('accepts only the channels THIS MEMBER holds, which is no longer a constant', async () => {
+    /*
+      THIS TEST USED TO IMPORT `isChatTab` AND `CHAT_TABS` FROM `types.ts`, and both are gone.
 
-    for (const tab of CHAT_TABS) expect(isChatTab(tab)).toBe(true);
+      They were a closed union over `['main', 'off-topic']` and they answered the question this
+      describe block asks — `messages.room` is a bare label with no foreign key, so without a check
+      an arbitrary string could be written and the content would sit in a channel nobody displays.
 
-    // `messages.room` is a bare label with no foreign key, so without this an arbitrary
-    // string could be written and the content would sit in a channel nobody displays.
-    expect(isChatTab('main')).toBe(true);
-    expect(isChatTab('off-topic')).toBe(true);
-    expect(isChatTab('smuggled')).toBe(false);
-    expect(isChatTab('')).toBe(false);
-    expect(isChatTab('MAIN')).toBe(false);
+      `chatTabsWithBadges` (2026-08-28) made the channel set per ROOM and per MEMBER, so a constant
+      cannot answer it any more, and the union answered a WEAKER question than the one that matters:
+      it caught a typo, never a member naming a channel their badge does not open. Both commands ask
+      `memberChatChannels` now — the server's own answer, from the room configuration and the
+      member's badges — and refuse anything not on it.
+
+      The parser that decides which names are even eligible is still a pure allow-list and is
+      exercised here; the per-member half is executed against the database in
+      `chat-tabs-contract.test.ts`.
+    */
+    const { parseChatTabsWithBadges, BUILT_IN_CHAT_TABS } = await import('./chat-tabs');
+
+    expect([...BUILT_IN_CHAT_TABS]).toEqual(['main', 'off-topic']);
+
+    // A name that collides with a built-in is refused, because the channel name IS `messages.room`.
+    expect(parseChatTabsWithBadges('[{"name":"main","badges":[]}]')).toEqual([]);
+    expect(parseChatTabsWithBadges('[{"name":"off-topic","badges":[]}]')).toEqual([]);
+    // …and so is anything that is not a usable entry at all.
+    expect(parseChatTabsWithBadges('not json')).toEqual([]);
+    expect(parseChatTabsWithBadges('[{"name":"","badges":[]}]')).toEqual([]);
+    expect(parseChatTabsWithBadges('[{"name":"vip"}]')).toEqual([]);
   });
 
   it('caps message, question and alert bodies', () => {
@@ -171,7 +188,13 @@ describe('write-action input validation', () => {
     expect(chat).toContain('export const sendMessage = command(');
     // Checked on BOTH paths now, where the reply path had no bound at all.
     expect((chat.match(/body\.length > MAX_MESSAGE_BODY/g) ?? []).length).toBe(2);
-    expect(chat).toContain('isChatTab(value)');
+    /*
+      The channel check, which moved out of the schema on 2026-08-28 and is asserted where it landed.
+      `isChatTab` is gone with the closed union; the schema bounds the string and the body asks
+      `memberChatChannels`, because the answer needs the request's user and a Zod predicate has none.
+    */
+    expect(chat).toContain('memberChatChannels(request, shortCode, user)');
+    expect(chat).toContain("error(403, 'Unknown channel.')");
 
     const questions = text(new URL('../routes/alert-questions.remote.ts', import.meta.url));
     expect(questions).toContain('body.length > MAX_QUESTION_BODY');

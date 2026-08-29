@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { ngbTooltip, ngbTooltipWith } from '#lib/ngb-tooltip.js';
+  import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
+  import { downscaledSize } from '#lib/profile-picture-downscale.js';
+  import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
+  import CloseSessionPane from './CloseSessionPane.svelte';
+  import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
   import { ALERT_SEARCH_LIMIT } from '#lib/alert-search-limit.js';
   import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
-  import { alertDateFormatter } from '#lib/message-formatters.js';
   import {
     CONNECTIVITY_ROWS,
     connectivityGlyph,
@@ -18,19 +21,27 @@
     ActivePoll,
     FollowChatStyle,
     ManagedChatUser,
+    MessageAction,
+    MessageActionItem,
+    MessageReactionPayload,
+    MessageReactions,
     ModalName,
     ModalTargetUser,
     SavedPoll,
     SettingsTab,
-    Theme
+    Theme,
+    TradeCopyPayload
   } from '#lib/types.js';
+  import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
+  import AlertQaModal from './AlertQaModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
+  import MobileRestorePane from './MobileRestorePane.svelte';
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
   import PostAlertModal from './PostAlertModal.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
-  import RoomMessage from './RoomMessage.svelte';
   import { chatModeConfirmPrompt, type ChatMode } from '#lib/chat-mode.js';
   import { refusalMessage, refusalOrTransportMessage } from '#lib/refusal-message.js';
   import { uploadFile } from '../../routes/files-pane.remote';
@@ -75,6 +86,10 @@
     mediaIceServers?: RTCIceServer[];
     settingsTab: SettingsTab;
     alertTab: AlertTab;
+    /** "Sticky non-trade alert?" — passed through to the composer, which re-applies it per open. */
+    stickyNonTradeAlert?: boolean;
+    /** `sessData.hasAlertScheduler`, forwarded to the composer — see `PostAlertModal`'s own prop. */
+    schedulerAvailable?: boolean;
     theme: Theme;
     roomSplitDir: 'ltr' | 'ttb' | 'rtl' | 'btt';
     sessionControlInitialTab:
@@ -138,13 +153,62 @@
       senderEmailHash: string;
       senderAvatarUrl: string;
       senderRole: string;
+      /**
+       * The row's own reactions, validated on the SERVER by `parseReactions` before they travel —
+       * the same shape and the same route every other rendered message takes.
+       */
+      reactions: MessageReactions;
     }[];
+    /**
+     * The chrome every rendered message shares, spread onto each Q&A entry.
+     *
+     * THIS REVERSES A DECISION recorded in `room-message-chrome.ts`, which said the thread was
+     * "left spelling its four" because spreading the full chrome "would silently turn those on
+     * inside a modal that has never shown them". That was right while the thread was inert: it
+     * rendered `kind="chat"` with an `onaction` that did nothing, so anything the chrome switched on
+     * would have been a control that could not act.
+     *
+     * The thread acts now, and it renders `kind="alert"` because that is what the reference does
+     * (`this.isQAMsg = !0, this.logType = "alerts"`). Spreading is what makes its menu the menu the
+     * reference draws, minus the three entries that are dead upstream — `message-behavior.ts` names
+     * them and says why.
+     *
+     * `alertLabels` is deliberately NOT passed, and that is the reference's own choice: the body
+     * pipe receives `e.isQAMsg ? null : alertLabels` (bundle byte 1,331,700), so a hash inside a
+     * question stays text.
+     */
+    messageChrome: RoomMessageChrome;
+    /**
+     * The two display modes the settings modal's Text Mode radios show and set.
+     *
+     * `alertsDisplayMode` is also what the Q&A thread renders in — upstream's Q&A modal calls
+     * `loadAlertsMode()`, the same function the alerts log calls, rather than keeping a third key.
+     */
+    alertsDisplayMode: ChatDisplayMode;
+    chatLogDisplayMode: ChatDisplayMode;
+    onDisplayModeChange: (surface: ChatDisplaySurface, mode: ChatDisplayMode) => void;
+    /**
+     * What a Q&A entry's menu asks for. `mention` never arrives here — this component owns the
+     * thread's composer, so it inserts that one itself.
+     */
+    onQaAction: (
+      action: MessageAction,
+      item: MessageActionItem,
+      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+    ) => void;
     onMentionUser: (name: string) => void;
     onPrivateChat: (user: ModalTargetUser) => void;
     onFollowToggle: (user: ModalTargetUser) => void;
     onFollowStyleChange: (user: ModalTargetUser, style: FollowChatStyle) => void;
     onMuteToggle: (user: ModalTargetUser) => void;
     onUserAction: (action: string, user: ModalTargetUser) => void;
+    /**
+     * Upstream's `allowToManageNotes`. It gates two things there — `pTe`, the password panel below,
+     * while false, and `fTe`, the member's own notes with a delete per row, while true. Only the
+     * first exists here: `notes` is room-scoped, keyed by `room_short_code` with no member column,
+     * so there are no per-member notes to list. That is a schema change and its own feature.
+     */
+    canManageNotes?: boolean;
     /**
      * Save the five permission checkboxes — the one control here that carries a PAYLOAD.
      *
@@ -169,6 +233,25 @@
     streamingType: string;
     onManagedUserRemoval: (list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) => void;
     onManagedUserInfo: (user: ManagedChatUser) => void;
+    /**
+     * `sessData.enablePrivateMessageHistory` — whether the user-info modal offers the moderation
+     * read at all.
+     *
+     * A CONVENIENCE, not the authority: `loadPeerPrivateMessageHistory` refuses on the server from
+     * the control plane. Hiding the button stops a presenter asking for something the room has not
+     * enabled; it is not what stops the read.
+     */
+    privateMessageHistoryEnabled: boolean;
+    /** Opens the all-user private-message modal for one peer. */
+    onShowPrivateMessages: (user: ModalTargetUser) => void;
+    /** What that modal is showing, and why it is not. All three owned by `RoomPrivateChat`. */
+    peerHistory: {
+      readonly nick: string;
+      readonly messages: readonly PrivateChatMessage[];
+      readonly truncated: boolean;
+    } | null;
+    peerHistoryLoading: boolean;
+    peerHistoryError: string | null;
     currentUser: {
       id: number;
       email: string;
@@ -182,6 +265,26 @@
      * pair code. `N/A` is the captured value for "not answered yet".
      */
     mobilePin?: string;
+    /**
+     * Whether this member can reach the mobile app at all — `gates.mobileAppAvailable`.
+     *
+     * Gates the Mobile App TAB, which upstream does not gate at all. That absence is
+     * `docs/decoded/mobile-app-decoded.md` §3 row 26, verified by reading the whole troubleshooter
+     * component: `ptrMobileAppEnabled` occurs five times in the bundle and none is in that range.
+     *
+     * The doc asks for a deliberate decision rather than a copy, and this is it. A room with no app
+     * configured would otherwise show a tab whose only button answers 409 every time — a control
+     * whose sole effect is its own presence, which this repository refuses by name. The endpoint is
+     * gated regardless; this stops the member being offered something that cannot work.
+     */
+    mobileAppAvailable?: boolean;
+    /** `restoreMobileAppTokens` — see `runMobileRestore`, which composes what the member reads. */
+    onrestoremobiletokens: () => Promise<{
+      registrations: number;
+      sent: number;
+      failed: number;
+      pruned: number;
+    }>;
     /** `sessData.customMobileAppAndroidUrl`, when `customMobileAppEnabled`. */
     mobileAndroidUrl?: string | null;
     /** `sessData.customMobileAppIOSUrl`, when `customMobileAppEnabled`. */
@@ -201,6 +304,23 @@
      */
     canEditUsername?: boolean;
     targetUser: ModalTargetUser;
+    /**
+     * `adminUploadProfilePic` — a presenter sets this member's avatar.
+     *
+     * Its own prop, not an `onUserAction` case: see the note at the button. The `File` crosses to
+     * the server as a real `File`, which `uploadComposerImage` already relies on and documents.
+     */
+    onUploadProfilePicture: (user: ModalTargetUser, file: File) => void;
+    /** The other half of the same control — see the button in the avatar cluster. */
+    onRemoveProfilePicture: (user: ModalTargetUser) => void;
+    /**
+     * The debug log this presenter last received, or null.
+     *
+     * Both fields are filled by the SERVER from the replying member's own session — a member cannot
+     * name whose log this is said to be, which is the one thing upstream's `{requestor}` reply let
+     * it do. See `routes/debug-log.remote.ts`.
+     */
+    debugLog?: { fromUserId: number; fromName: string; log: string } | null;
     mutedUsers: Record<string, ManagedChatUser>;
     followedUsers: Record<string, ManagedChatUser>;
     targetMessage: {
@@ -237,6 +357,18 @@
     chatMode?: ChatMode;
     /** `changeChatMode` — a presenter act that changes the room; `#lib/chat-mode.ts` says why typed. */
     onChatModeChange: (mode: ChatMode) => void;
+    /** What members are told when the room is closed, as stored. The editor opens on this. */
+    closedMessage?: string;
+    /**
+     * Both close-session buttons, as ONE receiver taking what they differ by.
+     *
+     * *" Save Message and Close Session "* and *" Just Save Close Message "* save the same text; one
+     * of them then closes the room. Two props would have been two chances to wire the save to only
+     * one of them — which is exactly what was wrong here until 2026-08-27, when the first wrote
+     * `sessionOpen: false` without the message and the second raised `Message Saved` and wrote
+     * nothing at all. Two buttons offered to save it and neither did.
+     */
+    onSaveCloseMessage?: (message: string, then: 'close' | 'save-only') => void;
     onRteDraftChange: (html: string) => void;
     onRteSend: () => void;
     /**
@@ -272,6 +404,8 @@
     mediaIceServers = [],
     settingsTab,
     alertTab,
+    stickyNonTradeAlert = false,
+    schedulerAvailable = false,
     theme,
     roomSplitDir,
     sessionControlInitialTab,
@@ -310,24 +444,40 @@
     onReplySend,
     onQuestionSend,
     alertQuestions = [],
+    messageChrome,
+    alertsDisplayMode,
+    chatLogDisplayMode,
+    onDisplayModeChange,
+    onQaAction,
     onMentionUser,
     onPrivateChat,
     onFollowToggle,
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
+    canManageNotes = false,
     onSavePermissions,
     streamingType,
     onManagedUserRemoval,
     onManagedUserInfo,
+    privateMessageHistoryEnabled,
+    onShowPrivateMessages,
+    peerHistory,
+    peerHistoryLoading,
+    peerHistoryError,
     currentUser,
     mobilePin = 'N/A',
+    mobileAppAvailable = false,
+    onrestoremobiletokens,
     mobileAndroidUrl = null,
     mobileIosUrl = null,
     hideMobileCredentials = false,
     isLimitedPresenter = false,
     canEditUsername = false,
     targetUser,
+    debugLog = null,
+    onUploadProfilePicture,
+    onRemoveProfilePicture,
     mutedUsers,
     followedUsers,
     targetMessage,
@@ -336,6 +486,8 @@
     rteDraft = '',
     rteIsEditing = false,
     chatMode = 'g',
+    closedMessage = '',
+    onSaveCloseMessage,
     onChatModeChange,
     onRteDraftChange,
     onRteSend,
@@ -514,42 +666,6 @@
   });
   let replyComposer = $state('');
   let replyEmojiOpen = $state(false);
-  let qaComposer = $state('');
-  let qaEmojiOpen = $state(false);
-  let qaMenuQuestionId = $state<number | null>(null);
-  const qaQuestions = $derived(
-    alertQuestions.filter((question) => question.alertId === targetMessage?.id)
-  );
-  const qaTimeFormatter = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  // Captured alerts carry the timestamp exactly as it was rendered; database rows are formatted.
-  /*
-    The tooltip beside the visible time, which the reference BINDS rather than writes:
-    `xn("ngbTooltip", Ct(27, 24, e.msg.t, "short"))` against a visible `hh:mm a`. Angular's
-    `date:'short'` for en-US is `M/d/yy, h:mm a`, which is exactly what `alertDateFormatter` already
-    produces — reused rather than re-derived, because a second formatter for the same shape is how
-    two of them drift apart.
-
-    Empty when there is no timestamp to format: `ngbTooltipWith` renders nothing for an empty string,
-    which matches a reference binding that evaluates to nothing.
-  */
-  const qaAlertTooltip = $derived.by(() => {
-    if (!targetMessage) return '';
-    return 'createdAt' in targetMessage && targetMessage.createdAt
-      ? alertDateFormatter.format(new Date(targetMessage.createdAt as string | Date))
-      : '';
-  });
-  const qaAlertTimestamp = $derived.by(() => {
-    if (!targetMessage) return '';
-    if ('evidenceTimestampText' in targetMessage && targetMessage.evidenceTimestampText) {
-      return targetMessage.evidenceTimestampText;
-    }
-    return 'createdAt' in targetMessage && targetMessage.createdAt
-      ? qaTimeFormatter.format(new Date(targetMessage.createdAt as string | Date))
-      : '';
-  });
   let youtubeURL = $state('');
   let ytVideoList = $state<Array<{ title: string; url: string }>>([]);
   let youtubePromptOpen = $state(false);
@@ -641,8 +757,22 @@
       : ''
   );
   let reportLoading = $state(true);
-  let alertDisplayMode = $state<'regular' | 'compact'>('regular');
-  let chatDisplayMode = $state<'regular' | 'compact'>('regular');
+  /*
+    ── THE TWO TEXT-MODE RADIOS WERE DEAD, and this is the third control of that exact shape ────────
+
+    They were `$state<'regular' | 'compact'>('regular')` here, seeded to a CONSTANT and never from
+    anything, writing `onPreferenceChange('alertDisplayMode' | 'chatDisplayMode', 'regular' |
+    'compact')` — three invented names against the reference's own `alertsMode` / `chatMode` keys and
+    its `'r'` / `'c'` values. Nothing in this room read any of them. So the radios persisted a
+    preference nobody consulted, and reopening the modal showed Regular whatever had been picked.
+
+    That is the same defect the room's chat-mode radio had (`chat-mode.remote.ts` records it) and the
+    same one `dead-preference-keys.ts` was written for. Both invented keys join that list.
+
+    They are PROPS now: the mode is resolved once per surface on the page — `resolveChatDisplayMode`,
+    which the owner's `altChatRender` can force — and a change is reported back up rather than kept
+    here, because the logs that render it are not inside this component.
+  */
   let presenterTextColor = $state('#f7fd37');
   let presenterBackgroundColor = $state('#000000');
   let chatStyle = $state<FollowChatStyle>({
@@ -686,7 +816,8 @@
   });
   type ConnectivityTestState = 'pending' | 'passed' | 'failed' | 'unconfigured';
   type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
-  let activeConnectivityTab = $state<'network' | 'mic'>('network');
+  let activeConnectivityTab = $state<'network' | 'mic' | 'mobile'>('network');
+
   let testResults = $state({ udp: false, tcp: false, stun: false, turn: false });
   /**
    * Which ICE servers the last run used.
@@ -750,9 +881,16 @@
     micErrorMessage = '';
   }
 
-  function onConnectivityTabChange(tab: 'network' | 'mic') {
+  function onConnectivityTabChange(tab: 'network' | 'mic' | 'mobile') {
     if (tab === activeConnectivityTab) return;
     if (activeConnectivityTab === 'mic') cleanupMicTest();
+    /*
+      Leaving the Mobile App tab drops its result, and nothing here has to remember to do that:
+      `MobileRestorePane` holds the message and the `{:else if}` below unmounts it, so the state goes
+      with it. Recorded because the manual reset that used to sit on this line is exactly the kind of
+      thing a later reader deletes as redundant — and it would be, until somebody moved the state
+      back up here.
+    */
     activeConnectivityTab = tab;
   }
 
@@ -1179,6 +1317,125 @@
 
   function setAutoplayAttribute(node: HTMLVideoElement) {
     node.setAttribute('autoplay', 'autoplay');
+  }
+
+  /**
+   * The hidden picker behind the "Upload Profile Picture" button.
+   *
+   * `$state`, and the first draft of this had it as a plain `let` with a comment arguing that
+   * nothing renders from it. THE COMPILER DISAGREED — `non_reactive_update`: *"`profilePictureInput`
+   * is updated, but is not declared with `$state(...)`"* — and it is right, because `bind:this` is
+   * a WRITE, performed on mount and again with `undefined` on teardown. A plain `let` holds a
+   * detached node after the modal is re-rendered, and `svelte-check --fail-on-warnings` (this app's
+   * own `check` script) would have refused it in CI.
+   *
+   * `| undefined` rather than `| null` because that is what `bind:this` writes on teardown for this
+   * shape — measured by `BindThisProbe.svelte`, which exists to answer exactly that question rather
+   * than have each site guess.
+   *
+   * `svelte-autofixer` returns zero issues and one suggestion here — *"The usage of `bind:this` can
+   * often be replaced with an easier to read `action` or even better an `attachment`."* DECLINED,
+   * recorded rather than ignored, because this repository has already ruled on the question with the
+   * docs in hand. `dom-reference-contract.svelte.test.ts` quotes `svelte/bind` verbatim — *"To get a
+   * reference to a DOM node, use `bind:this`"* — and admits a capture attachment only for three
+   * STRUCTURAL reasons: crossing a component boundary, fanning one node to two owners, or a node
+   * that has no single lvalue. This node is read in the same file, by one owner, inside an event
+   * handler. An attachment here would be the hand-rolled `bind:this` that gate calls unsanctioned.
+   */
+  let profilePictureInput = $state<HTMLInputElement | undefined>();
+
+  /**
+   * The picker filter: `image` then a slash then a wildcard — ASSEMBLED, not written as a literal.
+   *
+   * This is not obfuscation and it is not style. Writing that attribute value directly puts a
+   * slash-star pair in the file, and slash-star opens a comment window for the whole-file regex that
+   * fifty-five test files here use to strip comments before reading markup.
+   *
+   * Measured when the first draft did exactly that: the window opened at line 2,559 and the next
+   * star-slash closed it at line 5,687 — **120,987 characters of markup deleted**, taking
+   * `AlertQaModal`, `BootboxDialog`, `CompactMessageRow` and the rest with them. Three contract
+   * tests went red for markup that was still on disk.
+   *
+   * `orphan-component-contract.test.ts` catches that class and its message offers two resolutions:
+   * move the render out of the window, or give every reader a Svelte-aware stripper. Neither fits a
+   * 6,000-line host with fifty-five readers. Not emitting the sequence is the third, and it costs
+   * one line and this paragraph.
+   *
+   * `PostAlertModal.svelte` carries the literal safely because nothing closes its window — an
+   * unclosed one matches nothing and deletes nothing. That is luck, not design, and this file has
+   * none of it.
+   *
+   * A SECOND self-inflicted failure is recorded here because it cost a run: the first version of
+   * this very paragraph quoted the closing sequence, which terminated the docblock early and made
+   * the whole component unparseable. `CLAUDE.md` already says a comment must not contain the syntax
+   * it is describing; this is that rule earning its place twice in one edit.
+   *
+   * The value is byte-identical to the attribute the capture renders; only how it reaches the DOM
+   * has changed.
+   */
+  const IMAGE_ACCEPT = `image/${'*'}`;
+
+  /**
+   * Downscale to the reference's 125px box, then hand the result up.
+   *
+   * ## The step this was missing
+   *
+   * `adminUploadProfilePic` (bundle byte 2,084,700) never uploads the chosen file. It reads it,
+   * draws it into a canvas at a 125px longest edge, and uploads THAT as a PNG. The first version of
+   * this control shipped without the step because the evidence row naming it was not read until
+   * after; `#lib/profile-picture-downscale.js` carries the arithmetic and that correction.
+   *
+   * It matters more here than upstream: this room stores the bytes itself, and an avatar is only
+   * ever drawn at 45px in a roster row or 80px in this modal.
+   *
+   * ## Failing OPEN, deliberately
+   *
+   * Every step below can fail on a file the browser cannot decode - `createImageBitmap` throws,
+   * `getContext` returns null, `toBlob` hands back null. In each case the ORIGINAL file is sent. The
+   * server refuses a non-image and reports why; refusing here as well would replace that specific
+   * message with a vaguer one from a resize that was never the point.
+   */
+  async function sendProfilePicture(user: ModalTargetUser, file: File): Promise<void> {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const size = downscaledSize(bitmap.width, bitmap.height);
+      if (size.width === bitmap.width && size.height === bitmap.height) {
+        bitmap.close();
+        onUploadProfilePicture(user, file);
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        bitmap.close();
+        onUploadProfilePicture(user, file);
+        return;
+      }
+      context.drawImage(bitmap, 0, 0, size.width, size.height);
+      bitmap.close();
+
+      // `image/png` and quality 1, both the reference's - `F.toBlob(te => ..., "image/png", 1)`.
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((result) => resolve(result), 'image/png', 1)
+      );
+      if (!blob) {
+        onUploadProfilePicture(user, file);
+        return;
+      }
+
+      /*
+        `.png`, because the bytes ARE a PNG now whatever the original was. A `.jpg` name on PNG bytes
+        is the kind of small lie that survives into a filename on disk and confuses the next person
+        who looks at the uploads directory.
+      */
+      const renamed = file.name.replace(/\.[^./\\]*$/, '') + '.png';
+      onUploadProfilePicture(user, new File([blob], renamed, { type: 'image/png' }));
+    } catch {
+      onUploadProfilePicture(user, file);
+    }
   }
 
   function setReadonlyAttribute(node: HTMLTextAreaElement) {
@@ -1787,27 +2044,6 @@
     }
   }
 
-  async function sendQuestion() {
-    const body = qaComposer.trim();
-    if (!body) return;
-    if (await onQuestionSend(body)) {
-      qaComposer = '';
-      qaEmojiOpen = false;
-    }
-  }
-
-  // Mirrors the reply composer: Enter sends, Shift+Enter is ignored, Alt+Enter inserts a newline.
-  // The captured textarea had no handler at all, so pressing Enter did nothing.
-  function handleQaKeydown(event: KeyboardEvent) {
-    if (event.key !== 'Enter') return;
-    // Shift+Enter and Alt+Enter insert a line break: fall through so the textarea does it
-    // natively, which puts the break at the caret and keeps undo history intact. Calling
-    // preventDefault() before this check swallowed the keystroke and produced no newline at all.
-    if (event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    void sendQuestion();
-  }
-
   // Same defect as the Q&A composer had, and the same fix: preventDefault() ran before the
   // modifier check, so Shift+Enter was swallowed instead of inserting a line break.
   function handleReplyKeydown(event: KeyboardEvent) {
@@ -1932,6 +2168,36 @@
           shown - the element, its attributes and its rendered size are unchanged.
         -->
         <img src={targetUserModalAvatar} alt={targetUser.nick} loading="lazy" />
+        <!--
+          WIRED 2026-08-29, and it was found by ARITHMETIC rather than by reading the bundle:
+          `remove-profile-picture-btn` carried two rules in `app.css` and had no wearer for the whole
+          port, which `orphan-style-contract.test.ts` now refuses.
+
+          The class list is the capture's, verbatim from the const table at bundle byte 2,088,832:
+
+            ["type","button",1,"btn","btn-danger","btn-sm","rounded-pill",
+             "remove-profile-picture-btn",3,"click"], [1,"fas","fa-times"]
+
+          What its click CALLS was not read — the const table gives the shape and the binding
+          position, and the handler lives in a render function this pass did not locate. So the
+          BEHAVIOUR is inferred from the control's own icon and placement rather than transcribed,
+          and `profile-picture.remote.ts` records that as invented.
+
+          `title` is ours too: the capture's button is an icon with no label, which is a control a
+          screen reader announces as "button". An icon-only control needs an accessible name, and
+          adding one is an addition rather than a divergence.
+        -->
+        {#if isPresenter}
+          <button
+            type="button"
+            title="Remove profile picture"
+            aria-label="Remove profile picture"
+            class="btn btn-danger btn-sm rounded-pill remove-profile-picture-btn"
+            onclick={() => onRemoveProfilePicture(targetUser)}
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        {/if}
       </div>
       <h3 class="modal-title">
         {targetUser.nick}
@@ -2043,8 +2309,33 @@
                       <th scope="row">Badges:</th>
                       <td>
                         <div class="d-inline-block align-baseline mr-1"></div>
-                        {#if targetUser.isTrial}<span class="badge badge-danger">Trial</span>{/if}
-                        {#if targetUser.isNew}<span class="badge badge-info">New</span>{/if}
+                        <!--
+                          `O(20, sessData.isNewIndicatorOn && isPresenter && user.isNew ? 20 : -1)`
+                          — bundle byte 2,060,925, and this gate had ONE of its three terms.
+
+                          `isPresenter` is added here because it is the term this room can actually
+                          evaluate, and it is the one that matters: whether somebody is a new member
+                          is a moderation fact, and a member should not be reading it about another
+                          member. The `Trial` badge above it carries the same rule upstream
+                          (`O(19, isPresenter && user.isFT ? 19 : -1)`) and it is fixed with it.
+
+                          `isNewIndicatorOn` is deliberately NOT added, and the reason is the same
+                          one that keeps it off `ROOM_VISIBLE_SETTINGS`: **`isNew` has no supply.**
+                          It arrives on the reference's own login payload (`globals.user.isNew =
+                          B.data.isNew`, byte 995,175; `isNew: s.isNew || !1`, 1,157,344) from a
+                          server that is not in the capture, so the rule deciding who is new is
+                          unknowable here. Zero occurrences in `apps/room/src/lib/server` or on the
+                          controller — measured, not assumed. A gate with nothing to gate is not a
+                          consumer, which is exactly why `enableBadges` was held out until
+                          `item.badges` had a supply. `missing-settings-triage.md` carries it as
+                          BLOCKED with what would unblock it.
+                        -->
+                        {#if isPresenter && targetUser.isTrial}<span class="badge badge-danger"
+                            >Trial</span
+                          >{/if}
+                        {#if isPresenter && targetUser.isNew}<span class="badge badge-info"
+                            >New</span
+                          >{/if}
                         {#if targetUser.years}
                           <span class="stars-container">
                             <i class="fas fa-star stars-icon"></i>
@@ -2417,12 +2708,52 @@
                   onclick={() => onUserAction('disable-private-chat', targetUser)}
                   ><i class="icon fa fa-comment-slash"></i> Disable Private Chat</button
                 >
+                <!--
+                  WIRED 2026-08-29, and it takes ITS OWN PROP rather than a widened `onUserAction`.
+
+                  That is the call `save-permissions` already paid for and `focusOnSessionNote`
+                  before it: `onUserAction` carries an action name and a user, and a control that
+                  needs to carry a FILE too would have to widen it for every other action as well.
+                  A prop shared between two different acts is what lets a control look wired while
+                  doing something else.
+
+                  Upstream's `adminUploadProfilePic($event)` takes the click event, so the picker is
+                  the button's own. The input is hidden rather than styled because the capture
+                  renders a `<button>` here and nothing else — a visible file input would be a
+                  control the reference does not have.
+                -->
+                <input
+                  type="file"
+                  accept={IMAGE_ACCEPT}
+                  class="d-none"
+                  bind:this={profilePictureInput}
+                  onchange={(event) => {
+                    const picked = event.currentTarget.files?.[0];
+                    // Reset FIRST, so choosing the same file twice still fires a change.
+                    event.currentTarget.value = '';
+                    if (picked) void sendProfilePicture(targetUser, picked);
+                  }}
+                />
                 <button
                   type="button"
                   class="btn btn-block btn-outline-light"
-                  onclick={() => onUserAction('upload-profile-picture', targetUser)}
+                  onclick={() => profilePictureInput?.click()}
                   ><i class="icon fa fa-user-circle"></i> Upload Profile Picture</button
                 >
+                <!--
+                  Slot 102, `O(102, sessData.enablePrivateMessageHistory ? 102 : -1)` at bundle byte
+                  2,068,640, template `hTe` with consts 90 and 91. `{#if}` and not `hidden`: the
+                  reference REMOVES the node, and what it gates is an entitlement rather than a mode,
+                  which is `MainTabStrip`'s rule for choosing between the two.
+                -->
+                {#if privateMessageHistoryEnabled}
+                  <button
+                    type="button"
+                    class="btn btn-block btn-outline-light"
+                    onclick={() => onShowPrivateMessages(targetUser)}
+                    ><i class="icon fas fa-comment"></i> Show private messages</button
+                  >
+                {/if}
               </div>
             </div>
           </div>
@@ -2435,15 +2766,22 @@
               { show: userInfoTab === 'notes', active: userInfoTab === 'notes' }
             ]}
           >
-            <div>
-              <p>To be able to manage user's notes, please enter the password.</p>
-              <button
-                class="btn btn-outline-light"
-                onclick={() => onUserAction('admin-notes-password', targetUser)}
-              >
-                Enter Password
-              </button>
-            </div>
+            <!--
+              Upstream's own gate: `pTe` is the false branch of `allowToManageNotes`. Until
+              2026-08-29 this panel rendered ALWAYS and its button alerted "Wrong password!" whatever
+              was typed; the comparison is real now and clearing it visibly does something.
+            -->
+            {#if !canManageNotes}
+              <div>
+                <p>To be able to manage user's notes, please enter the password.</p>
+                <button
+                  class="btn btn-outline-light"
+                  onclick={() => onUserAction('admin-notes-password', targetUser)}
+                >
+                  Enter Password
+                </button>
+              </div>
+            {/if}
           </div>
         </div>
       </div>
@@ -3147,11 +3485,8 @@
               value="Alert Regular Mode"
               id="alert-regular-mode"
               class="form-check-input"
-              {@attach setInputChecked(alertDisplayMode === 'regular')}
-              onchange={() => {
-                alertDisplayMode = 'regular';
-                onPreferenceChange('alertDisplayMode', 'regular');
-              }}
+              {@attach setInputChecked(alertsDisplayMode === 'r')}
+              onchange={() => onDisplayModeChange('alerts', 'r')}
             />
             <label for="alert-regular-mode" class="form-check-label">Regular Mode</label>
           </div>
@@ -3162,11 +3497,8 @@
               value="Alert Compact Mode"
               id="alert-compact-mode"
               class="form-check-input"
-              {@attach setInputChecked(alertDisplayMode === 'compact')}
-              onchange={() => {
-                alertDisplayMode = 'compact';
-                onPreferenceChange('alertDisplayMode', 'compact');
-              }}
+              {@attach setInputChecked(alertsDisplayMode === 'c')}
+              onchange={() => onDisplayModeChange('alerts', 'c')}
             />
             <label for="alert-compact-mode" class="form-check-label">Compact Mode</label>
           </div>
@@ -3304,11 +3636,8 @@
               id="chat-regular-mode"
               aria-checked="true"
               class="form-check-input"
-              {@attach setInputChecked(chatDisplayMode === 'regular')}
-              onchange={() => {
-                chatDisplayMode = 'regular';
-                onPreferenceChange('chatDisplayMode', 'regular');
-              }}
+              {@attach setInputChecked(chatLogDisplayMode === 'r')}
+              onchange={() => onDisplayModeChange('chat', 'r')}
             />
             <label for="chat-regular-mode" class="form-check-label">Regular Mode</label>
           </div>
@@ -3319,11 +3648,8 @@
               value="Chat Compact Mode"
               id="chat-compact-mode"
               class="form-check-input"
-              {@attach setInputChecked(chatDisplayMode === 'compact')}
-              onchange={() => {
-                chatDisplayMode = 'compact';
-                onPreferenceChange('chatDisplayMode', 'compact');
-              }}
+              {@attach setInputChecked(chatLogDisplayMode === 'c')}
+              onchange={() => onDisplayModeChange('chat', 'c')}
             />
             <label for="chat-compact-mode" class="form-check-label">Compact Mode</label>
           </div>
@@ -3887,7 +4213,7 @@
     id="debug-log-modal"
     open={name === 'debug'}
     ariaLabelledby="user-details"
-    title="Debug Log"
+    title={debugLog ? `Debug Log — ${debugLog.fromName}` : 'Debug Log'}
     {onclose}
     titleClass="modal-title"
     titleTag="h3"
@@ -3897,13 +4223,26 @@
     footerOutsideContent
   >
     <div class="row">
+      <!--
+        `debug-area` is the CAPTURED class and it had no consumer until 2026-08-29: `app.css:2443`
+        and `:3080` have carried `.debug-area { height: 870px; resize: none; background:
+        var(--debug-log-bg) }` and its mobile override the whole time, matching nothing in the
+        markup. Two CSS rules for a class no element wore is the same defect as a class with no CSS,
+        and building the feature is what closes it.
+
+        The value is the SERVER's, not the replying member's — see `routes/debug-log.remote.ts`. It
+        is bound rather than attached because it changes: a presenter can ask a second member without
+        closing the modal, and a one-shot attachment would leave the first member's log on screen
+        under the second one's name.
+      -->
       <textarea
         id="debugLogModalTxt"
         rows="1000"
         {...{ readonly: 'readonly' } as Record<string, string>}
         {@attach setReadonlyAttribute}
-        class="form-control"
-        style="min-width: 100%;"></textarea>
+        class="form-control debug-area"
+        style="min-width: 100%;"
+        value={debugLog?.log ?? ''}></textarea>
     </div>
     {#snippet footer()}
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
@@ -3921,6 +4260,8 @@
     onalert={onAlert}
     onpost={onPostAlert}
     onpastepost={onPastePostAlert}
+    {stickyNonTradeAlert}
+    {schedulerAvailable}
   />
 </app-post-alert-modal>
 <app-poll-modal id="pollModalCompHolder" class="pollModalHolder" bind:this={pollPanelHost}>
@@ -4146,43 +4487,12 @@
           </div>
         </div>
       </div>
-      <div
-        id="close-session"
-        role="tabpanel"
-        aria-labelledby="close-session-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'close-session',
-            active: sessionControlTab === 'close-session'
-          }
-        ]}
-      >
-        <div class="d-flex justify-content-center">
-          <button
-            type="button"
-            class="btn btn-outline-light mr-2 my-2"
-            onclick={() => onUserAction('session-save-close', targetUser)}
-          >
-            <i class="fas fa-save"></i> Save Message and Close Session
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-light mr-2 my-2"
-            onclick={() => onUserAction('session-save-close-message', targetUser)}
-          >
-            <i class="fas fa-save"></i> Just Save Close Message
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-light mr-2 my-2"
-            onclick={() => onUserAction('session-open', targetUser)}
-          >
-            Open Session
-          </button>
-        </div>
-        <div id="summernoteClosedMsg">undefined</div>
-      </div>
+      <CloseSessionPane
+        active={sessionControlTab === 'close-session'}
+        {closedMessage}
+        onOpenSession={() => onUserAction('session-open', targetUser)}
+        onSave={onSaveCloseMessage}
+      />
       <div
         id="lock-session"
         role="tabpanel"
@@ -4822,165 +5132,17 @@
     {/snippet}
   </Modal>
 </app-reply-modal>
-<app-alert-qa-modal>
-  <Modal
-    id="alertQAModal"
-    open={name === 'qa'}
-    ariaLabelledby="alertQALabel"
-    rootClass="fade modal"
-    rootRole={null}
-    rootAttributes={{ 'data-keyboard': 'false', 'data-backdrop': 'static' }}
-    dialogRole={null}
-    {onclose}
-    headerClass="align-items-start"
-    footerClass="flex-nowrap"
-    bodyStyle="max-height: 70vh;"
-  >
-    {#snippet header()}
-      <div class="flex-fill">
-        <h5 id="alertQALabel" class="modal-title">Q&amp;A for Alert:</h5>
-        <div class="admin-alert mt-2">
-          <div
-            {...{ clas: 'd-flex flex-column  align-items-center w-100' } as Record<string, string>}
-          >
-            <div class="mr-1 d-flex flex-row-reverse">
-              <div
-                class="d-flex flex-row-reverse justify-content-center align-items-start flex-nowrap mt-1"
-              >
-                <div class="avatar pl-1">
-                  <img
-                    alt="qaMsg.avt"
-                    src={targetMessage?.senderAvatarUrl ??
-                      'https://secure.gravatar.com/avatar/?d=mm&s=50'}
-                    loading="lazy"
-                    width="50"
-                    height="50"
-                  />
-                </div>
-              </div>
-              <div class="w-100">
-                <div class="d-flex justify-content-between align-items-center w-100">
-                  <span
-                    {...{ placement: 'top' } as Record<string, string>}
-                    {@attach ngbTooltipWith(qaAlertTooltip)}
-                    class="created-at mr-2">{qaAlertTimestamp}</span
-                  >
-                  <div class="d-flex align-items-center justify-content-between flex-nowrap">
-                    <strong class="username mx-1">{targetMessage?.senderName ?? ''}</strong>
-                  </div>
-                </div>
-                <div class="msg-left text-formated preText ml-2 mr-2 p-0">
-                  {targetMessage?.body ?? ''}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/snippet}
-    {#if qaQuestions.length === 0}
-      <div class="my-2">There are no questions.</div>
-    {:else}
-      <!--
-        The captured modal body renders each question through the same <app-st-message> component
-        the room uses, as `msg-box pb-1 msg-box-adm` in its reversed layout - not a bespoke list.
-      -->
-      {#each qaQuestions as question (question.id)}
-        <RoomMessage
-          item={{
-            id: question.id,
-            senderId: question.senderId,
-            senderName: question.senderName,
-            senderEmailHash: question.senderEmailHash,
-            senderAvatarUrl: question.senderAvatarUrl,
-            body: question.body,
-            createdAt: new Date(question.createdAt),
-            // Follows the sender, not the viewer. The captured reader-side modal renders another
-            // reader's question as plain `msg-box pb-1` in the forward layout and the presenter's
-            // answer as `msg-box pb-1 msg-box-adm` reversed; the compiled source picks its toast
-            // wording the same way (`const f = s.isA ? 'answer' : 'question'`). Hardcoding true
-            // made every entry, including a reader's own question, render as a presenter's.
-            isAdmin: question.senderRole === 'staff' || question.senderRole === 'admin',
-            // The captured question body carries `questionColor`. RoomMessage otherwise infers that
-            // from the text containing a "?", which would drop the colour for a question phrased
-            // without one - and inside this modal every entry is a question by definition.
-            evidenceQuestion: true
-          }}
-          kind="chat"
-          currentUserId={currentUser.id}
-          currentUserEmailHash={currentUser.emailHash}
-          viewerIsPresenter={isPresenter}
-          {theme}
-          menuOpen={qaMenuQuestionId === question.id}
-          showDateSeparator={false}
-          ontoggle={(id) => (qaMenuQuestionId = qaMenuQuestionId === id ? null : id)}
-          onaction={() => {}}
-        />
-      {/each}
-    {/if}
-    {#snippet footer()}
-      <div id="textAreaHolder" class="d-flex align-items-center textSendDiv flex-fill">
-        <div class="flex-fill d-flex mx-0">
-          <div class="px-0 flex-fill">
-            <textarea
-              name="txt-area"
-              id="textAreaQATxt"
-              rows="1"
-              spellcheck="true"
-              class="txt-area form-control border-0"
-              placeholder={isPresenter ? 'Type your answer here...' : 'Type your question here...'}
-              bind:value={qaComposer}
-              onkeydown={handleQaKeydown}></textarea>
-          </div>
-          <div
-            class="justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol"
-          >
-            <span
-              {...{
-                placement: 'auto',
-                container: 'body',
-                autoclose: 'outside',
-                popoverclass: 'popOverDiv'
-              } as Record<string, string>}
-              class="textAreaBtns"
-              aria-describedby={qaEmojiOpen ? 'ngb-popover-qa-emoji' : undefined}
-              onclick={() => (qaEmojiOpen = !qaEmojiOpen)}
-            >
-              <i
-                {...{ placement: 'left', ngbtooltip: 'Add Emojis' } as Record<string, string>}
-                {@attach ngbTooltip}
-                class="far fa-smile"
-              ></i>
-            </span>
-            {#if qaEmojiOpen}
-              <EmojiPicker
-                popoverId="ngb-popover-qa-emoji"
-                onselect={(glyph) => (qaComposer += glyph)}
-              />
-            {/if}
-            <!--
-              The compiled component gates this node on `canPostImages`
-              (`O(23, o.canPostImages ? 23 : -1)` in app-alert-qa-modal.full.js), which is why the
-              captured reader-side footer carries only the emoji button.
-            -->
-            {#if isPresenter}
-              <span class="textAreaBtns">
-                <i
-                  {...{
-                    ngbtooltip: 'Upload an Image',
-                    placement: 'left'
-                  } as Record<string, string>}
-                  {@attach ngbTooltip}
-                  class="fas fa-image"
-                ></i>
-              </span>
-            {/if}
-          </div>
-        </div>
-      </div>
-    {/snippet}
-  </Modal>
-</app-alert-qa-modal>
+<AlertQaModal
+  open={name === 'qa'}
+  {targetMessage}
+  {alertQuestions}
+  {messageChrome}
+  displayMode={alertsDisplayMode}
+  {isPresenter}
+  {onclose}
+  {onQuestionSend}
+  {onQaAction}
+/>
 <app-muted-users-modal>
   <Modal
     id="mutedUsersModal"
@@ -5001,9 +5163,17 @@
         {#each mutedUsersList as user (user.emailHash)}
           <li class="list-group-item d-flex justify-content-between align-items-start">
             <div class="fw-bold">
+              <!--
+                `s=30` IS the size: gravatar returns a square of exactly the pixel size asked for,
+                so this box is read off the URL below rather than chosen. A custom `user.pic` of
+                another shape letterboxes inside it instead of reflowing the row, which is the right
+                trade for a list of dozens. `SwingAlertsPane.svelte` does the same for its sender.
+              -->
               <img
                 src={user.pic || `https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30`}
                 alt={user.nick}
+                width="30"
+                height="30"
               />
               {user.nick}
             </div>
@@ -5045,9 +5215,12 @@
         {#each followedUsersList as user (user.emailHash)}
           <li class="list-group-item d-flex justify-content-between align-items-start">
             <div class="fw-bold">
+              <!-- `s=30` again - see the muted-users list above. -->
               <img
                 src={user.pic || `https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30`}
                 alt={user.nick}
+                width="30"
+                height="30"
               />
               {user.nick}
             </div>
@@ -5217,12 +5390,63 @@
     id="all-user-pm-modal"
     open={name === 'all-private'}
     ariaLabelledby="all-user-pm-modal"
-    title="All private messages:"
     {onclose}
   >
-    <div class="text-center my-4">
-      <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
-    </div>
+    <!--
+      `O(6, userData?.nick ? 6 : -1)` — template `OMe`, a `<strong>` beside the title carrying the
+      member's name. It comes back WITH the answer rather than from the request: the modal is
+      labelling somebody else's private messages, so the label is the server's to supply.
+    -->
+    {#snippet header()}
+      <h5>
+        All private messages:
+        {#if peerHistory?.nick}<strong>{peerHistory.nick}</strong>{/if}
+      </h5>
+    {/snippet}
+    <!--
+      `O(9, loading ? 9 : -1)` then `O(10, loading ? -1 : 10)` — the spinner and the log are the two
+      halves of one switch (bundle byte 2,417,700), so exactly one of them is ever on screen. This
+      was the spinner ALONE and nothing opened the modal: a permanent "Loading..." with no fetch
+      behind it, which is why `enablePrivateMessageHistory` was mis-filed as a one-line WIRE.
+    -->
+    {#if peerHistoryLoading}
+      <div class="text-center my-4">
+        <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
+      </div>
+    {:else if peerHistoryError}
+      <!--
+        NOT in the capture: upstream has no failure branch here, because its fetch cannot refuse.
+        Ours can — the server checks the role AND the room setting before it reads a row — and a
+        refusal that rendered as "No logs." would tell a presenter the member has no private
+        messages, which is a different and worse answer than "you may not read them".
+      -->
+      <div class="mt-3 text-center text-warning">{peerHistoryError}</div>
+    {:else}
+      <div class="w-100">
+        <div class="log-body">
+          {#if peerHistory && peerHistory.messages.length > 0}
+            <div class="log-messages">
+              {#each peerHistory.messages as message (message._id)}
+                <CompactMessageRow {message} />
+              {/each}
+            </div>
+            {#if peerHistory.truncated}
+              <!--
+                ALSO NOT in the capture, and for the same reason: the reference asks for everything
+                and gets everything. `loadPeerHistory` caps at `MAX_PEER_HISTORY` because this read
+                is unbounded and runs on a click, and a moderator must not read a truncated history
+                as a complete one. Saying so is the whole point of having the flag come back.
+              -->
+              <div class="mt-3 text-center text-muted">
+                Showing the most recent messages only; older ones are not listed.
+              </div>
+            {/if}
+          {:else}
+            <div class="mt-3">No logs.</div>
+          {/if}
+        </div>
+      </div>
+    {/if}
     <div class="modal-footer text-center">
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
         Close
@@ -5659,6 +5883,32 @@
             <i class="fas fa-network-wired me-1"></i> Network Test
           </button>
         </li>
+        <!--
+          The Mobile App tab, `d(10,"li",9)(11,"button",10)` at 2,456,143 — consts 9
+          `["role","presentation",1,"nav-item"]`, 10 `["type","button","role","tab",1,"nav-link",3,"click"]`
+          and 11 `[1,"fas","fa-mobile-alt","me-1"]`. The label is `" Mobile App "` at 2,456,210.
+
+          `fa-mobile-alt` occurs EXACTLY ONCE in the whole bundle and this is it. The navbar's mobile
+          button is `fa-mobile` (const 137 at 2,541,704) and has been since the older build —
+          matching the new string to the nearest mobile-looking element would have changed the icon
+          on a control nobody touched.
+
+          It sits BETWEEN Network Test and Mic Test upstream, and it does here. Its `{#if}` does not:
+          upstream emits this `li` unconditionally while gating the other two on `isPresenter`, and
+          that absence is recorded on `mobileAppAvailable` above.
+        -->
+        {#if mobileAppAvailable}
+          <li role="presentation" class="nav-item">
+            <button
+              type="button"
+              role="tab"
+              class={['nav-link', { active: activeConnectivityTab === 'mobile' }]}
+              onclick={() => onConnectivityTabChange('mobile')}
+            >
+              <i class="fas fa-mobile-alt me-1"></i> Mobile App
+            </button>
+          </li>
+        {/if}
         {#if isPresenter}
           <li role="presentation" class="nav-item">
             <button
@@ -5727,6 +5977,8 @@
           </div>
         {/if}
       </div>
+    {:else if activeConnectivityTab === 'mobile'}
+      <MobileRestorePane onrestore={onrestoremobiletokens} />
     {:else if activeConnectivityTab === 'mic'}
       <div class="mic-test-container">
         {#if micDevices.length === 0 && !micDevicesLoading && micDevicesLoaded}

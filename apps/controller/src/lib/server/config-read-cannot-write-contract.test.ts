@@ -119,8 +119,32 @@ describe('config-read and config-write are separate capabilities', () => {
  * so adding one means deciding — in this file, visibly — which capability it takes.
  */
 describe('every internal route verifies the credential its job needs', () => {
-  const WRITES = ['room-ban', 'room-permissions', 'room-setting', 'stream-ingest'];
-  const READS = ['room-config', 'room-entry', 'mobile-pin', 'stream-read'];
+  /*
+    `room-mute` joined on 2026-08-27 — the indefinite chat mute, opcode 3. It was written AFTER the
+    read/write split, so it is the first door that never inherited the caveat its three siblings
+    carried; this list is where that was decided rather than copied.
+  */
+  const WRITES = ['room-ban', 'room-mute', 'room-permissions', 'room-setting', 'stream-ingest'];
+  /*
+    `room-notes-auth` joined 2026-08-29. It POSTs a candidate the controller compares against
+    `needPasswordForUserNotes` and answers two booleans; nothing on the controller changes, which is
+    what puts it here rather than in WRITES. The same shape as `room-entry` beside it — the
+    credential stays and the question travels.
+  */
+  /*
+    `mobile-restore` joined 2026-08-29, and it is the one entry in this list that is NOT read-only —
+    it sends a push notification and can delete a dead registration. It is here anyway, and the
+    distinction is worth stating rather than glossing.
+
+    This split is about the room's CONFIGURATION. `room-ban`, `room-permissions` and `room-setting`
+    change a room's stored settings from the room, and those take `config-write`. `mobile-restore`
+    changes no setting: it is the same shape as `mobile-pin` directly above it — a POST, on demand,
+    for one named member, reached only when that member presses a button about their own device —
+    and `mobile-pin` MINTS a credential, so "read" here has never meant "no side effect".
+
+    What both actually assert is that the room may ask this question, not that the answer is free.
+  */
+  const READS = ['room-config', 'room-entry', 'room-notes-auth', 'mobile-pin', 'mobile-restore', 'stream-read'];
 
   it.each(WRITES)('%s verifies a WRITE capability', async (route) => {
     const source = await sourceOf(route);

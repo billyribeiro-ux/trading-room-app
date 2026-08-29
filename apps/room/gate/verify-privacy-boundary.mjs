@@ -60,6 +60,7 @@
 import { execFile } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import { missingEvidenceRoots } from './evidence-bound-tests.mjs';
 import { countEncodedIdentityPayloads, findUnsafeRawEmails } from './privacy-utils.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -160,11 +161,44 @@ if (added.length > 0) {
   process.exit(1);
 }
 
+/*
+  A "gone" finding means one of two completely different things, and telling a reader to run
+  `--update` without distinguishing them is how a baseline gets corrupted.
+
+  It is GONE-BECAUSE-REDACTED when somebody removed the data. Shrinking the baseline is then correct
+  and is the whole reason `--update` exists.
+
+  It is GONE-BECAUSE-ABSENT when the file simply is not in this checkout. Every capture root here is
+  a gitignored symlink that resolves only on the machine that took the captures, so a clone reports
+  every finding inside them as missing — 81 of them on 2026-08-28, all in `alert-section/`,
+  `app-message-modal/` and `app-room/`. **Running `--update` there would rewrite the baseline down to
+  what a clone can see**, and the next run on the owner's machine would report those 81 as NEW
+  personal data entering the repository. A gate that fails on the author's own untouched captures is
+  a gate that gets switched off.
+
+  So the advice is withheld when any capture root is missing, and the reason is printed instead.
+  `missingEvidenceRoots()` is imported rather than re-derived: `gate/evidence-bound-tests.mjs`
+  already owns which roots exist and why, and a second copy of that list is a second thing to keep
+  in step.
+*/
 if (removed.length > 0) {
-  console.log(
-    `[privacy] ${removed.length} baselined finding(s) are gone — run --update to shrink the baseline:`
-  );
-  for (const entry of removed.slice(0, 10)) console.log(`  ${entry}`);
+  const missingRoots = missingEvidenceRoots();
+  if (missingRoots.length > 0) {
+    console.log(
+      `[privacy] ${removed.length} baselined finding(s) are not visible from this checkout, which is` +
+        ` missing ${missingRoots.length} capture root(s): ${missingRoots.join(', ')}.`
+    );
+    console.log('[privacy] Do NOT run --update here. They are absent, not redacted.');
+    console.log(
+      '[privacy] Shrinking the baseline would make them read as NEW personal data on a checkout' +
+        ' that has the captures.'
+    );
+  } else {
+    console.log(
+      `[privacy] ${removed.length} baselined finding(s) are gone — run --update to shrink the baseline:`
+    );
+    for (const entry of removed.slice(0, 10)) console.log(`  ${entry}`);
+  }
 }
 
 console.log(

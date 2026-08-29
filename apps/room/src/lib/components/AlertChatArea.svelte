@@ -41,9 +41,12 @@
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import ChatSearchBar from '#lib/components/ChatSearchBar.svelte';
+  import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
   import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
   import type { RoomChat } from '#lib/room/chat.svelte.js';
@@ -56,8 +59,8 @@
     ChatTab,
     FollowChatStyle,
     MessageAction,
+    MessageActionEvent,
     MessageActionItem,
-    MessageReactionPayload,
     ModalName,
     RoomMessageItem
   } from '#lib/types.js';
@@ -74,6 +77,23 @@
      */
     broadcasts: RoomBroadcasts;
     chat: RoomChat;
+    /**
+     * The channel strip this column draws, decided on the SERVER.
+     *
+     * `chatTabsWithBadges` lets an owner configure extra channels behind badges, so the list is per
+     * room AND per member; it arrives with the page as `data.chatTabs`. Both columns get the same
+     * one — an entitlement does not depend on which column a member is looking at.
+     */
+    chatTabs: readonly string[];
+    /**
+     * The display mode for each of this component's TWO logs, resolved on the page.
+     *
+     * Two props and not one because upstream keys them separately — `loadChatMode` against
+     * `chatMode`, `loadAlertsMode` against `alertsMode` — so a member can run the alerts log compact
+     * and the chat log as cards. `#lib/chat-display-mode.ts`.
+     */
+    alertsDisplayMode: ChatDisplayMode;
+    chatDisplayMode: ChatDisplayMode;
     polls: RoomPolls;
     /** The page owns which menu is open, so only one is open across every column at once. */
     menus: RoomMenus;
@@ -112,6 +132,12 @@
 
     /** Both logs arrive already filtered, searched and paged. This pane never decides visibility. */
     visibleAlerts: RoomMessageItem[];
+    /**
+     * The toolbar search's scope, when it is narrower than the log — see
+     * `#lib/alert-toolbar-search-scope.js`. `null` when there is nothing to say, which is most of
+     * the time; a notice that is always there is one nobody reads.
+     */
+    searchScopeNotice: string | null;
     visibleChatMessages: RoomMessageItem[];
     /** The alerts column ONLY — a chat message must not get a parsed label. See the chrome file. */
     alertLabels: readonly AlertLabel[];
@@ -165,6 +191,14 @@
     onopenpoll: () => void;
     ontogglealertstoolbar: () => void;
     ontogglealertssearch: () => void;
+    /**
+     * `doChatLogSearch` — submit the chat column's term to the server.
+     *
+     * Takes the column AND the term rather than reading either, so the component decides nothing:
+     * which column it is in is the one thing a shared handler gets wrong, and the term is passed at
+     * the moment of submit rather than read later from state that may have moved on.
+     */
+    onchatsearch: (column: 'main' | 'extra', term: string) => void;
     ondetachalerts: () => void;
     onsavealerts: () => void;
     onarchivealerts: () => void;
@@ -187,10 +221,19 @@
       kind: 'alert' | 'chat',
       action: MessageAction,
       item: MessageActionItem,
-      payload?: MouseEvent | MessageReactionPayload
+      payload?: MessageActionEvent
     ) => void;
     onprivatechat: () => void;
     onexpandcomposer: (element: HTMLTextAreaElement | undefined) => void;
+    /** One keystroke in the main composer — `updateLastTypedTime()`. */
+    ontyped: (value: string) => void;
+    /** `!i.is(":focus")` — one of the reference's three `notyping` conditions. */
+    onstoppedtyping: () => void;
+    /**
+     * "Typing indicator" — the names currently typing in this column's channel, already excluding
+     * this viewer. Empty when the room has not enabled it, which reads the same as nobody typing.
+     */
+    typists: readonly string[];
     onsend: () => Promise<void>;
     onimageupload: () => void;
     onrte: () => void;
@@ -204,6 +247,9 @@
     alerts,
     broadcasts,
     chat,
+    chatTabs,
+    alertsDisplayMode,
+    chatDisplayMode,
     polls,
     menus,
     isPresenter,
@@ -220,6 +266,7 @@
     giphyApiKey,
     showMessageOptions = $bindable(false),
     visibleAlerts,
+    searchScopeNotice,
     visibleChatMessages,
     alertLabels,
     messageChrome,
@@ -236,12 +283,16 @@
     onopenpoll,
     ontogglealertstoolbar,
     ontogglealertssearch,
+    onchatsearch,
     ondetachalerts,
     onsavealerts,
     onarchivealerts,
     onmessageaction,
     onprivatechat,
     onexpandcomposer,
+    ontyped,
+    onstoppedtyping,
+    typists,
     onsend,
     onimageupload,
     onrte,
@@ -637,6 +688,19 @@
                         {/if}
                       {/if}
                     </div>
+                    <!--
+                      THE SEARCH'S SCOPE, said out loud. Not captured — the reference's toolbar sends
+                      `doChatLogSearch` to a server and has nothing to warn about; ours filters the
+                      alerts the page holds. `alert-toolbar-search-scope.ts` carries the whole
+                      account, including why this is the resolution rather than a round trip on
+                      Enter.
+
+                      `role="status"` so a screen reader is told the answer narrowed, which is the
+                      one thing a sighted reader gets from the sentence appearing where it was not.
+                    -->
+                    {#if searchScopeNotice}
+                      <small class="form-text text-muted" role="status">{searchScopeNotice}</small>
+                    {/if}
                   </div>
                 </div>
               </form>
@@ -655,6 +719,7 @@
                   {item}
                   kind="alert"
                   {...messageChrome}
+                  displayMode={alertsDisplayMode}
                   {alertLabels}
                   followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
                   menuOpen={menus.messageId === `alert:${item.id}`}
@@ -701,33 +766,7 @@
                   <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
                 {/if}</a
               >
-              <ul
-                role="tablist"
-                class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs"
-              >
-                <li class="nav-item">
-                  <!-- svelte-ignore a11y_interactive_supports_focus -->
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <a
-                    data-bs-toggle="tab"
-                    role="tab"
-                    class={['nav-link', { active: chat.tab === 'main' }]}
-                    onclick={() => (chat.tab = 'main')}>Main Chat</a
-                  >
-                </li>
-                <li class="nav-item">
-                  <!-- svelte-ignore a11y_interactive_supports_focus -->
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <a
-                    data-bs-toggle="tab"
-                    role="tab"
-                    class={['nav-link', { active: chat.tab === 'off-topic' }]}
-                    onclick={() => (chat.tab = 'off-topic')}>Off Topic</a
-                  >
-                </li>
-              </ul>
+              <ChatTabStrip tabs={chatTabs} bind:active={chat.tab} />
               <ul class="nav ml-auto align-items-center">
                 <li class="nav-item">
                   <!-- svelte-ignore a11y_missing_attribute -->
@@ -741,7 +780,7 @@
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <!-- svelte-ignore a11y_missing_attribute -->
-                  <a title="Search" class="nav-link p-0" onclick={() => onopenmodal('chat-logs')}>
+                  <a title="Search" class="nav-link p-0" onclick={() => chat.search.toggle('main')}>
                     <i class="fas fa-search"></i>
                   </a>
                 </li>
@@ -763,6 +802,21 @@
             </nav>
           </div>
 
+          <!--
+            The magnifier above used to open the Chat Logs modal. Upstream binds it to
+            `toggleChatToolbarSearchOnly()` (byte 1,453,494, the `li` at index 10), and this room's
+            own ALERTS column already worked that way — so the chat column was the odd one out. The
+            modal is still reached from the sidebar, so nothing lost a route.
+          -->
+          {#if chat.search.isOpen('main')}
+            <ChatSearchBar
+              term={chat.search.term('main')}
+              oninput={(value) => chat.search.setTerm('main', value)}
+              onsubmit={() => onchatsearch('main', chat.search.term('main'))}
+              onclear={() => chat.search.clear('main')}
+            />
+          {/if}
+
           <app-roomscroller
             bind:this={chatScroller}
             style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
@@ -774,6 +828,7 @@
                   {item}
                   kind="chat"
                   {...messageChrome}
+                  displayMode={chatDisplayMode}
                   followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
                   menuOpen={menus.messageId === `chat:${item.id}`}
                   showDateSeparator={'evidenceSeparatorText' in item
@@ -813,6 +868,38 @@
             </div>
           {/if}
           <!--
+            `O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)` — byte 1,454,281, a SIBLING of
+            the composer switch below and therefore above whichever half of it renders. Consts 58,
+            59, 60 and 61:
+
+              <div><div class="d-flex align-items-center typing-indicator-container">
+                <strong class="users-count me-1">[{{ usersTypingCnt }}]</strong>
+                <app-typing-indicator-dots></app-typing-indicator-dots>
+                <span class="users-typing"><em class="mx-1">{{ usersTyping }}</em></span>
+              </div></div>
+
+            THE ANIMATED DOTS ARE NOT REPRODUCED, and that is a measurement rather than a shortcut.
+            `app-typing-indicator-dots` is three empty spans whose whole appearance is CSS, and
+            neither `app-typing-indicator-dots` nor its `.typing-indicator` class has a single rule
+            in any stylesheet this repository holds — the same check `smallerImagePreview` failed and
+            `blinkingRec` passed. Emitting three empty spans that style to nothing would be markup
+            with no consumer; inventing the animation would be inventing a design. The three classes
+            that DO have rules — `typing-indicator-container`, `users-count`, `users-typing` — are
+            all here.
+
+            The COUNT is `typists.length` rather than a second field: a joined string that has to be
+            split to be counted is two representations of one fact, and upstream carries both only
+            because its receiver builds the string first.
+          -->
+          {#if typists.length > 0}
+            <div>
+              <div class="d-flex align-items-center typing-indicator-container">
+                <strong class="users-count me-1">[{typists.length}]</strong>
+                <span class="users-typing"><em class="mx-1">{typists.join(',')}</em></span>
+              </div>
+            </div>
+          {/if}
+          <!--
                       `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or the
                       captured Chat Disabled block. Two reasons reach the same block: the room is in
                       mode `d`, which applies to everyone, and this viewer is muted, which does not.
@@ -849,7 +936,15 @@
                     {@attach captureComposerElement}
                     bind:value={chat.composer}
                     onfocus={() => chat.focused('textAreaTxt')}
-                    oninput={(event) => onexpandcomposer(event.currentTarget)}
+                    oninput={(event) => {
+                      onexpandcomposer(event.currentTarget);
+                      /*
+                        `updateLastTypedTime()` — one `typing` per burst, then `notyping` after five
+                        seconds of silence. The signal owns the debounce; this only reports the key.
+                      */
+                      ontyped(event.currentTarget.value);
+                    }}
+                    onblur={onstoppedtyping}
                     onkeydown={(event) => {
                       if (event.key === 'Enter' && !event.shiftKey) {
                         event.preventDefault();

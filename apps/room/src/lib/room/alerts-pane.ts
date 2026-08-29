@@ -1,3 +1,4 @@
+import { alertSearchScopeNotice } from '#lib/alert-toolbar-search-scope.js';
 import { tick } from 'svelte';
 
 import type { AlertFilterFor } from '#lib/alert-filter.js';
@@ -116,6 +117,18 @@ export class RoomAlertsPane<Row extends ExportableRow> {
   readonly #forceAlertsToBottom: (scroller: HTMLElement) => void;
   readonly #sessionHandle: () => string;
   readonly #setChatAlertsDetached: (next: boolean) => void;
+
+  /**
+   * Whether the toolbar's search is answering over a partial log. HERE because this class already
+   * holds both halves — the term, and the set the toolbar actually filters. The rule is on
+   * `#lib/alert-toolbar-search-scope.js`.
+   */
+  get searchScopeNotice(): string | null {
+    return alertSearchScopeNotice({
+      term: this.#alerts.search,
+      loadedCount: this.#feeds.searchableAlerts.length
+    });
+  }
 
   archive() {
     const archivable = this.#feeds.visibleAlerts.length;

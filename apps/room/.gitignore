@@ -1,0 +1,5 @@
+
+# Playwright artefacts. `trace: retain-on-failure` means a green run writes nothing worth keeping,
+# and a red one writes traces and screenshots that belong on a CI artefact rather than in git.
+test-results/
+playwright-report/

@@ -152,6 +152,34 @@ jobs:
         # than being silently rewritten into something nobody reviewed.
         run: pnpm install --frozen-lockfile
 
+      - name: Formatting
+        working-directory: apps/${{ matrix.app }}
+        # ADDED 2026-08-29, and it closed a real drift rather than a hypothetical one.
+        #
+        # Both apps have carried a `format:check` script for months and NOTHING RAN IT. That is what
+        # an ungated script becomes - a convention a person has to remember - and it is the same
+        # failure the `test:gates` note below records for the controller's eleven verifiers.
+        #
+        # The measurement, because the first number written here was the wrong one. Under the
+        # scripts as they were declared, the drift was 11 files in the room and FIVE in the
+        # controller. A repository-wide `prettier --check .` reported 88 for the controller, and
+        # the gap between those two figures was the real finding: the controller's `format:check`
+        # was scoped to `src/**`, `scripts/**/*.mjs`, `e2e/**` and root config, so seven `.js`
+        # collectors under `scripts/` and every markdown file in the app were outside the gate it
+        # declared. Both apps now check `.`, so the scope is one thing and `.prettierignore` is the
+        # single place an exemption is recorded.
+        #
+        # Fixing the drift was NOT a blanket rewrite. 73 of the 88 were the decoded captures under
+        # `docs/reference/`, which carry "every attribute verbatim" by their own first paragraph -
+        # evidence, which `CLAUDE.md` says never to reformat. Those and the two generated
+        # `docs/generated/` artifacts joined `.prettierignore` with the reason written beside them,
+        # in the shape that file already uses; the 18 authored files and the room's 11 were
+        # formatted.
+        #
+        # First, because it is the cheapest answer in the log and a formatting failure tells you
+        # nothing about the code that a later step would explain better.
+        run: pnpm run format:check
+
       - name: Lint
         working-directory: apps/${{ matrix.app }}
         run: pnpm run lint
@@ -162,17 +190,27 @@ jobs:
 
       - name: Unit tests
         working-directory: apps/${{ matrix.app }}
-        # `test:unit` for the controller rather than `test`, and the difference is deliberate. Its
-        # `test` script chains fourteen verifiers, and one of them — `runtime:http` — makes live
-        # HTTP requests to a DEPLOYED preview. A gate that depends on a running deployment reports
-        # somebody else's outage as this revision's failure. The room's `test` is entirely local
+        # `test:gates && test:unit` for the controller rather than `test`, and the split is
+        # deliberate. Its `test` script chains fourteen verifiers, and exactly ONE of them —
+        # `runtime:http` — makes live HTTP requests to a DEPLOYED preview and opens a PostgreSQL
+        # connection. A gate that depends on a running deployment reports somebody else's outage as
+        # this revision's failure, so that one stays out. The room's `test` is entirely local
         # (`privacy:verify`, `schema:verify`, `vitest run`), so it runs whole.
         #
-        # The verifiers left out here are not unowned: they run in the pre-merge full gate. Naming
-        # that boundary is the point — a green check on this workflow means lint, types, units and a
-        # build, and does not claim to mean the evidence verifiers passed.
+        # THIS LINE USED TO RUN `test:unit` ALONE, and the comment here claimed the eleven verifiers
+        # left out "run in the pre-merge full gate". Measured 2026-08-29: no workflow in this
+        # repository runs the controller's `test`, so that gate was a person remembering. Eleven
+        # verifiers — the schema pin, the migration and release checks, the evidence layout, the
+        # privacy boundary, the font and room-login contracts — were enforced by nobody on a pull
+        # request, which is the only verification a production deploy gets (`quality.yml:34`).
+        #
+        # `test:gates` is exactly those eleven: a provable PREFIX of `test`, which
+        # `package-scripts-contract.test.ts` asserts so the two cannot drift apart. Everything is
+        # local — each was run individually in a container with no PostgreSQL and no preview, and all
+        # eleven passed — so nothing here can go red because something else is down.
         run: |
           if [ "${{ matrix.app }}" = "controller" ]; then
+            pnpm run test:gates
             pnpm run test:unit
           else
             pnpm run test
@@ -342,5 +380,102 @@ jobs:
         with:
           name: controller-e2e-failure-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/controller/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  room-e2e:
+    name: room end-to-end
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    # THE ROOM HAD NO BROWSER, AND IT COST TWO PRODUCTION DEFECTS.
+    #
+    # `controller-e2e` above has driven a browser since 2026-08-23. The ROOM — the product surface,
+    # forty-six components, three thousand unit assertions — had none, and every verification note in
+    # `CHANGELOG.md` said so in the same words: "nothing was opened in a browser".
+    #
+    # The first run of this suite, on 2026-08-28, found two defects that had been shipping:
+    #
+    #   ReferenceError:      `createRoom` sat above ten page bindings its dependency thunks close
+    #   every render 500     over. On the server a `$derived` evaluates immediately, so the root read
+    #                        `deps.isPresenter()` while that binding was in its temporal dead zone.
+    #                        Introduced 2026-08-17; ELEVEN DAYS of the room's own page answering 500.
+    #
+    #   two <title> tags     `app.html` carried `<title>PTRChat</title>` before `%sveltekit.head%`.
+    #                        `document.title` is the FIRST title, so the browser tab never showed the
+    #                        room's name — a wired setting whose entire purpose is that tab.
+    #
+    # Neither was visible to anything else here: both type-check, both lint clean, `svelte-check` is
+    # silent on both, and every unit test constructs its subject with stubs that are already
+    # initialised. That is the argument for this job, so it is not a workflow anyone deletes as
+    # redundant.
+    #
+    # No PostgreSQL service, unlike the controller's job. The room fails closed without its
+    # configuration, so `e2e/stub-controller.mjs` answers the two control-plane routes it needs — and
+    # VERIFIES the capability bearer rather than accepting it, so the seam is exercised by every page
+    # load. Bringing the real controller here would give every room-render failure two possible
+    # causes; the controller's own behaviour is tested by the controller's own job.
+
+    steps:
+      - name: Check out the immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the repository-pinned Node runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Activate the repository pnpm version
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          corepack enable
+          # No version literal, for the reason `ci-package-manager-pin.test.ts` asserts, and retried
+          # for the reason the frontend job above records — the undici parser crash is a property of
+          # the download, so it can strike any job that installs.
+          attempt=1
+          until corepack install; do
+            if [ "$attempt" -ge 3 ]; then
+              echo "::error title=corepack install failed::three attempts; see the log above"
+              exit 1
+            fi
+            echo "corepack install crashed or failed (attempt $attempt); retrying"
+            sleep "$((attempt * 5))"
+            attempt=$((attempt + 1))
+          done
+          expected="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          actual="$(pnpm --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error title=pnpm version mismatch::package.json pins $expected, the runner has $actual"
+            exit 1
+          fi
+          echo "pnpm $actual, matching the packageManager pin"
+
+      - name: Install dependencies from the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the browser the harness is configured for
+        working-directory: apps/room
+        # Chromium ALONE — `playwright.config.ts` declares exactly one project. `--with-deps` because
+        # a bare runner has none of the shared libraries it needs.
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end
+        working-directory: apps/room
+        # The config owns both servers: a stub control plane, then `vite build && node build`. The
+        # BUILT server and not `vite dev`, because the room's page is compiled on first request under
+        # dev and that one compile exceeded every bound this suite tried — measured, not assumed. It
+        # is also what actually ships.
+        run: pnpm run test:e2e
+
+      - name: Preserve the traces and screenshots of a failing run
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: room-e2e-failure-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/room/test-results/
           if-no-files-found: warn
           retention-days: 14

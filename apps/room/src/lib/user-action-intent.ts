@@ -88,18 +88,21 @@ const EXACT_ALERTS: Readonly<Record<string, string>> = {
     call `applyChatMute`, in `#lib/server/chat-mute.ts`.
   */
   /*
-    `mute-chat-indefinitely` STAYS, and is the one entry here that is honestly blocked rather than
-    merely unbuilt. The reference reaches it with `muteChat("0")` against a " Mute Chat indefinately "
-    label (its own spelling) at bundle byte 2067543, and `"0" >= 0` is true, so it sends
-    `{user, time:0}` down the same command as the 24-hour one.
+    `mute-chat-indefinitely` WAS HERE and is gone, 2026-08-27 — the FOURTH entry ever removed, after
+    `unmute-chat`, `force-reload` and `mute-chat-24`, and the last one that was a liar.
 
-    An indefinite mute ALREADY EXISTS in this system and is already enforced: the controller's opcode
-    3 sets `role = 3, muted = true`, and `refuseIfChatMuted` reads `member.muted` on every send. What
-    is missing is a DOOR from the room to it — the equivalent of `internal/room-ban` for a ban. That
-    is a controller endpoint with its own authority checks, not a line here, so it is recorded rather
-    than faked with a 24-hour mute wearing an "indefinite" label.
+    It stayed longer than the other three because its blocker was real rather than a search that
+    stopped at one directory: an indefinite mute already existed as the controller's opcode 3
+    (`role = 3, muted = true`, enforced by `refuseIfChatMuted` through `member.muted`), and what was
+    missing was a DOOR from the room to it. Faking it with a 24-hour mute wearing an "indefinite"
+    label would have been a control whose label and behaviour disagree, which is worse than one
+    honestly listed here.
+
+    The door is `internal/room-mute/[code]` and the room's half is `muteChatIndefinitely` in
+    `chat-mute.remote.ts`. It is a THIRD command rather than a parameter on the 24-hour one because
+    the two durations live in two different stores — see the endpoint for why, and for the honest gap
+    that the reference's `time` value does not survive that split.
   */
-  'mute-chat-indefinitely': 'user chat muted',
   /*
     `restart-audio` KEEPS ITS ENTRY AND IS NO LONGER A LIAR — 2026-08-23.
 
@@ -288,10 +291,30 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     `case"updateProfilePic"`, which sets BOTH `globals.preferences.profilePic` and
     `globals.user.profilePic` and then emits `preferenceChanged {key:"profilePic", value}`.
   */
-  'debug-log':
-    'ModalHost.svelte:2306 — wire IS captured: getDebugLog → member replies debugLogResp{requestor,log:V1} → presenter fills a readonly textarea#debugLogModalTxt rows=1000 in #debug-log-modal titled "Debug Log"',
-  'upload-profile-picture':
-    'ModalHost.svelte:2379 — wire IS captured: adminUploadProfilePic sends, member applies case"updateProfilePic" setting preferences.profilePic AND user.profilePic then emitting preferenceChanged',
+  /*
+    `debug-log` IS GONE FROM THIS TABLE — built 2026-08-29, which is what removing an entry here
+    declares. It has a real branch in `RoomUserActions.handle` calling `requestDebugLog`, a bounded
+    buffer in `#lib/debug-log-buffer.js`, both receivers in `RoomPrivateCommands`, and a modal that
+    fills.
+
+    The one thing worth leaving behind: it could NOT be ported as written. Upstream's reply is
+    `{requestor: xe.requestor, log}` — the replying CLIENT names who receives the log — so a member
+    could push text into any presenter's modal. `sendDebugLog` takes no requestor argument at all;
+    the server remembers who asked. See `routes/debug-log.remote.ts`.
+  */
+  /*
+    `upload-profile-picture` IS GONE FROM THIS TABLE — built 2026-08-29.
+
+    A CORRECTION worth keeping: `TODO.md` said it "belongs with the controller like `writeRoomBan`"
+    because it is durable. Measured, that is wrong — the controller's `users` table has NO avatar
+    column, and the room's own `users.avatar_url` is what the roster reads and every chat message
+    joins to. A ban is room CONFIGURATION, which the controller owns; an avatar is a property of a
+    person, and this application is where that person's row lives.
+
+    It is also the first presenter command that writes a durable row keyed on the TARGET alone, so it
+    is the first that needed `requireRoomMember`: every other one is scoped by `publishToUsers`, and
+    a row update is not. See `routes/profile-picture.remote.ts`.
+  */
 
   /*
     Three more found in the same 2026-08-23 diff, none previously recorded.
@@ -341,7 +364,7 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     sitting in the same menu as `" Mute Microphone for all non-admins "`.
   */
   'get-my-token':
-    'ModalHost.svelte:3075 — no handler, but FULLY EVIDENCED at byte 2255348: a "Session Information" bootbox showing globals.sessionID in a readonly #sessionId and globals.sesionToken in a readonly #sessionToken, each with a Copy button, and one "Close" button'
+    'ModalHost.svelte:3230 — INERT ON PURPOSE, and the reason changed on 2026-08-29 from "merely unbuilt" to a SECURITY divergence. The reference dialog (byte 2255348) renders the session-token global into a readonly input. This room CANNOT reproduce that without a regression: its session cookie is set httpOnly (server/auth.ts:91), so no script can read it today, and every occurrence of that global name in this repository is a QUOTATION of the reference inside a comment — the client holds no token at all. Building it would mean handing the server the job of putting an httpOnly value into the DOM, turning a cookie an XSS cannot read into a string it can, in a multi-tenant fintech room. The other half is not worth building alone: globals.sessionID is the room code, already visible in the address bar, so a dialog showing only that is a control whose only effect is repeating what the URL says. Unblocking this needs a token that is SAFE to show — a short-lived, narrowly-scoped support identifier minted for the purpose — which is a feature, not a port.'
 };
 
 /**

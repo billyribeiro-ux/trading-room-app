@@ -22,7 +22,8 @@
     "schema:verify": "node gate/verify-postgres-schema-artifacts.mjs",
     "test": "pnpm privacy:verify && pnpm schema:verify && vitest run",
     "privacy:verify": "node gate/verify-privacy-boundary.mjs",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.8.1",
@@ -69,7 +70,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.68.0",
     "vite": "8.2.2",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "@playwright/test": "1.62.1"
   },
   "imports": {
     "#lib": "./src/lib/index.js",

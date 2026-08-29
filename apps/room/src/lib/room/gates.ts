@@ -12,10 +12,9 @@ import { tawkSupportAvailable } from '#lib/tawk-support.js';
 import type { PageData } from '../../routes/$types';
 
 import type { RoomMedia } from './media.svelte';
-import type { RoomPrefs } from './prefs.svelte';
 
 /**
- * What the sixteen predicates read off the loaded page data.
+ * What the eighteen predicates read off the loaded page data.
  *
  * DERIVED from `PageData` rather than restated. Between them these read a dozen fields off
  * `sessData`, and hand-narrowing that is how a gate ends up reading `unknown` and being cast into
@@ -30,14 +29,15 @@ type RosterSession = Parameters<typeof rosterBlockVisible>[1];
 /**
  * WHAT THIS VIEWER MAY SEE, in one place.
  *
- * Phase 5 slice 27. Sixteen `$derived` predicates — whether the roster is visible, whether archives
+ * Phase 5 slice 27. Eighteen `$derived` predicates — whether the roster is visible, whether archives
  * are reachable, which alert labels this room uses, whether the Benzinga panel appears and at what
  * URL, whether the mobile app link is offered, whether the chat column is hidden at all.
  *
- * **They are one module because they answer one question**, asked sixteen ways: given this room's
+ * **They are one module because they answer one question**, asked eighteen ways: given this room's
  * configuration and this viewer's role, what is on screen. Every one reads `data` and most read
- * nothing else; none of them writes anything. That is the tightest seam left on the page — seven
- * collaborators across 286 lines, and not a single field shared with it.
+ * nothing else; none of them writes anything. That is the tightest seam left on the page — SIX
+ * collaborators across 389 lines, and not a single field shared with it. It was seven until
+ * `recordingTooltip` stopped reading a preference it should never have been reading.
  *
  * **GETTERS, not `$derived` class fields, and this is the precedent rather than a preference.** A
  * derived field initialises in DECLARATION ORDER, before the constructor has assigned the thunks it
@@ -51,7 +51,6 @@ type RosterSession = Parameters<typeof rosterBlockVisible>[1];
  * own, and every one of these is a gate on what a member may see.
  */
 export class RoomGates {
-  readonly #prefs: RoomPrefs;
   readonly #media: RoomMedia;
   readonly #session: () => GatesSession;
   readonly #isPresenter: () => boolean;
@@ -60,7 +59,6 @@ export class RoomGates {
   readonly #chatAlertsDetached: () => boolean;
 
   constructor(options: {
-    prefs: RoomPrefs;
     media: RoomMedia;
     /** The loaded page data, through a thunk because the load replaces it on every refetch. */
     session: () => GatesSession;
@@ -71,7 +69,6 @@ export class RoomGates {
     /** Whether the alerts column has been detached into its own window. */
     chatAlertsDetached: () => boolean;
   }) {
-    this.#prefs = options.prefs;
     this.#media = options.media;
     this.#session = options.session;
     this.#isPresenter = options.isPresenter;
@@ -119,13 +116,17 @@ export class RoomGates {
   }
 
   /**
-   * `'Recording to: ' + decodedRecName()`, suppressed for non-presenters when the session says so.
+   * `'Recording to: ' + decodedRecName()`, suppressed for non-presenters when the ROOM says so —
+   * `(sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName` at bundle byte
+   * 2,474,213, transcribed in full in a comment at `RoomNavbar.svelte:305`.
    *
-   * `dontShowRecInfoToUsers` is not captured in our session data, so it is read defensively and
-   * treated as off when absent - the capture's default is to SHOW the name.
+   * It read that flag off `prefs.loaded` until 2026-08-28, a per-VIEWER key nothing in this room
+   * writes, so every member saw the recording FILE NAME whatever the owner ticked. That was also
+   * this class's only use of `RoomPrefs`, which is why the dependency left the constructor with it.
+   * The post-mortem is in `gates.svelte.test.ts`, at the test that could not have caught it.
    */
   get recordingTooltip() {
-    const hideFromUsers = this.#prefs.loaded.dontShowRecInfoToUsers === true;
+    const hideFromUsers = this.#session().sessData?.dontShowRecInfoToUsers === true;
     if ((hideFromUsers && !this.#isPresenter()) || !this.#media.roomRecordingName) return '';
     return `Recording to: ${decodeURIComponent(this.#media.roomRecordingName)}`;
   }
@@ -148,6 +149,78 @@ export class RoomGates {
    */
   get viewerOnlyMode() {
     return page.url.searchParams.get('vo') === '1' || page.url.searchParams.get('vo') === '2';
+  }
+
+  /**
+   * `hideStreams` — the streams tab's own `hidden`, moved here 2026-08-28 to sit with its sibling.
+   *
+   * ```js
+   * this.hideStreams = !this.appService.globals.sessData.useMediaMTX
+   * ```
+   * (`app-presentationarea.full.js:2293`), applied to BOTH the `#streams-tab` `li` (`:5357`) and the
+   * `#streams` pane (`:5388-5391`) — the same value twice, so the tab and its content can never
+   * disagree.
+   *
+   * **Note the NEGATION and the default that falls out of it.** The setting says the feature is ON;
+   * the flag says the tab is HIDDEN. A room with no MediaMTX sends no `useMediaMTX` at all,
+   * `!undefined` is true, and the tab stays hidden — which is right, and is why this is not written
+   * as an `=== false` check.
+   *
+   * It was a `$derived` in the page until `notesHidden` arrived beside it and the two read as one
+   * subject: which main tabs this room does not show. A gate on what a member may see belongs with
+   * the other gates.
+   */
+  get streamsHidden() {
+    return this.#session().sessData?.useMediaMTX !== true;
+  }
+
+  /**
+   * `hideNotes` — "Hide Notes Section?", ORed with viewer-only mode, exactly as the reference does.
+   *
+   * ```js
+   * this.hideNotes = this.appService.globals.sessData.hideNotes || this.appService.globals.viewerOnlyMode
+   * ```
+   * (bundle byte 1955694), applied as `z('hidden', o.hideNotes)` to BOTH the notes `li` (2016630)
+   * and the notes pane (2017506) — the same value twice, so the tab and its content can never
+   * disagree.
+   *
+   * ## Why it is composed HERE and not sent composed
+   *
+   * `ROOM_VISIBLE_SETTINGS` sends the SETTING and not the OR. The room already knows whether it is
+   * in viewer-only mode — it is the `vo` query parameter, read three lines up — so folding it in on
+   * the controller would be the control plane answering a question this side answers better, and it
+   * would make the value sent depend on how the member arrived. The reference composes it in the
+   * room too.
+   *
+   * ## Found by ENUMERATION
+   *
+   * `hideFiles` and `hideStreams` have crossed since `ROOM_VISIBLE_SETTINGS` was written and are
+   * applied the same way; `hideNotes` was not on that list, so an owner who ticked the box got a
+   * room that still showed the tab. Nobody noticed the trio was a pair until
+   * `gate/audit-setting-coverage.mjs` asked the bundle which settings the reference reads that this
+   * room does not.
+   */
+  get notesHidden() {
+    return this.#session().sessData?.hideNotes === true || this.viewerOnlyMode;
+  }
+
+  /**
+   * `!sessData.hasSpeechRecognitionDisabled` — may this room caption at all?
+   *
+   * `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0` (byte 1,147,900),
+   * and the consumer that matters is `startSpeechRecognition()` at byte 1,110,427, which returns
+   * early on `!preferences.doSpeechReco || !globals.hasSpeechRecognition`.
+   *
+   * `!== true` rather than `=== false`, because absent means NOT disabled: a room that has never
+   * configured captions has them, which is the reference's default and the only safe reading of a
+   * payload whose unset settings are omitted rather than sent as null.
+   *
+   * `RoomRecording.beginSpeechRecognition` has quoted the capture's own refusal — *"disabled by
+   * preferences or session settings"* — in its docblock since it was written, while gating on the
+   * PREFERENCES half alone. This is the session half.
+   */
+  get speechRecognitionAvailable() {
+    return this.#session().sessData?.hasSpeechRecognitionDisabled !== true;
   }
 
   /**
@@ -213,6 +286,18 @@ export class RoomGates {
    * inside the handler is the capture's own belt-and-braces and is kept: a `data-bs-toggle` opens
    * the modal whether or not the click handler agrees, so the command must not go out on a room
    * with no app.
+   *
+   * ## The reference's THIRD term is refused, and this is the record of that
+   *
+   * `alwaysShowRoster` crossed to this room on 2026-08-28, and the reference uses it twice. The seed
+   * is built. The second use is a third OR-term on the mobile-app ICON's slot —
+   * `!(ptrMobileAppEnabled || customMobileAppEnabled || alwaysShowRoster) || …` at byte 2,487,668 —
+   * while `getMyPinAndDoInfo` keeps the two-term gate transcribed above (byte 2,529,070).
+   *
+   * The two disagree on purpose upstream: the icon's slot stays occupied so the row does not reflow,
+   * and the command behind it refuses. Reproducing that here would put a button in the navbar that
+   * opens a modal reading `N/A` forever — a control whose only effect is nothing, which this
+   * repository forbids introducing. **The divergence is deliberate and this paragraph is it.**
    */
   get mobileAppAvailable() {
     return (

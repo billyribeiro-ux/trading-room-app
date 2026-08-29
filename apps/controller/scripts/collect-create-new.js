@@ -92,7 +92,10 @@
     { needle: 'textAngularToolbar', why: 'gap 3 — toolbar disabled state (candidate, from must-match/important:879)' },
     { needle: 'taToolbar', why: 'gap 3 — toolbar disabled state (candidate)' },
     { needle: 'ta-toolbar', why: 'gap 3 — toolbar disabled state (candidate, the class in the capture)' },
-    { needle: 'ptrMobileAppCaseByCaseEnabled', why: 'gap 6 — the three branches Angular stripped; labels and handlers unknown' },
+    {
+      needle: 'ptrMobileAppCaseByCaseEnabled',
+      why: 'gap 6 — the three branches Angular stripped; labels and handlers unknown'
+    },
     { needle: 'customMobileAppLaunchWord', why: 'gap 7 — what the launch word actually does' },
     /* Gap 4 is resolved SERVER-side by the reference, so the bundle can show at most what the
        client asks for. Included because that request is still more than we have today. */
@@ -163,9 +166,7 @@
     /* Absence is REPORTED, never filled in. A target that is not in the bundle is a finding about
        where the answer is not, which is worth having written down. */
     if (!entry.found) {
-      out.gaps.push(
-        `"${target.needle}" does not occur in any same-origin bundle this page loads (${target.why})`
-      );
+      out.gaps.push(`"${target.needle}" does not occur in any same-origin bundle this page loads (${target.why})`);
     }
   }
 
@@ -191,7 +192,18 @@
         computed: (() => {
           const s = getComputedStyle(anchor);
           const o = {};
-          for (const p of ['display', 'visibility', 'width', 'height', 'background-color', 'color', 'border', 'font-size', 'padding', 'margin']) {
+          for (const p of [
+            'display',
+            'visibility',
+            'width',
+            'height',
+            'background-color',
+            'color',
+            'border',
+            'font-size',
+            'padding',
+            'margin'
+          ]) {
             o[p] = s.getPropertyValue(p);
           }
           return o;

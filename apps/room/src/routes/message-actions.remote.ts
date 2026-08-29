@@ -8,6 +8,7 @@ import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/
 import { capturedRoomItem } from '#lib/server/captured-room.js';
 import { isEmptyChatHtml, sanitizeChatHtml } from '#lib/server/chat-html.js';
 import { hashEmail } from '#lib/server/connection.js';
+import { readRoomConfig } from '#lib/server/room-config-client.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
@@ -73,9 +74,15 @@ const messageActionArgs = z.discriminatedUnion('operation', [
   z.strictObject({ operation: z.literal('delete'), ...target }),
   z.strictObject({ operation: z.literal('markAnswered'), ...target }),
   z.strictObject({ operation: z.literal('showMsgToAll'), ...target }),
+  /*
+    NO `kind` AND NO `id`. The branch reads neither — it mutes a USER, and the row that was clicked
+    is only how the viewer named them. Carrying the target anyway invited the lie the Q&A thread
+    would have had to tell on 2026-08-28: a question is neither an alert nor a chat message, so
+    muting its author meant sending a question id under one of two labels that do not describe it.
+    A field nothing reads is a field the next reader will start reading.
+  */
   z.strictObject({
     operation: z.literal('mute24'),
-    ...target,
     targetUserId: z.number().int().positive()
   }),
   z.strictObject({
@@ -106,6 +113,26 @@ export const messageAction = command(messageActionArgs, async (args) => {
   const user = requireUser(locals);
   const room = requireRoomShortCode(locals);
   const isPresenter = isPresenterRole(user.role);
+  /*
+    `mute24` carries neither coordinate — see its member of the union above — so the two are read
+    from the five operations that do. It is handled before anything below touches them.
+  */
+  if (args.operation === 'mute24') {
+    if (!isPresenter) error(403, 'Presenters only.');
+    /*
+      The insert used to be written out here. It moved to `applyChatMute` when the user modal's
+      " Mute Chat for 24hrs " button was wired, because that is a SECOND door onto the same act and a
+      second copy of a rule is how a ban that enforced nothing shipped earlier the same day:
+      `internal/room-ban` hand-copied a mapping instead of calling it and wrote the wrong half.
+
+      What moving it bought beyond deduplication: the member is now TOLD. This branch wrote the row
+      and announced nothing, so somebody muted mid-conversation kept an enabled composer until their
+      next page load. `unmuteChat` in `chat-mute.remote.ts` is still the other half.
+    */
+    applyChatMute(room, args.targetUserId, user.id);
+    return;
+  }
+
   const { kind, id } = args;
 
   /*
@@ -176,6 +203,30 @@ export const messageAction = command(messageActionArgs, async (args) => {
     toggleReaction(parseReactions(source), key, emoji, hashEmail(user.email));
 
   if (args.operation === 'delete') {
+    /*
+      ── "Users can delete own messages?" ────────────────────────────────────────────────────────
+
+      THE THREE BRANCHES BELOW ALREADY LET A MEMBER DELETE THEIR OWN — `!isPresenter && senderId !==
+      user.id` is a 403, so `senderId === user.id` walks straight through — and **none of them asked
+      the room whether that was allowed.** The setting exists upstream for exactly this
+      (`canDeleteOwnMessage`, bundle byte 1,158,799, whose FIRST term is
+      `globals.sessData.usersCanDeleteOwnMsgs`), and an owner who left it off got members deleting
+      their own messages anyway by calling this endpoint.
+
+      The room's menu did not offer the control — `allowDeleteOwnMessage` defaults `false` and
+      nothing fed it — so the gap was invisible from the UI. That is precisely why the check belongs
+      HERE: a control nobody can see is not a control nobody can reach.
+
+      A PRESENTER IS UNAFFECTED. The setting governs a MEMBER deleting their own; a presenter
+      removing anything is a different authority and is not conditioned on it upstream either.
+    */
+    if (!isPresenter) {
+      const config = await readRoomConfig(locals, room, user.email);
+      if (config.settings?.usersCanDeleteOwnMsgs !== true) {
+        error(403, 'Not yours to delete.');
+      }
+    }
+
     /*
       Captured items carry negative ids and live in the fixture, not in a table, so there is no row
       to delete. Record the deletion instead. Same authorisation rule as a real delete — a presenter
@@ -356,21 +407,6 @@ export const messageAction = command(messageActionArgs, async (args) => {
       .set({ answered: true })
       .where(and(eq(messages.roomShortCode, room), eq(messages.id, id)))
       .run();
-    return;
-  }
-
-  if (args.operation === 'mute24') {
-    /*
-      The insert used to be written out here. It moved to `applyChatMute` when the user modal's
-      " Mute Chat for 24hrs " button was wired, because that is a SECOND door onto the same act and a
-      second copy of a rule is how a ban that enforced nothing shipped earlier the same day:
-      `internal/room-ban` hand-copied a mapping instead of calling it and wrote the wrong half.
-
-      What moving it bought beyond deduplication: the member is now TOLD. This branch wrote the row
-      and announced nothing, so somebody muted mid-conversation kept an enabled composer until their
-      next page load. `unmuteChat` in `chat-mute.remote.ts` is still the other half.
-    */
-    applyChatMute(room, args.targetUserId, user.id);
     return;
   }
 

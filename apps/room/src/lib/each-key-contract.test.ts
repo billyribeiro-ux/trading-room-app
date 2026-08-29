@@ -166,6 +166,13 @@ describe('every {#each} key says something true', () => {
       ).toBeGreaterThanOrEqual(count);
     };
     unkeyedAt('src/lib/components/RoomMessage.svelte', 2);
-    unkeyedAt('src/routes/+page.svelte', 1);
+    /*
+      MOVED, 2026-08-28, and re-pointed rather than dropped. This was `+page.svelte`'s
+      `bodySegmentsPrivate` snippet — a link split threaded into `PrivateChatPanel` as a prop. It is
+      `CompactMessageRow.svelte`'s now, because a second surface (the all-user private-message modal)
+      renders the same row and a transcription written twice is two transcriptions. The block did not
+      change; only its home did, and the reason for it carrying no key is unchanged.
+    */
+    unkeyedAt('src/lib/components/CompactMessageRow.svelte', 1);
   });
 });

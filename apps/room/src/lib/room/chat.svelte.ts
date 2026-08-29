@@ -1,3 +1,5 @@
+import { appendMention } from '#lib/mention-insert.js';
+import { RoomChatSearch } from './chat-search.svelte.js';
 import type { ChatTab } from '#lib/types.js';
 
 /*
@@ -59,6 +61,13 @@ export type ChatComposerId = 'textAreaTxt' | 'textAreaTxtExtra';
 export const EXTRA_COMPOSER: ChatComposerId = 'textAreaTxtExtra';
 
 export class RoomChat {
+  /**
+   * The MAIN column's channel.
+   *
+   * `'main'` unless the room says otherwise: `sessData.autoSwitchToOfftopics && (this.channel =
+   * "offTopic", …)` in `ngOnInit`, byte 1,407,102. A SEED and not a lock — the channel tabs still
+   * switch back, and writing it as a derivation would re-switch the column on every invalidate.
+   */
   #tab = $state<ChatTab>('main');
   /** `this.channel = 'offTopic'` in `app-extra-chat` — the extra column has its own channel. */
   #extraTab = $state<ChatTab>('off-topic');
@@ -67,7 +76,38 @@ export class RoomChat {
   /** `globals.chatInputFocus` — which composer the viewer last typed in. */
   #focus = $state<ChatComposerId>('textAreaTxt');
 
+  /*
+    ── WHO IS TYPING, per column ──────────────────────────────────────────────────────────────────
+
+    `usersTyping` is a joined STRING upstream (`s += o[a].n`, byte 1,433,553) and `usersTypingCnt`
+    its length; the display reads both. Here the names arrive as an array and the count is `.length`,
+    because a string that has to be split to be counted is two representations of one fact.
+
+    PER COLUMN, and that is the reason there are two of each. The frame carries the channel it
+    belongs to, and the two columns show different channels — a single field would put the extra
+    column's typists under the main column's composer the moment the two channels differed.
+
+    `$state.raw`: the array is REPLACED by every frame and never edited, so a deep proxy would cost
+    on every read and buy nothing.
+  */
+  #typists = $state.raw<readonly string[]>([]);
+  #extraTypists = $state.raw<readonly string[]>([]);
+
+  /** `amITyping` — so a burst sends ONE `typing`, not one per keystroke. Per composer. */
+  #announced = { main: false, extra: false };
+
   readonly #extraColumnEnabled: () => boolean = () => false;
+
+  /**
+   * The two columns' search boxes, in `#lib/room/chat-search.svelte.ts`.
+   *
+   * HELD, not owned. This class knows one thing about a search — that switching a channel ends it —
+   * because a search is scoped to a channel on the wire. Everything else about the box reads there.
+   *
+   * Defaults to an unwired instance so the many callers that construct this class for its tabs alone
+   * need not know the feature exists.
+   */
+  readonly search: RoomChatSearch;
 
   /**
    * Takes the extra column's preference as a thunk rather than a value.
@@ -76,16 +116,79 @@ export class RoomChat {
    * the settings modal mid-session — at which point every mention would keep routing to the main
    * composer because this class was still holding `false`.
    */
-  constructor(sources: { extraColumnEnabled: () => boolean }) {
+  constructor(sources: {
+    extraColumnEnabled: () => boolean;
+    /**
+     * `sessData.autoSwitchToOfftopics` — a VALUE, not a thunk, and that is the difference between a
+     * seed and a lock. It is read once, here, exactly as the reference reads it once in `ngOnInit`.
+     */
+    autoSwitchToOffTopic?: boolean;
+    /** See `search`. Omitted by callers that render no search box. */
+    search?: RoomChatSearch;
+  }) {
     this.#extraColumnEnabled = sources.extraColumnEnabled;
+    this.search = sources.search ?? new RoomChatSearch();
+    if (sources.autoSwitchToOffTopic) this.#tab = 'off-topic';
   }
 
   get tab(): ChatTab {
     return this.#tab;
   }
 
+  /** The names typing in the MAIN column's channel, already excluding this viewer. */
+  get typists(): readonly string[] {
+    return this.#typists;
+  }
+
+  /** The same for the extra column. */
+  get extraTypists(): readonly string[] {
+    return this.#extraTypists;
+  }
+
+  /**
+   * One `typing` frame off the wire — `typingUpdated` upstream.
+   *
+   * Routed by CHANNEL rather than by column, because that is what the frame carries and because the
+   * two columns can show the same channel: a frame for `main` while both columns are on `main` has
+   * to land in both, and matching on the channel is what makes that fall out rather than needing a
+   * rule.
+   */
+  typingUpdated(chatChannel: string, names: readonly string[]): void {
+    /*
+      NO MAPPING. `CHAT_CHANNELS` in `#lib/server/chat-log.ts` is `['main', 'off-topic']` — this
+      room's wire names ARE its `ChatTab` values, so a translation function here would be a second
+      spelling of a fact that is already one. (The reference's own names differ — `offTopic` — and
+      that difference is the boundary's, not this class's.)
+    */
+    if (this.#tab === chatChannel) this.#typists = names;
+    if (this.#extraTab === chatChannel) this.#extraTypists = names;
+  }
+
+  /**
+   * Whether this composer has already told the room it is typing.
+   *
+   * `amITyping` upstream, and it is what turns a burst of keystrokes into ONE frame. The caller
+   * announces only on a `false`; the debounce that clears it lives with the timer.
+   */
+  announceTyping(composer: 'main' | 'extra'): boolean {
+    if (this.#announced[composer]) return false;
+    this.#announced[composer] = true;
+    return true;
+  }
+
+  /** Clears the flag so the next burst announces again. Called when `notyping` is sent. */
+  clearTypingAnnouncement(composer: 'main' | 'extra'): void {
+    this.#announced[composer] = false;
+  }
+
   set tab(next: ChatTab) {
     this.#tab = next;
+    /*
+      SWITCHING CHANNELS ENDS THE SEARCH. In the SETTER rather than in an effect, so it is a property
+      of switching rather than a reaction that could run a frame late — or not at all, if a switch
+      happened without a render. Why it must end is on `endedByChannelSwitch`.
+    */
+    this.search.endedByChannelSwitch('main');
   }
 
   get extraTab(): ChatTab {
@@ -94,6 +197,8 @@ export class RoomChat {
 
   set extraTab(next: ChatTab) {
     this.#extraTab = next;
+    // See `tab` above: a search belongs to one channel.
+    this.search.endedByChannelSwitch('extra');
   }
 
   /*
@@ -143,17 +248,16 @@ export class RoomChat {
    * Returns true when the MAIN composer was written to, which is the page's cue to focus it and put
    * the caret at the end. The extra column gets no such treatment upstream either.
    *
-   * The extra column's insert is upstream's own and differs by a space:
-   * `i.length ? val(i + ' @' + e + ' ') : val('@' + e + ' ')`. Both forms are reproduced exactly —
-   * a leading space only when there is already something typed, and a trailing space always, so the
-   * next word does not run into the name.
+   * The insert itself moved to `#lib/mention-insert.ts` on 2026-08-28, when the Q&A thread became a
+   * third receiver of it. The rule — a leading space only when something is already typed, a
+   * trailing space always — is stated there, once.
    */
   mention(name: string, toExtraColumn: boolean): boolean {
     if (toExtraColumn) {
-      this.#extraComposer += `${this.#extraComposer ? ' ' : ''}@${name} `;
+      this.#extraComposer = appendMention(this.#extraComposer, name);
       return false;
     }
-    this.#composer += `${this.#composer ? ' ' : ''}@${name} `;
+    this.#composer = appendMention(this.#composer, name);
     return true;
   }
 
