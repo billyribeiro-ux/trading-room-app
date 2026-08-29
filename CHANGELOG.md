@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 01:50 UTC — Five documents understated the wired settings by a factor of three
+
+**Runtime impact: NO.** Documentation corrections and one new check inside an existing verifier.
+
+#### What was found
+
+`room-settings-schema.ts` carries a `wired` flag meaning a setting has a real consumer. The schema
+itself is pinned — `verify-room-settings-schema.mjs` compares every `wired: true` against
+`EXPECTED_WIRED_SETTINGS` and fails on drift. **The prose was not**, and five documents quote the
+number:
+
+| document | said | measured 2026-08-29 |
+| --- | --- | --- |
+| `apps/controller/README.md` | "33 of 269 … the other 257" | **103 of 269; 166 unwired** |
+| `apps/controller/docs/OUTSTANDING.md` | "only 33 of 269 have a consumer" | 103 |
+| `apps/controller/docs/ARCHITECTURE.md` | "**Current state:** 33 of 269 wired; 236 unwired" | 103 / 166 |
+| `docs/decoded/admin-surface.md` | "58 of 269 are wired. 211 are not." + all 58 names | 103 / 166 |
+| `v5.md` | "only 33 of 269" — quoting `OUTSTANDING.md` faithfully | 103 |
+
+Every one **understated** the work: a reader of the controller's own README was told a third of the
+shipped settings do something. The README's was worse than stale — **33 + 257 is 290**, so its
+arithmetic never described a 269-setting schema on any day.
+
+`SESSION-STATE.md:125` also names a count — *"The count moved 43 → 46 of 269"* — and was **left
+alone**. It is a dated narrative of a change that happened, not a claim about today, and a gate that
+demanded history be rewritten would be wrong.
+
+`admin-surface.md` additionally listed the 58 wired settings by name; that roster is regenerated
+from `EXPECTED_WIRED_SETTINGS`, alphabetised, and now carries all 103.
+
+#### The gate
+
+Added to `verify-room-settings-schema.mjs`, which is the **first step of the controller's `pnpm
+test`** and already computes `wired.length` for the schema pin. Checking the prose there costs one
+read per file and keeps one source of the truth; a separate test would have to re-derive the number,
+which is how two sources of one truth begin to disagree.
+
+**Its first run failed on a correct sentence**, and the narrowing that followed is recorded at the
+code. The pattern matched every `"<n> of 269"`, which caught `ARCHITECTURE.md:88` — *"They overlap on
+20 of 269 settings"* — a different statistic about settings two components both write. A gate that
+reports a correct sentence as a defect teaches whoever meets it to widen the exemption rather than
+read the finding, so the window now has to mention `wired` (or "have a consumer"). The cost is
+stated rather than hidden: a wiring claim phrased without those words is not caught. That is the
+right side to err on — a missed claim is a stale sentence, a false one is a broken build.
+
+#### Verified
+
+* **Six negative controls.** One per document — each stated count changed to 93 and each producing a
+  failure naming that document — plus the over-match guard: `ARCHITECTURE.md`'s unrelated "20 of
+  269" must stay legal, and does. Every mutation asserted that it applied before the run; every file
+  restored afterwards.
+* `node scripts/verify-room-settings-schema.mjs` — green: *"wired-count prose verified in 5
+  documents"*, *"268 extracted + 1 reviewed deviation = 269 total; 103 wired"*.
+* Controller unit suite — **96 files passed, 5 skipped; 1,016 tests passed, 21 skipped.**
+* `eslint` on the changed verifier — clean.
+* The full controller gate (`pnpm test`) run before the push.
+
+#### A related number, corrected in passing
+
+The standing plan for this branch recorded **"67 `wired: true` against 202 `wired: false`"**. That
+was already stale when written: measured today the schema holds **103 and 166**. Recorded here
+rather than silently used, because the plan's figure was the input to a phase estimate.
+
 ### 2026-08-29 01:47 UTC — Two rows of TODO.md contradicted each other, and the census is now gated
 
 **Runtime impact: NO.** A tracker correction and five assertions added to an existing contract test.

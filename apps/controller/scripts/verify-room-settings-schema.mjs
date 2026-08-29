@@ -432,6 +432,76 @@ try {
     fail(`generated schema is stale (${digest(canonical)} != ${digest(first)}); run pnpm schema:extract`);
   }
 
+  /*
+    ── EVERY DOCUMENT THAT STATES THE WIRED COUNT STATES THE RIGHT ONE ─────────────────────────────
+
+    ## What this is for
+
+    `wired.length` is pinned above against `EXPECTED_WIRED_SETTINGS`, so the SCHEMA cannot drift
+    unnoticed. Five documents also quote the number in prose, and on 2026-08-29 four of them were
+    measured for the first time in months:
+
+      apps/controller/README.md          "33 of 269 settings are wired … the other 257"
+      apps/controller/docs/OUTSTANDING.md "only 33 of 269 settings have a consumer"
+      apps/controller/docs/ARCHITECTURE.md "Current state: 33 of 269 wired; 236 unwired"
+      docs/decoded/admin-surface.md       "58 of 269 are wired. 211 are not." + all 58 names
+      v5.md                               quoting OUTSTANDING.md's 33
+
+    The real number was 103. The README's was worse than stale — 33 + 257 is 290, so its arithmetic
+    never described a 269-setting schema at all, on any day.
+
+    The direction of the error is what makes it worth a gate rather than a correction: every one of
+    them UNDERSTATED the work. A reader of the controller's own README was told a third of the
+    shipped settings worked. "Current state:" in ARCHITECTURE.md is precisely the sentence that is
+    read as current by definition, and precisely the one nothing was checking.
+
+    ## Why here
+
+    This script already computes `wired.length` and already fails on drift. Checking the prose costs
+    one read per file and puts the assertion where the number is known, rather than in a test that
+    would have to re-derive it — which is how two sources of one truth start disagreeing.
+  */
+  const COUNT_CLAIMS = [
+    'README.md',
+    'docs/OUTSTANDING.md',
+    'docs/ARCHITECTURE.md',
+    '../../docs/decoded/admin-surface.md',
+    '../../v5.md'
+  ];
+
+  for (const relative of COUNT_CLAIMS) {
+    const path = resolve(REPO_ROOT, relative);
+    const text = readFileSync(path, 'utf8');
+    /*
+      "<n> of 269" WHERE THE WORD `wired` IS NEARBY, and the narrowing was measured rather than
+      chosen.
+
+      A first version matched every "<n> of 269" in the file, on the argument that a claim added
+      lower down should be covered on the day it is added. Its first run failed on
+      `docs/ARCHITECTURE.md:88` — *"They overlap on 20 of 269 settings"* — which is a DIFFERENT
+      statistic, about settings two components both write, and had nothing to do with wiring. A gate
+      that reports a correct sentence as a defect is worse than no gate: it teaches whoever meets it
+      to widen the exemption rather than read the finding.
+
+      So the window is required to mention `wired`. The cost is stated rather than hidden: a wiring
+      claim phrased without that word is not caught. That is the right side to err on here, because
+      every one of the five real claims uses it, and a missed claim is a stale sentence while a false
+      one is a broken build.
+    */
+    const claims = [...text.matchAll(/(\d+)(?: of| \/) 269/g)]
+      .filter((match) => /wired|have a consumer/i.test(text.slice(match.index - 120, match.index + 160)))
+      .map((match) => Number(match[1]));
+    const wrong = claims.filter((claimed) => claimed !== wired.length);
+    if (wrong.length > 0) {
+      fail(
+        `${relative} states "${wrong.join(' of 269", "')} of 269" but ${wired.length} settings are wired. ` +
+          `This paragraph is read as the current state; correct it rather than this check.`
+      );
+    }
+  }
+
+  console.log(`wired-count prose verified in ${COUNT_CLAIMS.length} documents`);
+
   console.log(`room-settings schema verified: 268 extracted + 1 reviewed deviation = 269 total; ${wired.length} wired`);
 } finally {
   rmSync(tempDirectory, { recursive: true, force: true });

@@ -120,9 +120,13 @@ it is. The flag is what separates working from looking-like-it-works. It flips t
 `true` only when a real consumer exists, and the UI marks unwired settings so nobody
 — including the owner — believes a toggle does something it doesn't.
 
-Current state: **33 of 269 wired; 236 unwired.** The 33 are consumed by the
-room-login implementation and are encoded explicitly in the generator rather than
-recovered from a previous generated file.
+Current state: **103 of 269 wired; 166 unwired** — measured 2026-08-29, and checked on
+every run by `scripts/verify-room-settings-schema.mjs`, which fails if this sentence and the schema
+disagree. The wired names are encoded explicitly in the generator rather than recovered from a
+previous generated file.
+
+It said **33 wired; 236 unwired** until 2026-08-29. A line labelled "Current state" is the one that
+most needs a gate, because it is read as current by definition.
 
 ## Roles
 
