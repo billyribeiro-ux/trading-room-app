@@ -273,11 +273,19 @@ export class RoomUserActions<
     this.#selectedMessageUser = null;
   }
 
+  /**
+   * The member the user modal is about — the message selection if there is one, else the roster's.
+   *
+   * Delegates to `targetFor` so a `User` becomes a `ModalTargetUser` in ONE place. It did not, and
+   * the second construction was missing all five permission fields; `entitlement-shape-contract.test.ts`
+   * records what that costs, why nothing reached it, and refuses a third.
+   */
   get target(): ModalTargetUser {
     if (this.#selectedMessageUser) return this.#selectedMessageUser;
     const user = this.#session().connectedUsers.find(
       (connectedUser) => connectedUser.id === this.#selectedUserId
     );
+    // No `User` at all: a placeholder for a modal that should not be open. See the contract test.
     if (!user) {
       return {
         id: 0,
@@ -288,16 +296,7 @@ export class RoomUserActions<
         ip: 'n/a'
       };
     }
-    return {
-      id: user.id,
-      nick: user.displayName,
-      email: user.email,
-      emailHash: user.emailHash,
-      pic: user.avatarUrl,
-      status: user.status,
-      permissions: user.role === 'user' ? 'r' : 'a',
-      ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
-    };
+    return this.targetFor(user);
   }
 
   targetFor(user: User): ModalTargetUser {

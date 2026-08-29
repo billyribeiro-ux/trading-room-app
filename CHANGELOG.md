@@ -33,6 +33,43 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 01:05 UTC — A second construction of an entitlement-bearing object, found one call site from being real
+
+**Runtime impact: NO.** No live path reached the lossy branch. The change removes it and gates
+against a third.
+
+`RoomUserActions` built `ModalTargetUser` from a `User` in TWO places: `targetFor(user)`, and an
+inline literal inside `get target()`. Identical except that the inline one omitted `hasMic`,
+`hasScreen`, `hasCam`, `canEditNotes` and `hasAdminChat`.
+
+Those five are entitlements, and `targetFor`'s own comment already records the cost:
+`#permissionsModal` seeds its checkboxes from this object, `Boolean(undefined)` draws every box
+unchecked however the membership stands, and `POST /internal/room-permissions` writes `false` for
+every key absent from `granted`. Save would strip mic, screen, cam and notes and report
+"Permissions applied".
+
+**Traced end to end before claiming anything:** the roster's ⠇ menu calls `onselectuser` →
+`selectUserId`, which clears the message selection and lands on the inline branch — and the only
+item in that menu that opens the modal is `onopenrosteruserinfo` → `openInfoFor` → `select` →
+`targetFor`. The lossy object was built, held, and replaced before anything rendered it. So this was
+latent, and that is the argument for fixing it rather than shrugging: the same five fields caused a
+REAL revocation once already, and the comment recording it says the dangerous state was "harmless
+while the Save button sent nothing" — right up until it sent.
+
+`entitlement-shape-contract.test.ts` reads the permission fields out of `ModalTargetUser` ITSELF
+rather than from a hardcoded list, so a sixth is covered without anyone remembering this file. Three
+negative controls seen RED: re-inlining the lossy construction, dropping `hasCam` from the one
+builder, and adding a sixth permission field to the type that the builder does not carry.
+
+The ceiling on `user-actions.svelte.ts` drops 896 → 895.
+
+Found while tracing `selectUserId` for TODO row 9, not by looking for it.
+
+**Also verified this session and not previously reported:** the controller suite, untouched by the
+last two commits and therefore not run with them — **97 files / 1,026 tests passing, 5 files and 21
+tests skipped**, `svelte-check` 0 errors 0 warnings over 1,545 files, eslint and prettier clean.
+`services/**` was not run: nothing under it changed, which is what the test-what-changed table asks.
+
 ### 2026-08-30 00:15 UTC — The Admin Notes tab had a working gate and nothing behind it
 
 **Runtime impact: YES.** A presenter who clears the user-notes password now sees the member's notes,

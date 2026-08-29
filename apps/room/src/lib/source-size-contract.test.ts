@@ -2604,7 +2604,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
       the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
     */
-    max: 896,
+    /*
+      DOWN one on 2026-08-29, and the line it lost is a SECOND CONSTRUCTION of `ModalTargetUser`.
+      `get target()` built the object inline from the same `User` `targetFor` takes, missing all
+      five permission fields — which is a silent revocation the moment anything opens the
+      permissions modal from that path. Nothing did; the fix is worth the line anyway, and
+      `entitlement-shape-contract.test.ts` refuses a third.
+    */
+    max: 895,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
