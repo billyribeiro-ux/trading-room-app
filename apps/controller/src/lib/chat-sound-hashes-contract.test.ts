@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { resolveRoomConfig, roomVisibleConfig } from '#lib/room-config.js';
+
 /**
  * "Play chat message sound for" — the setting stays here; only HASHES travel.
  *
@@ -48,6 +50,53 @@ describe('the raw setting never crosses', () => {
   });
 });
 
+describe('the derivation reads a config that CAN hold the setting', () => {
+  /*
+    ── THE ASSERTION THIS FILE WAS MISSING, AND THE FEATURE WAS DEAD FOR WANT OF IT ────────────────
+
+    Everything above proves what happens to the value once it is read. Nothing proved it could be
+    read at all — and it could not. The endpoint derived the hashes from
+    `roomVisibleConfig(...).values`, which is the projection onto `ROOM_VISIBLE_SETTINGS`, and the
+    first test in this file asserts that `playChatMessageSoundFor` is deliberately NOT on that list.
+
+    So the two halves of this contract were each correct and together guaranteed the read was
+    permanently `undefined`. The list was always empty. **"Play chat message sound for" has never
+    made a sound for anybody**, and it failed CLOSED — no address leaked, nothing threw, the room got
+    a well-formed empty array — which is exactly why no gate, no type and no reviewer saw it.
+
+    Found by a security review of this branch, filed as a correctness note rather than a
+    vulnerability. The lesson is narrow and worth keeping: a contract that asserts a TRANSFORMATION
+    must also assert that its INPUT is reachable, or it will happily prove the correctness of code
+    that never runs on anything.
+  */
+  const SETTING = { playChatMessageSoundFor: 'a@example.test, b@example.test' };
+
+  it('the visible projection does NOT carry it, which is the privacy rule', () => {
+    expect(roomVisibleConfig(SETTING).values.playChatMessageSoundFor).toBeUndefined();
+  });
+
+  it('the unfiltered resolution DOES, which is what makes the feature possible', () => {
+    expect(resolveRoomConfig(SETTING).values.playChatMessageSoundFor).toBe('a@example.test, b@example.test');
+  });
+
+  it('and the endpoint derives from the unfiltered one', () => {
+    /*
+      Named precisely rather than as "reads resolveRoomConfig somewhere": the defect was reading the
+      RIGHT setting off the WRONG object, so the assertion has to be about which object.
+
+      COMMENTS STRIPPED, for the reason the first test in this file gives — and it caught me on the
+      first run: the endpoint now carries a paragraph explaining the defect, and that paragraph quotes
+      the very expression this asserts is gone. A negative assertion over raw source is an assertion
+      about the prose as much as the code, every time, without exception.
+    */
+    const code = ENDPOINT.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(code).toContain('resolveRoomConfig(roomSettings).values.playChatMessageSoundFor');
+    expect(code, 'reading it off the visible projection is the bug this test exists for').not.toContain(
+      'resolved.values.playChatMessageSoundFor'
+    );
+  });
+});
+
 describe('the split is a character class, which is the fix', () => {
   /*
     `String.replace(" ", "")` applies a STRING pattern to the FIRST occurrence only. That is not a
@@ -65,7 +114,9 @@ describe('the split is a character class, which is the fix', () => {
     expect(upstream).toEqual(['a@example.test', 'b@example.test', ' c@example.test']);
 
     // With five addresses, three are damaged. The first two are always fine and never the rest.
-    const five = 'a@example.test, b@example.test, c@example.test, d@example.test, e@example.test'.replace(' ', '').split(',');
+    const five = 'a@example.test, b@example.test, c@example.test, d@example.test, e@example.test'
+      .replace(' ', '')
+      .split(',');
     expect(five.filter((entry) => entry.startsWith(' '))).toHaveLength(3);
   });
 

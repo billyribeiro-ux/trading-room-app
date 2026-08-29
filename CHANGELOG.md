@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 01:20 UTC — A security review of the branch, and the dead feature it found
+
+**Runtime impact: YES, and it is a repair.** *"Play chat message sound for"* — the setting an owner
+types member addresses into — **has never made a sound for anybody**. Fixed.
+
+#### The review itself
+
+A full security pass over this branch against `main`, targeted at the surfaces it adds: the alert
+scheduler and its atomic claim, the three new remote functions, the canvas spliced into the outgoing
+screenshare, `autoRecord`, the e2e harness that mints and verifies signed tokens, the `app.html`
+change and the session navigation-loop fix. Threat model: tenant isolation, server-side authority,
+fail-closed reads, no credential leakage.
+
+**No HIGH or MEDIUM vulnerability was found.** The properties verified as holding, each with
+evidence, are worth recording because "we looked" is only useful if it says what it looked at:
+
+* **Tenant isolation** — every new read and write carries a room predicate. `removeScheduledAlert`
+  puts the room *in* the `WHERE` and answers 404 on a miss, so a presenter of room A can neither
+  delete nor confirm room B's row; `fireScheduledAlert` inserts and publishes into the row's own room.
+* **Authority server-side** — all three scheduler functions take the room from `presenterRoom()`, and
+  the sender from the session. The reference's `sendLaterAsNick` / `sendLaterAsEmail` are refused by
+  `z.strictObject` rather than ignored.
+* **Fail-closed** — every new control-plane gate reads `=== true`.
+* **No credential leakage** — the four new crossing settings are booleans; the seven credential-shaped
+  names remain off `ROOM_VISIBLE_SETTINGS`, and `roomVisibleConfig` is an allow-list projection.
+* **Capability tokens** — a `config-read:` bearer cannot satisfy the write verifier, and every
+  mutating internal route requires the write domain.
+* **SQL** — the one hand-written fragment interpolates a Drizzle column reference and two
+  non-user-controlled numbers, bound as parameters.
+* **Harness containment** — the e2e signing secret lives in `playwright.config.ts`, is imported only
+  by `e2e/handoff.ts`, and no production module imports anything under `e2e/`. `ROOM_JWT_SECRET` has
+  no default anywhere.
+
+#### The finding: a contract that proved the correctness of code that never ran
+
+`internal/room-config/[code]` derived `chatSoundForEmailHashes` from
+`roomVisibleConfig(...).values.playChatMessageSoundFor` — and `roomVisibleConfig` is the projection
+onto `ROOM_VISIBLE_SETTINGS`, which **deliberately excludes that setting**, because the raw addresses
+must never cross. So the read was permanently `undefined` and the list was permanently empty.
+
+It failed CLOSED — no address leaked, nothing threw, the room received a well-formed empty array —
+which is precisely why nothing saw it.
+
+**`chat-sound-hashes-contract.test.ts` existed and asserted the wrong half.** It proved the setting
+does not cross, that the split is a character class rather than upstream's broken `String.replace`,
+and that the digest matches the room's. Every one of those was true. None of them asked whether the
+value could be READ at all, and the two halves together *guaranteed* it could not.
+
+> A contract that asserts a TRANSFORMATION must also assert that its INPUT is reachable, or it will
+> happily prove the correctness of code that never runs on anything.
+
+Three assertions now close it, behavioural rather than textual: the visible projection does **not**
+carry the setting (the privacy rule), the unfiltered resolution **does** (what makes the feature
+possible), and the endpoint reads the second. Two negative controls seen RED.
+
+`resolveRoomConfig` is called a second time rather than widening `roomVisibleConfig` to hand back
+un-narrowed values. Two passes over a settings object cost nothing beside the database reads above,
+and a function whose job is to narrow, returning the un-narrowed set, is the exact shape that turns
+one careless spread into the leak the projection exists to prevent.
+
+#### And a fifth comment-versus-code trap, on the first run
+
+The new negative assertion read raw source, and the endpoint's own new paragraph quotes the very
+expression it asserts is gone. The first test in that same file already strips comments for exactly
+this reason, and I tripped it anyway. **A negative assertion over raw source is an assertion about
+the prose as much as the code, every time, without exception.**
+
+My first attempt at the corresponding control was also a silent no-op — the mutation string did not
+match after formatting, so it changed nothing and the suite stayed green. Re-run with an assertion
+that the mutation applied, it fails as it should. A control that changes nothing proves nothing.
+
+#### Verified
+
+`svelte-check` 0/0 · `eslint` clean in both apps · controller **101 files / 1,037 tests**, 21 skipped
+(from 1,034) · room **187 files / 3,089 tests**, 1 skipped · room e2e **7 passed in 35s** · two
+negative controls on the fix seen RED.
+
+**Unchanged and still true:** `cargo clippy -p tradingroom-api` cannot run here — `mediasoup-sys`'s
+build script fetches libsrtp and the egress proxy answers 403. That is the same blocker recorded
+earlier and it is not this branch's.
+
 ### 2026-08-29 00:05 UTC — The login page navigated in an infinite loop, and the browser gate proved it
 
 **Runtime impact: YES, and it is a repair.** A member arriving with a valid handoff landed on a page

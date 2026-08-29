@@ -4,7 +4,7 @@ import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, badges, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { parseBadgeIds, readPermissions, readSettings } from '#lib/server/rooms.js';
-import { roomVisibleConfig } from '#lib/room-config.js';
+import { resolveRoomConfig, roomVisibleConfig } from '#lib/room-config.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { createHash } from 'node:crypto';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
@@ -98,7 +98,8 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     error(404, 'Room not found');
   }
 
-  const resolved = roomVisibleConfig(await readSettings(room.id));
+  const roomSettings = await readSettings(room.id);
+  const resolved = roomVisibleConfig(roomSettings);
 
   /*
     The member, when the caller names one.
@@ -208,7 +209,32 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     will ever match. MEASURED, not reasoned: the first two entries of any list are always fine and
     every entry from the THIRD on is dead, so a five-address list loses three of five.
   */
-  const chatSoundForEmailHashes = String(resolved.values.playChatMessageSoundFor ?? '')
+  /*
+    READ FROM THE UNFILTERED CONFIG, AND THAT IS THE FIX RATHER THAN A SHORTCUT.
+
+    This used to read `resolved.values.playChatMessageSoundFor` — and `resolved` is
+    `roomVisibleConfig(...)`, which projects onto `ROOM_VISIBLE_SETTINGS`. `playChatMessageSoundFor`
+    is deliberately NOT on that list, precisely because the raw addresses must never cross. So the
+    read was permanently `undefined`, the list was permanently empty, and **"play chat sound for
+    these members" has never made a sound for anybody.**
+
+    It failed CLOSED, which is why nothing noticed: no address leaked, no error was thrown, and the
+    room received a well-formed empty array. That is the quiet half of a dead feature — the loud half
+    is a control an owner types addresses into that does nothing.
+
+    Found by a security review of this branch, filed as a correctness note rather than a
+    vulnerability, and verified here before being believed: `playChatMessageSoundFor` occurs zero
+    times in `room-config.ts`, so it cannot be on the allow-list.
+
+    `resolveRoomConfig` is called a SECOND time rather than widening `roomVisibleConfig` to return
+    unfiltered values. Two passes over a settings object cost nothing beside the database reads above,
+    and the alternative — a function whose job is to narrow, handing back the un-narrowed set — is the
+    exact shape that turns one careless spread into the leak the projection exists to prevent. The
+    allow-list stays in one place and keeps one meaning.
+
+    The privacy property is unchanged and is the whole point: only md5 hashes leave this function.
+  */
+  const chatSoundForEmailHashes = String(resolveRoomConfig(roomSettings).values.playChatMessageSoundFor ?? '')
     .split(/[\s,]+/)
     .map((address) => address.trim().toLowerCase())
     .filter((address) => address.length > 0)
