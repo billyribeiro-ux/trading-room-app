@@ -1,5 +1,6 @@
 <script lang="ts">
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
+  import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
@@ -1343,6 +1344,69 @@
    */
   const IMAGE_ACCEPT = `image/${'*'}`;
 
+  /**
+   * Downscale to the reference's 125px box, then hand the result up.
+   *
+   * ## The step this was missing
+   *
+   * `adminUploadProfilePic` (bundle byte 2,084,700) never uploads the chosen file. It reads it,
+   * draws it into a canvas at a 125px longest edge, and uploads THAT as a PNG. The first version of
+   * this control shipped without the step because the evidence row naming it was not read until
+   * after; `#lib/profile-picture-downscale.js` carries the arithmetic and that correction.
+   *
+   * It matters more here than upstream: this room stores the bytes itself, and an avatar is only
+   * ever drawn at 45px in a roster row or 80px in this modal.
+   *
+   * ## Failing OPEN, deliberately
+   *
+   * Every step below can fail on a file the browser cannot decode - `createImageBitmap` throws,
+   * `getContext` returns null, `toBlob` hands back null. In each case the ORIGINAL file is sent. The
+   * server refuses a non-image and reports why; refusing here as well would replace that specific
+   * message with a vaguer one from a resize that was never the point.
+   */
+  async function sendProfilePicture(user: ModalTargetUser, file: File): Promise<void> {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const size = downscaledSize(bitmap.width, bitmap.height);
+      if (size.width === bitmap.width && size.height === bitmap.height) {
+        bitmap.close();
+        onUploadProfilePicture(user, file);
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        bitmap.close();
+        onUploadProfilePicture(user, file);
+        return;
+      }
+      context.drawImage(bitmap, 0, 0, size.width, size.height);
+      bitmap.close();
+
+      // `image/png` and quality 1, both the reference's - `F.toBlob(te => ..., "image/png", 1)`.
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((result) => resolve(result), 'image/png', 1)
+      );
+      if (!blob) {
+        onUploadProfilePicture(user, file);
+        return;
+      }
+
+      /*
+        `.png`, because the bytes ARE a PNG now whatever the original was. A `.jpg` name on PNG bytes
+        is the kind of small lie that survives into a filename on disk and confuses the next person
+        who looks at the uploads directory.
+      */
+      const renamed = file.name.replace(/\.[^./\\]*$/, '') + '.png';
+      onUploadProfilePicture(user, new File([blob], renamed, { type: 'image/png' }));
+    } catch {
+      onUploadProfilePicture(user, file);
+    }
+  }
+
   function setReadonlyAttribute(node: HTMLTextAreaElement) {
     node.setAttribute('readonly', 'readonly');
   }
@@ -2636,7 +2700,7 @@
                     const picked = event.currentTarget.files?.[0];
                     // Reset FIRST, so choosing the same file twice still fires a change.
                     event.currentTarget.value = '';
-                    if (picked) onUploadProfilePicture(targetUser, picked);
+                    if (picked) void sendProfilePicture(targetUser, picked);
                   }}
                 />
                 <button

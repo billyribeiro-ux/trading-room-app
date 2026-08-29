@@ -1666,7 +1666,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in that catalog turned red the moment the button existed and has been deleted, which is the
       declaration that it is done.
     */
-    max: 6151,
+    /*
+      6151 -> 6215, 2026-08-29, for the 125px downscale and the alerts — a CORRECTION, not a feature.
+
+      Here it is the canvas step and the paragraph on why it fails OPEN: four escape hatches, each handing the ORIGINAL file up, because a resize that refused the upload would replace the server's specific message with a vaguer one.
+
+      `upload-profile-picture` shipped earlier the same day without either, because
+      `docs/decoded/missing-commands-triage.md:93` — *"canvas-downscales the image to a 125px longest
+      edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
+      the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
+    */
+    max: 6215,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2361,7 +2371,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in that catalog turned red the moment the button existed and has been deleted, which is the
       declaration that it is done.
     */
-    max: 880,
+    /*
+      880 -> 896, 2026-08-29, for the 125px downscale and the alerts — a CORRECTION, not a feature.
+
+      Here it is two alerts and the correction that replaced a paragraph arguing for silence - reasoning carried over from `getDebugLog`, where it is true, and never checked here.
+
+      `upload-profile-picture` shipped earlier the same day without either, because
+      `docs/decoded/missing-commands-triage.md:93` — *"canvas-downscales the image to a 125px longest
+      edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
+      the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
+    */
+    max: 896,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 

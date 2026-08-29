@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,150 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,214 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
 | 3 | `routes/+page.svelte` | 1,462 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,162 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `routes/logout/+page.svelte` | 31 | no |
 | 55 | `routes/+layout.svelte` | 27 | no |
 
-**2 of 55 surfaces audited · 1,059 of 27,595 lines · 3.8%.**
+**2 of 55 surfaces audited · 1,059 of 27,659 lines · 3.8%.**
 
 ## The honest scoping statement
 

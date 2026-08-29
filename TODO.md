@@ -490,6 +490,15 @@ re-broadcast loop. It was the identical defect to the screens one that
 and brought nobody"* — one tab away, and nobody had looked.
 
 **2. DEAD CONTROLS — no handler at all, not even a toast.** Clicking does literally nothing.
+**BOTH BUILT 2026-08-29 — this whole section is superseded and kept only for the byte offsets it
+records.** `debug-log` and `upload-profile-picture` (with its remove half) have real branches, real
+commands and contract cover; see `routes/debug-log.remote.ts` and `routes/profile-picture.remote.ts`.
+**One correction the build produced:** the upload evidence in
+`docs/decoded/missing-commands-triage.md:93` is TRUNCATED in that document — it names a "125px
+longest edge" downscale and three alert sentences but cuts off mid-word — so both were read from the
+bundle instead, at bytes 2,084,700 and 2,086,100, and the downscale and the alerts shipped as a
+correction hours after the feature. The original text follows.
+
 `getDebugLog`: `ModalHost.svelte:2306` dispatches `onUserAction('debug-log', …)` and that string
 occurs **exactly once in the whole source**, at the call site — no branch in `handle()`, no entry in
 `EXACT_ALERTS`. Its modal at `:3844` is unreachable (nothing ever sets `name === 'debug'`) and

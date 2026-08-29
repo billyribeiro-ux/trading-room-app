@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 22:00 UTC — The 125px downscale and the alerts: a correction to a feature shipped hours earlier
+
+**Runtime impact: YES.** Uploaded pictures are resized before they leave the browser, and the
+presenter is told what happened.
+
+#### Evidence I had not read
+
+A staleness sweep over the trackers turned up `docs/decoded/missing-commands-triage.md:93`, which
+says `adminUploadProfilePic` *"canvas-downscales the image to a 125px longest edge"*. **I built
+`upload-profile-picture` without consulting that row.** The row is truncated in the document —
+it stops mid-word at `Authorization: Cl` — so the arithmetic and the alert sentences came from the
+bundle itself, at bytes 2,084,700 and 2,086,100.
+
+#### The downscale
+
+```js
+B > W ? B > 125 && (W *= 125 / B, B = 125)
+      : W > 125 && (B *= 125 / W, W = 125)
+```
+
+Longest edge to 125, the other in proportion, an image already inside the box left alone — and a
+**square takes the `else` branch**, which is reproduced rather than normalised because it costs
+nothing to be exact. `Math.floor`, not `Math.round`: the reference assigns the float straight to
+`canvas.width` and the platform truncates.
+
+**It matters more here than upstream.** This room stores the bytes itself where the reference POSTed
+to a CDN, and an avatar is only ever drawn at **45px** in a roster row or **80px** in the user modal.
+A presenter picking a 4,000px photo was putting megabytes on disk to serve a 45px square.
+
+The picker **fails open**: an undecodable bitmap, a missing 2d context, a null blob or any throw all
+send the original file, because the server refuses a non-image with a specific message and a resize
+that refused would replace it with a vaguer one.
+
+#### The alerts, and a decision that was wrong
+
+The first version argued that *"upstream raises no alert on success — the picture simply changes"*.
+**That was reasoning carried over from `getDebugLog`, where it is true, and never checked here.** The
+reference alerts three times: `Uploading: ${name}... Please wait...`, `Profile picture uploaded
+successfully for ${nick}`, and `Upload Failed...`.
+
+Two of the three are now transcribed. The progress alert is dropped and recorded as a divergence:
+upstream's is a bootbox that `hideAll()` closes from the callbacks, and this room's primitive is a
+string the member dismisses — showing "Uploading…" would make the presenter dismiss it before they
+could read the result. The failure prefers the **server's** reason when there is one and falls back
+to upstream's sentence verbatim.
+
+#### The same false-positive, a third time
+
+A control deleting the success alert came back **green**: the assertion matched the docblock quoting
+the reference, not the code. `orphan-style-contract` hit this through transcription notes and
+`dead-export-contract` through its own catalog; this file's own subject is a correction, so its prose
+necessarily contains the strings the code must contain. The assertions strip comments now.
+
+Two more of my own errors, both caught by existing gates: the new function's docblock **orphaned the
+one above it** (`orphaned-comment-contract`), and the test **inlined an `indexOf` inside a `slice`**
+(`slice-anchor-contract`, which asks for the position to be bound and asserted).
+
+**Verified:** `format:check`, `eslint`, `svelte-check` 1,353 files / 0 errors / 0 warnings, **200
+files / 3,219 tests green**, **8-spec browser suite green**. **Five negative controls seen RED**:
+rounding instead of flooring; upscaling an already-small image; the picker skipping the downscale;
+the success sentence changed; the failure no longer preferring the server's reason.
+
 ### 2026-08-29 21:00 UTC — Every export has a reader, and the gate that says so had a bug hiding nine of them
 
 **Runtime impact: NO.** One gate. No application code changed.

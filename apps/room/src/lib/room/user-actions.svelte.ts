@@ -831,30 +831,46 @@ export class RoomUserActions<
   /**
    * `adminUploadProfilePic` — a presenter sets one member's avatar.
    *
-   * ## No announcement, and a FAILURE that is shown
+   * ## A CORRECTION: this DOES announce, and the first version was wrong to be silent
    *
-   * `#announceThenSend` is what `save-permissions` above uses, and it is wrong here in both
-   * directions. Upstream raises no alert on success — the picture simply changes, which is its own
-   * confirmation — so announcing one would be inventing the `EXACT_ALERTS` shape this repository has
-   * spent five commits removing.
+   * The first version of this method carried a paragraph arguing that *"upstream raises no alert on
+   * success — the picture simply changes, which is its own confirmation"*. **That was reasoning
+   * carried over from `getDebugLog`, where it is true, and it was never checked here.** The
+   * reference is explicit, at bundle byte 2,086,100:
    *
-   * A failure IS raised, because this one can fail in ways the presenter must see and cannot infer:
-   * the file is not an image, it is over the 25Mb limit, or the member has left the room. The
-   * silence on success and the noise on failure are deliberately asymmetric — an upload that quietly
-   * did nothing looks exactly like one that worked.
+   * ```js
+   * beforeSend: … bootbox.alert(`Uploading: ${e.name}... Please wait...`)
+   * success:     … bootbox.alert("Profile picture uploaded successfully for " + (user.nick||user.name))
+   * error:       … bootbox.alert("Upload Failed...")
+   * ```
    *
-   * The modal stays OPEN. `savePermissions` closes it because saving is the end of that dialog;
-   * a presenter who has just set a picture may well set another, and closing would be a small
-   * divergence with no evidence behind it.
+   * Three alerts, one per outcome, and the sentences are transcribed rather than composed. That is
+   * the opposite of the `EXACT_ALERTS` defect this repository has spent commits removing: those were
+   * alerts raised over NOTHING, and these are raised over a real round trip.
+   *
+   * The progress alert is dropped and that IS a divergence, recorded rather than hidden: upstream's
+   * is a bootbox that `bootbox.hideAll()` closes from the success and error callbacks, and this
+   * room's `alert` primitive is a single string the member dismisses. Showing "Uploading…" would
+   * require the presenter to dismiss it before they could read the result.
+   *
+   * The failure sentence is the SERVER's when there is one — "That is not an image", the size limit,
+   * or the member having left the room — falling back to upstream's `"Upload Failed..."` verbatim.
+   * A specific reason beats a transcribed one; the transcription is what happens when there is no
+   * specific reason to give.
+   *
+   * The modal stays OPEN. `savePermissions` closes it because saving is the end of that dialog; a
+   * presenter who has just set a picture may well set another.
    */
   uploadProfilePicture(user: ModalTargetUser, file: File): void {
     void this.#commands
       .uploadProfilePicture({ targetUserId: user.id, file })
+      .then(() => {
+        // Verbatim, byte 2,086,100 — including that it names the member rather than the file.
+        this.#dialogs.alert = `Profile picture uploaded successfully for ${user.nick}`;
+      })
       .catch((cause: unknown) => {
         this.#dialogs.alert =
-          cause instanceof Error && cause.message
-            ? cause.message
-            : 'That profile picture could not be uploaded.';
+          cause instanceof Error && cause.message ? cause.message : 'Upload Failed...';
       });
   }
 

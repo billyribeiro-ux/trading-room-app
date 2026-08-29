@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { RoomPrivateCommands } from '#lib/room/private-commands.js';
+import { downscaledSize, needsDownscale } from '#lib/profile-picture-downscale.js';
 import type { RoomChatMute } from '#lib/room/chat-mute.js';
 
 /**
@@ -171,6 +172,110 @@ describe('the membership check is the same notion of live that logging in uses',
     */
     const auth = readFileSync(`${ROOT}lib/server/auth.ts`, 'utf8');
     expect(auth).toContain("error(404, 'No such member in this room.')");
+  });
+});
+
+describe('the picture is downscaled to the reference 125px box before it is uploaded', () => {
+  it('scales the LONGEST edge to 125 and the other in proportion', () => {
+    /*
+      The reference's own arithmetic, byte 2,084,700:
+        B > W ? B > 125 && (W *= 125 / B, B = 125)
+              : W > 125 && (B *= 125 / W, W = 125)
+    */
+    expect(downscaledSize(4000, 2000)).toEqual({ width: 125, height: 62 });
+    expect(downscaledSize(2000, 4000)).toEqual({ width: 62, height: 125 });
+    expect(downscaledSize(500, 500)).toEqual({ width: 125, height: 125 });
+  });
+
+  it('leaves an image already inside the box completely alone', () => {
+    /*
+      The `&&` in both branches. An avatar that is already small must not be re-encoded: the room
+      draws it at 45px and 80px, so upscaling it to 125 would add bytes and blur.
+    */
+    expect(downscaledSize(100, 80)).toEqual({ width: 100, height: 80 });
+    expect(downscaledSize(125, 125)).toEqual({ width: 125, height: 125 });
+    expect(needsDownscale(100, 80)).toBe(false);
+    expect(needsDownscale(126, 10)).toBe(true);
+  });
+
+  it('floors rather than rounds, because a canvas dimension is an integer', () => {
+    /*
+      `W *= 125 / B` produces a float and the reference assigns it straight to `canvas.width`, which
+      the platform truncates. Rounding here would diverge by up to half a pixel from what the
+      reference actually draws.
+    */
+    expect(downscaledSize(300, 199)).toEqual({ width: 125, height: 82 });
+    expect((199 * 125) / 300).toBeCloseTo(82.9, 1);
+  });
+
+  it('returns an undecodable size unchanged rather than throwing', () => {
+    /*
+      Zero or non-finite means the browser could not decode the file. Carrying on lets the SERVER
+      refuse it with the real reason - "That is not an image" - instead of failing here with a
+      complaint about a size.
+    */
+    expect(downscaledSize(0, 0)).toEqual({ width: 0, height: 0 });
+    expect(downscaledSize(Number.NaN, 10)).toEqual({ width: Number.NaN, height: 10 });
+  });
+
+  it('is applied by the picker, and fails OPEN when the browser cannot decode', () => {
+    const modal = readFileSync(`${ROOT}lib/components/ModalHost.svelte`, 'utf8');
+    expect(modal).toContain('downscaledSize(bitmap.width, bitmap.height)');
+    /* PNG at quality 1, both the reference's. */
+    expect(modal).toContain("'image/png', 1");
+    /*
+      Four escape hatches, each handing the ORIGINAL file up: an undecodable bitmap, a missing 2d
+      context, a null blob, and any throw. A resize that refused the upload would replace the
+      server's specific message with a vaguer one.
+    */
+    const from = modal.indexOf('async function sendProfilePicture');
+    expect(from, 'the downscaling picker is gone').toBeGreaterThan(-1);
+    const to = modal.indexOf('\n  }', from);
+    expect(to, 'the picker no longer closes').toBeGreaterThan(from);
+    const fallbacks = modal.slice(from, to);
+    expect(fallbacks.split('onUploadProfilePicture(user, file)').length - 1).toBe(4);
+  });
+});
+
+/**
+ * Source with comments removed.
+ *
+ * The assertions below quote sentences that ALSO appear in the docblocks explaining them — this
+ * file's own subject is a correction, so the prose necessarily contains the strings the code must
+ * contain. A raw `toContain` therefore passes on the comment and measures nothing, which is exactly
+ * what happened: the control that deleted the success alert came back green.
+ *
+ * Third instance of this shape in one day — `orphan-style-contract` hit it through transcription
+ * notes and `dead-export-contract` through its own catalog. A gate that reads source must read the
+ * CODE.
+ */
+const codeOf = (source: string) =>
+  source
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+describe('the presenter is told what happened, in the reference own words', () => {
+  it('announces success and failure, which the first version did NOT', () => {
+    /*
+      THE CORRECTION THIS BLOCK EXISTS FOR. The first version of `uploadProfilePicture` argued that
+      upstream raises no alert on success. That reasoning was carried over from `getDebugLog`, where
+      it is true, and was never checked here — the reference alerts three times, at byte 2,086,100.
+    */
+    const actions = codeOf(readFileSync(`${ROOT}lib/room/user-actions.svelte.ts`, 'utf8'));
+    expect(actions).toContain('Profile picture uploaded successfully for');
+    expect(actions).toContain("'Upload Failed...'");
+  });
+
+  it('prefers the server reason over the transcribed one', () => {
+    /*
+      "That is not an image" or the size limit beats `"Upload Failed..."`. The transcription is the
+      fallback for when there is no specific reason to give, not the first answer.
+    */
+    const actions = codeOf(readFileSync(`${ROOT}lib/room/user-actions.svelte.ts`, 'utf8'));
+    expect(actions).toContain(
+      "cause instanceof Error && cause.message ? cause.message : 'Upload Failed...'"
+    );
   });
 });
 
