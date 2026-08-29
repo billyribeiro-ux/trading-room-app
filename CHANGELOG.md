@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 15:05 UTC — A browser confirms the dropdowns open, and refutes a defect I had started bisecting
+
+**Runtime impact: NO.** One end-to-end spec. No application code changed.
+
+#### Why a browser, for this specifically
+
+The commit before this one repaired two dropdowns that could never open, and gated the mechanism in
+`bootstrap-dropdown-contract.test.ts`. That gate reads source text. **Nothing in this repository had
+ever confirmed that a dropdown actually opens on screen** — `svelte-check` has no layout, a jsdom
+mount has no layout, and the contract test asserts a class name rather than a rendered box. The one
+question that matters is not "is the class right" but "is the menu visible after a click".
+
+`e2e/room-renders.spec.ts` now asks it, over every dropdown the room renders, reading `display` from
+the computed style — because `display` *is* the property that was broken.
+
+#### What it does not cover, stated rather than implied
+
+**The two repaired menus are not among the five it tests, and cannot be.** The presentation area's
+volume control is attached-only — `ScreenZoomControls` renders it beside a screen being shared — and
+the streaming view's buffer picker needs a live MediaMTX stream. Neither exists in this job, and
+`getDisplayMedia` cannot be automated at all. Measured, not assumed: the first draft looked for
+`#dropdownVolume` in `vo=1` mode and found **nothing in the DOM**.
+
+What *is* covered is the mechanism both now use, including the navbar's own `#dropdownVolume` — the
+twin of the repaired control, driven by the same class.
+
+Separately, and because it could not be shown in a browser: the two repaired menus rely on `.show`
+**alone**, while the five navbar menus carry both `.show` and an inline `display: block`. That this
+is sufficient was verified from the cascade rather than assumed — `.dropdown-menu.show` (specificity
+0,2,0) beats `.dropdown-menu` (0,1,0), and a sweep of all three shipped sheets found no other rule
+setting `display` on `.volumeControl` or on the buffer menu.
+
+#### The defect that was not one
+
+Mid-way through, the spec reported that `#dropdownRecording` did not open on a real click while a
+synthetic `element.click()` opened it — a sharp, reproducible difference. I got as far as reading
+Svelte's `handle_event_propagation` source and bisecting `RoomNavbar.svelte`'s `stopPropagation`
+handlers.
+
+**It was my own harness.** The failure follows the POSITION, not the control: with the recording menu
+probed first, the recording menu failed and the other four passed; with the volume menu probed first,
+the *volume* menu failed and the recording menu passed. The first interaction after that navigation
+never takes effect. Waiting on Svelte's delegated-handler symbol is not enough — it is already
+present while that click is still being dropped — so the spec spends one discarded interaction and
+says so, rather than asserting a cause it has not proven.
+
+Recorded at length because the near-miss is the lesson: a reproducible measurement pointed at working
+code, and the thing that refuted it was reversing the order rather than reasoning harder about the
+framework.
+
+#### Also found, and it is not a defect
+
+`/opt/pw-browsers` carries Chromium build 1194 while `@playwright/test@1.62.1` wants 1234, so the
+suite cannot launch here without an `executablePath` override. That override was **container-local
+and is not committed** — the repository's `playwright.config.ts` stays the one CI uses, where the
+matching browser is installed.
+
+**Verified:** the full room end-to-end suite, **8 specs green in a real browser**, including the new
+one; the full unit suite, 196 files / 3,156 tests green. The new spec's negative control was seen
+RED — removing both the `show` class and the inline `display` from the SoundCloud menu — and the
+first attempt at that control **did not fire**, because removing the class alone left the inline
+style opening the menu, which is how the belt-and-braces pairing in the navbar was found.
+
 ### 2026-08-29 14:35 UTC — Two dropdowns that could never be opened, because Bootstrap's JavaScript is not here
 
 **Runtime impact: YES.** Two controls that did nothing now work; one gate; five argued ceiling raises.

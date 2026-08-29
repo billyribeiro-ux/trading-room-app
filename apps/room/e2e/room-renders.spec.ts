@@ -280,3 +280,131 @@ test.describe('the room itself', () => {
     expect(overflow, 'the document scrolls horizontally').toBeLessThanOrEqual(1);
   });
 });
+
+/*
+  THE DROPDOWNS, WHICH ARE THE ONE THING IN THIS ROOM NO STATIC CHECK CAN CONFIRM.
+
+  This app renders Bootstrap's markup and ships none of Bootstrap's JavaScript, so `data-bs-toggle`
+  is inert and a dropdown opens only if this codebase adds `.show` itself, from `RoomMenus`. Two
+  menus were missing that for months and NOTHING here could see it: both type-check, both lint
+  clean, `svelte-check` is silent on both, `bootstrap-dropdown-contract.test.ts` reads source text,
+  and a jsdom mount has no layout at all.
+
+  Only a browser answers the real question, which is not "is the class right" but "is the menu ON
+  SCREEN after a click". This group asks it the way a member does, over every dropdown the room
+  actually renders, and it reads `display` from the computed style because `display` IS the
+  mechanism that was broken.
+
+  ## What it does NOT cover, stated rather than implied
+
+  The two menus that were repaired are not among the six below, and cannot be. The presentation
+  area's volume control is ATTACHED ONLY - `ScreenZoomControls` renders it beside a screen that is
+  being shared - and the streaming view's buffer picker needs a live MediaMTX stream. Neither exists
+  in this job, and `getDisplayMedia` cannot be automated at all, which this repository already
+  records as needing a human at a screen picker. Measured, not assumed: a first draft of this spec
+  looked for `#dropdownVolume` in `vo=1` mode and found NOTHING IN THE DOM.
+
+  What is covered is the MECHANISM those two now use, including the navbar's own `#dropdownVolume` -
+  the twin of the repaired control, driven by the same class. If `RoomMenus` stops opening menus,
+  this goes red.
+
+  Its own group, and NOT serial with the one above, because this one CLICKS - that group shares a
+  page precisely on the promise that every assertion reads rather than mutates.
+*/
+test.describe('the dropdowns open, in a browser', () => {
+  test('every rendered dropdown is hidden until clicked, and shuts again', async ({ page }) => {
+    await page.route('**/*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return route.continue();
+      return route.abort();
+    });
+    await page.goto(handoffUrl(ROOM));
+    await page
+      .getByRole('button', { name: /log ?in|enter/i })
+      .first()
+      .click();
+    await page.waitForTimeout(1_000);
+    const entered = await page.goto(`/?room=${ROOM}`, { waitUntil: 'domcontentloaded' });
+    expect(entered?.status(), 'the room must answer 200 before anything below means anything').toBe(
+      200
+    );
+
+    /*
+      Discovered from the page rather than listed here. A hard-coded list rots into a spec that keeps
+      passing while the controls it names are gone - and the menu is found through the trigger's own
+      `aria-labelledby`, which is the association the markup already makes.
+    */
+    const pairs = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-bs-toggle="dropdown"]')]
+        .filter((trigger) => {
+          if (!trigger.id || (trigger as HTMLElement).offsetParent === null) return false;
+          /*
+            IN THE VIEWPORT, not merely in the layout. The sidebar's `#archivesDropdown` is rendered
+            and laid out but sits off-screen until the sidebar slides in, and Playwright reported
+            exactly that - "element is outside of the viewport" - for sixty seconds. A member cannot
+            click it either without opening the sidebar first, so testing it here would be testing a
+            different interaction than the one this spec is about.
+          */
+          const box = trigger.getBoundingClientRect();
+          return (
+            box.width > 0 &&
+            box.height > 0 &&
+            box.top >= 0 &&
+            box.left >= 0 &&
+            box.bottom <= window.innerHeight &&
+            box.right <= window.innerWidth
+          );
+        })
+        .map((trigger) => trigger.id)
+        .filter((id) => document.querySelector(`.dropdown-menu[aria-labelledby="${id}"]`))
+    );
+
+    /*
+      The vacuity floor, and it is not decorative: every assertion below runs inside a loop over this
+      list, so an empty list is silent green ticks. Five visible, paired dropdowns were measured in
+      the room this job builds.
+    */
+    expect(pairs.length, 'no dropdown was discovered, so nothing below was tested').toBeGreaterThan(
+      3
+    );
+
+    /*
+      ONE DISCARDED INTERACTION, and it is not superstition — it is a measurement.
+
+      The FIRST click after this navigation never takes effect, whichever control receives it. That
+      was established by reversing the order: with the recording menu first, the recording menu
+      failed and the other four passed; with the volume menu first, the VOLUME menu failed and the
+      recording menu passed. The failure follows the position, not the control.
+
+      Waiting on Svelte's delegated-handler symbol appearing on the trigger is not enough — it is
+      already there while that first click is still being dropped — so the honest thing is to spend
+      one interaction rather than to assert a cause this suite has not proven. It is spent on the
+      body, where it is also what the loop below does between menus.
+
+      Recorded because it nearly became a bug report: the first draft of this spec read that dropped
+      click as a dead control and got as far as bisecting `RoomNavbar.svelte`.
+    */
+    await page.locator('body').click({ position: { x: 2, y: 2 } });
+    await page.waitForTimeout(200);
+
+    for (const id of pairs) {
+      const trigger = page.locator(`#${id}`);
+      const menu = page.locator(`.dropdown-menu[aria-labelledby="${id}"]`);
+      const display = () =>
+        menu.evaluate((node) => window.getComputedStyle(node as HTMLElement).display);
+
+      expect(await display(), `${id}: the menu must start hidden`).toBe('none');
+
+      await trigger.click();
+      expect(await display(), `${id}: clicking the trigger must open the menu`).toBe('block');
+
+      /*
+        Closed by clicking the trigger again, which is the reference's own mechanism (Bootstrap
+        toggles) and what `RoomMenus.toggle` reproduces. Leaving it open would also carry state into
+        the next iteration.
+      */
+      await trigger.click();
+      expect(await display(), `${id}: clicking the trigger again must shut the menu`).toBe('none');
+    }
+  });
+});
