@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,273 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,281 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
 | 3 | `routes/+page.svelte` | 1,473 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,187 | no |
@@ -113,27 +113,28 @@ guessed.
 | 37 | `lib/components/GiphyPicker.svelte` | 152 | no |
 | 38 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
 | 39 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 40 | `lib/components/BootboxDialog.svelte` | 131 | no |
-| 41 | `lib/components/MobileRestorePane.svelte` | 130 | no |
-| 42 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 43 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 44 | `lib/components/CloseSessionPane.svelte` | 104 | no |
-| 45 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 46 | `lib/components/ChatSearchBar.svelte` | 88 | no |
-| 47 | `lib/components/CompactMessageRow.svelte` | 77 | no |
-| 48 | `lib/components/PositionsContainer.svelte` | 74 | no |
-| 49 | `lib/components/ModeratorMessage.svelte` | 73 | no |
-| 50 | `lib/components/ToastHost.svelte` | 64 | no |
-| 51 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 52 | `lib/components/ChatTabStrip.svelte` | 55 | no |
-| 53 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 54 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
-| 55 | `lib/components/PositionsControls.svelte` | 44 | no |
+| 40 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
+| 41 | `lib/components/BootboxDialog.svelte` | 131 | no |
+| 42 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 43 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 44 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 45 | `lib/components/CloseSessionPane.svelte` | 104 | no |
+| 46 | `lib/components/RoomBranding.svelte` | 91 | no |
+| 47 | `lib/components/ChatSearchBar.svelte` | 88 | no |
+| 48 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 49 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 50 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 51 | `lib/components/ToastHost.svelte` | 64 | no |
+| 52 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 53 | `lib/components/ChatTabStrip.svelte` | 55 | no |
+| 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 57 surfaces audited · 1,059 of 28,093 lines · 3.8%.**
+**2 of 58 surfaces audited · 1,059 of 28,234 lines · 3.8%.**
 
-| 56 | `routes/logout/+page.svelte` | 31 | no |
-| 57 | `routes/+layout.svelte` | 27 | no |
+| 56 | `lib/components/PositionsControls.svelte` | 44 | no |
+| 57 | `routes/logout/+page.svelte` | 31 | no |
+| 58 | `routes/+layout.svelte` | 27 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

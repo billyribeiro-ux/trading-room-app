@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * port; it turned out to be the captured class for the Debug Log textarea, and the reason it had no
  * wearer was that the FEATURE was not built. Finding it was luck. This makes it arithmetic.
  *
- * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 8
+ * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 7
  *
  * They split cleanly, and the split is what makes each one actionable:
  *
@@ -58,10 +58,6 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  */
 const ORPHANS: Record<string, { captured: boolean; why: string }> = {
   // ── The user-info modal, `ng-c1441935951` — a modal this room renders, missing four affordances ──
-  'edit-user-avatar-options': {
-    captured: true,
-    why: 'the avatar dropdown inside `#user-modal` — the pencil overlay on the picture. `.edit-user-avatar img` beside it IS worn, so the container is built and its options menu is not.'
-  },
   'chat-stars': {
     captured: true,
     why: "a per-member rating shown beside the nick in `#user-modal`. Nothing in this room reads or writes a member's stars, so the class is the only trace of the feature."
@@ -280,8 +276,24 @@ describe('app.css styles nothing that no element wears', () => {
       trivia — and if either is built, the stale-entry test above turns red and forces this to be
       revisited with it.
     */
-    const userModal = ['edit-user-avatar-options', 'chat-stars', 'tagline'];
+    /*
+      `edit-user-avatar-options` LEFT THIS LIST on 2026-08-29, which is the third time this gate has
+      turned red on a build rather than on a regression — `remove-profile-picture-btn` was the first.
+
+      It also corrected its sibling. `remove-profile-picture-btn` had shipped as a floating button on
+      the avatar, presenter-gated, under a note recording that its handler had not been located.
+      Reading `K2e` @ 2,058,852 found it: const 23 IS that button and it lives INSIDE this dropdown,
+      whose gate has no role term at all. Two of the four affordances were one control.
+
+      TWO REMAIN, and both need something this room does not have rather than markup: `chat-stars` a
+      per-member rating nothing reads or writes, and `tagline` a column.
+    */
+    const userModal = ['chat-stars', 'tagline'];
     for (const cls of userModal) expect(ORPHANS[cls]?.captured, cls).toBe(true);
+    expect(
+      ORPHANS['edit-user-avatar-options'],
+      'the avatar dropdown is built; its entry must stay gone'
+    ).toBeUndefined();
 
     /*
       THE MIC-TEST SURFACE WAS NEVER MISSING, and this assertion is what is left of the claim that it

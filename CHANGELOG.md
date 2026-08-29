@@ -33,6 +33,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 22:40 UTC — Two of `#user-modal`'s four missing affordances were one control, and it corrected the one already built
+
+**Runtime impact: YES.** Any member can now change their own profile picture from the user modal —
+Gravatar, upload, or remove — which is what the capture offers and this room offered to nobody.
+
+#### What reading the template actually found
+
+Row AJ listed four affordances of `#user-modal` as missing, one of which
+(`remove-profile-picture-btn`) was built earlier the same day as a floating button on the avatar,
+presenter-gated, under a note that admitted the gap in as many words: *"what its click CALLS was not
+read — the const table gives the shape and the binding position, and the handler lives in a render
+function this pass did not locate."*
+
+It has been located. Template `K2e` @ bundle byte 2,058,852, with every const parsed from the
+`app-user-info-modal` table at 2,087,748 by a string-aware walker rather than counted by eye:
+
+```
+6  [1,"dropdown","edit-user-avatar-options"]
+16 [...,"data-bs-toggle","dropdown",...,1,"dropdown-toggle"]      23 [...,"remove-profile-picture-btn",3,"click"]
+19 ["href","https://en.gravatar.com/",...,"dropdown-item","text-dark"]
+21 ["href","",...,"dropdown-item","text-dark",3,"click"]
+```
+
+**Const 23 is that button, and it lives inside this dropdown.** Two of the four "missing
+affordances" were one control, and both guesses about the half already built were wrong:
+
+* **Its place.** Not floating on the avatar — an item in the menu, beside Gravatar and upload.
+* **Its gate.** `O(6, o.user.userXrefID === o.appService.globals.user.userXrefID ? 6 : -1)`, read at
+  2,095,081. There is **no role term in it**. A member with no presenter rights gets this on their
+  own avatar and nobody else's; a presenter does not get it on anybody's.
+
+#### The correction widened the server, and the widening is narrower than it sounds
+
+`roomForAvatarChange` now answers two authorities — the capture has both. A presenter setting any
+member's picture goes through `presenterRoom()` and `requireRoomMember`, unchanged. A member setting
+their own goes through `requireRoomShortCode` with no role demanded.
+
+**The self path is STRICTER than the presenter path**, which is why it is safe to add: it names
+nobody. The id must EQUAL the one `requireUser` read from the session, so the widest thing a
+non-presenter gains is the ability to act on the single row they already owned.
+
+#### A gate that would have gone quietly blind
+
+Moving the scoping into a helper made `remote-command-scope-contract.test.ts` fail — correctly. The
+obvious fix, adding `roomForAvatarChange(` to its `ROOM_SCOPING` list, **would have made that gate
+weaker than it looks**: a command would then satisfy it by calling any function with that name,
+whatever the function did. That is precisely the failure its own docblock says it cannot see,
+arriving by the front door.
+
+So an indirection is now admitted only with the terms its own body must contain, and a new
+assertion checks them. It caught three of the four negative controls independently.
+
+#### Two states, not four items
+
+`O(4, prefs.profilePic ? 5 : 4)`. With no picture the menu offers Gravatar and upload; with one it
+offers only Remove. A reader who saw the four captured strings listed together would build all four
+at once, and that is the wrong control. This room has no `preferences.profilePic`, so
+`hasOwnProfilePicture` asks the same question of the value it does store — is the avatar the gravatar
+fallback — through an `isGravatar` extracted from the resize helper that already asked it.
+
+#### Verification
+
+**Four negative controls seen RED**: the self branch trusting a client id; the presenter path losing
+its membership check; the self branch moved after the presenter gate; and a scoping helper that
+scopes nothing.
+
+`svelte-check` 0/0. `eslint` clean. `prettier --check` clean. Room **207 files, 3,323 passed**;
+controller **97 files, 1,026 passed**. Browser suite **10 passed**. One ceiling raised (nine lines —
+the menu is its own component) and one declared.
+
+Row AJ is down to two: `chat-stars`, a per-member rating nothing here reads or writes, and `tagline`,
+which needs a column. Neither is markup.
+
 ### 2026-08-29 22:05 UTC — A gate reported a built feature as a missing one, and a tracker row carried it upward
 
 **Runtime impact: none.** The feature was already there. What changes is that the gate can now see it.

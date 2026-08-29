@@ -1167,6 +1167,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
   },
   {
+    file: 'lib/components/AvatarOptionsMenu.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      `edit-user-avatar-options` — the dropdown on your own avatar in `#user-modal`, template `K2e`
+      @ bundle byte 2,058,852. It is 134 lines for about 45 of markup because the rest is the two
+      corrections reading it forced: `remove-profile-picture-btn` had shipped as a floating button on
+      the avatar, presenter-gated, and const 23 says it belongs INSIDE this menu on a gate with no
+      role term at all. Two of `#user-modal`'s four missing affordances were one control.
+    */
+    max: 134,
+    why: 'the own-avatar dropdown; the menu remove-profile-picture-btn actually belongs to'
+  },
+  {
     file: 'lib/components/ChatSearchBar.svelte',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
@@ -1739,7 +1753,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       component rather than by pattern — and gating it here is a deliberate decision, because a room
       with no app would otherwise show a tab whose only button answers 409 every time.
     */
-    max: 6275,
+    /*
+      6275 -> 6284, 2026-08-29, for `edit-user-avatar-options` — and the raise is nine lines because
+      the MENU is not in it. `AvatarOptionsMenu.svelte` holds the transcription, its const table and
+      the two corrections it forced; what is left here is the gate, the mount and two derivations.
+
+      The extraction was the size contract's doing and it was right twice over: the menu owns its own
+      open state, so nothing in this file has to remember to close it, and the component is where a
+      reader looking for `remove-profile-picture-btn` will now find it — beside the three items it
+      shares a menu with, rather than beside an avatar it never belonged to.
+    */
+    max: 6284,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3270,7 +3294,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       transcribed — upstream alerts "Command sent successfully…" on the statement after the transmit,
       unconditionally, to a member who by this pane's own copy is not getting notifications.
     */
-    max: 131,
+    max: 134,
     why: 'the Mobile App pane; it composes the sentence upstream raises over nothing'
   },
   {

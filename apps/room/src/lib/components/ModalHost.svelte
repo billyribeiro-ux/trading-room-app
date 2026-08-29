@@ -38,6 +38,7 @@
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import MobileRestorePane from './MobileRestorePane.svelte';
+  import AvatarOptionsMenu from './AvatarOptionsMenu.svelte';
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
   import PostAlertModal from './PostAlertModal.svelte';
@@ -2053,20 +2054,42 @@
     void sendReply();
   }
 
-  function gravatarAtSize(url: string, size: number) {
+  /**
+   * Whether an avatar is the gravatar fallback rather than something the member uploaded.
+   *
+   * Extracted from `gravatarAtSize`, which already asked exactly this question to decide whether it
+   * could resize. It is now asked in two places — that, and whether the avatar dropdown offers
+   * "Remove profile picture" — and one concept in two spellings is how they stop agreeing.
+   *
+   * IT IS THE ONLY SIGNAL AVAILABLE, and that is worth stating rather than leaving to be discovered.
+   * The reference asks `preferences.profilePic`, a field whose emptiness means "never set". This
+   * room has no such field: `removeProfilePicture` writes `gravatarUrl(email)` into `users.avatar_url`,
+   * so a member who has removed their picture has a URL rather than a null. "Is it a gravatar" is
+   * therefore the same question, asked of the value this room actually stores.
+   */
+  function isGravatar(url: string) {
     try {
-      const avatarUrl = new URL(url);
-      if (avatarUrl.hostname !== 'secure.gravatar.com') return url;
-      avatarUrl.searchParams.set('s', String(size));
-      return avatarUrl.toString();
+      return new URL(url).hostname === 'secure.gravatar.com';
     } catch {
-      return url;
+      return false;
     }
+  }
+
+  function gravatarAtSize(url: string, size: number) {
+    if (!isGravatar(url)) return url;
+    const avatarUrl = new URL(url);
+    avatarUrl.searchParams.set('s', String(size));
+    return avatarUrl.toString();
   }
 
   const targetUserModalAvatar = $derived(gravatarAtSize(targetUser.pic, 80));
   const isPresenter = $derived(currentUser.role === 'staff' || currentUser.role === 'admin');
   const isTargetCurrentUser = $derived(targetUser.emailHash === currentUser.emailHash);
+  /*
+    `O(4, e.appService.globals.preferences.profilePic ? 5 : 4)` — the avatar menu's two states. See
+    `isGravatar` for why this room asks a different question to get the same answer.
+  */
+  const hasOwnProfilePicture = $derived(!isGravatar(targetUser.pic));
   const isTargetFollowed = $derived(Boolean(followedUsers[targetUser.emailHash]));
   const isTargetMuted = $derived(Boolean(mutedUsers[targetUser.emailHash]));
   const mutedUsersList = $derived(Object.values(mutedUsers));
@@ -2169,34 +2192,19 @@
         -->
         <img src={targetUserModalAvatar} alt={targetUser.nick} loading="lazy" />
         <!--
-          WIRED 2026-08-29, and it was found by ARITHMETIC rather than by reading the bundle:
-          `remove-profile-picture-btn` carried two rules in `app.css` and had no wearer for the whole
-          port, which `orphan-style-contract.test.ts` now refuses.
+          `edit-user-avatar-options`, the last of `#user-modal`'s four missing affordances. The
+          transcription, the const table and the two corrections it forced are on the component.
 
-          The class list is the capture's, verbatim from the const table at bundle byte 2,088,832:
-
-            ["type","button",1,"btn","btn-danger","btn-sm","rounded-pill",
-             "remove-profile-picture-btn",3,"click"], [1,"fas","fa-times"]
-
-          What its click CALLS was not read — the const table gives the shape and the binding
-          position, and the handler lives in a render function this pass did not locate. So the
-          BEHAVIOUR is inferred from the control's own icon and placement rather than transcribed,
-          and `profile-picture.remote.ts` records that as invented.
-
-          `title` is ours too: the capture's button is an icon with no label, which is a control a
-          screen reader announces as "button". An icon-only control needs an accessible name, and
-          adding one is an addition rather than a divergence.
+          Gate: `O(6, o.user.userXrefID === o.appService.globals.user.userXrefID ? 6 : -1)` — your
+          own avatar, with no role term. `roomForAvatarChange` in `profile-picture.remote.ts` is the
+          server half of that, and it is the authority; this is responsiveness.
         -->
-        {#if isPresenter}
-          <button
-            type="button"
-            title="Remove profile picture"
-            aria-label="Remove profile picture"
-            class="btn btn-danger btn-sm rounded-pill remove-profile-picture-btn"
-            onclick={() => onRemoveProfilePicture(targetUser)}
-          >
-            <i class="fas fa-times"></i>
-          </button>
+        {#if isTargetCurrentUser}
+          <AvatarOptionsMenu
+            hasPicture={hasOwnProfilePicture}
+            onremove={() => onRemoveProfilePicture(targetUser)}
+            onupload={() => profilePictureInput?.click()}
+          />
         {/if}
       </div>
       <h3 class="modal-title">

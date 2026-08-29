@@ -58,7 +58,37 @@ const REMOTE_MODULES = readdirSync(REMOTE_DIR)
  * `roomShortCode` on any command's argument would let a presenter of room A act on room B, so no
  * command has one.
  */
-const ROOM_SCOPING = ['presenterRoom()', 'requireRoomShortCode('];
+const ROOM_SCOPING = ['presenterRoom()', 'requireRoomShortCode(', 'roomForAvatarChange('];
+
+/**
+ * Helpers that establish the room on a command's behalf, and what each must itself contain.
+ *
+ * ## Why this is a map and not three more strings in the list above
+ *
+ * `roomForAvatarChange` joined `ROOM_SCOPING` on 2026-08-29, when the two profile-picture commands
+ * stopped calling `presenterRoom()` directly: the capture has TWO authorities for an avatar — a
+ * presenter setting anyone's, and any member setting their own — and expressing that twice was how
+ * one of them would end up spelled differently.
+ *
+ * **Adding the name alone would have made this gate weaker than it looks.** A command would then
+ * satisfy it by calling any function with that name, whatever the function did — which is precisely
+ * the failure the docblock above says this file cannot see, arriving by the front door. So an
+ * indirection is admitted only with the terms its own body has to contain, and `every scoping
+ * helper is real` below checks them.
+ *
+ * The chain the two assertions make is what matters: the command reaches the room only through the
+ * helper, and the helper reaches it only through the session.
+ */
+const SCOPING_HELPERS: Readonly<Record<string, readonly string[]>> = {
+  roomForAvatarChange: [
+    // The presenter path: role first, then the target's membership of the room the role is in.
+    'presenterRoom()',
+    'requireRoomMember(targetUserId, room)',
+    // The self path: scoped to a room, and reached only by an id the SERVER read from the session.
+    'requireRoomShortCode(locals)',
+    'requireUser(locals).id === targetUserId'
+  ]
+};
 
 /**
  * Commands that scope to the CALLER'S OWN ACCOUNT rather than to a room.
@@ -140,5 +170,35 @@ describe('every remote command decides its tenant on the server', () => {
       }
     }
     expect(stale, `Stale PER_VIEWER_COMMANDS entries:\n  ${stale.join('\n  ')}`).toEqual([]);
+  });
+
+  it('every scoping helper is real, so the indirection cannot become a hole', () => {
+    /*
+      The other half of admitting a helper to `ROOM_SCOPING`. Without this, a command satisfies this
+      file by calling a function with the right NAME — and the docblock at the top already records
+      that a name is not what this gate is about.
+
+      Each helper is located in whichever module defines it and checked for the terms that make it a
+      scoper. A helper that stopped reading the session, or started taking a room from an argument,
+      fails here rather than in a tenant's room.
+    */
+    for (const [helper, required] of Object.entries(SCOPING_HELPERS)) {
+      const definer = REMOTE_MODULES.map((file) => readFileSync(file, 'utf8')).find((source) =>
+        source.includes(`function ${helper}(`)
+      );
+      expect(definer, `${helper} is in ROOM_SCOPING but nothing defines it`).toBeDefined();
+
+      const from = (definer ?? '').indexOf(`function ${helper}(`);
+      expect(from, `${helper} is not a function of the module that mentions it`).toBeGreaterThan(
+        -1
+      );
+      const next = (definer ?? '').indexOf('\nexport ', from);
+      const body = (definer ?? '').slice(from, next === -1 ? undefined : next);
+
+      for (const term of required) {
+        expect(body, `${helper} no longer contains ${term}`).toContain(term);
+      }
+      expect(body, `${helper} takes a room from its caller`).not.toContain('roomShortCode:');
+    }
   });
 });

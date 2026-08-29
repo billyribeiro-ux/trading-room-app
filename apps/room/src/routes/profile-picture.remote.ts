@@ -1,8 +1,13 @@
 import { error } from '@sveltejs/kit';
-import { command } from '$app/server';
+import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
-import { presenterRoom, requireRoomMember } from '#lib/server/auth.js';
+import {
+  presenterRoom,
+  requireRoomMember,
+  requireRoomShortCode,
+  requireUser
+} from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
 import { storeUpload } from '#lib/server/file-storage.js';
@@ -48,6 +53,49 @@ import { publishRosterToRoom, publishToUsers, setRosterAvatar } from '#lib/serve
 */
 
 /**
+ * Who may change WHOSE avatar, resolved once for both commands.
+ *
+ * ## Two authorities, and the capture has both
+ *
+ * A PRESENTER may set any member's picture: `setUserProfilePic`, the button inside `gTe` gated
+ * `O(14, globals.isPresenter …)`. That is what these two commands were built for on 2026-08-29 and
+ * it is unchanged.
+ *
+ * ANY MEMBER may change their OWN: the `edit-user-avatar-options` dropdown, whose gate is
+ * `O(6, o.user.userXrefID === o.appService.globals.user.userXrefID ? 6 : -1)` — read at bundle byte
+ * 2,095,081, and note what is NOT in it. There is no role term. A member with no presenter rights
+ * gets that dropdown on their own avatar and nobody else's.
+ *
+ * ## The self path is STRICTER than the presenter path, which is why it is safe to widen here
+ *
+ * A presenter names a target and the server checks the role and the membership. The self path names
+ * nobody: the id must EQUAL the caller's own, which the server took from the session. So the widest
+ * thing a non-presenter gains is the ability to act on the one row they could already have changed
+ * by any other route — and the narrowest way to say that is a comparison against `requireUser`,
+ * which is what this is.
+ *
+ * Returning the ROOM rather than a boolean is deliberate: every caller needs it next, for
+ * `publishToUsers`, and a helper that answered `true` would leave each of them to fetch the room
+ * again by whichever means it remembered.
+ */
+function roomForAvatarChange(targetUserId: number): string {
+  const { locals } = getRequestEvent();
+
+  if (requireUser(locals).id === targetUserId) {
+    /*
+      Self-service. `requireRoomShortCode` and not `presenterRoom`, so no role is demanded — and no
+      membership check either, because the caller IS the member: `requireUser` resolved this id from
+      the session, so there is no id here that anybody chose.
+    */
+    return requireRoomShortCode(locals);
+  }
+
+  const room = presenterRoom();
+  requireRoomMember(targetUserId, room);
+  return room;
+}
+
+/**
  * Clear a member's uploaded picture, returning them to the gravatar this room derives.
  *
  * ## What "remove" means here, and why it is not a null
@@ -77,8 +125,7 @@ import { publishRosterToRoom, publishToUsers, setRosterAvatar } from '#lib/serve
  */
 export const removeProfilePicture = command(z.number().int().positive(), async (targetUserId) => {
   ensureDatabase();
-  const room = presenterRoom();
-  requireRoomMember(targetUserId, room);
+  const room = roomForAvatarChange(targetUserId);
 
   /*
       The email is read from the row rather than taken from the caller, for the same reason the
@@ -130,8 +177,7 @@ export const uploadProfilePicture = command(
   }),
   async ({ targetUserId, file }) => {
     ensureDatabase();
-    const room = presenterRoom();
-    requireRoomMember(targetUserId, room);
+    const room = roomForAvatarChange(targetUserId);
 
     /*
       Checked here as well as by the schema, because `z.instanceof(File)` proves the TYPE and this
