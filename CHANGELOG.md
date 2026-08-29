@@ -33,6 +33,47 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 20:15 UTC — 185 lines of dead CSS deleted, in its own commit
+
+**Runtime impact: NO.** Nothing wore any of it — asserted, then confirmed in a browser.
+
+#### What was removed
+
+The 15 invented class names the orphan sweep found: the pre-decomposition panel layout
+(`.panel-header`, `.panel-title`, `.panel-tools`, `.chat-panel`, `.chat-tabs`, `.chat-tools`,
+`.messages-area`, `.alerts-panel`, `.chat-messages`, `.chat-room-icon`, `.settings-tool`,
+`.sort-menu`, `.user-menu`) and the two split gutters superseded by the captured `.as-split-gutter`.
+
+**26 rules, 185 lines, and not one of them partial.** Every selector in every rule was dead, so no
+rule needed surgery and none could take a live selector down with it. That is what made the deletion
+safe to do mechanically: `postcss` removed whole rules and would have thrown on any rule mixing live
+and dead selectors — it did not have to.
+
+#### Its own commit, as the measurement said it should be
+
+`app.css` is read by `dump-contract.test.ts` and by the capture verifiers, and a bulk stylesheet edit
+landing beside a feature is how a change gets attributed to the wrong commit. The list was measured
+in one commit and removed in the next.
+
+#### What the deletion then broke, and what that was worth
+
+`doc-citation-contract.test.ts` went red: two citations in `todo-next.md` pointed at
+`app.css:3089-3091` and `:3110-3122`, and the file now has 2,985 lines. **That gate is right and its
+advice was followed** — *"prefer naming the module and its symbol over any number at all"* — so both
+now name the `.st-fileSortBar` block by symbol instead. A line number in a document is a citation
+that decays every time the file it points into is edited.
+
+Every custom property the deleted rules referenced (`--split-gutter-bg`, `--darkTheme-chat-bg`,
+`--darkTheme-msgs-bg` and three more) still has other consumers, checked rather than assumed.
+
+The catalog is down to **13 entries, and every one is now a feature** rather than dead code — the two
+surfaces the sweep named, plus five captured rules that are not features. An entry there can no
+longer mean "delete this".
+
+**Verified:** `format:check`, `eslint`, `svelte-check` 1,351 files / 0 errors / 0 warnings, **199
+files / 3,204 tests green**, and the **8-spec browser suite green on the deletion**, which is the
+evidence that matters for a stylesheet change.
+
 ### 2026-08-29 19:45 UTC — The remove half of the avatar control, found by the gate written an hour earlier
 
 **Runtime impact: YES.** A presenter can now clear a member's picture as well as set one.

@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * port; it turned out to be the captured class for the Debug Log textarea, and the reason it had no
  * wearer was that the FEATURE was not built. Finding it was luck. This makes it arithmetic.
  *
- * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 28
+ * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 13
  *
  * They split cleanly, and the split is what makes each one actionable:
  *
@@ -99,36 +99,7 @@ const ORPHANS: Record<string, { captured: boolean; why: string }> = {
     captured: true,
     why: 'the captured class for the disable-video control, whose gate this room implements without wearing the class.'
   },
-  mid: { captured: true, why: 'a captured layout name with no counterpart in this decomposition.' },
-
-  // ── OURS: panel-layout names from before the page became components ──
-  'alerts-panel': { captured: false, why: 'the pre-decomposition alerts column.' },
-  'chat-panel': { captured: false, why: 'the pre-decomposition chat column.' },
-  'chat-messages': { captured: false, why: 'the pre-decomposition message list.' },
-  'chat-room-icon': { captured: false, why: 'the pre-decomposition room icon.' },
-  'chat-tabs': {
-    captured: false,
-    why: 'the pre-decomposition chat tab strip; `ChatTabStrip.svelte` renders the captured markup instead.'
-  },
-  'chat-tools': { captured: false, why: 'the pre-decomposition chat toolbar.' },
-  'messages-area': { captured: false, why: 'the pre-decomposition scroller.' },
-  'panel-header': { captured: false, why: 'the pre-decomposition panel chrome.' },
-  'panel-title': { captured: false, why: 'the pre-decomposition panel chrome.' },
-  'panel-tools': { captured: false, why: 'the pre-decomposition panel chrome.' },
-  'settings-tool': { captured: false, why: 'the pre-decomposition settings button.' },
-  'sort-menu': {
-    captured: false,
-    why: 'a roster sort menu superseded by the captured `dropdown-menu` markup.'
-  },
-  'user-menu': {
-    captured: false,
-    why: 'a roster user menu superseded by the captured `dropdown-menu` markup.'
-  },
-  'vertical-gutter': {
-    captured: false,
-    why: 'the split gutter before `as-split` was transcribed; `SplitGutter.svelte` renders the captured class.'
-  },
-  'horizontal-gutter': { captured: false, why: 'see `vertical-gutter`.' }
+  mid: { captured: true, why: 'a captured layout name with no counterpart in this decomposition.' }
 };
 
 /** Class selectors declared anywhere in `app.css`, with the lines they are declared on. */

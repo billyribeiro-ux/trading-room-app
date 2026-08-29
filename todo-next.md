@@ -5774,8 +5774,13 @@ canonical search-vs-read failure** (*"I searched for `st-fileSortBar`, got nothi
 in the capture'"*). So the first instinct is that something is missing again. **Check our source
 before writing that down — rule 6 — and it is the opposite:**
 
-- `apps/room/src/app.css:3089-3091` carries all three rules **verbatim as captured evidence**, and
-  `3110-3122` carries them expanded.
+- `apps/room/src/app.css` carries all three rules **verbatim as captured evidence** inside the
+  `The Files sort bar` docblock, and carries them expanded immediately below it as `.st-fileSortBar`,
+  `.st-fileSortName, .st-fileSortDate` and their `.active` pair. **Named by symbol rather than by
+  line, deliberately** — the line numbers this row used to carry (`3089-3091` and `3110-3122`) went
+  stale on 2026-08-29 when 185 lines of pre-decomposition panel CSS were deleted from that file, and
+  a citation past the end of its own file is exactly what `doc-citation-contract.test.ts` exists to
+  refuse.
 - `apps/room/src/lib/components/FilesPane.svelte:321-325` carries the markup with the decoded class
   lists (`d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar`,
   `btn btn-sm m-1 st-fileSortName`, `btn btn-sm m-1 st-fileSortDate`).
@@ -5871,8 +5876,8 @@ stylesheet under `src/lib/styles/` is derived from the artefact §16.8 just prov
 mechanically, and neither is recorded anywhere else:
 
 1. **It cannot contain anything the reference gained after 2026-07-30.** The Files sort bar is the
-   worked example — absent from its source, therefore absent from it, and `app.css:3110-3122` is
-   where those rules actually live instead. **Do not treat this file as a completeness check.**
+   worked example — absent from its source, therefore absent from it, and `app.css`'s own
+   `.st-fileSortBar` block is where those rules actually live instead. **Do not treat this file as a completeness check.**
 2. **Its values are browser serializations, not author values** (§16.8 property 3), because its
    source is. A colour read out of it is `rgb(…)` where the author wrote hex.
 

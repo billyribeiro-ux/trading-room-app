@@ -30,7 +30,7 @@
 }
 
 /*
-  Carried over from the captured shell's inline <style>, which sets these on BOTH html and body:
+  Carried over from the captured shell's inline \3c style>, which sets these on BOTH html and body:
   `background-color: #fff; overflow: hidden !important`, plus the iOS viewport-height workaround
   (`min-height: -webkit-fill-available` / `height: -webkit-fill-available`). On iOS Safari 100vh
   resolves to the viewport *without* the browser chrome, so a 100vh app is taller than the visible
@@ -224,21 +224,6 @@ as-split-area.chat-box {
   overflow-y: hidden;
 }
 
-.alerts-panel,
-.chat-panel {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.horizontal-gutter,
-.vertical-gutter {
-  background: var(--split-gutter-bg);
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
 .as-split-gutter {
   display: flex;
   flex: 0 0 var(--layout-split-gutter);
@@ -368,158 +353,9 @@ app-chat app-roomscroller {
   background: var(--lightTheme-msgs-bg);
 }
 
-.vertical-gutter {
-  cursor: col-resize;
-  background-image: var(--split-gutter-vertical-image);
-}
-
-.horizontal-gutter {
-  cursor: row-resize;
-  background-image: var(--split-gutter-horizontal-image);
-}
-
-.panel-header {
-  position: relative;
-  /* Same reason as `.bs-component` above: a wrapping header must be allowed to grow. */
-  flex: 0 0 auto;
-  min-height: var(--layout-panel-header);
-  display: flex;
-  align-items: center;
-  color: var(--msgs-header-color);
-  background: var(--msgs-header-bg);
-}
-
-.panel-title {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 8px;
-  padding: 5px 0;
-  color: var(--light-gray);
-  border: 0;
-  background: transparent;
-  font-size: 20px;
-  font-weight: 300;
-}
-
-.panel-tools {
-  width: 61.1px;
-  flex: 0 0 61.1px;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-left: auto;
-  margin-right: 4px;
-}
-
-.panel-tools button {
-  width: 16px;
-  height: 24px;
-  padding: 0;
-  color: var(--light-gray);
-  border: 0;
-  background: transparent;
-}
-
-.panel-tools button:first-child {
-  margin: 0 4px;
-}
-
-.panel-tools .settings-tool {
-  width: 29.1px;
-  display: flex;
-  align-items: center;
-  margin-left: 8px;
-}
-
-.settings-tool::after {
-  width: 0;
-  height: 0;
-  margin-left: 4px;
-  border-top: 4px solid;
-  border-right: 4px solid transparent;
-  border-left: 4px solid transparent;
-  content: '';
-}
-
-.messages-area {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--lightTheme-msgs-bg);
-}
-
-.chat-panel {
-  background: var(--lightTheme-chat-bg);
-}
-
 .chat-header {
   font-size: 12px;
   line-height: 18px;
-}
-
-.chat-room-icon {
-  flex: 0 0 16px;
-  width: 16px;
-  height: 16px;
-  margin-left: 8px;
-  margin-right: 4px;
-  font-size: 16px;
-  line-height: 16px;
-}
-
-.chat-tabs {
-  flex: 1;
-  height: 33px;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  border-bottom: 1px solid var(--tabs-border-color);
-}
-
-.chat-tabs button {
-  height: 33px;
-  margin-right: 5px;
-  padding: 8px 5px 5px;
-  color: var(--light-gray);
-  border: 1px solid transparent;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
-.chat-tabs button.active {
-  color: var(--success);
-  border-color: var(--tabs-border-color);
-  background: var(--dark-black);
-}
-
-.chat-tools {
-  flex: 0 0 58.1px;
-  width: 58.1px;
-  justify-content: flex-start;
-  gap: 0;
-  margin-left: 0;
-}
-
-.chat-tools button {
-  height: 19px;
-}
-
-.chat-tools .settings-tool {
-  width: 26.1px;
-}
-
-.chat-tools .settings-tool::after {
-  border-top-width: 3px;
-  border-right-width: 3px;
-  border-left-width: 3px;
-}
-
-.chat-messages {
-  background: var(--lightTheme-msgs-bg);
 }
 
 #textAreaHolder {
@@ -1497,20 +1333,10 @@ app-privchat.privChatHolder {
   carries tokens with no consumer.
 */
 
-.darkTheme .messages-area,
-.darkTheme .chat-messages {
-  color: var(--darkTheme-msg-color);
-  background: var(--darkTheme-msgs-bg);
-}
-
 .darkTheme #chatScrollViewParentAlerts,
 .darkTheme app-chat app-roomscroller {
   color: var(--darkTheme-msg-color);
   background: var(--darkTheme-msgs-bg);
-}
-
-.darkTheme .chat-panel {
-  background: var(--darkTheme-chat-bg);
 }
 
 .darkTheme app-chat > .chat {
@@ -1533,16 +1359,6 @@ app-privchat.privChatHolder {
   border-color: var(--darker-gray);
   background: var(--darkTheme-textarea-bg);
   box-shadow: 1px 1px 1px var(--darker-gray);
-}
-
-.darkTheme .sort-menu,
-.darkTheme .user-menu {
-  color: var(--white);
-  background: var(--dark-black);
-}
-
-.darkTheme .user-menu button {
-  color: var(--white);
 }
 
 .sr-only {
