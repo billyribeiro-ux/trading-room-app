@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 04:45 UTC — The duplication audit's verdict, and the blind spot it found while disproving itself
+
+**Runtime impact: NO.** One vacuity guard, one stale line reference.
+
+#### The verdict: 32 claimed, 32 refuted, 0 survivors
+
+The duplication audit finished — **72 agents, 8 dimensions, 5.2M tokens, 1h51m**. It claimed **32**
+duplications. Every one was put to two independent skeptics required to read both sites, and **all 32
+were refuted**. None of this session's five gates duplicates anything, and no deletion was warranted.
+
+That is the adversarial stage earning its place twice over. This repository has measured its own
+**21% false-finding rate** on unverified enumeration; this run's was **100%**. Acting on the raw
+report would have deleted working gates.
+
+The verdicts were also better than the claims. One caught **two factual defects in the finding it was
+refuting** — a stale line range and `codeOf` where the code now says `svelteCodeOf`, plus the claim
+that two files were "the only two building such a regex" when a third does and one of the two builds
+it twice.
+
+#### The blind spot, found while proving a NON-duplication
+
+To show `unfed-props-contract.test.ts` and `orphan-component-contract.test.ts` are distinct, a
+verifier asked what one mutation does to both. Break the shared `<Name` matcher and:
+
+* `orphan-component` goes **loudly red**, listing ~50 unreachable files;
+* `unfed-props` goes **vacuously green**.
+
+Its sweep skips any component with no call sites — *"A component nothing renders is a different
+problem, and not this file's."* That early return is correct, and it means a **broken `callSites` is
+indistinguishable from a tree where nothing renders anything**. Its vacuity guard only exercises
+`declaredProps`, so it could not see the difference.
+
+**Measured, not argued:** changing the matcher to `` `<zzNeverMatches${name}\b` `` and running the
+file gave **5 passed**.
+
+That matters more here than almost anywhere. This sweep found **six real defects in one afternoon** —
+`hasQaOnAlerts` defaulting to `true` so Q&A was live in rooms that had not bought it, `hideAvatars`,
+the four-value private-message rule, `bufferSizeLevel` — every one invisible from any other
+direction. A silently blind version would have reported the same green while they came back.
+
+Closed with a guard that asserts call sites are found at all **and** that one named, real edge still
+resolves: `RoomOverlays.svelte` renders `ToastHost`. A count alone would be satisfied by a matcher
+that matched everything.
+
+#### A stale line number the citation gate cannot see
+
+`orphan-component-contract.test.ts` said the declining comment sits *"at line 214"*. It is at **205**
+— wrong by nine. `doc-citation-contract.test.ts` could not catch it: a bare *"line 214"* in prose is
+not a backticked `path:line`. Replaced with the quoted comment itself, which survives the next edit,
+and the reason is recorded there. Widening the gate to bare numbers was rejected — prose is full of
+numbers that are not citations.
+
+#### Verified
+
+* **Two negative controls, each proved to have applied:** the matcher made never-matching now fails
+  the new guard (it passed before), and inverting the matcher fails the main sweep.
+* Room **192 files, 3,136 passed, 1 skipped**; `svelte-check` **1,339 files 0/0**; `eslint` clean.
+
 ### 2026-08-29 04:30 UTC — The roster stopped following presenter elevation, and the compiler had been saying so
 
 **Runtime impact: YES.** A member elevated to presenter mid-session kept a non-presenter's roster.

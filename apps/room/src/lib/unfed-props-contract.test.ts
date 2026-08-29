@@ -242,6 +242,47 @@ describe('every component prop is supplied by somebody, or explained here', () =
     expect(declaredProps(roomMessage?.source ?? '').length).toBeGreaterThan(25);
   });
 
+  it('FINDS CALL SITES, which the guard above cannot see', () => {
+    /*
+      THE HOLE THIS CLOSES, MEASURED RATHER THAN IMAGINED — 2026-08-29.
+
+      The sweep skips any component with no call sites: *"A component nothing renders is a different
+      problem, and not this file's."* That early return is correct, and it means a BROKEN
+      `callSites` is indistinguishable from a tree where nothing renders anything — every component
+      returns early, `findings` is empty, and this file reports green.
+
+      Proven, not argued: changing the matcher to `` `<zzNeverMatches${name}\\b` `` and running this
+      file gave **5 passed**. The guard above could not see it, because it only exercises
+      `declaredProps`.
+
+      That matters more here than in most files. This sweep found six real defects in one afternoon —
+      `hasQaOnAlerts` defaulting to `true` so Q&A was on in rooms that had not bought it,
+      `hideAvatars`, the four-value private-message rule, `bufferSizeLevel` — and every one of them
+      was invisible from every other direction. A silently blind version of it would have reported
+      the same green while they came back.
+
+      Found by an adversarial verifier disproving a claimed duplication: asked whether this file and
+      `orphan-component-contract.test.ts` fail on the same mutation, it showed they fail in OPPOSITE
+      directions — the orphan gate goes loudly red and this one goes vacuously green.
+    */
+    const rendered = svelteFiles.filter((file) => callSites(file.path).length > 0);
+    expect(
+      rendered.length,
+      'callSites matched nothing anywhere — the sweep below is skipping every component and passing'
+    ).toBeGreaterThan(20);
+
+    /*
+      One NAMED pair as well as the count, because a matcher that matched everything would also
+      satisfy a threshold. `RoomOverlays.svelte` renders `ToastHost` — checked at the code, not
+      assumed — so this fails if the matcher stops resolving a specific, real edge.
+    */
+    const toastHost = svelteFiles.find((file) => file.path.endsWith('components/ToastHost.svelte'));
+    expect(
+      callSites(toastHost?.path ?? '').map((site) => site.path),
+      'ToastHost is rendered by RoomOverlays; if this is empty the matcher is broken'
+    ).toContain('lib/components/RoomOverlays.svelte');
+  });
+
   /*
     …and that the SPREAD resolution works, which is the half that could silently start supplying
     everything or nothing. `RoomMessageChrome` is the only spread in this tree today; if it stopped

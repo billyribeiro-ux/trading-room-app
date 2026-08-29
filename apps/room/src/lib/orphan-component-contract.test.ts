@@ -7,8 +7,10 @@ import { describe, expect, it } from 'vitest';
  *
  * ## The question `unfed-props-contract.test.ts` names and declines
  *
- * That file sweeps every component's props for one nobody supplies, and at line 214 it steps around
- * a case it can see but does not own:
+ * That file sweeps every component's props for one nobody supplies, and it steps around
+ * a case it can see but does not own — quoted rather than cited by line, because *"line 214"* was
+ * written here once and was wrong by nine, and a bare line number in prose is invisible to
+ * `doc-citation-contract.test.ts`:
  *
  *     // A component nothing renders is a different problem, and not this file's.
  *     if (sites.length === 0) return [];
