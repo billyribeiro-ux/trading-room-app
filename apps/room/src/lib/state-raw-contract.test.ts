@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
 import { execSync } from 'node:child_process';
 import ts from 'typescript';
 import { parse } from 'svelte/compiler';
@@ -202,12 +203,18 @@ const objectStateFields = (
  * is ticked, so the object is mutated. `bind:value={name}` REPLACES a variable, which raw state
  * permits, so a plain identifier target is deliberately not counted.
  */
-const boundMemberRoots = (source: string): Set<string> => {
+const boundMemberRoots = (source: string, path: string): Set<string> => {
   const roots = new Set<string>();
+  /** `bind:prop={local}` on a CHILD COMPONENT: [component name, prop name, local name]. */
+  const handedOver: [string, string, string][] = [];
 
-  const visit = (node: unknown): void => {
+  const visit = (node: unknown, owner: string | null): void => {
     if (!node || typeof node !== 'object') return;
-    const candidate = node as { type?: string; expression?: Record<string, unknown> };
+    const candidate = node as {
+      type?: string;
+      name?: string;
+      expression?: Record<string, unknown>;
+    };
 
     if (candidate.type === 'BindDirective' && candidate.expression) {
       let cursor = candidate.expression;
@@ -217,16 +224,84 @@ const boundMemberRoots = (source: string): Set<string> => {
         cursor = cursor.object as Record<string, unknown>;
       }
       if (sawMember && cursor.type === 'Identifier') roots.add(cursor.name as string);
+      else if (owner && cursor.type === 'Identifier' && candidate.name) {
+        handedOver.push([owner, candidate.name, cursor.name as string]);
+      }
     }
 
+    const next = candidate.type === 'Component' ? (candidate.name ?? null) : owner;
     for (const value of Object.values(node as Record<string, unknown>)) {
-      if (Array.isArray(value)) value.forEach(visit);
-      else if (value && typeof value === 'object') visit(value);
+      if (Array.isArray(value)) value.forEach((entry) => visit(entry, next));
+      else if (value && typeof value === 'object') visit(value, next);
     }
   };
 
-  visit(parse(source, { modern: true }).fragment);
+  visit(parse(source, { modern: true }).fragment, null);
+  for (const [component, prop, local] of handedOver) {
+    if (childMutatesProp(path, source, component, prop)) roots.add(local);
+  }
   return roots;
+};
+
+/**
+ * ONE HOP INTO A CHILD — does `<Child bind:prop={local}>` write `local`'s members?
+ *
+ * ## The blind spot this closes, which this file had already been bitten by once
+ *
+ * The docblock at the top records it: the first sweep called `followChatStyle` replace-only because
+ * it read only the `<script>` AST, and converting it would have "silently broken ... a colour
+ * picker with the suite fully green, because a mutation of raw state does not throw". Reading the
+ * template's `BindDirective` nodes fixed that.
+ *
+ * **On 2026-08-29 the identical false positive came back through a new door.** `FollowChatStylePane`
+ * was extracted from `ModalHost`, and every `bind:value={followChatStyle.color}` went with it. What
+ * is left in the parent is `bind:style={followChatStyle}` — a bind to a plain IDENTIFIER, which this
+ * file deliberately does not count, because replacing a variable is something raw state permits.
+ *
+ * It is not a replacement. The child declares that prop `$bindable()` and binds its MEMBERS, so the
+ * writes still happen; they happen in another file. Extraction moved the mutation out of sight of
+ * the scanner without changing anything about the mutation.
+ *
+ * ## Why one hop, and why FOLLOWED rather than assumed
+ *
+ * Assuming a component bind means mutation would exempt every one of them, including the many that
+ * genuinely only reassign — the gate would keep passing and stop measuring. Following it answers the
+ * question actually being asked, and one hop is enough: a prop that a child passes on again is
+ * itself a component bind IN THAT CHILD, so the recursion happens naturally when that file is
+ * scanned as a subject.
+ *
+ * The import is resolved from the parent's own specifiers rather than by searching for a filename,
+ * so an alias or a re-export cannot silently point this at the wrong component. A component this
+ * cannot resolve returns `false` — the conservative direction here, because a false NEGATIVE only
+ * costs an entry in the report that a human then reads.
+ */
+const childMutatesProp = (
+  path: string,
+  source: string,
+  component: string,
+  prop: string
+): boolean => {
+  const specifier = new RegExp(`import\\s+${component}\\s+from\\s+['"]([^'"]+)['"]`).exec(source);
+  if (!specifier) return false;
+
+  /*
+    `#lib/x` is this app's own subpath import and resolves to `src/lib/x`; anything else relative is
+    resolved against the importing file. A specifier that is neither — a package — cannot be a
+    component of ours, and falls through to the `existsSync` guard below.
+  */
+  const target = specifier[1].startsWith('.')
+    ? resolvePath(dirname(path), specifier[1])
+    : resolvePath('src', specifier[1].replace(/^#/, ''));
+  if (!existsSync(target)) return false;
+
+  const child = readFileSync(target, 'utf8');
+  return boundMemberRoots(child, target).has(prop) || scriptMutates(child, prop);
+};
+
+/** Whether a `<script>` block writes members of `name`, reusing the same rules as a class field. */
+const scriptMutates = (source: string, name: string): boolean => {
+  const script = /<script[^>]*>([\s\S]*?)<\/script>/.exec(source)?.[1] ?? '';
+  return new RegExp(`\\b${name}\\.[\\w.]+\\s*=[^=]`).test(script);
 };
 
 const tracked = execSync("git ls-files 'src/**'", { encoding: 'utf8' }).trim().split('\n');
@@ -240,7 +315,7 @@ const allFields: Field[] = [
     .flatMap((file) => {
       const text = readFileSync(file, 'utf8');
       const ast = parse(text, { modern: true });
-      const bound = boundMemberRoots(text);
+      const bound = boundMemberRoots(text, file);
       /*
         `content` is typed as an ESTree `Program`, which does not DECLARE the `start` / `end`
         offsets Svelte attaches to every node at runtime. Widened at the read rather than cast away
@@ -355,14 +430,15 @@ describe('the detector itself, in both directions', () => {
   it('counts a bind: to a MEMBER as a mutation', () => {
     const source =
       '<script lang="ts">let box = $state({ on: false });</script><input bind:checked={box.on} />';
-    expect(boundMemberRoots(source), 'bind:checked={box.on} writes a property of box').toEqual(
-      new Set(['box'])
-    );
+    expect(
+      boundMemberRoots(source, 'probe.svelte'),
+      'bind:checked={box.on} writes a property of box'
+    ).toEqual(new Set(['box']));
   });
 
   it('does NOT count a bind: to a plain variable, which is a reassignment raw allows', () => {
     const source = '<script lang="ts">let name = $state("");</script><input bind:value={name} />';
-    expect(boundMemberRoots(source)).toEqual(new Set());
+    expect(boundMemberRoots(source, 'probe.svelte')).toEqual(new Set());
   });
 
   it('sees a mutating method and a property write on a plain let, not just on this.#field', () => {

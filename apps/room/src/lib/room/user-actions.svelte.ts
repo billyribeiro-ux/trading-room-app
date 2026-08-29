@@ -22,7 +22,7 @@ import { RoomChatMute } from './chat-mute';
 import type { UserActionCommands } from './user-action-commands';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomKicks } from './kicks';
-import { RoomNotesAccess, type NotesAccessCheck } from './notes-access.svelte';
+import { RoomAdminNotes, type NotesPort } from './admin-notes';
 import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control';
 import type { RoomToasts } from './toasts.svelte';
@@ -129,8 +129,8 @@ export class RoomUserActions<
     dialogs: RoomDialogs;
     toasts: RoomToasts;
     commands: UserActionCommands;
-    /** The notes-password door — NOT a presenter-to-member command, so not in `UserActionCommands`. */
-    notesCheck: NotesAccessCheck;
+    /** The Admin Notes wire — the door and the list behind it. See `NotesPort`. */
+    notesPort: NotesPort;
     session: () => UserActionSession<User>;
     isPresenter: () => boolean;
     /** `media.talking` — who has a microphone open, which is what "mute all" acts on. */
@@ -200,7 +200,7 @@ export class RoomUserActions<
     });
 
     this.#managed = new RoomManagedUsers(options.defaultFollowStyle);
-    this.#notes = new RoomNotesAccess(options.dialogs, options.notesCheck);
+    this.#notes = new RoomAdminNotes(options.dialogs, options.notesPort);
     this.#kicks = new RoomKicks<User>({
       dialogs: options.dialogs,
       commands: options.commands,
@@ -236,10 +236,10 @@ export class RoomUserActions<
    * its ceiling, and left the way the ratchet asks: extract rather than raise. The fourth slice out,
    * after `RoomChatMute`, `RoomKicks` and `RoomSessionControl`.
    */
-  readonly #notes: RoomNotesAccess;
+  readonly #notes: RoomAdminNotes;
 
-  get canManageNotes(): boolean {
-    return this.#notes.granted;
+  get userNotes(): RoomAdminNotes['list'] {
+    return this.#notes.list;
   }
 
   get selectedMessageUser() {
@@ -658,7 +658,7 @@ export class RoomUserActions<
         in a dialog, not in this call's return. `void` rather than a floating promise so the intent
         is declared: nothing here awaits, and the rejection path is handled inside.
       */
-      void this.#notes.ask();
+      void this.#notes.ask(user.id);
       return;
     }
 

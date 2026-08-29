@@ -58,7 +58,6 @@ const REMOTE_MODULES = readdirSync(REMOTE_DIR)
  * `roomShortCode` on any command's argument would let a presenter of room A act on room B, so no
  * command has one.
  */
-const ROOM_SCOPING = ['presenterRoom()', 'requireRoomShortCode(', 'roomForAvatarChange('];
 
 /**
  * Helpers that establish the room on a command's behalf, and what each must itself contain.
@@ -87,8 +86,36 @@ const SCOPING_HELPERS: Readonly<Record<string, readonly string[]>> = {
     // The self path: scoped to a room, and reached only by an id the SERVER read from the session.
     'requireRoomShortCode(locals)',
     'requireUser(locals).id === targetUserId'
+  ],
+  /*
+    The Admin Notes helper, and it is the first with THREE checks rather than two — the third is a
+    password. `presenterRoom()` and `requireRoomMember` are the same pair `roomForAvatarChange` uses
+    and for the same reason: these commands write a durable row keyed on the target alone, which no
+    subscriber map bounds. `requireNotesAccess` is the one that is new, and it is required HERE
+    rather than trusted from the client, because the room's own `canManage` is a flag the room owns.
+  */
+  roomForNotesOn: [
+    'presenterRoom()',
+    'requireRoomMember(subjectUserId, room)',
+    'requireNotesAccess(room, requireSessionId(getRequestEvent().locals))'
   ]
 };
+
+/**
+ * The two direct calls, plus every admitted indirection — DERIVED, not listed again.
+ *
+ * It was listed again until 2026-08-29, and the second entry was already the third place a helper's
+ * name had to be written: once where it is defined, once in the map above, once here. A name that
+ * must be added in three places is a name that gets added in two, and the failure is silent in the
+ * direction that matters — the command looks unscoped and the gate says so, which is at least loud.
+ * The reverse, a name here with no entry above, would admit an indirection with no requirements at
+ * all, and that is the hole this map exists to close.
+ */
+const ROOM_SCOPING = [
+  'presenterRoom()',
+  'requireRoomShortCode(',
+  ...Object.keys(SCOPING_HELPERS).map((helper) => `${helper}(`)
+];
 
 /**
  * Commands that scope to the CALLER'S OWN ACCOUNT rather than to a room.

@@ -38,6 +38,9 @@
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import MobileRestorePane from './MobileRestorePane.svelte';
+  import UserNotesPane from './UserNotesPane.svelte';
+  import FollowChatStylePane from './FollowChatStylePane.svelte';
+  import type { UserNoteView } from '#lib/server/user-notes.js';
   import AvatarOptionsMenu from './AvatarOptionsMenu.svelte';
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
@@ -204,12 +207,31 @@
     onMuteToggle: (user: ModalTargetUser) => void;
     onUserAction: (action: string, user: ModalTargetUser) => void;
     /**
-     * Upstream's `allowToManageNotes`. It gates two things there — `pTe`, the password panel below,
-     * while false, and `fTe`, the member's own notes with a delete per row, while true. Only the
-     * first exists here: `notes` is room-scoped, keyed by `room_short_code` with no member column,
-     * so there are no per-member notes to list. That is a schema change and its own feature.
+     * The Admin Notes tab: its gate, its list, and the two actions on it.
+     *
+     * **BOTH STATES EXIST NOW, 2026-08-29.** There used to be a separate `canManageNotes` prop here
+     * whose docblock said only one did — *"`notes` is room-scoped, keyed by `room_short_code` with
+     * no member column, so there are no per-member notes to list. That is a schema change and its
+     * own feature."* The diagnosis was right and the schema change is done: `user_notes`, keyed by
+     * room AND subject. `canManage` travels with the data it gates rather than beside it, so there
+     * is no way to pass one and forget the other.
+     *
+     * Structural rather than `RoomUserNotes` itself, so this component depends on the SHAPE and not
+     * on a class in `lib/room/` — which is what lets `UserNotesPane`'s own test render it against a
+     * plain object instead of standing up the room. Every method is invoked through an arrow at the
+     * call site below, never handed over by reference: a class method passed as a value loses
+     * `this`, which `dialogs.svelte.ts` records having been bitten by.
      */
-    canManageNotes?: boolean;
+    userNotes: {
+      /** Upstream's `allowToManageNotes` — what the room may DRAW. The server decides what it writes. */
+      readonly canManage: boolean;
+      readonly notes: readonly UserNoteView[];
+      readonly loading: boolean;
+      readonly error: string | null;
+      add(): void;
+      remove(note: UserNoteView): void;
+      open(subjectUserId: number): void;
+    };
     /**
      * Save the five permission checkboxes — the one control here that carries a PAYLOAD.
      *
@@ -456,7 +478,7 @@
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
-    canManageNotes = false,
+    userNotes,
     onSavePermissions,
     streamingType,
     onManagedUserRemoval,
@@ -2271,6 +2293,16 @@
                 onclick={(event) => {
                   event.preventDefault();
                   userInfoTab = tabId as typeof userInfoTab;
+                  /*
+                    Upstream's const 56 is the ONLY tab in this strip with a click binding — the
+                    other three are plain anchors. This is what that binding is for: the notes tab
+                    fetches, and the other three render what the modal already holds.
+
+                    An event handler and not an `$effect` on `userInfoTab`. The load is a side
+                    effect of a click, not a value derived from state, and an effect here would
+                    re-fire on every unrelated reason the tab happened to be re-evaluated.
+                  */
+                  if (tabId === 'notes') userNotes.open(targetUser.id);
                 }}
               >
                 {label}
@@ -2775,153 +2807,28 @@
             ]}
           >
             <!--
-              Upstream's own gate: `pTe` is the false branch of `allowToManageNotes`. Until
-              2026-08-29 this panel rendered ALWAYS and its button alerted "Wrong password!" whatever
-              was typed; the comparison is real now and clearing it visibly does something.
+              BOTH halves of upstream's two-state switch now, `O(104, allowToManageNotes ? 105 : 104)`.
+              Only 104 was here; see `UserNotesPane.svelte` for what 105 is and how it was found.
             -->
-            {#if !canManageNotes}
-              <div>
-                <p>To be able to manage user's notes, please enter the password.</p>
-                <button
-                  class="btn btn-outline-light"
-                  onclick={() => onUserAction('admin-notes-password', targetUser)}
-                >
-                  Enter Password
-                </button>
-              </div>
-            {/if}
+            <UserNotesPane
+              canManage={userNotes.canManage}
+              notes={userNotes.notes}
+              loading={userNotes.loading}
+              error={userNotes.error}
+              onEnterPassword={() => onUserAction('admin-notes-password', targetUser)}
+              onAdd={() => userNotes.add()}
+              onRemove={(note) => userNotes.remove(note)}
+            />
           </div>
         </div>
       </div>
     {:else if isTargetFollowed}
-      <div class="py-2">
-        <div class="p-2 d-flex align-items-end justify-content-between">
-          <div class="flex-fill">
-            <div title="Chat Color Mode" class="pb-2">
-              <i class="fas fa-wrench"></i>
-              <span class="pl-2">Edit chat text colors &amp; size:</span>
-            </div>
-            <div class="ml-5">
-              <input
-                type="color"
-                name="follow-chat-text-color"
-                id="follow-chat-text-color"
-                class="form-check-input"
-                bind:value={followChatStyle.color}
-              />
-              <label for="follow-chat-text-color" class="form-check-label ml-4 pl-2">
-                Text Color
-              </label>
-            </div>
-            <div class="ml-5">
-              <input
-                type="color"
-                name="follow-chat-username-color"
-                id="follow-chat-username-color"
-                class="form-check-input"
-                bind:value={followChatStyle.usernameColor}
-              />
-              <label for="follow-chat-username-color" class="form-check-label ml-4 pl-2">
-                Username Color
-              </label>
-            </div>
-            <div class="ml-5">
-              <input
-                type="color"
-                name="follow-chat-bg-color"
-                id="follow-chat-bg-color"
-                class="form-check-input"
-                bind:value={followChatStyle.bgColor}
-              />
-              <label for="follow-chat-bg-color" class="form-check-label ml-4 pl-2">
-                Background Color
-              </label>
-            </div>
-            <div class="ml-5">
-              <input
-                type="color"
-                name="follow-chat-ticker-color"
-                id="follow-chat-ticker-color"
-                class="form-check-input"
-                bind:value={followChatStyle.tickerColor}
-              />
-              <label for="follow-chat-ticker-color" class="form-check-label ml-4 pl-2">
-                Ticker Color
-              </label>
-            </div>
-            <div class="ml-5">
-              <input
-                type="number"
-                name="follow-chat-text-size"
-                id="follow-chat-text-size"
-                class="form-check-input"
-                bind:value={followChatStyle.fontSize}
-              />
-              <label for="follow-chat-text-size" class="form-check-label ml-4 pl-2">
-                Text Size
-              </label>
-            </div>
-            <div class="ml-5 text-mode-box">
-              <input
-                type="checkbox"
-                name="follow-chat-donot-disturb"
-                value="Chat Sound for followed user"
-                id="follow-chat-donot-disturb"
-                class="form-check-input"
-                bind:checked={followChatStyle.playSound}
-              />
-              <label for="follow-chat-donot-disturb" class="form-check-label">
-                Chat sound {followChatStyle.playSound ? 'on' : 'off'}
-              </label>
-            </div>
-          </div>
-        </div>
-        <div
-          class="follow-user-example"
-          style:background-color={followChatStyle.bgColor}
-          style:color={followChatStyle.color}
-          style:font-size={`${followChatStyle.fontSize}px`}
-        >
-          <div>
-            <div style:color={followChatStyle.usernameColor}><strong>Username:</strong></div>
-            This is the followed user message example with
-            <span class="stockColor" style:color={followChatStyle.tickerColor}>$TICKER</span>
-            color!
-          </div>
-          <button
-            class="btn btn-dark btn-sm"
-            disabled={!followChatStyle.playSound}
-            title={followChatStyle.playSound ? 'Chat sound is on.' : 'Chat sound is off.'}
-            onclick={() => onUserAction('test-follow-sound', targetUser)}
-          >
-            <span
-              class={[
-                'fa',
-                {
-                  'fa-volume-up': followChatStyle.playSound,
-                  'fa-volume-mute': !followChatStyle.playSound
-                }
-              ]}
-            ></span>
-          </button>
-        </div>
-        <div class="text-right">
-          <button
-            type="button"
-            class="btn btn-outline-danger mx-1"
-            onclick={() => (followChatStyle = defaultFollowStyle())}
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-light"
-            onclick={() => onFollowStyleChange(targetUser, followChatStyle)}
-          >
-            Save changes
-          </button>
-        </div>
-      </div>
+      <FollowChatStylePane
+        bind:style={followChatStyle}
+        onreset={() => (followChatStyle = defaultFollowStyle())}
+        onsave={() => onFollowStyleChange(targetUser, followChatStyle)}
+        ontestsound={() => onUserAction('test-follow-sound', targetUser)}
+      />
     {/if}
     {#snippet footer()}
       {#if !isTargetCurrentUser}

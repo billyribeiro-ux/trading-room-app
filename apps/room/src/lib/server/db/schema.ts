@@ -435,6 +435,82 @@ export const notes = sqliteTable(
   ]
 );
 
+/**
+ * PER-MEMBER ADMIN NOTES — what a presenter writes ABOUT a member, on `#user-modal`'s notes tab.
+ *
+ * Not to be confused with `notes` above, which is the SESSION notes pane: shared documents with a
+ * welcome mat, a position and a version history. These are one line each, about one person, and
+ * nobody but a presenter ever sees them.
+ *
+ * ## The capture, read whole rather than guessed
+ *
+ * Found on 2026-08-29 by an orphan CSS class — `smallAvatarImg` had a rule in `app.css` and no
+ * wearer, and the class turned out to be the avatar on a row of this list. `fTe` @ bundle byte
+ * 2,064,959 is one row:
+ *
+ * ```
+ * <img class="smallAvatarImg" [src]="e.pic || 'https://…/avatar/' + e.emailHash + '?d=mm&s=80'"
+ *      [alt]="user.nick">
+ * " [" (e.date | date:'short') "] " e.name ": " e.note " "
+ * <button (click)="deleteNode(note, $index)"><i class="fas fa-minus-circle"></i></button>
+ * ```
+ *
+ * and `mTe` wraps them in a `col` scrolling at `max-height:300px` with " Add Note " below. The two
+ * commands are `addUserNote {user, note}` and `delUserNote {user, noteIDX}`, both answering with
+ * the whole new array (byte 2,079,597).
+ *
+ * ## THREE DIVERGENCES, each deliberate and each recorded where it is made
+ *
+ * **1. Deletion is by ID, not by ordinal.** Upstream sends `noteIDX`, the row's position in the
+ * array it happens to be rendering. Two presenters with the modal open delete different notes; the
+ * second request arrives against a list that has already shifted and removes the wrong one. That is
+ * the read-then-write race this repository refuses by name, and the reason the reference has to do
+ * it is that its notes have no identity — the Q&A thread has the same constraint and the same
+ * parent-plus-ordinal addressing. **Ours have identity because we own the table**, so there is no
+ * reason to inherit the race.
+ *
+ * **2. The author is a FOREIGN KEY, not a snapshot.** Upstream's row carries `{pic, emailHash,
+ * name}` copied in at write time. Joining instead means a presenter who changes their display name
+ * changes it on their old notes too, which is a real behaviour difference and is the right one: one
+ * source of truth for who somebody is, and no second copy of an email hash to keep in step.
+ *
+ * **3. `alt` is the SUBJECT and `src` is the AUTHOR, upstream.** That is not a transcription error
+ * here — read the bindings above. It is upstream's own inconsistency, and it is preserved in the
+ * comment rather than in the markup: the room labels each avatar with the person it is a picture
+ * of, because a screen reader announcing the wrong name is a defect wherever it was copied from.
+ *
+ * ## The index is the read path
+ *
+ * Every read is *"the notes about member X in room R"*, so the index leads with both and carries
+ * `createdAt` to serve the ordering without a sort. Without it this grows into a scan of every note
+ * in every room — the unbounded read this repository asks about at 10,000 rows.
+ */
+export const userNotes = sqliteTable(
+  'user_notes',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /* Same reason as every other row here: a note about a member of room A is not room B's. */
+    roomShortCode: text('room_short_code').notNull(),
+    /** The member the note is ABOUT. */
+    subjectUserId: integer('subject_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** The presenter who WROTE it. Joined for the name and avatar rather than copied — see above. */
+    authorUserId: integer('author_user_id')
+      .notNull()
+      .references(() => users.id),
+    note: text('note').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [
+    index('user_notes_room_subject_idx').on(
+      table.roomShortCode,
+      table.subjectUserId,
+      table.createdAt
+    )
+  ]
+);
+
 export const noteVersions = sqliteTable(
   'note_versions',
   {
@@ -824,6 +900,35 @@ export const sessions = sqliteTable(
      * Null for a session that predates the handoff.
      */
     roomShortCode: text('room_short_code'),
+    /**
+     * When this session last cleared the room's user-notes password, or null.
+     *
+     * ## Why the grant is a COLUMN and not a boolean the client carries
+     *
+     * The reference keeps it in the component: `manageAdminNotes()` compares the typed value
+     * against `sessData.needPasswordForUserNotes` and sets `this.allowToManageNotes = !0` (bundle
+     * byte 2,081,768). Both halves live in the browser, so a presenter who wanted past the prompt
+     * never needed the password — the flag is one assignment away in a console.
+     *
+     * That is tolerable upstream, where the notes it guards are on the same origin as the password
+     * it compares. It is not tolerable here, and not for a subtle reason: **this repository's rule
+     * is that an authority decision is made on the server from data the server owns**, and a
+     * `canManageNotes` prop travelling from the client to `addUserNote` would be the 2026-08-07
+     * privilege escalation arriving through a feature instead of a token.
+     *
+     * So the room's client still holds `canManageNotes` — it decides what to DRAW — and the server
+     * holds this, which decides what may be WRITTEN. The two are never the same value and the
+     * server never reads the client's.
+     *
+     * ## Why a timestamp rather than a boolean
+     *
+     * A boolean grant would last as long as the session row, which is up to thirty days. Upstream's
+     * lasts as long as the component instance — one page view. A timestamp lets the grant expire
+     * (`NOTES_ACCESS_TTL_MS`, beside the check in `server/user-notes.ts`), which is STRICTER than
+     * the reference rather than looser, and it costs nothing: the column is written once per
+     * successful prompt and read once per note write.
+     */
+    notesAccessAt: integer('notes_access_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).notNull()
   },

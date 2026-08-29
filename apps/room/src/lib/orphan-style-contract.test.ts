@@ -76,13 +76,15 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
  * `captured: false, renderedUpstream: true` is impossible by construction and is refused below.
  */
 const ORPHANS: Record<string, { captured: boolean; renderedUpstream: boolean; why: string }> = {
-  // ── Captured AND rendered by the reference: unbuilt surfaces, each with its const index ──
-  smallAvatarImg: {
-    captured: true,
-    renderedUpstream: true,
-    why: 'const 98 of `app-user-info-modal` — `[1,"smallAvatarImg",3,"src","alt"]`, the avatar on a row of the PER-USER ADMIN NOTES list, `#user-modal`\'s notes tab. Read at `fTe` (bundle byte 2,064,959): each row is that image, then `" [" date|short "] " name ": " note`, then a `fa-minus-circle` button calling `deleteNode(note, index)`; `mTe` wraps them in const 93, a `col` scrolling at `max-height:300px`, and puts an " Add Note " button below. This room renders the tab and only its FALSE branch — `{#if !canManageNotes}`, upstream\'s `pTe` password prompt — with no `{:else}` at all, so a presenter who clears the password gets an empty panel. See `TODO.md` row AK.'
-  },
+  /*
+    ── Captured and rendered by NOTHING, upstream or here ──
 
+    THE "UNBUILT SURFACE" HALF OF THIS CATALOG IS EMPTY. `smallAvatarImg` was the only entry
+    measured as both captured and rendered upstream, and it left the same day it was named: const 98
+    of `app-user-info-modal` is the avatar on a row of the per-member ADMIN NOTES list, `fTe` @ byte
+    2,064,959, and this room rendered that tab's password prompt and nothing behind it. Built as
+    `UserNotesPane.svelte` with `user_notes` under it. Every rule below is carried, not pending.
+  */
   // ── Captured and rendered by NOTHING, upstream or here: carried rules, not pending features ──
   'sr-only': {
     captured: true,
@@ -452,33 +454,34 @@ describe('app.css styles nothing that no element wears', () => {
     ).toEqual([]);
   });
 
-  it('names the ONE surface the captured orphans still point at', () => {
+  it('names what the captured orphans pointed at — and every one is now answered', () => {
     /*
-      Not decoration: this is the finding the sweep produced, and a catalog of reasons is where a
-      finding goes to be forgotten. Asserting it keeps the surface visible as WORK — and if it is
-      built, the stale-entry test above turns red and forces this to be revisited with it.
+      This assertion is what is left of four "missing affordances of `#user-modal`", and not one of
+      the four was resolved the way the row that recorded them assumed:
 
-      ## Four became one, and three of the four left for three different reasons
-
-      `#user-modal` was recorded as missing four affordances. Not one of the three that left was
-      resolved the way the row assumed:
-
-      - `remove-profile-picture-btn` was BUILT, and then built again in the right place — const 23
-        put it inside the dropdown rather than floating on the avatar, under a gate with no role
-        term in it.
+      - `remove-profile-picture-btn` was BUILT, then built again in the right place — const 23 puts
+        it inside the dropdown rather than floating on the avatar, under a gate with no role term.
       - `edit-user-avatar-options` was BUILT, from `K2e` @ 2,058,852. It is what const 23 lives in.
       - `chat-stars` and `tagline` were NEVER SURFACES. The reference styles both and renders
-        neither, in v3 or v4 — see the render test above for the measurement. The star rating the
-        first was named for is real, wears consts 60/61/62, and this room already renders it.
+        neither, in v3 or v4 — see the render test above for the measurement.
 
-      Two of the four were one control, and two of the four were nothing. What is left is the only
-      one measured as both captured and rendered upstream.
+      A FIFTH was found by the same arithmetic and is the only one that was a whole feature:
+      `smallAvatarImg`, const 98, the avatar on a row of the per-member ADMIN NOTES list. Its
+      neighbouring consts read as a followed-users list and that guess was wrong; `fTe` @ 2,064,959
+      settled it. The tab existed here with its password prompt and NO `{:else}` — the gate had been
+      repaired earlier the same day and opened onto nothing. Built, with `user_notes` under it.
+
+      So the catalog's "captured, therefore pending" half is empty, and that is what is asserted:
+      every remaining entry is a carried rule, and a NEW entry claiming otherwise must bring a const
+      index with it.
     */
-    expect(ORPHANS.smallAvatarImg?.captured, 'smallAvatarImg').toBe(true);
-    expect(ORPHANS.smallAvatarImg?.renderedUpstream, 'smallAvatarImg').toBe(true);
-
-    for (const built of ['edit-user-avatar-options', 'remove-profile-picture-btn']) {
-      expect(ORPHANS[built], `${built} is built; its entry must stay gone`).toBeUndefined();
+    for (const settled of [
+      'edit-user-avatar-options',
+      'remove-profile-picture-btn',
+      'smallAvatarImg'
+    ]) {
+      expect(ORPHANS[settled], `${settled} is built; its entry must stay gone`).toBeUndefined();
+      expect(isWorn(settled), `${settled} has markup now`).toBe(true);
     }
     for (const retracted of ['chat-stars', 'tagline']) {
       expect(
@@ -486,6 +489,10 @@ describe('app.css styles nothing that no element wears', () => {
         `${retracted} is dead upstream too; app.css must not declare it again`
       ).toBe(false);
     }
+    expect(
+      Object.values(ORPHANS).filter((entry) => entry.renderedUpstream),
+      'a captured-and-rendered entry is an unbuilt surface — it belongs in TODO.md, not here'
+    ).toEqual([]);
 
     /*
       THE STAR RATING IS BUILT, and this is what is left of the claim that it was missing. It is

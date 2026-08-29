@@ -537,7 +537,6 @@
   customFaviconURL={data.sessData?.customFaviconURL}
   customCSS={data.sessData?.customCSS}
 />
-<!-- `canManageNotes` is upstream's `allowToManageNotes`: only the class that asked knows. -->
 <ModalHost
   name={modals.modal}
   mediaIceServers={media.iceServers}
@@ -626,7 +625,7 @@
   onFollowStyleChange={(user, style) => userActions.applyFollowStyle(user, style)}
   onMuteToggle={(user) => userActions.requestMuteToggle(user)}
   onUserAction={(action, user) => userActions.handle(action, user)}
-  canManageNotes={userActions.canManageNotes}
+  userNotes={userActions.userNotes}
   onSavePermissions={(user, granted) => userActions.savePermissions(user, granted)}
   streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}

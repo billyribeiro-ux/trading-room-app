@@ -101,16 +101,28 @@ const make = (
   */
   let notesAnswers: ({ required: boolean; ok: boolean } | null)[] = [];
   let notesFails = false;
+  /** Which member ids the notes list was fetched for, in order. */
+  const notesListed: number[] = [];
 
   const actions = new RoomUserActions<User>({
     dialogs,
     toasts,
-    notesCheck: (payload: { candidate: string }) => {
-      notesAsked.push(payload);
-      if (notesFails) return Promise.reject(new Error('controller unreachable'));
-      const next = notesAnswers.shift();
-      if (next === null) return Promise.reject(new Error('controller unreachable'));
-      return Promise.resolve(next ?? { required: true, ok: false });
+    /*
+      The door AND the list behind it. The list is recorded rather than stubbed silently, because
+      one of this class's branches now loads it: clearing the password must load the notes in the
+      same action, and a port that answered without recording would let that regress unnoticed.
+    */
+    notesPort: {
+      check: (payload: { candidate: string }) => {
+        notesAsked.push(payload);
+        if (notesFails) return Promise.reject(new Error('controller unreachable'));
+        const next = notesAnswers.shift();
+        if (next === null) return Promise.reject(new Error('controller unreachable'));
+        return Promise.resolve(next ?? { required: true, ok: false });
+      },
+      list: (subjectUserId) => (notesListed.push(subjectUserId), Promise.resolve([])),
+      add: () => Promise.resolve([]),
+      remove: () => Promise.resolve([])
     },
     commands: {
       presenter: (payload) =>
@@ -199,6 +211,7 @@ const make = (
     dialogs,
     toasts,
     notesAsked,
+    notesListed,
     setNotesAnswers: (answers: ({ required: boolean; ok: boolean } | null)[]) => {
       notesAnswers = answers;
     },
@@ -524,7 +537,7 @@ describe('the dispatcher', () => {
     setNotesAnswers([{ required: false, ok: true }]);
 
     actions.handle('admin-notes-password', TARGET);
-    await vi.waitFor(() => expect(actions.canManageNotes).toBe(true));
+    await vi.waitFor(() => expect(actions.userNotes.canManage).toBe(true));
 
     expect(notesAsked).toEqual([{ candidate: '' }]);
     expect(dialogs.prompt, 'upstream raises no dialog when nothing is configured').toBeNull();
@@ -541,10 +554,10 @@ describe('the dispatcher', () => {
     actions.handle('admin-notes-password', TARGET);
     await vi.waitFor(() => expect(dialogs.prompt).not.toBeNull());
     expect(dialogs.prompt?.title).toBe("Please enter the password to manage user's notes:");
-    expect(actions.canManageNotes, 'not granted before anything is typed').toBe(false);
+    expect(actions.userNotes.canManage, 'not granted before anything is typed').toBe(false);
 
     dialogs.prompt?.onconfirm('  hunter2  ');
-    await vi.waitFor(() => expect(actions.canManageNotes).toBe(true));
+    await vi.waitFor(() => expect(actions.userNotes.canManage).toBe(true));
 
     /*
       The typed value REACHES the server untrimmed. Trimming is the controller's job — it reproduces
@@ -568,7 +581,7 @@ describe('the dispatcher', () => {
 
     // The reference's exact string, and the one thing about this control that was always right.
     await vi.waitFor(() => expect(dialogs.alert).toBe('Wrong password!'));
-    expect(actions.canManageNotes).toBe(false);
+    expect(actions.userNotes.canManage).toBe(false);
   });
 
   it('an EMPTY answer closes the prompt and says nothing, as upstream does', async () => {
@@ -586,7 +599,7 @@ describe('the dispatcher', () => {
 
     expect(dialogs.prompt).toBeNull();
     expect(dialogs.alert).toBeNull();
-    expect(actions.canManageNotes).toBe(false);
+    expect(actions.userNotes.canManage).toBe(false);
     expect(notesAsked, 'nothing is sent for an empty answer').toEqual([{ candidate: '' }]);
   });
 
@@ -604,7 +617,7 @@ describe('the dispatcher', () => {
     await vi.waitFor(() => expect(dialogs.alert).not.toBeNull());
 
     expect(dialogs.alert).not.toBe('Wrong password!');
-    expect(actions.canManageNotes, 'a network failure must not grant').toBe(false);
+    expect(actions.userNotes.canManage, 'a network failure must not grant').toBe(false);
   });
 
   it('a controller that fails on the SECOND call also refuses to grant or blame', async () => {
@@ -625,7 +638,7 @@ describe('the dispatcher', () => {
     expect(dialogs.alert, 'a network failure must not read as a wrong password').not.toBe(
       'Wrong password!'
     );
-    expect(actions.canManageNotes).toBe(false);
+    expect(actions.userNotes.canManage).toBe(false);
   });
 
   it('NEITHER mute is one of the controls that only talk any more', () => {

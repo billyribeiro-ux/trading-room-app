@@ -33,6 +33,140 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 00:15 UTC — The Admin Notes tab had a working gate and nothing behind it
+
+**Runtime impact: YES.** A presenter who clears the user-notes password now sees the member's notes,
+can add one and can delete one. Until today, clearing it revealed an empty panel. New table
+`user_notes`, new column `sessions.notes_access_at`, migration `0009_user_notes.sql`.
+
+#### The defect, and the only thing that pointed at it
+
+`#user-modal`'s Admin Notes tab is a two-state switch upstream — `O(104, allowToManageNotes ? 105 :
+104)`, where 104 is the password prompt and 105 is the list. **This room rendered 104 and had no
+`{:else}` at all.**
+
+The password half had been repaired earlier the same day: `admin-notes-password` used to alert
+`Wrong password!` whatever was typed, and the comparison now happens on the controller because
+`needPasswordForUserNotes` is one of the seven credential-shaped settings that never reach this
+room. So the gate was correct, and it opened onto nothing.
+
+**Nothing here could see that.** It type-checks, it lints, `svelte-check` is silent, and the control
+does not lie — it opens exactly what it says it opens. What found it was arithmetic:
+`orphan-style-contract.test.ts` reported `smallAvatarImg` as a class `app.css` styles and nothing
+wears, and following that class into the bundle landed on `fTe` @ 2,064,959 — the avatar on a row of
+this list. That is the second feature this gate has found by the CSS being the only trace, after
+`.debug-area`.
+
+**The const table lied about what it was.** Consts 93-99 read as a followed-users list — a scrolling
+`col`, a `fa-plus-circle`, a `fa-minus-circle`, with the follow-chat colour inputs a few entries
+later — and that guess was wrong, which is the fourth wrong guess made from a const table alone in
+two days. `mTe` and `fTe` settle it: a `col` scrolling at `max-height:300px`, an `@for` over
+`user.notes`, an `<hr>`, and " Add Note ". The follow feature it was mistaken for is largely built
+here already.
+
+#### Three divergences, each recorded where it is made
+
+**1. Deletion is by ID.** Upstream sends `noteIDX`, the row's position in the list the browser
+happens to be rendering. Two presenters with the modal open delete different notes; the second
+request arrives against a list that has already shifted and removes the wrong one. Upstream has no
+choice — its notes have no identity, the same constraint the Q&A thread has. Ours do, because we own
+the table. `noteIDX` appears in no code path here, and the contract test refuses it.
+
+**2. The author is a foreign key, not a snapshot.** Upstream copies `{pic, emailHash, name}` into
+each row. Joining means a presenter who changes their display name changes it on their old notes
+too — one source of truth for who somebody is, and no second copy of an email hash to keep in step.
+
+**3. `alt` is not reproduced.** Upstream labels every avatar in the list with the SUBJECT's nick
+while the image is the AUTHOR's, so a screen reader announces the wrong person once per row. The
+room labels each avatar with the person it is a picture of.
+
+#### The grant is on the server, and that is the part upstream does not have at all
+
+`manageAdminNotes()` compares the typed value against `sessData.needPasswordForUserNotes` and sets
+`this.allowToManageNotes = !0` — both halves in the browser, so a presenter who wanted past the
+prompt never needed the password. Tolerable there, where the notes and the password are the same
+origin. Not tolerable here, and not for a subtle reason: **a `canManage` boolean travelling from the
+client to `addUserNote` would be the 2026-08-07 privilege escalation arriving through a feature.**
+
+So there are two values and they are never the same one. The room keeps `canManage`, which decides
+what to DRAW. The server keeps `sessions.notes_access_at`, written only when the controller answers
+yes, and read by every write. It is a TIMESTAMP so the grant expires — thirty minutes, which is
+STRICTER than upstream's, whose grant dies with the page but is one console assignment away. The
+`required` half is re-asked of the controller on every write rather than cached, so an owner who
+turns the password on has it take effect.
+
+#### Four extractions, because three files were at their ceilings
+
+The feature added to `ModalHost.svelte`, which had **three lines of headroom**. `source-size-contract`
+answers that with one instruction and it is not "raise the number":
+
+- `UserNotesPane.svelte` — the tab itself, both states.
+- `FollowChatStylePane.svelte` — 128 lines of follow-chat editor, the largest block of the modal
+  nothing else in it read. Chosen by measuring free identifiers across candidate slices rather than
+  by taking the first one that looked separable: it had five, and four were handlers. Nothing was
+  rewritten, and the browser suite is the check that the extraction changed no rendering.
+- `lib/room/user-notes.svelte.ts` — the list, its two prompts, its three calls.
+- `lib/room/admin-notes.ts` — the composition, **and it is a third class because both alternatives
+  were written and both were refused by that gate**: `RoomUserActions` wiring the pair cost it 23
+  lines, and `RoomNotesAccess` owning the list cost that file 56. A file at its ceiling is a file
+  where the next paragraph of wiring does not belong.
+- `lib/room/user-notes-port.ts` — the four remote calls in one frozen object.
+
+`ModalHost.svelte`'s ceiling drops 6,284 → 6,189; `RoomOverlays.svelte`'s drops 848 → 847, and the
+line it lost is the point: `canManageNotes` and `userNotes` were two props that had to be passed
+together, and the gate now travels ON the object it gates.
+
+#### A gate went blind in exactly the way it had been fixed for once before
+
+`state-raw-contract.test.ts` opens by recording that its first sweep called `followChatStyle`
+replace-only, because it read only the `<script>` AST, and that converting it *"would have silently
+broken ... a colour picker with the suite fully green, because a mutation of raw state does not
+throw"*. Reading the template's `BindDirective` nodes fixed it.
+
+**Extracting `FollowChatStylePane` brought the identical false positive back through a new door.**
+Every `bind:value={followChatStyle.color}` went with the pane; what is left in the parent is
+`bind:style={followChatStyle}`, a bind to a plain identifier, which that file deliberately does not
+count because replacing a variable is something raw state permits. It is not a replacement — the
+child declares the prop `$bindable()` and binds its members. The mutation moved out of sight without
+changing.
+
+The scanner now follows a component `bind:` **one hop** into the child, resolving the import from the
+parent's own specifiers rather than by filename. Followed rather than assumed: assuming a component
+bind means mutation would exempt every one of them, and the gate would keep passing and stop
+measuring. One hop is enough — a prop passed on again is itself a component bind in that child, so
+the recursion happens when that file is scanned as a subject.
+
+#### One more gate learned to derive instead of repeat
+
+`remote-command-scope-contract.test.ts` kept `ROOM_SCOPING` as a hand-written list beside
+`SCOPING_HELPERS`, so an admitted indirection had to be named in three places. It is derived from the
+map's keys now. The failure of the old shape was silent in the dangerous direction: a name in the
+list with no entry in the map admits an indirection with no requirements at all.
+
+#### Verification
+
+Ten negative controls, each seen RED:
+
+1. Key the `{#each}` on the index instead of the note id.
+2. Drop `requireNotesAccess` from the shared scoping helper.
+3. Make the grant never expire.
+4. Unscope the delete from the subject.
+5. Delete the `{:else}` branch — the original defect, restored and caught.
+6. Let the command schema accept a client `canManage` flag.
+7. Use a deep `$state` proxy for the replace-only list.
+8. Separate the grant from the load.
+9. **Child stops binding members** — `followChatStyle` reported again, which proves the one-hop
+   follow resolves the child rather than passing for some other reason.
+10. **Parent stops binding at all** — reported again, the other direction.
+
+Room suite **208 files / 3,359 tests**, `svelte-check` 0 errors 0 warnings over 1,372 files, eslint
+clean, prettier clean, browser suite **10 passed** against the container's chromium. The controller
+suite was not run: nothing under `apps/controller` changed.
+
+**Not verified:** no two-browser test of a second presenter deleting concurrently — the id-addressed
+delete is argued from the query rather than demonstrated, and the `WHERE` returning zero rows is
+asserted in a unit test, not exercised against a real race.
+
 ### 2026-08-29 23:20 UTC — Two of the last three "missing surfaces" were never surfaces, and the third was the wrong one
 
 **Runtime impact: NO in effect, YES in the stylesheet.** Two rules were deleted from `app.css`

@@ -161,6 +161,13 @@ describe('force-reload reaches the wire', () => {
     const actions = new RoomUserActions<Row>({
       dialogs,
       toasts: new RoomToasts(),
+      /* The Admin Notes wire. Nothing here exercises it; it exists so the class can be built. */
+      notesPort: {
+        check: () => Promise.resolve({ required: false, ok: true }),
+        list: () => Promise.resolve([]),
+        add: () => Promise.resolve([]),
+        remove: () => Promise.resolve([])
+      },
       commands: {
         presenter: () => Promise.resolve(null),
         editUsername: () => Promise.resolve(null),

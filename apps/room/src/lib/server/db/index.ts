@@ -290,6 +290,16 @@ export function ensureDatabase() {
       last_seen_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_last_seen_idx ON sessions(last_seen_at);
+    CREATE TABLE IF NOT EXISTS user_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      subject_user_id INTEGER NOT NULL REFERENCES users(id),
+      author_user_id INTEGER NOT NULL REFERENCES users(id),
+      note TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS user_notes_room_subject_idx
+      ON user_notes(room_short_code, subject_user_id, created_at);
     CREATE TABLE IF NOT EXISTS spent_handoffs (
       jti TEXT PRIMARY KEY,
       redeemed_at INTEGER NOT NULL,
@@ -378,6 +388,14 @@ export function ensureDatabase() {
   );
   if (!sessionColumns.has('room_short_code')) {
     sqlite.exec('ALTER TABLE sessions ADD COLUMN room_short_code TEXT');
+  }
+  /*
+    The Admin Notes grant, 2026-08-29. A timestamp and not a boolean so it can EXPIRE — see
+    `NOTES_ACCESS_TTL_MS` beside the check that reads it, and `schema.ts` for why the grant is on the
+    server at all when upstream keeps it in a component field.
+  */
+  if (!sessionColumns.has('notes_access_at')) {
+    sqlite.exec('ALTER TABLE sessions ADD COLUMN notes_access_at INTEGER');
   }
 
   const messageColumns = new Set(
