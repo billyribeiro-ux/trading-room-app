@@ -227,7 +227,7 @@ path segments, no query string, no body, no headers set by the client. The token
 `sesionToken` is the reference's own spelling — one `s` in "sesion". Counted across the bundle:
 `sesionToken` 36 occurrences, `sessionToken` 6. This repository already preserves the spelling when
 quoting the reference (`apps/room/src/lib/roster-gates.ts:263`,
-`apps/room/src/routes/+page.svelte:2046`).
+`apps/room/src/lib/room/gates.ts:315`).
 
 ### 2.4 The pipe — `noSanitize`, transform body read from source
 
@@ -517,7 +517,7 @@ full).
 
 | # | reference (+locator) | ours (+`path:line`) | verdict |
 | --- | --- | --- | --- |
-| 1 | Recordings **main tab**, `<li>` + `<a id="recordings-tab">`, label `Recordings`, icon `fas fa-file-video` — `bundle@1916945`, consts 31/59/12/60/14 | `MainTab` is `'screens' \| 'streams' \| 'notes' \| 'videoplayer' \| 'files'` — `apps/room/src/lib/types.ts:2`. The tab strip runs `apps/room/src/routes/+page.svelte:10834-11041` and declares Screens (:10843), Streams (:10870), Notes (:10890), VideoPlayer (:10958), Files (:10992). No Recordings `<li>` | **MISSING** |
+| 1 | Recordings **main tab**, `<li>` + `<a id="recordings-tab">`, label `Recordings`, icon `fas fa-file-video` — `bundle@1916945`, consts 31/59/12/60/14 | `MainTab` is `'screens' \| 'streams' \| 'notes' \| 'videoplayer' \| 'files'` — `apps/room/src/lib/types.ts:2`. The tab strip is `apps/room/src/lib/components/MainTabStrip.svelte`, which declares exactly five — `screens`, `streams`, `notes`, `videoplayer`, `files` — and no Recordings `<li>` | **MISSING** |
 | 2 | `#recordings` **pane**, `class="tab-pane position-relative h-100"` — `bundle@1930394`, const 25 `bundle@1995797` | `<div id="mainTabsContent" class="tab-content">` at `+page.svelte:11042` holds panes for screens (:11046), streams (:11199), notes (:11272), videoplayer (:11317), files (:11335). No `#recordings` pane | **MISSING** |
 | 3 | The pane's **`<iframe width="100%" height="100%" frameborder="0">`** bound to `getRecordingsUrl() \| noSanitize:'resourceUrl'` — `bundle@1930394`, const 140 `bundle@2003434` | nothing | **MISSING** |
 | 4 | Tab+pane gate `archivesAvailableTo() && sessData.recsInRoom` — `bundle@2016775`, `bundle@2017572` | `recsInRoom` is **absent from `apps/room/src` entirely** (0 occurrences). It exists only in the controller schema, `apps/controller/src/lib/room-settings-schema.ts:243`, marked `wired: false` | **MISSING** |
@@ -626,7 +626,7 @@ failure recorded in `~/CLAUDE.md` §1.
 **Control 4 — I checked whether our repo has a recordings surface I had not found**, rather than
 concluding from one grep. Enumerated every file under `apps/room/src/routes` (13 files) and every
 directory under `apps/controller/src/routes` (28 directories); read the full tab strip
-(`+page.svelte:10834-11041`) and the full tab-content block start (`:11042` onward, panes at
+(`MainTabStrip.svelte`) and the full tab-content block start (`:11042` onward, panes at
 :11046/:11199/:11272/:11317/:11335); read `MainTab` at `types.ts:2`. No recordings route, component,
 pane or tab exists.
 

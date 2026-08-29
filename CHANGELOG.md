@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 01:58 UTC — Seventeen citations pointed past the end of the file they named
+
+**Runtime impact: NO.** Documentation corrections and one new test.
+
+#### What was found
+
+`routes/+page.svelte` was decomposed from roughly **eleven thousand lines to 1,425**. Seventeen
+`path:line` citations across six documents went on naming lines that no longer exist. Nothing
+noticed, because a line number in Markdown is prose to every tool here.
+
+Twelve were **section headings in `docs/DIVERGENCE-REGISTER.md`** — the register of every knowing
+divergence from the reference, which is the document somebody reads to decide whether a difference
+is deliberate. `### S19 · apps/room/src/routes/+page.svelte:7743` in a 1,425-line file does not
+merely fail to help: it suggests the entry describes code that is gone.
+
+#### How each was repointed — by its own quoted text, not by guessing
+
+Every register entry quotes the reason from the comment in the code. That quote is an exact,
+self-verifying way to find where the subject moved, and it is what was used:
+
+| entry | located by searching for | now |
+| --- | --- | --- |
+| S19 | *"trusting it would put room policy in the gift of whatever arrives on a socket"* | `lib/room/events.svelte.ts` |
+| S23 | *"built from three values this room does not have"* | `lib/room/gates.ts` |
+| S25 | *"disabled by preferences or session settings"* | `lib/room/recording.ts` |
+| P5 | *"no such filter"* / *"refuses to page while"* | `lib/room/feed-scroll.ts` |
+| P6 | `dragEnd` | `lib/room/split.svelte.ts` |
+| U2 | `viewerOnlyModeLimited` | `lib/room/gates.ts` |
+| U3 | *"has ZERO occurrences in this room"* | `lib/room/gates.ts` |
+| T10 | *"elevates a member to presenter"* | still `routes/+page.svelte`, now **:312** |
+| T11 | *"denormalising controller state into room rows"* | `lib/room/feeds.svelte.ts` |
+| T12 | *"is not seekable"* | `lib/room/volume.svelte.ts` |
+| T13 | *"this room has no camera producer yet"* | `lib/room/local-capture.svelte.ts` |
+| T14 | *"the measurement says the headroom is real and unused"* | `lib/room/local-capture.svelte.ts` |
+
+Plus `HANDOFF.md` (`#dropdownVolume` → `RoomNavbar.svelte:663`) and `docs/decoded/recordings.md`
+(the `sesionToken` spelling note → `lib/room/gates.ts:315`; the main tab strip → `MainTabStrip.svelte`,
+whose five orphaned sub-citations `(:10843)`…`(:10992)` are replaced by the tab keys themselves —
+`screens`, `streams`, `notes`, `videoplayer`, `files`).
+
+Most lost their line number entirely and name the module, which is what
+`docs/decoded/missing-commands-triage.md` already recommends in its own words: *cite symbols and
+verbatim strings, which survive refactors*. The three new line citations were each read back and
+confirmed to sit on the right content.
+
+#### The gate, and what it deliberately cannot do
+
+`src/lib/doc-citation-contract.test.ts` resolves every backticked `path:line` in every live Markdown
+file and fails on any that points past the end.
+
+**It catches the loud half only.** A citation that still lands inside the file can point at the
+wrong line — after a decomposition most of them do — and this calls those fine. That limit is
+written into the file rather than left implied, because a gate whose limits are not recorded gets
+read as a guarantee it never made. The quiet half is what the cite-symbols convention is for.
+
+`CHANGELOG.md` and `apps/room/docs/REPOSITORY-STATE-2026-08-03.md` are exempt **by name, with the
+reason at the exemption**. Both cite lines in the pre-decomposition file; both were correct on the
+day they were written. A gate demanding they be renumbered would be demanding that history be
+falsified. Exempting by name rather than by a "looks dated" pattern keeps the next live document
+from being quietly absorbed.
+
+#### Verified
+
+* Sweep before: **17 of 212** resolvable citations past end of file. After: **2 of 200**, and both
+  are the two dated documents above.
+* **Three negative controls**, each proved to have applied: re-creating the S19 citation → *points
+  past the end of nothing* fails; an exemption naming a file that does not exist → *exempts only
+  documents that still exist* fails; breaking the scanner's extension pattern → the vacuity guard
+  *resolved a plausible number of citations* fails, which is the control that matters most, since a
+  scanner matching nothing would otherwise report green.
+* Room suite — **3,107 passed, 1 skipped, exit 0**, reproduced on four consecutive runs.
+* `eslint` on the new file — clean.
+
+#### One unexplained run, recorded rather than smoothed over
+
+The first full run after these edits reported **3 failed / 3,104 passed**. Its output was piped to
+`tail` and the failing names were not captured. Four subsequent full runs were clean at 3,107. Two
+workflow agents were running on this 4-core container at the time, so load is a plausible cause —
+**but it is not an established one**, and it is written here as an open observation rather than
+dismissed as a flake. If it recurs, the names are the first thing to capture.
+
 ### 2026-08-29 01:50 UTC — Five documents understated the wired settings by a factor of three
 
 **Runtime impact: NO.** Documentation corrections and one new check inside an existing verifier.

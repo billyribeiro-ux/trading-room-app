@@ -286,7 +286,7 @@ send it either.
 - **riskIfConverged:** client-asserted attribution: any peer could publish captions under another
   member's name.
 
-### S19 · `apps/room/src/routes/+page.svelte:7743` — the `changeChatMode` broadcast's payload is not trusted
+### S19 · `apps/room/src/lib/room/events.svelte.ts` — the `changeChatMode` broadcast's payload is not trusted
 
 - **Reference:** stated in part — "The broadcast carries the new mode as well."
 - **We do instead:** `void invalidateAll()` and re-read `room_state` from the server.
@@ -341,7 +341,7 @@ send it either.
 - **convergeable:** no.
 - **riskIfConverged:** as S21.
 
-### S23 · `apps/room/src/routes/+page.svelte:2125` — the default Benzinga URL is not reproduced
+### S23 · `apps/room/src/lib/room/gates.ts` — the default Benzinga URL is not reproduced
 
 - **Reference:** stated, transcribed verbatim at `:2116-2120`:
   `` benzingaUrl = `https://ptrv3.protradingroom.com/public/bz/index.html?sessID=${globals.sessionID}&id=${sessData.uuid}&tok=${globals.sesionToken}` ``
@@ -373,7 +373,7 @@ here because it is the same class of decision as S1–S5.
 - **riskIfConverged:** an IP ban list published to every visitor's browser, enforced by the client
   that the ban is meant to stop. The list itself is also a disclosure.
 
-### S25 · `apps/room/src/routes/+page.svelte:4597` — captioning additionally requires presenter
+### S25 · `apps/room/src/lib/room/recording.ts` — captioning additionally requires presenter
 
 - **Reference:** stated for two of the three gates, and only two. "Gated as the capture gates it:
   'Speech recognition not started: disabled by preferences or session settings' / 'Speech
@@ -658,7 +658,7 @@ Deliberate product choices. Converging each of these is a product decision, not 
 - **riskIfConverged:** none, provided the replacement is the project's dialog primitive —
   `window.alert` is forbidden by the repository standard.
 
-### P5 · `apps/room/src/routes/+page.svelte:2985` — there is no in-place filter over the live chat log
+### P5 · `apps/room/src/lib/room/feed-scroll.ts` — there is no in-place filter over the live chat log
 
 - **Reference:** stated. "The reference's roomlog component has its own `searchTerm` that filters
   the live log in place, and refuses to page while one is set — a filtered log is not a paged one."
@@ -672,7 +672,7 @@ Deliberate product choices. Converging each of these is a product decision, not 
   means building the in-place filter and feeding it here.
 - **riskIfConverged:** none.
 
-### P6 · `apps/room/src/routes/+page.svelte:7412` — a mobile drag of the inner chat/alerts gutter is persisted
+### P6 · `apps/room/src/lib/room/split.svelte.ts` — a mobile drag of the inner chat/alerts gutter is persisted
 
 - **Reference:** stated. "`W4e` drops its `dragEnd`" — upstream the inner gutter does not persist on
   mobile, just as the outer one does not (`app-room.render-helpers.js:1786-1791` binds `dragStart`
@@ -714,7 +714,7 @@ converged from what is currently in `evidence-dumps/`.
   network path; both are new attack surface for a freshness gain bounded by
   `SSO_MAX_TOKEN_AGE_SECONDS`.
 
-### U2 · `apps/room/src/routes/+page.svelte:1447` — `viewerOnlyModeLimited` is not modelled
+### U2 · `apps/room/src/lib/room/gates.ts` — `viewerOnlyModeLimited` is not modelled
 
 - **Reference:** stated only in part. "`?vo=2` additionally sets `viewerOnlyModeLimited` upstream" —
   what it then gates is **not stated**.
@@ -730,7 +730,7 @@ converged from what is currently in `evidence-dumps/`.
   change that was not re-read this session: the `vo` -> `viewerOnlyMode` mapping comes from
   `HANDOFF.md`, which quotes it from the minified bundle at ~2595500."
 
-### U3 · `apps/room/src/routes/+page.svelte:1489` and `apps/controller/src/lib/room-config.ts:333` — two of the five `hideChatAlerts` writers are not modelled
+### U3 · `apps/room/src/lib/room/gates.ts` and `apps/controller/src/lib/room-config.ts:333` — two of the five `hideChatAlerts` writers are not modelled
 
 - **Reference:** stated, all five, with line numbers (`app-room.full.js:1893-1902`, `:2179-2181`).
   Three are modelled.
@@ -908,7 +908,7 @@ identically" can be executed against it.
 - **Bucket:** TECHNICAL · **convergeable:** no — there is no poll to pause. · **riskIfConverged:** a
   hidden tab holds a stale roster.
 
-### T10 · `apps/room/src/routes/+page.svelte:1943` — the copy restriction is an `$effect`, not a one-shot
+### T10 · `apps/room/src/routes/+page.svelte:312` — the copy restriction is an `$effect`, not a one-shot
 
 - **Reference:** stated. "upstream this runs once in `ngAfterViewInit` and never again, because
   `isPresenter` cannot change in that component's lifetime."
@@ -920,7 +920,7 @@ identically" can be executed against it.
   restricted. · **riskIfConverged:** a promoted member keeps the copy/right-click restriction for the
   rest of the session.
 
-### T11 · `apps/room/src/routes/+page.svelte:2891` — badges are joined at render time, so they appear on old messages too
+### T11 · `apps/room/src/lib/room/feeds.svelte.ts` — badges are joined at render time, so they appear on old messages too
 
 - **Reference:** stated. "A member given a badge mid-session sees it on their NEXT message upstream
   and on ALL of them here".
@@ -930,7 +930,7 @@ identically" can be executed against it.
 - **Bucket:** TECHNICAL · **convergeable:** no, not without denormalising controller state into room
   rows. · **riskIfConverged:** stale badge data in room rows.
 
-### T12 · `apps/room/src/routes/+page.svelte:5318` — `currentTime = 0` is not reproduced
+### T12 · `apps/room/src/lib/room/volume.svelte.ts` — `currentTime = 0` is not reproduced
 
 - **Reference:** assigns it.
 - **We do instead:** do not.
@@ -939,7 +939,7 @@ identically" can be executed against it.
 - **Bucket:** TECHNICAL · **convergeable:** yes · **riskIfConverged:** an exception where the
   reference has a no-op.
 
-### T13 · `apps/room/src/routes/+page.svelte:5879` — the SFU half of the webcam toggle is not reproduced
+### T13 · `apps/room/src/lib/room/local-capture.svelte.ts` — the SFU half of the webcam toggle is not reproduced
 
 - **Reference:** `stopCam()` closes the producer as well as stopping the tracks.
 - **We do instead:** stop the tracks only.
@@ -948,7 +948,7 @@ identically" can be executed against it.
 - **Bucket:** TECHNICAL · **convergeable:** yes, once the room has a camera producer. ·
   **riskIfConverged:** nothing to converge until the producer exists.
 
-### T14 · `apps/room/src/routes/+page.svelte:6120` — `contentHint = "detail"` is set on the raw screen track
+### T14 · `apps/room/src/lib/room/local-capture.svelte.ts` — `contentHint = "detail"` is set on the raw screen track
 
 - **Reference:** stated. "The capture sets `contentHint = \"detail\"` on its alert-overlay canvas
   stream and never on the raw screen track."

@@ -88,11 +88,11 @@ for weeks.
 
 | variant                                                                                          | const        | status                                                             |
 | ------------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------------------------------ |
-| `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | main nav     | **BUILT — do not touch.** `apps/room/src/routes/+page.svelte:6824` |
+| `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | main nav     | **BUILT — do not touch.** `apps/room/src/lib/components/RoomNavbar.svelte:663` |
 | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]`                | zoom overlay | **MISSING — build this**                                           |
 
 Ours is genuinely the nav variant, not a near-miss: `fa-2x`, `fa-volume-mute` and `mainNavItem` each
-occur **exactly once** in the bundle, and `+page.svelte:6824` has all three.
+occur **exactly once** in the bundle, and `RoomNavbar.svelte` has all three.
 
 ### The evidence files — the DECODED tree, not the bundle
 
