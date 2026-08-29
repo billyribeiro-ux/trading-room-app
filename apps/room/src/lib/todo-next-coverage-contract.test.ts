@@ -115,6 +115,28 @@ describe('every row still describes the file it names', () => {
     expect(gone, `${gone.join(', ')} — deleted, or renamed without moving the row`).toEqual([]);
   });
 
+  /*
+    PARTLY OVERLAPPING WITH `source-size-contract.test.ts`, measured 2026-08-29 and recorded here so
+    the overlap is a decision rather than an accident.
+
+    That file's "every component on disk has a declared ceiling" (:3087) already fails when a new
+    component is added without being catalogued — but its subject set is `svelteFilesUnder(
+    'lib/components/')` (:3072), so it REQUIRES an entry for **51 of these 55 surfaces**. The four
+    outside it are the route files: `routes/+page.svelte`, `routes/session/+page.svelte`,
+    `routes/logout/+page.svelte` and `routes/+layout.svelte`.
+
+    `routes/+page.svelte` does carry a ceiling (`source-size-contract.test.ts:34`), and that is worth
+    separating from the rest: it has one VOLUNTARILY. Nothing would fail if it were removed, because
+    the completeness check never enumerates `routes/`. "Has an entry" and "is required to have one"
+    are different properties, and only the second is coverage — an audit of this overlap first
+    reported 52 by counting the first, which is the distinction this paragraph exists to keep.
+
+    So the assertion below is not redundant, and it is not independent either. It is kept because the
+    two guard different documents for different reasons — a ceiling catalog is about size, this is
+    about a tracker that gets read as SCOPE — and because dropping it would leave the route files
+    uncovered by either. If `source-size-contract` ever widens to all of `src/`, this comment is the
+    place that says what would then be genuinely duplicated.
+  */
   it('omits no surface that does', () => {
     const listed = new Set(rows.map((row) => row.path));
     const missing = [...measured.keys()].filter((path) => !listed.has(path));

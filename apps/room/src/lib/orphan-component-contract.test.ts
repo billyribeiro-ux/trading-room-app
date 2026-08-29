@@ -103,7 +103,25 @@ for (const path of paths) {
   byName.set(name, [...(byName.get(name) ?? []), path]);
 }
 
-/** The components `path` renders, by their `<Name` tag. */
+/**
+ * The components `path` renders, by their `<Name` tag.
+ *
+ * ## Its near-twin, named so nobody merges them by mistake
+ *
+ * `unfed-props-contract.test.ts`'s `callSites()` runs almost the same regex, and the two are
+ * DELIBERATELY separate — a duplication audit on 2026-08-29 classified them adjacent-but-distinct
+ * and this note is the outcome:
+ *
+ *   `callSites(component)`  asks WHO renders one component, and returns the call sites so their
+ *                           attributes can be read. It is a lookup, answered per component.
+ *   `rendersOf(path)`       asks WHAT one file renders, and returns targets to walk. It is an edge
+ *                           list, answered per file — the transpose.
+ *
+ * Merging them would mean one function serving a lookup and a graph traversal, and the traversal
+ * needs edges the lookup deliberately drops. What they must NOT do is diverge on the question they
+ * do share — whether a mention inside a comment counts — which is why both strip comments first and
+ * why this sentence exists rather than a shared helper nobody would notice going stale.
+ */
 const rendersOf = (path: string): string[] => {
   const code = codeOf(sources.get(path)!);
   const rendered = new Set<string>();
