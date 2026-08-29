@@ -140,6 +140,14 @@ pushes — a slow CI job restarts from zero on every push, so seven pushes again
 means nothing is ever learned. Merging and pushing are separate acts; never combine them in one
 command, because the push invalidates the green checks you were about to merge.
 
+**That gate is `pnpm run gate`, in each app that changed.** It is not a synonym for `pnpm test`, and
+the difference is the whole reason the script exists: on 2026-08-29 a push went red on
+`format:check`, a step CI runs and `pnpm test` does not, over a doc that had been unformatted since
+`5e0e4cc`. Reproducing CI by remembering its step list is the convention that failed;
+`apps/controller/src/lib/package-scripts-contract.test.ts` now pins each `gate` to the steps
+`.github/workflows/quality.yml` actually invokes, so the list is checked rather than recalled.
+Adding a step to CI without adding it to a gate fails that test.
+
 **When in doubt, run less and say what you skipped.** "I ran the three tests covering this change; I
 did not run the full gate because nothing else was touched" is a complete and honest report.
 

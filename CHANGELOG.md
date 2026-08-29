@@ -33,6 +33,102 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 23:40 UTC — CI went red on a formatting step nothing local ran, so `gate` now derives its steps from CI
+
+**Runtime impact: NO.** Nothing ships differently. What changes is that "the full gate" is a command
+rather than a list somebody keeps in their head.
+
+#### The failure, reported by the owner
+
+```
+Run pnpm run format:check
+$ prettier --check .
+[warn] docs/streaming-choices.md
+[warn] Code style issues found in the above file.
+```
+
+Two files were unformatted, not one, and they had different ages:
+
+| file | age |
+| --- | --- |
+| `apps/room/docs/streaming-choices.md` | unformatted since `5e0e4cc`, verified by checking out the `066cbf7` copy |
+| `apps/room/docs/ROOM-STATE-2026-08-06.md` | written earlier this session |
+
+Both are formatted now, and both changes were proved to be formatting ONLY by comparing token
+multisets before and after: `ROOM-STATE` differs solely in table-rule padding, `streaming-choices`
+in four `*`→`_` emphasis markers. No word moved.
+
+#### The cause is not the two files
+
+The local check that had been run all session was
+`npx prettier --check "src/**/*.{ts,svelte,css}"` — a glob typed by hand, narrower than CI's
+`prettier --check .`, and different every time it was typed. That is the whole defect: **CI's
+definition of green existed in one place and the local one existed in somebody's memory.**
+
+The comment beside CI's own formatting step had already named this shape, from the other side:
+
+> That is what an ungated script becomes — a convention a person has to remember.
+
+It was written about scripts CI did not run. This was a script CI *did* run that nothing local did.
+
+#### What was built
+
+`gate` in both `package.json` files, chaining exactly what the `frontend` job runs, in its order:
+
+| app | `pnpm run gate` |
+| --- | --- |
+| room | `format:check → lint → check → test → build` |
+| controller | `format:check → lint → check → test:gates → test:unit → build` |
+
+`CLAUDE.md`'s *"the full gate runs once, immediately before a push"* now names that command, so the
+standard's own instruction is executable.
+
+#### The test derives CI's list rather than restating it, and that was the second draft
+
+The first version of `package-scripts-contract.test.ts`'s new block listed each gate's steps as a
+literal. **That is a copy of CI, and it drifts in the direction that matters**: adding a step to
+`quality.yml` and to the literal while forgetting the `package.json` would have passed. The block
+now slices the `frontend` job out of the workflow and reads its `pnpm run` invocations, resolving
+the one per-app difference CI has — the shell `if` on `matrix.app` that gives the controller
+`test:gates && test:unit` where the room gets `test` whole. The workflow is then the only place
+CI's definition of green is written.
+
+The two end-to-end jobs are outside that slice deliberately: a gate that launched chromium on every
+push would stop being run.
+
+#### The assertion caught something on its first run
+
+`build` was in neither gate. It is CI's slowest step and the least likely to fail alone, which is an
+argument for its position and not for its absence — "the full gate, once, before a push" is exactly
+when a broken build should be found. Added to both.
+
+#### Negative controls — five run, and the fifth found a defect in the test itself
+
+| mutation | result |
+| --- | --- |
+| room gate loses `build` | RED — room order assertion |
+| room gate reordered, `lint` before `format:check` | RED — order is genuinely checked, not just membership |
+| controller `gate` deleted | RED — two assertions |
+| a `pnpm run licence:check` step added to `quality.yml` | RED — both apps, since the step sits outside the matrix branch |
+| the `frontend` job renamed | **first attempt: "no tests"** |
+
+That last line is the finding. The guard had been an `expect` inside the initialiser that slices the
+job, which runs at COLLECTION time, so a renamed job threw before any test existed and vitest
+reported the file as having no tests — the one failure shape that reads as absence rather than
+breakage in a CI log. The initialiser now returns `''` and every guard lives in the floor test,
+where a failure has a sentence attached. Re-run: RED on three named assertions.
+
+#### Verified
+
+- `apps/controller` — `package-scripts-contract.test.ts`, 12 passed; the five controls above, each
+  with the file restored and `diff`ed byte-identical afterwards.
+- `pnpm run gate` in both apps, which is the point of the change. Room exit 0; controller through
+  the Vercel adapter's `✔ done`.
+- Both apps now answer `All matched files use Prettier code style!` to a bare `prettier --check .`.
+
+Not verified: that anybody will run it. Nothing in a repository can assert that. What the pin
+guarantees is that running it means what CI means.
+
 ### 2026-08-30 04:30 UTC — The user modal's Badges cell was an empty div, and the whole supply was already on the page
 
 **Runtime impact: YES.** A presenter opening a member's user-info modal now sees that member's

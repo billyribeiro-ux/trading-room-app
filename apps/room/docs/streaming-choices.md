@@ -2,12 +2,12 @@
 
 Written 2026-08-05.
 
-> **Superseded 2026-08-29.** This line read *"Nothing here is implemented except the entry marked
-> DONE"*, and the only entry so marked is row 1. It has been untrue since **rows 2 and 4 shipped**:
+> **Superseded 2026-08-29.** This line read _"Nothing here is implemented except the entry marked
+> DONE"_, and the only entry so marked is row 1. It has been untrue since **rows 2 and 4 shipped**:
 > the recorder picks VP9 at 8 Mbps (`apps/room/src/lib/recording-codec.ts`) and the screen track
 > carries `contentHint = 'detail'` (`apps/room/src/lib/room/local-capture.svelte.ts`, in
-> `startScreenSharing`). `TODO.md` row R had recorded that this line needed correcting *"when
-> somebody next opens it"*; this is that.
+> `startScreenSharing`). `TODO.md` row R had recorded that this line needed correcting _"when
+> somebody next opens it"_; this is that.
 
 **Implemented as of 2026-08-29: rows 1, 2 and 4.** Rows 6, 8 and 10 remain open and each needs the
 measurement named in its own entry — rows 6 and 8 need a human at an OS screen picker, because
@@ -24,20 +24,20 @@ matters: an unmeasured claim is a hypothesis with a confident tone.
 
 Measured, not assumed:
 
-| Fact                                 | Value                                                                                                                               |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Screen share capture                 | `getDisplayMedia({audio:false, video:{width:{max:1920},height:{max:1080},frameRate:{max:30}}})` — **byte-identical to the capture** |
-| Screen share delivered               | 1920×1080 @ 30                                                                                                                      |
-| SFU first video codec                | **VP9** (`services/media/src/codecs.rs`), H.264 and VP8 behind it                                                                   |
-| Codec pinned by client               | none — `produceScreen` passes no `codec`, so the router's first offer wins                                                          |
-| Encodings sent                       | `undefined` — matches the capture's `useSharingSimulcast = !1`                                                                      |
-| `videoGoogleStartBitrate`            | `100_000` — matches the capture's `1e5`                                                                                             |
+| Fact                                 | Value                                                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen share capture                 | `getDisplayMedia({audio:false, video:{width:{max:1920},height:{max:1080},frameRate:{max:30}}})` — **byte-identical to the capture**                                                                                   |
+| Screen share delivered               | 1920×1080 @ 30                                                                                                                                                                                                        |
+| SFU first video codec                | **VP9** (`services/media/src/codecs.rs`), H.264 and VP8 behind it                                                                                                                                                     |
+| Codec pinned by client               | none — `produceScreen` passes no `codec`, so the router's first offer wins                                                                                                                                            |
+| Encodings sent                       | `undefined` — matches the capture's `useSharingSimulcast = !1`                                                                                                                                                        |
+| `videoGoogleStartBitrate`            | `100_000` — matches the capture's `1e5`                                                                                                                                                                               |
 | Screen track `contentHint`           | **`'detail'`** — set in `local-capture.svelte.ts`'s `startScreenSharing`, on the SCREEN capture only, never the camera path. Recorded as `unset` here until 2026-08-29, which was stale from the moment row 2 shipped |
-| Canvas/overlay re-encode in the path | none                                                                                                                                |
-| Browser                              | Chrome 150.0.7871.187                                                                                                               |
-| Screen share SENT (presenter)        | 1920×1080 @19, ~525 kbps, `qualityLimitationReason: none`, `encoderImplementation: libvpx`, `scalabilityMode: L1T1`                 |
-| Screen share RECEIVED (member)       | 1920×1080 @20, `video/VP9`, 236 frames decoded, **0 dropped**                                                                       |
-| Cumulative quality limitation        | `{bandwidth: 0, cpu: 0, none: 11.988, other: 0}` — the encoder spent **zero seconds** constrained                                   |
+| Canvas/overlay re-encode in the path | none                                                                                                                                                                                                                  |
+| Browser                              | Chrome 150.0.7871.187                                                                                                                                                                                                 |
+| Screen share SENT (presenter)        | 1920×1080 @19, ~525 kbps, `qualityLimitationReason: none`, `encoderImplementation: libvpx`, `scalabilityMode: L1T1`                                                                                                   |
+| Screen share RECEIVED (member)       | 1920×1080 @20, `video/VP9`, 236 frames decoded, **0 dropped**                                                                                                                                                         |
+| Cumulative quality limitation        | `{bandwidth: 0, cpu: 0, none: 11.988, other: 0}` — the encoder spent **zero seconds** constrained                                                                                                                     |
 
 ### The finding that reframes everything below
 
