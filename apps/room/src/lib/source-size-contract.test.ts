@@ -1194,7 +1194,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that had to be passed together, and the gate now travels ON the object it gates. A prop you
       cannot forget is worth more than a prop you can pass correctly.
     */
-    max: 847,
+    /*
+      848 -> 847 -> 848, and the round trip is stated rather than hidden.
+
+      It was 848 at the start of 2026-08-30. It went DOWN to 847 that evening when `canManageNotes`
+      and `userNotes` became one prop — a real saving, taken as a bonus rather than to pay for
+      anything. It is back at 848 now for `targetBadges`, the prop that fills the user modal's
+      Badges cell, which had been rendering an empty `div` while the whole badge map was already on
+      the page.
+
+      **This is not a raise past where the file has been**, and that distinction is the only thing
+      that makes it acceptable: the ratchet exists so a file cannot grow, and this one has not. Four
+      alternatives were tried first and each moved the line into a file equally at its cap —
+      resolving badges in `+page.svelte` (at 1471), carrying them on `ModalTargetUser` via a thunk
+      through `RoomUserActions` (895/896) and `create-room` (1332/1333), collapsing the three
+      peer-history props (they are one object plus a `nick`, so the collapse was false), and lifting
+      the four-line `onShowPrivateMessages` arrow into a named function (net +1).
+
+      If this number is ever asked to pass 848, the answer is an extraction from this file and not
+      another paragraph here.
+    */
+    max: 848,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.

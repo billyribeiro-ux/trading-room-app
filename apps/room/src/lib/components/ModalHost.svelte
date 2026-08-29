@@ -34,6 +34,7 @@
   } from '#lib/types.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
+  import type { MessageBadge } from '#lib/types.js';
   import AlertQaModal from './AlertQaModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
@@ -233,6 +234,14 @@
       remove(note: UserNoteView): void;
       open(subjectUserId: number): void;
     };
+    /**
+     * The target member's badges, resolved by `RoomFeeds.badgesFor` on the page.
+     *
+     * A prop rather than a resolver callback because every other fact about the target arrives that
+     * way, and because the resolution needs the page's badge map and the theme — both of which the
+     * page has and this component does not.
+     */
+    targetBadges: readonly MessageBadge[];
     /**
      * Save the five permission checkboxes — the one control here that carries a PAYLOAD.
      *
@@ -479,6 +488,7 @@
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
+    targetBadges,
     userNotes,
     onSavePermissions,
     streamingType,
@@ -2349,7 +2359,31 @@
                     <tr>
                       <th scope="row">Badges:</th>
                       <td>
-                        <div class="d-inline-block align-baseline mr-1"></div>
+                        <!--
+                          THE CELL WAS EMPTY while the supply was already in the browser. Upstream
+                          binds `innerHTML` here (bytes 2,060,329-2,060,802); these are ELEMENTS
+                          because `badge.text` is controller data, and UNGATED because upstream's
+                          binding carries no `O()`. See `user-badges-contract.test.ts`.
+                        -->
+                        <div class="d-inline-block align-baseline mr-1">
+                          {#each targetBadges as badge, badgeIndex (`${targetUser.id}-${badgeIndex}`)}
+                            {#if badge.imageUrl}
+                              <img
+                                class="user-badge-img"
+                                src={badge.imageUrl}
+                                alt={badge.text ?? 'Badge'}
+                                width="16"
+                                height="16"
+                              />
+                            {:else}
+                              <span
+                                class="badge px-1 mx-1 user-badge"
+                                style="background-color: {badge.backgroundColor}; color: {badge.color};"
+                                >{badge.text}</span
+                              >
+                            {/if}
+                          {/each}
+                        </div>
                         <!--
                           `O(20, sessData.isNewIndicatorOn && isPresenter && user.isNew ? 20 : -1)`
                           — bundle byte 2,060,925, and this gate had ONE of its three terms.

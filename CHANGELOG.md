@@ -33,6 +33,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 04:30 UTC — The user modal's Badges cell was an empty div, and the whole supply was already on the page
+
+**Runtime impact: YES.** A presenter opening a member's user-info modal now sees that member's
+badges. The row rendered empty while the same member's badges appeared on every chat message they
+sent.
+
+#### The gap, and why the tracker had it filed wrongly
+
+`TODO.md` row 9 grouped `badges` with `notesArr` and `privData` as needing *"a server-side
+user-detail lookup this room has no endpoint for"*. True of the other two. **False of this one**, and
+the whole chain was already complete: `internal/room-config` builds `badges: {definitions,
+byEmailHash}` for the WHOLE room, `+page.server.ts` puts it on the page load, and
+`RoomFeeds.badgesFor(emailHash)` has resolved it — dark-theme variant swap included — for the chat
+since it was written.
+
+What was missing was the cell:
+
+```svelte
+<th scope="row">Badges:</th>
+<td><div class="d-inline-block align-baseline mr-1"></div>
+```
+
+Nothing bound to it — the unfed counterpart of the reference's `T(17,"div",57)` plus
+`z("innerHTML", Ct(18,14,e.badges,"html"), wn)` at bundle bytes 2,060,329-2,060,802.
+
+#### `innerHTML` is not reproduced, and that is the important decision
+
+Every value in a badge — `text`, `color`, `backgroundColor` — originates in controller data an owner
+typed into a settings form and travels through `internal/room-config`. Binding it as HTML would make
+a badge label an injection into the one surface only presenters see. That upstream marks its binding
+`noSanitize` is not a licence; it is the reason to look. The chips are the same ELEMENT markup
+`RoomMessage` already draws, which renders the same thing and cannot.
+
+#### UNGATED here, GATED in the chat, deliberately
+
+`RoomMessage` gates chat badges on `chatBadges && enableBadges && (!showBadgesToPresentersOnly ||
+viewerIsPresenter)`. The reference's binding here carries **no `O()` gate at all** — read in the
+update block, not assumed — so the cell renders whenever the modal does. Copying the chat gate would
+hide a member's badges from the presenter who opened the modal to look at that member, which inverts
+what the surface is for; the tab is already inside `isPresenter && !isLimitedPresenter`, so
+"presenters only" is structural here rather than a flag. The contract test pins both halves, so
+neither can drift into the other.
+
+#### A ceiling went back up, and it is stated rather than hidden
+
+`RoomOverlays.svelte` was 848 at the start of the day, went DOWN to 847 when `canManageNotes` and
+`userNotes` became one prop, and is back at 848 for the one prop this feature needs. **It has not
+grown past where it has been**, which is the only thing that makes it acceptable, and four
+alternatives were tried first — resolving in `+page.svelte` (at its cap), carrying badges on
+`ModalTargetUser` through `RoomUserActions` and `create-room` (both at their caps), collapsing the
+three peer-history props (false: they are one object plus a `nick`), and lifting the four-line
+`onShowPrivateMessages` arrow into a named function (net +1). The argument is recorded at the
+ceiling itself, with the note that the next request past 848 gets an extraction and not another
+paragraph.
+
+#### Verification
+
+Four negative controls seen RED: restore the empty div; render a badge label as `{@html}`; stop
+resolving through the shared resolver; copy the chat gate into the modal cell.
+
+Room **211 files / 3,408 tests**, `svelte-check` 0/0 over 1,382 files, eslint clean, prettier clean,
+browser suite **10 passed**.
+
+**Not verified:** no browser check of a member who actually holds a badge — the room the e2e suite
+opens has none, so the rendering is asserted in a contract test rather than seen.
+
 ### 2026-08-30 03:50 UTC — Two defects an audit fan-out found: a publish after a `return`, and a navbar gate with no gate in it
 
 **Runtime impact: YES, twice.** A presenter watching a live poll is now told when an answer arrives.

@@ -631,6 +631,7 @@
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}
+  targetBadges={feeds.badgesFor(userActions.target.emailHash)}
   targetUser={userActions.target}
   debugLog={debugLog.received}
   onUploadProfilePicture={(user, file) => userActions.uploadProfilePicture(user, file)}
