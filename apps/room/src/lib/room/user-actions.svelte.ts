@@ -722,6 +722,26 @@ export class RoomUserActions<
     }
 
     /*
+      `debug-log` — WIRED 2026-08-29, and it leaves `INERT_ACTIONS` with this branch.
+
+      NO ANNOUNCEMENT, deliberately, and it is the difference between this and `force-reload`
+      directly above. The capture's sender is one line with no `bootbox` after it:
+
+        getDebugLog(){ this.appService.sendServerAdminCommand("getDebugLog", this.user) }   // 2080323
+
+      so `#announceThenSend` would be inventing an alert the reference does not raise — which is the
+      `EXACT_ALERTS` shape four commits have been removing, arriving from the other direction.
+
+      The modal is opened by the ANSWER rather than by the click, for the same reason: there is
+      nothing to show until a log arrives, and an empty textarea that appears immediately would read
+      as "this member has no log" rather than as "waiting".
+    */
+    if (action === 'debug-log') {
+      void this.#commands.requestDebugLog(user.id);
+      return;
+    }
+
+    /*
       `test-follow-sound` — WIRED 2026-08-23, and the sound is `pling` because the reference says so.
 
       This sat in `INERT_ACTIONS` reading *"which sound the reference plays here is not evidenced"*.

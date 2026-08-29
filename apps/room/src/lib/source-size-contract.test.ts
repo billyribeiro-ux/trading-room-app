@@ -517,7 +517,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1426 -> 1428, 2026-08-29: two lines, `open` and `ontoggle` on `ScreenVolumeControl`, whose
       dropdown could not be opened at all. See `bootstrap-dropdown-contract.test.ts`.
     */
-    max: 1428,
+    /*
+      1428 -> 1463, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is the install and its teardown, the effect that opens the modal when an answer arrives, and the two notes that matter most: why the buffer is installed in `onMount` rather than in `createRoom`, and why it is installed BEFORE the stream subscribes.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 1463,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -723,7 +734,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the functions were leaving and their state was not. That difference is what the dependency
       scan makes visible before the code is written rather than after.
     */
-    max: 244,
+    /*
+      244 -> 260, 2026-08-29, for the third per-modal cleanup in `closeActive`.
+
+      The poll's and the Q&A's were already there; the Debug Log's joins them rather than sitting at
+      the call site, because `ModalHost` has ONE `onclose` for every modal it hosts — a per-modal
+      clear written there would have to re-derive which modal was closing, which is the thing this
+      method exists to know.
+
+      A STRUCTURAL type for the dependency (`{ clearReceived(): void }`), like `messageActions` and
+      `userActions` above it, so the modal registry does not learn the name of a feature it knows
+      nothing else about.
+    */
+    max: 260,
     why: 'the overlay state machine - five fields the template reads and this class alone writes'
   },
   {
@@ -1049,7 +1072,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       once and handing it down. `=== true` is the fail-closed read every optional control-plane field
       takes here.
     */
-    max: 823,
+    /*
+      823 -> 834, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one prop, passed as the CLASS rather than its value because both ends are read — the markup forwards the received log and the page opens the modal on arrival.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 834,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1579,7 +1613,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       extraction that paid for this raise; without it these ten lines would have been ten lines of
       prose in the largest component in the repository.
     */
-    max: 6006,
+    /*
+      6006 -> 6028, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one prop with its docblock, a title that names whose log is being read, and the note recording that `.debug-area` had two CSS rules and no wearer until now.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 6028,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2242,7 +2287,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Raised under the same standing "get it done" as the entry above, and reversible on the same
       terms: the peer media commands are a coherent slice.
     */
-    max: 803,
+    /*
+      803 -> 823, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one dispatch branch — two lines of code and a paragraph on why there is NO announcement, which is the difference between this control and `force-reload` directly above it.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 823,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -2348,7 +2404,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The number goes DOWN when a control is retired, not up per control wired: a new entry costs one
       line, and the docblock that explains its payload belongs with the command that reads it.
     */
-    max: 72,
+    /*
+      72 -> 79, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is one command and its docblock, and the docblock is the larger half: why this one raises no alert when `forceReload` beside it does.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 79,
     why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
   },
   {
@@ -2385,8 +2452,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines to a capped file is moving the problem, not solving it, and the ratchet said so
       immediately. Its own module is where a thing this size belongs.
     */
-    max: 46,
+    /*
+      46 -> 63, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is a fifth callback group, with the same justification as the four above it: the buffer belongs to `RoomDebugLog` and the send to a remote command, so neither can be built here without this module reaching for the whole room.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 63,
     why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
+  },
+  {
+    file: 'lib/room/debug-log.svelte.ts',
+    /*
+      Born capped, 2026-08-29, in the commit that created it.
+
+      Two halves of one feature: the console buffer every member fills, and the log a presenter
+      received. They look unrelated and are not — the same page is both ends, so splitting them by
+      role would have put one feature in two classes.
+
+      If this number climbs, the question is whether BUFFERING RULES have arrived in it. They must
+      not: `#lib/debug-log-buffer.ts` owns the bound, the truncation and the redaction, and is pure.
+    */
+    max: 109,
+    why: 'the console buffer and the received log; the rules are in the pure module beside it'
   },
   {
     file: 'lib/room/private-commands.ts',
@@ -2427,7 +2520,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       From here it ratchets down again, and building a receiver should take it down: each of the
       three that remain replaces a paragraph describing it with a branch doing it.
     */
-    max: 198,
+    /*
+      198 -> 267, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is the two receivers and the frame fields they read. The larger half is the `debugLogResp` branch, which VALIDATES all three fields rather than trusting them — the only place in this router where a frame arrives from a member rather than from a presenter.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 267,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
@@ -2616,7 +2720,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every gate in this repository. It is declared beside the `prefs` it reads and returned so the
       page uses the same one, which is what makes a second copy impossible rather than merely unwise.
     */
-    max: 1225,
+    /*
+      1225 -> 1254, 2026-08-29, for `debug-log` — a presenter pulling one member's console log.
+
+      Here it is the buffer's construction, two imports, and the callback group wiring both directions of the frame.
+
+      A FEATURE arriving, not a wire. It left `INERT_ACTIONS`, which is what removing an entry there
+      declares, and it is the one command in this room that could not be transcribed: upstream's
+      reply lets the CLIENT name who receives the log, so the server had to grow a memory of who
+      asked. `debug-log-contract.test.ts` is where that argument lives; these files carry only what
+      each of them does.
+    */
+    max: 1254,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

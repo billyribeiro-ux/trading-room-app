@@ -56,6 +56,16 @@ export interface AddressedCommand {
   msg?: unknown;
   /** `muteChat` only — an ISO instant, never a composed sentence. See `RoomChatMute`. */
   mutedTill?: unknown;
+  /**
+   * `debugLogResp` only — whose console this is, and the console itself.
+   *
+   * ALL THREE ARE THE SERVER'S. Upstream fills the recipient from the replying client
+   * (`{requestor: xe.requestor}`), which is the one thing this pair could not be ported with; see
+   * `routes/debug-log.remote.ts` and the note in the module docblock above.
+   */
+  fromUserId?: unknown;
+  fromName?: unknown;
+  log?: unknown;
 }
 
 export class RoomPrivateCommands {
@@ -85,12 +95,26 @@ export class RoomPrivateCommands {
      * opinion about media beyond "somebody asked for audio to come back".
      */
     reconnectAudio: () => Promise<void>;
+    /**
+     * `getDebugLog` — a presenter asked THIS browser for its console log.
+     *
+     * Two thunks rather than one, because the two halves belong to different owners: the buffer is
+     * `RoomDebugLog`'s and the send is a remote command the page holds. Nothing is shown to the
+     * member, which is the capture — the sender raises no confirm and the receiver no toast.
+     */
+    collectDebugLog: () => string;
+    sendDebugLog: (log: string) => void;
+    /** `debugLogResp` — a member this presenter asked has answered. */
+    debugLogReceived: (from: { fromUserId: number; fromName: string; log: string }) => void;
   }) {
     this.#viewerId = options.viewerId;
     this.#chatMute = options.chatMute;
     this.#forceReloadRequested = options.forceReloadRequested;
     this.#kicked = options.kicked;
     this.#reconnectAudio = options.reconnectAudio;
+    this.#collectDebugLog = options.collectDebugLog;
+    this.#sendDebugLog = options.sendDebugLog;
+    this.#debugLogReceived = options.debugLogReceived;
   }
 
   readonly #viewerId: () => number;
@@ -98,6 +122,9 @@ export class RoomPrivateCommands {
   readonly #forceReloadRequested: () => void;
   readonly #kicked: (message: string) => void;
   readonly #reconnectAudio: () => Promise<void>;
+  readonly #collectDebugLog: () => string;
+  readonly #sendDebugLog: (log: string) => void;
+  readonly #debugLogReceived: (from: { fromUserId: number; fromName: string; log: string }) => void;
 
   /**
    * Route one addressed frame.
@@ -189,6 +216,48 @@ export class RoomPrivateCommands {
       */
       this.#kicked(typeof command.msg === 'string' ? command.msg : '');
       disconnect();
+      return true;
+    }
+
+    if (command.cmd === 'getDebugLog') {
+      /*
+        `getDebugLog(){ this.appService.sendServerAdminCommand("getDebugLog", this.user) }`, byte
+        2,080,323. The sender raises no confirm and this receiver raises nothing either: the member
+        is not interrupted, and the presenter learns the answer by their modal filling.
+
+        The reply carries the LOG and nothing else. Upstream sends `{requestor: xe.requestor, log}` -
+        the client naming its own recipient - and that is the one field this pair could not be
+        ported with, because a member could then push text into any presenter's modal. The server
+        recorded who asked; see `routes/debug-log.remote.ts`.
+      */
+      this.#sendDebugLog(this.#collectDebugLog());
+      return true;
+    }
+
+    if (command.cmd === 'debugLogResp') {
+      /*
+        THE ONE FRAME IN THIS ROUTER THAT TRAVELS MEMBER -> PRESENTER, which is why the addressing
+        gate above is doing different work here than anywhere else: everywhere else it stops a
+        member acting on somebody else's command, and here it stops a member reading somebody else's
+        console.
+
+        Every field is validated rather than trusted, even though the server filled all three. This
+        is the boundary where an untrusted frame would arrive if the server's memory were ever
+        bypassed, and a receiver that assumed its shape would render `undefined` into the textarea -
+        the exact defect `room-renders.spec.ts` exists to catch.
+      */
+      if (
+        typeof command.fromUserId !== 'number' ||
+        typeof command.fromName !== 'string' ||
+        typeof command.log !== 'string'
+      )
+        return false;
+
+      this.#debugLogReceived({
+        fromUserId: command.fromUserId,
+        fromName: command.fromName,
+        log: command.log
+      });
       return true;
     }
 

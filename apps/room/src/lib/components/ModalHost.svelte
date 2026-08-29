@@ -282,6 +282,14 @@
      */
     canEditUsername?: boolean;
     targetUser: ModalTargetUser;
+    /**
+     * The debug log this presenter last received, or null.
+     *
+     * Both fields are filled by the SERVER from the replying member's own session — a member cannot
+     * name whose log this is said to be, which is the one thing upstream's `{requestor}` reply let
+     * it do. See `routes/debug-log.remote.ts`.
+     */
+    debugLog?: { fromUserId: number; fromName: string; log: string } | null;
     mutedUsers: Record<string, ManagedChatUser>;
     followedUsers: Record<string, ManagedChatUser>;
     targetMessage: {
@@ -434,6 +442,7 @@
     isLimitedPresenter = false,
     canEditUsername = false,
     targetUser,
+    debugLog = null,
     mutedUsers,
     followedUsers,
     targetMessage,
@@ -3986,7 +3995,7 @@
     id="debug-log-modal"
     open={name === 'debug'}
     ariaLabelledby="user-details"
-    title="Debug Log"
+    title={debugLog ? `Debug Log — ${debugLog.fromName}` : 'Debug Log'}
     {onclose}
     titleClass="modal-title"
     titleTag="h3"
@@ -3996,13 +4005,26 @@
     footerOutsideContent
   >
     <div class="row">
+      <!--
+        `debug-area` is the CAPTURED class and it had no consumer until 2026-08-29: `app.css:2443`
+        and `:3080` have carried `.debug-area { height: 870px; resize: none; background:
+        var(--debug-log-bg) }` and its mobile override the whole time, matching nothing in the
+        markup. Two CSS rules for a class no element wore is the same defect as a class with no CSS,
+        and building the feature is what closes it.
+
+        The value is the SERVER's, not the replying member's — see `routes/debug-log.remote.ts`. It
+        is bound rather than attached because it changes: a presenter can ask a second member without
+        closing the modal, and a one-shot attachment would leave the first member's log on screen
+        under the second one's name.
+      -->
       <textarea
         id="debugLogModalTxt"
         rows="1000"
         {...{ readonly: 'readonly' } as Record<string, string>}
         {@attach setReadonlyAttribute}
-        class="form-control"
-        style="min-width: 100%;"></textarea>
+        class="form-control debug-area"
+        style="min-width: 100%;"
+        value={debugLog?.log ?? ''}></textarea>
     </div>
     {#snippet footer()}
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>

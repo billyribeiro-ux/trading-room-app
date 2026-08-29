@@ -151,7 +151,10 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
       forceReloadRequested: () => reloadAsked.push(FakeEventSource.last?.closed === true),
       kicked: (message: string) =>
         kicked.push({ message, closedAlready: FakeEventSource.last?.closed === true }),
-      reconnectAudio: () => (audioReconnects.push(true), Promise.resolve())
+      reconnectAudio: () => (audioReconnects.push(true), Promise.resolve()),
+      collectDebugLog: () => 'log',
+      sendDebugLog: () => {},
+      debugLogReceived: () => {}
     })
     /*
       Records the message AND whether the stream was already closed when it arrived. That second
@@ -314,7 +317,10 @@ const hiddenTabStream = (missed: true[]) =>
       }),
       forceReloadRequested: () => {},
       kicked: () => {},
-      reconnectAudio: () => Promise.resolve()
+      reconnectAudio: () => Promise.resolve(),
+      collectDebugLog: () => '',
+      sendDebugLog: () => {},
+      debugLogReceived: () => {}
     })
   });
 

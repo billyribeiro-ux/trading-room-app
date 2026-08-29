@@ -44,6 +44,13 @@ export interface UserActionCommands extends ChatMuteCommands {
   }) => Promise<unknown>;
   /** `forceReload` — reloads ONE member's browser. Presenter-gated on the server. */
   forceReload: (targetUserId: number) => Promise<unknown>;
+  /**
+   * `getDebugLog` — asks ONE member's browser for its console log. Presenter-gated on the server.
+   *
+   * No alert accompanies it, unlike `forceReload` above: the capture's sender raises none, and the
+   * presenter learns the answer by the modal filling. See `routes/debug-log.remote.ts`.
+   */
+  requestDebugLog: (targetUserId: number) => Promise<unknown>;
   /** `remoteRestartAudio` — ONE member's browser re-consumes every microphone. Same gating. */
   restartAudio: (targetUserId: number) => Promise<unknown>;
   /**

@@ -33,6 +33,84 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 17:05 UTC — `debug-log` is built, and it is the one command that could not be transcribed
+
+**Runtime impact: YES.** A presenter can pull one member's console log. One inert control leaves the table.
+
+#### Why this one needed design rather than a port
+
+Every other frame on `privCmds` travels presenter→member. **This pair is the exception**, and that
+is the whole difficulty. Upstream's member replies `{requestor: xe.requestor, log: V1}` — the
+replying CLIENT names who receives the log — so a member could push arbitrary text into any
+presenter's Debug Log modal, indistinguishable from a real answer because a real answer is also
+arbitrary text.
+
+`private-commands.ts` has carried that warning in its docblock since the channel was written. The
+resolution is not a validated field but an **absent** one: `sendDebugLog` takes no requestor
+argument at all, and the server looks up who asked. A field that does not exist cannot be trusted by
+a future edit, which is stronger than validating one — and the contract test asserts the *shape*,
+not a value, for exactly that reason.
+
+#### What was built
+
+| piece | what it is |
+| --- | --- |
+| `debug-log-buffer.ts` | pure, bounded ring — 500 lines, each truncated at 2,000 chars, credentials scrubbed |
+| `server/debug-log-requests.ts` | who asked for whose log; 30s TTL, expiry on read *and* write, single-use claims |
+| `debug-log.remote.ts` | `requestDebugLog` (presenter-gated) and `sendDebugLog` (no requestor argument) |
+| `room/debug-log.svelte.ts` | the console patch and the received log |
+| receivers | both directions, behind the router's existing deny-by-default addressing gate |
+
+**Redaction is ours and is recorded as invented.** The reference sends its log verbatim; here a
+member's console can carry a MediaMTX playback token in a query parameter. A sweep of every
+client-side `console.*` call found exactly one line naming anything token-shaped, and it logs a
+preference *key*, not a value — so this is not fixing a known leak, it is refusing to build a channel
+that would carry the next one. The patterns are deliberately narrow: a rule broad enough to catch
+"anything long and random" eats message ids and stack offsets, and a log with its identifiers
+scrubbed cannot debug anything. Both halves are asserted.
+
+#### `.debug-area` had two CSS rules and no wearer
+
+`app.css:2443` and its mobile override at `:3080` have been styling a class no element carried. CSS
+for a class nothing wears is the same defect as a class with no CSS; the textarea now carries it,
+which is what the capture has.
+
+#### A bug my own test caught
+
+`scrubLine` produced `grant failed 13[redacted]`. `String.replace` passes the match **offset** as the
+second callback argument when the pattern has no capture group, and a truthy check let the index
+through. Now a `typeof === 'string'` test, with the reason at the code.
+
+#### Two things the build forced, both correct
+
+`RoomDebugLog.clearReceived()` was written with a docblock claiming it runs when the modal closes —
+and **nothing called it**. It is now the third per-modal cleanup in `RoomModals.closeActive`, beside
+the poll's and the Q&A's, with a test asserting it fires for `debug` and *not* for an unrelated
+close. The size ratchet then refused nine files and demanded an argument for each, and the
+`INSTANCES` registry refused the new class until it was listed.
+
+`svelte-autofixer`: zero issues; one suggestion (`SvelteDate`) **declined and recorded at the code**,
+for the reason `RoomAlerts` already declines the same one — the Date is constructed, read once and
+discarded inside a patched `console.log`, so making it reactive would allocate a signal per logged
+line to drive nothing.
+
+#### The census moved, and the gate made it
+
+`TODO.md` row 4: **6 inert → 5**. `user-action-disposition-contract.test.ts` recomputes that number
+and refused the stale sentence — including my first correction, which wrongly raised the dispatched
+count too.
+
+**Verified:** room — `format:check`, `eslint`, `svelte-check` 1,348 files / 0 errors, **197 files /
+3,186 tests green**, and the **8-spec browser suite green**. **Seven negative controls seen RED**: a
+requestor field admitted to the schema; the claim's expiry removed; the claim made reusable; the
+addressing gate removed; the frame's shape check removed; the buffer's bound removed; the captured
+class removed from the textarea.
+
+**Not verified, and stated plainly:** no two-browser run. The round trip — presenter clicks, member's
+browser answers, modal fills — is asserted at every seam in isolation and has not been executed end
+to end against a live room. The e2e job cannot do it: it drives one browser, and this feature needs
+two members.
+
 ### 2026-08-29 16:10 UTC — The Svelte MCP gate, and a formatting gate that existed but ran nowhere
 
 **Runtime impact: NO.** Formatting, one CI step, one latent bug found in a gate written yesterday.

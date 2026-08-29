@@ -269,10 +269,32 @@ export type RoomEvent =
   | {
       channel: 'privCmds';
       data: {
-        cmd: 'forceReload' | 'unmuteChat' | 'kickUser' | 'muteChat' | 'remoteRestartAudio';
+        cmd:
+          | 'forceReload'
+          | 'unmuteChat'
+          | 'kickUser'
+          | 'muteChat'
+          | 'remoteRestartAudio'
+          | 'getDebugLog'
+          | 'debugLogResp';
         targetUserId?: number;
         msg?: string;
         mutedTill?: string;
+        /*
+          `debugLogResp` only, and THE ONLY FRAME ON THIS CHANNEL THAT TRAVELS MEMBER -> PRESENTER.
+
+          All three are filled by the SERVER from the replying member's own session. Upstream lets
+          that member choose its recipient — `{requestor: xe.requestor}` — which is the one thing
+          this pair could not be ported with, because it would let any member push text into any
+          presenter's Debug Log modal. `routes/debug-log.remote.ts` resolves the recipient from a
+          request the server recorded when the presenter asked, and `sendDebugLog` takes no
+          requestor argument at all.
+
+          `getDebugLog` itself carries nothing but the target, like `forceReload` beside it.
+        */
+        fromUserId?: number;
+        fromName?: string;
+        log?: string;
       };
     };
 

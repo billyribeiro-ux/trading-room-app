@@ -83,6 +83,10 @@ import {
 } from '../../routes/files-pane.remote';
 import { uploadComposerImage } from '../../routes/composer-image.remote';
 import { savePreference as savePreferenceCommand } from '../../routes/user-settings.remote';
+import {
+  requestDebugLog,
+  sendDebugLog as sendDebugLogCommand
+} from '../../routes/debug-log.remote';
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
@@ -117,6 +121,7 @@ import { RoomNotes } from '#lib/room/notes.svelte.js';
 import { RoomFeeds } from '#lib/room/feeds.svelte.js';
 import { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
 import { addressedChannelFor } from '#lib/room/addressed-channel.js';
+import { RoomDebugLog } from '#lib/room/debug-log.svelte.js';
 import { RoomEventStream } from '#lib/room/events.svelte.js';
 import { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
 import { RoomRecording } from '#lib/room/recording.js';
@@ -451,6 +456,12 @@ export function createRoom(deps: RoomDeps) {
     stay assignments to state instead of becoming forty rewritten expressions.
   */
   const dialogs = new RoomDialogs();
+  /*
+    The room's own console log. Constructed here and INSTALLED by the page, not by this factory:
+    patching a global from a constructor would patch it in every unit test that builds a room. See
+    `RoomDebugLog.install`.
+  */
+  const debugLog = new RoomDebugLog();
 
   /*
     The screen VIEWER, in `#lib/room/screens.svelte.ts`.
@@ -876,6 +887,7 @@ export function createRoom(deps: RoomDeps) {
       muteChatIndefinitely,
       unmuteChat,
       forceReload,
+      requestDebugLog,
       restartAudio,
       kickUser,
       sessionSendUrl,
@@ -962,7 +974,21 @@ export function createRoom(deps: RoomDeps) {
       viewerId: () => data.user.id,
       chatMute: userActions.chatMute,
       dialogs,
-      reconnectAudio: () => mediaTransport.reconnectAudio()
+      reconnectAudio: () => mediaTransport.reconnectAudio(),
+      /*
+        The console buffer, and the two directions of `getDebugLog`.
+
+        `send` is fire-and-forget on purpose and NOT awaited: nothing is shown to the member either
+        way (the capture's receiver raises no toast), and a rejected promise here would be an
+        unhandled rejection in a browser whose console this very feature is collecting.
+      */
+      debugLog: {
+        collect: () => debugLog.collect(),
+        send: (log) => {
+          void sendDebugLogCommand({ log }).catch(() => {});
+        },
+        received: (from) => debugLog.receive(from)
+      }
     })
   });
 
@@ -1088,7 +1114,8 @@ export function createRoom(deps: RoomDeps) {
     messageActions,
     userActions,
     unreadQaAlertIds,
-    setTheme: deps.setTheme
+    setTheme: deps.setTheme,
+    debugLog
   });
 
   /*
@@ -1216,7 +1243,9 @@ export function createRoom(deps: RoomDeps) {
       once and is exactly as frozen. The probe asserts that too. It also matches how `gates` already
       receives this same value, twelve hundred lines above.
     */
-    rosterViewer: () => rosterViewer
+    rosterViewer: () => rosterViewer,
+    /* The room's console buffer and the received log. The PAGE installs it — see `RoomDebugLog`. */
+    debugLog
   } as const;
 }
 

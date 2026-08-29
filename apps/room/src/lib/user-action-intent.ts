@@ -291,8 +291,17 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     `case"updateProfilePic"`, which sets BOTH `globals.preferences.profilePic` and
     `globals.user.profilePic` and then emits `preferenceChanged {key:"profilePic", value}`.
   */
-  'debug-log':
-    'ModalHost.svelte:2306 — wire IS captured: getDebugLog → member replies debugLogResp{requestor,log:V1} → presenter fills a readonly textarea#debugLogModalTxt rows=1000 in #debug-log-modal titled "Debug Log"',
+  /*
+    `debug-log` IS GONE FROM THIS TABLE — built 2026-08-29, which is what removing an entry here
+    declares. It has a real branch in `RoomUserActions.handle` calling `requestDebugLog`, a bounded
+    buffer in `#lib/debug-log-buffer.js`, both receivers in `RoomPrivateCommands`, and a modal that
+    fills.
+
+    The one thing worth leaving behind: it could NOT be ported as written. Upstream's reply is
+    `{requestor: xe.requestor, log}` — the replying CLIENT names who receives the log — so a member
+    could push text into any presenter's modal. `sendDebugLog` takes no requestor argument at all;
+    the server remembers who asked. See `routes/debug-log.remote.ts`.
+  */
   'upload-profile-picture':
     'ModalHost.svelte:2379 — wire IS captured: adminUploadProfilePic sends, member applies case"updateProfilePic" setting preferences.profilePic AND user.profilePic then emitting preferenceChanged',
 

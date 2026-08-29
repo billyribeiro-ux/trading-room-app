@@ -34,6 +34,7 @@ import { RoomDisplayModes } from './display-modes.svelte';
 import { RoomScreenOverlay } from './screen-overlay';
 import { TypingSignal } from './typing-signal';
 import { RoomDialogs } from './dialogs.svelte';
+import { RoomDebugLog } from './debug-log.svelte.js';
 import { RoomLogPages } from './log-pages.svelte';
 import { RoomMedia } from './media.svelte';
 import { RoomMenus } from './menus.svelte';
@@ -86,6 +87,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   // Phase 5 services
   toasts: RoomToasts,
   dialogs: RoomDialogs,
+  debugLog: RoomDebugLog,
   prefs: RoomPrefs,
   roomVolume: RoomVolume,
   broadcasts: RoomBroadcasts,

@@ -493,6 +493,7 @@
     alertsPane,
     loadedChatStyle,
     rosterViewer,
+    debugLog,
     /*
       The split reader comes FROM `createRoom` now, and it did not used to. This page declared its
       own — `splitPairFromValue(prefs.loaded[key])` — and passed it in, which read `prefs` before
@@ -622,6 +623,23 @@
   });
 
   /*
+    A DEBUG LOG ARRIVED, so show it.
+
+    The modal is opened by the ANSWER and never by the click, which is why this is here rather than
+    in the `debug-log` branch of `RoomUserActions`. There is nothing to show until a member replies,
+    and a textarea that appeared empty on the click would read as "this member has no log" rather
+    than as "waiting" — the reference has the same shape, opening nothing at the sender.
+
+    An `$effect` and not a `$derived`, because opening a modal is an action rather than a value; it
+    is the sibling of the poll effect directly above, and for the same reason. `debugLog.received`
+    is the only thing it reads, so a presenter closing the modal cannot re-enter it: `modals.modal`
+    is written here and never read.
+  */
+  $effect(() => {
+    if (debugLog.received) modals.modal = 'debug';
+  });
+
+  /*
     THE TAWK WIDGET, in `#lib/tawk-runtime.ts`.
 
     Ninety lines of script injection, a 100ms poll for `window.Tawk_API`, a once-only attribute
@@ -724,6 +742,20 @@
    * calling that would own half the room's preference system by accident.
    */
   onMount(() => {
+    /*
+      THE CONSOLE BUFFER, installed here and nowhere else.
+
+      In `onMount` rather than in `createRoom` because it patches a GLOBAL: a class that did this
+      from its constructor would patch `console` in every unit test that builds a room, and the
+      teardown below is what keeps that from leaking between files. Client-only for the same reason
+      the stream is — there is no console worth collecting during SSR, and the log a presenter wants
+      is the one from the browser that is having the problem.
+
+      FIRST, before the stream subscribes, so a failure during subscription is itself in the buffer.
+      That is the one ordering constraint here and it is the whole reason this line is not lower
+      down: a debug log that starts after the thing that went wrong is a debug log of the recovery.
+    */
+    const stopDebugLog = debugLog.install();
     const stopRoomEvents = roomEvents.subscribe();
     // After subscribe, never before: the stream must not wait on a third-party host.
     const stopGeoLookup = roomEvents.resolveOwnLocation();
@@ -788,6 +820,8 @@
     if (!document.hidden) roomRefresh.start();
 
     return () => {
+      // The global goes back exactly as it was — see the install note above.
+      stopDebugLog();
       stopRoomEvents();
       stopGeoLookup();
       // The injected script goes with the component. Upstream never unmounts `app-room`, so it has
@@ -1345,6 +1379,7 @@
     -->
     <RoomOverlays
       {alerts}
+      {debugLog}
       {isPresenter}
       {unreadQaAlertIds}
       {broadcasts}

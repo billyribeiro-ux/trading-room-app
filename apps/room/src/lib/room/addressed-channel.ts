@@ -31,6 +31,18 @@ export function addressedChannelFor(deps: {
   dialogs: { alertThen: (message: string, ondismiss: () => void) => void; alert: string | null };
   /** Audio only — narrower than a session restart on purpose. See `reconnectAudio`. */
   reconnectAudio: () => Promise<void>;
+  /**
+   * The room's console buffer and the command that answers with it.
+   *
+   * A FIFTH callback pair, and it arrives with the same justification as the four above: the buffer
+   * belongs to `RoomDebugLog` and the send is a remote command the page holds, so neither can be
+   * constructed here without this module reaching for the whole room.
+   */
+  debugLog: {
+    collect: () => string;
+    send: (log: string) => void;
+    received: (from: { fromUserId: number; fromName: string; log: string }) => void;
+  };
 }): RoomPrivateCommands {
   return new RoomPrivateCommands({
     viewerId: deps.viewerId,
@@ -39,7 +51,12 @@ export function addressedChannelFor(deps: {
     forceReloadRequested: () =>
       deps.dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
     // The presenter's own message, as text. No page swap — see `kickUser` above.
-    kicked: (message: string) => (deps.dialogs.alert = message),
-    reconnectAudio: deps.reconnectAudio
+    kicked: (message: string) => {
+      deps.dialogs.alert = message;
+    },
+    reconnectAudio: deps.reconnectAudio,
+    collectDebugLog: deps.debugLog.collect,
+    sendDebugLog: deps.debugLog.send,
+    debugLogReceived: deps.debugLog.received
   });
 }

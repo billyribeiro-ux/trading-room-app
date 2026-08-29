@@ -66,6 +66,7 @@ const make = (
   const kicksSent: { targetUserId: number; message: string; ban?: boolean }[] = [];
   const urlsSent: { cmd: string; url: string }[] = [];
   const mutesSent: { targetUserId: number }[] = [];
+  const debugLogsAsked: number[] = [];
   const audioRestarts: number[] = [];
   const opened: string[] = [];
   const mentioned: string[] = [];
@@ -114,6 +115,11 @@ const make = (
           ? Promise.reject(new Error('refused'))
           : (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
+      /* `debug-log` sends and says nothing — the recorded ids are what its branch is asserted on. */
+      requestDebugLog: (targetUserId: number) => (
+        debugLogsAsked.push(targetUserId),
+        Promise.resolve(null)
+      ),
       muteChat: (payload: { targetUserId: number }) => (
         mutesSent.push(payload),
         Promise.resolve(null)
@@ -195,6 +201,7 @@ const make = (
     kicksSent,
     urlsSent,
     mutesSent,
+    debugLogsAsked,
     indefiniteMutesSent,
     audioRestarts,
     permsSent,

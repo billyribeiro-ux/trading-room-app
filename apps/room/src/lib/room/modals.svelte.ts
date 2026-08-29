@@ -50,10 +50,19 @@ export class RoomModals {
      * belongs where everything can see it.
      */
     setTheme: (next: Theme) => void;
+    /**
+     * Forget the debug log a presenter was reading.
+     *
+     * A STRUCTURAL TYPE rather than `RoomDebugLog`, like `messageActions` and `userActions` above:
+     * this class needs one method, and naming the whole class would couple the modal registry to a
+     * feature it otherwise knows nothing about.
+     */
+    debugLog: { clearReceived(): void };
   }) {
     this.#menus = options.menus;
     this.#polls = options.polls;
     this.#messageActions = options.messageActions;
+    this.#debugLog = options.debugLog;
     this.#userActions = options.userActions;
     this.#unreadQaAlertIds = options.unreadQaAlertIds;
     this.#setTheme = options.setTheme;
@@ -72,6 +81,7 @@ export class RoomModals {
   readonly #menus: RoomMenus;
   readonly #polls: RoomPolls;
   readonly #messageActions: { clearSelected(): void; readonly selected: { id: number } | null };
+  readonly #debugLog: { clearReceived(): void };
   readonly #userActions: { loadManaged(): void };
   readonly #unreadQaAlertIds: { clear(): void; delete(id: number): boolean };
   readonly #setTheme: (next: Theme) => void;
@@ -152,6 +162,12 @@ export class RoomModals {
     //   yi(`.${e._id}`).on('hidden.bs.modal', () => { ... delete e.unreadQA })
     if (this.#modal === 'qa' && this.#messageActions.selected)
       this.#unreadQaAlertIds.delete(this.#messageActions.selected.id);
+    /*
+      One member's console does not sit in a presenter's page for the rest of the session. Without
+      this, re-opening the Debug Log modal for any reason would show whoever answered LAST, under
+      whatever title that answer carried — which reads as a fresh reply and is not one.
+    */
+    if (this.#modal === 'debug') this.#debugLog.clearReceived();
     this.#modal = null;
   }
 

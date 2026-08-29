@@ -27,6 +27,7 @@
   import type { RoomMediaTransport } from '#lib/room/media-transport.svelte.js';
   import type { RoomMessageActions } from '#lib/room/message-actions.svelte.js';
   import type { RoomModals } from '#lib/room/modals.svelte.js';
+  import type { RoomDebugLog } from '#lib/room/debug-log.svelte.js';
   import type { RoomPolls } from '#lib/room/polls.svelte.js';
   import type { RoomPrefs } from '#lib/room/prefs.svelte.js';
   import type { RoomPrivateChat } from '#lib/room/private-chat.svelte.js';
@@ -110,6 +111,7 @@
     onDisplayModeChange,
     unreadQaAlertIds,
     modals,
+    debugLog,
     chatMode,
     globalChatStyle,
     mobilePin,
@@ -175,6 +177,14 @@
     unreadQaAlertIds: SvelteSet<number>;
     /** Which overlay is showing, and how it is configured. Owned by the class, not by props. */
     modals: RoomModals;
+    /**
+     * The room's console log — the buffer this browser fills and the one a presenter received.
+     *
+     * The CLASS rather than its value, because both ends are read here: the markup passes
+     * `debugLog.received` down to `ModalHost`, and the page's own effect opens the modal when it
+     * arrives. Passing the value alone would mean a second prop for the arrival.
+     */
+    debugLog: RoomDebugLog;
     chatMode: ChatMode;
     globalChatStyle: FollowChatStyle;
     mobilePin: string;
@@ -611,6 +621,7 @@
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}
   targetUser={userActions.target}
+  debugLog={debugLog.received}
   privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
   onShowPrivateMessages={(user) => {
     modals.open('all-private');
