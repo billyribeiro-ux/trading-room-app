@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 19:30 UTC — Benzinga renders twice upstream, and a tracker row asked us to delete a working feature
+
+**Runtime impact: YES** for the first; **none** for the second, which is the point of it.
+
+#### NEW-TODO §2.2 — the decode pass found a second surface
+
+The row listed one thing outstanding: *"the const table entries for exact classes on the `<li>`,
+`<a>` and `<img>`, and where `benzingaUrl` is set."* Reading them produced a finding the row did not
+contain: **there are three render functions in the bundle.** Two are the sidebar component compiled
+twice (`mPe` 2,467,533, `_Re` 2,563,731 — this bundle ships components in duplicate, which the
+stylesheets here already record). The third, **`PPe` at 2,473,150**, is a different element, in a
+different container, with different classes. Only the sidebar one existed here.
+
+**The const indices were parsed with a string-aware walker rather than counted by eye**, because an
+index is per component: `benzinga-li` is index 90 of the table at 2,470,000, while the sidebar's
+`li` is index 32 of its own table, where that number means a generic `nav-item` shared with "Manage
+Muted Users". Counting brackets across a minified bundle is exactly how those get confused.
+
+```
+90  [1,"nav-item","animated","fadeIn","benzinga-li"]
+141 ["target","_blank","title","Benzinga News",1,"nav-link"]
+142 [1,"benzinga-logo","animated","fadeIn",3,"src"]
+```
+
+Gate `O(15, sessData.hasBenzingaNews ? 15 : -1)`, immediately before the talking indicator — where
+it now renders. `animated fadeIn` are animate.css 3.7.2, which **is** a dependency here, so they are
+worn rather than dropped.
+
+**One condition is ours.** Upstream's navbar item is image-only with a hard fallback:
+`altBenzingaLogoURL || "/assets/images/benzinga-logo.png"`. That asset is not in this repository —
+measured, not assumed (`find -iname "*benzinga*"` returns nothing) — so the faithful transcription
+puts a broken `<img>` in the navbar of every room with Benzinga on and no custom logo. That is the
+`playing.gif` defect fixed earlier in this same file. The sidebar's icon-and-text answer is not
+available: that branch exists in the sidebar's capture and not in this one, and inventing it would be
+inventing evidence. So the item renders when the room supplies a logo, and a room without one still
+has the sidebar item.
+
+`benzinga-navbar-contract.test.ts`, 9 tests. **Five negative controls seen RED**: dropping the logo
+condition; dropping `animated fadeIn`; dropping `rel="noopener noreferrer"`; dropping the image
+dimensions; giving the navbar copy the sidebar's icon fallback.
+
+#### NEW-TODO §2.6 — the row was false, and acting on it would have deleted a feature
+
+It read: *"`Connectivity/Mic Troubleshooter` is in our older bundle and **gone** from the current v4.
+If we built it, it should probably come out."* We did build it — four tabs of
+`#webrtc-troubleshooter-modal`.
+
+**Counted in the current v4 bundle with `String.indexOf`, not `grep -c`** (the bundle is one line, so
+a line-based count answers 1 or 0 for everything — the mistake `missing-commands-triage.md` records
+being made once already):
+
+```
+Connectivity/Mic       2
+webrtc-troubleshooter  8
+troubleshooter-tabs    6
+```
+
+Nothing about it was removed. Where the claim came from is not recoverable — the older bundle it
+compares against is gitignored — and it does not matter: the current bundle is SHA-256 pinned here
+and it says the feature is there.
+
+`troubleshooter-retained-contract.test.ts` pins the measurement against the bundle. Deleting the row
+stops a reader acting on it; it does not stop the claim being re-derived from one bad grep, and **a
+silently deleted modal breaks no type, no lint rule and no other test here.** Two negative controls
+seen red. If a future v4 genuinely drops the feature this fails, and that is the moment to have the
+conversation — with evidence rather than a sentence.
+
+#### Verification
+
+`svelte-check` 0 errors, 0 warnings. `eslint` clean. `prettier --check` clean. Room suite **206
+files, 3,292 passed, 1 skipped**. Two ceilings raised and argued. `slice-anchor-contract.test.ts`
+caught two inlined `indexOf` calls in the new test and they were bound to locals — the gate working
+on the commit that added the risk.
+
+**Not verified in a browser.** A room with `hasBenzingaNews` on and a custom logo set is the owner's
+confirmation to give.
+
 ### 2026-08-29 19:15 UTC — Chat search, and the filter a faithful port would have skipped
 
 **Runtime impact: YES.** Both chat columns can search their whole channel. Neither had a search box

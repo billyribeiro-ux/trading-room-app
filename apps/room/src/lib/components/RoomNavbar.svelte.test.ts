@@ -91,6 +91,8 @@ const render = (over: Record<string, unknown> = {}) => {
       presenterAudio: { audioMutedFor: {}, audioVolumeFor: {} },
       individualVolumeControls: false,
       recordingReminderAllowed: false,
+      benzingaUrl: null,
+      benzingaLogoUrl: null,
       recordingTooltip: '',
       mobileAppAvailable: false,
       tawkAvailable: false,

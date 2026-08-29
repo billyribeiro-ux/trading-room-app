@@ -533,7 +533,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
       security-relevant half of the change; this entry carries its part.
     */
-    max: 1470,
+    /*
+      RAISED 1470 -> 1472 on 2026-08-29: two props for the navbar's Benzinga item. Assembly only —
+      the argument is on `RoomNavbar.svelte`.
+    */
+    max: 1472,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -3388,7 +3392,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       add a class with no effect. That is a rediscovery cost, which is what this repository's
       comments are for.
     */
-    max: 935,
+    /*
+      935 -> 1008, 2026-08-29, for the NAVBAR copy of Benzinga — a second render of the feature that
+      upstream has and this room had only half of.
+
+      `NEW-TODO.md` §2.2 listed one thing outstanding: the const-table classes. Reading them produced
+      a finding the row did not contain — there are THREE render functions in the bundle. Two are the
+      sidebar component compiled twice; the third, `PPe` at 2,473,150, is a different element with
+      different classes in a different container, and nothing here had it.
+
+      Seventy-three lines for eighteen of markup, and the rest is the two things a reader will
+      otherwise re-derive or undo: the const indices (parsed with a string-aware walker, because an
+      index is per component and the sidebar's `li` is index 32 of a table where that means a generic
+      `nav-item`), and the extra `&& benzingaLogoUrl` condition. Upstream's item is image-only with a
+      hard fallback to an asset this repository does not have, so the faithful transcription is a
+      broken image in every unconfigured room's navbar — the `playing.gif` defect that is fixed
+      forty lines further down this same file.
+    */
+    max: 1008,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

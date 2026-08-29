@@ -126,20 +126,32 @@ do NOT fall back to the other field.
 **Both tokens already exist** in `css/complete-app-styles.css` and `src/app.css`. Build against the
 token names.
 
-## 2.2 Benzinga News — small, decoded
+## 2.2 Benzinga News — BUILT, 2026-08-29 ✅
 
-A nav `<li>` linking out, beside "Reopen Alerts / Chat" and "Recording" (`mPe`/`pPe`/`fPe`):
+The outstanding decode pass is done, and it produced a finding this section did not contain:
+**Benzinga renders in TWO places upstream, not one.**
 
-- `href` = `benzingaUrl`
-- renders `<img src="{{sessData.altBenzingaLogoURL}}">` when that is set, **else** icon + the text
-  **"Benzinga News"**
-- assets: `/assets/images/benzinga-logo.png`; classes `benzinga-li`, `benzinga-logo`,
-  `benzinga-logo-alt`
+| | where | consts | image | fallback |
+| --- | --- | --- | --- | --- |
+| sidebar | `mPe` 2,467,533 and `_Re` 2,563,731 — the same component compiled twice | `nav-link sidebar-item ps-1` / `benzinga-logo-alt` / `fas fa-newspaper` | `altBenzingaLogoURL` | icon + the words "Benzinga News" |
+| **navbar** | **`PPe` 2,473,150** | `90 [1,"nav-item","animated","fadeIn","benzinga-li"]`, `141 ["target","_blank","title","Benzinga News",1,"nav-link"]`, `142 [1,"benzinga-logo","animated","fadeIn",3,"src"]` | `altBenzingaLogoURL \|\| "/assets/images/benzinga-logo.png"` | **none — image only** |
 
-**`altBenzingaLogoURL` is per-room** — the same customer-branding pattern as the theme tokens.
+Only the sidebar one existed here. The navbar one shipped on 2026-08-29
+(`benzinga-navbar-contract.test.ts`, 9 tests, 5 negative controls seen red).
 
-**Still needed:** the const table entries for exact classes on the `<li>`, `<a>` and `<img>`, and
-where `benzingaUrl` is set.
+**The const indices were parsed with a string-aware walker, not counted by eye** — an index is per
+component, and the sidebar's `li` is index 32 of a *different* table, where it is a generic
+`nav-item` shared with "Manage Muted Users".
+
+**Two divergences, both measured and both recorded at the code:**
+
+- `/assets/images/benzinga-logo.png` is **not in this repository** (`find -iname "*benzinga*"`
+  returns nothing), so the navbar item renders only when the room supplies a logo. Transcribing the
+  fallback faithfully would put a broken `<img>` in every unconfigured room's navbar — the
+  `playing.gif` defect again. The sidebar's icon-and-text answer is not available here: that branch
+  exists in the sidebar's capture and not in this one, and inventing it would be inventing evidence.
+- The default `benzingaUrl` is not reproduced. It is built from three values this room does not
+  have — see `gates.ts`, which has recorded that since before this pass.
 
 ## 2.5 Mobile app — the other half of the v4 delta
 
@@ -148,10 +160,18 @@ New strings: `mobile-app-container`, `mobile`, `restoreMobileAppTokens`, `fa-mob
 `docs/MOBILE-APP.md` already exists in this repository — **read it before decoding anything**, it may
 already answer most of this.
 
-## 2.6 Removed upstream — check whether we built it
+## 2.6 Removed upstream — THE CLAIM WAS FALSE, closed 2026-08-29 ✅
 
-`"Connectivity/Mic Troubleshooter"` is in our older bundle and **gone** from the current v4. If we
-built it, it should probably come out. If we did not, do not build it.
+This row read: *"`Connectivity/Mic Troubleshooter` is in our older bundle and **gone** from the
+current v4. If we built it, it should probably come out."* We did build it, so the row's instruction
+was to delete a working feature — four tabs of `#webrtc-troubleshooter-modal`.
+
+**Counted in the current v4 bundle with `String.indexOf`, not `grep -c`:** `Connectivity/Mic` 2,
+`webrtc-troubleshooter` 8, `troubleshooter-tabs` 6. Nothing about it was removed.
+
+Pinned by `troubleshooter-retained-contract.test.ts` against the SHA-256'd bundle, because deleting
+the row stops a reader acting on it but does not stop the claim being re-derived from one bad grep —
+and a silently deleted modal breaks no type, no lint rule and no other test here.
 
 ---
 
@@ -250,9 +270,8 @@ it was planning.
    Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
    repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
    `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
-3. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
-4. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-5. **Part 3 v5** — when an account is cleared for it.
+3. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
+4. **Part 3 v5** — when an account is cleared for it.
 
 **Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
 complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,

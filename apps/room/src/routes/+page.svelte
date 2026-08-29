@@ -1041,6 +1041,8 @@
           individualVolumeControls={gates.individualVolumeControls}
           recordingReminderAllowed={gates.recordingReminderAllowed}
           recordingTooltip={gates.recordingTooltip}
+          benzingaUrl={gates.benzingaUrl}
+          benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
           mobileAppAvailable={gates.mobileAppAvailable}
           tawkAvailable={gates.tawkAvailable}
           doNotDisturbOn={prefs.doNotDisturbOn}

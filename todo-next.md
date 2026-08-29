@@ -76,11 +76,11 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,214 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
-| 3 | `routes/+page.svelte` | 1,469 | no |
+| 3 | `routes/+page.svelte` | 1,471 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,187 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,007 | no |
 | 6 | `lib/components/PresentationArea.svelte` | 958 | no |
-| 7 | `lib/components/RoomNavbar.svelte` | 934 | no |
+| 7 | `lib/components/RoomNavbar.svelte` | 1,006 | no |
 | 8 | `lib/components/PollPanel.svelte` | 824 | no |
 | 9 | `lib/components/RoomOverlays.svelte` | 835 | no |
 | 10 | `lib/components/RoomSidebar.svelte` | 777 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 55 | `routes/logout/+page.svelte` | 31 | no |
 
-**2 of 56 surfaces audited · 1,059 of 27,816 lines · 3.8%.**
+**2 of 56 surfaces audited · 1,059 of 27,890 lines · 3.8%.**
 
 | 56 | `routes/+layout.svelte` | 27 | no |
 ## The honest scoping statement
