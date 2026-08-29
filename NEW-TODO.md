@@ -193,10 +193,24 @@ custom properties**, and every colour in the new sort-bar rules is a `var(--…)
 
 # PART 5 — Three alert features found 2026-08-15 by ENUMERATION, not by asking
 
-Full spec: `docs/decoded/alert-scheduler-filter-labels.md`.
+**All three are BUILT, and their sections are removed from this file — 2026-08-29.**
 
-**How they were found is the point.** `audit-feature-coverage.mjs` was written after Swing and Day
-Trade — two whole tabs — turned out to have been in the bundle from day one with nothing ever
+| | shipped as | contract |
+|---|---|---|
+| **5.1 Alert Filter** | `alert-filter.ts`, persisted through `savePreference('alertFilterFor')`, consumed in `alerts.svelte.ts`, `alerts-pane.ts` and `create-room.svelte.ts` | `alert-filter-contract.test.ts` — 26 tests |
+| **5.2 Alert Labels** | `alert-labels.ts`, rendered by `RoomMessage.svelte` and configured in `ModalHost.svelte` | `alert-labels-contract.test.ts` |
+| **5.3 Alert Scheduler** | `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte`, and the sweeper `startAlertScheduler`; `hasAlertScheduler` is `wired: true` | `scheduled-alert-contract.test.ts` — with 5.2, 50 tests |
+
+**Why they are removed rather than re-marked.** The three sections here were a SUMMARY of
+`docs/decoded/alert-scheduler-filter-labels.md`, which carries the same evidence — the byte offsets,
+the verbatim strings, the two 2026-08-15 corrections — roughly five times over. Two places recording
+one thing is how one of them goes stale, and it is exactly what happened: on 2026-08-29 §5.3 still
+carried a 🔴 and still said *"`hasAlertScheduler` … is NOT in `room-settings-schema.ts`"*, while the
+entitlement had been wired and all four modules shipped. **The decoded document is the spec. This
+file tracks what is left to build, and none of this is.**
+
+**How they were found is still the point.** `audit-feature-coverage.mjs` was written after Swing and
+Day Trade — two whole tabs — turned out to have been in the bundle from day one with nothing ever
 enumerating the reference's features. Running it after the Swing build reported 47/88 wire commands
 present, and four of the missing ones were alert-related. All four returned **zero hits across
 `docs/`, `TODO.md` and `NEW-TODO.md`**: no spec, no row, no mention anywhere.
@@ -204,85 +218,28 @@ present, and four of the missing ones were alert-related. All four returned **ze
 Same failure mode as Swing, caught by the same mechanism, eleven hours later. **Run that audit after
 every feature lands.**
 
-## 5.1 Alert Filter — each viewer chooses whose alerts they see 🟡
-
-Smallest of the three and the only one that changes what an ordinary member sees. One command in
-both directions, one modal, no entitlement flag found.
-
-- `updateAlertFilter` — send `{alertFilterFor, userXrefID}` (byte 1,221,491); the response sets
-  `user.alertFilterFor` and **re-fetches `getAlertsLog {page:0}`** (byte 1,017,535).
-- **CORRECTED 2026-08-15: the filtering is CLIENT-side, in three places** — the live SSE stream
-  (1,004,533), `getAlertsLog` (1,017,070) and the alerts search results (1,020,817), all with one
-  identical guard. An earlier version of this row said the server owns it; building to that would
-  have produced an architecture the reference does not have. The command is for PERSISTENCE.
-- **Consequence worth deciding on:** every alert reaches every browser and some are hidden after
-  arrival, so this is a display preference and **not** an access control. Filtering server-side
-  instead would be a real improvement and a deliberate divergence — record it as one if taken.
-- `preferences.showAlertsFrom` **inverts the meaning** — the same selection is an allow-list when
-  true and a deny-list when false. Treating it as a display toggle gets the semantics backwards.
-- Buttons verbatim, spaces included: `" Unselect All "`, `" Select All "`, `" Save"` — the last has a
-  leading space and no trailing one, unlike its neighbours.
-
-## 5.2 Alert Labels — per-room hashtags prefixed onto alert text 🟢
-
-**Not a wire feature at all**: `getAlertLabels` / `saveAlertLabels` / `updateAlertLabels` /
-`hasAlertLabels` are all 0 occurrences. Configuration plus a text transform.
-
-- `sessData.alertLabels` is a **string containing JSON**, trimmed then `JSON.parse`d, every entry
-  given `checked = false` (byte 1,147,292). `chatTabsWithBadges` and `modAlertFilterList` use the
-  identical shape — **three room settings shipped as JSON strings.**
-- **CORRECTED 2026-08-15: an entry is `{hash, name, bgcolor, color}`, not `{hash}`** — and the labels
-  have a **SECOND consumer** the first pass missed entirely. `parseSymbols` (byte 1,328,216) replaces
-  `#hash` in ALERT text with a coloured `span.badge` showing `name`. Chat and Q&A messages are
-  excluded. `hash` is what goes in the text; `name` is what the reader sees.
-- **`bgcolor` and `color` are interpolated RAW into a `style` attribute** while only `name` is
-  sanitised. Owner-controlled in the reference, so not member-facing — but **do not reproduce that
-  shape**; validate the colours or bind them as custom properties, and record the divergence.
-- `processAlertLabels` prefixes `" #" + hash` per checked label, **newline after the last and a space
-  after the others** (byte 2,131,295). Called from **four** sites, not one.
-- Checkboxes are cleared in **three** places, not one: after a successful prepend, on `doCloseModal`,
-  and on `clearInputFields`. Selection never survives leaving the composer by any route.
-
-## 5.3 Alert Scheduler — post an alert later, optionally repeating 🔴
-
-The largest. An entitlement, three commands, a modal with a table, repeat semantics, and a
-**server-side scheduler this project has no equivalent for** — that part is a design decision, not a
-port.
-
-- **Entitlement `sessData.hasAlertScheduler`** (8 occurrences). It is NOT in `room-settings-schema.ts`
-  and its manage-page control was not located. Per the per-client-entitlement pattern one should
-  exist — **not invented; recorded as a gap.**
-- `alertMsgLater` (byte 2,130,937) · `getScheduledAlerts`, null payload (bytes 1,009,797 / 1,021,836)
-  · `removeScheduledAlert` `{scheduledAlertID}` (byte 2,407,145), whose response splices by id.
-- **`ignoreWeekends` is not the checkbox value** — it is sent as
-  `"daily" === repeatScheduledAlert && ignoreWeekends`, so a weekly repeat always sends false.
-- Component `app-scheduled-alerts-modal`, modal id `scheduledAlertsModal`, `decls: 27`. Row cells:
-  `sendOn | date:"short"`, `alert.n`, `alert.txt`, `repeat || "off"`, a `" Remove "` button, plus a
-  conditional `"no weekends"` span when daily and ignoring weekends.
-- Strings verbatim: `"Alert scheduled OK."`, `"Please enter some alert text..."`, and a remove
-  confirm built by CONCATENATION with a full stop before `text:` and **no closing question mark**.
-
-**Honest gaps** (also in the spec): the `hasAlertScheduler` manage control, the three `ngClass` class
-names on the repeat badge, the modal's own 27-declaration layout, and what the server does with
-`sendLaterAsNick` / `sendLaterAsEmail` / `dontCrossPost`.
-
 ---
 
 # Suggested order
 
 **Built since this list was written, and removed from it:** 2.3 Swing Alerts, 2.4 Day Trade Alerts,
-and the four "For All" broadcast commands — which were not a missing feature but three SHIPPED
-controls that said "For All" and moved one browser. See `CHANGELOG.md`.
+the four "For All" broadcast commands — which were not a missing feature but three SHIPPED controls
+that said "For All" and moved one browser — and, on 2026-08-29, **all three of PART 5**: the Alert
+Filter, the Alert Labels and the Alert Scheduler. See `CHANGELOG.md`, and `PART 5` above for where
+each landed.
 
 **Re-specified because "fully decoded" was not:** 2.1, the Files sort bar. Three errors found on
 re-reading, one of which ships a control that looks right and behaves wrong. Build from
 `docs/decoded/files-sort-bar.md`, not from §2.1.
 
-1. **1.1 + 1.2 together** — they share the SSE revocation plumbing, and they are the two that cost
-   money every day they are open.
-2. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
+**Removed from this order on 2026-08-29 because they are built:** *1.1 + 1.2 together* (PART 1
+records them CLOSED on 2026-08-27), *5.1 Alert Filter*, *5.2 Alert Labels* and *5.3 Alert Scheduler*
+(PART 5 above). The order below was still scheduling all five, which is how a plan outlives the work
+it was planning.
+
+1. **2.1 the sort bar** — spec verified offset by offset, small, and it proves the theming rule end
    to end.
-3. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
+2. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
    onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
    Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller
    tables, none matching. Our Recordings is a different thing: `recording-codec.ts` records the
@@ -293,13 +250,9 @@ re-reading, one of which ships a control that looks right and behaves wrong. Bui
    Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
    repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
    `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
-4. **5.1 Alert Filter**, then **5.2 Alert Labels** — both small, and 5.1 is the only one of the
-   three that changes what an ordinary member sees.
-5. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
-6. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-7. **5.3 Alert Scheduler** — needs an entitlement whose manage-page control was NOT located, and a
-   server-side scheduler that does not exist here.
-8. **Part 3 v5** — when an account is cleared for it.
+3. **2.2 Benzinga** — small, needs one more decode pass for the const-table classes.
+4. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
+5. **Part 3 v5** — when an account is cleared for it.
 
 **Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
 complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,
@@ -307,10 +260,17 @@ complete list of what the reference has and we do not. Moderation (`kickUser`, `
 Five media-server admin commands are deliberately parked as UNCLEAR: whether a presenter should be
 able to reset shared media infrastructure is a product and safety decision, not a porting question.
 
-## Evidence, all committed
+## Evidence — two of these four are NOT committed, corrected 2026-08-29
 
-- `apps/room/docs/source-v4-2026-08-15/` — the current v4, three files + `sha256sums.txt` + a README
-  recording how it was verified and what changed
-- `apps/room/scripts/collect-app-versions.js` — the read-only version collector
-- `v5.md` — the version measurements and the retraction
-- `apps/room/docs/source/` — the OLDER v4, SHA-256 pinned, untouched
+This heading read **"Evidence, all committed"**. Measured with `git ls-files` and on disk:
+
+| | tracked | present here | |
+|---|---|---|---|
+| `apps/room/docs/source-v4-2026-08-15/` | **5 files** | yes | the current v4: three artifacts + `sha256sums.txt` + a README recording how it was verified and what changed. All three verified `OK` against that file on 2026-08-29 |
+| `v5.md` | **yes** | yes | the version measurements and the retraction |
+| `apps/room/scripts/collect-app-versions.js` | **0** | **no** | the read-only version collector. `.gitignore` excludes `/apps/room/scripts/` whole, deliberately — the collectors in it reach the reference application and this repository is public. `docs/UNPUBLISHED-SCRIPTS.md` records what is in there |
+| `apps/room/docs/source/` | **0** | **no** | the OLDER v4. Gitignored for the same reason, and its absence is why **42 evidence-bound test files are excluded from every run in a fresh clone** — `gate/evidence-bound-tests.mjs` prints that on every invocation |
+
+The correction matters more than the two entries do: a list headed "all committed" is read as *a
+clone has these*, and a clone has half of them. What a clone actually holds is the v4 bundle and
+`v5.md`; everything reconstructed from a DOM capture needs the author's machine.

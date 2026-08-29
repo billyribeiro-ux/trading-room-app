@@ -33,6 +33,94 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 02:40 UTC — `accept="image/*"` opened a comment that ate a real render, and a false claim I had just written
+
+**Runtime impact: NO.** A test-helper fix, a tripwire, and two corrections to claims of mine.
+
+The duplication audit's shared-logic pass reported that this session's new gate asserted something
+false about its neighbour. It was right, and chasing it found a defect underneath.
+
+#### 1. The false claim, corrected the hour it was introduced
+
+The cross-reference written an hour earlier said `orphan-component-contract`'s `rendersOf` and
+`unfed-props-contract`'s `callSites` both *"strip comments first"*. **`callSites` does not** — it
+tests `file.source`, the raw text, and `unfed-props-contract.test.ts` defines no comment stripper at
+all. So its own docblock, *"`<Name` — the tag, so a mention in prose does not count as a call site"*,
+is false there too.
+
+That paragraph was written from the shape of the code instead of from the code. It is corrected in
+place rather than deleted, and it names the pre-existing false comment beside it.
+
+#### 2. The defect underneath: a template `/*` is not a comment
+
+Checking whether the hole was live turned up something worse in **my own** helper:
+
+```
+NoteEditor.svelte:1278    <input accept="image/*" … />
+```
+
+That `/` and `*` open a block comment the whole-file regex closes at the next real `*/` — **7,000
+characters later** — deleting everything between, including
+
+```
+NoteEditor.svelte:1430    <BootboxDialog mode="alert" message={errorMessage} … />
+```
+
+The naive stripper removed **10,374 of that file's 54,609 characters**. A walk over the result would
+have reported a live component as rendered by nobody — and whoever met that report would have
+deleted working code.
+
+It did not fire only because `BootboxDialog` is rendered from seven other files as well. **That is
+luck, not correctness**, and it was proven both ways: a probe component rendered inside the swallowed
+window is seen correctly by the fixed stripper and is **invisible** to the old one.
+
+**The rule, and why it is the right one.** `/* … */` and `//` are JavaScript and CSS comment syntax.
+In a Svelte file that syntax is in force only inside `<script>` and `<style>`; the template's
+comments are `<!-- -->` and nothing else. So markup comments are stripped everywhere and JS-style
+comments only within those blocks — and `accept="image/*"` is then what it actually is, an attribute
+value. `tsCodeOf` keeps the whole-file behaviour for `.ts` sources, where it is correct.
+
+#### 3. The scope, measured — and the first answer was wrong
+
+Fifty-five test files strip block comments and read `.svelte` sources. The live exposure is **one
+file**: this gate's own.
+
+| file | verdict |
+| --- | --- |
+| `NoteEditor.svelte` | **loses `<BootboxDialog>`** — the only real case |
+| `PostAlertModal.svelte` | has `accept="image/*"` and **no `*/` follows it anywhere** |
+| `ImageUploadDialog.svelte` | the same |
+| `RoomOverlays.svelte` | its glued `/*` sits inside a comment that discusses `/*`. Harmless |
+
+The first draft of that table called two of them "latent hazards". **That was wrong**, and the way it
+was caught is the point: the negative control written for `PostAlertModal` **did not fire**, and
+chasing why produced the measurement — a non-greedy `/\*[\s\S]*?\*/` with no closing `*/` anywhere
+after it matches nothing, so those files lose not one character. A control that fails to fire is
+evidence, and this is the second time tonight it has been the thing that found the truth.
+
+What *would* make them hazards is a `*/` appearing later — a new docblock, a CSS comment. That is a
+plausible edit with no local warning, which is what the tripwire is for.
+
+#### 4. A tripwire, not a sweep
+
+Rewriting fifty-five files would be a large, risky change for a hazard that bites one. Instead
+`orphan-component-contract.test.ts` now asserts that the naive strip and the correct one **agree on
+which components each file renders**, with `NoteEditor` recorded as the one measured exception and a
+staleness check on that exception.
+
+It is called a tripwire rather than a fix, in the file, because that is what it is: it cannot repair
+the other fifty-five, only stop a sixth file from joining them unnoticed.
+
+#### Verified
+
+* **Four controls, each proved to have applied.** A probe rendered inside the swallowed window: seen
+  by the fixed stripper, invisible to the old one. A new hazardous file — a component tag *and* a
+  closing `*/` after an `accept` attribute — fails *loses no component tag that the correct stripper
+  keeps*. The known exception made safe fails *carries no stale exception*. And the control that
+  did **not** fire, which produced the scope correction above.
+* Room suite — **190 files, 3,109 passed, 1 skipped**.
+* `svelte-check` — **1,334 files, 0 errors, 0 warnings**. `eslint` — clean.
+
 ### 2026-08-29 02:25 UTC — The duplication audit's findings, and the one lesson worth borrowing
 
 **Runtime impact: NO.**
