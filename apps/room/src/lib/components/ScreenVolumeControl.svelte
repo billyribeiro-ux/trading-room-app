@@ -7,7 +7,7 @@
    *
    * | variant | const | where |
    * | --- | --- | --- |
-   * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | app-room 104 | the navbar — already built, `+page.svelte:6824` |
+   * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | app-room 104 | the navbar — already built, `RoomNavbar.svelte:663` |
    * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]` | app-presentationarea 90 | HERE, the screen tab bar's `ms-auto` cluster |
    *
    * Decoded from `docs/source/components/app-presentationarea.render-helpers.js:264-459`

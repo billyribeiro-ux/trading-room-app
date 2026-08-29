@@ -37,7 +37,13 @@ zero. Three real defects shipped green here and were only caught by a screenshot
 Testing: run what changed, not the world. `pnpm --filter room vitest run <file>` plus
 `pnpm --filter room check`. The full gate runs ONCE before a push.
 
-Commit and push only when asked. `services/**` is a mirror — changes there are lost on sync.
+Commit and push only when asked. **`services/**` is authored HERE and this repository is its
+authority** — corrected 2026-08-29. This line used to read *"`services/**` is a mirror — changes
+there are lost on sync"*, which is the exact sentence `CLAUDE.md` records as **false and cost real
+time**: `apps/controller/scripts/verify-backend-provenance.mjs:97-118` searched for a sync in either
+direction, found none, and records the owner confirming on 2026-08-12 that the siblings are
+reference only. Edits there are governed, not provisional — re-pin the file in that verifier and
+add a CHANGELOG entry saying why.
 
 ---
 
@@ -89,7 +95,7 @@ for weeks.
 | variant                                                                                          | const        | status                                                             |
 | ------------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------------------------------ |
 | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | main nav     | **BUILT — do not touch.** `apps/room/src/lib/components/RoomNavbar.svelte:663` |
-| `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]`                | zoom overlay | **MISSING — build this**                                           |
+| `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]`                | zoom overlay | **BUILT — corrected 2026-08-29.** `apps/room/src/lib/components/ScreenVolumeControl.svelte:113` renders `<button type="button" id="dropdownVolume" data-bs-toggle="dropdown" class="btn btn-sm btn-dark">`, attribute for attribute. This cell said **MISSING — build this** while the section heading forty lines above it said **BUILT 2026-08-12**; the heading was right |
 
 Ours is genuinely the nav variant, not a near-miss: `fa-2x`, `fa-volume-mute` and `mainNavItem` each
 occur **exactly once** in the bundle, and `RoomNavbar.svelte` has all three.

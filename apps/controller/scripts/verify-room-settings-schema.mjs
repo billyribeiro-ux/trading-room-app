@@ -481,7 +481,22 @@ try {
     'apps/controller/docs/OUTSTANDING.md',
     'apps/controller/docs/ARCHITECTURE.md',
     'docs/decoded/admin-surface.md',
-    'v5.md'
+    'v5.md',
+    /*
+      `TODO.md` joined on 2026-08-29, and how it was missed is the reason it is worth a note.
+
+      The first pass of this check found five documents by searching for the phrasings it already
+      knew — "N of 269", "N wired" — and corrected all five. `TODO.md:206` states the same property
+      in a SIXTH phrasing, *"marks 170 of them `wired: false`"*, which none of those patterns match,
+      and it was found only when a separate audit read the trackers by hand.
+
+      That is the failure mode of a pinned list of sites: it grows by whoever notices, and what
+      nobody notices stays unpinned. The list is still the right shape — the alternative is a
+      repo-wide number hunt with a false-positive rate the "20 of 269" incident already measured —
+      but it earns this paragraph, because the next stale count will be in a seventh file phrased a
+      seventh way.
+    */
+    'TODO.md'
   ];
 
   /**
@@ -579,7 +594,9 @@ try {
       ...text.matchAll(/(?:the other|the remaining) (\d+) entries?/gi),
       ...text.matchAll(/(?:the other|the remaining) (\d+) are/gi),
       ...text.matchAll(/(\d+) unwired/gi),
-      ...text.matchAll(/(\d+) are not\.\*\*/gi)
+      ...text.matchAll(/(\d+) are not\.\*\*/gi),
+      // `TODO.md:206`'s phrasing: "marks **166** of them `wired: false`".
+      ...text.matchAll(/marks \*?\*?(\d+)\*?\*? of them `?wired: false/gi)
     ].map((match) => Number(match[1]));
     /*
       CASE-INSENSITIVE, because prose starts sentences. Both surviving phrasings begin one — *"The

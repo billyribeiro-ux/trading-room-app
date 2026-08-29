@@ -55,9 +55,38 @@ const DATED: Record<string, string> = {
 /** Where a repo-relative-ish citation might actually live, longest-shot last. */
 const ROOTS = ['', 'apps/room/', 'apps/controller/', 'apps/room/src/', 'apps/controller/src/', 'services/'];
 
-const docs = globSync('**/*.md', { cwd: REPO }).filter(
-  (relative) => !relative.includes('node_modules')
-);
+/*
+  MARKDOWN **AND SOURCE COMMENTS**, the second added 2026-08-29.
+
+  The first version read `.md` only. A tracker audit then found the same defect twice inside source
+  files, where no gate could see it:
+
+    lib/media/session.ts        +page.svelte lines 1760-1766 — the master-volume handler, which now
+                                lives in lib/room/volume.svelte.ts
+    lib/media/session.ts        +page.svelte lines 1814-1817 — muting by track.enabled, now
+                                lib/room/local-capture.svelte.ts
+    ScreenVolumeControl.svelte  +page.svelte line 6824 — the navbar volume trigger, now
+                                RoomNavbar.svelte:663
+
+  THE THREE ABOVE ARE WRITTEN WITHOUT BACKTICKS ON PURPOSE. Widening this sweep to source files made
+  it read its own docblock, and these examples — quoted as the defect they are — failed it. That is
+  the comment-versus-code trap for the sixth time in this repository, and the first instinct was to
+  exempt this file by name. That would have been a hole: a genuinely stale citation here would then
+  never be caught. Changing the FORM of the example instead keeps the file inside its own gate, which
+  is where it belongs.
+
+  A citation in a docblock is exactly as misleading as one in a document and rather more likely to be
+  followed, because it sits beside the code it claims to explain. The two file sets are read the same
+  way and asserted together: this repository's comments ARE its documentation, and the standard says
+  so in as many words.
+*/
+const docs = [
+  ...globSync('**/*.md', { cwd: REPO }),
+  ...globSync('apps/*/src/**/*.ts', { cwd: REPO }),
+  ...globSync('apps/*/src/**/*.svelte', { cwd: REPO })
+]
+  .map((relative) => relative.replaceAll('\\', '/'))
+  .filter((relative) => !relative.includes('node_modules'));
 
 type Citation = { doc: string; cited: string; resolved: string; want: number; actual: number };
 
@@ -91,12 +120,14 @@ for (const doc of docs) {
 }
 
 describe('the citation sweep runs at all', () => {
-  it('found documents to read', () => {
-    expect(docs.length).toBeGreaterThan(50);
+  it('found documents and sources to read', () => {
+    // 175 markdown + ~745 source files on 2026-08-29.
+    expect(docs.length).toBeGreaterThan(300);
   });
 
   it('resolved a plausible number of citations, so the assertion below is not vacuous', () => {
-    // 200 on 2026-08-29. A floor well below it fails a broken scanner without failing a tidy-up.
+    // 200 in markdown plus 41 in source comments on 2026-08-29. A floor well below the total fails
+    // a broken scanner without failing a tidy-up.
     expect(citations.length).toBeGreaterThan(100);
   });
 

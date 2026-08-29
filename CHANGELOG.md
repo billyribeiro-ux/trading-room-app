@@ -33,6 +33,115 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 02:55 UTC — Eight stale or self-contradicting claims across the trackers, and a gate that was only reading half the repository
+
+**Runtime impact: NO.** Tracker corrections, one comment repointed in shipping source, and a widened
+gate.
+
+The duplication audit's tracker pass read `TODO.md`, `HANDOFF.md`, `NEW-TODO.md` and the controller
+docs by hand. Every finding below was verified against the code before being acted on.
+
+#### 1. A dangerous standing order: `HANDOFF.md:40`
+
+> *"Commit and push only when asked. `services/**` is a mirror — changes there are lost on sync."*
+
+`CLAUDE.md` names **that exact sentence** as **false and cost real time**:
+`verify-backend-provenance.mjs:97-118` searched for a sync in either direction, found none, and
+records the owner confirming on 2026-08-12 that the siblings are reference only. A handoff document
+telling the next session its `services/**` edits will be discarded is the worst kind of stale — it
+stops work rather than misreporting it. Corrected to match the root standard.
+
+#### 2. A sixth wired-count site the gate had missed — and a seventh it then caught
+
+`TODO.md:206` said *"marks **170** of them `wired: false`"* and derived *"26 of the 170"* from it.
+The real number is **166**. Five documents were corrected an hour earlier; this sixth states the
+property in a **sixth phrasing** that none of the check's patterns matched, and it was found only by
+reading the trackers by hand.
+
+`TODO.md` is now pinned in `COUNT_CLAIMS` and the phrasing taught — and **the moment it was pinned
+the check failed again**, on `TODO.md:217`'s *"It opened at 202 unwired"*. That one is legitimate
+history, so it moved into the blockquote convention rather than the check being loosened.
+
+**The lesson is written at the code:** a pinned list of sites grows by whoever notices, and what
+nobody notices stays unpinned. The list is still the right shape — a repo-wide number hunt has the
+false-positive rate the "20 of 269" incident already measured — but the next stale count will be in a
+seventh file phrased a seventh way.
+
+#### 3. Row W held four numbers for one property, in one cell
+
+| the cell said | |
+| --- | --- |
+| *"**TWO** controls report success and send nothing"* | headline |
+| *"`EXACT_ALERTS` holds **three** keys today"* | stale |
+| *"`EXACT_ALERTS` now holds **two** keys and **neither is a liar**"* | correct |
+| *"**The two liars left** are these"* — then lists **one** | the other is declared DONE in the same breath |
+| *"HIGH — **one** control still reports success and does nothing"* | correct |
+
+Successive edits had layered without removing what they superseded. Rewritten to state the measured
+truth once — **one lying control, `admin-notes-password`; `EXACT_ALERTS` holds two keys and neither
+lies** — and to defer the census to row 4, which is machine-checked. A third site,
+`TODO.md:474`'s *"Row W holds THREE as of 2026-08-27"*, now points instead of counting.
+
+#### 4. Row AE said no browser runs in CI
+
+*"no automated browser check runs in CI — `.github/workflows/` holds `backend-quality.yml`,
+`quality.yml` and `smoke.yml`, and none drives a browser"*. Measured by parsing `quality.yml`: it
+holds **two** browser jobs, `controller-e2e` and `room-e2e`, each running `playwright install
+--with-deps chromium` then `pnpm run test:e2e`. Row AE called that its *"only part of this row that is
+work"*, so the row is now closed.
+
+#### 5. TODO's ready-to-build table still had the Alert Scheduler
+
+*"The entitlement IS captured and IS in the schema … but it is `wired: false`, so nothing in the room
+reads it."* It is **`wired: true`**, and the feature ships in five modules under
+`scheduled-alert-contract.test.ts`. `NEW-TODO.md` §5.3 carried the same stale claim and was corrected
+the same day — **two trackers describing one feature, both wrong in the same direction.**
+
+#### 6. HANDOFF contradicted itself forty lines apart
+
+Its heading: *"ITEM U — the zoom-controls volume dropdown (**BUILT 2026-08-12**)"*. Its own table:
+*"zoom overlay | **MISSING — build this**"*. The heading is right —
+`ScreenVolumeControl.svelte:113` renders
+`<button type="button" id="dropdownVolume" data-bs-toggle="dropdown" class="btn btn-sm btn-dark">`,
+attribute for attribute.
+
+#### 7. The citation gate was reading half the repository
+
+Three stale citations were sitting in **source comments**, where the markdown-only gate could not see
+them:
+
+| | claimed | now |
+| --- | --- | --- |
+| `lib/media/session.ts` | `+page.svelte` 1760-1766, the master-volume handler | `lib/room/volume.svelte.ts`, via `RemoteAudioSinks.svelte` |
+| `lib/media/session.ts` | `+page.svelte` 1814-1817, muting by `track.enabled` | `lib/room/local-capture.svelte.ts` |
+| `ScreenVolumeControl.svelte` | `+page.svelte:6824`, the navbar trigger | `RoomNavbar.svelte:663` |
+
+**A citation in a docblock is exactly as misleading as one in a document and rather more likely to be
+followed, because it sits beside the code it claims to explain.** The gate now reads every `.ts` and
+`.svelte` under both apps as well: **41 source-comment citations, 0 past end of file** after the
+repointing.
+
+Widening it made it read **its own docblock**, where those three are quoted as the defect they are —
+the comment-versus-code trap for the sixth time here. The first instinct was to exempt the file by
+name; that would have been a hole, since a genuinely stale citation in it would then never be caught.
+The examples were rewritten **without backticks** instead, so the file stays inside its own gate.
+
+#### Verified
+
+* **Two negative controls** for the widened gate, each proved to have applied: a stale citation in a
+  `.ts` comment and one in a `.svelte` comment, both firing *points past the end of nothing*.
+* All wired-count controls re-run with `TODO.md` pinned; the verifier reports **6 documents**.
+* Room **190 files, 3,109 passed, 1 skipped**; `svelte-check` **1,334 files, 0/0**; `eslint` clean.
+* Controller **97 files / 1,023 passed**; `verify-room-settings-schema.mjs` green.
+
+#### The restore trap, a third time
+
+A control's `git checkout` reverted an **uncommitted** fix — the source-comment repointing — and the
+"restored" run went red, which is how it was noticed. Redone and committed before any further
+controls. Three times tonight a restore against a baseline I had not committed has destroyed work;
+the rule that actually holds is **commit first, then mutate**, and it is written here rather than
+learned a fourth time.
+
 ### 2026-08-29 02:35 UTC — NEW-TODO.md was scheduling five things that were already built
 
 **Runtime impact: NO.** Tracker corrections.
