@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 03:15 UTC — The tenancy kernel proven on a real cluster, and the retirement migration that must not be written
+
+**Runtime impact: NO.** No code changed. A tracker row corrected with measurements, and a planned
+migration stopped before it was written.
+
+#### PostgreSQL was here all along
+
+`runtime:http` and every backend gate had been reported blocked on "no PostgreSQL in this container".
+**PostgreSQL 16.13 is installed** at `/usr/lib/postgresql/16`. Brought up on 127.0.0.1:5432, roles
+provisioned by `services/docker/postgres/10-provision-roles.sh`, the whole chain applied by
+`cargo run --locked --release --bin migrate`, and `api/fixtures/seed.sql` loaded.
+
+Two setup facts worth recording, because both cost a run:
+
+* `initdb` refuses to run as root — the cluster is owned by the `postgres` user.
+* **`--auth=trust` fails the migrate preflight.** `validate_migrator_identity` requires
+  `system_user` to be `method:identity` with a non-empty method, and trust auth leaves it empty. The
+  error names `session_user` and `current_user`, which were both correct, so the failing third value
+  is invisible in the message. `scram-sha-256` in `pg_hba.conf` fixes it. **Not a code defect** — the
+  check is right and CI uses password auth.
+
+#### The retarget proven, with a control that makes it non-vacuous
+
+Every row below is a query run against that cluster, not a reading of the SQL:
+
+| role | tenant key | rooms visible |
+| --- | --- | ---: |
+| owner `ptr_clone` | — | **2** (the fixture) |
+| `tradingroom_app` | none | **0** — fails closed |
+| `tradingroom_app` | tenant A | **1** — the positive control: the mechanism works |
+| `tradingroom_app` | tenant A, querying B's rows | **0** — isolation holds |
+| `ptr_clone_app` | none | **0** |
+| `ptr_clone_app` | **a valid tenant key** | **0** — the 0009 retarget holds even with a key |
+
+An `INSERT` as `ptr_clone_app` is refused: *"new row violates row-level security policy for table
+rooms"*.
+
+**The control is what makes this worth writing down.** "Reads zero rows" over an empty database is
+true of everything; the fixture and the tenant-A positive control turn it into a measurement.
+
+Its remaining surface, measured rather than counted from the SQL: **87 table privileges over 22
+tables** (22 SELECT, 22 INSERT, 22 DELETE, **21** UPDATE — one table has none), **6 routine grants**,
+`USAGE` on schema `public`, **0** default ACLs, **0** database grants, **0** owned objects — and it
+can still **log in**.
+
+#### The migration this repository planned would have re-armed a committed password
+
+The standing plan's Phase 9 item 1 reads: *"one forward-only migration revoking at all seven grant
+sites, then `DROP ROLE` that REFUSES rather than `CASCADE`s."*
+
+**That must not be written.** `0001_baseline.sql:25-28`:
+
+```sql
+IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ptr_clone_app') THEN
+  CREATE ROLE ptr_clone_app LOGIN PASSWORD 'CHANGE_ME_APP'
+    NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOINHERIT;
+END IF;
+```
+
+`0001` is byte-identical to the captured schema and may not be edited, and
+`db/migrate.rs:243-258` exists **precisely** to stop that branch firing: its preflight refuses to
+migrate unless `ptr_clone_app` is already provisioned. So dropping the role would (a) make the next
+`migrate` run fail that preflight, and (b) re-arm a `LOGIN` role with a committed password on every
+fresh database.
+
+**Retirement here means NEUTER, NOT DROP**: revoke the 87 privileges, the 6 routine grants and schema
+`USAGE`, then `ALTER ROLE ptr_clone_app NOLOGIN`, keeping the role so both the fence and `0001` stay
+satisfied. That removes the credential path and every privilege while leaving nothing to recreate.
+
+#### Why it was NOT written tonight
+
+`TODO.md` row 1's own condition: *"Deliberately deferred until the cutover is proven in a real
+deployment, **not just on scratch clusters**."* This was a scratch cluster. The condition is the
+owner's recorded decision and it is not met, so the row is updated with the measurements and the
+corrected shape, and the migration is left unwritten. Half the row — *is the retarget real?* — is now
+answered with evidence; the other half is a deployment, not a keystroke.
+
+#### What is still blocked, and by what
+
+`cargo test --workspace` cannot build: `mediasoup-sys v0.14.2`'s build script downloads
+`libsrtp v3.0.0-beta-2fc078db` from `github.com` and the agent proxy answers **HTTP 403 Forbidden**,
+retrying to exhaustion. That is an egress policy, not a defect, and it blocks the `media` crate only.
+`-p tradingroom-api` — which is where the tenancy, migration and re-appliability tests live — was run
+separately.
+
 ### 2026-08-29 03:05 UTC — The duplication audit's verdict: 24 assertions, one true duplicate
 
 **Runtime impact: NO.** One duplicated assertion removed; everything else kept, with reasons.
