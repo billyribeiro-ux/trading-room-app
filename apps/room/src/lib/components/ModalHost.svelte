@@ -4924,13 +4924,10 @@
           <li class="list-group-item d-flex justify-content-between align-items-start">
             <div class="fw-bold">
               <!--
-                `s=30` IS the size, so these two are the one case in this file where the box is
-                knowable without measuring anything: gravatar returns a square image of exactly the
-                pixel size the query asks for. Read off the URL on the line below, not chosen.
-
-                `user.pic` can override the gravatar with an arbitrary custom picture, and a
-                non-square one will letterbox inside this box rather than reflow the row - which is
-                the trade the attributes buy, and the right way round for a list of dozens.
+                `s=30` IS the size: gravatar returns a square of exactly the pixel size asked for,
+                so this box is read off the URL below rather than chosen. A custom `user.pic` of
+                another shape letterboxes inside it instead of reflowing the row, which is the right
+                trade for a list of dozens. `SwingAlertsPane.svelte` does the same for its sender.
               -->
               <img
                 src={user.pic || `https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30`}
@@ -4978,15 +4975,7 @@
         {#each followedUsersList as user (user.emailHash)}
           <li class="list-group-item d-flex justify-content-between align-items-start">
             <div class="fw-bold">
-              <!--
-                `s=30` IS the size, so these two are the one case in this file where the box is
-                knowable without measuring anything: gravatar returns a square image of exactly the
-                pixel size the query asks for. Read off the URL on the line below, not chosen.
-
-                `user.pic` can override the gravatar with an arbitrary custom picture, and a
-                non-square one will letterbox inside this box rather than reflow the row - which is
-                the trade the attributes buy, and the right way round for a list of dozens.
-              -->
+              <!-- `s=30` again - see the muted-users list above. -->
               <img
                 src={user.pic || `https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30`}
                 alt={user.nick}

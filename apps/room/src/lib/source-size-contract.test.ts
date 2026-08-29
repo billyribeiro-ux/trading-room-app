@@ -1556,7 +1556,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and the rule that its ceiling only moves with a reason written down is what has taken it from
       6,021 to here.
     */
-    max: 5995,
+    /*
+      5995 -> 6006, 2026-08-29, for the two gravatar avatars in the muted-users and followed-users
+      lists, which had no box and now have one.
+
+      Ten lines: `width`/`height` on each of two images, a five-line note on the first, and a
+      one-line cross-reference on the second - written as a cross-reference precisely because this
+      file's ceiling makes a second copy of the same paragraph cost something.
+
+      The number is small and the reason it is recorded anyway is that the WHY does not live here:
+      `?s=30` is gravatar's own size parameter, so the box is read off the URL rather than chosen,
+      and the full argument - including which images in this repository cannot be dimensioned and
+      why - sits in `img-dimensions-contract.test.ts`, which enforces it. That file is the
+      extraction that paid for this raise; without it these ten lines would have been ten lines of
+      prose in the largest component in the repository.
+    */
+    max: 6006,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2909,8 +2924,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/RoomNavbar.svelte',
-    max: 922,
-    why: 'the top bar - the one component with neither a mount nor an SSR render test'
+    /*
+      922 -> 935, 2026-08-29, and the thirteen lines are a BROKEN IMAGE and its replacement.
+
+      This file rendered `/assets/images/playing.gif` whenever SoundCloud was playing and that asset
+      is not in this repository - a sweep of every `/assets/**` reference found exactly one missing
+      file, this one. The string IS in the captured bundle, so the markup was a faithful
+      transcription; only the JavaScript and CSS were ever captured, never the images. Every member
+      saw a broken image in the navbar on every play.
+
+      What grew is the note, not the code: the element is still one line. The note records the
+      precedent it follows (`benzinga-logo.png`, resolved the same way in `RoomSidebar.svelte`), why
+      `fa-volume-up` is not a pick, and the ONE thing a future reader would otherwise redo - that
+      FA6's `fa-beat` fits and does not exist in the 5.8.1 that ships here, so reaching for it would
+      add a class with no effect. That is a rediscovery cost, which is what this repository's
+      comments are for.
+    */
+    max: 935,
+    why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
     file: 'lib/components/ScreenPane.svelte',

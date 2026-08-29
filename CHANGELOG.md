@@ -33,6 +33,93 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 14:20 UTC — A broken image in the navbar, and the `<img>` rule CLAUDE.md names but nothing enforced
+
+**Runtime impact: YES.** One broken image replaced, three images given a reserved box, two new gates.
+
+#### The defect
+
+`RoomNavbar.svelte` rendered `/assets/images/playing.gif` whenever SoundCloud was playing, and that
+file **is not in this repository**. A sweep of every `/assets/**` reference in the room found exactly
+one missing asset, this one. The string IS in the captured bundle, so the markup was a faithful
+transcription — only the JavaScript and CSS were ever captured, never the images — but the result was
+a broken image in the navbar for every member on every play.
+
+Resolved the way `RoomSidebar.svelte` already resolved the identical case for `benzinga-logo.png`:
+**the icon form, never a broken `<img>`.** `fa-volume-up` is not a pick — it is what that same file
+already uses for "audio is on". The animation is knowingly lost and that is recorded at the code:
+FontAwesome **5.8.1** ships here, its only animations are `fa-spin`/`fa-pulse` (both spinners, both
+meaning "working"), and FA6's `fa-beat` would have fit and **does not exist in 5.8.1** — reaching for
+it would have added a class with no effect.
+
+#### Three images gained a box, none of it invented
+
+| where | box | where the number came from |
+| --- | --- | --- |
+| `ModalHost.svelte`, muted-users and followed-users lists | 30×30 | gravatar's own `?s=30` — read off the URL. `SwingAlertsPane.svelte` already did exactly this for its sender avatar |
+| `PollPanel.svelte` spinner | 32×32 | measured off `static/assets/images/ajax-loader.gif` itself |
+
+#### Two measurements corrected my own first answers
+
+**A text scan reported 47 `<img>` tags. Five were not markup** — they were transcriptions of the
+reference inside explanatory comments (the bootbox body in `SwingAlertsPane`, the hand-built
+`#added-image-to-chat` node in `AlertChatArea`). "Fixing" those would have corrupted evidence to
+satisfy a linter. The gate therefore reads the **Svelte parser's AST**, where a comment cannot be
+mistaken for an element.
+
+**A class-only CSS scan then called 31 images undimensioned. Six already had a box**, from rules
+keyed on a bare `img` (`.edit-user-avatar img`), an id path
+(`#mobileAppInfoModal … a:last-child img`), or a custom-element ancestor (`app-privchat .avatarImg`).
+Reporting those as defects would have sent the owner to look at working code.
+
+The captured sheet ships every component rule **twice** — once Angular-scoped
+(`.avatarImg[_ngcontent-ng-c3142977328]`), once re-homed onto the custom element
+(`app-privchat .avatarImg:not(:root)`). This app carries no `_ngcontent` attributes, so the first
+copy matches nothing here and the second matches **only while the component still renders
+`<app-privchat>`**. Delete that wrapper as "a div would do" and two avatars silently lose 32×32, which
+is why the gate checks the ancestor against the AST rather than trusting the selector.
+
+#### `img-dimensions-contract.test.ts`
+
+Every `<img>` is dimensioned, or in `SIZED_BY_CSS` naming the rule that gives it a box, or in
+`UNSIZEABLE` with a reason. **No fourth state and no ignore.** `SIZED_BY_CSS` entries are re-verified
+against the sheets — the rule must still exist, still carry both declarations, and still reach the
+image through its required ancestor.
+
+Six negative controls, **each seen RED**: a new undimensioned image; a catalogued image dimensioned
+leaving a stale entry; the `app-privchat` wrapper replaced by a `div`; the roster-avatar CSS weakened
+to `width: auto`; an image pointed at a missing asset; and the AST walk broken, which correctly took
+three tests down at once.
+
+A **seventh control did not fire and was my own error**: it edited the asset path inside a comment,
+and the gate ignoring a comment is the entire design. Re-run against the real attribute, it fired.
+
+#### `browser-dialog-contract.test.ts`
+
+CLAUDE.md forbids `window.confirm` / `alert` / `prompt`; nothing enforced it and **both apps measure
+clean** — which is the "clean by discipline" condition the standard says to close. A native dialog
+blocks the event loop of a page holding live transports, and the room decides the member left.
+
+Both apps are scanned from one place, because CLAUDE.md binds both. Components are **compiled** and
+the calls read from the TypeScript AST, so `onalert(...)`, `this.#alert(...)` and `dialogs.confirm()`
+are structurally distinct and cannot be flagged — and a call inside a template expression, which a
+script-only scan would miss, **can** be. Two controls seen RED, one per app; the room's was
+deliberately written inside a template expression to prove the compile step earns its keep.
+
+**Not built, and why:** CLAUDE.md's two phosphor rules have **no surface here** — `phosphor-svelte`
+is not a dependency of any app in this monorepo. A gate would have had no subject.
+
+#### The ratchet
+
+`ModalHost` 5995 → 6006 and `RoomNavbar` 922 → 935, both argued in place per the ratchet's own rule.
+The detail was first moved out of both call sites into the gate that enforces it — the extraction the
+ratchet asks for — and only the residue was paid for with a raise. `PollPanel` came back **under** its
+ceiling. `todo-next.md`'s inventory restated: 27,307 → 27,331 lines.
+
+**Verified:** the full room suite, 195 files / 3,151 tests green; `svelte-check` 1,342 files, 0
+errors, 0 warnings. **Not run:** the backend suite and the controller suite — no `services/**` or
+controller source changed, and the controller is only READ by the new dialog gate.
+
 ### 2026-08-29 05:10 UTC — `get-my-token` is not "merely unbuilt"; building it would open the session cookie
 
 **Runtime impact: NO.** A tracker correction, a new gate, and one lint-config fix.

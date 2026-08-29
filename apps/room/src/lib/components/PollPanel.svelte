@@ -728,8 +728,7 @@
           <h2>{pollQuestion}</h2>
           <p>Total Responses: {total}</p>
           {#if total === 0}
-            <!-- 32x32 read off `static/assets/images/ajax-loader.gif` itself, not chosen. -->
-        <img src="/assets/images/ajax-loader.gif" alt="" width="32" height="32" />
+            <img src="/assets/images/ajax-loader.gif" alt="" width="32" height="32" />
             <p style="margin: 10px; text-align: center;">
               Waiting for results to come in...Please Wait...
             </p>

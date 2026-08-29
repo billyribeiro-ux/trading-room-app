@@ -154,7 +154,7 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
   'lib/components/AlertChatArea.svelte': {
     '{broadcasts.salesImageUrl}': {
       count: 1,
-      why: 'the sales image a presenter pins over the chat box, by URL. The captured `added-image-to-chat` rule gives it `width: 100%; height: auto`, which is the captured behaviour.'
+      why: 'the sales image a presenter pins over the chat box, by URL. Its container is `position: absolute` with `top/left: 0` and `width/height: 100%` in the captured sheet, so the overlay is OUT OF FLOW and no size it settles at can shift anything on the page - the same reason `TODO.md` row 7 already records for this element. The image itself is `width: 100%; height: auto` inside that fixed box.'
     }
   },
   'lib/components/FilesPane.svelte': {
