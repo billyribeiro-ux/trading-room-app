@@ -4923,9 +4923,20 @@
         {#each mutedUsersList as user (user.emailHash)}
           <li class="list-group-item d-flex justify-content-between align-items-start">
             <div class="fw-bold">
+              <!--
+                `s=30` IS the size, so these two are the one case in this file where the box is
+                knowable without measuring anything: gravatar returns a square image of exactly the
+                pixel size the query asks for. Read off the URL on the line below, not chosen.
+
+                `user.pic` can override the gravatar with an arbitrary custom picture, and a
+                non-square one will letterbox inside this box rather than reflow the row - which is
+                the trade the attributes buy, and the right way round for a list of dozens.
+              -->
               <img
                 src={user.pic || `https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30`}
                 alt={user.nick}
+                width="30"
+                height="30"
               />
               {user.nick}
             </div>
@@ -4967,9 +4978,20 @@
         {#each followedUsersList as user (user.emailHash)}
           <li class="list-group-item d-flex justify-content-between align-items-start">
             <div class="fw-bold">
+              <!--
+                `s=30` IS the size, so these two are the one case in this file where the box is
+                knowable without measuring anything: gravatar returns a square image of exactly the
+                pixel size the query asks for. Read off the URL on the line below, not chosen.
+
+                `user.pic` can override the gravatar with an arbitrary custom picture, and a
+                non-square one will letterbox inside this box rather than reflow the row - which is
+                the trade the attributes buy, and the right way round for a list of dozens.
+              -->
               <img
                 src={user.pic || `https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30`}
                 alt={user.nick}
+                width="30"
+                height="30"
               />
               {user.nick}
             </div>

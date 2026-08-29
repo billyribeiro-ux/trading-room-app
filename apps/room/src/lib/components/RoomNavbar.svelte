@@ -479,8 +479,33 @@
             <i class="fab fa-2x fa-soundcloud"></i>
             <span class="ml-2">
               <span class="caret"></span>
+              <!--
+                THE ICON FORM, because the asset the reference names is not in this repository.
+
+                Upstream renders `/assets/images/playing.gif` here - the string is in the captured
+                bundle, so the markup below was a faithful transcription. The IMAGE was never
+                captured: only the JavaScript and CSS were, and a sweep of every `/assets/**`
+                reference in this app found exactly one file missing, this one. So the transcribed
+                markup rendered a broken image on every play, in the navbar, for every member.
+
+                This is the same situation as `/assets/images/benzinga-logo.png`, and it takes the
+                same resolution `RoomSidebar.svelte` already recorded for that one: an icon form,
+                never a broken `<img>`. `fa-volume-up` is not a pick - it is what THIS file already
+                uses for "audio is on" at the screen-volume control below, so the substitution
+                introduces no new vocabulary.
+
+                What is knowingly lost: the reference's indicator ANIMATES and this one does not.
+                FontAwesome 5.8.1 is what ships here, and its animation classes are `fa-spin` and
+                `fa-pulse` - both spinners, both meaning "working", neither meaning "playing".
+                FA6's `fa-beat`/`fa-fade` would fit and DO NOT EXIST in 5.8.1; using one would have
+                been a class with no effect. A still icon that means the right thing beats a moving
+                one that means the wrong thing, and beats a broken image outright.
+
+                Restore the animation by adding the asset and reverting to the transcription - not
+                by inventing a keyframe here.
+              -->
               {#if media.soundCloudPlaying}
-                <img src="/assets/images/playing.gif" alt="" style="max-height: 25px;" />
+                <i class="fas fa-volume-up ml-1" title="Playing"></i>
               {/if}
             </span>
           </a>
