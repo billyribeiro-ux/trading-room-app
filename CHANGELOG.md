@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 01:38 UTC — The coverage map was being read as scope, and every number in it was wrong
+
+**Runtime impact: NO.** A tracker rewrite and one new test.
+
+#### What was wrong
+
+`todo-next.md` opens with a COVERAGE MAP under a heading telling the reader it is the scope of the
+remaining audit. Its numbers were measured for the first time since they were written:
+
+| the map said | measured 2026-08-29 |
+| --- | --- |
+| 42 Svelte surfaces, ~30,000 lines | **55 surfaces, 27,290 lines** |
+| `routes/+page.svelte` — 6,894 lines | **1,425** — off by **5,469** |
+| `AlertChatArea.svelte` — 873 | **1,162** |
+| `RoomSidebar.svelte` — 694 | **777** |
+| `RoomMessage.svelte` — 936 | **1,007** |
+| `PresentationArea.svelte` — 1,123 | **957** |
+| `notes/NoteEditor.svelte` — 1,517 | **1,545** |
+| `routes/session/+page.svelte` — 659 | **701** — and this is one of the two AUDITED surfaces |
+| `ModalHost.svelte` — 5,965 | **5,979** |
+
+It also omitted `RoomOverlays.svelte` — 820 lines, the fourth-largest component in the room — and 26
+other surfaces it named nowhere. The old table named 30 files explicitly and gestured at "13
+smaller"; there are 55.
+
+The `+page.svelte` row is the one that mattered: the page was decomposed and the row never moved, so
+the headline "2 of 42 surfaces, 2.7% of lines" was computed from a denominator containing 5,469
+lines that no longer exist. **That figure had been quoted back as the size of the remaining work.**
+
+#### The evidence constraint, now recorded where scope is read
+
+Also added, because it bounds what any audit here CAN conclude: **13 of the 14 reference-capture
+roots are absent from this checkout**, gitignored for the reason `gate/evidence-bound-tests.mjs`
+gives — they are dumps of a live room carrying real names, addresses and in one case a live JWT, and
+this repository is public. **42 evidence-bound test files are therefore excluded from every run
+here**, which the suite prints on every invocation rather than implying full coverage.
+
+The only reference evidence readable in this checkout is the v4 bundle, and all three artifacts were
+verified against `sha256sums.txt` at 01:26 UTC (`OK`/`OK`/`OK`). It settles what the reference
+CONTAINS, and settles absence with a control. It cannot settle rendered geometry — computed layout
+and spacing live in the DOM captures, which are not here. Gaps turning on measured pixels are
+therefore not auditable in this checkout, and the map now says so instead of leaving it to be
+guessed.
+
+#### The gate
+
+`src/lib/todo-next-coverage-contract.test.ts`. It recomputes every line count and fails if any row,
+either headline total, or the surface list disagrees with the filesystem. A component added tomorrow
+fails it until entered with an audit verdict; a deleted one cannot leave a row behind.
+
+Two details earned rather than designed:
+
+* **The table is sliced out by heading before any row is parsed.** `todo-next.md` is ~7,900 lines
+  with many tables, and the row pattern applied file-wide matched three rows in other ones —
+  reporting two documentation paths and the string `bde` as deleted surfaces. That was this file's
+  own first run.
+* **The audited tally is read from the verdict CELL, not the row.** `evidence-gap-register-counts.test.ts`
+  was corrected for exactly this: it counted matches across the whole row, so prose elsewhere in the
+  line voted on the tally.
+
+#### Verified
+
+* **Five negative controls, each proved to have applied before the run and each firing on exactly
+  the right assertion:** a line count off by one → *states every line count correctly*; a row deleted
+  → *omits no surface that does*; a row naming a nonexistent file → *lists no surface that does not
+  exist*; the totals line contradicting the rows → *counts the surfaces it lists*; the fixture list
+  drifting from the orphan gate's → *exempts the same fixtures the orphan gate does*. Green again
+  after each revert.
+* 10 tests passing.
+* **A mistake worth recording:** the first attempt at these controls ran `git checkout todo-next.md`
+  to revert each mutation while the rewrite itself was still UNCOMMITTED — so the first revert
+  silently restored the stale file and the next three controls "passed" against wreckage. The
+  regenerator was deterministic and re-ran cleanly, and the controls were redone against a committed
+  baseline with each mutation asserting it applied. Reverting to a baseline you have not committed
+  is not a revert.
+* **Not run:** the full gate. It runs once, immediately before the push.
+
 ### 2026-08-29 01:31 UTC — Two components nothing renders, and the gate that will not let a third happen
 
 **Runtime impact: NO.** Both deleted components were unreachable from every route, so nothing the
