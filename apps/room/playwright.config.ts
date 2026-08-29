@@ -54,7 +54,16 @@ const env = {
     because `better-sqlite3` wants a real file and the room's own bootstrap creates the schema on
     first open, so there is nothing to seed.
   */
-  DATABASE_URL: '.data/e2e.sqlite'
+  DATABASE_URL: '.data/e2e.sqlite',
+  /*
+    Settings for named rooms, which is how `room-config-seam.spec.ts` observes one setting BOTH ways
+    in a single run. The stub keys on the short code — `any short code is a room` was already true of
+    it — so `hidden` answers with the column hidden and every other code gets the default.
+
+    Here rather than in the spec because `webServer.env` is read once at boot: a spec cannot change
+    it, which is exactly the property that makes the two answers race-free rather than ordered.
+  */
+  ROOM_SETTINGS_BY_CODE_JSON: JSON.stringify({ hidden: { hideChatAlerts: true } })
 };
 
 export default defineConfig({

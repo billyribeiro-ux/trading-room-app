@@ -11,6 +11,8 @@ import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
 import { RoomNotesAccess } from './notes-access.svelte';
+import { RoomAdminNotes } from './admin-notes';
+import { RoomUserNotes } from './user-notes.svelte';
 import { RoomEventStream } from './events.svelte';
 import { RoomGates } from './gates';
 import { RoomLocalCapture } from './local-capture.svelte';
@@ -99,6 +101,8 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   feeds: RoomFeeds,
   messageActions: RoomMessageActions,
   notesAccess: RoomNotesAccess,
+  adminNotes: RoomAdminNotes,
+  userNotes: RoomUserNotes,
   screens: RoomScreens,
   mediaTransport: RoomMediaTransport,
   localCapture: RoomLocalCapture,

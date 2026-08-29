@@ -48,24 +48,66 @@ function commandBody(name: string): string {
   return SOURCE.slice(from, next === -1 ? SOURCE.length : next);
 }
 
-describe('a presenter can only set an avatar for a member of their own room', () => {
-  it('gates on the presenter role and the caller own room, in one call', () => {
+/** `roomForAvatarChange`, which both commands now go through. Bounded by the next declaration. */
+function authorityHelper(): string {
+  const from = SOURCE.indexOf('function roomForAvatarChange(');
+  expect(from, 'roomForAvatarChange is gone').toBeGreaterThan(-1);
+  const next = SOURCE.indexOf('\nexport const ', from);
+  return SOURCE.slice(from, next === -1 ? SOURCE.length : next);
+}
+
+describe('who may change whose avatar', () => {
+  /*
+    TWO AUTHORITIES, and the capture has both — which this file asserted only half of until
+    2026-08-29.
+
+    A PRESENTER may set any member's picture (`setUserProfilePic`, gated `O(14, globals.isPresenter …)`).
+    ANY MEMBER may change their OWN: the `edit-user-avatar-options` dropdown, gated
+    `O(6, o.user.userXrefID === o.appService.globals.user.userXrefID ? 6 : -1)` at bundle byte
+    2,095,081 — with no role term in it at all.
+
+    The gate moved into `roomForAvatarChange` so both commands ask once. These assertions moved with
+    it rather than being deleted: what they protect is unchanged, and the helper is now the single
+    place either of them could go wrong.
+  */
+  const helper = authorityHelper();
+
+  it('sends anyone who is NOT the caller down the presenter path, membership and all', () => {
     /*
       `presenterRoom()` returns the room only after the role check, which is what makes "gated" and
       "scoped to the caller's tenant" the same event — see `auth.ts`. A `roomShortCode` argument
-      would let a presenter of room A command room B, so the command must not take one.
+      would let a presenter of room A command room B, so neither command may take one.
     */
-    expect(SOURCE).toContain('const room = presenterRoom();');
+    expect(helper).toContain('const room = presenterRoom();');
+    expect(helper).toContain('requireRoomMember(targetUserId, room);');
     expect(SOURCE).not.toContain('roomShortCode:');
+  });
+
+  it('lets a member act on THEMSELVES without a role, and names nobody to do it', () => {
+    /*
+      THE WIDENING, and the reason it is safe stated as an assertion rather than only in prose: the
+      self branch compares the argument against an id the SERVER read from the session. It does not
+      trust an id, it refuses every id but one.
+
+      `requireRoomShortCode` and not `presenterRoom`, because demanding a role here would refuse the
+      capture's own control; and no membership check, because the caller IS the member.
+    */
+    const self = helper.indexOf('requireUser(locals).id === targetUserId');
+    const scope = helper.indexOf('return requireRoomShortCode(locals);');
+    const presenter = helper.indexOf('presenterRoom()');
+
+    expect(self, 'the self branch is gone').toBeGreaterThan(-1);
+    expect(scope, 'the self branch no longer scopes to a room').toBeGreaterThan(self);
+    expect(scope, 'the self branch must return BEFORE the presenter gate').toBeLessThan(presenter);
   });
 
   it('checks membership BEFORE the durable write, not after', () => {
     const body = commandBody('uploadProfilePicture');
-    const check = body.indexOf('requireRoomMember(targetUserId, room)');
+    const check = body.indexOf('roomForAvatarChange(targetUserId)');
     const write = body.indexOf('db.update(users)');
     const store = body.indexOf('storeUpload(file)');
 
-    expect(check, 'the membership check is gone').toBeGreaterThan(-1);
+    expect(check, 'the authority check is gone').toBeGreaterThan(-1);
     expect(write, 'the durable write is gone').toBeGreaterThan(-1);
 
     /*
@@ -79,17 +121,15 @@ describe('a presenter can only set an avatar for a member of their own room', ()
 
   it('gates the REMOVE the same way, because it writes the same row', () => {
     /*
-      A second durable write keyed on the target alone, and therefore a second place the tenancy
-      check has to be remembered. It is asserted separately rather than trusted to the shared
-      docblock: the whole reason `requireRoomMember` exists is that this class of check is easy to
-      leave out of the next command, and "the file has one somewhere" is not the property that
-      matters.
+      A second durable write keyed on the target alone, and therefore a second place the authority
+      has to be remembered. It is asserted separately rather than trusted to the shared helper: the
+      whole reason that helper exists is that this class of check is easy to leave out of the next
+      command, and "the file has one somewhere" is not the property that matters.
     */
     const body = commandBody('removeProfilePicture');
-    expect(body).toContain('presenterRoom()');
-    const check = body.indexOf('requireRoomMember(targetUserId, room)');
+    const check = body.indexOf('roomForAvatarChange(targetUserId)');
     const write = body.indexOf('db.update(users)');
-    expect(check, 'removeProfilePicture no longer checks membership').toBeGreaterThan(-1);
+    expect(check, 'removeProfilePicture no longer checks authority').toBeGreaterThan(-1);
     expect(check).toBeLessThan(write);
 
     /*

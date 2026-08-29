@@ -1619,12 +1619,6 @@ app-privchat.privChatHolder {
   max-width: 600px;
 }
 
-#user-modal .tagline {
-  display: block;
-  font-size: 14px;
-  font-style: italic;
-}
-
 .smallAvatarImg {
   display: inline !important;
   max-width: 20px !important;
@@ -1638,18 +1632,6 @@ app-privchat.privChatHolder {
 .edit-username:hover {
   cursor: pointer;
   opacity: 0.85;
-}
-
-.chat-stars {
-  vertical-align: text-top !important;
-  font-size: 8px;
-}
-
-span.chat-stars {
-  display: inline-block;
-  margin-top: 2px;
-  margin-left: 2px;
-  color: var(--app-primary-color);
 }
 
 .stars-container {

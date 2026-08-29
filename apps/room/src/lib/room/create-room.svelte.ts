@@ -59,7 +59,7 @@ import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
 import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';
-import { checkNotesPassword } from '../../routes/notes-auth.remote';
+import { userNotesPort } from './user-notes-port';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -896,7 +896,7 @@ export function createRoom(deps: RoomDeps) {
   const userActions = new RoomUserActions<(typeof data.connectedUsers)[number]>({
     dialogs,
     toasts,
-    notesCheck: checkNotesPassword,
+    notesPort: userNotesPort,
     commands: {
       presenter: presenterCommand,
       editUsername,

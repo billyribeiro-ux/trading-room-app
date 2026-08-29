@@ -33,6 +33,659 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 01:40 UTC — Four of the census's six "NOT BUILT" commands cannot be built here at all
+
+**Runtime impact: NO.** A tracker document, its contract test, and one new machine-checked status.
+
+`missing-commands-triage.md` tagged 25 commands with `BUILT` / `BUILT AS x` / `NOT BUILT`, and
+`NOT BUILT` had a precise meaning to the gate — *the command name does not occur in `apps/room/src`*
+— and a different meaning to a reader: **work**. Six rows carried it. Two of them are work.
+
+The other four were measured, each to a different and specific blocker:
+
+| command | blocker, measured |
+| --- | --- |
+| `presAreaTabs-recordings` | no archive service, and ZERO recordings/archive tables in either schema |
+| `stopRecMsg` | the reference's own server does not send it; it needs a recorder |
+| `stopOBStream` | its Start/Stop pair renders under `O(1, e.useMTX ? -1 : 1)` at bundle byte 2,145,988 — only when MTX is **off**, and this deployment is MTX |
+| `streamPlayerDisabled` | gated on `globals.isPlayer`, which is `decodedPassedToken.isPTRPlayer` (byte 1,191,994) — a JWT claim the controller mints nowhere |
+
+The last one is the reason this was worth doing rather than leaving as prose. `gates.ts` already
+recorded *"`isPlayer` has ZERO occurrences in this room… this room has no such mode, so there is
+nothing to read"* — true, and only half the story. The other half is the SUPPLY: `isPlayer` is not a
+mode somebody forgot to build, it is a claim on the handoff token, and `HandoffPayload` in
+`room-handoff.ts` carries `type`, `issued`, `iat`, `exp` and the identity. `isPTRPlayer` occurs zero
+times in `apps/room/src` and zero times in `apps/controller/src`, counted. **No client could ever
+be a player, so the command could never fire.** That is a different sentence from "not built", and
+only one of the two tells the next engineer to stop.
+
+#### The status is machine-checked, because BLOCKED is the one most able to become a hiding place
+
+It is the status that means "not my problem". So the gate requires that a row claiming it NAMES the
+blocker, in a vocabulary of things that exist or can be obtained — `archive`, `recorder`,
+`MediaMTX`, `useMTX`, `isPTRPlayer`, `isPlayer`, `capture`, `owner`. A row that says BLOCKED and
+explains nothing fails, the same rule `INERT_ACTIONS` and `ORPHANS` are held to. The check found a
+row immediately: `presAreaTabs-recordings` had its blocker recorded in `TODO.md` and not in its own
+cell, so the document did not say the thing the document was being trusted for.
+
+The two that remain are asserted BY NAME — `archiveLogs`, `unarchiveLogs` — so finishing them turns
+the gate red rather than quietly leaving the census looking the same. Both are real work: sends are
+`{type:"chat"|"alerts", date, channel}` and `{type, roomID, archiveID}`, with a third command
+`getArchiveList {type}` behind the browser at bytes 2,304,726 and 2,312,026 that the census does not
+yet carry a row for.
+
+#### Verification
+
+Three negative controls, each seen RED: stripping the blocker text from a BLOCKED row; moving
+`archiveLogs` to BLOCKED to hide real work (fires twice — the vocabulary check and the
+remaining-work list); and letting the headline disagree with the rows.
+
+Room suite **209 files / 3,365 tests**. Nothing else was run: one document and one test file changed.
+
+### 2026-08-30 01:05 UTC — A second construction of an entitlement-bearing object, found one call site from being real
+
+**Runtime impact: NO.** No live path reached the lossy branch. The change removes it and gates
+against a third.
+
+`RoomUserActions` built `ModalTargetUser` from a `User` in TWO places: `targetFor(user)`, and an
+inline literal inside `get target()`. Identical except that the inline one omitted `hasMic`,
+`hasScreen`, `hasCam`, `canEditNotes` and `hasAdminChat`.
+
+Those five are entitlements, and `targetFor`'s own comment already records the cost:
+`#permissionsModal` seeds its checkboxes from this object, `Boolean(undefined)` draws every box
+unchecked however the membership stands, and `POST /internal/room-permissions` writes `false` for
+every key absent from `granted`. Save would strip mic, screen, cam and notes and report
+"Permissions applied".
+
+**Traced end to end before claiming anything:** the roster's ⠇ menu calls `onselectuser` →
+`selectUserId`, which clears the message selection and lands on the inline branch — and the only
+item in that menu that opens the modal is `onopenrosteruserinfo` → `openInfoFor` → `select` →
+`targetFor`. The lossy object was built, held, and replaced before anything rendered it. So this was
+latent, and that is the argument for fixing it rather than shrugging: the same five fields caused a
+REAL revocation once already, and the comment recording it says the dangerous state was "harmless
+while the Save button sent nothing" — right up until it sent.
+
+`entitlement-shape-contract.test.ts` reads the permission fields out of `ModalTargetUser` ITSELF
+rather than from a hardcoded list, so a sixth is covered without anyone remembering this file. Three
+negative controls seen RED: re-inlining the lossy construction, dropping `hasCam` from the one
+builder, and adding a sixth permission field to the type that the builder does not carry.
+
+The ceiling on `user-actions.svelte.ts` drops 896 → 895.
+
+Found while tracing `selectUserId` for TODO row 9, not by looking for it.
+
+**Also verified this session and not previously reported:** the controller suite, untouched by the
+last two commits and therefore not run with them — **97 files / 1,026 tests passing, 5 files and 21
+tests skipped**, `svelte-check` 0 errors 0 warnings over 1,545 files, eslint and prettier clean.
+`services/**` was not run: nothing under it changed, which is what the test-what-changed table asks.
+
+### 2026-08-30 00:15 UTC — The Admin Notes tab had a working gate and nothing behind it
+
+**Runtime impact: YES.** A presenter who clears the user-notes password now sees the member's notes,
+can add one and can delete one. Until today, clearing it revealed an empty panel. New table
+`user_notes`, new column `sessions.notes_access_at`, migration `0009_user_notes.sql`.
+
+#### The defect, and the only thing that pointed at it
+
+`#user-modal`'s Admin Notes tab is a two-state switch upstream — `O(104, allowToManageNotes ? 105 :
+104)`, where 104 is the password prompt and 105 is the list. **This room rendered 104 and had no
+`{:else}` at all.**
+
+The password half had been repaired earlier the same day: `admin-notes-password` used to alert
+`Wrong password!` whatever was typed, and the comparison now happens on the controller because
+`needPasswordForUserNotes` is one of the seven credential-shaped settings that never reach this
+room. So the gate was correct, and it opened onto nothing.
+
+**Nothing here could see that.** It type-checks, it lints, `svelte-check` is silent, and the control
+does not lie — it opens exactly what it says it opens. What found it was arithmetic:
+`orphan-style-contract.test.ts` reported `smallAvatarImg` as a class `app.css` styles and nothing
+wears, and following that class into the bundle landed on `fTe` @ 2,064,959 — the avatar on a row of
+this list. That is the second feature this gate has found by the CSS being the only trace, after
+`.debug-area`.
+
+**The const table lied about what it was.** Consts 93-99 read as a followed-users list — a scrolling
+`col`, a `fa-plus-circle`, a `fa-minus-circle`, with the follow-chat colour inputs a few entries
+later — and that guess was wrong, which is the fourth wrong guess made from a const table alone in
+two days. `mTe` and `fTe` settle it: a `col` scrolling at `max-height:300px`, an `@for` over
+`user.notes`, an `<hr>`, and " Add Note ". The follow feature it was mistaken for is largely built
+here already.
+
+#### Three divergences, each recorded where it is made
+
+**1. Deletion is by ID.** Upstream sends `noteIDX`, the row's position in the list the browser
+happens to be rendering. Two presenters with the modal open delete different notes; the second
+request arrives against a list that has already shifted and removes the wrong one. Upstream has no
+choice — its notes have no identity, the same constraint the Q&A thread has. Ours do, because we own
+the table. `noteIDX` appears in no code path here, and the contract test refuses it.
+
+**2. The author is a foreign key, not a snapshot.** Upstream copies `{pic, emailHash, name}` into
+each row. Joining means a presenter who changes their display name changes it on their old notes
+too — one source of truth for who somebody is, and no second copy of an email hash to keep in step.
+
+**3. `alt` is not reproduced.** Upstream labels every avatar in the list with the SUBJECT's nick
+while the image is the AUTHOR's, so a screen reader announces the wrong person once per row. The
+room labels each avatar with the person it is a picture of.
+
+#### The grant is on the server, and that is the part upstream does not have at all
+
+`manageAdminNotes()` compares the typed value against `sessData.needPasswordForUserNotes` and sets
+`this.allowToManageNotes = !0` — both halves in the browser, so a presenter who wanted past the
+prompt never needed the password. Tolerable there, where the notes and the password are the same
+origin. Not tolerable here, and not for a subtle reason: **a `canManage` boolean travelling from the
+client to `addUserNote` would be the 2026-08-07 privilege escalation arriving through a feature.**
+
+So there are two values and they are never the same one. The room keeps `canManage`, which decides
+what to DRAW. The server keeps `sessions.notes_access_at`, written only when the controller answers
+yes, and read by every write. It is a TIMESTAMP so the grant expires — thirty minutes, which is
+STRICTER than upstream's, whose grant dies with the page but is one console assignment away. The
+`required` half is re-asked of the controller on every write rather than cached, so an owner who
+turns the password on has it take effect.
+
+#### Four extractions, because three files were at their ceilings
+
+The feature added to `ModalHost.svelte`, which had **three lines of headroom**. `source-size-contract`
+answers that with one instruction and it is not "raise the number":
+
+- `UserNotesPane.svelte` — the tab itself, both states.
+- `FollowChatStylePane.svelte` — 128 lines of follow-chat editor, the largest block of the modal
+  nothing else in it read. Chosen by measuring free identifiers across candidate slices rather than
+  by taking the first one that looked separable: it had five, and four were handlers. Nothing was
+  rewritten, and the browser suite is the check that the extraction changed no rendering.
+- `lib/room/user-notes.svelte.ts` — the list, its two prompts, its three calls.
+- `lib/room/admin-notes.ts` — the composition, **and it is a third class because both alternatives
+  were written and both were refused by that gate**: `RoomUserActions` wiring the pair cost it 23
+  lines, and `RoomNotesAccess` owning the list cost that file 56. A file at its ceiling is a file
+  where the next paragraph of wiring does not belong.
+- `lib/room/user-notes-port.ts` — the four remote calls in one frozen object.
+
+`ModalHost.svelte`'s ceiling drops 6,284 → 6,189; `RoomOverlays.svelte`'s drops 848 → 847, and the
+line it lost is the point: `canManageNotes` and `userNotes` were two props that had to be passed
+together, and the gate now travels ON the object it gates.
+
+#### A gate went blind in exactly the way it had been fixed for once before
+
+`state-raw-contract.test.ts` opens by recording that its first sweep called `followChatStyle`
+replace-only, because it read only the `<script>` AST, and that converting it *"would have silently
+broken ... a colour picker with the suite fully green, because a mutation of raw state does not
+throw"*. Reading the template's `BindDirective` nodes fixed it.
+
+**Extracting `FollowChatStylePane` brought the identical false positive back through a new door.**
+Every `bind:value={followChatStyle.color}` went with the pane; what is left in the parent is
+`bind:style={followChatStyle}`, a bind to a plain identifier, which that file deliberately does not
+count because replacing a variable is something raw state permits. It is not a replacement — the
+child declares the prop `$bindable()` and binds its members. The mutation moved out of sight without
+changing.
+
+The scanner now follows a component `bind:` **one hop** into the child, resolving the import from the
+parent's own specifiers rather than by filename. Followed rather than assumed: assuming a component
+bind means mutation would exempt every one of them, and the gate would keep passing and stop
+measuring. One hop is enough — a prop passed on again is itself a component bind in that child, so
+the recursion happens when that file is scanned as a subject.
+
+#### One more gate learned to derive instead of repeat
+
+`remote-command-scope-contract.test.ts` kept `ROOM_SCOPING` as a hand-written list beside
+`SCOPING_HELPERS`, so an admitted indirection had to be named in three places. It is derived from the
+map's keys now. The failure of the old shape was silent in the dangerous direction: a name in the
+list with no entry in the map admits an indirection with no requirements at all.
+
+#### Verification
+
+Ten negative controls, each seen RED:
+
+1. Key the `{#each}` on the index instead of the note id.
+2. Drop `requireNotesAccess` from the shared scoping helper.
+3. Make the grant never expire.
+4. Unscope the delete from the subject.
+5. Delete the `{:else}` branch — the original defect, restored and caught.
+6. Let the command schema accept a client `canManage` flag.
+7. Use a deep `$state` proxy for the replace-only list.
+8. Separate the grant from the load.
+9. **Child stops binding members** — `followChatStyle` reported again, which proves the one-hop
+   follow resolves the child rather than passing for some other reason.
+10. **Parent stops binding at all** — reported again, the other direction.
+
+Room suite **208 files / 3,359 tests**, `svelte-check` 0 errors 0 warnings over 1,372 files, eslint
+clean, prettier clean, browser suite **10 passed** against the container's chromium. The controller
+suite was not run: nothing under `apps/controller` changed.
+
+**Not verified:** no two-browser test of a second presenter deleting concurrently — the id-addressed
+delete is argued from the query rather than demonstrated, and the `WHERE` returning zero rows is
+asserted in a unit test, not exercised against a real race.
+
+### 2026-08-29 23:20 UTC — Two of the last three "missing surfaces" were never surfaces, and the third was the wrong one
+
+**Runtime impact: NO in effect, YES in the stylesheet.** Two rules were deleted from `app.css`
+(`.chat-stars`, `span.chat-stars`, `#user-modal .tagline`). No element in this room wore any of
+them, and no element in the reference wears them either, so nothing renders differently. Everything
+else here is a test and two trackers.
+
+#### The premise that was never checked
+
+`orphan-style-contract.test.ts` catalogues every class `app.css` styles that nothing wears, split by
+whether a captured stylesheet has the class. `captured: true` was being READ as *"the rule is
+waiting for markup"* — a feature to build — and `TODO.md` row AJ carried two entries upward on
+exactly that reading: `chat-stars`, *"a per-member rating nothing in this room reads or writes"*, and
+`tagline`, *"which needs a column"*.
+
+**A stylesheet can carry a rule the application never renders.** That is the very defect this gate
+exists to catch, and there was no reason to assume the reference was free of it.
+
+Measured across BOTH pinned bundles — v4 `main.d1d09071be31f1ba.js` and v3 `main.99a5781d1d7a7775.js`
+— `chat-stars` occurs 12 times and `tagline` once, and **all 26 occurrences are immediately followed
+by `[_ngcontent-%COMP%]`**: compiled Angular CSS selectors, zero of them strings in a const table.
+The full 131-entry const table of `app-user-info-modal`, parsed at byte 2,087,741, holds neither
+name. The global `styles.ee2a710065b60389.css` holds neither.
+
+**The star rating is real and this room already renders it.** It wears three OTHER classes — consts
+60/61/62, `stars-container` / `stars-icon` / `stars-num` — at `ModalHost.svelte` and twice in
+`RoomMessage.svelte`. `chat-stars` is the PREDECESSOR's name for the same badge:
+`ptr1-DECODE.md:5289` records `09.css:1160  .chatStars { … vertical-align: text-top }` and
+`todo-next.md:1145` records what wore it, `<img class="chatStars" src="/public/images/<years>.png">`,
+the tenure badge. v4 kept the rule, kebab-cased and still carrying `vertical-align: text-top`, and
+re-implemented the badge. **This room copied in a rule that had been dead upstream for a whole major
+version and then filed it as a feature to build.** `tagline` is the same shape with less of a trail:
+the FIELD is real — it is on the login wire and in the roster row — but the predecessor rendered it
+as `<small class="text-muted user-info-block">`, and no capture held here shows anything wearing
+`.tagline`.
+
+`renderedUpstream` is now a MEASURED field on every catalog entry, asserted against the pinned v4
+bundle on every run, so "captured" can never again be read as "pending". The predicate requires the
+class to be a string INSIDE AN ARRAY — the shape of a const-table entry — because bare containment
+matched `{name:"mid"}` in the bundled sdp parser, which is a library property and not a class.
+
+#### A third blindness in the same matcher, on the same component, eleven lines from the second
+
+`mid` was catalogued as *"a captured layout name with no counterpart in this decomposition"*. It is
+worn, on the microphone level bar in `ModalHost.svelte`, with `low` and `high` beside it and the
+reference's own three thresholds:
+
+```svelte
+class={['volume-bar-fill', { low: micLevel <= 30, mid: micLevel > 30 && micLevel <= 70, high: micLevel > 70 }]}
+```
+
+The literal matcher missed it **for one character**. Its boundary sets admit the punctuation a class
+sits between in an attribute or a clsx array, and an object key is followed by a COLON, which was in
+the leading set and not the trailing one.
+
+`class` takes an object or array since Svelte 5.16 and the official guidance (`svelte/class`, read
+today) is to prefer it over `class:` — so the idiomatic conditional class in this codebase is a name
+that appears only as an object key, and the gate could not see any of them. `isWornAsClassKey` reads
+`class={…}` VALUES only, extracted with a string-aware brace walker because the value is arbitrary
+JavaScript. **Not by adding `:` to the boundary set**, which would let every options bag in the room
+vouch for a class named `title` or `id` — the gate would keep passing and stop measuring.
+
+That is the third way this matcher has answered "no" for the wrong reason, after the five
+`mic-status-*` classes it filed as an entirely missing surface. Two of the three landed on the same
+component.
+
+#### What the last entry actually is, and it is not what the consts suggested
+
+`smallAvatarImg` is the one entry measured as both captured and rendered upstream. Its neighbouring
+consts read as a followed-users list — 93 a `col` scrolling at `max-height:300px`, 96
+`fa-plus-circle`, 99 `fa-minus-circle`, the follow-chat colour inputs a few entries later — and that
+reading was **wrong**, which is the fourth wrong guess made from a const table alone in two days.
+
+Reading the TEMPLATE settles it. `fTe` @ 2,064,959 is one row of the **per-user ADMIN NOTES** list on
+`#user-modal`'s notes tab: the avatar, then `" [" (date | short) "] " name ": " note`, then a
+`fa-minus-circle` calling `deleteNode(note, $index)`. `mTe` wraps them and adds " Add Note ".
+
+**This room renders that tab and only its FALSE branch.** `{#if !canManageNotes}` — upstream's `pTe`
+password prompt — has no `{:else}`, so a presenter who clears the password gets an empty panel. The
+gate itself was fixed earlier the same day; it opens onto nothing. Filed as `TODO.md` row AK, with
+its addressing (by ordinal, like the Q&A thread, for the same reason: the rows have no id) and its
+dependency on row 9's `userInfo` frame, which carries `notesArr`.
+
+The follow feature it was mistaken for is largely BUILT here — `managed-users.svelte.ts`,
+`followChatStyle`, the five colour inputs and the sound gate, `#followedUsersModal` worn — and its
+own avatar is sized by a descendant rule rather than that class.
+
+#### Verification
+
+Five negative controls, each seen RED:
+
+1. Deleting the `mid:` key from the level bar → `mid` reported as an uncatalogued orphan.
+2. `smallAvatarImg` catalogued `renderedUpstream: false` → *"catalogued false, measured true"*.
+3. `chat-header` catalogued `renderedUpstream: true` → *"catalogued true, measured false"*.
+4. Restoring a `.chat-stars` rule to `app.css` → uncatalogued, and *"is dead upstream too; app.css
+   must not declare it again"*.
+5. **The region restriction, proved load-bearing rather than argued.** `.refreshAll` added to
+   `app.css` — a name that is an object key in this codebase and never a class — fails as shipped
+   and PASSES once `isWornAsClassKey` is widened from `class={…}` values to the whole corpus. The
+   first two candidate probes (`.title`, then a scan for keys the literal matcher already sees)
+   found nothing, which is how the third was chosen; a control that cannot fire is not a control.
+
+`orphan-style-contract.test.ts` 6 passed. The catalog is FOUR entries: one surface to build, three
+carried rules. Row AJ is closed.
+
+### 2026-08-29 22:40 UTC — Two of `#user-modal`'s four missing affordances were one control, and it corrected the one already built
+
+**Runtime impact: YES.** Any member can now change their own profile picture from the user modal —
+Gravatar, upload, or remove — which is what the capture offers and this room offered to nobody.
+
+#### What reading the template actually found
+
+Row AJ listed four affordances of `#user-modal` as missing, one of which
+(`remove-profile-picture-btn`) was built earlier the same day as a floating button on the avatar,
+presenter-gated, under a note that admitted the gap in as many words: *"what its click CALLS was not
+read — the const table gives the shape and the binding position, and the handler lives in a render
+function this pass did not locate."*
+
+It has been located. Template `K2e` @ bundle byte 2,058,852, with every const parsed from the
+`app-user-info-modal` table at 2,087,748 by a string-aware walker rather than counted by eye:
+
+```
+6  [1,"dropdown","edit-user-avatar-options"]
+16 [...,"data-bs-toggle","dropdown",...,1,"dropdown-toggle"]      23 [...,"remove-profile-picture-btn",3,"click"]
+19 ["href","https://en.gravatar.com/",...,"dropdown-item","text-dark"]
+21 ["href","",...,"dropdown-item","text-dark",3,"click"]
+```
+
+**Const 23 is that button, and it lives inside this dropdown.** Two of the four "missing
+affordances" were one control, and both guesses about the half already built were wrong:
+
+* **Its place.** Not floating on the avatar — an item in the menu, beside Gravatar and upload.
+* **Its gate.** `O(6, o.user.userXrefID === o.appService.globals.user.userXrefID ? 6 : -1)`, read at
+  2,095,081. There is **no role term in it**. A member with no presenter rights gets this on their
+  own avatar and nobody else's; a presenter does not get it on anybody's.
+
+#### The correction widened the server, and the widening is narrower than it sounds
+
+`roomForAvatarChange` now answers two authorities — the capture has both. A presenter setting any
+member's picture goes through `presenterRoom()` and `requireRoomMember`, unchanged. A member setting
+their own goes through `requireRoomShortCode` with no role demanded.
+
+**The self path is STRICTER than the presenter path**, which is why it is safe to add: it names
+nobody. The id must EQUAL the one `requireUser` read from the session, so the widest thing a
+non-presenter gains is the ability to act on the single row they already owned.
+
+#### A gate that would have gone quietly blind
+
+Moving the scoping into a helper made `remote-command-scope-contract.test.ts` fail — correctly. The
+obvious fix, adding `roomForAvatarChange(` to its `ROOM_SCOPING` list, **would have made that gate
+weaker than it looks**: a command would then satisfy it by calling any function with that name,
+whatever the function did. That is precisely the failure its own docblock says it cannot see,
+arriving by the front door.
+
+So an indirection is now admitted only with the terms its own body must contain, and a new
+assertion checks them. It caught three of the four negative controls independently.
+
+#### Two states, not four items
+
+`O(4, prefs.profilePic ? 5 : 4)`. With no picture the menu offers Gravatar and upload; with one it
+offers only Remove. A reader who saw the four captured strings listed together would build all four
+at once, and that is the wrong control. This room has no `preferences.profilePic`, so
+`hasOwnProfilePicture` asks the same question of the value it does store — is the avatar the gravatar
+fallback — through an `isGravatar` extracted from the resize helper that already asked it.
+
+#### Verification
+
+**Four negative controls seen RED**: the self branch trusting a client id; the presenter path losing
+its membership check; the self branch moved after the presenter gate; and a scoping helper that
+scopes nothing.
+
+`svelte-check` 0/0. `eslint` clean. `prettier --check` clean. Room **207 files, 3,323 passed**;
+controller **97 files, 1,026 passed**. Browser suite **10 passed**. One ceiling raised (nine lines —
+the menu is its own component) and one declared.
+
+Row AJ is down to two: `chat-stars`, a per-member rating nothing here reads or writes, and `tagline`,
+which needs a column. Neither is markup.
+
+### 2026-08-29 22:05 UTC — A gate reported a built feature as a missing one, and a tracker row carried it upward
+
+**Runtime impact: none.** The feature was already there. What changes is that the gate can now see it.
+
+#### The claim
+
+`TODO.md` row AJ named two unbuilt reference surfaces found by measuring `app.css` against its
+wearers. The second: *"A microphone-test surface with FIVE states — `mic-status-idle`/`testing`/
+`success`/`no-audio`/`error`, all `ng-c2606333922`, with no counterpart here at all."*
+
+**It is fully built.** `ModalHost.svelte` declares
+
+```ts
+type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
+```
+
+assigns every one of the five, and renders `class="mic-status mic-status-{micStatus} mb-3"`.
+
+#### Why the gate could not see it
+
+`orphan-style-contract.test.ts` matched class names LITERALLY, and these are never written down
+whole — each is assembled at render time from a prefix and an interpolation. So five worn classes
+were catalogued as orphans, and the row carried them up as a whole missing surface.
+
+**This is the mirror of the failure that same file already records about comments**, and it is the
+more expensive direction. A matcher that answers "yes" for the wrong reason reports a clean sweep
+over nothing; a matcher that answers "no" for the wrong reason **files working code as absent** — and
+that answer looks like work, gets scheduled, and gets built twice.
+
+#### The fix requires both halves
+
+`isWornByInterpolation` asks two questions and needs both: does the corpus contain the prefix
+immediately followed by `{`, and does the suffix appear as a string literal? A prefix alone would let
+`mic-status-{x}` vouch for `mic-status-anything`, and the catalog would lose the power to refuse that
+is its whole point. Every hyphen is tried as the cut, because `a-b-{c}` and `a-{b}` are both real.
+
+**Three negative controls seen RED**: removing the matcher (the blind spot returns); removing every
+trace of the `no-audio` state (a class with no wearer again); and removing the interpolation site
+while leaving the literals, which proves a half-match does not vouch.
+
+The five entries are gone from the catalog — **13 to 8** — which is that file's own declaration that
+something is done, the same shape `INERT_ACTIONS` uses.
+
+#### What row AJ still has
+
+**(a) stands and was re-verified**: `edit-user-avatar-options`, `chat-stars` and `tagline` have
+**zero** occurrences in `src/`. They are three genuine affordances of `#user-modal` — a modal this
+room does render — and the fourth of that group, `remove-profile-picture-btn`, was built earlier
+today.
+
+#### Verification
+
+`eslint` clean, unit suite **207 files / 3,317 passed**.
+
+### 2026-08-29 21:45 UTC — A browser finally watched a room setting change the DOM
+
+**Runtime impact: none.** Verification, and the kind this repository had none of at this seam.
+
+#### The row, and what it actually asked for
+
+`TODO.md` row E has stood open since it was written, and it was the only row in the blocked table
+marked *"nothing — this one is mine to run"*. Its ask, in its own words: *"the gates ARE tested —
+`chat-alerts-gates-contract.test.ts`, 30 assertions across 13 tests, negative-controlled — but no
+browser has watched a column leave the DOM when an owner ticks the box."*
+
+That gap was real rather than a formality. Everything between the setting and the pixel is covered in
+pieces — the controller decides what crosses, the room signs for it, `RoomGates` resolves it,
+`RoomShell` renders on it — and each piece is asserted against a stub of its neighbour. **A seam is
+exactly where that kind of cover is weakest**: every piece can be right about an interface both sides
+have got wrong.
+
+#### What was built, and why it is not the instrument the row describes
+
+The row's instrument was `room-config-seam-e2e.mjs`: untracked (`git ls-files` returns 0), absent
+from a fresh checkout, and declaring `CONTROL=http://localhost:5180` while the controller's dev port
+is 5173 — so its one attempted run reached a different project entirely and got a 404 from
+`/register`.
+
+`apps/room/e2e/room-config-seam.spec.ts` is a TRACKED spec in the suite that already boots both
+halves, so it runs on every push instead of by hand. And it sees more than the probe could: because
+`stub-controller.mjs` now keys settings on the SHORT CODE — *"any short code is a room"* was already
+true of it — **the same build answers both ways in one run**. That is the only version of the
+assertion that can tell *"the column is hidden"* apart from *"the column was never built"*.
+
+```
+✓ the chat/alerts column is THERE when the owner has not hidden it   (2.0s)
+✓ the chat/alerts column is GONE  when the owner has hidden it       (1.7s)
+```
+
+The assertion is a COUNT of zero, not invisibility, because `RoomShell` removes the pane rather than
+hiding it — the reference's `O(2, hideChatAlerts ? -1 : 2)`. A hidden-but-present column would still
+receive messages, still scroll, and still cost the member the render.
+
+#### Three negative controls seen RED, and the third is the point
+
+* removing the `{#if !hideChatAlerts}` gates — the column can never leave;
+* inverting them — it can never be present;
+* **removing `hideChatAlerts` from the controller's `ROOM_VISIBLE_SETTINGS`** — the column stays.
+
+The third is what makes this a seam test rather than a component test: the failure is on the
+controller, three modules away from the markup being asserted.
+
+#### The honest limit, stated at the file rather than discovered later
+
+The stub is not the controller. It verifies the `config-read` HMAC and refuses a `config-write` token
+on the read route, so the CAPABILITY half of the seam is real traffic — but the settings it returns
+are the spec's, not a database's. What is proven is that a value crossing the seam reaches the DOM
+and changes it; that the controller puts the right value on the wire stays
+`room-config-boundary.test.ts`'s subject. Two services in one job would give every failure two
+possible causes.
+
+#### Verification
+
+Full browser suite **10 passed** (8 existing plus these 2). `eslint` clean, `prettier --check` clean,
+`svelte-check` 0/0, unit suite **207 files / 3,317 passed**.
+
+### 2026-08-29 21:20 UTC — Three stale claims in the streaming docs, and the row reporting two of them was stale about the third
+
+**Runtime impact: none.** Documentation, corrected against the code rather than against itself.
+
+`TODO.md` row R recorded that `apps/room/docs/streaming-choices.md` carried two stale lines and that
+they *"should be corrected when somebody next opens it"*. Both confirmed by reading:
+
+* Its header said *"Nothing here is implemented except the entry marked DONE"* — the only entry so
+  marked being row 1. Untrue since rows 2 and 4 shipped: the recorder picks VP9 at 8 Mbps
+  (`recording-codec.ts`) and the screen track carries `contentHint = 'detail'`.
+* Its "What is already true" table recorded `Screen track contentHint` as **unset**.
+
+**The row's own citation for the second was also stale**, and that is the part worth recording. It
+said `contentHint` *"is set in `apps/room/src/lib/room/media-transport.svelte.ts`"*. Measured:
+`contentHint` has **zero occurrences** in that file. The line is in `local-capture.svelte.ts`'s
+`startScreenSharing`, which took the produce paths when it was extracted.
+
+A third stale pointer of exactly the kind the 44 in `missing-commands-triage.md` were, found the same
+way — by verifying the row before acting on it rather than after.
+
+The correction also carries what the code already records and the doc did not: `contentHint` is set
+on the SCREEN capture only, never the camera path, and it is a **divergence** — the capture sets it
+on its alert-overlay canvas stream and never on the raw screen track. Its cost is unmeasured.
+
+Rows 6, 8 and 10 remain open and each still needs a human at an OS screen picker, because
+`getDisplayMedia` cannot be automated and headless returns a synthetic gradient.
+
+Room **207 files, 3,317 passed**; controller **97 files, 1,026 passed**.
+
+### 2026-08-29 21:05 UTC — 44 stale citations in the tracker, converted to symbols and gated
+
+**Runtime impact: none.** A maintainability fix on the document `feature-coverage-contract.test.ts`
+calls *"the tracker"* for everything the reference has and this room does not.
+
+#### The measurement
+
+`TODO.md` recorded the problem and its consequence: *"a reader who follows one of its line numbers,
+finds unrelated code, and concludes the feature is gone will be wrong."* Measured:
+
+* **44 `path:line` citations**, of which **23 named a line that no longer exists**. The videoplayer
+  row cited `+page.svelte:11294-11316` for a file now under 1,500 lines. The `restoreMobileAppTokens`
+  row cited `ModalHost.svelte:5327-5362`, which — checked while building that very feature earlier
+  today — is now the alerts advanced-search modal.
+* **2 were absolute paths** into the author's home directory, which no clone can resolve at all.
+
+#### The fix is the document's own recommendation
+
+Its method section already said it: *cite symbols and verbatim strings, which survive refactors.* All
+44 are now a path plus a symbol.
+
+**The 200 byte offsets are untouched and that distinction is the point.** They cite the SHA-256'd
+bundle, which cannot drift. A byte offset is evidence; a line number is a guess about a file somebody
+else will edit.
+
+#### What this closes that another gate says it cannot see
+
+`doc-citation-contract.test.ts` checks that a `path:line` citation lands inside the file it names,
+and its docblock states its own limit plainly: *"a citation that still lands INSIDE the file can
+still point at the wrong line — after a decomposition most of them do, and this gate calls them fine.
+It catches the loud half only. The quiet half is what the 'cite symbols' convention is for, and no
+assertion replaces it."*
+
+For this one document, an assertion now does replace it — because the convention can be stated
+absolutely here: no line numbers at all. `missing-command-census-contract.test.ts` refuses a
+`path:line` citation, a dangling `, :133` continuation left by a naive strip, an absolute path, and —
+as its vacuity floor — the loss of the byte offsets.
+
+**Four negative controls seen RED**, one per rule.
+
+#### Verification
+
+`svelte-check` 0/0. `eslint` clean. Room **207 files, 3,317 passed, 1 skipped**.
+
+### 2026-08-29 20:45 UTC — The settings enumeration is fully triaged, and the count that said otherwise is gone
+
+**Runtime impact: none.** A measurement, two corrections and a guard.
+
+#### The largest open surface turned out to be closed
+
+`TODO.md` presented the settings enumeration as the biggest remaining question: 269 declared, 166
+unwired, *"26 read by the reference's OWN room client"*. Run live against the pinned bundle
+(`gate/audit-setting-coverage.mjs`, sha256 `40796ca8…`):
+
+```
+settings  269 declared · 103 this room reads · 166 it does not
+Of the 166 it does not read, the REFERENCE reads 22 in its own browser
+```
+
+**Twenty-two, not twenty-six** — and every one of the 22 already has a disposition in
+`docs/decoded/missing-settings-triage.md`, each with a byte offset:
+
+* **7 are credentials** the reference ships to every browser and this room refuses to. Wiring one is
+  a regression wearing an enumeration's clothes.
+* **1 is answered by derivation** — `playChatMessageSoundFor`'s feature is built and the raw value
+  deliberately does not cross.
+* **3 are not gaps at all**, because the reference's own feature does not work: `h264Enabled` is
+  `sessData.h264Enabled || !0` — unconditionally true, so the setting has no effect upstream;
+  `advancedSearchAlerts` is gated on one hard-coded owner id; `smallerImagePreview` seeds a
+  preference whose only class has no rule in any of the 52 stylesheets held here.
+* **The rest are BLOCKED** on an archive service, a server-owned lock, a second MediaMTX cluster, the
+  `r` recording-bot parameter, a cross-post fan-out that occurs **zero** times in the bundle, or a
+  Discord application registration.
+
+The `WIRE` section — settings whose surface exists and lack only a term — **opened at twelve rows and
+is down to one**, `recsInRoom`, itself blocked on the Recordings tab.
+
+So there is no buildable work in this surface. That is the finding.
+
+#### Two stale copies of one number, three phrasings, one file
+
+`verify-room-settings-schema.mjs` has a `COUNT_CLAIMS` list, and its docblock records why a pinned
+list of sites is still the right shape while predicting its failure: *"the next stale count will be
+in a seventh file phrased a seventh way."*
+
+It was a seventh phrasing in a file already on the list. `COUNT_CLAIMS` checks the WIRED total; this
+is a different claim — how many of the unwired ones the reference reads — and no pattern matched it.
+
+**The second copy was found by a negative control that failed to fire.** Deleting the pointer to the
+contract test left the guard green, because the pointer assertion was being satisfied by a different
+line — one that itself read *"pins the 26 by NAME"*. Without that control, one of the two would have
+been corrected and the other left standing.
+
+#### The fix is the doctrine, not another correction
+
+`setting-coverage-contract.test.ts` already states it about its own prose: *"NO COUNTS IN THIS
+PARAGRAPH ANY MORE… the numbers move every time a setting is wired, and prose beside a list it counts
+is the copy nobody updates."* Both counts are now GONE from `TODO.md` rather than corrected, and that
+test asserts they stay gone — matching the two shapes that actually occurred rather than hunting
+digits across a 900-line tracker, which is the false-positive rate the "20 of 269" incident measured.
+
+**Four negative controls seen RED**: a numeric count restored; a spelled-out count; the second
+phrasing restored; the pointer deleted.
+
+#### Verification
+
+`svelte-check` 0/0. `eslint` clean. Room **207 files, 3,316 passed**; controller **97 files, 1,026
+passed**. `verify-room-settings-schema.mjs` clean: 268 extracted + 1 reviewed deviation = 269, 103
+wired, roster matches.
+
 ### 2026-08-29 20:20 UTC — The credential tripwire had a hole its own TODO row named
 
 **Runtime impact: none.** A test-only change, and the one it guards is the boundary between a

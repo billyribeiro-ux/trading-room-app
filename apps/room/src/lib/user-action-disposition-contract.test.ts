@@ -507,6 +507,13 @@ describe('an inert action really does nothing, executed', () => {
     const actions = new RoomUserActions<Row>({
       dialogs,
       toasts,
+      /* The Admin Notes wire. Nothing here exercises it; it exists so the class can be built. */
+      notesPort: {
+        check: () => Promise.resolve({ required: false, ok: true }),
+        list: () => Promise.resolve([]),
+        add: () => Promise.resolve([]),
+        remove: () => Promise.resolve([])
+      },
       commands: {
         presenter: (payload: { subCmd: string; targetUserId: number }) => (
           sent.push(payload),

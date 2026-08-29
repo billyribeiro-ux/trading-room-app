@@ -77,7 +77,32 @@ const authorised = (header, shortCode) => {
   return presented.length === wanted.length && timingSafeEqual(presented, wanted);
 };
 
-const settings = JSON.parse(process.env.ROOM_SETTINGS_JSON ?? '{}');
+/**
+ * Settings, per room code, with a default.
+ *
+ * `ROOM_SETTINGS_JSON` is the settings every room gets. `ROOM_SETTINGS_BY_CODE_JSON` overrides them
+ * for named short codes — `{"hidden": {"hideChatAlerts": true}}` — and the override REPLACES rather
+ * than merges, because a partial merge would make a spec's settings depend on what the default
+ * happened to contain that week.
+ *
+ * ## Why per code rather than per run
+ *
+ * A setting that gates a whole column has to be observed BOTH ways to mean anything: a spec that
+ * only ever sees it on cannot tell "the column is hidden" from "the column was never built". Two
+ * Playwright projects with two environments would do it, at the cost of a second full server boot
+ * and a suite where the two halves of one assertion live in different runs.
+ *
+ * Keying on the short code costs nothing and is what a real controller does — `any short code is a
+ * room` was already true here. One page load asks for `hidden`, the next asks for a default room,
+ * and the two answers come back in the same run with no shared mutable state between them. It is
+ * also race-free by construction rather than by the `workers: 1` this suite happens to set.
+ */
+const defaultSettings = JSON.parse(process.env.ROOM_SETTINGS_JSON ?? '{}');
+const settingsByCode = JSON.parse(process.env.ROOM_SETTINGS_BY_CODE_JSON ?? '{}');
+const settingsFor = (shortCode) =>
+  Object.prototype.hasOwnProperty.call(settingsByCode, shortCode)
+    ? settingsByCode[shortCode]
+    : defaultSettings;
 
 /** The `RoomConfig` shape `readRoomConfig` validates, with a presenter as the connected member. */
 const configFor = (shortCode, email) => ({
@@ -89,7 +114,7 @@ const configFor = (shortCode, email) => ({
     publicId: null,
     maxUsers: 0
   },
-  settings,
+  settings: settingsFor(shortCode),
   locked: [],
   member: {
     displayName: 'E2E Presenter',

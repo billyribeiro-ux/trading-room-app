@@ -1,6 +1,7 @@
-import { command } from '$app/server';
+import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom } from '#lib/server/auth.js';
+import { presenterRoom, requireSessionId } from '#lib/server/auth.js';
+import { grantNotesAccess } from '#lib/server/user-notes.js';
 import { checkNotesPasswordRemotely } from '#lib/server/room-config-client.js';
 
 /*
@@ -61,5 +62,25 @@ const CANDIDATE = z.strictObject({ candidate: z.string().max(512) });
  */
 export const checkNotesPassword = command(CANDIDATE, async ({ candidate }) => {
   const room = presenterRoom();
-  return await checkNotesPasswordRemotely(room, candidate);
+  const decision = await checkNotesPasswordRemotely(room, candidate);
+
+  /*
+    THE GRANT IS RECORDED HERE AND NOWHERE ELSE, added 2026-08-29 with the notes list itself.
+
+    Until the list existed this command's answer had one consumer — the room's own
+    `canManageNotes`, which decides what to DRAW. That was complete for what it did, and it is not
+    sufficient for a write: `user-notes.remote.ts` must know the same thing about a LATER request,
+    and the only version of it the room could send is a boolean the room controls.
+
+    So the answer is written to the session row the moment the controller grants it, and the notes
+    commands read it from there. The room's flag and the server's grant are deliberately two
+    different values that happen to agree — the server never reads the room's, and a room that lied
+    about its own would still be refused by `requireNotesAccess`.
+
+    Only on `ok`. A refused attempt writes nothing, so a wrong password cannot extend a grant that
+    is about to expire.
+  */
+  if (decision.ok) grantNotesAccess(requireSessionId(getRequestEvent().locals));
+
+  return decision;
 });

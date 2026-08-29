@@ -979,6 +979,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
+    file: 'lib/components/UserNotesPane.svelte',
+    /*
+      `#user-modal`'s Admin Notes tab, BOTH states of it — upstream's `O(104, allowToManageNotes ? 105
+      : 104)`. This room had only 104, the password prompt; 105, the list, did not exist, so a
+      presenter who cleared the password got an empty panel. Found by an orphan CSS class rather than
+      by reading the capture: `smallAvatarImg` is the avatar on a row of this list.
+    */
+    max: 124,
+    why: 'the Admin Notes tab - a gate, a list, and the two actions on it'
+  },
+  {
+    file: 'lib/components/FollowChatStylePane.svelte',
+    /*
+      The follow-chat STYLE editor, lifted out of `ModalHost.svelte` verbatim when the Admin Notes
+      tab took that file past its ceiling. Nothing here is rewritten - the same markup, re-indented,
+      with the style object bound and three inline handlers lifted to callbacks - so the extraction
+      cannot have changed what the panel renders, and the browser suite is the check that it did not.
+    */
+    max: 152,
+    why: 'the follow-chat colour and size editor - five inputs, a live example, three callbacks'
+  },
+  {
     file: 'lib/components/RoomOverlays.svelte',
     /*
       Everything that floats above the room, taken out of the page in Phase 5 slice 17.
@@ -1133,7 +1155,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
       `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
     */
-    max: 848,
+    /*
+      DOWN one, and the line it lost is the point: `canManageNotes` and `userNotes` were two props
+      that had to be passed together, and the gate now travels ON the object it gates. A prop you
+      cannot forget is worth more than a prop you can pass correctly.
+    */
+    max: 847,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1165,6 +1192,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 293,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
+  },
+  {
+    file: 'lib/components/AvatarOptionsMenu.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      `edit-user-avatar-options` — the dropdown on your own avatar in `#user-modal`, template `K2e`
+      @ bundle byte 2,058,852. It is 134 lines for about 45 of markup because the rest is the two
+      corrections reading it forced: `remove-profile-picture-btn` had shipped as a floating button on
+      the avatar, presenter-gated, and const 23 says it belongs INSIDE this menu on a gate with no
+      role term at all. Two of `#user-modal`'s four missing affordances were one control.
+    */
+    max: 134,
+    why: 'the own-avatar dropdown; the menu remove-profile-picture-btn actually belongs to'
   },
   {
     file: 'lib/components/ChatSearchBar.svelte',
@@ -1739,7 +1780,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       component rather than by pattern — and gating it here is a deliberate decision, because a room
       with no app would otherwise show a tab whose only button answers 409 every time.
     */
-    max: 6275,
+    /*
+      6275 -> 6284, 2026-08-29, for `edit-user-avatar-options` — and the raise is nine lines because
+      the MENU is not in it. `AvatarOptionsMenu.svelte` holds the transcription, its const table and
+      the two corrections it forced; what is left here is the gate, the mount and two derivations.
+
+      The extraction was the size contract's doing and it was right twice over: the menu owns its own
+      open state, so nothing in this file has to remember to close it, and the component is where a
+      reader looking for `remove-profile-picture-btn` will now find it — beside the three items it
+      shares a menu with, rather than beside an avatar it never belonged to.
+    */
+    /*
+      DOWN 95 on 2026-08-29, by the Admin Notes list. That feature ADDED to this file — a prop, a
+      pane, and a load on the notes tab — and the ratchet had three lines of headroom left, which is
+      exactly the situation its own instruction is written for. Two slices left instead:
+      `UserNotesPane.svelte`, which is the tab it was adding, and `FollowChatStylePane.svelte`, the
+      128-line follow-chat editor that was the largest block of this modal nothing else in it read.
+      The second was chosen by measuring free identifiers across candidate slices rather than by
+      taking the first one that looked separable — it had five, and four of them were handlers.
+    */
+    max: 6189,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -1946,6 +2006,37 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/room/derived-return-probe.svelte.ts',
     max: 30,
     why: 'a PROBE: what a caller gets when a $derived is returned by value, by getter and by thunk'
+  },
+  {
+    file: 'lib/room/user-notes.svelte.ts',
+    /*
+      The per-member admin notes list: `$state.raw` because every mutation returns the whole list
+      from the server and it is assigned wholesale, exactly as upstream does with
+      `user.notes = resp.notes`. Two dialogs, three async calls, and one deliberate divergence -
+      deletion addresses a note by its own id, not by the ordinal upstream sends.
+    */
+    max: 203,
+    why: 'the per-member admin notes list, its two prompts and its three calls'
+  },
+  {
+    file: 'lib/room/admin-notes.ts',
+    /*
+      The composition of the door and the list, and it is a third class because both alternatives
+      were written and both were refused by this gate: `RoomUserActions` wiring the pair cost it 23
+      lines, and `RoomNotesAccess` owning the list cost that file 56. A file at its ceiling is a file
+      where the next paragraph of wiring does not belong.
+    */
+    max: 83,
+    why: 'the Admin Notes feature - the door, the list, and the rule that the grant loads'
+  },
+  {
+    file: 'lib/room/user-notes-port.ts',
+    /*
+      The four remote calls the Admin Notes tab makes, in one frozen object, so `RoomUserNotes` knows
+      nothing about the wire and the composition root names the feature once.
+    */
+    max: 31,
+    why: 'the Admin Notes wire - four remote functions adapted to positional arguments'
   },
   {
     file: 'lib/room/notes-access.svelte.ts',
@@ -2513,7 +2604,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
       the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
     */
-    max: 896,
+    /*
+      DOWN one on 2026-08-29, and the line it lost is a SECOND CONSTRUCTION of `ModalTargetUser`.
+      `get target()` built the object inline from the same `User` `targetFor` takes, missing all
+      five permission fields — which is a silent revocation the moment anything opens the
+      permissions modal from that path. Nothing did; the fix is worth the line anyway, and
+      `entitlement-shape-contract.test.ts` refuses a third.
+    */
+    max: 895,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -3270,7 +3368,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       transcribed — upstream alerts "Command sent successfully…" on the statement after the transmit,
       unconditionally, to a member who by this pane's own copy is not getting notifications.
     */
-    max: 131,
+    max: 134,
     why: 'the Mobile App pane; it composes the sentence upstream raises over nothing'
   },
   {

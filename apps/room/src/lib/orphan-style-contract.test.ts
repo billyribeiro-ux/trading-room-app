@@ -16,32 +16,30 @@ import { describe, expect, it } from 'vitest';
  * port; it turned out to be the captured class for the Debug Log textarea, and the reason it had no
  * wearer was that the FEATURE was not built. Finding it was luck. This makes it arithmetic.
  *
- * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 13
+ * ## Measured 2026-08-29: 200 class selectors, 29 with no wearer — now 4
  *
- * They split cleanly, and the split is what makes each one actionable:
+ * The catalog started at 29, split by whether the reference's own stylesheet had the class. The
+ * fifteen this repository INVENTED were deleted outright: panel-layout names from before the page
+ * was decomposed, styling nothing and never going to. The other fourteen were captured, and that
+ * flag was read as *"the rule is waiting for markup"* — a feature to build.
  *
- * - **CAPTURED** — the class exists in the reference's own stylesheet. `app.css` carries a copy for
- *   markup this room has not built, so the rule is waiting rather than dead. Four of them
- *   (`edit-user-avatar-options`, `remove-profile-picture-btn`, `chat-stars`, `tagline`) shared the
- *   Angular component id `ng-c1441935951`, which is `#user-modal` — the user-info modal this room
- *   DOES render, missing four of its affordances. Five more (`mic-status-*`) share `ng-c2606333922`,
- *   a microphone-test surface with five states that has no counterpart here at all.
+ * **Ten have since left, and they left in four different ways.** Each is worth more than the entry
+ * it removed, because each is a way this gate could answer wrongly:
  *
- * **`remove-profile-picture-btn` LEFT THIS LIST the same day**, which is the gate working as
- * intended rather than a note: it turned red the moment the button was built, and deleting its
- * entry is the declaration that it is done — the shape `INERT_ACTIONS` uses. Three of the user
- * modal's four remain.
- * - **OURS** — the class is in no captured sheet. `app.css` invented it, and nothing in `src/`
- *   mentions it. Every one of these is a panel-layout name from before the page was decomposed into
- *   components; they style nothing and they never will.
+ * 1. **BUILT** — `remove-profile-picture-btn`, then `edit-user-avatar-options`. The list turned red
+ *    the moment each gained markup, and deleting the entry is the declaration that it is done, the
+ *    shape `INERT_ACTIONS` uses.
+ * 2. **WORN BY AN INTERPOLATION** — the five `mic-status-*`, a surface reported as entirely missing
+ *    while it was fully built. See `isWornByInterpolation`.
+ * 3. **WORN AS A CLSX OBJECT KEY** — `mid`, on the mic level bar eleven lines from those five. See
+ *    `isWornAsClassKey`.
+ * 4. **NEVER A SURFACE AT ALL** — `chat-stars` and `tagline`. The reference styles both and renders
+ *    neither, in v3 or v4; the premise that a captured rule implies captured markup was simply
+ *    false. `renderedUpstream` measures it now, and both rules are gone from `app.css`.
  *
- * ## Why nothing is DELETED here
- *
- * Deleting the fifteen invented rules changes nothing observable — that is exactly the argument for
- * doing it and exactly why it is not done in the same commit as the measurement. `app.css` is read
- * by `dump-contract.test.ts` and by the capture verifiers, and a bulk edit landing beside a feature
- * is how a stylesheet change gets attributed to the wrong commit. The list is recorded, frozen, and
- * cannot grow; removing it is its own change.
+ * Three of those four are the gate reporting work that did not exist. That is the expensive
+ * direction — the answer LOOKS like work — and it is why every claim this file makes is now
+ * measured against the pinned bundle rather than inferred from a stylesheet.
  *
  * ## What this refuses
  *
@@ -52,54 +50,57 @@ import { describe, expect, it } from 'vitest';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /**
- * The known 29, each with why it has no wearer.
+ * The remaining orphans, each with why it has no wearer AND whether the reference renders it.
  *
- * `captured` means the reference's own stylesheet has the class, so the rule is waiting for markup;
- * `false` means this repository invented it and nothing will ever wear it.
+ * ## `captured` was doing two jobs, and one of them was wrong
+ *
+ * It means one thing only: the class is in a stylesheet this repository captured. It was being READ
+ * as a second thing — *"the rule is waiting for markup, so the feature is unbuilt"* — and row AJ of
+ * `TODO.md` carried two entries upward on exactly that reading.
+ *
+ * The inference does not hold, because **a stylesheet can carry a rule the application never
+ * renders**. That is the very defect this file exists to catch, and there was no reason to assume
+ * the reference was free of it. It is not: measured against the pinned v4 bundle, FOUR of the seven
+ * entries below are styled by the reference and rendered by nothing in it.
+ *
+ * `renderedUpstream` is that measurement, and it is asserted rather than asserted-about — see
+ * `tells the truth about which orphans the reference actually renders`. It is what makes an entry
+ * actionable:
+ *
+ * | captured | renderedUpstream | what the entry IS |
+ * | --- | --- | --- |
+ * | `true` | `true` | a REFERENCE SURFACE this room has not built — work, with a const index |
+ * | `true` | `false` | dead CSS upstream as well as here — carried, never a feature |
+ * | `false` | `false` | invented here; nothing will ever wear it |
+ *
+ * `captured: false, renderedUpstream: true` is impossible by construction and is refused below.
  */
-const ORPHANS: Record<string, { captured: boolean; why: string }> = {
-  // ── The user-info modal, `ng-c1441935951` — a modal this room renders, missing four affordances ──
-  'edit-user-avatar-options': {
-    captured: true,
-    why: 'the avatar dropdown inside `#user-modal` — the pencil overlay on the picture. `.edit-user-avatar img` beside it IS worn, so the container is built and its options menu is not.'
-  },
-  'chat-stars': {
-    captured: true,
-    why: "a per-member rating shown beside the nick in `#user-modal`. Nothing in this room reads or writes a member's stars, so the class is the only trace of the feature."
-  },
-  tagline: {
-    captured: true,
-    why: '`#user-modal .tagline` — a free-text line under the display name. This room has no column for one.'
-  },
+const ORPHANS: Record<string, { captured: boolean; renderedUpstream: boolean; why: string }> = {
+  /*
+    ── Captured and rendered by NOTHING, upstream or here ──
 
-  // ── The microphone test, `ng-c2606333922` — five states, no counterpart here ──
-  'mic-status-idle': {
-    captured: true,
-    why: 'one of five states of a mic-test surface this room does not have.'
-  },
-  'mic-status-testing': { captured: true, why: 'see `mic-status-idle`.' },
-  'mic-status-success': { captured: true, why: 'see `mic-status-idle`.' },
-  'mic-status-no-audio': { captured: true, why: 'see `mic-status-idle`.' },
-  'mic-status-error': { captured: true, why: 'see `mic-status-idle`.' },
-
-  // ── Captured, and not a feature ──
+    THE "UNBUILT SURFACE" HALF OF THIS CATALOG IS EMPTY. `smallAvatarImg` was the only entry
+    measured as both captured and rendered upstream, and it left the same day it was named: const 98
+    of `app-user-info-modal` is the avatar on a row of the per-member ADMIN NOTES list, `fTe` @ byte
+    2,064,959, and this room rendered that tab's password prompt and nothing behind it. Built as
+    `UserNotesPane.svelte` with `user_notes` under it. Every rule below is carried, not pending.
+  */
+  // ── Captured and rendered by NOTHING, upstream or here: carried rules, not pending features ──
   'sr-only': {
     captured: true,
+    renderedUpstream: false,
     why: "Bootstrap's visually-hidden utility, present unscoped in the captured sheet at two places. This copy is redundant rather than waiting; nothing here needs it because every hidden label in this room uses `aria-label`."
-  },
-  smallAvatarImg: {
-    captured: true,
-    why: 'a smaller avatar variant the reference uses in a surface this room does not build.'
   },
   'chat-header': {
     captured: true,
+    renderedUpstream: false,
     why: 'the captured chat column header; this room renders its own through `AlertChatArea`.'
   },
   'disable-video': {
     captured: true,
+    renderedUpstream: false,
     why: 'the captured class for the disable-video control, whose gate this room implements without wearing the class.'
-  },
-  mid: { captured: true, why: 'a captured layout name with no counterpart in this decomposition.' }
+  }
 };
 
 /** Class selectors declared anywhere in `app.css`, with the lines they are declared on. */
@@ -153,14 +154,136 @@ const WEARERS = [
   .map((file) => withoutComments(readFileSync(`${ROOT}${file}`, 'utf8')))
   .join('\n');
 
-function isWorn(cls: string): boolean {
+function escapeForRegExp(value: string): string {
+  return value.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+function isWornLiterally(cls: string): boolean {
   /*
     Bounded on both sides so `chat-panel` is not matched by `chat-panel-wide`, and so a class inside
     a `class={[...]}` array, a template literal or a plain attribute all count. The boundary set is
     the punctuation a class name can actually sit between in this codebase's markup and clsx arrays.
   */
-  const escaped = cls.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-  return new RegExp(`[\\s"'\`{|:.,\\[]${escaped}[\\s"'\`}|,\\]]`).test(WEARERS);
+  return new RegExp(`[\\s"'\`{|:.,\\[]${escapeForRegExp(cls)}[\\s"'\`}|,\\]]`).test(WEARERS);
+}
+
+/**
+ * A class ASSEMBLED at render time — `class="mic-status mic-status-{micStatus}"`.
+ *
+ * ## Why this exists, and what not having it cost
+ *
+ * The literal matcher above cannot see a class that is never written down whole. Five were:
+ * `mic-status-idle`, `-testing`, `-success`, `-no-audio` and `-error` sat in the catalog below
+ * reading *"one of five states of a mic-test surface this room does not have"* — and the surface is
+ * fully built. `ModalHost.svelte` declares
+ * `type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error'`, assigns every one of the
+ * five, and renders `class="mic-status mic-status-{micStatus} mb-3"`.
+ *
+ * So this gate reported five orphans that were worn, and `TODO.md` row AJ carried them upward as a
+ * whole missing reference surface — *"a microphone-test surface with FIVE states … with no
+ * counterpart here at all"*. **A matcher that answers "no" for the wrong reason files working code
+ * as absent**, which is the mirror of the hollow-coverage failure this file already records about
+ * comments, and the more expensive direction: the answer looks like work.
+ *
+ * ## The test is BOTH halves, deliberately
+ *
+ * A prefix ending in an interpolation is not enough on its own — `mic-status-{x}` would then vouch
+ * for `mic-status-anything`, and the catalog would lose its power to refuse. The suffix must ALSO
+ * appear as a string literal in the corpus, which is what a union member, an enum value or a `?:`
+ * arm looks like. Both conditions, or it is not worn.
+ *
+ * Every hyphen is tried as the cut rather than only the last, because a class can be assembled at
+ * any of them: `a-b-{c}` and `a-{b}` are both real shapes.
+ */
+function isWornByInterpolation(cls: string): boolean {
+  for (let cut = cls.indexOf('-'); cut !== -1; cut = cls.indexOf('-', cut + 1)) {
+    const prefix = cls.slice(0, cut + 1);
+    const suffix = cls.slice(cut + 1);
+    if (!WEARERS.includes(`${prefix}{`)) continue;
+    if (new RegExp(`['"\`]${escapeForRegExp(suffix)}['"\`]`).test(WEARERS)) return true;
+  }
+  return false;
+}
+
+/**
+ * Every `class={…}` VALUE in the corpus, concatenated — the regions an object key can hide in.
+ *
+ * `class` takes an object or an array since Svelte 5.16, and clsx keeps the TRUTHY KEYS: the
+ * official guidance (`svelte/class`, read 2026-08-29) is *"consider avoiding `class:`, since the
+ * attribute is more powerful and composable"*, so the idiomatic conditional class in this codebase
+ * is `class={{ mid: level > 30 }}` — a class name that appears in the source only as an OBJECT KEY.
+ *
+ * Extracted with a brace walker rather than a regex because the value is arbitrary JavaScript:
+ * `class={['volume-bar-fill', { low: …, mid: …, high: … }]}` nests an object inside an array, and a
+ * template literal inside either can carry a `}` that closes nothing. Strings and escapes are
+ * tracked for the same reason the const-table walker tracks them.
+ */
+function classValueRegions(): string {
+  const regions: string[] = [];
+  const OPEN = 'class={';
+
+  for (let at = WEARERS.indexOf(OPEN); at !== -1; at = WEARERS.indexOf(OPEN, at + 1)) {
+    let depth = 0;
+    let quote: string | null = null;
+    let escaped = false;
+    let i = at + OPEN.length - 1;
+
+    for (; i < WEARERS.length; i += 1) {
+      const ch = WEARERS[i];
+      if (quote !== null) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '{' || ch === '[' || ch === '(') depth += 1;
+      else if (ch === '}' || ch === ']' || ch === ')') {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+
+    regions.push(WEARERS.slice(at + OPEN.length - 1, i + 1));
+  }
+
+  return regions.join('\n');
+}
+
+const CLASS_VALUES = classValueRegions();
+
+/**
+ * A class worn as a clsx OBJECT KEY — `class={['volume-bar-fill', { mid: level > 30 }]}`.
+ *
+ * ## The third blindness of the same matcher, and what it cost
+ *
+ * `mid` sat in the catalog below reading *"a captured layout name with no counterpart in this
+ * decomposition"*. It is worn, at `ModalHost.svelte`, on the microphone level bar — with `low` and
+ * `high` beside it and the reference's own three thresholds (`<= 30`, `> 30 && <= 70`, `> 70`).
+ *
+ * `isWornLiterally` could not see it for one character: its boundary sets admit the punctuation a
+ * class sits between in an attribute or a clsx ARRAY, and a key is followed by a COLON, which is in
+ * the LEADING set and not the trailing one. So `{ mid: … }` read as no wearer at all.
+ *
+ * That is the same shape as the `mic-status-*` miss this file already records — a matcher answering
+ * "no" for the wrong reason, filing working code as absent — and it landed on the SAME COMPONENT,
+ * eleven lines away from it. One fix does not generalise to the next; each new way of writing a
+ * class needs the matcher taught, which is why this is a third function rather than a wider regex.
+ *
+ * ## Why not simply add `:` to the trailing boundary set
+ *
+ * Because that reads the whole corpus, where `mid:` is any object property in any module, and a
+ * class named `title` or `id` or `name` would be vouched for by every options bag in the room. The
+ * gate would keep passing and stop measuring — the hollow-coverage failure, arrived at by
+ * loosening rather than by omission. Restricting the search to `class={…}` VALUES keeps the
+ * question the one being asked: is this name a class somebody puts on an element.
+ */
+function isWornAsClassKey(cls: string): boolean {
+  return new RegExp(`(^|[\\s{,])${escapeForRegExp(cls)}\\s*:`).test(CLASS_VALUES);
+}
+
+function isWorn(cls: string): boolean {
+  return isWornLiterally(cls) || isWornByInterpolation(cls) || isWornAsClassKey(cls);
 }
 
 describe('app.css styles nothing that no element wears', () => {
@@ -217,12 +340,12 @@ describe('app.css styles nothing that no element wears', () => {
     expect(undeclared, 'app.css no longer declares these, so their entries are dead').toEqual([]);
   });
 
-  it('tells the truth about which orphans are the reference own', () => {
+  it('tells the truth about which orphans the reference STYLES', () => {
     /*
-      The `captured` flag is what makes an entry actionable rather than decorative: `true` means a
-      rule waiting for markup — a feature to build — and `false` means a name this repository
-      invented, which can only ever be deleted. Getting it backwards would file a missing feature as
-      dead code, so it is checked against the captured sheets rather than trusted.
+      `captured` says only that a sheet this repository captured declares the class. It is measured
+      rather than trusted because it is half of what makes an entry actionable — the other half is
+      the test below, and reading this one as if it were both is the error that put two dead rules
+      in `TODO.md` as unbuilt features.
     */
     const sheets = [
       readFileSync(`${ROOT}../css/complete-app-styles.css`, 'utf8'),
@@ -239,18 +362,171 @@ describe('app.css styles nothing that no element wears', () => {
     expect(wrong).toEqual([]);
   });
 
-  it('names the two surfaces the captured orphans point at', () => {
+  it('tells the truth about which orphans the reference RENDERS', () => {
     /*
-      Not decoration: these are the two FINDINGS this sweep produced, and a list of 29 reasons is
-      where a finding goes to be forgotten. Asserting them keeps both visible as work rather than as
-      trivia — and if either is built, the stale-entry test above turns red and forces this to be
-      revisited with it.
-    */
-    const userModal = ['edit-user-avatar-options', 'chat-stars', 'tagline'];
-    for (const cls of userModal) expect(ORPHANS[cls]?.captured, cls).toBe(true);
+      ## The measurement this file was missing, and the two claims it retracted
 
-    const micTest = Object.keys(ORPHANS).filter((cls) => cls.startsWith('mic-status-'));
-    expect(micTest).toHaveLength(5);
-    for (const cls of micTest) expect(ORPHANS[cls]?.captured, cls).toBe(true);
+      A captured rule with no wearer HERE was being read as a feature waiting to be built. That
+      reading needs a premise nobody checked: that the reference renders everything it styles. It
+      does not.
+
+      `chat-stars` and `tagline` were catalogued as affordances of `#user-modal` — *"a per-member
+      rating nothing in this room reads or writes"* and *"a free-text line under the display name;
+      this room has no column for one"* — and `TODO.md` row AJ carried both upward as reference
+      surfaces still to build, the second of them as needing a schema change.
+
+      Measured across BOTH pinned bundles, v3 and v4: `chat-stars` occurs 12 times and `tagline`
+      once, and **every one of those 26 occurrences is immediately followed by `[_ngcontent-%COMP%]`**
+      — that is, is a compiled Angular CSS selector. Zero are strings in a const table. The
+      131-entry const table of `app-user-info-modal` (parsed at bundle byte 2,087,741) contains
+      neither name. The reference styles them and renders them nowhere, in either version.
+
+      They are gone from `app.css` and gone from this catalog: two rules that could not have been
+      built because there was nothing to build.
+
+      **What IS there, and was mistaken for them.** The star rating in the reference is real, and it
+      wears three OTHER classes — consts 60/61/62, `stars-container` / `stars-icon` / `stars-num` —
+      which this room renders at `ModalHost.svelte` and twice in `RoomMessage.svelte`. So the
+      feature `chat-stars` was named for is BUILT, under the names the reference actually uses. A
+      class name is not a feature, and this row had been treating one as the other.
+
+      ## Where `chat-stars` came from, which settles that it can never gain markup
+
+      It is the PREDECESSOR'S name for the same badge. `ptr1-DECODE.md:5289` records
+      `09.css:1160  .chatStars { max-height: 8px; height: 8px; vertical-align: text-top; }`, and
+      `todo-next.md:1145` records what wore it: `<img class="chatStars" src="/public/images/<years>
+      .png">`, the tenure badge, regular roster only. v4 kept the RULE — kebab-cased, and still
+      carrying `vertical-align: text-top` — and re-implemented the badge as consts 60/61/62 with a
+      number drawn over an icon instead of a per-year image. The old rule was never deleted.
+
+      So this room copied in a stylesheet rule that had been dead upstream for a whole major
+      version, and then catalogued it as a feature to build. `tagline` is the same shape with less
+      of a trail: the FIELD is real — it is on the login wire and in the roster row — but the
+      predecessor rendered it as `<small class="text-muted user-info-block">`
+      (`todo-next.md:1140`), and no capture held here shows anything wearing `.tagline`.
+
+      ## What is measured, and what this cannot see
+
+      `renderedUpstream` is the class appearing as a string INSIDE AN ARRAY in the bundle — the
+      shape of a const-table entry, `[1,"smallAvatarImg",3,"src","alt"]`. Bare containment is not
+      enough and was measured to matter: `mid` appears in this bundle as `{name:"mid"}` in the
+      bundled sdp parser, which is an object property in a library and not a class on an element.
+
+      The corpus is `main.*.js`, which holds every component definition, plus the global
+      `styles.*.css`. `scripts.*.js` is third-party (its README records it as byte-identical across
+      all three builds and it is not re-fetched here), so a class applied by a vendor plugin rather
+      than by an Angular template would not be seen. None of the entries below is of that kind, but
+      the limit is recorded rather than left to be assumed away.
+    */
+    const bundle = readFileSync(
+      `${ROOT}../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`,
+      'utf8'
+    );
+    const renders = (cls: string) =>
+      new RegExp(`[\\[,]"${cls.replace(/[-]/g, '\\-')}"[\\],]`).test(bundle);
+
+    /*
+      The vacuity floor, both directions. Without it a broken path or a regex typo answers `false`
+      for everything and every `renderedUpstream: false` below passes for the wrong reason — which
+      is precisely the failure being corrected, arrived at from the other side.
+    */
+    expect(bundle.length).toBe(2_891_205);
+    expect(renders('remove-profile-picture-btn'), 'const 23, a control since built here').toBe(
+      true
+    );
+    expect(renders('mic-status-nonesuch'), 'a class no reference template can contain').toBe(false);
+
+    const wrong: string[] = [];
+    for (const [cls, entry] of Object.entries(ORPHANS)) {
+      if (renders(cls) !== entry.renderedUpstream) {
+        wrong.push(
+          `${cls}: catalogued renderedUpstream=${entry.renderedUpstream}, measured ${renders(cls)}`
+        );
+      }
+      /* Styled by no capture yet rendered by the reference is not a state that can exist. */
+      if (entry.renderedUpstream && !entry.captured)
+        wrong.push(`${cls}: rendered but not captured`);
+    }
+    expect(
+      wrong,
+      'an entry disagrees with the bundle. `renderedUpstream: true` is a surface to build; ' +
+        '`false` is a rule to delete — getting it backwards is what row AJ did twice.'
+    ).toEqual([]);
+  });
+
+  it('names what the captured orphans pointed at — and every one is now answered', () => {
+    /*
+      This assertion is what is left of four "missing affordances of `#user-modal`", and not one of
+      the four was resolved the way the row that recorded them assumed:
+
+      - `remove-profile-picture-btn` was BUILT, then built again in the right place — const 23 puts
+        it inside the dropdown rather than floating on the avatar, under a gate with no role term.
+      - `edit-user-avatar-options` was BUILT, from `K2e` @ 2,058,852. It is what const 23 lives in.
+      - `chat-stars` and `tagline` were NEVER SURFACES. The reference styles both and renders
+        neither, in v3 or v4 — see the render test above for the measurement.
+
+      A FIFTH was found by the same arithmetic and is the only one that was a whole feature:
+      `smallAvatarImg`, const 98, the avatar on a row of the per-member ADMIN NOTES list. Its
+      neighbouring consts read as a followed-users list and that guess was wrong; `fTe` @ 2,064,959
+      settled it. The tab existed here with its password prompt and NO `{:else}` — the gate had been
+      repaired earlier the same day and opened onto nothing. Built, with `user_notes` under it.
+
+      So the catalog's "captured, therefore pending" half is empty, and that is what is asserted:
+      every remaining entry is a carried rule, and a NEW entry claiming otherwise must bring a const
+      index with it.
+    */
+    for (const settled of [
+      'edit-user-avatar-options',
+      'remove-profile-picture-btn',
+      'smallAvatarImg'
+    ]) {
+      expect(ORPHANS[settled], `${settled} is built; its entry must stay gone`).toBeUndefined();
+      expect(isWorn(settled), `${settled} has markup now`).toBe(true);
+    }
+    for (const retracted of ['chat-stars', 'tagline']) {
+      expect(
+        declared.has(retracted),
+        `${retracted} is dead upstream too; app.css must not declare it again`
+      ).toBe(false);
+    }
+    expect(
+      Object.values(ORPHANS).filter((entry) => entry.renderedUpstream),
+      'a captured-and-rendered entry is an unbuilt surface — it belongs in TODO.md, not here'
+    ).toEqual([]);
+
+    /*
+      THE STAR RATING IS BUILT, and this is what is left of the claim that it was missing. It is
+      asserted by the classes the reference's own const table uses, because the retracted entry was
+      a class name mistaken for a feature and the guard against repeating that is to name the
+      feature by the markup that renders it.
+    */
+    for (const cls of ['stars-container', 'stars-icon', 'stars-num']) {
+      expect(isWorn(cls), cls).toBe(true);
+    }
+
+    /*
+      THE MIC-TEST SURFACE WAS NEVER MISSING, and this assertion is what is left of the claim that it
+      was. Five `mic-status-*` classes were catalogued here as *"a microphone-test surface with five
+      states that has no counterpart here at all"*, and `TODO.md` row AJ carried that upward as a
+      whole unbuilt reference surface.
+
+      It is built. `ModalHost.svelte` declares
+      `type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error'`, assigns all five, and
+      renders `class="mic-status mic-status-{micStatus} mb-3"` — so every one of the five is worn,
+      by an interpolation the literal matcher could not see. `isWornByInterpolation` sees it now, and
+      the five entries are gone from the catalog, which is this file's own declaration that something
+      is done.
+
+      What remains asserted is the SHAPE that made the error possible, so it cannot come back
+      silently: the surface exists and every state it can reach has a class.
+    */
+    const micStates = ['idle', 'testing', 'success', 'no-audio', 'error'];
+    for (const state of micStates) {
+      expect(isWorn(`mic-status-${state}`), `mic-status-${state}`).toBe(true);
+      expect(
+        ORPHANS[`mic-status-${state}`],
+        `mic-status-${state} is not an orphan`
+      ).toBeUndefined();
+    }
   });
 });
