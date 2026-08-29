@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
  *
  * | | count |
  * | --- | --- |
- * | referenced by NOTHING, anywhere | **6** |
+ * | referenced by NOTHING, anywhere | **15** — 6 values and 9 derived types |
  * | exported but read only inside their own module | 38 |
  * | modules imported by nothing, or only by tests | **1**, and it is a probe whose whole purpose is to be measured |
  *
@@ -30,12 +30,15 @@ import { describe, expect, it } from 'vitest';
  * decisions into a catalog to be argued one by one, for no defect. An export with NO reader is a
  * different thing: there is nothing to pair with.
  *
- * ## The six, and why each is still here
+ * ## The fifteen, and why each is still here
  *
- * None is an oversight; each is the residue of a subsystem that was removed, replaced or not yet
- * built. That is exactly why they need recording rather than deleting in silence — a reader who
- * finds `hashPassword` unused might reasonably conclude passwords are broken, when the truth is
- * that this room never creates one.
+ * None is an oversight. The six VALUES are each the residue of a subsystem that was removed,
+ * replaced or not yet built — which is exactly why they need recording rather than deleting in
+ * silence: a reader who finds `hashPassword` unused might reasonably conclude passwords are broken,
+ * when the truth is that this room never creates one. The nine TYPES are one line each, cost nothing
+ * at runtime, and are declared as complete sets beside siblings that are read.
+ *
+ * The nine were invisible until the collector was fixed on 2026-08-29 — see `exportsOf`.
  */
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -81,6 +84,60 @@ const UNREAD: Record<string, { module: string; why: string }> = {
       'this one is not, because the field uses the key name inline. A captured constant, so it is ' +
       'evidence as much as code.'
   },
+  /*
+    ── DERIVED TYPES, exported beside siblings that ARE read ─────────────────────────────────────
+
+    All nine are one line each and carry no runtime cost: six are `$inferSelect` row types declared
+    in a block with `User`, `Message` and the rest that DO have readers, and three are
+    `ReturnType<typeof …>` aliases for a factory's shape.
+
+    Kept as a SET rather than pruned to the ones currently imported. A schema that names a type for
+    six of its tables and not the other six is a schema whose next reader adds
+    `typeof chatMutes.$inferSelect` inline — which is the duplication the block exists to prevent.
+    The same argument holds for the three aliases: `RoomContext` is the shape the whole page is built
+    from, and it being currently inferable at every call site is not a reason to leave it unnamed.
+
+    These were INVISIBLE until 2026-08-29. The collector's `else if` chain attached its type branch
+    to an inner `if`, so exported types were never gathered at all; fixing that surfaced all nine at
+    once. A catalog is only as honest as the walk that fills it.
+  */
+  AlertQuestion: {
+    module: 'lib/server/db/schema.ts',
+    why: 'a `$inferSelect` row type, declared with its siblings.'
+  },
+  ChatMute: {
+    module: 'lib/server/db/schema.ts',
+    why: 'a `$inferSelect` row type, declared with its siblings.'
+  },
+  PollAnswer: {
+    module: 'lib/server/db/schema.ts',
+    why: 'a `$inferSelect` row type, declared with its siblings.'
+  },
+  PrivateMessage: {
+    module: 'lib/server/db/schema.ts',
+    why: 'a `$inferSelect` row type, declared with its siblings.'
+  },
+  SharedFile: {
+    module: 'lib/server/db/schema.ts',
+    why: 'a `$inferSelect` row type, declared with its siblings.'
+  },
+  UserSettings: {
+    module: 'lib/server/db/schema.ts',
+    why: 'a `$inferSelect` row type, declared with its siblings.'
+  },
+  BuiltInChatTab: {
+    module: 'lib/chat-tabs.ts',
+    why: 'the union of `BUILT_IN_CHAT_TABS`, named so a caller narrowing to those four does not re-derive it.'
+  },
+  RoomContext: {
+    module: 'lib/room/create-room.svelte.ts',
+    why: 'the shape the whole page is built from. Inferable at every call site today, which is not a reason to leave the room own type unnamed.'
+  },
+  RoomRefresh: {
+    module: 'lib/room/refresh.svelte.ts',
+    why: 'the factory shape, named for the same reason as `RoomContext`.'
+  },
+
   isDeadPreferenceKey: {
     module: 'lib/dead-preference-keys.ts',
     why:
@@ -98,17 +155,34 @@ function exportsOf(file: string, source: string): string[] {
   const visit = (node: ts.Node): void => {
     const modifiers = ts.canHaveModifiers(node) ? (ts.getModifiers(node) ?? []) : [];
     if (modifiers.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
-      if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name)
-        names.push(node.name.text);
-      else if (ts.isVariableStatement(node))
-        for (const declaration of node.declarationList.declarations)
+      /*
+        THREE INDEPENDENT QUESTIONS, each braced, and both halves of that were earned.
+
+        The first draft wrote them as an unbraced `else if` chain. It type-checked under `vitest`
+        (which strips types) and failed `svelte-check`, which CI runs with `--fail-on-warnings`:
+        narrowing `node` past an unbraced `for` reduced the next branch's intersection to `never`.
+
+        Reformatting then exposed a REAL BUG underneath the type error — `prettier` re-indented the
+        final `else if` onto the inner `if (ts.isIdentifier(...))`, which is where JavaScript had
+        been attaching it all along. Exported types, interfaces and enums were therefore collected
+        only when a variable declaration's name was NOT an identifier, which is to say never. The
+        type error and the logic error had the same cause, and only the braces fix both.
+      */
+      if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
+        if (node.name) names.push(node.name.text);
+      }
+      if (ts.isVariableStatement(node)) {
+        for (const declaration of node.declarationList.declarations) {
           if (ts.isIdentifier(declaration.name)) names.push(declaration.name.text);
-          else if (
-            ts.isTypeAliasDeclaration(node) ||
-            ts.isInterfaceDeclaration(node) ||
-            ts.isEnumDeclaration(node)
-          )
-            names.push(node.name.text);
+        }
+      }
+      if (
+        ts.isTypeAliasDeclaration(node) ||
+        ts.isInterfaceDeclaration(node) ||
+        ts.isEnumDeclaration(node)
+      ) {
+        names.push(node.name.text);
+      }
     }
     ts.forEachChild(node, visit);
   };

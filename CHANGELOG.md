@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 21:00 UTC — Every export has a reader, and the gate that says so had a bug hiding nine of them
+
+**Runtime impact: NO.** One gate. No application code changed.
+
+#### What was measured
+
+`CLAUDE.md`: *"Nothing exists without a consumer. No config nothing reads."* An export nobody imports
+is a promise to nobody — and it is invisible, because `eslint` sees a used symbol (it is exported)
+and `svelte-check` types it happily.
+
+Across **213 non-test modules**, every exported binding checked against every other `.ts` and
+`.svelte` in `src/` — **tests included**, because a symbol a contract test pins is genuinely read:
+
+| | count |
+| --- | --- |
+| referenced by NOTHING, anywhere | **15** — 6 values, 9 derived types |
+| exported but read only inside their own module | 38 |
+| modules imported by nothing | **0** |
+| modules imported only by tests | **1**, and it is a probe whose purpose is to be measured |
+
+**Zero orphaned modules across 213** is the headline: the module graph is clean.
+
+#### Only the first row is gated, and that is a judgement
+
+An exported constant with one internal reader is usually a deliberate pairing —
+`SWING_ALERT_PRICE_MAX_LENGTH` exists so a schema bound and the input respecting it are one value.
+Condemning those would push 38 real decisions into a catalog for no defect. An export with *no*
+reader has nothing to pair with.
+
+#### The six values, each the residue of a subsystem
+
+`spentHandoffs` (the single-use handoff guard, lost deliberately when the reference proved to mint no
+`jti`), `hashPassword` (this room verifies passwords and never creates one — accounts arrive by
+signed handoff), `isAdminRole`, `applyCookies` (the v5 client, blocked on the vendor), `SEARCH_ON_KEY`
+and `isDeadPreferenceKey`. **A reader who finds `hashPassword` unused might reasonably conclude
+passwords are broken.** They are recorded rather than deleted for exactly that reason.
+
+#### The gate's own bug, and what fixed it
+
+Three failures in a row, each exposing the next:
+
+1. **The catalog made its own symbols look read.** Naming all six in `UNREAD` meant the gate counted
+   itself as a reader and swept an empty list. Same false-positive the orphan-style gate hit through
+   comments; the gate's own file is now excluded, by name.
+2. **The entry-point pattern missed `+page.server.ts`**, reporting three route files as orphaned
+   modules. Matched on the basename now.
+3. **`svelte-check` found a type error `vitest` could not** — narrowing past an unbraced `for`
+   reduced a branch to `never`. Reformatting then exposed a **real logic bug underneath**: `prettier`
+   re-indented the final `else if` onto an inner `if`, which is where JavaScript had been attaching
+   it all along. **Exported types were only collected when a variable name was not an identifier —
+   which is to say never.** Bracing fixed both, and nine exported types appeared at once.
+
+A catalog is only as honest as the walk that fills it.
+
+**Verified:** `format:check`, `eslint`, `svelte-check` 1,352 files / 0 errors / 0 warnings, **200
+files / 3,210 tests green**. **Five negative controls seen RED**: a new export with no reader; a
+catalogued export gaining one; a catalogued entry naming the wrong module; a module nothing imports;
+the corpus no longer excluding the gate's own file. A sixth attempt did not fire — the module I
+un-imported still had other importers, which was my mutation being insufficient, not the gate.
+
 ### 2026-08-29 20:15 UTC — 185 lines of dead CSS deleted, in its own commit
 
 **Runtime impact: NO.** Nothing wore any of it — asserted, then confirmed in a browser.
