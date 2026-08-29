@@ -619,3 +619,71 @@ describe('an inert action really does nothing, executed', () => {
     }
   });
 });
+
+/*
+  ── THE CENSUS IN `TODO.md` ROW 4 IS THE ONE THIS FILE COMPUTES ───────────────────────────────────
+
+  ## Why a prose sentence is asserted from a test
+
+  Row 4 of `TODO.md` carries a one-line disposition census, and row 4 ends by naming THIS FILE as the
+  authority — *"read it, not this row"*. That instruction was the whole enforcement: a reader who
+  followed it got the truth, and a reader who did not got whatever the row last said.
+
+  Row W, in the same file, records what that costs. Its own count of this family was written as
+  seven, then nine, then twelve, and it says why in as many words: *"each was arithmetic over a
+  previous number rather than a read"*. Row 4 then repeated the failure in a smaller way — its
+  census said **40 dispatched, 6 inert, 3 carrying a fixed alert**, with `mute-chat-indefinitely`
+  named as the one that sends nothing. That was true when written and stopped being true the SAME
+  DAY: the control was wired on 2026-08-27 and its `EXACT_ALERTS` entry deleted. Row W recorded the
+  change. Row 4 kept the superseded number, and the two rows contradicted each other in one file for
+  two days.
+
+  Measured 2026-08-29: **39 dispatched, 6 inert, 2 carrying a fixed alert, neither a liar.**
+
+  ## What makes this cheap rather than ceremonial
+
+  All three numbers are already computed above, for the buckets. Nothing new is measured here — the
+  assertion only forbids the row from disagreeing with what this file already knew. A count that
+  drifts now fails on the commit that drifts it, naming both numbers, instead of being discovered by
+  somebody re-deriving it by hand a fortnight later.
+*/
+describe("TODO.md row 4's census still describes this code", () => {
+  const TODO = readFileSync('../../TODO.md', 'utf8');
+  const stated =
+    /\*\*Disposition census, measured [\d-]+: (\d+) dispatched actions, (\d+) inert, (\d+) carrying a fixed alert/.exec(
+      TODO
+    );
+
+  it('states a census in a form that can be checked', () => {
+    /*
+      Reworded away and this goes red rather than silently passing — the failure mode that makes a
+      document-reading assertion worthless. `todo-next-coverage-contract.test.ts` guards its own
+      totals line the same way, for the same reason.
+    */
+    expect(stated, 'row 4 no longer states a machine-checkable census').not.toBeNull();
+  });
+
+  it('counts the dispatched actions correctly', () => {
+    expect(Number(stated![1])).toBe(dispatchedActions().size);
+  });
+
+  it('counts the inert actions correctly', () => {
+    expect(Number(stated![2])).toBe(INERT_ACTION_NAMES.length);
+  });
+
+  it('counts the actions carrying a fixed alert correctly', () => {
+    expect(Number(stated![3])).toBe(TOAST_ONLY_ACTIONS.length);
+  });
+
+  it('does not still name a control that has since been wired', () => {
+    /*
+      The specific way row 4 went stale, denied by name. `mute-chat-indefinitely` left `EXACT_ALERTS`
+      on 2026-08-27; a census still calling it silent is describing a control that now sends.
+    */
+    const claimedSilent = /only `([a-z-]+)` sends nothing/.exec(TODO)?.[1];
+    expect(
+      claimedSilent && TOAST_ONLY_ACTIONS.includes(claimedSilent) ? [] : [claimedSilent].filter(Boolean),
+      `${claimedSilent} is named as sending nothing, but it is not in EXACT_ALERTS any more`
+    ).toEqual([]);
+  });
+});

@@ -33,6 +33,73 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 01:47 UTC — Two rows of TODO.md contradicted each other, and the census is now gated
+
+**Runtime impact: NO.** A tracker correction and five assertions added to an existing contract test.
+
+#### What was wrong
+
+`TODO.md` row 4 carried a disposition census: **"40 dispatched actions, 6 inert, 3 carrying a fixed
+alert — of which two are announcements over real sends and only `mute-chat-indefinitely` sends
+nothing."**
+
+Measured 2026-08-29 by replicating the contract's own scan: **39 dispatched, 6 inert, 2 carrying a
+fixed alert — and neither of those two is a liar.**
+
+The interesting part is not that it drifted, it is that the file already knew. `mute-chat-indefinitely`
+was wired on **2026-08-27** and its `EXACT_ALERTS` entry deleted the same day. **Row W recorded
+that**, in detail. Row 4 kept the superseded number. Two rows of one file disagreed with each other
+for two days, and row 4 ended by naming the contract test as the authority — *"read it, not this
+row"* — which is enforcement that works only on a reader who takes the advice.
+
+#### Why it earned a gate rather than an edit
+
+Row W's own text records the same family being counted as **seven, then nine, then twelve**, and
+says why: *"each was arithmetic over a previous number rather than a read."* A fourth correction with
+nothing holding it would have been the fifth number.
+
+`user-action-disposition-contract.test.ts` already computes all three numbers for its bucket
+assertions, so the gate measures nothing new — it only forbids the row from disagreeing with what
+the file already knew. Added: the three counts, a check that the sentence still parses at all, and
+one denying that a control named as silent is absent from `EXACT_ALERTS` — the exact way this row
+went stale.
+
+#### Also checked, and found correct
+
+* **Row W's remaining HIGH defect is real and live.** `admin-notes-password`
+  (`user-actions.svelte.ts:630-640`): the prompt's `onconfirm` takes **no parameter**, so the typed
+  password is never received, and the handler sets `'Wrong password!'` unconditionally. Row W
+  describes it accurately.
+* **`EXACT_ALERTS` holds two keys, not one.** A first read of this session said one — `restart-audio`
+  sits below a long comment and was missed by a truncated read. Row W was right; the correction is
+  recorded because a wrong reading that merely disappears teaches nobody why it was made.
+* **Row AF is complete**, both halves — the corrected paragraph in `chat-plain-text.ts:25-38` and the
+  companion note in `server/chat-html.ts:89-106` — and its `TODO.md` row is removed, not struck
+  through, as the convention requires.
+
+#### Not a finding, and recorded so it is not re-run
+
+A dead-export sweep over `apps/room/src` reported **342** exports with no consumer. It was wrong.
+Hand-checking five showed four used inside their own module as a return or parameter type
+(`AlertDelivery`, `OverlayCard`, `drawOverlayFrame`, `AlertSearch`), which the sweep excluded by
+construction, and the fifth (`ChatPagingState`) the same. **Zero genuine dead exports.** The question
+is also weaker than it looks here: exporting a constant so a contract test can pin it is this
+repository's documented practice, so "exported but unused elsewhere" is not evidence of death. No
+gate was built.
+
+#### Verified
+
+* **Five negative controls, each proved to have applied and each firing on exactly the right
+  assertion:** a wrong dispatched count, a wrong inert count, a wrong fixed-alert count, the sentence
+  reworded away (which fails the parse check first, as intended), and a wired control renamed as
+  silent. Green again after each restore.
+* `user-action-disposition-contract.test.ts` — **16 tests passing** (11 before).
+* `evidence-gap-register-counts.test.ts`, the only other test that reads `TODO.md` from disk — 4
+  passing.
+* `eslint` on the changed file — clean.
+* Restores were done from an in-memory copy rather than `git checkout`, after that mistake earlier
+  this session.
+
 ### 2026-08-29 01:38 UTC — The coverage map was being read as scope, and every number in it was wrong
 
 **Runtime impact: NO.** A tracker rewrite and one new test.
