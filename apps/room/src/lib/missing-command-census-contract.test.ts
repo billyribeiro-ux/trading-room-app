@@ -206,7 +206,17 @@ describe('the triage document tells the truth about what is built', () => {
     expect(
       notBuilt,
       'the buildable remainder of the census has changed — update this list and TODO.md with it'
-    ).toEqual(['archiveLogs', 'unarchiveLogs']);
+    ).toEqual([]);
+    /*
+      IT IS EMPTY, 2026-08-30. `archiveLogs` and `unarchiveLogs` were the last two, and they left as
+      `BUILT AS` rather than `BUILT` because this room names them `archiveChatLog` and
+      `unarchiveChatLog` — the reference's own names never appear in our source, which is exactly the
+      case that status exists for.
+
+      So every one of the twenty-five is now built, built under another name, or BLOCKED with the
+      blocker named. A row returning to `NOT BUILT` is a new finding, and it fails here until it is
+      listed above.
+    */
   });
 
   it('has no row marked BUILT whose command does not occur at all', () => {
@@ -234,7 +244,7 @@ describe('the triage document tells the truth about what is built', () => {
       is then free to be absent, which is the whole point.
     */
     const renamed = table.filter((row) => row.status.startsWith('BUILT AS '));
-    expect(renamed.length, 'the BUILT AS rows have gone; is the census still measuring?').toBe(5);
+    expect(renamed.length, 'the BUILT AS rows have gone; is the census still measuring?').toBe(7);
 
     const missing = renamed
       .filter((row) => !occurs(row.status.slice('BUILT AS '.length)))

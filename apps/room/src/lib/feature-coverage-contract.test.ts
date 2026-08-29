@@ -61,9 +61,16 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   (`presenter-commands.remote.ts`), and the pair is held together by
   `force-stop-screen-contract.test.ts` — a citation would not have caught this one, and did not.
 */
+/*
+  `archiveLogs` and `unarchiveLogs` left on 2026-08-30 — the last two rows the missing-command census
+  still carried as NOT BUILT after the other four were measured to real blockers. Cited at
+  `routes/chat-archive.remote.ts` and `lib/server/chat-archive.ts`, each beside its divergence:
+  deletion is scoped by the SESSION's room rather than by the `roomID` upstream sends from
+  `globals.sessData`, and the fourth dialog button — `Delete Searched`, which deletes by a LIKE
+  pattern the caller typed — is deliberately not drawn beside the reversible one.
+*/
 const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'alertQAMsg',
-  'archiveLogs',
   'callScreeen',
   'deleteAlertMsg',
   'deleteChatMsg',
@@ -93,7 +100,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'stopRecMsg',
   'stopRecMtx',
   'stopWebcam',
-  'unarchiveLogs',
   'updateChatMsg',
   'updateUserPM',
   'userDeleteChatMsg'

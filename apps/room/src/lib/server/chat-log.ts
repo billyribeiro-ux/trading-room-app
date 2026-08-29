@@ -1,4 +1,4 @@
-import { and, desc, eq, like } from 'drizzle-orm';
+import { and, desc, eq, isNull, like, type SQL } from 'drizzle-orm';
 
 import { db } from './db';
 import { messages, users } from './db/schema';
@@ -104,31 +104,51 @@ export type ChatChannel = string;
  * search results only. The `email -> hash` step below is the reason this pair travels together at
  * all: the raw address must never reach a client, and one function is one place to enforce that.
  */
-function chatRows() {
-  return db
-    .select({
-      id: messages.id,
-      room: messages.room,
-      senderId: messages.senderId,
-      body: messages.body,
-      isAdmin: messages.isAdmin,
-      backgroundColor: messages.backgroundColor,
-      fontColor: messages.fontColor,
-      answered: messages.answered,
-      replyToMessageId: messages.replyToMessageId,
-      replyToName: messages.replyToName,
-      replyToBody: messages.replyToBody,
-      reactionsJson: messages.reactionsJson,
-      createdAt: messages.createdAt,
-      bodyHtml: messages.bodyHtml,
-      senderName: users.displayName,
-      senderEmail: users.email,
-      senderAvatarUrl: users.avatarUrl,
-      senderRole: users.role,
-      senderStatus: users.status
-    })
-    .from(messages)
-    .innerJoin(users, eq(messages.senderId, users.id));
+function chatRows(where: SQL | undefined) {
+  return (
+    db
+      .select({
+        id: messages.id,
+        room: messages.room,
+        senderId: messages.senderId,
+        body: messages.body,
+        isAdmin: messages.isAdmin,
+        backgroundColor: messages.backgroundColor,
+        fontColor: messages.fontColor,
+        answered: messages.answered,
+        replyToMessageId: messages.replyToMessageId,
+        replyToName: messages.replyToName,
+        replyToBody: messages.replyToBody,
+        reactionsJson: messages.reactionsJson,
+        createdAt: messages.createdAt,
+        bodyHtml: messages.bodyHtml,
+        senderName: users.displayName,
+        senderEmail: users.email,
+        senderAvatarUrl: users.avatarUrl,
+        senderRole: users.role,
+        senderStatus: users.status
+      })
+      .from(messages)
+      .innerJoin(users, eq(messages.senderId, users.id))
+      /*
+      ARCHIVED ROWS ARE NOT THE LIVE LOG, and this predicate is the entire archive feature.
+
+      `messages.archiveId` is null while a message is live and points at a `chat_archives` row once
+      a presenter has swept it. Every reader goes through this builder, so the exclusion is stated
+      ONCE rather than at each call site — which is how one of them would eventually be forgotten.
+
+      Forgetting it is the failure worth naming: the sweep would write every row, the archive list
+      would fill, `unarchiveLogs` would restore correctly, and NOTHING would ever leave anybody's
+      screen. A whole feature, green and inert.
+
+      **The caller's predicate is a PARAMETER and not a chained `.where()`**, and that is not style.
+      Drizzle's `.where()` SETS the clause; a second call replaces the first rather than ANDing it,
+      so a `chatRows().where(...)` at the call site would silently drop this line and produce
+      exactly the inert feature above, with every test still green. Taking the predicate here makes
+      the combination the only way to build the query.
+    */
+      .where(and(isNull(messages.archiveId), where))
+  );
 }
 
 /** Rows as the client reads them: reactions parsed, and the address replaced by its hash. */
@@ -150,9 +170,10 @@ function chatRowsToMessages<T extends { senderEmail: string; reactionsJson: stri
  */
 export function loadChatPage(roomShortCode: string, channel: ChatChannel, page = 0) {
   return chatRowsToMessages(
-    chatRows()
+    chatRows(
       // `/sess/${sessionID}/chat/${channel}/` — this room's chat, and one channel of it.
-      .where(and(eq(messages.roomShortCode, roomShortCode), eq(messages.room, channel)))
+      and(eq(messages.roomShortCode, roomShortCode), eq(messages.room, channel))
+    )
       /* Newest first so the LIMIT keeps the newest, with `id` breaking ties: two messages in the same
        millisecond would otherwise page in an order SQLite is free to change between calls, which is
        how a row gets delivered twice or not at all. */
@@ -218,14 +239,13 @@ export function searchChatChannel(roomShortCode: string, channel: ChatChannel, t
   const needle = term.trim();
   if (!needle) return [];
   return chatRowsToMessages(
-    chatRows()
-      .where(
-        and(
-          eq(messages.roomShortCode, roomShortCode),
-          eq(messages.room, channel),
-          like(messages.body, `%${needle.replace(/[%_\\]/g, '\\$&')}%`)
-        )
+    chatRows(
+      and(
+        eq(messages.roomShortCode, roomShortCode),
+        eq(messages.room, channel),
+        like(messages.body, `%${needle.replace(/[%_\\]/g, '\\$&')}%`)
       )
+    )
       /*
         Newest first so the LIMIT keeps the newest matches, with `id` breaking ties for the reason
         `loadChatPage` gives: two rows in the same millisecond would otherwise order however SQLite

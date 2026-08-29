@@ -39,6 +39,7 @@
   import EmojiPicker from './EmojiPicker.svelte';
   import MobileRestorePane from './MobileRestorePane.svelte';
   import UserNotesPane from './UserNotesPane.svelte';
+  import LogArchiveModals from './LogArchiveModals.svelte';
   import FollowChatStylePane from './FollowChatStylePane.svelte';
   import type { UserNoteView } from '#lib/server/user-notes.js';
   import AvatarOptionsMenu from './AvatarOptionsMenu.svelte';
@@ -4200,50 +4201,7 @@
     onend={onPollEnd}
   />
 </app-poll-modal>
-<app-chat-logs-modal>
-  <Modal
-    id="chat-logs-modal"
-    open={name === 'chat-logs'}
-    ariaLabelledby="chat-logs-modal"
-    title="Chat Logs"
-    {onclose}
-    footerClass="text-center"
-  >
-    <div>
-      <button type="button" class="btn btn-primary my-2">Reload Log List</button>
-      <div class="list-group">
-        <h5 class="mt-2">There are no archived chats at this time</h5>
-      </div>
-    </div>
-    {#snippet footer()}
-      <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
-        Close
-      </button>
-    {/snippet}
-  </Modal>
-</app-chat-logs-modal>
-<app-alert-logs-modal>
-  <Modal
-    id="alerts-logs-modal"
-    open={name === 'alert-logs'}
-    ariaLabelledby="alerts-logs-modal"
-    title="Alerts Logs"
-    {onclose}
-    footerClass="text-center"
-  >
-    <div>
-      <button type="button" class="btn btn-primary my-2">Reload Log List</button>
-      <div class="list-group">
-        <h5 class="mt-2">There are no archived alerts at this time</h5>
-      </div>
-    </div>
-    {#snippet footer()}
-      <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
-        Close
-      </button>
-    {/snippet}
-  </Modal>
-</app-alert-logs-modal>
+<LogArchiveModals {name} {onclose} {onAlert} {onConfirm} />
 <app-session-control-modal>
   <Modal
     id="session-control-modal"

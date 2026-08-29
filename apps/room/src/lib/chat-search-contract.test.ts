@@ -183,7 +183,14 @@ describe('the LIKE pattern cannot be escaped out of', () => {
       `senderEmailHash`, so search results alone fall back to a placeholder avatar. The `email ->
       hash` step is why the pair travels together: the raw address must never reach a client.
     */
-    expect(SERVER).toContain('function chatRows()');
+    /*
+      `chatRows(where)` and not `chatRows()` since 2026-08-30. The predicate became a PARAMETER when
+      the archive arrived: drizzle's `.where()` SETS the clause rather than ANDing it, so a caller
+      chaining its own would have silently dropped the `isNull(messages.archiveId)` exclusion and
+      produced an archive feature that swept rows nothing ever hid. Asserted with the parameter, so
+      a revert to the chainable form fails here as well as in `chat-archive-contract`.
+    */
+    expect(SERVER).toContain('function chatRows(where: SQL | undefined)');
     expect(SERVER).toContain('function chatRowsToMessages<');
     expect((SERVER.match(/senderEmail: users\.email/g) ?? []).length).toBe(1);
     expect((SERVER.match(/hashEmail\(senderEmail\)/g) ?? []).length).toBe(1);

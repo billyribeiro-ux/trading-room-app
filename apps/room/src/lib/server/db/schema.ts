@@ -89,6 +89,65 @@ export const privateMessages = sqliteTable(
   ]
 );
 
+/**
+ * ONE SWEEP of the chat log into the archive — the thing `archiveLogs` creates and `unarchiveLogs`
+ * restores.
+ *
+ * ## The capture, read whole rather than inferred from the command name
+ *
+ * `archiveOptions()` at bundle byte 1,444,182 is a four-button dialog titled "Archive Chat
+ * Messages", and reading it is what settles the data model:
+ *
+ * ```js
+ * all:       confirm("Are you sure you want to archive the chats for everyone?")
+ *              -> archiveChatDate(new Date)
+ * dateRange: const o = new Date($("#date-archive-chat").val());
+ *            if (isNaN(o.getTime())) return bootbox.alert("Please select a date."), !1;
+ *            confirm("Are you sure you want to archive the chats older than selected date?")
+ *              -> archiveChatDate(o)
+ * ```
+ *
+ * and `archiveChatDate(e)` sends `{type:"chat", date:e, channel:this.channel}`.
+ *
+ * **"Archive All" is not a second operation.** It passes `new Date()` — everything older than NOW —
+ * so ONE predicate serves both buttons, and `olderThan` below is the only parameter the sweep has.
+ * Modelling them separately would have been two code paths for one rule.
+ *
+ * ## `channel`, because the reference scopes by it and this room has more than one
+ *
+ * The send carries `this.channel`, which is the chat COLUMN — `main`, the off-topic tab, the extra
+ * column. Archiving the main log must not sweep the off-topic one, and a sweep that ignored the
+ * channel would be discovered by whoever lost the wrong log.
+ *
+ * ## What is stored beyond the identity, and why each has a reader
+ *
+ * `messageCount` is the archive browser's own label: the reference lists archives by DATE
+ * (`loadLogs()` sets `logDates` from `getArchiveList`), and a list of bare dates gives a presenter
+ * no way to tell a sweep of four messages from a sweep of four thousand before restoring it.
+ * `archivedByUserId` is who did it — an administrative act on everybody's data, and the one
+ * question an incident asks first.
+ */
+export const chatArchives = sqliteTable(
+  'chat_archives',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    roomShortCode: text('room_short_code').notNull(),
+    /** The chat column this sweep took, `messages.room` — NOT the room. */
+    channel: text('channel').notNull(),
+    /** Everything strictly older than this was swept. "Archive All" passes the moment it was run. */
+    olderThan: integer('older_than', { mode: 'timestamp' }).notNull(),
+    archivedAt: integer('archived_at', { mode: 'timestamp' }).notNull(),
+    archivedByUserId: integer('archived_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    messageCount: integer('message_count').notNull()
+  },
+  (table) => [
+    /* Every read is "the archives of room R", newest first. Nothing ever reads across rooms. */
+    index('chat_archives_room_idx').on(table.roomShortCode, table.archivedAt)
+  ]
+);
+
 export const messages = sqliteTable('messages', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   /*
@@ -132,6 +191,25 @@ export const messages = sqliteTable('messages', {
    * bold, which is a different message from the one they sent.
    */
   bodyHtml: text('body_html'),
+  /**
+   * The archive this message was swept into, or null while it is LIVE.
+   *
+   * ## Why a nullable pointer and not a `deleted_at`-style flag
+   *
+   * Because the reference restores. `unarchiveLogs {type, roomID, archiveID}` puts a whole archive
+   * back into the live log, so the archive has to be a THING with an identity, not a state each row
+   * remembers separately — otherwise "restore the sweep from the 14th" means finding every row
+   * whose timestamp falls in a window, which is a different and lossier question.
+   *
+   * NULL is the live state, so every existing row is live without a backfill and every insert stays
+   * a live insert without naming this column. That is deliberate: an archive is a rare
+   * administrative act, and the common path should not have to know it exists.
+   *
+   * **The exclusion lives in `chatRows()`, and it is the load-bearing half.** A pointer nothing
+   * filters on is a column that archives nothing; `chat-archive-contract.test.ts` asserts the
+   * predicate is there, because forgetting it would leave the whole feature green and inert.
+   */
+  archiveId: integer('archive_id').references(() => chatArchives.id),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
 

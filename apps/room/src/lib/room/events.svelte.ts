@@ -6,6 +6,7 @@ import { isMtxStream } from '#lib/mtx-streams.js';
 import type { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
 import { formatUserLocation } from '#lib/roster-gates.js';
 import { playSoundEffect } from '#lib/sound-effects.js';
+import { ROOM_RECORDING_COMMANDS } from './recording-commands';
 
 import type { RoomBroadcasts } from './broadcasts.svelte';
 import type { AddressedCommand, RoomPrivateCommands } from './private-commands';
@@ -349,6 +350,11 @@ export class RoomEventStream<Entry> {
           );
           return;
         }
+        /* A presenter swept or restored the chat log — see `chat-archive.remote.ts` for the weight. */
+        if (command?.cmd === 'chatArchiveChanged') {
+          void invalidateAll();
+          return;
+        }
         if (command?.cmd === 'openSession') {
           this.#alertThenReload('The session is now open, click here to reload the page and enter');
           return;
@@ -370,28 +376,14 @@ export class RoomEventStream<Entry> {
           `prefs.recordingStopSound` (resume plays the start sound behind the stop preference), and
           neither checks `videoOnlyMode` where start and stop do.
         */
-        if (command?.cmd === 'startRec') {
-          this.#media.roomRecordingStarted(command.recName ?? '');
-          if (!this.#prefs.doNotDisturbOn && this.#prefs.recordingStartSound)
-            playSoundEffect('recordingStart');
-          return;
-        }
-        if (command?.cmd === 'stopRec') {
-          this.#media.roomRecordingStopped();
-          if (!this.#prefs.doNotDisturbOn && this.#prefs.recordingStopSound)
-            playSoundEffect('recordingStop');
-          return;
-        }
-        if (command?.cmd === 'pauseRec') {
-          this.#media.roomRecordingPauseChanged(true);
-          if (!this.#prefs.doNotDisturbOn && this.#prefs.recordingStopSound)
-            playSoundEffect('recordingStop');
-          return;
-        }
-        if (command?.cmd === 'resumeRec') {
-          this.#media.roomRecordingPauseChanged(false);
-          if (!this.#prefs.doNotDisturbOn && this.#prefs.recordingStopSound)
-            playSoundEffect('recordingStart');
+        /* The sound each one plays is a TABLE — see `recording-commands.ts` for the quirk it makes visible. */
+        const recording = command?.cmd ? ROOM_RECORDING_COMMANDS[command.cmd] : undefined;
+        if (recording && command?.cmd) {
+          if (command.cmd === 'startRec') this.#media.roomRecordingStarted(command.recName ?? '');
+          else if (command.cmd === 'stopRec') this.#media.roomRecordingStopped();
+          else this.#media.roomRecordingPauseChanged(command.cmd === 'pauseRec');
+          if (!this.#prefs.doNotDisturbOn && this.#prefs[recording.preference])
+            playSoundEffect(recording.sound);
           return;
         }
 

@@ -70,11 +70,11 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 60 surfaces, measured
+## The inventory — all 62 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,188 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,146 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
 | 3 | `routes/+page.svelte` | 1,473 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,187 | no |
@@ -130,13 +130,15 @@ guessed.
 | 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 60 surfaces audited · 1,059 of 28,414 lines · 3.7%.**
+**2 of 62 surfaces audited · 1,059 of 28,665 lines · 3.7%.**
 
 | 56 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 57 | `routes/logout/+page.svelte` | 31 | no |
 | 58 | `routes/+layout.svelte` | 27 | no |
 | 59 | `lib/components/FollowChatStylePane.svelte` | 151 | no |
 | 60 | `lib/components/UserNotesPane.svelte` | 123 | no |
+| 61 | `lib/components/LogArchiveModals.svelte` | 147 | no |
+| 62 | `lib/components/ChatArchivePane.svelte` | 146 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

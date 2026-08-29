@@ -33,6 +33,102 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 02:35 UTC — The chat archive, and the census is now empty of buildable work
+
+**Runtime impact: YES.** A presenter can sweep a chat column's messages older than a date — or all
+of them — into an archive, browse the archives, and restore one. Archived messages leave every
+member's log. New table `chat_archives`, new column `messages.archive_id`, migration
+`0010_chat_archives.sql`.
+
+`archiveLogs` and `unarchiveLogs` were the last two rows `missing-commands-triage.md` carried as
+NOT BUILT after the other four were measured to real blockers earlier tonight. **That column is now
+empty**: every one of the twenty-five commands is built, built under another name, or BLOCKED with
+its blocker named.
+
+#### The exclusion is the feature, and it nearly shipped droppable
+
+`messages.archiveId` is null while a message is live. Everything else — the sweep, the browser, the
+restore — is bookkeeping around one predicate in `chatRows()`. Without it the sweep writes every
+row, the archive list fills, restore works correctly, and **nothing ever leaves anybody's screen**:
+a whole feature, green and inert.
+
+The first draft chained it: `chatRows()` ending in `.where(isNull(...))`, with both callers chaining
+their own `.where(...)` after. **Drizzle's `.where()` SETS the clause rather than ANDing it**, so
+each caller would have silently replaced the exclusion, and every test would still have passed
+because they measure the builder rather than the query it produces. The predicate is a PARAMETER
+now — `chatRows(where)` — which makes the combination the only way to build the query, and the
+contract test refuses the chainable form as well as the missing filter.
+
+#### Three divergences, each recorded where it is made
+
+**1. The room is never an argument.** Upstream's `unarchiveLogs` carries `roomID` from
+`globals.sessData.roomID` — a client-held value naming which room to act on. Every function here
+takes the room from the session, and the archive id is checked against it, so a presenter of room A
+naming room B's archive matches zero rows.
+
+**2. The channel list comes from the server.** The reference's dialog can only sweep the column its
+toolbar was opened from; this browser is a room-level modal, so it must name a channel. The only
+alternatives were guessing `'main'` — a lie in any room that configured a second column — or asking.
+It asks, using `memberChatChannels`, the same allow-list the sweep itself is checked against, so the
+picker cannot offer a channel the sweep would then refuse and a badge channel this presenter does
+not hold is absent from both.
+
+**3. `Delete Searched` is not drawn.** The fourth button on upstream's dialog deletes by a LIKE
+pattern the caller typed. Archiving is reversible and that is not; putting both on one surface blurs
+the distinction at exactly the moment a presenter is standing there making it. It stays its own row
+on the census, and the contract test asserts the string appears in none of the three files.
+
+#### The count is taken from the write, not from a read before it
+
+`archiveChatChannel` inserts the archive, then stamps rows with a single conditional
+`UPDATE … RETURNING`, and `messageCount` is the length of what came back. A `SELECT count(*)` first
+would be a TOCTOU: a message posted between the two lands in the sweep and not in the count, so the
+browser offers to restore forty when it holds forty-one. An empty sweep is REFUSED — 409, with the
+archive row removed — rather than recorded as an entry that restores nothing.
+
+#### What was there before
+
+`ModalHost.svelte` drew this modal with the literal string *"There are no archived chats at this
+time"* and a `Reload Log List` button carrying **no `onclick` at all** — a control whose only effect
+was being drawn, reporting a fact about the room that nothing had checked.
+
+#### The ratchet argued for a better arrangement, twice
+
+The first wiring threaded a thirty-seventh state class from `create-room` through `+page.svelte` and
+`RoomOverlays` to `ModalHost`. `source-size-contract.test.ts` refused it at **all three** — each was
+at its ceiling. Following the instruction produced the better shape: `LogArchiveModals.svelte` owns
+the holder itself, using the `onAlert` / `onConfirm` callbacks `ModalHost` already receives, and
+nothing between the page and that component knows the feature exists.
+
+It also forced a second extraction that stands on its own. `events.svelte.ts` gained an arm and had
+to give one back, so the four recording commands became a TABLE in `recording-commands.ts` — and
+that is worth more than the sixteen lines: the capture has a quirk in exactly that mapping,
+`resumeRec` plays the START sound behind the STOP preference, and in a table that row visibly
+disagrees with its neighbours instead of being one word inside the fourth of four near-identical
+handlers. `events.svelte.ts`'s ceiling drops 935 → 927; `ModalHost.svelte`'s file drops to 6,146.
+
+#### Verification
+
+Seven negative controls, each seen RED — **after one that did not fire and was my own error**: the
+first attempt at "drop the exclusion" targeted a line with a trailing semicolon that prettier had
+moved, so the mutation never applied and the control passed for no reason at all. Corrected and
+re-run before anything was concluded from it.
+
+1. Drop the exclusion — the whole feature goes inert.
+2. Make the builder chainable again, so the drop becomes possible.
+3. Accept any channel the caller names.
+4. Record an empty sweep as an archive.
+5. Unscope the unarchive from the room.
+6. Guess the channel list instead of asking the server.
+7. Drop upstream's `isNaN` guard.
+
+Room suite **210 files / 3,399 tests**, `svelte-check` 0/0 over 1,381 files, eslint clean, prettier
+clean, browser suite **10 passed**. Controller untouched and not run; `services/**` untouched.
+
+**Not verified:** no two-browser test of a member's log emptying while they watch — the broadcast is
+argued from the handler rather than demonstrated, and the archive round trip is asserted in unit
+tests rather than against a real second client.
+
 ### 2026-08-30 01:40 UTC — Four of the census's six "NOT BUILT" commands cannot be built here at all
 
 **Runtime impact: NO.** A tracker document, its contract test, and one new machine-checked status.

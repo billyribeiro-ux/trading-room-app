@@ -290,6 +290,17 @@ export function ensureDatabase() {
       last_seen_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_last_seen_idx ON sessions(last_seen_at);
+    CREATE TABLE IF NOT EXISTS chat_archives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      older_than INTEGER NOT NULL,
+      archived_at INTEGER NOT NULL,
+      archived_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      message_count INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS chat_archives_room_idx
+      ON chat_archives(room_short_code, archived_at);
     CREATE TABLE IF NOT EXISTS user_notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       room_short_code TEXT NOT NULL,
@@ -401,6 +412,10 @@ export function ensureDatabase() {
   const messageColumns = new Set(
     (sqlite.pragma('table_info(messages)') as Array<{ name: string }>).map((column) => column.name)
   );
+  /* The chat archive, 2026-08-30. Null is LIVE, so every existing row stays live with no backfill. */
+  if (!messageColumns.has('archive_id')) {
+    sqlite.exec('ALTER TABLE messages ADD COLUMN archive_id INTEGER REFERENCES chat_archives(id)');
+  }
   if (!messageColumns.has('is_admin')) {
     sqlite.exec('ALTER TABLE messages ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
   }
