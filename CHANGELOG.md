@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 21:45 UTC — A browser finally watched a room setting change the DOM
+
+**Runtime impact: none.** Verification, and the kind this repository had none of at this seam.
+
+#### The row, and what it actually asked for
+
+`TODO.md` row E has stood open since it was written, and it was the only row in the blocked table
+marked *"nothing — this one is mine to run"*. Its ask, in its own words: *"the gates ARE tested —
+`chat-alerts-gates-contract.test.ts`, 30 assertions across 13 tests, negative-controlled — but no
+browser has watched a column leave the DOM when an owner ticks the box."*
+
+That gap was real rather than a formality. Everything between the setting and the pixel is covered in
+pieces — the controller decides what crosses, the room signs for it, `RoomGates` resolves it,
+`RoomShell` renders on it — and each piece is asserted against a stub of its neighbour. **A seam is
+exactly where that kind of cover is weakest**: every piece can be right about an interface both sides
+have got wrong.
+
+#### What was built, and why it is not the instrument the row describes
+
+The row's instrument was `room-config-seam-e2e.mjs`: untracked (`git ls-files` returns 0), absent
+from a fresh checkout, and declaring `CONTROL=http://localhost:5180` while the controller's dev port
+is 5173 — so its one attempted run reached a different project entirely and got a 404 from
+`/register`.
+
+`apps/room/e2e/room-config-seam.spec.ts` is a TRACKED spec in the suite that already boots both
+halves, so it runs on every push instead of by hand. And it sees more than the probe could: because
+`stub-controller.mjs` now keys settings on the SHORT CODE — *"any short code is a room"* was already
+true of it — **the same build answers both ways in one run**. That is the only version of the
+assertion that can tell *"the column is hidden"* apart from *"the column was never built"*.
+
+```
+✓ the chat/alerts column is THERE when the owner has not hidden it   (2.0s)
+✓ the chat/alerts column is GONE  when the owner has hidden it       (1.7s)
+```
+
+The assertion is a COUNT of zero, not invisibility, because `RoomShell` removes the pane rather than
+hiding it — the reference's `O(2, hideChatAlerts ? -1 : 2)`. A hidden-but-present column would still
+receive messages, still scroll, and still cost the member the render.
+
+#### Three negative controls seen RED, and the third is the point
+
+* removing the `{#if !hideChatAlerts}` gates — the column can never leave;
+* inverting them — it can never be present;
+* **removing `hideChatAlerts` from the controller's `ROOM_VISIBLE_SETTINGS`** — the column stays.
+
+The third is what makes this a seam test rather than a component test: the failure is on the
+controller, three modules away from the markup being asserted.
+
+#### The honest limit, stated at the file rather than discovered later
+
+The stub is not the controller. It verifies the `config-read` HMAC and refuses a `config-write` token
+on the read route, so the CAPABILITY half of the seam is real traffic — but the settings it returns
+are the spec's, not a database's. What is proven is that a value crossing the seam reaches the DOM
+and changes it; that the controller puts the right value on the wire stays
+`room-config-boundary.test.ts`'s subject. Two services in one job would give every failure two
+possible causes.
+
+#### Verification
+
+Full browser suite **10 passed** (8 existing plus these 2). `eslint` clean, `prettier --check` clean,
+`svelte-check` 0/0, unit suite **207 files / 3,317 passed**.
+
 ### 2026-08-29 21:20 UTC — Three stale claims in the streaming docs, and the row reporting two of them was stale about the third
 
 **Runtime impact: none.** Documentation, corrected against the code rather than against itself.
