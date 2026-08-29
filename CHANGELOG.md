@@ -33,6 +33,82 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 04:30 UTC — The roster stopped following presenter elevation, and the compiler had been saying so
+
+**Runtime impact: YES.** A member elevated to presenter mid-session kept a non-presenter's roster.
+
+#### The connector, stated first because it is the reason this was found the hard way
+
+The Svelte MCP was reported enabled. Measured in the same call that lists every connector: **Google
+Drive `enabledInChat: true`, Linear `enabledInChat: true`, svelte `enabledInChat: false`.** The toggle
+has not reached this session. `svelte-autofixer` still cannot be run here.
+
+So the next best thing was done instead — **the compiler itself**, which is what the autofixer wraps.
+`svelte.compile` / `svelte.compileModule` over every component and rune module in the room.
+
+#### What it found in one pass
+
+`svelte-check --threshold warning` reports **0 warnings** for `lib/room/create-room.svelte.ts`.
+`compileModule` reports **three** on the same file. One of them was a live defect:
+
+```ts
+return { …, rosterViewer } as const;   // state_referenced_locally
+```
+
+`rosterViewer` is `$derived` over `isPresenter` and `media.limitedPresenter`. Returning it **by
+value** handed `+page.svelte` a snapshot taken at construction — and the page **destructures** that
+object, so `rowVisible()` filtered the roster with a frozen viewer. `rosterRowVisible` reads
+`viewer.isPresenter`, and `giveMicScreen` elevates a member to presenter mid-session, so in a room
+with `onlyPresentersVisibleToViewers` on the new presenter kept a non-presenter's roster.
+
+The same value was already **live** twelve hundred lines above — `gates` receives
+`rosterViewer: () => rosterViewer`. One value, two consumers, one of them frozen.
+
+#### Measured, not argued
+
+`derived-return-probe.svelte.ts` returns one `$derived` three ways. Reading before and after a change:
+
+```
+before { snapshot: 0, live: 0, thunk: 0 }
+after  { snapshot: 0, live: 2, thunk: 2 }
+```
+
+**By value stays 0. Getter and thunk move.** A fourth case matters as much: a getter that is
+DESTRUCTURED is read once and is exactly as frozen — so returning a getter alone would have looked
+like a fix and changed nothing. Both ends had to move. The fix is a thunk, matching `gates`.
+
+#### The gate
+
+`svelte-compiler-warning-contract.test.ts` runs the compiler over every `.svelte` and `.svelte.ts` and
+fails on any warning not in a catalog that records **file, code, count and reason**. A count rather
+than a boolean, because "this file may warn" would have absorbed `rosterViewer` silently.
+
+Two warnings remain, both argued at the code as one-time seeds. The probe's own warning is argued
+too — it exhibits the pattern on purpose, and removing it would remove the thing being measured.
+
+**This is not a duplicate of `svelte-check`.** That runs the language server and does not surface
+`compileModule` warnings for `.svelte.ts` rune modules, which is where this room keeps its reactive
+state. The 0-versus-3 disagreement is the whole reason the file exists.
+
+#### A first draft that recorded nothing
+
+The probe's tests were first written inside `$effect.root`, following `prefs.svelte.test.ts`. **Every
+array came back empty** — the body recorded nothing and threw nothing, the same silent shape
+`vite.config.ts` warns about for SSR-compiled effects. That pattern is right for asserting an
+`$effect` re-runs; this asserts what a plain read returns, and a read needs no reactive context. The
+note is in the file so the next person does not add a root that quietly disables their own test.
+
+#### Verified
+
+* **Three negative controls, each proved to have applied:** reverting the fix (by-value `rosterViewer`
+  again) fails the sweep; a new file raising an unargued warning fails it; an argued count going stale
+  fails it. A fourth control was **rewritten because it did not fire** — a class-field read does not
+  raise this warning, so it proved nothing until replaced with a shape that does.
+* Room **192 files, 3,135 passed, 1 skipped**; `svelte-check` **1,339 files 0/0**; `eslint` clean.
+* Controller **97 files, 1,024 passed, 21 skipped**.
+* `create-room.svelte.ts`'s ceiling raised 1207 → 1225 with the argument at the entry; the probe
+  capped at 30.
+
 ### 2026-08-29 04:00 UTC — `admin-notes-password` compared nothing; row W's last liar is wired
 
 **Runtime impact: YES.** A presenter typing the **correct** notes password was told it was wrong,

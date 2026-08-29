@@ -1722,6 +1722,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the eleven floating menus and the two closers that deliberately differ'
   },
   {
+    file: 'lib/room/derived-return-probe.svelte.ts',
+    max: 30,
+    why: 'a PROBE: what a caller gets when a $derived is returned by value, by getter and by thunk'
+  },
+  {
     file: 'lib/room/notes-access.svelte.ts',
     max: 141,
     why: "the notes-password door — upstream's `allowToManageNotes` and the two-call check that sets it"
@@ -2572,7 +2577,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every gate in this repository. It is declared beside the `prefs` it reads and returned so the
       page uses the same one, which is what makes a second copy impossible rather than merely unwise.
     */
-    max: 1207,
+    max: 1225,
+    /*
+      1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
+      the other one.
+
+      `rosterViewer` was returned BY VALUE from the composition root, which handed `+page.svelte` a
+      snapshot of a `$derived` and made the roster filter stop following presenter elevation. It is a
+      thunk now — the same shape `gates` receives twelve hundred lines above. The reason is long
+      because the defect was invisible to `svelte-check` and visible to the compiler, and the next
+      person to shorten this return needs to know which of those to trust.
+    */
     /*
       1205 -> 1207, 2026-08-29. Two lines: the `notes-auth.remote` import and `notesCheck:` passed to
       `RoomUserActions`. Passed BESIDE `commands` rather than inside it because it is not a

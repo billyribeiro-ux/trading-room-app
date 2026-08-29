@@ -395,7 +395,7 @@
   }
 
   function rowVisible(entry: RosterEntry) {
-    return rosterRowVisible(rosterViewer, rosterSession, entry);
+    return rosterRowVisible(rosterViewer(), rosterSession, entry);
   }
 
   // `data` satisfies `NoteSurfaceSources` structurally; which of its fields the notes surface reads

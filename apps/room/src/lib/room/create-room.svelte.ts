@@ -1198,7 +1198,25 @@ export function createRoom(deps: RoomDeps) {
     feedScroll,
     alertsPane,
     loadedChatStyle,
-    rosterViewer
+    /*
+      A THUNK, not the value — corrected 2026-08-29, and it was a live defect.
+
+      `rosterViewer` is `$derived` over `isPresenter` and `media.limitedPresenter`, and returning it
+      by value handed the page a SNAPSHOT taken at construction. `+page.svelte` destructures this
+      object, so `rowVisible()` filtered the roster with a viewer frozen before anyone could be
+      elevated — and `giveMicScreen` elevates a member to presenter mid-session. In a room with
+      `onlyPresentersVisibleToViewers` on, the new presenter kept a non-presenter's roster.
+
+      The Svelte compiler said so all along: `state_referenced_locally` on this line. `svelte-check`
+      reports 0 warnings for this file while `svelte.compileModule` reports three, which is why it
+      went unseen. `derived-return-probe.svelte.test.ts` measures the difference rather than arguing
+      it — by value stays 0 across a change, a getter and a thunk both move to 2.
+
+      A thunk rather than a getter because the consumer DESTRUCTURES: a destructured getter is read
+      once and is exactly as frozen. The probe asserts that too. It also matches how `gates` already
+      receives this same value, twelve hundred lines above.
+    */
+    rosterViewer: () => rosterViewer
   } as const;
 }
 
