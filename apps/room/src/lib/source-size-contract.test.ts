@@ -537,7 +537,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       RAISED 1470 -> 1472 on 2026-08-29: two props for the navbar's Benzinga item. Assembly only —
       the argument is on `RoomNavbar.svelte`.
     */
-    max: 1472,
+    /*
+      RAISED 1472 -> 1474 on 2026-08-29, for `restoreMobileAppTokens` — the Mobile App tab. Argued because the
+      rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
+      `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
+    */
+    max: 1474,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1123,7 +1128,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in that catalog turned red the moment the button existed and has been deleted, which is the
       declaration that it is done.
     */
-    max: 836,
+    /*
+      RAISED 836 -> 848 on 2026-08-29, for `restoreMobileAppTokens` — the Mobile App tab. Argued because the
+      rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
+      `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
+    */
+    max: 848,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1712,7 +1722,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       edge"* — was not read until after. That row is truncated in the document, so the arithmetic and
       the three alert sentences come from the bundle itself at bytes 2,084,700 and 2,086,100.
     */
-    max: 6215,
+    /*
+      6215 -> 6275, 2026-08-29, for the troubleshooter's Mobile App TAB — and the PANE is not in this
+      number, which is the point of the raise being this small.
+
+      The pane went in here first and this contract refused it. The extraction to
+      `MobileRestorePane.svelte` bought more than a line count, and that is why it was the right
+      answer rather than a concession: the result message is now the PANE's state, so a tab change
+      unmounts it and "leaving the tab drops the last result" is structural instead of a line in
+      `onConnectivityTabChange` that a later reader deletes as redundant.
+
+      What is left here is the tab button (consts 9/10/11, with the one `fa-mobile-alt` in the whole
+      bundle), the `{:else if}` that mounts the pane, and two props. Most of the sixty lines are the
+      note on `mobileAppAvailable`: upstream renders this tab with NO gate — the anomaly
+      `mobile-app-decoded.md` §3 row 26 records, verified by reading the whole troubleshooter
+      component rather than by pattern — and gating it here is a deliberate decision, because a room
+      with no app would otherwise show a tab whose only button answers 409 every time.
+    */
+    max: 6275,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3230,6 +3257,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/components/ImageUploadDialog.svelte',
     max: 126,
     why: 'the composer image dialog, instantiated per feature rather than shared'
+  },
+  {
+    file: 'lib/components/MobileRestorePane.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The troubleshooter's Mobile App pane — `PAe` @ 2,438,242, which is one paragraph and one
+      button and nothing else. It is 131 lines because almost all of it is why: the copy is verbatim
+      including its missing full stop, `.mobile-app-container` carries no rule anywhere and is worn
+      regardless, and the sentence this pane composes is the one thing here deliberately NOT
+      transcribed — upstream alerts "Command sent successfully…" on the statement after the transmit,
+      unconditionally, to a member who by this pane's own copy is not getting notifications.
+    */
+    max: 131,
+    why: 'the Mobile App pane; it composes the sentence upstream raises over nothing'
   },
   {
     file: 'lib/components/Modal.svelte',

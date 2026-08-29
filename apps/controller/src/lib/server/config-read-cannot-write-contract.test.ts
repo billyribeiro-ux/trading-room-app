@@ -131,7 +131,20 @@ describe('every internal route verifies the credential its job needs', () => {
     what puts it here rather than in WRITES. The same shape as `room-entry` beside it — the
     credential stays and the question travels.
   */
-  const READS = ['room-config', 'room-entry', 'room-notes-auth', 'mobile-pin', 'stream-read'];
+  /*
+    `mobile-restore` joined 2026-08-29, and it is the one entry in this list that is NOT read-only —
+    it sends a push notification and can delete a dead registration. It is here anyway, and the
+    distinction is worth stating rather than glossing.
+
+    This split is about the room's CONFIGURATION. `room-ban`, `room-permissions` and `room-setting`
+    change a room's stored settings from the room, and those take `config-write`. `mobile-restore`
+    changes no setting: it is the same shape as `mobile-pin` directly above it — a POST, on demand,
+    for one named member, reached only when that member presses a button about their own device —
+    and `mobile-pin` MINTS a credential, so "read" here has never meant "no side effect".
+
+    What both actually assert is that the room may ask this question, not that the answer is free.
+  */
+  const READS = ['room-config', 'room-entry', 'room-notes-auth', 'mobile-pin', 'mobile-restore', 'stream-read'];
 
   it.each(WRITES)('%s verifies a WRITE capability', async (route) => {
     const source = await sourceOf(route);

@@ -74,15 +74,15 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,214 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,273 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
-| 3 | `routes/+page.svelte` | 1,471 | no |
+| 3 | `routes/+page.svelte` | 1,473 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,187 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,007 | no |
 | 6 | `lib/components/PresentationArea.svelte` | 958 | no |
 | 7 | `lib/components/RoomNavbar.svelte` | 1,006 | no |
 | 8 | `lib/components/PollPanel.svelte` | 824 | no |
-| 9 | `lib/components/RoomOverlays.svelte` | 835 | no |
+| 9 | `lib/components/RoomOverlays.svelte` | 847 | no |
 | 10 | `lib/components/RoomSidebar.svelte` | 777 | no |
 | 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
@@ -114,25 +114,26 @@ guessed.
 | 38 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
 | 39 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
 | 40 | `lib/components/BootboxDialog.svelte` | 131 | no |
-| 41 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 42 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 43 | `lib/components/CloseSessionPane.svelte` | 104 | no |
-| 44 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 45 | `lib/components/ChatSearchBar.svelte` | 88 | no |
-| 46 | `lib/components/CompactMessageRow.svelte` | 77 | no |
-| 47 | `lib/components/PositionsContainer.svelte` | 74 | no |
-| 48 | `lib/components/ModeratorMessage.svelte` | 73 | no |
-| 49 | `lib/components/ToastHost.svelte` | 64 | no |
-| 50 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 51 | `lib/components/ChatTabStrip.svelte` | 55 | no |
-| 52 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 53 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
-| 54 | `lib/components/PositionsControls.svelte` | 44 | no |
-| 55 | `routes/logout/+page.svelte` | 31 | no |
+| 41 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 42 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 43 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 44 | `lib/components/CloseSessionPane.svelte` | 104 | no |
+| 45 | `lib/components/RoomBranding.svelte` | 91 | no |
+| 46 | `lib/components/ChatSearchBar.svelte` | 88 | no |
+| 47 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 48 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 49 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 50 | `lib/components/ToastHost.svelte` | 64 | no |
+| 51 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 52 | `lib/components/ChatTabStrip.svelte` | 55 | no |
+| 53 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 54 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
+| 55 | `lib/components/PositionsControls.svelte` | 44 | no |
 
-**2 of 56 surfaces audited · 1,059 of 27,890 lines · 3.8%.**
+**2 of 57 surfaces audited · 1,059 of 28,093 lines · 3.8%.**
 
-| 56 | `routes/+layout.svelte` | 27 | no |
+| 56 | `routes/logout/+page.svelte` | 31 | no |
+| 57 | `routes/+layout.svelte` | 27 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

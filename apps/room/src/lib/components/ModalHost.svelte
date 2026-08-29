@@ -37,6 +37,7 @@
   import AlertQaModal from './AlertQaModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
+  import MobileRestorePane from './MobileRestorePane.svelte';
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
   import PostAlertModal from './PostAlertModal.svelte';
@@ -264,6 +265,26 @@
      * pair code. `N/A` is the captured value for "not answered yet".
      */
     mobilePin?: string;
+    /**
+     * Whether this member can reach the mobile app at all — `gates.mobileAppAvailable`.
+     *
+     * Gates the Mobile App TAB, which upstream does not gate at all. That absence is
+     * `docs/decoded/mobile-app-decoded.md` §3 row 26, verified by reading the whole troubleshooter
+     * component: `ptrMobileAppEnabled` occurs five times in the bundle and none is in that range.
+     *
+     * The doc asks for a deliberate decision rather than a copy, and this is it. A room with no app
+     * configured would otherwise show a tab whose only button answers 409 every time — a control
+     * whose sole effect is its own presence, which this repository refuses by name. The endpoint is
+     * gated regardless; this stops the member being offered something that cannot work.
+     */
+    mobileAppAvailable?: boolean;
+    /** `restoreMobileAppTokens` — see `runMobileRestore`, which composes what the member reads. */
+    onrestoremobiletokens: () => Promise<{
+      registrations: number;
+      sent: number;
+      failed: number;
+      pruned: number;
+    }>;
     /** `sessData.customMobileAppAndroidUrl`, when `customMobileAppEnabled`. */
     mobileAndroidUrl?: string | null;
     /** `sessData.customMobileAppIOSUrl`, when `customMobileAppEnabled`. */
@@ -446,6 +467,8 @@
     peerHistoryError,
     currentUser,
     mobilePin = 'N/A',
+    mobileAppAvailable = false,
+    onrestoremobiletokens,
     mobileAndroidUrl = null,
     mobileIosUrl = null,
     hideMobileCredentials = false,
@@ -793,7 +816,8 @@
   });
   type ConnectivityTestState = 'pending' | 'passed' | 'failed' | 'unconfigured';
   type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
-  let activeConnectivityTab = $state<'network' | 'mic'>('network');
+  let activeConnectivityTab = $state<'network' | 'mic' | 'mobile'>('network');
+
   let testResults = $state({ udp: false, tcp: false, stun: false, turn: false });
   /**
    * Which ICE servers the last run used.
@@ -857,9 +881,16 @@
     micErrorMessage = '';
   }
 
-  function onConnectivityTabChange(tab: 'network' | 'mic') {
+  function onConnectivityTabChange(tab: 'network' | 'mic' | 'mobile') {
     if (tab === activeConnectivityTab) return;
     if (activeConnectivityTab === 'mic') cleanupMicTest();
+    /*
+      Leaving the Mobile App tab drops its result, and nothing here has to remember to do that:
+      `MobileRestorePane` holds the message and the `{:else if}` below unmounts it, so the state goes
+      with it. Recorded because the manual reset that used to sit on this line is exactly the kind of
+      thing a later reader deletes as redundant — and it would be, until somebody moved the state
+      back up here.
+    */
     activeConnectivityTab = tab;
   }
 
@@ -5852,6 +5883,32 @@
             <i class="fas fa-network-wired me-1"></i> Network Test
           </button>
         </li>
+        <!--
+          The Mobile App tab, `d(10,"li",9)(11,"button",10)` at 2,456,143 — consts 9
+          `["role","presentation",1,"nav-item"]`, 10 `["type","button","role","tab",1,"nav-link",3,"click"]`
+          and 11 `[1,"fas","fa-mobile-alt","me-1"]`. The label is `" Mobile App "` at 2,456,210.
+
+          `fa-mobile-alt` occurs EXACTLY ONCE in the whole bundle and this is it. The navbar's mobile
+          button is `fa-mobile` (const 137 at 2,541,704) and has been since the older build —
+          matching the new string to the nearest mobile-looking element would have changed the icon
+          on a control nobody touched.
+
+          It sits BETWEEN Network Test and Mic Test upstream, and it does here. Its `{#if}` does not:
+          upstream emits this `li` unconditionally while gating the other two on `isPresenter`, and
+          that absence is recorded on `mobileAppAvailable` above.
+        -->
+        {#if mobileAppAvailable}
+          <li role="presentation" class="nav-item">
+            <button
+              type="button"
+              role="tab"
+              class={['nav-link', { active: activeConnectivityTab === 'mobile' }]}
+              onclick={() => onConnectivityTabChange('mobile')}
+            >
+              <i class="fas fa-mobile-alt me-1"></i> Mobile App
+            </button>
+          </li>
+        {/if}
         {#if isPresenter}
           <li role="presentation" class="nav-item">
             <button
@@ -5920,6 +5977,8 @@
           </div>
         {/if}
       </div>
+    {:else if activeConnectivityTab === 'mobile'}
+      <MobileRestorePane onrestore={onrestoremobiletokens} />
     {:else if activeConnectivityTab === 'mic'}
       <div class="mic-test-container">
         {#if micDevices.length === 0 && !micDevicesLoading && micDevicesLoaded}

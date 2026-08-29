@@ -8,7 +8,7 @@
       import { page } from '$app/state';
   import { invalidate, invalidateAll } from '$app/navigation';
   // The first remote function in this app. Aliased because the local wrapper below keeps the name.
-    import { getMyMobilePin } from './mobile-pin.remote';
+    import { getMyMobilePin, restoreMobileAppTokens } from './mobile-pin.remote';
     import { focusOnScreen } from './presenter-commands.remote';
     import { changeChatMode as changeChatModeCommand } from './chat-mode.remote';
                   import { isHttpError } from '@sveltejs/kit';
@@ -1417,6 +1417,8 @@
       {chatMode}
       {globalChatStyle}
       {mobilePin}
+      mobileAppAvailable={gates.mobileAppAvailable}
+      onrestoremobiletokens={() => restoreMobileAppTokens()}
       {theme}
       changeChatMode={(mode) => void changeChatMode(mode)}
       saveAlertFilter={(next) => alertsPane.saveFilter(next)}

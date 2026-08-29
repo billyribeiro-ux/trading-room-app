@@ -33,6 +33,92 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-29 19:55 UTC — The Mobile App tab, and the alert upstream raises over nothing
+
+**Runtime impact: YES.** A member who has stopped getting push notifications can press one button,
+have every registered device pushed to, and be told what actually happened.
+
+#### NEW-TODO §2.5, closed
+
+All four strings the v4 delta introduced are now accounted for: `mobile-app-container` and
+`fa-mobile-alt` are the pane and the tab icon, `restoreMobileAppTokens` is the command, `mobile` is
+the tab key. `docs/decoded/mobile-app-decoded.md` had already decoded the surface end to end, so this
+needed no fresh read of the bundle — only the two decisions that document deliberately left open, and
+a server half that is not in evidence at all.
+
+#### What the server does was DERIVED, and the derivation is the interesting part
+
+There is no inbound handler anywhere in the bundle: the switch at 1,020,600–1,022,200 was read in
+full and has no `restoreMobileAppTokens` case. The client's whole implementation is two statements.
+So the reference's server is **not in evidence**, and inventing a behaviour for it would be inventing
+evidence.
+
+What IS in evidence is the pane's own copy — *"restore your mobile app connectivity and get a test
+notification on your device"*, shown to somebody who *"is not getting notifications"*. With a token
+store that has exactly one honest meaning: **push to every registration this member has, and drop the
+ones the push proves dead.** A registration FCM answers `UNREGISTERED` for is a device that
+uninstalled or reinstalled, and a stale one in the list is the ordinary reason notifications stop —
+removing it IS the restoration.
+
+**No new machinery.** `sendTestPushToMember` has done exactly that for the Manage page since it grew
+its "send test" control. Its sibling `listFcmRegistrations` is deliberately NOT used: same sweep with
+`dryRun: true`, which validates tokens without buzzing anything — right for a diagnostic table, wrong
+for a button that promises a member a notification.
+
+#### The one thing deliberately not transcribed
+
+```js
+restoreMobileAppTokens(){
+  this.appService.sendServerCommand("restoreMobileAppTokens",{}),
+  bootbox.alert("Command sent successfully, check your mobile device for a test notification")
+}
+```
+
+The alert is the next statement after the transmit — no callback, no acknowledgement, no error path.
+It says that to a member with no paired device just as readily as to one with three, and the decoded
+note records that it fires even if the transmit threw.
+
+The member pressing this is, by the paragraph directly above the button, somebody who **is not
+getting notifications**. Telling them one is coming when nothing was reached leaves them waiting for
+a buzz that cannot arrive. The captured sentence is kept for the one case it is true of — at least
+one device reached — and the other outcomes say what happened, naming the pruned count when it is
+non-zero because that is the half that restored anything.
+
+#### Two decisions the decoded document asked for by name
+
+* **Row 26, the gate anomaly.** The new tab is the only mobile control in the bundle with no gate —
+  verified there by reading the whole troubleshooter component and counting, not by pattern
+  (`ptrMobileAppEnabled` occurs five times and none is in that range). Ours gates it on
+  `mobileAppAvailable`: a room with no app configured would otherwise show a tab whose only button
+  answers 409 every time.
+* **Row 24 was already closed.** The doc records `freeTrialsGetApp` as absent from
+  `room-settings-schema.ts` and `room-config-client.ts`. Measured: it is in both, `wired: true`, and
+  consumed at `gates.ts:306`. It is now re-checked on the new controller route as well.
+
+#### The extraction, and what it bought beyond a line count
+
+The pane went into `ModalHost.svelte` first and the size contract refused it. `MobileRestorePane.svelte`
+is the right answer rather than a concession: the result message is now the PANE's state, so a tab
+change unmounts it and *"leaving the tab drops the last result"* is structural instead of a line in
+`onConnectivityTabChange` that a later reader deletes as redundant.
+
+#### Verification
+
+`svelte-check` 0/0 both apps. `eslint` clean both. `prettier --check` clean. Room **207 files, 3,314
+passed, 1 skipped**; controller **97 files, 1,025 passed**. Three ceilings raised and argued, one
+declared. **Six negative controls seen RED**: raising the captured alert unconditionally; dropping
+the trial gate; returning the per-device detail; using the dry-run sweep; trusting the controller's
+counts; moving the capability check after the database lookup.
+
+Three census gates caught this landing and each was updated deliberately rather than silently:
+`missing-command-census-contract` (the row moves to BUILT), `config-read-cannot-write-contract` (the
+new internal route) and `config-write-capability-contract` (the new caller). The last two are the
+ones that matter — a new controller caller landing in neither list is a capability decision nobody
+made, and both refused to let it.
+
+**Not verified in a browser**, and this one also needs FCM credentials and a paired handset to prove
+end to end. That is the owner's to confirm.
+
 ### 2026-08-29 19:30 UTC — Benzinga renders twice upstream, and a tracker row asked us to delete a working feature
 
 **Runtime impact: YES** for the first; **none** for the second, which is the point of it.

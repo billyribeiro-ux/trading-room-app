@@ -108,6 +108,18 @@ export function mobilePinUrl(shortCode: string): string | null {
 }
 
 /**
+ * `restoreMobileAppTokens`: `POST {control}/internal/mobile-restore/{shortCode}`.
+ *
+ * Beside the pin and separate from the config read for the same reason: it is asked for once, by one
+ * member, when they press a button — and unlike the config read it has consequences, so it must not
+ * be reachable as a side effect of loading a page.
+ */
+export function mobileRestoreUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/mobile-restore/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `internal/room-entry/<code>` — may this attempt into this room?
  *
  * The room asks rather than decides, because the answer needs `webinarPW`, `banIPList` and the

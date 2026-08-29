@@ -23,6 +23,7 @@ import { ROOM_JWT_SECRET } from '$app/env/private';
 import {
   controlPlaneOrigin,
   mobilePinUrl,
+  mobileRestoreUrl,
   roomConfigUrl,
   roomEntryUrl,
   roomNotesAuthUrl,
@@ -869,6 +870,73 @@ export async function requestMobilePin(shortCode: string, memberEmail: string): 
     throw new RoomConfigUnavailable('the controller returned no pin');
   }
   return payload.pin;
+}
+
+/** What a restore did, in the only terms the room needs to compose a sentence. */
+export interface MobileRestoreResult {
+  /** Registrations this member had before the sweep. Zero means the app was never paired. */
+  registrations: number;
+  /** Devices the push actually reached. */
+  sent: number;
+  failed: number;
+  /** Dead registrations removed. This is the half that RESTORES anything. */
+  pruned: number;
+}
+
+/**
+ * `restoreMobileAppTokens` — push to every device this member has, and drop the dead ones.
+ *
+ * Modelled on {@link requestMobilePin} above, down to the capability and the timeout, because it is
+ * the same shape: a POST to the controller, for one named member, triggered by one button.
+ *
+ * **The counts are validated rather than trusted.** The room turns them into a sentence a member
+ * reads, and a `NaN` in that sentence would be worse than an error — it would look like an answer.
+ * The controller is ours, which is exactly why this is checked here: a boundary that only validates
+ * what it does not control is a boundary that stops being one the first time both sides move.
+ */
+export async function restoreMobileTokens(
+  shortCode: string,
+  memberEmail: string
+): Promise<MobileRestoreResult> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = mobileRestoreUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', memberEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${configReadToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the restore failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  const count = (key: keyof MobileRestoreResult): number => {
+    const value = payload[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+      throw new RoomConfigUnavailable(`the controller returned no ${key}`);
+    }
+    return value;
+  };
+
+  return {
+    registrations: count('registrations'),
+    sent: count('sent'),
+    failed: count('failed'),
+    pruned: count('pruned')
+  };
 }
 
 /**

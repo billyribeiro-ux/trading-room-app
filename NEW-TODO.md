@@ -153,12 +153,40 @@ component, and the sidebar's `li` is index 32 of a *different* table, where it i
 - The default `benzingaUrl` is not reproduced. It is built from three values this room does not
   have — see `gates.ts`, which has recorded that since before this pass.
 
-## 2.5 Mobile app — the other half of the v4 delta
+## 2.5 Mobile app — BUILT, 2026-08-29 ✅
 
-New strings: `mobile-app-container`, `mobile`, `restoreMobileAppTokens`, `fa-mobile-alt`.
+All four new v4 strings are accounted for: `mobile-app-container` and `fa-mobile-alt` are the pane
+and the tab icon, `restoreMobileAppTokens` is the command, and `mobile` is the tab key.
 
-`docs/MOBILE-APP.md` already exists in this repository — **read it before decoding anything**, it may
-already answer most of this.
+`docs/decoded/mobile-app-decoded.md` had already decoded the surface end to end, so nothing here
+needed a fresh read of the bundle — only a decision on the two things that document deliberately left
+open, and the server half, which is not in evidence at all.
+
+**Shipped:** the Mobile App tab in `#webrtc-troubleshooter-modal`, `MobileRestorePane.svelte`,
+`restoreMobileAppTokens` in `mobile-pin.remote.ts`, `restoreMobileTokens` in `room-config-client.ts`
+and `internal/mobile-restore/[code]` on the controller. `mobile-restore-contract.test.ts`, 16 tests,
+6 negative controls seen red.
+
+**Row 24 was already closed.** The doc records `freeTrialsGetApp` as *"absent from the doc, from
+`room-settings-schema.ts` and from `room-config-client.ts`"*. Measured 2026-08-29: it is in
+`room-settings-schema.ts:333` (`wired: true`), `room-config.ts:271`, `room-config-client.ts:123` and
+consumed at `gates.ts:306`. It is now also re-checked on the new controller route.
+
+**Row 26 — the gate anomaly — decided.** The doc asks for a deliberate decision rather than a copy.
+Upstream renders this tab with no gate at all; ours renders it on `mobileAppAvailable`, because a
+room with no app configured would otherwise show a tab whose only button answers 409 every time.
+
+**What the server does was DERIVED, and that is stated rather than implied.** There is no inbound
+handler anywhere in the bundle — the switch at 1,020,600–1,022,200 was read in full — so the
+reference's server is not in evidence. The pane's own copy is: *"restore your mobile app connectivity
+and get a test notification on your device"*, shown to somebody who *"is not getting notifications"*.
+With a token store that has one honest meaning, and `sendTestPushToMember` already did it for the
+Manage page.
+
+**The one thing deliberately not transcribed:** upstream's `bootbox.alert("Command sent
+successfully…")` fires on the statement after the transmit, with no callback and no error path — it
+says that to a member with no paired device just as readily as to one with three. Ours composes the
+sentence from what happened, keeping the captured string for the case it is true of.
 
 ## 2.6 Removed upstream — THE CLAIM WAS FALSE, closed 2026-08-29 ✅
 
@@ -270,8 +298,7 @@ it was planning.
    Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
    repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
    `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
-3. **2.5 Mobile** — after `docs/MOBILE-APP.md` is read.
-4. **Part 3 v5** — when an account is cleared for it.
+3. **Part 3 v5** — when an account is cleared for it.
 
 **Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
 complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,

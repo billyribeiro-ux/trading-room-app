@@ -74,7 +74,20 @@ const READERS = [
     `decideRoomEntryRemotely` immediately above, for the same reason: the credential stays where it
     was configured and the QUESTION travels.
   */
-  'checkNotesPasswordRemotely'
+  'checkNotesPasswordRemotely',
+  /*
+    `restoreMobileTokens` — added 2026-08-29, and the one entry in this list whose call is NOT
+    free of consequence: the controller sends a push notification and may delete a dead registration.
+    It is a READER anyway, and the reason is the split's actual subject.
+
+    This split is about the room's CONFIGURATION. Every writer above changes a room's stored settings
+    from the room. This changes none: it is the same shape as `requestMobilePin` four lines up — a
+    POST, on demand, for one named member, reached only when that member presses a button about
+    their own device — and `requestMobilePin` MINTS a pair code, so "read" here has never meant "no
+    side effect". What both assert is that the room may ask this question, not that the answer is
+    free.
+  */
+  'restoreMobileTokens'
 ];
 
 describe('the capability minted for each controller call', () => {

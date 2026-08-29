@@ -115,6 +115,8 @@
     chatMode,
     globalChatStyle,
     mobilePin,
+    mobileAppAvailable,
+    onrestoremobiletokens,
     theme,
 
     /*
@@ -188,6 +190,14 @@
     chatMode: ChatMode;
     globalChatStyle: FollowChatStyle;
     mobilePin: string;
+    /** Gates the troubleshooter's Mobile App tab — see the note on `ModalHost`'s own prop. */
+    mobileAppAvailable: boolean;
+    onrestoremobiletokens: () => Promise<{
+      registrations: number;
+      sent: number;
+      failed: number;
+      pruned: number;
+    }>;
     theme: Theme;
     changeChatMode: (mode: ChatMode) => void;
     /* It takes the NEXT filter - `ModalHost` calls it with the pair the modal collected. */
@@ -532,6 +542,8 @@
   name={modals.modal}
   mediaIceServers={media.iceServers}
   {mobilePin}
+  {mobileAppAvailable}
+  {onrestoremobiletokens}
   modAlertFilterList={data.sessData?.modAlertFilterList}
   stickyNonTradeAlert={data.sessData?.styckyNonTradeAlert === true}
   schedulerAvailable={data.sessData?.hasAlertScheduler === true}

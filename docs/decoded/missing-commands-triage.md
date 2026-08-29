@@ -27,9 +27,9 @@ again without a red test.
 
 | outcome | count |
 | --- | ---: |
-| *Confirmed missing*, now **BUILT** | **13** |
+| *Confirmed missing*, now **BUILT** | **14** |
 | *Confirmed missing*, **BUILT AS** something else | 5 |
-| *Confirmed missing*, still **NOT BUILT** | 7 |
+| *Confirmed missing*, still **NOT BUILT** | 6 |
 | need a decision first (the operator toolkit, below) — all still outstanding | 5 |
 | claimed missing, then REFUTED — we already have it | 7 |
 | classified as built-under-another-name at triage | 9 |
@@ -104,7 +104,7 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 | `getDebugLog` | BUILT | 4 | medium | Transport: sendAdminCmd -> socket.transmit("adminCmd",...) (offset 990391). UI gate, verba | Remote log capture: a presenter pulls the in-memory console log out of another member's browser. Sender at offset 2080323: getDebugLog(){this.appService.sendServerAdminCommand("getDebugLog",this.user)} — no confirm, no local alert. The target receives it on /p |
 | `notyping` | BUILT AS setTyping | 3 | medium | None — ordinary member command, not admin-gated. | MIS-CLUSTERED: this is the typing indicator's stop event, not a moderation command. It is the only member of this cluster sent with `sendServerCommand` (the ordinary `cmd` channel) rather than `sendServerAdminCommand`, which is the tell. Paired with `typing`:  |
 | `presAreaTabs-recordings` | NOT BUILT | 3 | small | Tab (slot 24) and pane (slot 46) carry the identical two-term gate, read verbatim at bytes | Not a wire command - it is the local tab key for a fifth presentation-area tab. All 3 occurrences read: (1) byte 1917052, inside template fn YCe, the <li> click handler `x("click",function(){return D(e),E(g().onMainTabChange("presAreaTabs-recordings"))})`; (2) |
-| `restoreMobileAppTokens` | NOT BUILT | 3 | medium | None. The panel renders on `z("ngIf", "mobile" === o.activeTab)` alone. Note the surroundi | Re-registers the caller's mobile push tokens with the server and asks it to fire a test push at the device. Fire-and-forget: the client sends an EMPTY payload and immediately shows a confirmation, so it never learns whether the restore worked. It is the sole c |
+| `restoreMobileAppTokens` | BUILT | 3 | medium | None. The panel renders on `z("ngIf", "mobile" === o.activeTab)` alone. Note the surroundi | Re-registers the caller's mobile push tokens with the server and asks it to fire a test push at the device. Fire-and-forget: the client sends an EMPTY payload and immediately shows a confirmation, so it never learns whether the restore worked. It is the sole c |
 | `stopRecMsg` | NOT BUILT | 3 | trivial | None. No permission check, no doNotDisturb check, and no Notification.permission check bef | A free-text recording status line pushed from the recorder. The subscriber branches on the STRING: `-1 != i.data.indexOf("Stopped") ? alertsService.error(i.data) : alertsService.info(i.data)` — so a message containing the word "Stopped" is rendered red and any |
 | `unarchiveLogs` | NOT BUILT | 2 | medium | `O(17, e.appService.globals.isPresenter ? 17 : -1)` — the Unarchive button is rendered onl | Restores a whole archive back into the live log. Both hits are sends, one per archives modal: `app-chat-logs-modal` (byte 2304724) and `app-alert-logs-modal` (byte 2312024). No `case"unarchiveLogs"` handler — after sending, the client optimistically flips `thi |
 | `editQAMessage` | BUILT AS editQuestion | 2 | small | `this.appService.globals.sessData.enableEditAlerts && "alerts"===this.logType && (this.can | Edits one Q&A reply nested inside an alert. Both hits are sends, one in each of the two compiled copies of `app-st-message` (1351806, 1389696); `case"editQAMessage"` count is 0, so it is send-only. It is the `isQAMsg` branch of a single `editMessage()` method  |
