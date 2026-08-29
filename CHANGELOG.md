@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:05 UTC — One comparison for the two prompted credentials, and a door NOT built
+
+**Runtime impact: NO.** `internal/room-notes-auth` answers exactly as before; its comparison now
+lives in a module of its own, with tests it did not have.
+
+#### What was extracted, and the design decision that is the point of it
+
+Seven settings are credential-shaped and never reach the room. **Two of them are PROMPTS** — the
+reference asks a presenter to type `needPasswordForUserNotes` before managing a member's notes
+(byte 2,081,768) and `deleteAlertPW` before archiving or deleting an alert (byte 2,048,903), and it
+compares both in the browser against values `sessData` already holds. The other five are never
+compared against anything a person types.
+
+`answerCredentialPrompt(configured, candidate)` is that comparison, now in
+`lib/server/room-credential-prompt.ts` with the notes endpoint as its first caller.
+
+**The obvious shape — one endpoint taking a credential NAME — was designed and rejected.** A name on
+the wire is an oracle: a `config-read` holder could ask whether a string is the value of
+`obsStreamKey` and walk any of the seven a guess at a time. An allow-list would narrow it and would
+still put a credential SELECTOR on a request, with a filter rather than the absence of a door
+standing between a stream key and a brute force. So each question keeps its own route naming its own
+setting in its own source, and only the constant-time compare is shared — because a constant-time
+compare written twice is one that is eventually written once incorrectly.
+
+The module's tests pin the two things about it that are deliberate and easy to "tidy" into bugs: the
+candidate is trimmed and **the configured value is not** (upstream's `e.trim() === …`; an owner who
+set a password with a trailing space has one, and trimming both sides would silently make `"secret"`
+and `"secret "` accept the same input), and the length test comes **before** `timingSafeEqual`,
+which throws on unequal lengths — reordering them turns a wrong password into a 500. Four negative
+controls seen RED: prompting when nothing is configured, trimming the configured value, dropping the
+length test, and not trimming the candidate.
+
+#### What was NOT built, and why it is being reported rather than shipped half-done
+
+`deleteAlertPW`'s own help text is *"If set, Presenters will need to enter the password to delete an
+alert"*, and **nothing in this room enforces that.** `message-actions.remote.ts`'s delete branch asks
+`usersCanDeleteOwnMsgs` of a member and lets a presenter through unconditionally — correct for chat,
+and for alerts it means an owner can configure this password and watch every presenter delete alerts
+unchallenged. The setting is `wired: false`, so nothing is lying about it; it simply does nothing.
+
+The whole door was built and then reverted: the second endpoint, a `sessions.alert_delete_access_at`
+grant column, `requireAlertDeleteAccess`, and a shared `askRoomCredential` flow so the second door
+reused the first's rather than copying sixty lines. It is not shipped because the CLIENT half does
+not fit: `message-actions.svelte.ts` is at its size ceiling, the prompt-before-send costs about
+thirty lines there, and every clean extraction from that file — the delete branch's optimistic hide,
+its Q&A special case, its confirm copy — is a deliberate piece of work rather than something to do
+as a side effect at the end of a change.
+
+**Shipping the server gate without the client prompt would have been a regression**: a presenter in
+a room with the password set would get a 403 and no way to satisfy it. So the correct order is the
+extraction first, then the door. Recorded in `TODO.md` with the measurements already taken, so the
+next pass starts from the evidence rather than re-deriving it.
+
+Controller **98 files / 1,032 tests**, room **210 files / 3,399 tests**, `svelte-check` 0/0 in both,
+eslint and prettier clean.
+
 ### 2026-08-30 02:35 UTC — The chat archive, and the census is now empty of buildable work
 
 **Runtime impact: YES.** A presenter can sweep a chat column's messages older than a date — or all
