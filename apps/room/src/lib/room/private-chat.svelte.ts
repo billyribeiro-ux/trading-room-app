@@ -1,4 +1,5 @@
 import { isHttpError } from '@sveltejs/kit';
+import { tick } from 'svelte';
 
 import {
   mergeOlderMessagesBy,
@@ -95,6 +96,22 @@ export interface PrivateChatCommands {
 export interface PrivateChatPrefs {
   readonly doNotDisturbOn: boolean;
   readonly chatSoundOn: boolean;
+  /**
+   * `preferences.chatPopup` — the toast and browser notification, G12.
+   *
+   * Beside `chatSoundOn` because upstream reads them in the SAME expression and gates both on
+   * `doNotDisturbOn`. `RoomPrefs` already owns it and the @-mention popup already reads it; the
+   * private channel simply never did.
+   */
+  readonly chatPopup: boolean;
+  /**
+   * `preferences.pmLogsOnRight` — G5, the side the conversation column sits on.
+   *
+   * It has been WRITTEN by the settings modal since that modal was built and read by nothing, which
+   * is the "a control whose only effect is changing its own label" shape `CLAUDE.md` names — and
+   * `dead-preference-keys.ts` deliberately does not list it, so nothing was covering for it either.
+   */
+  readonly pmLogsOnRight: boolean;
 }
 
 /*
@@ -141,6 +158,15 @@ export interface PrivateChatPrefs {
  */
 export const PRIVATE_CHAT_RESCROLL_MS = 500;
 
+/**
+ * How far to overscroll past the restored anchor after `Load More` — the reference's `- 20`.
+ *
+ * `scrollIntoView(true)` puts the anchor at the very top of the box, which hides the `Load More`
+ * badge and the last line of the page just fetched. Exported for the same reason the delay above
+ * is: a contract that restates the number is a contract that can disagree with the code.
+ */
+export const LOAD_MORE_OVERSCROLL_PX = 20;
+
 export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminChat: boolean }> {
   readonly #dialogs: RoomDialogs;
   readonly #prefs: PrivateChatPrefs;
@@ -167,6 +193,11 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   /** The Load More counter and its guards; `$state.raw` because it is only ever replaced whole. */
   #paging;
   #onlineUserIds;
+  #notify;
+  /** `loadMoreLastID` — the row to scroll back to once older history lands. See `loadMore`. */
+  #loadMoreAnchorId = '';
+  /** `privChatSearchResults` — the search's own bucket, so it cannot overwrite the thread. */
+  #searchResults;
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -210,6 +241,14 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
      * failure it removes is telling a presenter somebody is present when they have gone.
      */
     onlineUserIds: () => ReadonlySet<number>;
+    /**
+     * Raise a toast and a browser notification — G12's `alertService.info` plus `new Notification`.
+     *
+     * Injected rather than reached for, exactly as `playSound` is: this class knows WHEN somebody
+     * should be told and deliberately not HOW, and `RoomToasts` already owns the queue, the
+     * duplicate guard and the gravatar fallback the notification icon needs.
+     */
+    notify: (title: string, body: string, icon: string, emailHash: string) => void;
     /** `selectedMessageUser = null` — owned by the message-action path, cleared when this closes. */
     onCleared: () => void;
     onThreadDeleted: () => Promise<void>;
@@ -224,6 +263,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#closeUserMenu = options.closeUserMenu;
     this.#selectRosterUser = options.selectRosterUser;
     this.#onlineUserIds = options.onlineUserIds;
+    this.#notify = options.notify;
     this.#onCleared = options.onCleared;
     this.#onThreadDeleted = options.onThreadDeleted;
 
@@ -234,6 +274,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#searchTerm = $state('');
 
     this.#searching = $state(false);
+
+    this.#searchResults = $state.raw<PrivateChatMessage[]>([]);
 
     this.#threads = $state.raw<Record<number, PrivateChatMessage[]>>({});
 
@@ -336,8 +378,18 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     );
   }
 
+  /**
+   * What the scroller renders: the search results while searching, the thread otherwise — G25.
+   *
+   * `this.msgs = this.appService.globals.privChatSearchResults` while a term is set, and
+   * `this.msgs = this.appService.globals.privChatLog[this.currUser]` when it is cleared. Two
+   * buckets, one view — which is what makes clearing a search a swap rather than a refetch, and what
+   * keeps the older pages a reader had already loaded.
+   */
   get log(): PrivateChatMessage[] {
-    return this.#peerId === null ? [] : (this.#threads[this.#peerId] ?? []);
+    if (this.#peerId === null) return [];
+    if (this.#searching) return this.#searchResults;
+    return this.#threads[this.#peerId] ?? [];
   }
 
   canOpenFor(user: User) {
@@ -417,6 +469,42 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     }
 
     if (!this.#prefs.doNotDisturbOn && !isMine && this.#prefs.chatSoundOn) this.#playSound('pling');
+
+    /*
+      ── THE TOAST AND THE BROWSER NOTIFICATION — G12, byte 2,205,900 ──────────────────────────
+
+      ```js
+      !this.appService.globals.preferences.doNotDisturbOn &&
+      this.appService.globals.preferences.chatPopup && (
+        this.alertService.info(e.txt, "Message from " + e.n, { enableHtml: !0 }),
+        window.Notification) &&
+        new Notification("Message from " + e.n, {
+          body: e.txt,
+          icon: e.pic || "https://secure.gravatar.com/avatar/" + e.avt + "?d=mm&s=50" })
+      ```
+
+      Only the SOUND was fired here. A member with the panel closed, or with a different
+      conversation open, had no way to learn a private message had arrived — which is the one thing
+      a private message needs to do.
+
+      **Inside the `else` in the capture, and inside the same condition here.** Upstream raises this
+      in the branch where the message is NOT for the conversation on screen; there is no point
+      telling somebody about a message they are looking at. That is the same `#peerId !== peerId`
+      test the unread count above uses, so both live under it.
+
+      `?d=mm&s=50` and not the strip's 32: `RoomToasts.notify` already carries that exact fallback
+      for the @-mention popup, so this passes the hash and lets it build the URL — one transcription
+      of the gravatar shape rather than a second copy of it.
+    */
+    if (
+      !isMine &&
+      this.#peerId !== peerId &&
+      !this.#prefs.doNotDisturbOn &&
+      this.#prefs.chatPopup
+    ) {
+      this.#notify(`Message from ${message.n}`, message.txt, message.pic, message.avt);
+    }
+
     if (this.#peerId === peerId) this.scrollToBottom();
   }
 
@@ -466,6 +554,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   async switchToUser(peerId: number) {
     this.#peerId = peerId;
     this.#searchTerm = '';
+    /* Results belong to the thread that produced them; carrying them across would be another peer's. */
+    this.#searchResults = [];
+    this.#searching = false;
     if (!this.#threads[peerId]) this.#threads = { ...this.#threads, [peerId]: [] };
     this.#unreadByPeer = { ...this.#unreadByPeer, [peerId]: 0 };
     // `PCswitchChatToUser`: currPage = 0, hasMoreData = !0, isLoadingMore = !1, loadMoreLastID = "".
@@ -487,12 +578,22 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     // arrived is not an empty page.
     this.#paging = settleLoadMore(this.#paging, incoming.length);
 
+    /*
+      A SEARCH FILLS ITS OWN BUCKET — `privChatSearchResults`, G25. It used to overwrite
+      `#threads[peerId]`, which is why clearing a search had to refetch and why every older page the
+      reader had loaded was thrown away.
+    */
+    if (searchTerm) {
+      this.#searchResults = incoming;
+      return;
+    }
+
     // Page 0 replaces; a later page is older history and goes in front, deduped on `_id` because
     // offset paging over a live tail hands the boundary row back twice.
     this.#threads = {
       ...this.#threads,
       [peerId]:
-        page === 0 || searchTerm
+        page === 0
           ? incoming
           : mergeOlderMessagesBy(incoming, this.#threads[peerId] ?? [], (message) => message._id)
     };
@@ -510,8 +611,86 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     if (peerId === null || this.#paging.loadingMore || !this.#paging.hasMoreData) return;
     const next = startLoadMore(this.#paging);
     this.#paging = next;
+    /*
+      `this.loadMoreLastID = "pcm-" + this.msgs[0]._id` — byte 2,193,442, recorded BEFORE the
+      request. It is the row that is currently at the top, and after the older page is prepended it
+      is the row the reader was looking at. See `#restoreAfterLoadMore`.
+    */
+    const anchor = this.#threads[peerId]?.[0];
+    this.#loadMoreAnchorId = anchor ? `pcm-${anchor._id}` : '';
     await this.loadLog(peerId, next.page);
+    this.#restoreAfterLoadMore();
   }
+
+  /**
+   * Put the reader back where they were after `Load More` prepends older history — G14.
+   *
+   * ```js
+   * this.appService.appEventBus.subscribe("getPCLog", e => {          // byte 2,191,427
+   *   this.isLoadingMore = !1,
+   *   0 == e.length && (this.hasMoreData = !1, this.loadMoreLastID = ""),
+   *   this.loadMoreLastID && (
+   *     document.getElementById(this.loadMoreLastID).scrollIntoView(!0),
+   *     this.scrollRef.nativeElement.parentElement.scrollTop =
+   *       this.scrollRef.nativeElement.parentElement.scrollTop - 20)
+   * })
+   * ```
+   *
+   * Without it the older page is inserted above the viewport and the scroll position stays where it
+   * was — which is now a different message — so a reader pressing `Load More` was thrown backwards
+   * through history they had not read yet.
+   *
+   * **The `-20` is the reference's and it is not arbitrary.** `scrollIntoView(true)` aligns the
+   * anchor to the very TOP of the box, which hides the `Load More` badge and the last line of the
+   * page just fetched; twenty pixels of overscroll leaves both visible. Transcribed rather than
+   * tuned — it is a number about the reference's own row height, and guessing a different one would
+   * be inventing a value nobody can check.
+   *
+   * `CompactMessageRow` already emits `id="pcm-{message._id}"`, so the anchor existed all along and
+   * nothing scrolled to it.
+   */
+  #restoreAfterLoadMore(): void {
+    const anchorId = this.#loadMoreAnchorId;
+    this.#loadMoreAnchorId = '';
+    if (!anchorId) return;
+
+    /*
+      After the render that inserted the rows, not before it — the anchor's new position does not
+      exist until then. `tick()` and not `setTimeout`, the opposite of `scrollToBottom`'s choice and
+      for the reason given there: what is waited for here is Svelte inserting the rows, which it
+      knows about exactly.
+    */
+    void tick().then(() => {
+      const anchor = document.getElementById(anchorId);
+      if (!anchor) return;
+      anchor.scrollIntoView(true);
+      const scroller = document.querySelector('.pc-messages');
+      if (scroller) scroller.scrollTop = scroller.scrollTop - LOAD_MORE_OVERSCROLL_PX;
+    });
+  }
+
+  /*
+    ── `getAllPCLogsLoading` IS NOT MODELLED, AND THAT IS MEASURED — G7 ────────────────────────
+
+    ```js
+    O(1, e.getAllPCLogsLoading ? 1 : 2)      // "Loading private chats. Please wait..." / "No active chat"
+    O(3, e.getAllPCLogsLoading ? 3 : -1)     // the tab column's own "Loading all private chats." block
+    ```
+
+    Upstream needs that flag because it POSTs `getAllPCLogs` when the panel opens. **This room has
+    no such moment.** The conversation list is `loadConversations(...)` in `+page.server.ts:743`,
+    resolved before the page is rendered and delivered with it, and the only thing that refreshes it
+    is `invalidateAll()` — which keeps the previous list on screen while it runs. There is no
+    instant at which the strip exists and its contents are unknown.
+
+    So both of the reference's loading branches would be branches that can never render, which is a
+    branch that can never be checked — the dead-control shape this repository removes rather than
+    adds. The same call was made and recorded for the note carousel's file browser on 2026-08-30.
+
+    What WOULD make this real is fetching the list on open instead of at page load. That is a
+    plausible future change, and this note is here so whoever makes it knows two empty states are
+    waiting for the flag rather than discovering it from the capture a second time.
+  */
 
   /** `hasMoreData && !searchTerm` — the badge's gate, which is the server's answer and not a count. */
   get hasMore(): boolean {
@@ -620,15 +799,75 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#onCleared();
     this.#searchTerm = '';
     this.#searching = false;
+    this.#searchResults = [];
     this.#draft = '';
   }
 
-  /** `onEnterSearchChat(value)` - a term searches this thread; an empty one restores it. */
+  /**
+   * `closeTab(uid)` — the X on the header tab, G8.
+   *
+   * ```js
+   * closeTab(e) { this.user = null, this.recvdUser = null, this.currUser = "" }   // byte 2,205,022
+   * ```
+   *
+   * It clears `currUser`, which by `O(17, "" !== o.currUser ? 17 : 18)` drops the panel back to its
+   * empty pane. The room's wiring cleared the selected user and left `peerId` alone, so the header
+   * tab vanished and the thread and composer stayed — a conversation with nobody's name on it.
+   *
+   * Separate from {@link RoomPrivateChat.close}, which is the PANEL's X and hides the panel as well.
+   * This closes the conversation and leaves the panel open, which is why the two are not one method.
+   */
+  closeTab(): void {
+    this.#peerId = null;
+    this.#searchTerm = '';
+    this.#searching = false;
+    this.#searchResults = [];
+    this.#draft = '';
+    this.#onCleared();
+  }
+
+  /**
+   * `onEnterSearchChat(value)` — a term searches this thread; an empty one RESTORES it — G25.
+   *
+   * ```js
+   * clearSearchTerm() {                                            // byte 2,209,001
+   *   this.pmSearchTerm = "",
+   *   this.appService.guiEventBus.emit("setSearchTermPC", {searchTerm: this.pmSearchTerm, uid: this.currUser}),
+   *   this.appService.globals.privChatSearchResults = [],
+   *   this.msgs = this.appService.globals.privChatLog[this.currUser],
+   *   this.appService.appEventBus.emit("scrollPCLogToBottom", {force:!0, repeat:!0})
+   * }
+   * ```
+   *
+   * ## Two buckets, because the search overwrote the conversation
+   *
+   * Upstream keeps results in `privChatSearchResults` and swaps `msgs` back to the untouched
+   * `privChatLog[currUser]`. This held ONE array per peer and wrote the results into it, so:
+   *
+   *   - clearing the search cost a round trip to fetch page 0 again, and
+   *   - every older page the reader had loaded was discarded, so `Load More` had to be pressed all
+   *     the way back down.
+   *
+   * The thread and the results are now separate, and clearing is a local swap with no request —
+   * which is what makes it instant and what makes the pages survive.
+   *
+   * The scroll is upstream's too, on both paths: a fresh set of rows means the box is looking at
+   * whatever the old ones left it pointing at.
+   */
   async search(term: string) {
     if (this.#peerId === null) return;
+    const trimmed = term.trim();
     this.#searchTerm = term;
-    this.#searching = Boolean(term.trim());
-    await this.loadLog(this.#peerId, 0, term.trim());
+    this.#searching = Boolean(trimmed);
+
+    if (!trimmed) {
+      /* `privChatSearchResults = []` then `msgs = privChatLog[currUser]` — a swap, not a fetch. */
+      this.#searchResults = [];
+      this.scrollToBottom();
+      return;
+    }
+
+    await this.loadLog(this.#peerId, 0, trimmed);
     this.scrollToBottom();
   }
 

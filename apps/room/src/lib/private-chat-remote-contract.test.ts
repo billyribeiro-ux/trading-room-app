@@ -285,8 +285,17 @@ describe('the client’s own half', () => {
       rows already held. Offset paging over a live tail hands the boundary row back twice whenever a
       message arrives between two requests — the same reason the main feeds have used that fold
       since they were written. `#lib/chat-paging.ts` carries it, keyed here on `_id`.
+
+      **`searchTerm` LEFT THIS CONDITION later the same day**, for G25. A search used to overwrite
+      the thread, which is why clearing one had to refetch page 0 and why every older page the
+      reader had loaded was discarded. Results now land in their own bucket — `privChatSearchResults`
+      in the capture — and return before this line, so the thread is untouched by a search and this
+      condition is about pages alone.
     */
-    expect(privateChatModule).toContain('page === 0 || searchTerm');
+    expect(privateChatModule).toContain('if (searchTerm) {');
+    expect(privateChatModule).toContain('this.#searchResults = incoming;');
+    expect(privateChatModule).toContain('page === 0');
+    expect(privateChatModule).not.toContain('page === 0 || searchTerm');
     expect(privateChatModule).toContain(
       'mergeOlderMessagesBy(incoming, this.#threads[peerId] ?? [], (message) => message._id)'
     );

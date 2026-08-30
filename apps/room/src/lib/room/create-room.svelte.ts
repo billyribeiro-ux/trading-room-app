@@ -623,6 +623,11 @@ export function createRoom(deps: RoomDeps) {
   // row where the roster wants the whole one.
   const privateChat = new RoomPrivateChat<(typeof data.connectedUsers)[number]>({
     dialogs,
+    /*
+      The four the panel reads, taken from `RoomPrefs` rather than passed as an object literal, so a
+      preference changed in the settings modal reaches the panel without a reload. `chatPopup` and
+      `pmLogsOnRight` joined on 2026-08-30 — G12 and G5.
+    */
     prefs,
     commands: {
       loadLog: (payload) => loadPrivateChatLogCommand(payload),
@@ -642,6 +647,21 @@ export function createRoom(deps: RoomDeps) {
       connected list; a `Set` because the strip asks it once per tab.
     */
     onlineUserIds: () => new Set(roster.users.map((user) => user.id)),
+    /*
+      G12 — `alertService.info(txt, "Message from " + n)` plus `new Notification(...)`. `RoomToasts`
+      owns the queue, the duplicate guard and the `?d=mm&s=50` gravatar fallback the icon needs, so
+      the panel says WHEN and this says how, exactly as `playSound` above does.
+    */
+    notify: (title, body, icon, emailHash) => {
+      /*
+        `alertService.info(e.txt, "Message from " + e.n, {enableHtml: !0})` — the message is the BODY
+        and the name is the title, which reads backwards until you see the call: `alertService.info`
+        takes `(message, title)`. `enableHtml` is the reference's and is what the @-mention popup
+        beside this already passes.
+      */
+      toasts.show({ kind: 'info', title, message: body, enableHtml: true });
+      toasts.notify(title, body, icon, emailHash);
+    },
     onCleared: () => userActions.clearSelectedMessageUser(),
     onThreadDeleted: () => invalidateAll()
   });

@@ -575,7 +575,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1479 -> 1483, 2026-08-30. Four lines wiring the inline alert entry (`acA-01`) to the three
       things it needs: the text post, the image paste, and the toggle that persists and re-scrolls.
     */
-    max: 1483,
+    /*
+      1483 -> 1492, 2026-08-30. Nine lines for two private-chat rows: `pmLogsOnRight` handed to the
+      panel (G5) and `onclosepeer` calling `privateChat.closeTab()` (G8), each with the sentence
+      saying what it was doing wrong before.
+    */
+    max: 1492,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1684,7 +1689,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       53, 54, 55, 56) including the two entries belonging to rows still open, so that the next piece
       attaches to the element the capture names rather than to one invented for it.
     */
-    max: 525,
+    /*
+      525 -> 540, 2026-08-30. G5 — the `flex-row-reverse` swap and its prop.
+
+      Most of it is why: the preference has been WRITTEN by the settings modal since that modal was
+      built and read by nothing, so the toggle changed its own state and nothing else. The note also
+      says why the class is used rather than two orderings of the markup — DOM order is the reading
+      order a screen reader and the tab key follow.
+    */
+    max: 540,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -2795,7 +2808,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Flagged for the owner. The alternative was an extraction invented to satisfy a number, on a
       class whose whole shape is one field, one seed, one getter and one case per preference.
     */
-    max: 656,
+    /*
+      656 -> 685, 2026-08-30. `pmLogsOnRight` — G5, a preference this class did not hold at all while
+      the settings modal wrote it and the panel could not read it.
+
+      The docblock is most of the addition: it records that the key defaults FALSE where its
+      neighbours default true, because `!== false` would have flipped every existing member's panel
+      on the first load after this shipped.
+    */
+    max: 685,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -3287,7 +3308,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       G23 is one number — 60ms to the capture's 500 — plus why the second scroll exists at all and
       why it is a `setTimeout` where this codebase otherwise reaches for `tick()`.
     */
-    max: 672,
+    /*
+      672 -> 912, 2026-08-30. Six rows of the surface audit, and the largest single addition this
+      file has taken.
+
+      G8 `closeTab`, G12 the toast and browser notification, G14 the `Load More` scroll restore with
+      the reference's `-20`, G25 the search's own bucket, plus the two constants the contracts read
+      instead of restating. **G7 is in here as a REFUSAL** — a paragraph explaining why
+      `getAllPCLogsLoading` is not modelled: this room resolves the conversation list at page load,
+      so both of the reference's loading branches would be branches that can never render.
+
+      Roughly 160 of the 240 lines are prose, and the ratio is the point: every one of these is a
+      behaviour whose absence was invisible, and each needed its capture quoted to be checkable.
+
+      The seam if this grows again is the SCROLLING — `scrollToBottom`, `#restoreAfterLoadMore` and
+      the two constants are one concern that touches no other part of this class.
+    */
+    max: 912,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -3836,7 +3873,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1336 -> 1345, 2026-08-30. Nine lines: `onlineUserIds` for the private-chat panel (G16), and the
       note saying why the roster is read at recompute time rather than pushed in on three events.
     */
-    max: 1345,
+    /*
+      1345 -> 1365, 2026-08-30. `notify` for the private-chat panel (G12) and the note on why the
+      panel decides WHEN somebody is told while `RoomToasts` decides how — the same split
+      `playSound` above it already makes.
+    */
+    max: 1365,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

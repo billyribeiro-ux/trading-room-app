@@ -1448,6 +1448,7 @@
       open={privateChat.open}
       doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
+      pmLogsOnRight={prefs.pmLogsOnRight}
       peer={userActions.selectedMessageUser}
       tabs={privateChat.tabs}
       currentUserId={privateChat.peerId}
@@ -1456,7 +1457,12 @@
       searchTerm={privateChat.searchTerm}
       bind:draft={privateChat.draft}
       onclosepeer={() => {
-        userActions.clearSelectedMessageUser();
+        /*
+          G8 — `closeTab(uid)` clears `currUser`, and this cleared only the selection. The header
+          tab vanished and the thread and composer stayed: a conversation with nobody's name on it.
+          `closeTab` calls `onCleared`, which is what clears `selectedMessageUser`.
+        */
+        privateChat.closeTab();
         messageActions.clearSelected();
       }}
       ondeletethis={() => privateChat.deleteThread()}

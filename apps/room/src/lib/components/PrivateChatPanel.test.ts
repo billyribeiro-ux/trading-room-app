@@ -87,6 +87,7 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     target,
     props: {
       open: true,
+      pmLogsOnRight: false,
       doNotDisturb: false,
       isPresenter: false,
       peer: null,

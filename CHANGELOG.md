@@ -33,6 +33,78 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 09:20 UTC — Six more private-chat rows, a preference that had never been read, and one refusal
+
+**Runtime impact: YES.** An incoming private message raises a toast and a browser notification when
+the panel is closed or another conversation is open. Closing the header tab closes the conversation.
+`Load More` keeps the reader where they were. Clearing a search is instant and keeps the pages
+already loaded. And the settings modal's "PM logs on right" toggle moves the panel.
+
+**A PREFERENCE THAT HAD NEVER BEEN READ — G5.** `pmLogsOnRight` has been written and persisted by
+the settings modal since that modal was built, and nothing in the room ever read it back:
+`RoomPrefs` did not hold it, the panel had no prop for it, and `dead-preference-keys.ts` deliberately
+does not cover for it because the key is real and the control is meant to do something. So the
+checkbox flipped, the POST succeeded, and the panel did not move — the "control whose only effect is
+changing its own label" shape `CLAUDE.md` names, sitting in plain sight behind a working POST. It
+defaults FALSE where its neighbours default true, because `!== false` would have flipped every
+existing member's panel on the first load after this shipped.
+
+**G12 — only the SOUND fired.** `Message from <name>` as a toast and a browser notification, gated
+on `!doNotDisturbOn && chatPopup` as byte 2,205,900 has it, and raised only for a message that is not
+mine and not on the conversation already open — the same test the unread count beside it uses. A
+member with the panel closed had no way to learn a private message had arrived, which is the one
+thing a private message needs to do. `RoomToasts` is injected rather than reached for, exactly as
+`playSound` is: this class knows WHEN somebody should be told and deliberately not how.
+
+**G8 — the header tab vanished and the conversation stayed.** `closeTab()` clears the peer, the
+search, the results and the draft, then calls `onCleared`, which is the only thing the old wiring
+did. Kept separate from `close()`, which is the panel's own X and hides the panel too; the
+reference's two are two for the same reason.
+
+**G14 — `Load More` threw the reader backwards.** The older page is inserted above the viewport while
+the scroll position stays where it was, which is now a different message. The anchor is recorded as
+`pcm-${firstRow._id}` before the request and restored after it, with `scrollIntoView(true)` and the
+reference's `- 20`. **The twenty is transcribed and not tuned:** `scrollIntoView(true)` aligns the
+anchor to the very top, hiding the badge and the last line of the page just fetched, and picking a
+different number would be inventing a value nobody can check. `CompactMessageRow` already emitted the
+`pcm-` id, so the anchor existed all along and nothing scrolled to it.
+
+**G25 — a search overwrote the conversation it searched.** Two buckets now, as the capture has:
+`privChatSearchResults` beside `privChatLog[currUser]`, with `log` picking between them. Clearing a
+search used to cost a round trip AND discard every older page the reader had loaded, sending them
+back to press `Load More` from the bottom; it is now a local swap with no request.
+
+**AND ONE REFUSAL — G7.** `getAllPCLogsLoading` is deliberately not modelled. Upstream needs it
+because it POSTs `getAllPCLogs` when the panel opens; this room resolves the conversation list in
+`+page.server.ts` and delivers it with the page, and `invalidateAll()` keeps the previous list on
+screen while it runs. There is no instant at which the strip exists and its contents are unknown, so
+both of the reference's loading branches would be branches that can never render — the same call made
+for the note carousel's file browser this morning. The paragraph is at the code and names what would
+make the flag real, so a future change finds the two waiting empty states rather than rediscovering
+them from the capture. The contract asserts the absence AND the presence of that paragraph, because a
+refusal with no recorded reason is indistinguishable from an omission.
+
+**A stale contract corrected on the way.** `private-chat-remote-contract` asserted
+`page === 0 || searchTerm` as the replace condition. G25 took `searchTerm` out of it — a search
+returns before that line now — so the assertion was rewritten to the new shape with the reason,
+rather than deleted.
+
+**Negative controls, all ten seen RED after the commit, all first time.** Removing the side-swap
+class; defaulting the preference on with `!== false`; letting the toast fire for my own echo;
+ignoring `chatPopup`; making `closeTab` hide the panel as well; recording the Load More anchor AFTER
+the request instead of before; dropping the twenty-pixel overscroll; writing search results back into
+the thread; refetching on a cleared search; and deleting the G7 refusal paragraph — that last one is
+what makes the refusal a decision rather than an omission, so it is guarded like any other.
+
+**Verified.** `private-chat.svelte.test.ts` 30, seven of them new and executed against the class —
+including the two G25 cases that measure the REQUEST COUNT, which is the whole point of that row.
+`private-chat-strip-contract.test.ts` 19, six new. Whole `src/lib` suite 3,809 passed, 1 skipped.
+Five ceilings raised with their reasons, the largest being `private-chat.svelte.ts` at 672 → 912;
+roughly 160 of those 240 lines are prose, and the entry says so and names the seam if it grows again.
+`svelte-check` 0 errors, 0 warnings. Full `pnpm run gate` before the push, `gate-exit` echoed into the
+log and read from there. **Nothing was opened in a browser**, and the **Svelte MCP has been
+unavailable for this entire session**.
+
 ### 2026-08-30 08:40 UTC — Seven private-chat rows, four already built, and a member's email address in an outbound URL
 
 **Runtime impact: YES.** The private-chat tab strip shows the newest conversation first, lights the

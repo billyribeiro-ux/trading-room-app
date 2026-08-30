@@ -91,6 +91,8 @@
   interface Props {
     /** `display: block` when open — the capture keeps the panel mounted and hides it. */
     open: boolean;
+    /** `preferences.pmLogsOnRight` — G5, which side the conversation column sits on. */
+    pmLogsOnRight: boolean;
     doNotDisturb: boolean;
     isPresenter: boolean;
     /**
@@ -131,6 +133,7 @@
 
   let {
     open,
+    pmLogsOnRight,
     doNotDisturb,
     isPresenter,
     peer,
@@ -375,7 +378,21 @@
         </div>
       {/if}
     </div>
-    <div class="d-flex h-100 pc-body">
+    <!--
+      G5 — `z("ngClass", ct(7, YDe, o.appService.globals.preferences.pmLogsOnRight))` at byte
+      2,219,468, with `const YDe = t => ({"flex-row-reverse": t})` at 2,194,594.
+
+      **The preference has been WRITTEN since the settings modal was built and read by nothing.**
+      `onPreferenceChange('pmLogsOnRight', !previous)` persisted it, the checkbox showed its own new
+      state, and the panel never moved — the "control whose only effect is changing its own label"
+      shape `CLAUDE.md` names. `dead-preference-keys.ts` deliberately does not cover for it either,
+      because the key is real and the control is meant to do something.
+
+      `flex-row-reverse` and not two orderings of the markup: the DOM order is the reading order a
+      screen reader and the tab key follow, and reversing it visually is a presentation choice that
+      should not change either.
+    -->
+    <div class={['d-flex h-100 pc-body', { 'flex-row-reverse': pmLogsOnRight }]}>
       <!--
         G18 — `O(16, o.chatTabs && o.chatTabs.length > 0 ? 16 : -1), O(17, "" !== o.currUser ? 17 : 18)`
         at byte 2,219,468. TWO independent gates, and this had one wrapping both columns.

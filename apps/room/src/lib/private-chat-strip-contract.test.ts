@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { codeOf } from './source-comments.js';
-import { PRIVATE_CHAT_RESCROLL_MS } from './room/private-chat.svelte.js';
+import { LOAD_MORE_OVERSCROLL_PX, PRIVATE_CHAT_RESCROLL_MS } from './room/private-chat.svelte.js';
 
 /**
  * Seven rows of the `PrivateChatPanel` surface audit, and one defect none of them was looking for.
@@ -216,5 +216,87 @@ describe('the re-scroll', () => {
     expect(closes, 'the method must be closed').toBeGreaterThan(at);
     const body = STATE.slice(at, closes);
     expect(body.indexOf('run();')).toBeLessThan(body.indexOf('setTimeout('));
+  });
+});
+
+describe('the second cluster — G5, G7 and G14', () => {
+  it('G5 — the side swap reads the preference the settings modal has always written', () => {
+    /*
+      `z("ngClass", ct(7, YDe, o.…preferences.pmLogsOnRight))` at byte 2,219,468, with
+      `YDe = t => ({"flex-row-reverse": t})` at 2,194,594.
+
+      The write existed and the read did not, which is the "control whose only effect is changing its
+      own label" shape. `dead-preference-keys.ts` deliberately does not cover for this key, so
+      nothing was excusing it either.
+    */
+    expect(PANEL).toContain("{ 'flex-row-reverse': pmLogsOnRight }");
+    expect(PANEL).toContain('pmLogsOnRight: boolean;');
+    /* The class, not two orderings of the markup: DOM order is the reading and tab order. */
+    const body = PANEL.indexOf("'d-flex h-100 pc-body'");
+    expect(body, 'the body must carry it').toBeGreaterThan(-1);
+  });
+
+  it('G5 — and the preference is now held, defaulting to the layout that already shipped', () => {
+    const PREFS = read('./room/prefs.svelte.ts');
+    expect(PREFS).toContain('this.#pmLogsOnRight = $state(loadedSettings.pmLogsOnRight === true);');
+    /* `=== true`, not `!== false`: the neighbours default on, and this one must not flip anybody. */
+    expect(PREFS).not.toContain('loadedSettings.pmLogsOnRight !== false');
+    expect(PREFS).toContain("if (key === 'pmLogsOnRight') this.#pmLogsOnRight = value;");
+  });
+
+  it('G7 — the loading branches are NOT drawn, and the refusal is written down', () => {
+    /*
+      Upstream needs `getAllPCLogsLoading` because it POSTs `getAllPCLogs` on open. This room
+      resolves the list in `+page.server.ts` and delivers it with the page, so there is no instant at
+      which the strip exists and its contents are unknown — both branches could never render.
+
+      Asserted as an ABSENCE plus the paragraph, because a refusal with no reason recorded is
+      indistinguishable from an omission.
+    */
+    expect(STATE).not.toContain('getAllPCLogsLoading');
+    expect(PANEL).not.toContain('Loading private chats');
+    expect(PANEL).not.toContain('Loading all private chats');
+    const raw = readFileSync(new URL('./room/private-chat.svelte.ts', import.meta.url), 'utf8');
+    expect(raw, 'the reason must be recorded at the code').toContain(
+      '`getAllPCLogsLoading` IS NOT MODELLED'
+    );
+  });
+
+  it('G14 — Load More records the anchor BEFORE the request and restores after it', () => {
+    /*
+      `this.loadMoreLastID = "pcm-" + this.msgs[0]._id` then, on the response,
+      `document.getElementById(this.loadMoreLastID).scrollIntoView(!0)` and `scrollTop - 20`.
+
+      Without it the older page is inserted above the viewport and the scroll position stays where it
+      was — a different message — so a reader was thrown backwards through history.
+    */
+    const at = STATE.indexOf('async loadMore()');
+    expect(at, 'loadMore must exist').toBeGreaterThan(-1);
+    const end = STATE.indexOf('\n  }', at);
+    expect(end, 'loadMore must be closed').toBeGreaterThan(at);
+    const body = STATE.slice(at, end);
+    expect(body).toContain('`pcm-${anchor._id}`');
+    expect(body.indexOf('this.#loadMoreAnchorId =')).toBeLessThan(
+      body.indexOf('await this.loadLog')
+    );
+    expect(body.indexOf('await this.loadLog')).toBeLessThan(body.indexOf('#restoreAfterLoadMore'));
+  });
+
+  it('G14 — overscrolls by the reference s own twenty pixels', () => {
+    /*
+      `scrollIntoView(true)` aligns the anchor to the very top, which hides the `Load More` badge and
+      the last line of the page just fetched. Read from the constant rather than restated.
+    */
+    expect(LOAD_MORE_OVERSCROLL_PX).toBe(20);
+    expect(STATE).toContain('scroller.scrollTop = scroller.scrollTop - LOAD_MORE_OVERSCROLL_PX;');
+  });
+
+  it('G14 — waits for the render that inserted the rows, with tick and not a timer', () => {
+    /*
+      The opposite choice from `scrollToBottom` in the same class, and the note says why: there the
+      wait is for the BROWSER finishing layout after images arrive, which Svelte cannot await; here it
+      is for Svelte inserting rows, which it knows exactly.
+    */
+    expect(STATE).toContain('void tick().then(() => {');
   });
 });

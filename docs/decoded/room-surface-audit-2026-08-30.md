@@ -166,6 +166,8 @@ autoExpand(e){P("autoExpand:"),e.style.height="0";const i=window.getComputedStyl
 
 ### G12 — No incoming-PM toast or desktop notification ("Message from <name>")
 
+**BUILT 2026-08-30 09:20 UTC.** `Message from <name>` as both a toast and a browser notification, gated on `!doNotDisturbOn && chatPopup` exactly as byte 2,205,900 has it, and raised only for a message that is NOT mine and NOT on the conversation already open — the same test the unread count beside it uses, because there is no point telling somebody about a message they are looking at. Only the SOUND fired before, so a member with the panel closed had no way to learn a private message had arrived. `RoomToasts` is injected rather than reached for, exactly as `playSound` is: this class knows WHEN somebody should be told and deliberately not how, and that class already owns the queue, the duplicate guard and the `?d=mm&s=50` gravatar fallback the icon needs. `chatPopup` joined `PrivateChatPrefs`; `RoomPrefs` already held it for the @-mention popup.
+
 **medium** · `missing-behaviour` · reference byte **2,205,471**
 
 ```
@@ -189,6 +191,8 @@ sendMessage(){if(!this.canPost)return void bootbox.alert("Sorry, you can't post 
 > Verified: The refusal is UNREACHABLE DEAD CODE in the reference's own private-chat component, so there is no behaviour to model — and the one real refusal path that exists IS built here. 1.
 
 ### G14 — Load More loses the reader's position — no `pcm-` anchor scroll-restore and no `-20` nudge
+
+**BUILT 2026-08-30 09:20 UTC.** `loadMoreLastID` is recorded as `pcm-${firstRow._id}` BEFORE the request and restored after it, with `scrollIntoView(true)` and the reference's `- 20`. Without it the older page is inserted above the viewport while the scroll position stays where it was — now a different message — so a reader pressing `Load More` was thrown backwards through history they had not read. **The `-20` is transcribed rather than tuned:** `scrollIntoView(true)` aligns the anchor to the very top of the box, which hides the badge and the last line of the page just fetched, and guessing a different number would be inventing a value nobody can check. `CompactMessageRow` already emitted `id="pcm-{message._id}"`, so the anchor existed all along and nothing scrolled to it. `tick()` and not `setTimeout` — the opposite of `scrollToBottom`'s choice in the same class, and the note says why.
 
 **medium** · `missing-behaviour` · reference byte **2,191,427**
 
@@ -260,6 +264,8 @@ m(),O(16,o.chatTabs&&o.chatTabs.length>0?16:-1),m(),O(17,""!==o.currUser?17:18))
 
 ### G5 — `pmLogsOnRight` side-swap (`flex-row-reverse` on `.pc-body`) is not applied
 
+**BUILT 2026-08-30 09:20 UTC.** `class={['d-flex h-100 pc-body', { 'flex-row-reverse': pmLogsOnRight }]}` — `YDe = t => ({"flex-row-reverse": t})` at offset 2,194,594, applied at 2,219,468. The preference is now HELD by `RoomPrefs` as well, which it was not: the settings modal wrote it and persisted it and nothing in the room ever read it back, so the toggle changed its own state and nothing else. It defaults FALSE where its neighbours default true, because `!== false` would have flipped every existing member's panel on the first load after this shipped. The class rather than two orderings of the markup, because DOM order is the reading order a screen reader and the tab key follow.
+
 **medium** · `missing-control` · reference byte **2,219,468**
 
 ```
@@ -286,6 +292,8 @@ function rEe(t,n){if(1&t&&(d(0,"div",20),ht(1,oEe,8,9,"button",39,qDe),H(3,sEe,5
 
 ### G7 — No `getAllPCLogsLoading` state — neither the tab-strip loader nor the "Loading private chats" empty pane exists
 
+**MEASURED REFUSAL — recorded 2026-08-30 09:20 UTC, deliberately NOT built.** Upstream needs that flag because it POSTs `getAllPCLogs` when the panel opens. This room does not: the conversation list is `loadConversations(...)` at `+page.server.ts:743`, resolved before the page renders and delivered with it, and the only thing that refreshes it is `invalidateAll()`, which keeps the previous list on screen while it runs. **There is no instant at which the strip exists and its contents are unknown**, so both of the reference's loading branches would be branches that can never render — which is a branch that can never be checked, the same call made for the note carousel's file browser earlier today. The paragraph lives at the code, and it names what would make the flag real (fetching the list on open) so a future change finds the two waiting empty states rather than rediscovering them from the capture.
+
 **medium** · `missing-behaviour` · reference byte **2,196,694**
 
 ```
@@ -297,6 +305,8 @@ function sEe(t,n){1&t&&(d(0,"div",40)(1,"div",47),v(2,"Loading all private chats
 > Verified: I could not refute it: the loader is genuinely absent from apps/room/src. PrivateChatPanel.svelte:337 and :389 both render the static "No active chat" div with no loading branch, and RoomPrivateChat has only #peerHistoryLoading (the moderator peer-history modal, private-chat.svelte.ts:156/238/492) — nothing for the tab list.
 
 ### G8 — Header tab close (`closeTab`) does not deselect the open thread
+
+**BUILT 2026-08-30 09:20 UTC.** `closeTab()` on the panel state, wired to `onclosepeer`. It clears the peer, the search, the results bucket and the draft, then calls `onCleared` — which is what clears `selectedMessageUser`, the only thing the old wiring did. The header tab used to vanish while the thread and composer stayed: a conversation with nobody's name on it. Kept SEPARATE from `close()`, which is the panel's own X and hides the panel as well; the reference's two are two for the same reason.
 
 **medium** · `missing-behaviour` · reference byte **2,205,022**
 
@@ -351,6 +361,8 @@ scrollToBottom(e=!1,i=!1){try{P("scrollPCLogToBottom called on log....force:"+e+
 > Verified: I could not refute this. Our private-chat re-scroll delay is a bare literal 60 and it is the only delay in the private-chat scroll path; nothing anywhere in apps/room/src schedules a 500 ms private-chat re-scroll.
 
 ### G25 — Clearing the search refetches from the server; the reference restores the cached log locally
+
+**BUILT 2026-08-30 09:20 UTC.** Two buckets, as the capture has: `privChatSearchResults` beside `privChatLog[currUser]`, with `log` picking between them. Clearing a search is now a local swap with no request — `privChatSearchResults = []` then `msgs = privChatLog[currUser]` at byte 2,209,001. It used to overwrite the one thread array, so clearing cost a round trip AND discarded every older page the reader had already loaded, sending them back to press `Load More` from the bottom again. The results bucket is cleared on `switchToUser` and on both closes, because results belong to the thread that produced them.
 
 **low** · `divergence` · reference byte **2,209,001**
 

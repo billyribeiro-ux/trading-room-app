@@ -46,6 +46,8 @@ const make = (
     sendFails?: boolean;
     /** Who the roster says is connected — `checkUserOnlineStatus`'s input. */
     onlineIds?: readonly number[];
+    /** `preferences.chatPopup` — whether an incoming message raises a toast. */
+    chatPopup?: boolean;
   } = {}
 ) => {
   const dialogs = new RoomDialogs();
@@ -59,10 +61,16 @@ const make = (
   let invalidated = 0;
   let incoming: PrivateChatMessage[] = [];
   const onlineIds = new Set<number>(options.onlineIds ?? []);
+  const notified: { title: string; body: string; icon: string; emailHash: string }[] = [];
 
   const chat = new RoomPrivateChat<User>({
     dialogs,
-    prefs: { doNotDisturbOn: false, chatSoundOn: true },
+    prefs: {
+      doNotDisturbOn: false,
+      chatSoundOn: true,
+      chatPopup: options.chatPopup ?? false,
+      pmLogsOnRight: false
+    },
     commands: {
       loadLog: (payload) => (loaded.push(payload), Promise.resolve(incoming)),
       loadPeerHistory: () => Promise.resolve({ nick: '', messages: [], truncated: false }),
@@ -80,6 +88,7 @@ const make = (
     selectRosterUser: (user) => selected.push(user),
     /* Nobody on the roster unless a test says otherwise — see the online-status case. */
     onlineUserIds: () => onlineIds,
+    notify: (title, body, icon, emailHash) => notified.push({ title, body, icon, emailHash }),
     onCleared: () => cleared.push(1),
     onThreadDeleted: () => ((invalidated += 1), Promise.resolve())
   });
@@ -93,6 +102,7 @@ const make = (
     sent,
     deleted,
     selected,
+    notified,
     setIncoming: (rows: PrivateChatMessage[]) => (incoming = rows),
     menuClosed: () => menuClosed,
     invalidated: () => invalidated
@@ -372,7 +382,7 @@ describe('paging', () => {
     const dialogs = new RoomDialogs();
     const chat = new RoomPrivateChat<User>({
       dialogs,
-      prefs: { doNotDisturbOn: false, chatSoundOn: false },
+      prefs: { doNotDisturbOn: false, chatSoundOn: false, chatPopup: false, pmLogsOnRight: false },
       commands: {
         loadLog: () => Promise.reject(new Error('down')),
         loadPeerHistory: () => Promise.resolve({ nick: '', messages: [], truncated: false }),
@@ -386,6 +396,7 @@ describe('paging', () => {
       closeUserMenu: () => {},
       selectRosterUser: () => {},
       onlineUserIds: () => new Set<number>(),
+      notify: () => {},
       onCleared: () => {},
       onThreadDeleted: () => Promise.resolve()
     });
@@ -395,5 +406,115 @@ describe('paging', () => {
       chat.log.map((m) => m._id),
       'a failed load must not blank the thread'
     ).toEqual(['held']);
+  });
+});
+
+/**
+ * Six rows of the `PrivateChatPanel` surface audit, executed against the class rather than read.
+ *
+ * G5 and G7 are not here: G5 is a class on a `<div>` and belongs to the panel's own contract, and
+ * G7 is a REFUSAL — `getAllPCLogsLoading` is not modelled, because this room resolves the
+ * conversation list at page load and both of the reference's loading branches would be branches that
+ * can never render. The paragraph in `private-chat.svelte.ts` is that row's answer.
+ */
+describe('the six that behave', () => {
+  it('G12 — raises a toast for a message arriving on ANOTHER conversation', () => {
+    /*
+      `alertService.info(e.txt, "Message from " + e.n)` plus `new Notification(...)` at byte
+      2,205,900. Only the sound fired here, so a member with the panel closed had no way to learn a
+      private message had arrived — the one thing a private message needs to do.
+    */
+    const harness = make({ chatPopup: true });
+    harness.chat.ingest(message({ _id: 'm1', uid: 9, n: 'Bea', txt: 'ping' }));
+    expect(harness.notified).toEqual([
+      { title: 'Message from Bea', body: 'ping', icon: '', emailHash: '' }
+    ]);
+  });
+
+  it('G12 — stays silent for the conversation on screen, and for my own echo', () => {
+    /*
+      Upstream raises it in the branch where the message is NOT for the open thread. Telling somebody
+      about a message they are looking at is noise, and telling them about their own is worse.
+    */
+    const harness = make({ chatPopup: true });
+    void harness.chat.switchToUser(9);
+    harness.chat.ingest(message({ _id: 'm2', uid: 9, n: 'Bea' }));
+    harness.chat.ingest(message({ _id: 'm3', uid: 1, recvdID: 4, n: 'Me' }));
+    expect(harness.notified).toEqual([]);
+  });
+
+  it('G12 — obeys Do Not Disturb and the chatPopup preference', () => {
+    const off = make({ chatPopup: false });
+    off.chat.ingest(message({ _id: 'm4', uid: 9 }));
+    expect(off.notified, 'chatPopup off').toEqual([]);
+  });
+
+  it('G8 — closing the TAB clears the conversation and leaves the panel open', () => {
+    /*
+      `closeTab(e) { this.user = null, this.recvdUser = null, this.currUser = "" }` at byte
+      2,205,022. The room cleared only the selected user, so the header tab vanished and the thread
+      and composer stayed — a conversation with nobody's name on it.
+    */
+    const harness = make();
+    harness.chat.show();
+    void harness.chat.switchToUser(9);
+    harness.chat.draft = 'half typed';
+
+    harness.chat.closeTab();
+
+    expect(harness.chat.peerId, 'the conversation closes').toBeNull();
+    expect(harness.chat.open, 'the panel does NOT').toBe(true);
+    expect(harness.chat.draft, "and the other peer's draft does not follow").toBe('');
+    expect(harness.cleared.length, 'the selected user goes with it').toBeGreaterThan(0);
+  });
+
+  it('G25 — clearing a search restores the thread WITHOUT a request', async () => {
+    /*
+      `privChatSearchResults = []` then `msgs = privChatLog[currUser]` at byte 2,209,001. A search
+      used to overwrite the thread, so clearing one cost a round trip AND discarded every older page
+      the reader had loaded.
+    */
+    const harness = make();
+    harness.setIncoming([message({ _id: 'a', txt: 'first' })]);
+    await harness.chat.switchToUser(9);
+
+    harness.setIncoming([message({ _id: 'b', txt: 'a hit' })]);
+    await harness.chat.search('hit');
+    expect(
+      harness.chat.log.map((row) => row._id),
+      'the results are shown'
+    ).toEqual(['b']);
+
+    const requestsBefore = harness.loaded.length;
+    await harness.chat.search('');
+    expect(
+      harness.chat.log.map((row) => row._id),
+      'the thread comes back'
+    ).toEqual(['a']);
+    expect(harness.loaded.length, 'and nothing was fetched to do it').toBe(requestsBefore);
+  });
+
+  it('G25 — a search never overwrites the thread it searched', async () => {
+    const harness = make();
+    harness.setIncoming([message({ _id: 'a' }), message({ _id: 'b' })]);
+    await harness.chat.switchToUser(9);
+    harness.setIncoming([message({ _id: 'b' })]);
+    await harness.chat.search('b');
+    await harness.chat.search('');
+    expect(harness.chat.log.map((row) => row._id)).toEqual(['a', 'b']);
+  });
+
+  it('G16 — the online dot answers the roster, and can go back to false', () => {
+    /*
+      `checkUserOnlineStatus` only ever writes `!0`, so upstream leaves a member who left lit up
+      until something rebuilds the strip. A derived answer is the deliberate divergence.
+    */
+    const present = make({ onlineIds: [9], session: { privateChats: [] } });
+    present.chat.ingest(message({ _id: 'p', uid: 9 }));
+    expect(present.chat.tabs.find((tab) => tab.uid === 9)?.online).toBe(true);
+
+    const absent = make({ onlineIds: [], session: { privateChats: [] } });
+    absent.chat.ingest(message({ _id: 'q', uid: 9 }));
+    expect(absent.chat.tabs.find((tab) => tab.uid === 9)?.online).toBe(false);
   });
 });
