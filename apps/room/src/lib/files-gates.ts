@@ -14,8 +14,27 @@ export interface FilesSessionFlags {
 
 /** One row of the Files table, as far as these gates are concerned. */
 export interface FileRow {
-  /** Served back verbatim by `/uploads/[name]`; the reference calls the same field `contentType`. */
-  contentType: string;
+  /**
+   * `FP-13` — WHICH BUCKET this file is in, decided once at upload and stored.
+   *
+   * The reference discriminates at RENDER time, from `contentType`, at every point that matters —
+   * the row filter, the Play button, the tab counts, and this gate:
+   *
+   * ```js
+   * O(23, i.isP && e.contentType.indexOf('audio/') >= 0 && … ? 23 : -1)
+   * ```
+   *
+   * This application decided once and stored the answer (`kindForContentType`, `shared_files.kind`),
+   * which is a deliberate divergence and the better one: the classification is a property of the
+   * upload rather than a string test repeated at four call sites.
+   *
+   * The divergence was only three-quarters applied, and that is what this row is. The row filter,
+   * the tab counts and the Play button all read `kind`; this gate alone still ran
+   * `contentType.indexOf('audio/')`, which is a SUBSTRING test where `kindForContentType` uses
+   * `startsWith`. So a file typed `application/x-audio/foo` was absent from the Sounds tab and
+   * offered the Set-Alert-Sound button anyway — one pane, two answers to one question.
+   */
+  kind: string;
   /** The reference's `vidPath` — the file's url. */
   url: string;
 }
@@ -62,6 +81,9 @@ export function filesSectionHidden(session: FilesSessionFlags): boolean {
  *       sessData.overwriteCashRegisterSound.includes(e.vidPath) ? 23 : -1)
  * ```
  *
+ * The `contentType.indexOf('audio/')` term is read from `kind` here — see `FileRow.kind`, which
+ * records why this application answers that question once at upload instead of four times at render.
+ *
  * Returning one value rather than two booleans is the point: written as two independent `{#if}`
  * blocks in the template, a room that never receives `overwriteCashRegisterSound` renders BOTH at
  * once, which is exactly what happens if the setting is not allow-listed across.
@@ -79,7 +101,7 @@ export function alertSoundButtonFor(
   file: FileRow
 ): AlertSoundButton {
   if (!viewer.isPresenter) return null;
-  if (file.contentType.indexOf('audio/') < 0) return null;
+  if (file.kind !== 'sound') return null;
   const override = session.overwriteCashRegisterSound;
   if (override && override.includes(file.url)) return 'remove';
   return 'set';

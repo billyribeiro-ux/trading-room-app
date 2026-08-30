@@ -76,7 +76,7 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,481 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
-| 3 | `routes/+page.svelte` | 1,714 | no |
+| 3 | `routes/+page.svelte` | 1,729 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
@@ -91,7 +91,7 @@ guessed.
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 625 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
-| 18 | `lib/components/FilesPane.svelte` | 554 | no |
+| 18 | `lib/components/FilesPane.svelte` | 585 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | no |
 | 20 | `lib/components/notes/NotesPane.svelte` | 521 | no |
 | 21 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 33,847 lines · 3.2%.**
+**2 of 71 surfaces audited · 1,072 of 33,893 lines · 3.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

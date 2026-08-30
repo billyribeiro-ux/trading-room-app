@@ -24,8 +24,16 @@ const bundle = readFileSync(
 /** The flattened const table and update block — see `files-pane-contract.test.ts` for why. */
 const flat = bundle.replace(/\n\s*/g, '');
 
-const mp3: FileRow = { contentType: 'audio/mpeg', url: '/uploads/chaching.mp3' };
-const png: FileRow = { contentType: 'image/png', url: '/uploads/chart.png' };
+/*
+  `FP-13` — the fixtures carry `kind`, because that is what the gate reads now.
+
+  This pane had TWO answers to "is this a sound": the row filter, the tab counts and the Play button
+  all read the stored `kind`, while this gate alone ran `contentType.indexOf('audio/')`. `kind` is
+  written by `kindForContentType`, which uses `startsWith`, so the two parted company on a type like
+  `application/x-audio/foo` — absent from the Sounds tab and offered the Set-Alert-Sound button.
+*/
+const mp3: FileRow = { kind: 'sound', url: '/uploads/chaching.mp3' };
+const png: FileRow = { kind: 'image', url: '/uploads/chart.png' };
 
 const presenter = { isPresenter: true };
 const member = { isPresenter: false };
@@ -97,7 +105,7 @@ describe('the alert-sound row buttons', () => {
       what happened before the setting was allow-listed across, and is how you know the read half
       is missing.
     */
-    const other: FileRow = { contentType: 'audio/mpeg', url: '/uploads/other.mp3' };
+    const other: FileRow = { kind: 'sound', url: '/uploads/other.mp3' };
     for (const override of [undefined, null, '', mp3.url, other.url]) {
       for (const file of [mp3, other]) {
         const answer = alertSoundButtonFor(
@@ -118,13 +126,17 @@ describe('the alert-sound row buttons', () => {
     expect(alertSoundButtonFor(presenter, {}, png)).toBeNull();
   });
 
-  it('matches on the content type, not the file extension', () => {
-    // `e.contentType.indexOf('audio/') >= 0` — the row's own test, and the reason the server action
-    // re-checks the stored `content_type` rather than trusting a url that ends in `.mp3`.
-    expect(alertSoundButtonFor(presenter, {}, { contentType: 'audio/wav', url: '/a' })).toBe('set');
-    expect(
-      alertSoundButtonFor(presenter, {}, { contentType: 'application/pdf', url: '/a.mp3' })
-    ).toBeNull();
+  it('matches on the stored kind, not the file extension', () => {
+    /*
+      `e.contentType.indexOf('audio/') >= 0` is the row's own test upstream, and the reason the
+      server action re-checks what it stored rather than trusting a url that ends in `.mp3`. `FP-13`
+      moved the read to `kind` — the SAME decision, taken once at upload from the content type by
+      `kindForContentType`, rather than four times at render from a string.
+    */
+    expect(alertSoundButtonFor(presenter, {}, { kind: 'sound', url: '/a' })).toBe('set');
+    expect(alertSoundButtonFor(presenter, {}, { kind: 'file', url: '/a.mp3' })).toBeNull();
+    // An IMAGE named like a sound is still an image, which the extension test could not tell you.
+    expect(alertSoundButtonFor(presenter, {}, { kind: 'image', url: '/a.mp3' })).toBeNull();
   });
 
   it('sends the EMPTY STRING to remove, not the url being removed', () => {

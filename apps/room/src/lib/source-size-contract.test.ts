@@ -671,7 +671,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the caption overlay was forgotten on reload** while the navbar checkbox for the same preference
       persisted correctly. Two paths to one setting, one of them silently not a setting at all.
     */
-    max: 1715,
+    /*
+      1715 -> 1730, 2026-08-30, for `FP-01` — the refetch on opening Files or the video player.
+
+      Three executable lines: the `MainTabRefetch` and the effect that reads `mainTab`. The rest says
+      why the marker is a plain field and not `$state`, which is the same reason `arrivals.ts` gives
+      for `#seeded`: an effect that read its own marker reactively would re-run on the write meant to
+      end it.
+    */
+    max: 1730,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -2919,6 +2927,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
   },
   {
+    file: 'lib/room/main-tab-refetch.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a module to this list.
+
+      `FP-01` — `onMainTabChange`'s two refetches. Ten lines of rule and forty of why it is a class
+      at all: an `$effect` reading `mainTab` runs once at mount with whatever tab the room opened on,
+      and a refetch there fires a second load on top of the one that just delivered the page, for
+      every viewer, on every navigation. Upstream cannot have that problem, because its version is a
+      click handler.
+
+      It also records why the reference's TWO commands collapse into one `invalidate('room:data')`
+      here, which is not a simplification: this route has a single load and a caller trying to be
+      narrower would be inventing a second source of truth for `data.files`.
+    */
+    max: 55,
+    why: 'which main tabs refetch when opened, and the first-pass seed that stops a double load'
+  },
+  {
     file: 'lib/room/caption-staleness.ts',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a module to this list.
@@ -4998,7 +5024,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/FilesPane.svelte',
-    max: 557,
+    /*
+      557 -> 586, 2026-08-30, for `FP-03`, `FP-05` and `FP-12` — and `FP-12` is nearly all of it.
+
+      That row is not "a comment has a typo". The comments in this file cited const indices from
+      `app-presentationarea.full.js`, a capture **this repository does not hold**, so every index in
+      them was unverifiable by anybody but their author while reading as verified. Three were wrong.
+      They name the pinned v4 bundle and its offsets now, `files-pane-rows-contract.test.ts` decodes
+      that table and CHECKS them, and the sentences saying which numbers were stale are kept —
+      because a correction with no record of what it corrected is one somebody re-derives.
+    */
+    max: 586,
     why: 'the Files tab - the list, the sort bar and the upload control'
   },
   {

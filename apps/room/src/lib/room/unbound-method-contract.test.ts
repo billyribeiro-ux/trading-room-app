@@ -28,6 +28,7 @@ import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
 import { RoomChatMute } from './chat-mute';
 import { CaptionStaleness } from './caption-staleness';
+import { MainTabRefetch } from './main-tab-refetch';
 import { RoomChatSearch } from './chat-search.svelte';
 import { RoomKicks } from './kicks';
 import { RoomPeerHistory } from './peer-history.svelte';
@@ -133,6 +134,8 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
     leave a timer running with nothing to clear.
   */
   captionStaleness: CaptionStaleness,
+  /* Added 2026-08-30 with `FP-01`, again because this check asked and nobody remembered. */
+  mainTabRefetch: MainTabRefetch,
   peerHistory: RoomPeerHistory,
   profilePicture: RoomProfilePicture,
   userDetail: RoomUserDetail,

@@ -79,20 +79,34 @@
   }: Props = $props();
 </script>
 
+<!--
+  `FP-03` — `Hr = t => ({"show active": t})` at byte 1,916,418, bound at 2,017,799 over const 29's
+  static `tab-pane fade`, so the reference's rendered attribute is `tab-pane fade show active`. This
+  emitted `active show`: the same class SET, a different attribute STRING, and a byte-for-byte DOM
+  diff against a capture reports it as a difference. Free to match, so it matches.
+-->
 <div
   id="files"
-  class={mainTab === 'files' ? 'tab-pane fade active show' : 'tab-pane fade'}
+  class={mainTab === 'files' ? 'tab-pane fade show active' : 'tab-pane fade'}
   hidden={files.filesHidden}
   role="tabpanel"
   aria-labelledby="files-tab"
 >
   <ul id="myTab" class="nav nav-tabs files-tabs d-flex justify-content-center" role="tablist">
-    <!-- The click handler sits on the <li>, as the reference has it: its const puts the
-                           listener there, and `.files-tabs li.nav-item { cursor: pointer }` is
-                           measured on the li — so the 5px margin band around each tab is part of the
-                           target. Ours listened on the <a> alone and that band was dead. The anchor
-                           keeps the keydown, so the tab stays operable from the keyboard, which the
-                           reference's is not. -->
+    <!--
+      The click handler sits on the <li>, as the reference has it: its const puts the listener there,
+      and `.files-tabs li.nav-item { cursor: pointer }` is measured on the li — so the 5px margin band
+      around each tab is part of the target. Ours listened on the <a> alone and that band was dead.
+
+      `FP-05` — and the anchor's own `onclick` is GONE, all three of them. Const 32/34/35 (read at
+      1,996,545) carry `ngClass` and nothing else: the reference's anchors have no click at all, and
+      an anchor click here bubbled to the li, so the handler ran twice per click. Idempotent, so
+      nothing observable broke — which is precisely why it would have stayed.
+
+      The `onkeydown` stays and is deliberate: the reference's anchors are not keyboard operable and
+      ours are. That is the one half of this row that is an addition rather than a duplication, and
+      it is why the fix is not "make the anchor inert".
+    -->
     <li class="nav-item" role="presentation" onclick={() => (files.fileTab = 'files')}>
       <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
@@ -105,7 +119,6 @@
         role="tab"
         aria-controls="files"
         aria-selected={files.fileTab === 'files'}
-        onclick={() => (files.fileTab = 'files')}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') files.fileTab = 'files';
         }}
@@ -132,7 +145,6 @@
         role="tab"
         aria-controls="image"
         aria-selected={files.fileTab === 'images'}
-        onclick={() => (files.fileTab = 'images')}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') files.fileTab = 'images';
         }}
@@ -159,7 +171,6 @@
         role="tab"
         aria-controls="sounds"
         aria-selected={files.fileTab === 'sounds'}
-        onclick={() => (files.fileTab = 'sounds')}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') files.fileTab = 'sounds';
         }}
@@ -273,8 +284,16 @@
                         showed ten identical Stop buttons, all stopping the same single playback.
 
                         Label and icon are the reference's too: "Stop Playing For All " with
-                        `fa fa-play-circle mr-2` (its const 158 — the play glyph, not a stop glyph;
-                        transcribed, not corrected). Ours read "Stop For All" with `fa-stop-circle`.
+                        `fa fa-play-circle mr-2` — the play glyph, not a stop glyph; transcribed, not
+                        corrected. Ours read "Stop For All" with `fa-stop-circle`.
+
+                        `FP-12` — the index was cited as 158 and is **157** in the pinned v4 bundle:
+                        `d(0,"button",241) … T(1,"i",157), v(2,"Stop Playing For All ")` at byte
+                        1,946,166, with const 157 decoding to `[1,"fa","fa-play-circle","mr-2"]` at
+                        2,004,368. The VALUE was right and the index was one out, because the comment
+                        was written against `app-presentationarea.full.js`, a capture that is not in
+                        this repository. An index nobody can check is worse than no index: it reads
+                        as verified. Every citation below now names the v4 bundle and its offset.
                       -->
     <div>
       {#if isPresenter && mp3Playing}
@@ -501,11 +520,21 @@
                     </button>
                   {/if}
                   <!--
-                                    Nodes 22 and 23 of the row (full.js:1889-1916), consts
-                                    261/262/263, both `btn ml-2 btn-info set-alert-sound-btn` - the
-                                    class whose rule already ships at
+                                    Nodes 22 and 23 of the row, both
+                                    `btn ml-2 btn-info set-alert-sound-btn` — the class whose rule
+                                    already ships at
                                     `src/lib/styles/captured-runtime-components.css:6972`
                                     (`font-size: 12px`).
+
+                                    `FP-12` — these were cited as consts 261/262/263 against a
+                                    capture this repository does not hold. In the pinned v4 bundle
+                                    they are **267** (Overwrite, with the click) and **269** (Remove,
+                                    with the click), read at bytes 1,947,897 and 1,948,105; **268**
+                                    is the `fa fa-bell mr-2` glyph and the Remove button's is **144**,
+                                    `fa fa-trash mr-2`. **260** and **261** are the same two entries
+                                    WITHOUT a click — Angular's placeholder attrs for the same nodes
+                                    — which is why a reader counting entries finds four buttons where
+                                    there are two.
 
                                     ONE `{#if}` with an `{:else if}`, not two independent blocks.
                                     The two gates at full.js:1972-1991 are complements over the same
@@ -514,10 +543,12 @@
                                     `alertSoundButtonFor` in `#lib/files-gates.js` resolves them to one
                                     answer and is tested there.
 
-                                    TRANSCRIPTION NOTE: const 263 spells the type attribute
-                                    `pe="button"` - `["pe","button","title","Remove Overwrited Cash
-                                    Register Sound",...]` - where every sibling row button spells it
-                                    `type`. That is a typo in the original. It is harmless where it
+                                    TRANSCRIPTION NOTE: consts **261 and 269** spell the type
+                                    attribute `pe="button"` — `["pe","button","title","Remove
+                                    Overwrited Cash Register Sound",...]` — where every sibling row
+                                    button spells it `type`. (Cited as 263 before `FP-12`; the typo
+                                    is real and it is on the Remove button's pair, both the
+                                    placeholder and the live one.) That is a typo in the original. It is harmless where it
                                     stands, because the files table sits in no `form` and the
                                     implicit `submit` a missing type gives a button has nothing to
                                     submit; copied forward it would plant a latent bug for anyone
