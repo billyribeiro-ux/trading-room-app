@@ -33,6 +33,128 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 20:24 UTC — The screenshare panes: one share feeding two decoders, an empty box that never said why, and a consumer that came up 0x0
+
+**Runtime impact: YES.** Detaching a screen now blanks the pane it came from and offers a way back,
+instead of leaving the original window decoding the same producer with no route to re-attach. A
+screen that has not arrived says *"Connecting To Screen of …"* with a spinner instead of rendering an
+empty box. A consumer that comes up with no picture is asked for again, three times. A locked screen
+shows a lock badge that unlocks it in one click. Unmuting while sharing pulls the room to the screen
+you are looking at. And the screenshare `<video>` is silent, as the reference guarantees it is.
+
+Ten rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `SV-SP-02` through `SV-SP-14` — which
+closes the `StreamingView + ScreenPane + ScreenTabs` surface. **24 open · 200 closed · 224 rows.**
+
+#### `SV-SP-02` — four characters of upstream naming hid a duplicated decoder
+
+`isDetached` and `isDetachedCtrl` differ by four characters and mean **opposite ends of the same
+gesture**: the SOURCE window asking "have I sent this screen elsewhere?" and the POPOUT asking "am I
+a popout?". This room had only the second. So detaching a screen left the original pane rendering the
+same producer — one share feeding two live decoders — and the only way back was to find and close the
+popout window.
+
+The re-attach control is the row's one divergence and it is the accessible one. Upstream hangs the
+click on the `<h3>`: not focusable, not keyboard operable, announced to a screen reader as a heading.
+A real `<button>` inside the captured heading keeps the class, text and position exactly where the
+capture has them. `role="button"` plus a tabindex on the heading was tried first and is precisely
+what `a11y_no_noninteractive_element_to_interactive_role` refuses, with reason — it would have SAID
+button and still been a heading.
+
+#### `SV-SP-03` — a gate that is a negation
+
+`O(4, o.isConnected || o.isPresentingThisScreen || o.isDetached ? -1 : 4)` shows the connecting line
+while **none** of the three holds. Read the other way round it builds the opposite feature: a spinner
+over every screen that IS connected.
+
+`isPresentingThisScreen` is the term that matters here. Our own screens render from the local capture
+rather than from a consumer, so they are connected the moment they exist — without that term a
+presenter would watch a spinner over their own screen forever. The file already recorded that the
+term is false by construction and did not record what depends on it.
+
+#### `SV-SP-04` — the exclusions upstream needs and this does not
+
+A consumer that negotiates and delivers no frames renders a 0x0 video, which on screen is an empty
+pane that never fills — indistinguishable from a presenter who has not started sharing, so nothing
+about it looks like a fault to report.
+
+The three constants are the reference's: three attempts, 3,000 ms apart, ten pixels. **The Firefox
+and Edge exclusions are deliberately not reproduced.** They exist upstream because those browsers
+report `videoWidth` as 0 for a frame or two after `playing` on the codepath it was written for, so
+the retry fired on healthy streams. This takes the measurement after the same settling delay the
+retry would wait and re-reads it before acting, which makes those exclusions unnecessary rather than
+merely omitted — and a browser sniff nothing needs is a branch with no consumer.
+
+The pane measures and the transport re-consumes: the pane owns the element and can see `videoWidth`,
+and only the transport can ask for the producer again.
+
+#### `SV-SP-06` and `SV-SP-08` — two gaps their own asymmetry pointed at
+
+`StreamTabs.svelte` has rendered the locked-screen badge from the same const all along, **on the bar
+where upstream it can never appear**, while the bar that actually locks screens had none.
+`lockedScreenId` reached that component and was read for one thing: flipping a dropdown item's label.
+A locked screen showed no indicator anywhere.
+
+`SV-SP-08`'s verifier had the important half right: **the write was never missing.**
+`#selectedScreenTab` has held that value all along; what did not exist was a reader outside the
+component tree. That is why the row sits on the screens surface and its trigger sits on the
+microphone one — `RoomLocalCapture.#enableMicrophone` is this application's `presUnmuted` moment. The
+other half of upstream's handler, `startTalking`, arrives inbound from the room socket here rather
+than being sent, which is why only one half needed building.
+
+#### `SV-SP-10` — silent three ways, and this bound it to the volume knob
+
+Read from const 8 rather than inferred: `muted` sits in the STATIC attribute run before the `3`
+marker, the binding run after it holds only `click`, `controls`, `ngClass` and `id` — no `volume` —
+and `newScreenStream` re-asserts `i.muted = !0` twice more. **The reference makes this element silent
+three separate ways**, which is not something a codebase does by accident.
+
+Harmless today, because `addRemoteScreen` refuses any producer whose `kind !== 'video'`. That is one
+guard away from playing screenshare audio through an element the reference guarantees is silent. The
+`volume` and `muted` props are gone from the component, which makes the second predicate unwritable
+rather than merely absent.
+
+#### The three measured and refused
+
+- **`SV-SP-05`** — consume-on-arrival is an OWNER DECISION, not a fix. It is what
+  `selectScreenTabOfId`, the detached popout, the alerts overlay and `applyScreenLayers` are all
+  built on; changing it is a media-plane redesign, and the bandwidth it would save is a number nobody
+  has measured on a room with several simultaneous shares. `SV-SP-02` removed the sharpest instance
+  of the cost without touching the shape.
+- **`SV-SP-09`** — the presenter self-preview deferral is a DELIBERATE DIVERGENCE, and the two are
+  not the same trade: upstream defers because its own screen would otherwise be a second WebRTC
+  consumer of a producer it is already producing. Ours is a direct `srcObject` from the capture the
+  encoder already holds — no consumer, no negotiation. Reproducing it would hide a picture that costs
+  nothing to show.
+- **`SV-SP-13`** — the vendor fullscreen fallbacks are a MEASURED REFUSAL.
+  `document.mozCancelFullScreen` and its siblings are `undefined` in every browser this room
+  supports, so each added branch is a line that can never run — the `.flipped`-class-with-no-CSS
+  shape `CLAUDE.md` names by name, in executable form. The measurement is kept so nobody re-derives
+  the row as a gap.
+
+#### What the gate found
+
+Two things, both real. `orphaned-comment-contract` caught the `SV-SP-10` docblock left floating in
+the props list after the props it described were deleted — a comment explaining an absent prop, which
+belongs with the reasoning and not in a declaration list. And ESLint's `no-unused-svelte-ignore`
+refused the two ignores on the new lock badge, because the `{...spread}` carrying `placement` and
+`tooltip` already suppresses both rules — which is exactly what `StreamTabs.svelte` records about its
+own copy of the same badge.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **260 test files, 4,328 tests, 1
+skipped.** `svelte-check` clean at 1,475 files. **Eight negative controls, each seen red**: the
+connecting gate inverted; `ownScreen` dropped from the connected test; the detached term dropped from
+the hidden binding; the static `muted` removed; the retry budget removed; `stopPropagation` removed
+from the lock badge; the unmute reader removed; and the no-screen guard removed.
+
+Every byte offset in the new contract is READ at assert time rather than quoted, and three of the
+cited offsets turned out to point inside a sub-template rather than at the literal — the strings
+start at 1,492,830, 1,493,277 and 1,500,490. The contract asserts the measured positions and says so.
+
+Six size ceilings raised with their arguments. `svelte-autofixer` returns no issues and no
+suggestions on the reworked pane. **Nothing was opened in a browser.**
+
 ### 2026-08-30 19:50 UTC — The emoji picker: 1,821 cells on a click, a duplicate id, and a popover that positioned itself over the wrong composer
 
 **Runtime impact: YES.** The picker opens without building every one of its 1,821 cells first. Two

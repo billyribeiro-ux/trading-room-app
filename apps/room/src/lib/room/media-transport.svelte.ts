@@ -34,6 +34,17 @@ import type { RoomVolume } from './volume.svelte';
  */
 const TOP_SPATIAL_LAYER = 9;
 
+/**
+ * `SV-SP-04`'s three constants, all the reference's own (byte 1,499,022).
+ *
+ * `i.tooSmallRetries < 3`, `setTimeout(…, 3e3)`, and `s < 10 || r < 10`. Named rather than inlined
+ * because they are read numbers and not taste, and a bare `10` in a geometry test is the first thing
+ * a later reader "tunes".
+ */
+const SCREEN_TOO_SMALL_RETRIES = 3;
+export const SCREEN_TOO_SMALL_DELAY_MS = 3_000;
+export const SCREEN_TOO_SMALL_PIXELS = 10;
+
 /** The load values the transport reads, taken as a thunk so a navigation reaches them. */
 export interface TransportSession {
   user: {
@@ -144,6 +155,9 @@ export class RoomMediaTransport {
   #presenterReconnectToastId: number | null;
   #saveData: boolean;
   #deferredScreens: Map<string, ProducerInfo>;
+  #consumedScreens: Map<string, ProducerInfo>;
+  /** `tooSmallRetries` — per producer, because one bad consumer must not spend another's budget. */
+  #tooSmallRetries = new Map<string, number>();
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -369,6 +383,8 @@ export class RoomMediaTransport {
      * in the room, and every entry is removed the moment it is consumed.
      */
     this.#deferredScreens = new Map<string, ProducerInfo>();
+    /* `SV-SP-04` — what it would take to ask for a screen again. See `retryScreen`. */
+    this.#consumedScreens = new Map<string, ProducerInfo>();
 
     /*
       THE LOCAL PUBLISHER — `#lib/room/local-capture.svelte.ts`.
@@ -1200,6 +1216,13 @@ export class RoomMediaTransport {
     if (remote) {
       this.#screenStreams.set(info.producerId, remote.stream);
       /*
+        `SV-SP-04` — the `ProducerInfo` is retained for EVERY consumed screen, not only the deferred
+        ones, so `retryScreen` below has something to re-consume. `#deferredScreens` already held it
+        for the save-data case and the two are the same fact: what it would take to ask for this
+        producer again.
+      */
+      this.#consumedScreens.set(info.producerId, info);
+      /*
         `PA-03`, second toast — `subscribe("addScreenStream", e => { "screen" == e.mode &&
         alertsService.info(e.userName + " started screen sharing") })`, byte 1,960,202.
 
@@ -1210,6 +1233,53 @@ export class RoomMediaTransport {
       */
       this.#toasts.info(`${info.displayName ?? 'Presenter'} started screen sharing`);
     }
+  }
+
+  /**
+   * `SV-SP-04` — a screen consumer that comes up 0x0 is asked for again.
+   *
+   * ```js
+   * o.addEventListener("playing", () => { i.isConnected = !0;
+   *   const s = o.videoWidth, r = o.videoHeight;
+   *   … if ((s < 10 || r < 10) && i.tooSmallRetries < 3 && !i.mediaService.is_firefox &&
+   *       !i.mediaService.is_edge) return …, i.tooSmallRetries++,
+   *     void setTimeout(() => { i.mediaService.callScreenOfUserWEBRTC(this.muser) }, 3e3);
+   *   i.tooSmallRetries = 0 })                                                // byte 1,499,022
+   * ```
+   *
+   * A consumer that negotiates but delivers no frames renders a 0x0 video, which on screen is an
+   * empty pane that never fills — indistinguishable from a presenter who has not started sharing.
+   * The pane reports the measurement; this re-consumes.
+   *
+   * **The three constants are the reference's and are reproduced rather than tuned.** Three
+   * attempts, 3,000 ms apart, and a 10-pixel threshold: below ten in either axis is a decoder that
+   * produced nothing, not a small window. The counter resets on a good size, so a screen that
+   * recovers and later fails again gets its budget back — that is upstream's `tooSmallRetries = 0`
+   * on the success path, and without it a long session would exhaust the budget on unrelated blips.
+   *
+   * **The Firefox and Edge exclusions are NOT reproduced, and that is measured rather than lazy.**
+   * They exist upstream because those two report `videoWidth` as 0 for a frame or two after
+   * `playing` on the codepath it was written for, so the retry fired on healthy streams. This
+   * implementation does not take the measurement at `playing` — it takes it after a settling delay
+   * and re-reads it before acting, so the case those exclusions guard against cannot arise. Adding
+   * a browser sniff that nothing here needs would be adding a branch with no consumer.
+   */
+  async retryScreen(producerId: string): Promise<void> {
+    const info = this.#consumedScreens.get(producerId);
+    const session = this.#mediaSession;
+    if (!info || !session) return;
+
+    const attempts = this.#tooSmallRetries.get(producerId) ?? 0;
+    if (attempts >= SCREEN_TOO_SMALL_RETRIES) return;
+    this.#tooSmallRetries.set(producerId, attempts + 1);
+
+    this.#screenStreams.delete(producerId);
+    await this.addRemoteScreen(session, info);
+  }
+
+  /** `i.tooSmallRetries = 0` — a screen that came up with a real picture gets its budget back. */
+  screenSettled(producerId: string): void {
+    this.#tooSmallRetries.delete(producerId);
   }
 
   /**

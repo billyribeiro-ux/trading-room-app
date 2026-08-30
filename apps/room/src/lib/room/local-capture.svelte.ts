@@ -373,6 +373,26 @@ export class RoomLocalCapture {
       this.#media.micMuted = false;
 
       /*
+        `SV-SP-08` — unmuting while sharing pulls the room to the screen you are looking at.
+
+        ```js
+        subscribe("presUnmuted", e => { …startTalking…, this.globals.isScreenSharing &&
+          this.sendServerAdminCommand("focusOnScreen", {id: this.globals.currScreenID}) })
+        ```                                                                   // byte 1,141,836
+
+        This is the reference's `presUnmuted` moment: the local microphone has just been enabled.
+        The other half of that handler — `startTalking` — arrives here INBOUND from the room socket
+        rather than being sent, which is why only this half needed building; `media.svelte.ts`
+        records that difference.
+
+        `media.screenSharing` is `globals.isScreenSharing`, and `RoomScreens` decides the rest: it
+        re-checks the presenter role and does nothing when no screen is selected. The audit filed
+        this against the screens surface because the value is theirs; the trigger is here because
+        this is where a microphone opens.
+      */
+      if (this.#media.screenSharing) this.#screens.focusRoomOnSelectedScreen();
+
+      /*
         Publish it, or nobody hears anything.
 
         `MediaSession.produceMicrophone` (`src/lib/media/session.ts:571`) was written and never

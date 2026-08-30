@@ -644,17 +644,33 @@
               id="screensTabsContent"
               class={['tab-content', { 'viewer-only-screen-tab': viewerOnlyMode }]}
             >
+              <!--
+                `SV-SP-10` — NO `volume` and NO `muted` are passed. Const 8 carries `muted` in the
+                static attribute run and no `volume` in its binding list at all, and the pane's
+                element is statically muted; see `ScreenPane`'s own note. A screen is a picture, and
+                the room's volume control is for the room's audio.
+
+                `SV-SP-04` — `ontoosmall` / `onsettled` are the pane reporting a MEASUREMENT (this
+                consumer delivered a 0x0 picture) and the transport deciding what to do about it.
+                The pane owns the element and can see `videoWidth`; only the transport can ask for
+                the producer again.
+              -->
               {#each mediaTransport.screens as screen (screen.id)}
                 <ScreenPane
                   id={screen.id}
                   stream={mediaTransport.screenStreams.get(screen.id) ?? null}
                   active={screen.id === screens.selectedTab}
                   {viewerOnlyMode}
-                  {volume}
-                  muted={volume === 0}
                   showZoomCtrl={screens.showZoomCtrl}
                   zoomLevel={screens.zoomLevel}
                   pan={screens.pans.get(screen.id) ?? NEUTRAL_PAN}
+                  detachedHere={screens.isDetachedHere(screen.id)}
+                  onreattach={() => screens.reattach(screen.id)}
+                  ontoosmall={() => void mediaTransport.retryScreen(screen.id)}
+                  onsettled={() => mediaTransport.screenSettled(screen.id)}
+                  presenterName={screen.name}
+                  screenName={screen.screenName}
+                  ownScreen={screen.ownerId === null}
                   detached={screens.detachedScreenId !== null}
                   saveData={mediaTransport.saveData}
                   {userIdWatermark}

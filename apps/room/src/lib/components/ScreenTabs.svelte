@@ -181,6 +181,47 @@
             <i class="fas fa-eye"></i>
           </span>
         {/if}
+        <!--
+          `SV-SP-06` — the LOCKED badge, and its one-click unlock.
+
+          ```js
+          function oSe(t,n){ if(1&t){ const e=Y();
+            d(0,"span",82), x("click", () => { const o = g().$implicit;
+              return g(3).toggleLockScreen(o._id) }), T(1,"i",83), u() } }     // byte 1,918,843
+          O(3, i.appService.globals.lockedScreenID === e._id ? 3 : -1)         // byte 1,920,343
+          ```
+
+          Const 82 is `["placement","bottom","tooltip","Unlock this screen?",1,"mr-2",3,"click"]` and
+          const 83 `["aria-hidden","true",1,"fas","fa-lock"]`. It sits immediately after the forced
+          screen's eye badge, which is the order here.
+
+          **The asymmetry was the tell.** `StreamTabs.svelte` has rendered this badge from the same
+          const all along — on the bar where, upstream, it can never appear — while the bar that
+          actually locks screens had none. `lockedScreenId` reached this component and was read for
+          exactly one thing: flipping the dropdown item's label. So a locked screen showed no
+          indicator anywhere and the only way out was to find the right item in the right menu.
+
+          `stopPropagation` because the badge lives inside the tab's own anchor: without it, clicking
+          Unlock would also select the tab, which is not what the reference's separate `click` does.
+        -->
+        {#if screen.id === lockedScreenId}
+          <!--
+            NO `svelte-ignore` here, and that is not an oversight: the `{...spread}` carrying
+            `placement` and `tooltip` already suppresses both a11y rules, so an ignore placed on this
+            element is reported as UNWARNED and fails `svelte/no-unused-svelte-ignore`.
+            `StreamTabs.svelte` records the same thing about its own copy of this badge.
+          -->
+          <span
+            {...{ placement: 'bottom', tooltip: 'Unlock this screen?' } as Record<string, string>}
+            class="mr-2"
+            onclick={(event) => {
+              event.stopPropagation();
+              ontogglelock?.(screen.id);
+            }}
+          >
+            <i aria-hidden="true" class="fas fa-lock"></i>
+          </span>
+        {/if}
         <img class="presenter-img" src={screen.avatarUrl} alt="" width="20" height="20" />
         <span class="mx-1">{screen.name}-{screen.screenName}</span>
       </a>

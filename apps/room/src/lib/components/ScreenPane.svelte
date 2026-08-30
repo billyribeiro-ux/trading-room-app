@@ -45,6 +45,10 @@
    * and `src/lib/screen-zoom.ts` for the state model.
    */
   import { scaleForZoomLevel, captureVideoImage, type Pan } from '#lib/screen-zoom.js';
+  import {
+    SCREEN_TOO_SMALL_DELAY_MS,
+    SCREEN_TOO_SMALL_PIXELS
+  } from '#lib/room/media-transport.svelte.js';
   import ScreenZoomControls from './ScreenZoomControls.svelte';
 
   type Props = {
@@ -53,9 +57,6 @@
     /** The one-track MediaStream from `RemoteStream.stream`. */
     stream: MediaStream | null;
     active: boolean;
-    /** Volume 0-100, mirroring the room's master control. */
-    volume?: number;
-    muted?: boolean;
     /**
      * Zoom mode. Global rather than per screen, because the capture broadcasts it by value to
      * every view - see `src/lib/screen-zoom.ts`. Gates the drag, exactly as the captured
@@ -101,6 +102,48 @@
      * empty-id case, and a copy of it per component is a copy that stops matching.
      */
     userIdWatermark?: string | null;
+    /**
+     * `SV-SP-02` — has THIS window detached this screen into a popout?
+     *
+     * ```js
+     * function z0e(t,n){ … d(0,"h3",10), x("click", () => g().reAttachScren()),
+     *   v(1," Screen Detached.. Click here to re-attach "), u() }             // byte 1,492,849
+     * O(1, o.isDetached ? 1 : -1)                                            // byte 1,501,523
+     * ```
+     *
+     * Const 10 is `[1,"mt-4","text-center",3,"click"]`. Distinct from `detached` above, which is the
+     * POPOUT recognising itself — upstream's `isDetachedCtrl`. The two names differ by four
+     * characters and mean opposite ends of the same gesture.
+     */
+    detachedHere?: boolean;
+    /**
+     * `SV-SP-03` — who is sharing, and what they called it.
+     *
+     * ```js
+     * function q0e(t,n){ … d(0,"h3",3), T(1,"i",12), v(2) …
+     *   ns(" Connecting To Screen of ", e.muser.mediaValue.name, "-",
+     *      e.muser.mediaValue.screenName, " ") }                              // byte 1,493,278
+     * ```
+     *
+     * Two fields and a hyphen between them, which is the capture's own separator. Optional because
+     * the popout route renders a pane before the roster is known.
+     */
+    presenterName?: string;
+    screenName?: string;
+    /**
+     * `o.isPresentingThisScreen` — the third term of the connecting gate.
+     *
+     * True for a screen this browser is sharing. Those render from the local capture here rather
+     * than from a consumer, so they are connected the moment they exist and must never show a
+     * spinner waiting for a producer that is not coming.
+     */
+    ownScreen?: boolean;
+    /** `reAttachScren()` — the click on the blanked pane. */
+    onreattach?: () => void;
+    /** `SV-SP-04` — this consumer came up with no picture; ask for the producer again. */
+    ontoosmall?: () => void;
+    /** `i.tooSmallRetries = 0` — a real picture arrived, so the retry budget resets. */
+    onsettled?: () => void;
     /** Reports a drag upward; the parent owns the per-screen pan map. */
     onpan?: (x: number, y: number) => void;
     ontogglezoom?: () => void;
@@ -113,8 +156,13 @@
     id,
     stream,
     active,
-    volume = 100,
-    muted = false,
+    detachedHere = false,
+    presenterName = '',
+    screenName = '',
+    ownScreen = false,
+    onreattach,
+    ontoosmall,
+    onsettled,
     showZoomCtrl,
     zoomLevel,
     pan,
@@ -128,6 +176,35 @@
     onzoomout,
     onreset
   }: Props = $props();
+
+  /**
+   * `o.isConnected` — the reference's own name for "the picture has arrived".
+   *
+   * A screen this browser is SHARING is connected by construction: those render from the local
+   * capture rather than from a consumer, so `ownScreen` short-circuits the wait. Without that term a
+   * presenter would watch a spinner over their own screen forever.
+   */
+  const connected = $derived(stream !== null || ownScreen);
+
+  /**
+   * `O(4, o.isConnected || o.isPresentingThisScreen || o.isDetached ? -1 : 4)` — byte 1,501,699.
+   *
+   * Read as the negation it is: the connecting line shows only while NONE of the three is true. The
+   * detached term matters — a blanked pane already says what is happening and must not also claim to
+   * be connecting.
+   */
+  const connecting = $derived(!connected && !detachedHere);
+
+  /**
+   * `$0e = t => ({hidden: t})` over `!e.isDetached && (!e.isConnected || … || saveData)` —
+   * byte 1,493,686, and `SV-SP-14`.
+   *
+   * The detached zoom cluster collapses under exactly the conditions that hide the `<video>`, so a
+   * popout whose stream has not arrived does not float a magnifier over an empty box. `!isDetached`
+   * is upstream's own leading term and is `!detachedHere` here for the reason the two props record:
+   * this pane is the SOURCE window when that is true, and it draws no cluster at all.
+   */
+  const pictureHidden = $derived(!detachedHere && (!connected || saveData));
 
   /**
    * Dragging is gated behind the zoom toggle, which is the part the class names give away. The
@@ -237,8 +314,11 @@
     // Putting this work in the returned function meant it only ever ran on destroy - the element
     // never got a srcObject, the tab appeared with `hasSrc: false`, and nothing threw.
     if (node.srcObject !== stream) node.srcObject = stream;
-    node.volume = Math.min(1, Math.max(0, volume / 100));
-    node.muted = muted;
+    /*
+      `SV-SP-10` — NO volume and NO muted assignment. `muted` is a static attribute on the element,
+      as it is in const 8, and this used to write the room's master volume onto a screenshare. See
+      the note at the `<video>`.
+    */
 
     if (stream) {
       node.play().catch((error: unknown) => {
@@ -248,7 +328,45 @@
       });
     }
 
+    /*
+      `SV-SP-04` — a consumer that negotiates and delivers no frames.
+
+      ```js
+      o.addEventListener("playing", () => { i.isConnected = !0;
+        const s = o.videoWidth, r = o.videoHeight; …
+        if ((s < 10 || r < 10) && i.tooSmallRetries < 3 && …) return i.tooSmallRetries++,
+          void setTimeout(() => { i.mediaService.callScreenOfUserWEBRTC(this.muser) }, 3e3);
+        i.tooSmallRetries = 0 })                                              // byte 1,499,022
+      ```
+
+      On screen a 0x0 video is an empty pane that never fills, which is indistinguishable from a
+      presenter who has not started sharing — so nothing about it looks like a fault to report.
+
+      **The measurement is taken after the delay rather than at `playing`, and that is the one
+      deliberate change.** Upstream reads the size immediately and then has to exclude Firefox and
+      Edge, because those report 0 for a frame or two after the event on the codepath it was written
+      for. Reading it once the picture has had the same 3,000 ms to arrive makes those exclusions
+      unnecessary rather than merely omitted — and a browser sniff that nothing needs is a branch
+      with no consumer.
+
+      The timer is cleared on teardown: a pane closed inside the window must not re-consume a
+      producer nobody is watching.
+    */
+    let sizeCheck: ReturnType<typeof setTimeout> | undefined;
+    const onPlaying = () => {
+      globalThis.clearTimeout(sizeCheck);
+      sizeCheck = globalThis.setTimeout(() => {
+        const tooSmall =
+          node.videoWidth < SCREEN_TOO_SMALL_PIXELS || node.videoHeight < SCREEN_TOO_SMALL_PIXELS;
+        if (tooSmall) ontoosmall?.();
+        else onsettled?.();
+      }, SCREEN_TOO_SMALL_DELAY_MS);
+    };
+    node.addEventListener('playing', onPlaying);
+
     return () => {
+      globalThis.clearTimeout(sizeCheck);
+      node.removeEventListener('playing', onPlaying);
       // Release the stream so a removed pane cannot hold a decoder open.
       node.pause();
       node.srcObject = null;
@@ -345,14 +463,80 @@
           text-center`, which is const 1 of that component and is NOT the order the presentation
           area uses for its own h3 (const 23 is `text-center mt-4`). Reproduced as captured.
         -->
+        <!--
+          `SV-SP-02` — `z0e`, const 10 `[1,"mt-4","text-center",3,"click"]`, gated
+          `O(1, o.isDetached ? 1 : -1)` at byte 1,501,523.
+
+          The pane the screen was detached FROM blanks and offers the way back. Before this the
+          source window kept rendering the same producer, so one share fed two live decoders and the
+          only way to re-attach was to find and close the popout.
+
+          ONE DIVERGENCE, and it is the accessible one. Upstream hangs the click on the `<h3>`
+          itself, which is not focusable, not keyboard operable, and announced to a screen reader as
+          a heading rather than as the control it is. Putting a real `<button>` inside the captured
+          heading keeps the class, the text and the position exactly where the capture has them and
+          makes the control an actual control — `role="button"` plus a `tabindex` on the heading was
+          tried first and is what `a11y_no_noninteractive_element_to_interactive_role` refuses, with
+          reason: it would have SAID button and still been a heading.
+
+          The scoped rule below strips the button chrome, so nothing about the rendering changes.
+        -->
+        {#if detachedHere}
+          <h3 class="mt-4 text-center">
+            <button type="button" class="reattach" onclick={() => onreattach?.()}>
+              Screen Detached.. Click here to re-attach
+            </button>
+          </h3>
+        {/if}
         {#if saveData}
           <h3 class="mt-4 text-center">Video Disabled</h3>
         {/if}
+        <!--
+          `SV-SP-03` — `q0e`, byte 1,493,278: const 3 is
+          `[1,"text-center","mt-4","animated","fadeIn",2,"color","#fff"]` and const 12 the
+          `fas fa-spinner fa-pulse` glyph.
+
+          An un-arrived screen used to render NOTHING — the `<video>` is hidden while `stream` is
+          null, and nothing stood in its place, so a viewer clicking a tab saw an empty box with no
+          way to tell whether it was loading or broken. `StreamingView` has had its counterpart
+          (`Loading Stream...`) all along; this pane did not.
+
+          The hyphen between the two names is the capture's own separator, not a choice.
+        -->
+        {#if connecting}
+          <h3 class="text-center mt-4 animated fadeIn" style="color: #fff;">
+            <i class="fas fa-spinner fa-pulse"></i>
+            Connecting To Screen of {presenterName}-{screenName}
+          </h3>
+        {/if}
+        <!--
+          `SV-SP-10` — `muted` is a STATIC attribute here, as it is in const 8:
+
+          ```js
+          ["autoplay","autoplay","data-ng-dblclick","fullScreen()","playsinline","","muted","true",
+           1,"webcamScreen",3,"click","controls","ngClass","id"]                // byte 1,500,765
+          ```
+
+          `muted` and `volume` sit BEFORE the `3` marker and the binding run after it holds only
+          `click`, `controls`, `ngClass` and `id` — so the reference guarantees this element is
+          silent, and `newScreenStream` re-asserts `i.muted = !0` twice more (byte 1,497,239).
+
+          This bound both to the room's master volume. Harmless TODAY, because `addRemoteScreen`
+          refuses any producer whose `kind !== 'video'` so the consumed stream carries no audio
+          track — and that is one guard away from playing screenshare audio through an element the
+          reference makes silent three separate ways. A screen is a picture here; the room's volume
+          control is for the room's audio.
+
+          **There is no `volume` prop and no `muted` prop on this component any more**, and that is
+          the half of the fix that makes the second predicate unwritable rather than merely absent:
+          a caller cannot pass what does not exist. `PresentationArea` passes neither.
+        -->
         <video
           id="webcamScreen-{id}"
-          class={['webcamScreen', { hidden: stream === null || saveData, 'viewer-only-screen-video': viewerOnlyMode }]}
+          class={['webcamScreen', { hidden: pictureHidden, 'viewer-only-screen-video': viewerOnlyMode }]}
           autoplay
           playsinline
+          muted
           {@attach attachStream}
         ></video>
       </div>
@@ -379,7 +563,8 @@
       nothing here at all.
     -->
     {#if detached}
-      <div class="zoom-controls-container-detached">
+      <!-- `SV-SP-14` — `$0e = t => ({hidden: t})`, the same conditions that hide the picture. -->
+      <div class={['zoom-controls-container-detached', { hidden: pictureHidden }]}>
         <ScreenZoomControls
           variant="detached"
           showZoomCtrl={showZoomCtrlDetached}
@@ -395,6 +580,20 @@
 </div>
 
 <style>
+  /*
+    `SV-SP-02`'s re-attach control. The capture's own element is the `<h3>` and its own styling is
+    the two Bootstrap classes on it; this button exists only so the control is focusable and
+    announced correctly, so it inherits everything and adds nothing.
+  */
+  .reattach {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
   /*
    * The captured component's own rule, from
    * `docs/source/components/app-screenshare-view.component.css`:
