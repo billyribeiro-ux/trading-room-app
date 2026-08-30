@@ -251,7 +251,23 @@ describe('the wire has no silent break points', () => {
     expect(reaching).toBe(26);
     expect(mapped).toBe(23);
     expect(reaching - 1 - mapped).toBe(2);
-    expect(DEAD_PREFERENCE_KEYS).toHaveLength(reaching - 1 - 6);
+    /*
+      DERIVED PER KIND since 2026-08-30, because the flat length had already drifted twice.
+
+      Two kinds of name live on that list and only one of them is what this count measures. The
+      element ids are the ones the `?? input.id` fallback produced, and `reaching - 1 - 6` is what
+      the modal says there should be. The others — `alertDisplayMode`, `chatDisplayMode`,
+      `presenterStyle` — were never element ids: they are preference names somebody invented for a
+      control that should not have been a preference at all. Three landed after this assertion was
+      written and each one made a correct count wrong, which is a count measuring the wrong thing.
+
+      The split is by shape and the shapes cannot collide: every element id here is kebab-case and
+      no invented name is, because they were typed as JavaScript identifiers.
+    */
+    const elementIds = DEAD_PREFERENCE_KEYS.filter((key) => key.includes('-'));
+    const inventedNames = DEAD_PREFERENCE_KEYS.filter((key) => !key.includes('-'));
+    expect(elementIds).toHaveLength(reaching - 1 - 6);
+    expect(inventedNames).toEqual(['alertDisplayMode', 'chatDisplayMode', 'presenterStyle']);
   });
 
   it('every dead key is gone from both stores, and pm-window-layout is not mistaken for one', () => {
@@ -265,7 +281,7 @@ describe('the wire has no silent break points', () => {
     */
     expect(DEAD_PREFERENCE_KEYS).not.toContain('pm-window-layout');
     expect(DEAD_PREFERENCE_KEYS).toContain('app-disable-video');
-    expect(DEAD_PREFERENCE_KEYS).toHaveLength(19);
+    expect(DEAD_PREFERENCE_KEYS).toHaveLength(22);
 
     /*
       The server half moved to `user-settings.remote.ts` with `savePreference`. Re-pointed at the

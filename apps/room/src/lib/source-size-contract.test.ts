@@ -555,7 +555,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1,473 -> 1,474, 2026-08-30. One line: `showPmButton={gates.showPmButton}` reaching the main
       chat column, beside the one the extra column has always had.
     */
-    max: 1474,
+    /*
+      1474 -> 1477, 2026-08-30. Three lines, one per surface that renders a message:
+      `presenterColors={data.presenterColors}` to `AlertChatArea`, `ExtraChatPane` and
+      `RoomOverlays`. The map itself is read by the load and the lookup happens at the leaf, so the
+      page's share of the presenter-colour feature is exactly this pass-through.
+    */
+    max: 1477,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -674,7 +680,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       (`resumeRec` plays the START sound behind the STOP preference) and a table is where a reader
       cannot skim past it, which four separate blocks were not.
     */
-    max: 927,
+    /*
+      927 -> 947, 2026-08-30. The `presenterColorsChanged` receiver.
+
+      Two lines of behaviour and eighteen of citation, and the citation is the load-bearing half:
+      the reference REPLACES its whole colour map from the frame's `i.colors`, and this refetches
+      instead. That frame decides how everybody else's messages are painted for everyone in the
+      room, so what a socket says must not be what answers it. A future reader comparing the two
+      files will see a divergence; this is why it is there.
+    */
+    max: 947,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1265,7 +1280,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `prefs.loaded` here exactly as `streamingType` beside it is. One prop rather than five,
       for the reason `#lib/capture-settings.ts` records.
     */
-    max: 850,
+    /*
+      850 -> 855, 2026-08-30. `presenterColors` forwarded to `ModalHost`, which needs it for two
+      unrelated halves of one feature: the Q&A thread renders messages, and the settings modal's
+      colour pickers seed from this presenter's own entry.
+    */
+    max: 855,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1370,7 +1390,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       thread renders in the ALERTS mode rather than one of its own — upstream's Q&A modal calls
       `loadAlertsMode()`, the same function the alerts log calls.
     */
-    max: 359,
+    /*
+      359 -> 372, 2026-08-30. The presenter-colour map and its lookup.
+
+      The thread renders through the same `app-st-message` the room does, and the reference applies
+      `presenterSettings[msg.avt]` inside that component with no exception for the modal — so a
+      presenter's ANSWER here carries their colours too. Most of the addition is the paragraph
+      saying why `followedUsers` is still NOT passed: this component has never had it, and adding
+      it would be a behaviour change nothing asked for.
+    */
+    max: 372,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its composer and its own open menu row'
   },
   {
@@ -1963,7 +1992,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rendered without, so every member was shown "Mute Microphone for all non-admins" and
       "Get my token". The fourth button in that div stays outside the gate, as the reference has it.
     */
-    max: 6022,
+    /*
+      6022 -> 6107, 2026-08-30, and the markup SHRANK by eight lines while the file grew by
+      eighty-five. That ratio is the change.
+
+      The presenter's two colour pickers had a Save button writing `onPreferenceChange(
+      'presenterStyle', ...)` — a key in this presenter's own settings blob, read by nothing, in a
+      store no other viewer can see — under a heading reading *"These colors will affect how ALL
+      USERS see your messages and alerts"*. Reset assigned two constants and sent nothing. Both
+      buttons are now one-line `onclick={handler}` against real commands; what was added is the two
+      handlers, the refusal dialog they surface, the seed inside the existing settings effect, and
+      the prose recording what each of those replaced.
+
+      If this number climbs again, the settings modal is still the extraction — it is the largest
+      contiguous region left in this file and its state is almost entirely its own.
+    */
+    max: 6107,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2014,7 +2058,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       was restating `#lib/chat-tabs.ts`, and two places recording one fact is how one of them goes
       stale. What stayed is what is true HERE and nowhere else.
     */
-    max: 1617,
+    /*
+      1617 -> 1642, 2026-08-30. The room's presenter-colour map, read from `presenter_colors` and
+      handed to the browser keyed by sender hash — one query and its import, plus the paragraph
+      recording why it is a table rather than the reference's JSON blob and what bounds it. Room
+      state, sitting with `chatMode` and `closedMessage`, which is the shape it belongs to.
+    */
+    max: 1642,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
@@ -3575,7 +3625,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       refused in one column and offered it in the other. Twelve lines: the prop, its docblock and
       the `{#if}`.
     */
-    max: 1200,
+    /*
+      1200 -> 1211, 2026-08-30. The presenter-colour map: one prop, one import, and the same
+      `presenterColorsFor(...)` lookup on each of the two `RoomMessage` call sites — beside the
+      `followedUsers` lookup it sits with, because they are the same kind of thing. The map is
+      shared by every message; the lookup is per message, so neither belongs on the chrome.
+    */
+    max: 1211,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -3619,7 +3675,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
       security-relevant half of the change; this entry carries its part.
     */
-    max: 586,
+    /*
+      586 -> 596, 2026-08-30. The presenter-colour map, exactly as `AlertChatArea` takes it — one
+      prop, one import, one lookup at the call site. This column renders the same rows, so a map
+      handed to one and not the other would paint the same message two ways in one room.
+    */
+    max: 596,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -3797,7 +3858,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       **The file is smaller than it was this morning** (1032), and the captured-DOM contract that
       pins the card layout ran green throughout.
     */
-    max: 1008,
+    /*
+      1008 -> 1061, 2026-08-30. The presenter's colours, and one defect they uncovered.
+
+      The wiring is small: a prop, and two derived values that let the presenter's pair override the
+      message's own `backgroundColor` / `fontColor` — which is exactly where the reference applies
+      them, four lines after `msg.bkgColor` sets the same three slots. That placement is what makes
+      the full four-way precedence fall out with no new branch, and the comment explaining it is
+      most of the addition.
+
+      THE DEFECT: the kebab's inversion colour and the box's background were two separate
+      expressions and only one of them read `effectiveStyle`, so a followed user whose message also
+      carried a background got a kebab inverting a colour that was nowhere on screen. The comment
+      beside it already said it should be *"color: <box background>"*. It is one derived value now.
+
+      The extraction, if this climbs again, is still `bodySegments` and its four parse functions.
+    */
+    max: 1061,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

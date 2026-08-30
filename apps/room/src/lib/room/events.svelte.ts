@@ -468,6 +468,26 @@ export class RoomEventStream<Entry> {
           */
           void invalidateAll();
         }
+        if (command?.cmd === 'presenterColorsChanged') {
+          /*
+            A presenter saved or cleared their message colours. The reference replaces the whole map
+            from the frame and redraws both logs:
+
+              case "presenterColorsChanged":
+                this.globals.sessData.presenterSettings = i.colors,
+                this.guiEventBus.emit("redrawChatAndAlerts"); break;
+
+            (bundle byte 1,025,162.) Ours refetches for the same reason `changeChatMode` directly
+            above does, and the reason is stronger here rather than weaker: this frame decides how
+            OTHER people's messages are painted for everyone in the room, so a payload arriving on a
+            socket must not be what answers it. The rows are the authority; the frame is the trigger.
+
+            No payload is sent at all — see `presenter-colors.remote.ts` — so there is nothing here
+            to be tempted by.
+          */
+          void invalidateAll();
+          return;
+        }
         if (command?.cmd === 'focusOnScreen') {
           /*
             A presenter pulled the room to a screen. `selectScreenTabOfId` rather than assigning

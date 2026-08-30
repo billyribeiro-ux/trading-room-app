@@ -104,6 +104,7 @@ import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '#lib/day
 import {
   capturedItemOverrides,
   chatMutes,
+  presenterColors,
   roomState,
   hiddenRoomItems,
   pollAnswers,
@@ -685,6 +686,30 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         .from(roomState)
         .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
         .get()?.closedMessage ?? '',
+    /*
+      Every presenter's message colours for this room, as a map keyed by the sender's email hash —
+      the shape the renderer looks a message up in, so no per-message query and no per-message
+      allocation. `presenter-colors.ts` holds the feature; the read is here because it is room
+      state, exactly like `chatMode` above, and for the same reason: a client that asserted these
+      would be asserting how OTHER people's messages look.
+
+      Bounded by the number of presenters in the room, not by its history — the composite primary
+      key's leading column is the filter, so this is an index range scan over a handful of rows
+      however long the room has been running. That is the question `CLAUDE.md` asks of a new read
+      path, and it is why this is a table rather than the reference's JSON blob.
+    */
+    presenterColors: Object.fromEntries(
+      db
+        .select({
+          senderEmailHash: presenterColors.senderEmailHash,
+          color: presenterColors.textColor,
+          bgColor: presenterColors.backgroundColor
+        })
+        .from(presenterColors)
+        .where(eq(presenterColors.roomShortCode, requireRoomShortCode(locals)))
+        .all()
+        .map(({ senderEmailHash, color, bgColor }) => [senderEmailHash, { color, bgColor }])
+    ),
     chatMutedTill:
       db
         .select({ expiresAt: chatMutes.expiresAt })

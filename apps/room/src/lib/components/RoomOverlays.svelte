@@ -12,6 +12,7 @@
   import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { PresenterColorMap } from '#lib/presenter-colors.js';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
@@ -108,6 +109,7 @@
     // Page state this layer renders from. Only these two are written back.
     isPresenter,
     messageChrome,
+    presenterColors,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -170,6 +172,8 @@
      * construction is a second answer to which settings a message reads.
      */
     messageChrome: RoomMessageChrome;
+    /** The room's presenter colour map, forwarded whole to `ModalHost` — see `presenter-colors.ts`. */
+    presenterColors: PresenterColorMap;
     /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
     alertsDisplayMode: ChatDisplayMode;
     chatLogDisplayMode: ChatDisplayMode;
@@ -613,6 +617,7 @@
   onQuestionSend={messageActions.sendAlertQuestion}
   alertQuestions={data.alertQuestions}
   {messageChrome}
+  {presenterColors}
   {alertsDisplayMode}
   {chatLogDisplayMode}
   {onDisplayModeChange}

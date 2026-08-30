@@ -38,6 +38,7 @@
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
+  import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type {
@@ -123,6 +124,13 @@
      * message to find the sender's follow style. See `room-message-chrome.ts`.
      */
     followedUsers: Record<string, { followChatStyle?: FollowChatStyle }>;
+    /**
+     * Every presenter's message colours for this room, keyed by the sender's email hash.
+     *
+     * Beside `followedUsers` and for the same reason: the map is the same for every message, the
+     * lookup is not. `presenter-colors.ts` holds the precedence.
+     */
+    presenterColors: PresenterColorMap;
     /** The page owns which message menu is open, so only one is open across BOTH columns. */
     openMenuKey: string | null;
     onmenutoggle: (key: string | null) => void;
@@ -198,6 +206,7 @@
     giphyApiKey,
     chrome,
     followedUsers,
+    presenterColors,
     openMenuKey,
     onmenutoggle,
     onaction,
@@ -402,6 +411,7 @@
             kind="chat"
             {...chrome}
             followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
+            presenterStyle={presenterColorsFor(presenterColors, item.senderEmailHash)}
             menuOpen={openMenuKey === `chat:${item.id}`}
             showDateSeparator={'evidenceSeparatorText' in item
               ? item.evidenceSeparatorText !== null

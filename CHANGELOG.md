@@ -33,6 +33,132 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:06 UTC — The presenter colour pickers now change what everyone sees, which is what their own heading has always claimed
+
+**Runtime impact: YES.** A presenter's two message colours are stored per room, applied to every
+message and alert they have sent, for every viewer, and cleared by Reset. Three files that render a
+message read the new map; one new table, one new remote module, one new page-load key.
+
+#### The control and its heading disagreed, in all three of the heading's claims
+
+The settings modal has drawn two `<input type="color">` pickers under this sentence since it was
+built:
+
+> These colors will affect how ALL USERS see your messages and alerts
+
+Save wrote `onPreferenceChange('presenterStyle', { color, bkgColor })` — a key in **that presenter's
+own settings blob**, read by nothing, in a store no other viewer can see. So the colours did not
+affect all users, did not affect messages, and did not affect alerts. Reset assigned two constants
+and sent nothing, so a presenter could not clear colours they had never actually set, and the
+pickers were seeded from those same constants, so reopening the modal showed them whatever had been
+chosen. `presenterStyle` joins `dead-preference-keys.ts` beside the two Text Mode radios it is the
+third instance of.
+
+This closes `USM-06` and `USM-07` in `docs/decoded/room-surface-audit-2026-08-30.md`.
+
+#### Four reference sites, read before anything was written
+
+| what | byte | what it settles |
+| --- | ---: | --- |
+| `savePresenterStyle()` / `resetPresenterStyle()` | 2,243,496 | the send, and that Reset is a SEND of the empty pair rather than a local revert |
+| `case "presenterColorsChanged"` | 1,025,162 | the broadcast, which replaces the whole map and redraws both logs |
+| the modal seed | 2,241,150 | the pickers open on `presenterSettings[hashEmail(own email)]`, defaulting to a theme pair |
+| the render | 1,346,945 | `presenterSettings[msg.avt]`, applied only when BOTH halves are non-empty |
+
+#### The precedence, which is the part that was easy to get wrong and is why this was scoped separately
+
+Four writers touch the same three style slots in the reference's `ngOnInit`, each overwriting the
+one before: the message's own colours, then the presenter's pair, then the viewer's `chatStyle`,
+then `followedUsers[msg.avt]`. The third is the subtle one — it does not simply run last and win, it
+BRANCHES on whether the presenter's pair applied, and when it did it re-applies those colours and
+takes only `fontSize` from the viewer's style. Net order: **followed user > presenter > viewer's
+chat style > the message's own colours.**
+
+This room reaches that order with no new branch, by plugging the presenter's pair in exactly where
+the message's own colours sit — which is what the reference is doing too, four lines later in the
+same function. `presenter-colors.ts` carries the table; `presenter-colors-contract.test.ts` renders
+the component and reads the attributes for each of the four, rather than asserting on the source
+that produces them.
+
+**One divergence is measured and deliberate.** When the presenter's colours apply and the viewer
+also has a chat style, the reference still takes `fontSize` from that chat style; ours does not,
+because a message carrying its own background has never taken a font size here either. That is a
+property of this room's existing `effectiveStyle` gate, it applies identically to the
+message-background case that has shipped for months, and changing it would alter every captured
+message's rendering.
+
+#### The key is NOT on the wire, and that is the one place the shape deliberately does not match
+
+The reference sends it: `{ key: hashEmail(user.email), val: {...} }` — the client naming whose
+colours it is writing, over a hash that sits in every roster row and every rendered message. Anyone
+who could reach that socket could recolour any presenter's messages for the whole room.
+
+`savePresenterColors` here takes the two colours and nothing else. The row is keyed by `hashEmail`
+of the session's own account, resolved on the server. `z.strictObject` makes an extra `key` a
+refusal rather than an ignored field, and the contract asserts that refusal by casting past the
+type — the compile-time guard and the runtime one are different guarantees. This is the rule
+`CLAUDE.md` states as *"every authority decision is made on the server from data the server owns"*,
+and it is the shape the 2026-08-07 privilege escalation was fixed by.
+
+#### A defect the precedence test found on its way past
+
+The kebab menu's inversion colour and the message box's background were two separate expressions,
+and only one of them read `effectiveStyle`. So a followed user whose message also carried a
+background got a kebab inverting a colour that was nowhere on screen. The comment sitting beside it
+already said what it should be — *"color: &lt;box background&gt;"* — and nothing had ever compared
+the two. They are one derived value now. It was pre-existing and rare; presenter colours make it
+ordinary, because a presenter's pair is set once and applies to every message they send.
+
+#### A table, not the reference's JSON blob
+
+`presenter_colors` is keyed `(room_short_code, sender_email_hash)`. The reference keeps a map in a
+session document; a blob in a text column cannot be indexed, cannot be updated by one presenter
+without rewriting every other presenter's entry, and turns a lost update into two presenters
+silently overwriting each other. The composite primary key is also the read path — the page load
+asks for one room's whole map, which is the key's leading column, so it is a range scan bounded by
+the number of presenters in the room rather than by its history.
+
+"Cleared" is **absent**, not empty: Reset deletes the row, so the two states the reference encodes
+as an empty pair are one state here, both columns are `NOT NULL`, and a half-set entry is
+unrepresentable. The resolver still refuses one, because the map reaches the browser as JSON and
+"unreachable" is a claim about our writer, not about what a renderer is handed.
+
+#### Nine ceilings raised, each with its reason at the entry
+
+`ModalHost` +85 while its markup SHRANK by eight lines — both buttons are one-line
+`onclick={handler}` now, and what grew is the two handlers, the refusal dialog, the seed, and the
+prose recording what each replaced. `RoomMessage` +53, mostly the precedence argument and the kebab
+defect above. The other seven are between three and twenty-five lines each.
+
+`todo-next.md`'s inventory and both its totals were recomputed: seven rows moved, and the heading
+that said "all 62 surfaces" said 62 while the gated summary said 64.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly rather than through a pipe —
+prettier and eslint clean, `svelte-check` 0 errors, 3,543 tests passing (1 skipped), privacy and
+schema verifiers green, build done. The presenter-colour contract is 27 of those tests and executes
+the command against a live SQLite database and the real `publishToRoom`/`subscribeToRoom` hub.
+
+**Thirteen negative controls, each run and each seen RED**, on the committed tree and reverted after:
+`z.strictObject` → `z.object` with an optional `key`; `presenterRoom()` → the room straight off
+`locals`; Reset deleting the whole room's map; `effectiveStyle` back to `item.backgroundColor` so the
+viewer's chat style beats the presenter; the resolved background flipped so the presenter beats a
+followed user; the `evidenceKey` exclusion removed; the resolver's re-validation removed; the picker
+seed removed; Save back to `onPreferenceChange('presenterStyle', …)`; the broadcast receiver's name
+changed; the Q&A thread's lookup removed; the colour pattern loosened to "starts with a hash"; and
+the page-load key renamed. Two of them took two tests down rather than one.
+
+**Not verified:** nothing was opened in a browser. `settings-preference-wiring-contract.test.ts` is
+one of the 42 evidence-bound files excluded in this checkout — it reads `docs/source/components/`,
+which is gitignored — so the two dead-key counts in it were corrected **by reading, not by running**.
+They were already stale by two before this change (the Text Mode pair landed on 2026-08-28 without
+updating them), and the flat length has been replaced by a split that counts element ids and
+invented names separately, which is what each assertion was actually about.
+
+**The Svelte MCP server is still disconnected in this session**, as it has been throughout. The
+mandated `list-sections` / `get-documentation` / `svelte-autofixer` loop could not be run;
+`svelte-check` and eslint are what gated the four `.svelte` files instead. Recorded rather than
+implied.
+
 ### 2026-08-30 03:55 UTC — Three presenter actions were drawn for every member, and every gate assertion in this file was rebuilt on the compiler's tree
 
 **Runtime impact: YES.** "Remove webcam/screenpreview windows", "Mute Microphone for all non-admins"

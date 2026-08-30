@@ -44,6 +44,7 @@
   import ChatSearchBar from '#lib/components/ChatSearchBar.svelte';
   import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
+  import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
@@ -145,6 +146,13 @@
     messageChrome: RoomMessageChrome;
     /** Kept OUT of the chrome deliberately: looked up per message, not passed through. */
     followedUsers: Record<string, { followChatStyle?: FollowChatStyle }>;
+    /**
+     * Every presenter's message colours for this room, keyed by the sender's email hash.
+     *
+     * Beside `followedUsers` and for the same reason: the map is the same for every message, the
+     * lookup is not, so it is not chrome. `presenter-colors.ts` holds the precedence.
+     */
+    presenterColors: PresenterColorMap;
 
     /*
       Attachments the PAGE owns, because each writes to DOM the page also reads: the split element
@@ -280,6 +288,7 @@
     alertLabels,
     messageChrome,
     followedUsers,
+    presenterColors,
     captureAlertChatElement,
     captureAlertsScroller,
     captureComposerElement,
@@ -732,6 +741,7 @@
                   displayMode={alertsDisplayMode}
                   {alertLabels}
                   followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
+                  presenterStyle={presenterColorsFor(presenterColors, item.senderEmailHash)}
                   menuOpen={menus.messageId === `alert:${item.id}`}
                   showDateSeparator={'evidenceSeparatorText' in item
                     ? item.evidenceSeparatorText !== null
@@ -842,6 +852,7 @@
                   {...messageChrome}
                   displayMode={chatDisplayMode}
                   followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
+                  presenterStyle={presenterColorsFor(presenterColors, item.senderEmailHash)}
                   menuOpen={menus.messageId === `chat:${item.id}`}
                   showDateSeparator={'evidenceSeparatorText' in item
                     ? item.evidenceSeparatorText !== null

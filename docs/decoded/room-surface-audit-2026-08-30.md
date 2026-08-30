@@ -1074,6 +1074,8 @@ O(135,o.appService.globals.isPresenter?135:-1)
 
 ### USM-06 — Presenter colour Save writes a per-viewer preference instead of the server admin command
 
+**BUILT 2026-08-30 03:06 UTC.** `presenter-colors.remote.ts` (`savePresenterColors`), `presenter_colors`, a page-load map, the render override in `RoomMessage.svelte` and a `presenterColorsChanged` broadcast. The key is derived on the SERVER from the session rather than accepted from the wire — a deliberate divergence, argued at the command. `presenter-colors-contract.test.ts` holds it.
+
 **high** · `divergence` · reference byte **2,243,435**
 
 ```
@@ -1097,6 +1099,8 @@ savePresenterStyle(){this.appService.sendServerAdminCommand("savePresenterColors
 > Verified: I could not disprove this. Exhaustive search of apps/room/src (node_modules excluded) for `discord` (case-insensitive), the reference DOM ids (`discord-settings`, `discord-settings-tab`), the handler names (`doDiscordAuth`, `checkDiscordAuth`, `revokeDiscord`), and rename-synonyms (`oauth`, `revoke`, `integration`, `linkedAccount`, `third…
 
 ### USM-07 — Presenter colour Reset uses invented constants, never re-seeds from the server, and sends nothing
+
+**BUILT 2026-08-30 03:06 UTC**, with USM-06. Reset sends (`clearPresenterColors`, which DELETES the row where the reference sends the empty pair) and restores the theme pair from `PRESENTER_COLOR_DEFAULTS`, transcribed from `globals.presenterStyle` at byte 980,538. The pickers seed from the stored map on modal open and on a theme switch, as the reference does at bytes 2,241,150 and 2,254,236.
 
 **medium** · `wrong-constant` · reference byte **2,243,661**
 

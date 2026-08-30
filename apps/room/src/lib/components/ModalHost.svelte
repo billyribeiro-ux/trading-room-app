@@ -38,6 +38,12 @@
     TradeCopyPayload
   } from '#lib/types.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import {
+    PRESENTER_COLOR_DEFAULTS,
+    seedPresenterColors,
+    type PresenterColorMap
+  } from '#lib/presenter-colors.js';
+  import { clearPresenterColors, savePresenterColors } from '../../routes/presenter-colors.remote';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import type { MessageBadge } from '#lib/types.js';
   import AlertQaModal from './AlertQaModal.svelte';
@@ -189,6 +195,15 @@
      * question stays text.
      */
     messageChrome: RoomMessageChrome;
+    /**
+     * Every presenter's message colours for this room, keyed by the sender's email hash.
+     *
+     * Two consumers here, and they are different halves of the same feature: the Q&A thread renders
+     * messages and needs the map to look each sender up, and the settings modal's two colour
+     * pickers open on THIS presenter's entry — `messageChrome.currentUserEmailHash` — rather than
+     * on a constant, which is what they did until 2026-08-30. `presenter-colors.ts` holds the rest.
+     */
+    presenterColors: PresenterColorMap;
     /**
      * The two display modes the settings modal's Text Mode radios show and set.
      *
@@ -495,6 +510,7 @@
     onQuestionSend,
     alertQuestions = [],
     messageChrome,
+    presenterColors,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -801,8 +817,24 @@
     which the owner's `altChatRender` can force — and a change is reported back up rather than kept
     here, because the logs that render it are not inside this component.
   */
-  let presenterTextColor = $state('#f7fd37');
-  let presenterBackgroundColor = $state('#000000');
+  /*
+    ── THE PRESENTER'S TWO COLOUR PICKERS, and what they used to be ────────────────────────────────
+
+    They were seeded from these two CONSTANTS and their Save button wrote
+    `onPreferenceChange('presenterStyle', …)` — a key in this presenter's own settings blob that
+    nothing read, in a store no other viewer can see — under a heading reading *"These colors will
+    affect how ALL USERS see your messages and alerts"*. All three claims in that sentence were
+    false at once, and reopening the modal showed these constants whatever had been picked.
+
+    They are seeded from the room's stored map now (the effect below, on modal open, which is where
+    the reference seeds them too) and both buttons send a real command. `presenter-colors.ts` holds
+    the transcription, `presenter-colors.remote.ts` the write.
+
+    Plain `$state` strings rather than an object, because `bind:value` on `<input type="color">`
+    writes them individually — the same reason `chatStyle` below is `$state` and not `$state.raw`.
+  */
+  let presenterTextColor = $state(PRESENTER_COLOR_DEFAULTS.dark.color);
+  let presenterBackgroundColor = $state(PRESENTER_COLOR_DEFAULTS.dark.bgColor);
   let chatStyle = $state<FollowChatStyle>({
     color: '#f7fd37',
     tickerColor: '#f7fd37',
@@ -2069,6 +2101,50 @@
     onPreferenceChange('chatStyle', { ...chatStyle });
   }
 
+  /**
+   * Whatever the presenter's colour Save or Reset came back with, shown rather than swallowed.
+   *
+   * The same `bootbox.alert` shape `micScreenAlert` uses. A colour write that is refused — a role
+   * lost between opening the modal and pressing Save, most plausibly — has to say so, because the
+   * pickers keep showing the chosen colour either way and silence would read as success.
+   */
+  let presenterColorAlert = $state<string | null>(null);
+
+  /**
+   * Save — the reference's `savePresenterStyle()`, byte 2,243,496.
+   *
+   * The key it sends is deliberately absent from ours; `presenter-colors.remote.ts` explains why at
+   * length. The page re-reads the row when the broadcast comes back, so nothing is assigned here on
+   * success: the two pickers already hold what was sent, and the LOG is repainted by the load.
+   */
+  async function savePresenterStyle() {
+    try {
+      await savePresenterColors({ color: presenterTextColor, bgColor: presenterBackgroundColor });
+    } catch (cause) {
+      presenterColorAlert = refusalMessage(cause, 'Those colors were not saved.');
+    }
+  }
+
+  /**
+   * Reset — the reference's `resetPresenterStyle()`, byte 2,243,637, which is a SEND and not a
+   * local revert.
+   *
+   * Upstream sends the empty pair and restores the pickers to `globals.presenterStyle[theme]`; ours
+   * deletes the row and restores the same theme default. Until 2026-08-30 this button assigned two
+   * constants and sent nothing, so a presenter who had saved colours could not un-save them.
+   */
+  async function resetPresenterStyle() {
+    const defaults = PRESENTER_COLOR_DEFAULTS[theme];
+    try {
+      await clearPresenterColors();
+    } catch (cause) {
+      presenterColorAlert = refusalMessage(cause, 'Those colors were not cleared.');
+      return;
+    }
+    presenterTextColor = defaults.color;
+    presenterBackgroundColor = defaults.bgColor;
+  }
+
   $effect(() => {
     if (name !== 'user') return;
     userInfoTab = 'info';
@@ -2089,6 +2165,18 @@
   $effect(() => {
     if (name !== 'settings') return;
     chatStyle = { ...initialChatStyle };
+    /*
+      The presenter's own pair, from the room's map, or the theme default — the reference's seed at
+      bundle byte 2,241,150. In THIS effect rather than one of its own so that the settings modal
+      still has exactly one open-time seeding effect; `effect-not-derived-contract.test.ts` counts
+      them, and two effects keyed on the same `name` would be two answers to one question.
+
+      It reads `theme` as well, so switching theme while the modal is open re-seeds — which is what
+      the reference's `switchTheme` does at byte 2,254,236, verbatim the same four lines.
+    */
+    const seed = seedPresenterColors(presenterColors, messageChrome.currentUserEmailHash, theme);
+    presenterTextColor = seed.color;
+    presenterBackgroundColor = seed.bgColor;
   });
 
   $effect(() => {
@@ -2916,6 +3004,13 @@
   <!-- `bootbox.alert(...)` in the capture, both for the refusal and the confirmation. -->
   {#if micScreenAlert}
     <BootboxDialog mode="alert" message={micScreenAlert} onclose={() => (micScreenAlert = null)} />
+  {/if}
+  {#if presenterColorAlert}
+    <BootboxDialog
+      mode="alert"
+      message={presenterColorAlert}
+      onclose={() => (presenterColorAlert = null)}
+    />
   {/if}
 </app-play-youtube-modal>
 <app-user-settings-modal>
@@ -3927,22 +4022,11 @@
             </div>
           </div>
           <div class="text-right">
-            <button
-              type="button"
-              class="btn btn-outline-danger mx-1"
-              onclick={() => {
-                presenterTextColor = '#f7fd37';
-                presenterBackgroundColor = '#000000';
-              }}>Reset</button
+            <button type="button" class="btn btn-outline-danger mx-1" onclick={resetPresenterStyle}
+              >Reset</button
             >
-            <button
-              type="button"
-              class="btn btn-outline-light"
-              onclick={() =>
-                onPreferenceChange('presenterStyle', {
-                  color: presenterTextColor,
-                  bkgColor: presenterBackgroundColor
-                })}>Save changes</button
+            <button type="button" class="btn btn-outline-light" onclick={savePresenterStyle}
+              >Save changes</button
             >
           </div>
         </div>
@@ -4885,6 +4969,7 @@
   {targetMessage}
   {alertQuestions}
   {messageChrome}
+  {presenterColors}
   displayMode={alertsDisplayMode}
   {isPresenter}
   {onclose}

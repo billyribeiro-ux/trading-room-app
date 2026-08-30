@@ -1200,6 +1200,7 @@
               chatDisplayMode={displayModes.chat}
               {messageChrome}
               followedUsers={userActions.followedUsers}
+              presenterColors={data.presenterColors}
               {captureAlertChatElement}
               {captureAlertsScroller}
               {captureComposerElement}
@@ -1325,6 +1326,7 @@
                 chatTabs={data.chatTabs}
                 displayMode={displayModes.chat}
                 followedUsers={userActions.followedUsers}
+                presenterColors={data.presenterColors}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
@@ -1399,6 +1401,7 @@
       {mediaTransport}
       {messageActions}
       {messageChrome}
+      presenterColors={data.presenterColors}
       alertsDisplayMode={displayModes.alerts}
       chatLogDisplayMode={displayModes.chat}
       onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}

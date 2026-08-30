@@ -70,26 +70,26 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 62 surfaces, measured
+## The inventory — all 64 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,021 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,106 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
-| 3 | `routes/+page.svelte` | 1,473 | no |
-| 4 | `lib/components/AlertChatArea.svelte` | 1,199 | no |
-| 5 | `lib/components/RoomMessage.svelte` | 1,007 | no |
+| 3 | `routes/+page.svelte` | 1,476 | no |
+| 4 | `lib/components/AlertChatArea.svelte` | 1,210 | no |
+| 5 | `lib/components/RoomMessage.svelte` | 1,060 | no |
 | 6 | `lib/components/PresentationArea.svelte` | 958 | no |
 | 7 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
 | 8 | `lib/components/PollPanel.svelte` | 824 | no |
-| 9 | `lib/components/RoomOverlays.svelte` | 849 | no |
+| 9 | `lib/components/RoomOverlays.svelte` | 854 | no |
 | 10 | `lib/components/RoomSidebar.svelte` | 774 | no |
 | 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 13 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
 | 14 | `lib/components/StreamingView.svelte` | 597 | no |
 | 15 | `lib/components/FilesPane.svelte` | 556 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 585 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 595 | no |
 | 17 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
 | 18 | `lib/components/PostAlertModal.svelte` | 521 | no |
 | 19 | `lib/components/notes/NotesPane.svelte` | 446 | no |
@@ -97,7 +97,7 @@ guessed.
 | 21 | `lib/components/VideoPlayer.svelte` | 413 | no |
 | 22 | `lib/components/PrivateChatPanel.svelte` | 401 | no |
 | 23 | `lib/components/MainTabStrip.svelte` | 371 | no |
-| 24 | `lib/components/AlertQaModal.svelte` | 358 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
+| 24 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
 | 25 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 356 | no |
 | 26 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 326 | no |
 | 27 | `lib/components/StreamTabs.svelte` | 305 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 64 surfaces audited · 1,059 of 28,951 lines · 3.7%.**
+**2 of 64 surfaces audited · 1,072 of 29,131 lines · 3.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

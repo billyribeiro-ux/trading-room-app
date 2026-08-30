@@ -157,6 +157,7 @@ describe('page load contract', () => {
         "messages",
         "notes",
         "notesEnabled",
+        "presenterColors",
         "privateChats",
         "room",
         "savedPolls",

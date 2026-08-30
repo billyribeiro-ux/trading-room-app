@@ -1185,3 +1185,49 @@ export const roomState = sqliteTable('room_state', {
   closedMessage: text('closed_message'),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 });
+
+/**
+ * `savePresenterColors` — one presenter's two message colours, for one room.
+ *
+ * ## A table rather than a column on `room_state`
+ *
+ * `room_state` is one row per room and this is one row per PRESENTER per room, so the values cannot
+ * share it without becoming a JSON blob in a text column — which is what the reference does
+ * (`sessData.presenterSettings` is a map keyed by hashed email) and what nothing here should copy.
+ * A blob cannot be indexed, cannot be updated by one presenter without rewriting every other
+ * presenter's entry, and turns a lost update into two presenters silently overwriting each other.
+ *
+ * ## Bounded by the room's presenters, not by its history
+ *
+ * The composite primary key is the read path: the page load asks for one room's whole map, which is
+ * the primary key's leading column, so it is an index range scan whose size is the number of
+ * presenters in that room — a handful — rather than something that grows with usage. That is the
+ * question `CLAUDE.md` asks of every new read path, answered before the code was written.
+ *
+ * ## The key is the SENDER HASH, and the server is what puts it there
+ *
+ * `sender_email_hash` matches `messages.sender_email_hash`, which is what a rendered message is
+ * looked up by. The reference's client sends this key itself; ours never accepts one — see
+ * `presenter-colors.remote.ts`, and `presenter-colors.ts` for why that divergence exists.
+ *
+ * ## Cleared means ABSENT, not empty
+ *
+ * The reference clears a presenter's colours by sending the empty pair, and its renderer then tests
+ * `o.color && o.bkgColor` to skip it. Here the command DELETES the row instead, so the two states
+ * are one state: a row exists and both colours are valid, or there is no row. Both columns are
+ * therefore `notNull()`, and a half-set entry is unrepresentable rather than merely unhandled.
+ */
+export const presenterColors = sqliteTable(
+  'presenter_colors',
+  {
+    roomShortCode: text('room_short_code').notNull(),
+    /** The presenter's hashed email — the same key a message carries as `senderEmailHash`. */
+    senderEmailHash: text('sender_email_hash').notNull(),
+    /** The message BODY colour, `#rrggbb`. The reference's `val.color`. */
+    textColor: text('text_color').notNull(),
+    /** The message BACKGROUND colour, `#rrggbb`. The reference's `val.bkgColor`. */
+    backgroundColor: text('background_color').notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [primaryKey({ columns: [table.roomShortCode, table.senderEmailHash] })]
+);

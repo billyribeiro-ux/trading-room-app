@@ -21,6 +21,7 @@
   } from '#lib/message-formatters.js';
   import { messageMenuAllows, sourceMessageBehavior } from '#lib/message-behavior.js';
   import type { FollowChatStyle } from '#lib/types.js';
+  import { type PresenterColors } from '#lib/presenter-colors.js';
   import { hideMessageAvatar, type ChatDisplayMode } from '#lib/chat-display-mode.js';
 
   type MessageKind = 'alert' | 'chat';
@@ -54,6 +55,18 @@
      */
     alertLabels?: readonly AlertLabel[];
     followedStyle?: FollowChatStyle;
+    /**
+     * This SENDER's presenter colours, looked up by the call site from the room's map.
+     *
+     * Per message and therefore not on `RoomMessageChrome`, for the same reason `followedStyle` is
+     * not: the MAP is the same for every message, the lookup is not. Both are looked up at the same
+     * three call sites, from the same `item.senderEmailHash`.
+     *
+     * `#lib/presenter-colors.ts` holds the reference transcription and the precedence table. In
+     * short: this beats the viewer's `chatStyle` and the message's own colours, and loses to
+     * `followedStyle`, which is the viewer's explicit decision about one particular person.
+     */
+    presenterStyle?: PresenterColors;
     chatStyle?: FollowChatStyle;
     allowDeleteOwnMessage?: boolean;
     usersPublicReply?: boolean;
@@ -123,6 +136,7 @@
     currentUserName = '',
     alertLabels = [],
     followedStyle,
+    presenterStyle,
     chatStyle,
     allowDeleteOwnMessage = false,
     usersPublicReply = false,
@@ -213,17 +227,54 @@
   const avatarRowClass = $derived(
     `d-flex ${reverseMessage ? 'flex-row-reverse ' : ''}justify-content-center align-items-start flex-nowrap mt-1`
   );
+  /*
+    ── THE PRESENTER'S COLOURS OVERRIDE THE MESSAGE'S OWN, and that is the whole of the wiring ─────
+
+    The reference applies them by overwriting the same three assignments `msg.bkgColor` /
+    `msg.fontColor` made, in the same `ngOnInit`, four lines later (bundle byte 1,346,945). So they
+    are plugged in HERE, at the two values those assignments produce, rather than as a fourth branch
+    in `effectiveStyle` — which is what makes the full precedence fall out with no new condition:
+    `followedStyle` still wins below, `chatStyle` still loses to a message that has a background,
+    and the presenter's pair now IS that background.
+
+    `evidenceKey` excludes it for the same reason it excludes `effectiveStyle`: a captured row
+    renders the DOM that was captured, and a presenter whose hash happens to match a captured
+    sender's must not repaint the evidence.
+
+    `presenter-colors.ts` carries the four-row precedence table and the one measured divergence
+    (font size, which a message with its own background has never taken here either).
+  */
+  const senderPresenterStyle = $derived(item.evidenceKey ? undefined : presenterStyle);
+  const messageBackgroundColor = $derived(senderPresenterStyle?.bgColor ?? item.backgroundColor);
+  const messageFontColor = $derived(senderPresenterStyle?.color ?? item.fontColor);
   const effectiveStyle = $derived(
     item.evidenceKey
       ? undefined
-      : (followedStyle ?? (kind === 'chat' && !item.backgroundColor ? chatStyle : undefined))
+      : (followedStyle ?? (kind === 'chat' && !messageBackgroundColor ? chatStyle : undefined))
   );
+  /*
+    THE BOX'S BACKGROUND, resolved once — and the reason it is one value is a defect it was hiding.
+
+    Two things are painted from it: the box itself, and the kebab's inversion below. They were two
+    separate expressions, and the second one read only `item.backgroundColor` — so whenever the box
+    took its background from `followedStyle` while the message ALSO carried one of its own, the
+    kebab inverted a colour that was not on screen anywhere. The comment beneath already said what
+    it should be (*"color: <box background>"*); the code did not, and nothing compared them.
+
+    Found on 2026-08-30 by the presenter-colour precedence test, which made the case common rather
+    than rare: a presenter's pair is set once and applies to every message they send, so "followed
+    user who is also a presenter with colours" is an ordinary state rather than a corner. Captured
+    rows are unaffected — they have no `effectiveStyle`, so this resolves to exactly what the old
+    expression did.
+  */
+  const resolvedBackgroundColor = $derived(effectiveStyle?.bgColor ?? messageBackgroundColor);
   const messageBoxStyle = $derived.by(() => {
     if (item.evidenceMessageBoxStyle !== undefined) {
       return item.evidenceMessageBoxStyle ?? undefined;
     }
-    const backgroundColor = effectiveStyle?.bgColor ?? item.backgroundColor;
-    return backgroundColor ? `background-color: ${backgroundColor};` : undefined;
+    return resolvedBackgroundColor
+      ? `background-color: ${resolvedBackgroundColor};`
+      : undefined;
   });
   // The only inline style the captured DOM ever puts on `.msgMenu` is this background inversion:
   // app-room/complete.html has 13 kebab anchors carrying `color: <box background>; filter:
@@ -232,7 +283,9 @@
   // size into that anchor shrank the kebab on newly posted messages while captured ones (which
   // have no effectiveStyle) stayed at 20px.
   const backgroundInversionStyle = $derived(
-    item.backgroundColor ? `color: ${item.backgroundColor}; filter: invert(1);` : undefined
+    resolvedBackgroundColor
+      ? `color: ${resolvedBackgroundColor}; filter: invert(1);`
+      : undefined
   );
   const invertedTextStyle = $derived(
     effectiveStyle
@@ -253,7 +306,7 @@
   });
   const bodyStyle = $derived.by(() => {
     if (item.evidenceBodyStyle !== undefined) return item.evidenceBodyStyle ?? undefined;
-    const color = effectiveStyle?.color ?? item.fontColor;
+    const color = effectiveStyle?.color ?? messageFontColor;
     const fontSize = effectiveStyle?.fontSize;
     return (
       [color ? `color: ${color};` : '', fontSize ? `font-size: ${fontSize}px;` : '']

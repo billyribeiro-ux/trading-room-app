@@ -270,6 +270,14 @@ export function ensureDatabase() {
       closed_message TEXT,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS presenter_colors (
+      room_short_code TEXT NOT NULL,
+      sender_email_hash TEXT NOT NULL,
+      text_color TEXT NOT NULL,
+      background_color TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (room_short_code, sender_email_hash)
+    );
     CREATE TABLE IF NOT EXISTS scheduled_alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       room_short_code TEXT NOT NULL,
