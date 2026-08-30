@@ -33,6 +33,39 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
+
+**Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
+PR #163's lineage, above all the ModalHost TDZ fix, which is what returns `main`'s `room end-to-end`
+job to green after six consecutive red runs (the merges of #157 through #162).
+
+Two findings, both measured rather than assumed:
+
+1. **No Actions run existed for any head of `claude/repo-audit-implementation-e3oiu8` after
+   `db25d1f`.** `GET /actions/runs?head_sha=1ec23c4…` returns `total_count: 0`, and the checks on
+   the later heads show only Vercel. `db25d1f` is the head that merged as #162 and FAILED — so every
+   commit after it, including the fix for that very failure, sat unverified. Why the `pull_request`
+   events stopped producing runs was not established; what mattered was getting the gate onto the
+   fix. Dispatched by hand (`workflow_dispatch` on `quality.yml`, run 33338242697): green on
+   `1ec23c4`, `room end-to-end` included.
+
+2. **GitHub reported the PR CONFLICTING/DIRTY across three successive heads while every local merge
+   was clean.** merge-ort of each head (`1ec23c4`, `448e840`, `e3bd8b1`) with `origin/main`
+   completes without conflict — for `1ec23c4` the result is byte-identical to the head's own tree,
+   because main's tip `c126f54` is the merge of `db25d1f`, an ancestor of this branch. The
+   repository has no `.gitattributes` merge drivers that could make local and server-side merges
+   disagree. This false DIRTY is also the plain reading of why the branch kept accruing commits
+   instead of merging the way #157–#162 did.
+
+The remedy is structural rather than computed: a merge commit giving the head `origin/main` as a
+parent, pushed to `merge/pr163-into-main` and merged through its own PR so the `pull_request` gate
+runs BEFORE the tree reaches `main`, per convention 2 above. Pushing to PR #163's own branch was
+tried first and rejected twice — an active claude.ai session was still committing to it, and its
+later commits simply remain PR #163's diff. Verified on the exact merged tree locally before
+pushing: svelte-check across 1,491 files with 0 errors and 0 warnings; the six contract tests the
+two newest commits shipped, 618 passing; the room e2e suite 11/11 in 21.6s — among them the four
+tests red on `main` since #157.
+
 ### 2026-08-30 22:50 UTC — `NEW-TODO.md` was scheduling five commands that were already built
 
 **Runtime impact: NO.** One tracker corrected and one new assertion. No `src` module changed.
