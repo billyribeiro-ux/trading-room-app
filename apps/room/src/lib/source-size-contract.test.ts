@@ -3601,8 +3601,43 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a card opened from the main log with main focus emits nothing and the modal keeps the last
       extra-column answer. This records it on every open, which agrees in every case except that one.
     */
+    /*
+      LEVEL AT 706, 2026-08-30, and the ceiling does not move — which is the entry worth reading,
+      because a feature landed and the number did not.
+
+      `TODO.md` row AL had measured the `deleteAlertPW` door end to end and named ONE blocker:
+      *"the client prompt costs about thirty lines in `message-actions.svelte.ts`, which is AT its
+      ceiling… The blocker is therefore an extraction, not a design question. The candidates in that
+      file are the delete branch's optimistic hide, its Q&A special case, and its confirm-copy
+      ternary."*
+
+      All three went, to `room/message-delete.ts`, and the prompt went with them. What stayed is
+      `#runOperation` — a delete is still one of six operations sharing one wire call and one refusal
+      path — plus a collaborator field, a constructor option and a six-line arm that forwards. The
+      explanation moved with the code it explains, which is the distinction this file's own header
+      draws between an extraction and a shorter comment.
+    */
     max: 706,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
+  },
+  {
+    file: 'lib/room/message-delete.ts',
+    /*
+      Created 2026-08-30 and capped in the same commit, which is the habit the component block below
+      exists to teach: a module cannot be added without saying what too big means for it.
+    */
+    max: 294,
+    why: 'what it costs to delete one row: the confirmation, the password, the hide and its undo'
+  },
+  {
+    file: 'lib/room/message-actions-port.ts',
+    /*
+      Created 2026-08-30, and it is what PAID for the row-AL door: the composition root had one line
+      of headroom and this feature needed two. Six wires left `create-room.svelte.ts` so the seventh
+      could arrive without a raise.
+    */
+    max: 65,
+    why: 'the message menu wires, so the composition root holds none of them'
   },
   {
     file: 'lib/room/feeds.svelte.ts',
@@ -4765,7 +4800,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       session. The widening to `Caption | null` is the fix and reads like a loosening, which is why
       it says so where it is declared.
     */
-    max: 1421,
+    /*
+      1421 -> 1411, 2026-08-30, and it went DOWN while a feature went IN — which is the only shape
+      this ratchet is ever pleased by.
+
+      `TODO.md` row AL needed a SEVENTH wire on `RoomMessageActions` (`checkAlertDeletePassword`, the
+      `deleteAlertPW` door). With one line of headroom, adding its import and its option would have
+      taken this file two lines over. The instruction here is to extract rather than raise, so the
+      six wires that were already inline left for `room/message-actions-port.ts` — the shape
+      `user-notes-port.ts` and `chat-archive-port.ts` already have — and the seventh arrived inside
+      it. Six option lines and an eight-line import block became one spread and one import.
+    */
+    max: 1411,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

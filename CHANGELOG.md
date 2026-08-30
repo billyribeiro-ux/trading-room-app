@@ -102,6 +102,177 @@ no longer runs.
 `vitest --reporter=verbose` on an unloaded box. **Not run:** the controller gate, which no file here
 touches, and the browser suite.
 
+### 2026-08-30 20:30 UTC — `deleteAlertPW`: a configured password that did nothing, and the extraction that unblocked it
+
+**Runtime impact: YES.** In a room whose owner has set **Delete Alert Password**, a presenter is now
+asked for it before an alert is deleted, and the server refuses the delete if they have not answered
+it. Before this, that setting did nothing at all: `message-actions.remote.ts`'s delete branch asked
+`usersCanDeleteOwnMsgs` of a MEMBER and let a presenter through unconditionally. An owner could
+configure the password and watch every presenter delete alerts unchallenged.
+
+`TODO.md` row AL, removed. Its own text had measured the whole door and named ONE blocker, which is
+what this change starts with.
+
+#### The extraction came first, because the row said it had to
+
+Row AL: *"It was built end to end and reverted, for one reason: the client prompt costs about thirty
+lines in `message-actions.svelte.ts`, which is AT its ceiling… **The blocker is therefore an
+extraction, not a design question.** The candidates in that file are the delete branch's optimistic
+hide, its Q&A special case, and its confirm-copy ternary."*
+
+All three went, together, to **`apps/room/src/lib/room/message-delete.ts`** — they are one act rather
+than three neighbours, and the half that would have stayed behind is the half the password has to sit
+in front of. `message-actions.svelte.ts` keeps `#runOperation`: a delete is still one of six
+operations sharing one wire call and one refusal path, so the new class is handed that method rather
+than a second copy of it. Its ceiling is unchanged at 706 — a feature landed and the number did not.
+
+A second extraction paid for the wiring. `create-room.svelte.ts` had **one line of headroom** and
+this needed two (an import and an option), so the six message-menu wires that were already inline
+left for **`message-actions-port.ts`** — the shape `user-notes-port.ts` and `chat-archive-port.ts`
+already have — and the seventh arrived inside it. That ceiling went DOWN, 1421 → 1411.
+
+#### A SECOND route, never a credential name on the first
+
+`deleteAlertPW` is one of the seven credential-shaped settings that may never reach the room, so the
+credential stays on the controller and the QUESTION travels:
+**`POST /internal/room-alert-delete-auth/<code>`**, the fourth question-shaped read after
+`room-entry`, `room-notes-auth` and `room-welcome-mat-auth`. It shares their constant-time comparison
+(`room-credential-prompt.ts`) and nothing else.
+
+The tidier-looking alternative — one endpoint taking a credential NAME — is refused, and the reason is
+the one that module already records: **a name on the wire is an oracle.** Any holder of a
+`config-read` token could then ask "is this string the value of `obsStreamKey`" and walk all seven a
+guess at a time. So the READS list in `config-read-cannot-write-contract.test.ts` grows by one per
+question, deliberately: its length is the price of not having an oracle.
+
+#### The room half
+
+| file | what it is |
+| --- | --- |
+| `lib/server/control-plane.ts` | `roomAlertDeleteAuthUrl` — a sibling of `roomNotesAuthUrl`, not a parameter on it |
+| `lib/server/room-config-client.ts` | `checkAlertDeletePasswordRemotely`, a READER; throws `RoomConfigUnavailable` rather than resolving `{ok:false}` |
+| `lib/server/db/schema.ts` + `db/index.ts` | `sessions.alert_delete_access_at` — **its own column**, forward-only `ALTER`, null on every existing row |
+| `lib/server/alert-delete-access.ts` | `requireAlertDeleteAccess`, `grantAlertDeleteAccess`, `ALERT_DELETE_ACCESS_TTL_MS` |
+| `routes/alert-delete-auth.remote.ts` | `checkAlertDeletePassword` — `presenterRoom()`, `z.strictObject({candidate})`, grant written only on `ok` |
+| `routes/message-actions.remote.ts` | the gate, ahead of all three delete branches so a negative id cannot walk around it |
+| `lib/room/message-delete.ts` | the prompt, the confirmation, the Q&A case, the optimistic hide |
+
+**Its OWN column, and that is the whole point of it.** Reusing `notes_access_at`, or introducing a
+shared `credential_access_at`, would mean clearing one password opened the other. An owner who sets a
+notes password and an alert-delete password has said two things.
+
+**A much shorter TTL than the notes grant, and the number is argued rather than copied.** Thirty
+minutes is right for managing notes — a piece of work with a modal open. Deleting an alert is one
+click after one prompt, and the reference is stricter still: `deleteAlertMessage` prompts on every
+invocation and keeps no grant, because its grant is a closure. Two minutes sizes the window to *the
+gap between answering the prompt and the delete landing*, not to the length of a task. Single-use was
+rejected: a delete that lost a race would burn the grant and demand the password again for something
+that never happened.
+
+**It fails CLOSED, and this is the one call in `room-config-client.ts` whose failure blocks a
+destructive act.** An unreachable controller means alerts cannot be deleted until it returns — an
+outage. Deleting on a failed check is a data loss no later repair can undo.
+
+#### Re-measuring the row's byte offset found a BETTER site, and it changed what this code is
+
+Row AL cites byte 2,048,903 and calls it `archiveChatDate`. Both halves are true — `grep -abo` puts
+`archiveChatDate(e){` at **2,048,641** in `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, with
+`deleteAlertPW` read at 2,048,693 and 2,048,849, and 2,048,903 landing inside the matching branch's
+`sendServerAdminCommand("archiveLogs",{type:"alerts"…`. But that method archives a whole DAY.
+
+**The per-alert delete has its own copy of the same prompt, and it is this surface exactly:**
+
+```js
+deleteAlertMessage(e){                                          // byte 2,601,823
+  this.appService.globals.sessData.deleteAlertPW
+    ? bootbox.prompt({ title:"Please enter the password to delete this alert:", value:"",
+        callback: i => { i && (i.trim() === this.appService.globals.sessData.deleteAlertPW
+          ? this.appService.deleteAlert(e) : bootbox.alert("Wrong password!")) } })
+    : this.appService.deleteAlert(e)
+}
+```
+
+It is reached from `subscribe("doAlertDelete")` at **2,598,258**:
+
+```js
+subscribe("doAlertDelete", oe => { console.log("delete this alert", oe),
+  oe.shiftDelete
+    ? this.deleteAlertMessage(oe)
+    : bootbox.confirm("Are you sure you want to delete this alert by " + oe.n +
+                      ". text: " + oe.txt, se => { se && this.deleteAlertMessage(oe) }) })
+```
+
+with the flag set by the menu at 1,352,424 (`i.shiftKey && (e.shiftDelete = !0)`).
+
+**Three orderings had been written here as reasoned decisions, and all three turned out to be
+transcriptions.** The confirmation comes first; the password comes second, INSIDE the send; and
+**shift skips the confirmation and never the password**, because the prompt lives past the branch
+shift takes. The room already had the confirm string character for character. The reasoning that
+independently produced the same arrangement is kept at the code, because it is still why the
+arrangement is right — but the comments no longer claim it was a choice.
+
+The same read settled the Q&A exemption too. `doQAAlertDelete` at **2,598,525** confirms and then
+calls `deleteQAAlert({qaMsgID, msgIndex})` with **no password prompt anywhere in it** — so leaving
+the thread ungated is the capture rather than an omission.
+
+Four further sites compare the same value the same way: `doSearchSubmit(del)` at 2,051,139,
+`resetAllMediaServers()` at 2,167,386, `switchToBackup()` at 2,173,860, and the whole-log archive.
+All six are client-side, against a value `sessData` already holds. Every offset is transcribed at the
+code that uses it.
+
+There is deliberately **no client-side grant**, unlike `RoomNotesAccess`. Upstream's notes prompt
+reads `!this.allowToManageNotes` and asks once per page; `deleteAlertMessage` asks every time.
+
+#### What is NOT gated, and why
+
+Chat — the menu emits `doMsgDelete` (1,352,349), not `doAlertDelete`, and chat has its own rule here
+(`usersCanDeleteOwnMsgs`). Members — the help text says *"Presenters will need to enter the
+password"*, and the ownership checks already refuse them. The Q&A thread — `doQAAlertDelete` above,
+and here a thread entry is an `alert_questions` row deleted through `deleteQuestion`, never
+through `messageAction` at all.
+
+#### Verification
+
+`apps/room/src/lib/alert-delete-password-contract.test.ts`, 27 tests. The server half EXECUTES against
+the live SQLite database through `callRemote`: a presenter with no grant gets a 403 and **the row is
+still there**, which is the evidence rather than the status. The client half drives
+`RoomMessageDeletion` with a stub. The credential-boundary assertions read source through `codeOf`
+from `#lib/source-comments.js`, because this file's own transcription names `deleteAlertPW` four
+times and a raw-text scan would be satisfied by it.
+
+**Nine negative controls, each staged, mutated, SEEN RED, and restored:**
+
+| control | what went red |
+| --- | --- |
+| disable the server gate (`if (false && …)`) | 6 cases, including both 403s and the source assertion |
+| leak `deleteAlertPW` into `alert-delete-access.ts` as CODE | `does not name deleteAlertPW in code` — and the docblock naming it eight times stays green, which is the proof `codeOf` strips comments |
+| client accepts a wrong password (`if (true or decision.ok)`) | `says "Wrong password!" on the wrong one` |
+| server grants unconditionally | `writes NO grant for a wrong password` + the source assertion |
+| read `notesAccessAt` instead of `alertDeleteAccessAt` | `a notes grant does NOT open the alert-delete door` |
+| swallow `RoomConfigUnavailable` and return | `refuses rather than deletes when the controller cannot be reached` |
+| shift-click calls `send()` instead of `proceed()` | `SHIFT skips the confirmation and NEVER the password` |
+| drop `room-alert-delete-auth` from the controller's READS | `names every internal route that takes a credential` |
+| mint `configWriteToken` for the new reader | `checkAlertDeletePasswordRemotely mints a READ capability` |
+
+### 2026-08-30 20:30 UTC — Row W removed from `TODO.md`: it had been fixed for a day
+
+**Runtime impact: NO.** No code changed for this entry. `TODO.md` row W was headed *"ONE control
+reports success and sends nothing: `admin-notes-password`… **The live defect.**"* while the same cell
+said `EXACT_ALERTS` *"holds two keys and neither lies"* — and the second sentence was the true one.
+
+Measured 2026-08-30 by reading the files the row names. `admin-notes-password` is not a key of
+`EXACT_ALERTS` (`user-action-intent.ts` holds `save-permissions` and `restart-audio`, and both
+announce real sends). `RoomUserActions.handle` routes it to `RoomAdminNotes.ask`, over
+`lib/room/notes-access.svelte.ts` → `routes/notes-auth.remote.ts` →
+`internal/room-notes-auth/[code]`, with `sessions.notes_access_at` deciding what may be written. The
+work landed 2026-08-29 and is recorded in this file at that date; the row was simply never removed.
+`DIALOG_ONLY_ACTIONS` in `user-action-disposition-contract.test.ts` is empty, and that file, the notes
+contract and `RoomUserActions`' own suite are green — 83 tests.
+
+The census row for `admin-notes-password` further up `TODO.md` still read *"needs new server code"*
+and is corrected in place, in the same style as its neighbours, rather than removed: that table
+records verdicts and how they turned out.
+
 ### 2026-08-30 20:29 UTC — A browser ran, and the room was answering 500
 
 **Runtime impact: NO from this commit — it changes one test-harness config and this file.** But what

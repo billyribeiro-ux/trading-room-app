@@ -1028,6 +1028,30 @@ export const sessions = sqliteTable(
      * successful prompt and read once per note write.
      */
     notesAccessAt: integer('notes_access_at', { mode: 'timestamp' }),
+    /**
+     * When this session last cleared the room's `deleteAlertPW`, or null.
+     *
+     * ## ITS OWN COLUMN, and that is the whole point of it
+     *
+     * The obvious economy is one `credential_access_at` beside a `credential` name, or — worse —
+     * reusing `notes_access_at` because both are "the presenter typed a password". Both are refused
+     * for the same reason the two controller ROUTES are separate: **clearing one password must not
+     * open the other.** An owner who sets a notes password and no alert-delete password, or two
+     * different values for the two, has said two different things, and a shared grant column would
+     * silently merge them into one. A grant is per credential or it is not a grant.
+     *
+     * A timestamp rather than a boolean, for the reason `notesAccessAt` above gives at length — a
+     * boolean grant lasts as long as the session row, which is up to thirty days — and with a
+     * DIFFERENT and much shorter window. `ALERT_DELETE_ACCESS_TTL_MS` in
+     * `server/alert-delete-access.ts` says why: managing notes is a piece of work with a modal open,
+     * where deleting an alert is one click immediately after one prompt.
+     *
+     * Written only by `grantAlertDeleteAccess`, and only after the CONTROLLER said yes. Nothing the
+     * client sends can set it, which is the 2026-08-07 rule applied here: the room's dialog decides
+     * what to DRAW, this column decides what may be DELETED, and the server never reads the
+     * client's version of the answer.
+     */
+    alertDeleteAccessAt: integer('alert_delete_access_at', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).notNull()
   },

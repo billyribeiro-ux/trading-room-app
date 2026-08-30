@@ -4,7 +4,13 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { stripHtmlToText } from '#lib/chat-plain-text.js';
 import { MAX_MESSAGE_BODY } from '#lib/message-bounds.js';
-import { isPresenterRole, requireRoomShortCode, requireUser } from '#lib/server/auth.js';
+import {
+  isPresenterRole,
+  requireRoomShortCode,
+  requireSessionId,
+  requireUser
+} from '#lib/server/auth.js';
+import { requireAlertDeleteAccess } from '#lib/server/alert-delete-access.js';
 import { capturedRoomItem } from '#lib/server/captured-room.js';
 import { isEmptyChatHtml, sanitizeChatHtml } from '#lib/server/chat-html.js';
 import { hashEmail } from '#lib/server/connection.js';
@@ -252,6 +258,37 @@ export const messageAction = command(messageActionArgs, async (args) => {
       if (config.settings?.usersCanDeleteOwnMsgs !== true) {
         error(403, 'Not yours to delete.');
       }
+    }
+
+    /*
+      ── `deleteAlertPW` — "If set, Presenters will need to enter the password to delete an alert" ──
+
+      TODO row AL, closed 2026-08-30. The paragraph above governs a MEMBER deleting their own; this
+      one governs the case it explicitly does not cover — *"a presenter removing anything is a
+      different authority"* — and until now that authority was unconditional. An owner could
+      configure this password and watch every presenter delete alerts unchallenged.
+
+      **THE GATE IS ON PRESENTERS AND ON ALERTS, and THIS EXACT SURFACE IS IN THE CAPTURE.**
+      `deleteAlertMessage(e)` at bundle byte 2,601,823 raises
+      `bootbox.prompt({title:"Please enter the password to delete this alert:"…})` and only then
+      calls `deleteAlert(e)`; it is reached from `subscribe("doAlertDelete")` at 2,598,258, which is
+      what the message menu emits for an ALERT while chat gets `doMsgDelete` (1,352,349). So
+      "alerts, not chat" is transcribed, and "presenters" is the setting's own help text — *"If set,
+      Presenters will need to enter the password to delete an alert"*. A member is governed by the
+      two lines above and by the ownership checks below, which is a different rule for a different
+      act, and folding the two together would change what `usersCanDeleteOwnMsgs` means.
+
+      **IT IS BEFORE EVERY BRANCH, including the captured-fixture one.** A captured alert is still an
+      alert on screen, and a door that a negative id walks around is not a door. The three branches
+      below then decide WHERE the deletion is recorded; this decides whether it happens at all.
+
+      `requireAlertDeleteAccess` asks the controller — the room cannot hold `deleteAlertPW` — and
+      then reads this session's own grant. It THROWS on an unreachable controller rather than
+      resolving, so a delete is refused, not allowed, when the answer cannot be obtained. See the
+      module for the TTL and why it is two minutes and not the notes password's thirty.
+    */
+    if (isPresenter && kind === 'alert') {
+      await requireAlertDeleteAccess(room, requireSessionId(locals));
     }
 
     /*

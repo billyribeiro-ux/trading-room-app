@@ -10,6 +10,7 @@ import { RoomTradeAlerts } from './trade-alerts.svelte';
 import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
+import { RoomMessageDeletion } from './message-delete';
 import { RoomNotesAccess } from './notes-access.svelte';
 import { RoomAdminNotes } from './admin-notes';
 import { RoomChatArchive } from './chat-archive.svelte';
@@ -106,6 +107,20 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   composer: RoomComposer,
   feeds: RoomFeeds,
   messageActions: RoomMessageActions,
+  /*
+    Added 2026-08-30 with the `deleteAlertPW` door, and — for the fourth time in four days — because
+    the completeness check below ASKED rather than because anybody remembered.
+
+    It arrived the same way `RoomProfilePicture` did: by extraction out of a class that was already
+    listed. `RoomMessageActions` owned the delete branch; the branch left for `RoomMessageDeletion`,
+    and its methods went from covered to uncovered by a move that changed no behaviour at all.
+
+    `request` is the one to watch. It is called as `this.#deletion.request(…)` today and never handed
+    over, but the shape it is one refactor away from — `ondelete={deletion.request}` on a message
+    row — would lose `this` and take `#dialogs`, `#checkAlertDeletePassword` and the whole password
+    gate with it.
+  */
+  messageDeletion: RoomMessageDeletion,
   notesAccess: RoomNotesAccess,
   adminNotes: RoomAdminNotes,
   chatArchive: RoomChatArchive,

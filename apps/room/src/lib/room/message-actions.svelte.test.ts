@@ -108,7 +108,15 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
     openImage: () => {},
     clearUnreadQa: () => {},
     focusComposer: () => {},
-    onChanged: () => ((invalidated += 1), Promise.resolve())
+    onChanged: () => ((invalidated += 1), Promise.resolve()),
+    /*
+      The `deleteAlertPW` door, stubbed as "no password configured" — `{required:false, ok:true}` is
+      what `internal/room-alert-delete-auth` answers for a room that has not set one, and it is what
+      keeps every delete assertion in this file about the DELETE rather than about the prompt. The
+      prompt's own behaviour is driven with a stub that says otherwise, in
+      `alert-delete-password-contract.test.ts`.
+    */
+    checkAlertDeletePassword: () => Promise.resolve({ required: false, ok: true })
   });
 
   return {

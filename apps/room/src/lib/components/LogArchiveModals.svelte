@@ -31,11 +31,11 @@
    * `setting-coverage-contract.test.ts` records that the reference performs that comparison
    * client-side five times over.
    *
-   * So the alerts half needs the door built for the notes password on 2026-08-29 —
-   * `internal/room-notes-auth/[code]`, *the credential stays and the question travels* — pointed at
-   * a second credential. That is its own piece of work with its own authority argument, and pinning
-   * the placeholder here beside the finished half is how it stays visible as work rather than
-   * looking done.
+   * **THAT DOOR NOW EXISTS, 2026-08-30 — `internal/room-alert-delete-auth/[code]`**, built for
+   * `TODO.md` row AL so that deleting ONE alert asks the password. So the blocker this paragraph
+   * recorded is gone and what is left is the sweep itself: an `archiveLogs` command for alerts,
+   * gated on `requireAlertDeleteAccess` exactly as the per-alert delete now is. The placeholder is
+   * pinned here beside the finished half so it stays visible as work rather than looking done.
    */
   interface Props {
     name: ModalName;

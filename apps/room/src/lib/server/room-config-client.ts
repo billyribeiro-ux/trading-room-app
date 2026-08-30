@@ -25,6 +25,7 @@ import {
   mobilePinUrl,
   mobileRestoreUrl,
   roomConfigUrl,
+  roomAlertDeleteAuthUrl,
   roomEntryUrl,
   roomNotesAuthUrl,
   roomWelcomeMatAuthUrl,
@@ -1476,6 +1477,77 @@ export async function checkNotesPasswordRemotely(
   */
   if (typeof decision?.ok !== 'boolean' || typeof decision?.required !== 'boolean') {
     throw new RoomConfigUnavailable('the controller answered an unrecognised notes-auth shape');
+  }
+  return { required: decision.required, ok: decision.ok };
+}
+
+/** What `internal/room-alert-delete-auth` answers. */
+export interface AlertDeleteDecision {
+  /** Whether the room has `deleteAlertPW` configured at all. False means upstream never prompts. */
+  readonly required: boolean;
+  /** Whether this attempt may delete an alert. */
+  readonly ok: boolean;
+}
+
+/**
+ * Ask the controller whether an alert-delete password is required, and whether this one is right.
+ *
+ * ## Why it FAILS CLOSED by throwing, like its three siblings
+ *
+ * A thrown `RoomConfigUnavailable` is the only honest answer when the controller cannot be reached:
+ * the room does not hold `deleteAlertPW` and cannot decide locally, so "I could not ask" must not be
+ * mistaken for "yes". Returning `{ok:false}` on a network error would be wrong in the other
+ * direction too — it would tell a presenter their correct password was refused.
+ *
+ * **This is the one call in this file whose failure blocks a DESTRUCTIVE act rather than a
+ * read.** That is the right way round and is worth saying plainly: an unreachable controller means
+ * alerts cannot be deleted for as long as it stays unreachable, which is an outage, not a data loss.
+ * The alternative — deleting on a failed check — is a data loss that no later repair can undo.
+ *
+ * Two calls per interaction, and the first carries an EMPTY candidate. That is not a probe for the
+ * password; it is the reference's own first branch — `sessData.deleteAlertPW ? prompt : send` — asked
+ * of the only machine that can answer it. The endpoint returns `required:false` when nothing is
+ * configured, which is what lets a delete proceed without a prompt, exactly as upstream does.
+ */
+export async function checkAlertDeletePasswordRemotely(
+  shortCode: string,
+  candidate: string
+): Promise<AlertDeleteDecision> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomAlertDeleteAuthUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ candidate }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the alert-delete check failed or timed out after ${TIMEOUT_MS}ms`,
+      { cause }
+    );
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const decision = (await response.json()) as AlertDeleteDecision;
+  /*
+    Validated rather than trusted, because this value decides whether an alert is destroyed. A
+    controller that answered `{}` — a deploy mid-rollout, a proxy returning an error page as JSON —
+    would otherwise read as `ok: undefined`, which is falsy here but would be truthy under any later
+    `!== false` refactor.
+  */
+  if (typeof decision?.ok !== 'boolean' || typeof decision?.required !== 'boolean') {
+    throw new RoomConfigUnavailable('the controller answered an unrecognised alert-delete shape');
   }
   return { required: decision.required, ok: decision.ok };
 }
