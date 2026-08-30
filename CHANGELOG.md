@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 06:52 UTC — The note surface's three Giphy gaps, two of which were one word
+
+**Runtime impact: YES.** The Giphy popover has a search button as well as a clear button; a GIF
+double-clicked into a note is previewed at full width before it lands, and a double-click that
+registers twice no longer inserts two copies; and the note surface's two prompts say what it actually
+does.
+
+**`note-editor-giphy-search-button`.** Const 88 `[1,"input-group-text","text-dark",3,"click"]` is
+used TWICE at byte 1,467,345 — `d(12,"span",88)` with `fa-search`, `d(14,"span",88)` with `fa-times`.
+Only the clear half was here, so a search could be started only by pressing Enter in the field, with
+a visible affordance beside it that did the opposite. **Two words diverge from the capture, and they
+diverge in the sibling too rather than being introduced here:** `text-white` for `text-dark`, and the
+icon's `fa-2x`. This picker is a dark popover where the reference's is a light modal —
+`btn-close-white` on the header button is the same decision, made when the component was written — so
+matching the capture on one span would have put dark text on a dark ground. It matches its own
+sibling instead and the pair stays a pair. `role="button"` and a keydown on both is ours: the capture
+puts a click handler on a bare `<span>` no keyboard can reach. Not a `<button>`, because
+`input-group-text` is what gives the two their shape inside the group.
+
+**TWO ROWS THAT WERE ONE WORD, AND A COMPROMISE THAT WAS NOT NECESSARY.** `note-editor-giphy-hint-text`
+was filed — fairly — as "a shared-component compromise, not a transcription error": this room runs one
+`GiphyPicker` for four surfaces, and the bundle carries that hint four times with **one of them
+different**. `app-note` says `*Double click an image to insert it` at 1,467,154; the other three say
+`select it` at 1,425,716, 2,197,828 and 2,372,175. `GifConfirmDialog` had the identical split —
+`insert this image` in a note, `post this image` in chat.
+
+The difference is a prop. Both now take one, defaulted to the MAJORITY string so the three surfaces
+that were already right are not touched, and `NoteEditor` passes what the capture gives it. The words
+are not interchangeable, which is why upstream varies them: everywhere else a double-click selects a
+GIF that is then confirmed and SENT to a room; in a note it goes into a document.
+
+**`note-editor-gif-insert-confirm`.** `insertGif` inserted on the double-click. It now stages, and
+`confirmGif` is what inserts — through the same `GifConfirmDialog` the chat composer has always
+raised, which is what this row's own verification found: the pattern was built here, for chat, and
+not for notes. The preview matters because a Giphy result is a THUMBNAIL in a grid and what lands in
+the note is `images.original`, a larger image the presenter has not seen at the size it will appear.
+`this.sendingGif` (byte 1,482,885) is transcribed as a **refusal rather than a replacement**: a
+second select while one is pending is dropped, not swapped in, because the presenter is looking at a
+preview of the first and must not confirm a different image than the one on screen. The picker still
+closes on select — upstream's `modalService.dismissAll()` — and it closes BEFORE either guard, so a
+refused second select still shuts the popover it came from.
+
+**One thing deliberately not built.** The reference's Giphy modal has a footer ` Close ` button
+(const 41). Ours is a popover with a header `btn-close`, not a modal, and a footer button in a
+popover would be a control imported from a different surface. Recorded at the audit row rather than
+added.
+
+**Negative controls, all ten seen RED after the commit, all first time.** Deleting the search span;
+flipping the `hint` default to `insert it`; putting the hardcoded `<h6>` literal back; stopping
+`NoteEditor` passing `hint`; flipping the confirmation's default to the note wording; making
+`insertGif` insert directly again; removing the `sendingGif` guard; clearing `pendingGif` after the
+insert rather than before; dropping the `https://` guard; and removing the keydown from the new span.
+
+**Verified.** `note-giphy-contract.test.ts` 10 new assertions; whole `src/lib` suite 3,739 passed,
+1 skipped. `orphan-component-contract` updated — `NoteEditor` now hides a third component tag from a
+naive comment strip, which is what its register is for. `source-size-contract` after raising three
+ceilings with their reasons: `NoteEditor` 1,502 → 1,560, `GiphyPicker` 153 → 216,
+`GifConfirmDialog` 50 → 66. `slice-anchor-contract` after binding the new test's shared handler body
+once instead of four times inline; its count is unchanged at 142. `svelte-check` 0 errors, 0
+warnings. Full `pnpm run gate` before the push, `gate-exit` echoed into the log and read from there.
+**Nothing was opened in a browser**, and the **Svelte MCP has been unavailable for this entire
+session**.
+
 ### 2026-08-30 06:20 UTC — Four guards the note surface never had, and the stacking bug that was hiding two of them
 
 **Runtime impact: YES.** Pressing Insert Carousel with no image URL now says so instead of doing

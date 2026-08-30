@@ -76,7 +76,7 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
 | 2 | `routes/+page.svelte` | 1,482 | no |
-| 3 | `lib/components/notes/NoteEditor.svelte` | 1,501 | no |
+| 3 | `lib/components/notes/NoteEditor.svelte` | 1,559 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,077 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
@@ -111,7 +111,7 @@ guessed.
 | 35 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
 | 36 | `lib/components/RichTextEditor.svelte` | 191 | no |
 | 37 | `lib/components/Modal.svelte` | 157 | no |
-| 38 | `lib/components/GiphyPicker.svelte` | 152 | no |
+| 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
 | 39 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
 | 40 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
 | 41 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -129,9 +129,9 @@ guessed.
 | 53 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
 | 54 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 55 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 56 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
+| 56 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 
-**2 of 65 surfaces audited · 1,072 of 30,631 lines · 3.5%.**
+**2 of 65 surfaces audited · 1,072 of 30,767 lines · 3.5%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

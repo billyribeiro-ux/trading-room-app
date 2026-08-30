@@ -193,7 +193,8 @@ describe('the render graph is walkable at all', () => {
   all fifty-five would be a large, risky sweep for a hazard that, measured, bites exactly one file
   today:
 
-    NoteEditor.svelte        LOSES `<BootboxDialog>` and `<CarouselDialog>` — `accept="image/*"` in
+    NoteEditor.svelte        LOSES `<BootboxDialog>`, `<CarouselDialog>` and `<GifConfirmDialog>`
+                             — `accept="image/*"` in
                              its Insert Image dialog opens a window the regex closes thousands of
                              characters later, over the real renders below it
     CarouselDialog.svelte    the same, from 2026-08-30: the carousel's per-slide file input carries
@@ -248,7 +249,10 @@ describe('no NEW file becomes hazardous to a naive comment strip', () => {
    * naive strip costs: the render this gate exists to find is the one it eats.
    */
   const KNOWN = new Map([
-    ['lib/components/notes/NoteEditor.svelte', ['BootboxDialog', 'CarouselDialog']],
+    [
+      'lib/components/notes/NoteEditor.svelte',
+      ['BootboxDialog', 'CarouselDialog', 'GifConfirmDialog']
+    ],
     ['lib/components/notes/CarouselDialog.svelte', ['BootboxDialog']]
   ]);
 

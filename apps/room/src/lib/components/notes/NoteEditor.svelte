@@ -16,6 +16,8 @@
   import type { NoteVersion } from '#lib/types.js';
   import type { SessionImageFile } from '#lib/session-image-files.js';
 
+  import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
+
   import CarouselDialog from './CarouselDialog.svelte';
   import {
     PtrCarousel,
@@ -569,11 +571,47 @@
     openMenu = null;
   }
 
+  /**
+   * The GIF a double-click chose, waiting for the confirmation — `note-editor-gif-insert-confirm`.
+   *
+   * ```js
+   * sendGif(e, i) {                                                  // byte 1,482,885
+   *   this.sendingGif || (
+   *     this.modalService.dismissAll(),
+   *     this.sendingGif = !0,
+   *     bootbox.confirm(
+   *       `You sure you want to insert this image:<br/><img src='${i}' style='width: 100%;'>`,
+   *       o => { this.sendingGif = !1,
+   *              o && $("#summernoteEdit-" + this.tab._id).summernote("insertImage", i, e) }))
+   * }
+   * ```
+   *
+   * This inserted immediately. The preview is the point: a Giphy result is a thumbnail in a grid,
+   * and the thing that lands in the note is the ORIGINAL — a different, larger image the presenter
+   * has not seen at the size it will appear.
+   *
+   * `this.sendingGif` is a re-entrancy guard and it is transcribed as one. A double-click that
+   * registers twice — which is what a double-click on a slow machine does — inserted two copies.
+   * Holding the pending GIF in one nullable value is that guard: a second `onselect` while one is
+   * pending is refused rather than replacing it, because the presenter is looking at a preview of
+   * the first and would confirm a different image than the one on screen.
+   *
+   * The picker closes on select, which is upstream's `modalService.dismissAll()`.
+   */
+  let pendingGif = $state.raw<{ title: string; url: string } | null>(null);
+
   function insertGif(title: string, url: string): void {
-    if (url.startsWith('https://')) {
-      editor?.chain().focus().setImage({ src: url, alt: title }).run();
-    }
     giphyOpen = false;
+    if (pendingGif !== null) return;
+    if (!url.startsWith('https://')) return;
+    pendingGif = { title, url };
+  }
+
+  function confirmGif(): void {
+    const chosen = pendingGif;
+    pendingGif = null;
+    if (chosen === null) return;
+    editor?.chain().focus().setImage({ src: chosen.url, alt: chosen.title }).run();
   }
 
   function startResize(event: PointerEvent): void {
@@ -1176,7 +1214,14 @@
         >
       </div>
       {#if giphyApiKey && giphyOpen}
+        <!--
+          `hint` is passed because `app-note` is the ONE surface of the four whose wording differs:
+          `*Double click an image to insert it` at byte 1,467,154, against `select it` at the other
+          three. In a note the double-click puts the GIF straight into the document; everywhere else
+          it selects one to confirm and send. See the prop's own note.
+        -->
         <GiphyPicker
+          hint="*Double click an image to insert it"
           apiKey={giphyApiKey}
           popoverId={`${componentId}-note-giphy`}
           onclose={() => (giphyOpen = false)}
@@ -1383,6 +1428,19 @@
 
 {#if giphyApiKey && openMenu === null && dialog === null}
   <!-- Giphy is opened by the toolbar button through this captured picker surface. -->
+{/if}
+
+<!--
+  `sendGif`'s confirmation, byte 1,482,885 — the same dialog the chat composer has always raised,
+  with the one word that differs between the two surfaces passed in. See `insertGif`.
+-->
+{#if pendingGif !== null}
+  <GifConfirmDialog
+    url={pendingGif.url}
+    message="You sure you want to insert this image:"
+    onclose={() => (pendingGif = null)}
+    onconfirm={confirmGif}
+  />
 {/if}
 
 {#if errorMessage !== null}

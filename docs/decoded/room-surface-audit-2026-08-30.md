@@ -636,6 +636,8 @@ removeCarouselImage(e){window.bootbox.confirm({message:"Delete this slide?",butt
 
 ### note-editor-gif-insert-confirm — A GIF is inserted straight from the double-click; the reference confirms with a preview first
 
+**BUILT 2026-08-30 06:52 UTC.** `insertGif` now STAGES the chosen GIF and `confirmGif` is what inserts it, through the `GifConfirmDialog` the chat composer has always used — this row's own verification found that pattern already built for chat and not for notes. The preview is the point: a Giphy result is a thumbnail in a grid, and what lands in the note is `images.original`, a larger image the presenter has not seen at the size it will appear. `this.sendingGif` is transcribed as a REFUSAL rather than a replacement — a second select while one is pending is dropped, because the presenter is looking at a preview of the first and must not confirm a different image than the one on screen. `note-giphy-contract.test.ts`.
+
 **medium** · `missing-behaviour` · reference byte **1,482,885**
 
 ```
@@ -771,6 +773,8 @@ x("click",function(){D(e);const o=g().$index;return E(g(2).clearCarouselImage(o)
 
 ### note-editor-giphy-hint-text — Giphy hint reads "to select it" where app-note reads "to insert it"
 
+**BUILT 2026-08-30 06:52 UTC.** A `hint` prop on `GiphyPicker`, defaulting to `*Double click an image to select it` — the majority string at offsets 1,425,716, 2,197,828 and 2,372,175 — with `app-note`'s `insert it` (1,467,154) passed by `NoteEditor`. **This row filed it fairly as a shared-component compromise and it was one, but it was not a necessary one:** the difference is a prop, the default keeps the three surfaces that were already right untouched, and the words are not interchangeable — everywhere else a double-click selects a GIF that is then confirmed and SENT to a room; in a note it goes into a document. The same fix answers `GifConfirmDialog`'s `post`/`insert` split. `note-giphy-contract.test.ts`.
+
 **low** · `wrong-constant` · reference byte **1,467,154**
 
 ```
@@ -782,6 +786,8 @@ d(5,"div",83)(6,"h6"),v(7,"*Double click an image to insert it")
 > Verified: Could not refute. Our GiphyPicker hardcodes the hint as "*Double click an image to select it" in markup, and its Props interface is only { apiKey, popoverId, onclose, onselect } — there is no hint/label prop, so no consumer can vary the wording.
 
 ### note-editor-giphy-search-button — The Giphy search icon button is missing; only the clear button exists
+
+**BUILT 2026-08-30 06:52 UTC.** The other half of a pair: const 88 `[1,"input-group-text","text-dark",3,"click"]` is used TWICE at byte 1,467,345 — `d(12,"span",88)` with `fa-search`, `d(14,"span",88)` with `fa-times` — and only the clear half was here, so a search could be started only by pressing Enter with a visible affordance beside it that did the opposite. **Two words diverge from the capture and they diverge in the sibling too rather than being introduced here:** `text-white` for `text-dark` and the `fa-2x` on the icon, because this picker is a dark popover where the reference's is a light modal (`btn-close-white` on the header is the same decision). `role="button"` plus a keydown on both spans is ours — the capture puts a click handler on a bare `<span>` that no keyboard can reach. **The reference's modal footer ` Close ` is deliberately NOT added:** ours is a popover with a header `btn-close`, not a modal, and a footer button in a popover would be a control from a different surface. `note-giphy-contract.test.ts`.
 
 **low** · `missing-control` · reference byte **1,467,345**
 

@@ -1531,6 +1531,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       bundled with a feature.
     */
     /*
+      1502 -> 1560, 2026-08-30. `note-editor-gif-insert-confirm`, and the `hint` this surface passes.
+
+      Fifty-eight lines, forty of them the docblock on `insertGif`. The handler inserted on the
+      double-click; it now stages the GIF and `confirmGif` is what inserts. Two reasons, both worth
+      the words: the preview matters because a Giphy result is a THUMBNAIL and what lands in the note
+      is `images.original`, a larger image the presenter has not seen at the size it will appear; and
+      `this.sendingGif` is transcribed as a refusal rather than a replacement, because the presenter
+      is looking at a preview of the first GIF and a second must not swap what they are confirming.
+
+      This file is now past every carousel extraction's savings on GIF handling alone, which is the
+      argument for the toolbar coming out next rather than in another entry after this one.
+    */
+    /*
       1480 -> 1502, 2026-08-30. `note-editor-insert-carousel-silent-noop`.
 
       Twenty-two lines, twenty of them the reason: `insertCarousel` returned silently when no slide
@@ -1539,7 +1552,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rule agrees with it. The note also records what is NOT that message — a missing editor is a bug
       in this component, not a mistake by the presenter.
     */
-    max: 1502,
+    max: 1560,
     why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
   },
   {
@@ -3971,13 +3984,37 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/GifConfirmDialog.svelte',
-    max: 50,
-    why: 'the one confirmation between picking a GIF and posting it'
+    /*
+      50 -> 66, 2026-08-30. `note-editor-gif-insert-confirm`.
+
+      Sixteen lines, fourteen of them the reason a `message` prop exists at all: the note surface
+      asks `You sure you want to insert this image:` (byte 1,482,885) where the chat composer asks
+      `…post this image:`, and this one component serves both. The default is the chat string, so the
+      surface that already had this dialog is unchanged.
+    */
+    max: 66,
+    why: 'the one confirmation between picking a GIF and inserting or posting it'
   },
   {
     file: 'lib/components/GiphyPicker.svelte',
-    max: 153,
-    why: 'the GIF search grid'
+    /*
+      153 -> 216, 2026-08-30. Two audit rows, and most of the addition is why.
+
+      `note-editor-giphy-search-button` — const 88 is used TWICE in the capture
+      (`d(12,"span",88)` then `d(14,"span",88)`), and only the clear half was here, so a search could
+      be started only by pressing Enter with a visible affordance beside it that did the opposite.
+
+      `note-editor-giphy-hint-text` — `app-note` says `insert it` where three other surfaces say
+      `select it`, and this one component serves all four. A `hint` prop with the majority string as
+      its default; the entry carries the four offsets and the reason the words are not
+      interchangeable.
+
+      The rest is the two-word divergence from the capture on the new span (`text-white` for
+      `text-dark`, and `fa-2x`), which matches its own sibling rather than the reference because this
+      picker is a dark popover where the reference's is a light modal.
+    */
+    max: 216,
+    why: 'the GIF search grid, its search and clear pair, and the one word that varies by surface'
   },
   {
     file: 'lib/components/ImageUploadDialog.svelte',
