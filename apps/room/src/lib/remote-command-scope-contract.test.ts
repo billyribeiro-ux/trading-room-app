@@ -110,6 +110,44 @@ const SCOPING_HELPERS: Readonly<Record<string, readonly string[]>> = {
     'presenterRoom()',
     'requireRoomMember(subjectUserId, room)',
     'requireNotesAccess(room, requireSessionId(getRequestEvent().locals))'
+  ],
+  /*
+    THE THREE ADMITTED ON 2026-08-30, when seventeen form actions became remote commands.
+
+    All three do what `presenterRoom()` does — role first, room second, and the room returned only
+    after the role check, so "may they" and "which room" cannot be applied separately. None of them
+    calls it, and the reason is the same in all three: each refuses with its OWN SENTENCE.
+    `presenterRoom()` raises *"Presenters only."*, while these six note commands raise *"You cannot
+    create session notes."* and its five siblings, and the alert commands name their feature. Those
+    strings are the reference's own and `notes-account-action-contract.test.ts` pins that they
+    differ, so folding them into one message would have been a behaviour change smuggled inside a
+    refactor.
+
+    The terms required of each are what make them scopers rather than functions with a promising
+    name: the role read off the SESSION's user, and the room read off the SESSION's locals. Nothing
+    reaches either from an argument.
+  */
+  notesRoom: ['requireUser(locals)', 'isPresenterRole(user.role)', 'requireRoomShortCode(locals)'],
+  /*
+    The two trade-alert guards carry a FOURTH term each, and it is the entitlement.
+
+    They are two functions rather than one taking a predicate, deliberately: the setting each
+    consults is a different one, so a shared guard would be one place where turning Swing off could
+    be made to turn Day Trade off too. Requiring each to name its own `…TabVisible` here is what
+    stops the two being quietly collapsed later — a merged guard could satisfy one of these entries
+    and not the other.
+  */
+  swingAlertsRoom: [
+    'requireUser(locals)',
+    'isPresenterRole(user.role)',
+    'requireRoomShortCode(locals)',
+    'swingAlertsTabVisible(settings)'
+  ],
+  dayTradeAlertsRoom: [
+    'requireUser(locals)',
+    'isPresenterRole(user.role)',
+    'requireRoomShortCode(locals)',
+    'dayTradeAlertsTabVisible(settings)'
   ]
 };
 

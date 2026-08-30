@@ -38,6 +38,20 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (file: string) => readFileSync(`${ROOT}${file}`, 'utf8');
 
 const ACTIONS = read('lib/room/user-actions.svelte.ts');
+/*
+  THE BUILDER MOVED, 2026-08-30, and this contract got stronger for it.
+
+  `targetFor`'s mapping and the no-selection placeholder are `room/modal-target.ts` now, beside the
+  second mapping this rule was always about: `modalTargetFromMessage`, which `RoomMessageActions`
+  used to write out as an inline literal of its own. So the two constructions this file exists to
+  keep from drifting are finally in one file, where a reader comparing them does not have to know
+  that the other one exists.
+
+  The invariant is unchanged and is asserted in three more places than it was: one builder per
+  source, both exported and pure, and NEITHER class assembling the object field by field any more.
+*/
+const BUILDER = read('lib/room/modal-target.ts');
+const MESSAGES = read('lib/room/message-actions.svelte.ts');
 
 /**
  * The five permission fields, from the type rather than from memory.
@@ -61,6 +75,10 @@ describe('an entitlement-bearing target is built in one place', () => {
   it('reads the module it is measuring', () => {
     /* The vacuity floor: every assertion below is a search over this one string. */
     expect(ACTIONS.length).toBeGreaterThan(10_000);
+    expect(BUILDER.length).toBeGreaterThan(2_000);
+    expect(BUILDER).toContain(
+      'export function modalTargetFromRosterRow(user: RosterRowForTarget): ModalTargetUser'
+    );
     expect(ACTIONS).toContain('targetFor(user: User): ModalTargetUser');
   });
 
@@ -87,12 +105,14 @@ describe('an entitlement-bearing target is built in one place', () => {
       new Set(PERMISSION_FIELDS)
     );
 
-    const code = codeOf(ACTIONS);
-    const builderAt = code.indexOf('targetFor(user: User)');
+    const code = codeOf(BUILDER);
+    const builderAt = code.indexOf('export function modalTargetFromRosterRow');
     expect(builderAt, 'the one builder moved').toBeGreaterThan(-1);
     const builder = code.slice(builderAt);
     for (const field of PERMISSION_FIELDS) {
-      expect(builder.slice(0, 1200), `targetFor must carry ${field}`).toContain(`${field}:`);
+      expect(builder.slice(0, 1200), `modalTargetFromRosterRow must carry ${field}`).toContain(
+        `${field}:`
+      );
     }
   });
 
@@ -106,13 +126,28 @@ describe('an entitlement-bearing target is built in one place', () => {
       parameters and the placeholder below, and counting those would make this assertion pass or
       fail for reasons that have nothing to do with the shape.
     */
-    const constructions = [...codeOf(ACTIONS).matchAll(/nick:\s*user\.displayName/g)];
+    const constructions = [...codeOf(BUILDER).matchAll(/nick:\s*user\.displayName/g)];
     expect(
       constructions.length,
       'a second construction of ModalTargetUser from a User has appeared — it will differ from ' +
-        '`targetFor` in some field, and if that field is one of the five permissions, Save on the ' +
-        'permissions modal becomes a silent revocation. Call `targetFor` instead.'
+        '`modalTargetFromRosterRow` in some field, and if that field is one of the five ' +
+        'permissions, Save on the permissions modal becomes a silent revocation. Call the builder.'
     ).toBe(1);
+
+    /*
+      And the classes build NOTHING. This is the half that the extraction added: before it, this
+      assertion could only say "one construction in `user-actions`", which was silent about the
+      other file assembling its own. Now both are searched and both must be empty.
+    */
+    for (const [name, source] of [
+      ['user-actions.svelte.ts', ACTIONS],
+      ['message-actions.svelte.ts', MESSAGES]
+    ] as const) {
+      expect(
+        [...codeOf(source).matchAll(/nick:\s*(user|item)\./g)].length,
+        `${name} assembles a modal target itself — call the builder in room/modal-target.ts`
+      ).toBe(0);
+    }
   });
 
   it('routes the roster selection through that one builder', () => {
@@ -134,12 +169,16 @@ describe('an entitlement-bearing target is built in one place', () => {
     expect(closes, 'the builder must still follow the getter').toBeGreaterThan(opens);
     const getter = code.slice(opens, closes);
     expect(getter).toContain('return this.targetFor(user);');
-    expect(getter, 'the placeholder stays, and is the only literal here').toContain(
-      "status: 'offline'"
+    expect(getter, 'the no-such-user branch names the shared placeholder').toContain(
+      'return MODAL_TARGET_PLACEHOLDER;'
     );
     expect(
       [...getter.matchAll(/nick:/g)].length,
-      'only the placeholder may set nick directly'
-    ).toBe(1);
+      'the getter builds nothing at all now; even the placeholder is the module’s'
+    ).toBe(0);
+    expect(getter, 'and the delegation is the whole method').toContain('targetFor');
+
+    /* The message side delegates too — the assertion that had no home before the extraction. */
+    expect(codeOf(MESSAGES)).toContain('this.#selectUser(modalTargetFromMessage(item));');
   });
 });

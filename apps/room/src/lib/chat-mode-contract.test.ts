@@ -187,8 +187,25 @@ describe('the command', () => {
   });
 
   it('and the form action it replaced is gone from the file that held it', () => {
-    // Pointed at `+page.server.ts` deliberately: that file DID contain this, so the guard is real.
-    expect(serverCode).toContain('export const actions: Actions = {');
+    /*
+      Pointed at `+page.server.ts` deliberately: that file DID hold this action, so the two
+      `not.toContain`s below are a real guard rather than a search of a file that never had it.
+
+      THE ANCHOR CHANGED ON 2026-08-30 and the reason is worth keeping. It used to be
+      `toContain('export const actions: Actions = {')` — present-tense proof that this string is the
+      file where actions live. That export is gone: `logout` was the last one and nothing could
+      invoke it, so the whole thing went. An anchor that names a construct which no longer exists
+      fails for the right reason exactly once and then has to be replaced, and replacing it with
+      nothing is how a negative assertion starts passing because it is reading the wrong file.
+
+      So the anchor is now the load, which is what this file does export, plus the stronger fact the
+      deletion bought: there are no actions here AT ALL. `changeChatMode` cannot come back as an
+      action without failing the second assertion, whatever it is called.
+    */
+    expect(serverCode, 'this is still +page.server.ts').toContain('export const load');
+    expect(serverCode, 'and it exports no form actions at all now').not.toContain(
+      'export const actions'
+    );
     expect(serverCode).not.toContain('changeChatMode: async');
     expect(serverCode).not.toContain('if (!isChatMode(mode)) return fail(400');
   });

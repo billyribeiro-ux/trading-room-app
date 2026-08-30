@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 
 import { codeOf } from './source-comments.js';
 import { setWelcomeMatNoteTabSchema } from './notes-command.js';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { notes, users, type User } from '#lib/server/db/schema.js';
+import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
 /**
  * The all-rooms Welcome Mat, and the authority that moved from the browser to the server.
@@ -41,7 +45,14 @@ const read = (path: string) => codeOf(path, readFileSync(new URL(path, import.me
 
 const PANE = read('./components/notes/NotesPane.svelte');
 const AREA = read('./components/PresentationArea.svelte');
+/*
+  `+page.server.ts` no longer holds the write — `setWelcomeMatNoteTab` left for
+  `session-notes.remote.ts` on 2026-08-30 — but it is still swept for the credential below, and that
+  is deliberate: the assertion is that the setting is named in NO room source, so dropping a file
+  from the sweep because it stopped writing would narrow the claim without saying so.
+*/
 const ACTION = read('../routes/+page.server.ts');
+const NOTES_REMOTE = read('../routes/session-notes.remote.ts');
 const REMOTE = read('../routes/welcome-mat.remote.ts');
 const CLIENT = read('./server/room-config-client.ts');
 const REPOSITORY = read('./server/notes-repository.ts');
@@ -57,6 +68,7 @@ describe('the credential never reaches the room', () => {
       ['NotesPane', PANE],
       ['PresentationArea', AREA],
       ['+page.server.ts', ACTION],
+      ['session-notes.remote.ts', NOTES_REMOTE],
       ['welcome-mat.remote.ts', REMOTE]
     ] as const) {
       expect(source, name).not.toContain('allRoomsWelcomeMatPW');
@@ -134,41 +146,164 @@ describe('the remote query', () => {
   });
 });
 
+/*
+  REWRITTEN, not re-pointed, when `setWelcomeMatNoteTab` became a remote command on 2026-08-30.
+
+  These three read `+page.server.ts` and asserted on the TEXT of the branch: that it contained a
+  `checkWelcomeMatPasswordRemotely` call, that one `indexOf` came before another, that a `fail(503)`
+  was present. Re-pointing them at `session-notes.remote.ts` would have been one character of work
+  and would have proven strictly less than they did before — a text assertion cannot tell a live
+  refusal from one that a later edit put behind an `if` nothing enters.
+
+  So they execute. The controller is stubbed at the module boundary, exactly as
+  `scheduled-alert-contract.test.ts` stubs `readRoomConfig`, and what is asserted is what the
+  command DID: the row it wrote, or the row it left alone.
+
+  Only `checkWelcomeMatPasswordRemotely` is stubbed. It is the only export of that module the
+  command under test reaches, and stubbing the file wholesale would have quietly disabled
+  `readRoomConfig` for anything else that arrived in this file later.
+*/
+const controller = {
+  answer: async (
+    _candidate: string
+  ): Promise<{ required: boolean; ok: boolean; rooms: string[] }> => {
+    throw new RoomConfigUnavailableStub('no stub answer was configured');
+  }
+};
+
+class RoomConfigUnavailableStub extends Error {}
+
+vi.mock('#lib/server/room-config-client.js', () => ({
+  RoomConfigUnavailable: RoomConfigUnavailableStub,
+  checkWelcomeMatPasswordRemotely: (_shortCode: string, candidate: string) =>
+    controller.answer(candidate)
+}));
+
+const { newSessionNoteTab, setWelcomeMatNoteTab } = await import('../routes/session-notes.remote');
+
+/** The room the presenter is in. Every command takes it from the session, never from an argument. */
+const ROOM = '3625';
+
+function account(email: string, role: string): User {
+  const existing = db.select().from(users).where(eq(users.email, email)).get();
+  if (existing) return existing;
+  return db
+    .insert(users)
+    .values({
+      displayName: `welcome mat ${role}`,
+      email,
+      role,
+      passwordHash: 'scrypt$00$00',
+      createdAt: new Date()
+    })
+    .returning()
+    .get();
+}
+
+let presenter: User;
+
+beforeAll(() => {
+  ensureDatabase();
+  presenter = account('welcome-mat-presenter@example.test', 'staff');
+});
+
+beforeEach(() => {
+  db.delete(notes).run();
+});
+
+const as = <T>(run: () => T | Promise<T>) =>
+  callRemote(
+    { user: presenter, sessionId: 'welcome-mat-contract', roomShortCode: ROOM } as App.Locals,
+    run
+  );
+
+const isWelcomeMat = (noteId: number) =>
+  db.select().from(notes).where(eq(notes.id, noteId)).get()?.isWelcomeMat;
+
 describe('the write path re-checks rather than trusting the prompt', () => {
-  it('sends the password to the controller before applying anything', () => {
+  it('sends the password to the controller, and refuses the whole request when it is wrong', async () => {
     /*
-      The prompt is a UI affordance and nothing more. A client that skipped it entirely and posted
-      the form directly reaches exactly this check.
+      The prompt is a UI affordance and nothing more. A client that skipped it entirely and called
+      the command directly reaches exactly this check — which is what this test does: there is no
+      dialog anywhere in it, only the command and the controller's verdict.
     */
-    const at = ACTION.indexOf('if (command.data.data.allRooms) {');
-    expect(at, 'the branch must exist').toBeGreaterThan(-1);
-    const end = ACTION.indexOf('\n    }', at);
-    expect(end, 'the branch must be closed').toBeGreaterThan(at);
-    const branch = ACTION.slice(at, end);
-    expect(branch).toContain('await checkWelcomeMatPasswordRemotely(room, command.data.data.pw)');
-    expect(branch.indexOf('if (!decision.ok) return fail(403')).toBeLessThan(
-      branch.indexOf('setWelcomeMatNoteEverywhere')
-    );
-    /* `Wrong password!` is the reference's own string. */
-    expect(branch).toContain("message: 'Wrong password!'");
+    const note = await as(() => newSessionNoteTab({ name: 'Everywhere' }));
+
+    const asked: string[] = [];
+    controller.answer = async (candidate: string) => {
+      asked.push(candidate);
+      return { required: true, ok: false, rooms: ['3625', '9140'] };
+    };
+
+    /* `Wrong password!` is the reference's own string, at byte 1,474,217. */
+    await expect(
+      as(() => setWelcomeMatNoteTab({ noteId: note.id, allRooms: true, pw: 'guess' }))
+    ).rejects.toMatchObject({ status: 403, body: { message: 'Wrong password!' } });
+
+    expect(asked, 'the candidate never reached the controller').toEqual(['guess']);
+    // The status alone would pass with the mat already moved. This is the half that matters.
+    expect(isWelcomeMat(note.id)).toBe(false);
   });
 
-  it('fails CLOSED on an unreachable controller, with no per-room fallback', () => {
+  it('applies to every room the controller named, once it says yes', async () => {
+    /*
+      The positive control for the assertion above. A refusal that is really "this branch does
+      nothing at all" would pass the wrong-password test and fail here.
+    */
+    const note = await as(() => newSessionNoteTab({ name: 'Everywhere' }));
+    controller.answer = async (_candidate: string) => ({ required: true, ok: true, rooms: [ROOM] });
+
+    await as(() => setWelcomeMatNoteTab({ noteId: note.id, allRooms: true, pw: 'correct' }));
+
+    expect(isWelcomeMat(note.id)).toBe(true);
+  });
+
+  it('fails CLOSED on an unreachable controller, with no per-room fallback', async () => {
     /*
       Applying to this room only would be a quiet, wrong answer to a request that named every room —
-      and the presenter would have no way to tell which happened.
+      and the presenter would have no way to tell which happened. So the 503 is asserted WITH the
+      row: a `catch` that fell through to `setWelcomeMatNote({ room, … })` would answer 200 and set
+      exactly one mat, which is the failure this is about and which no status check alone can see.
     */
-    const at = ACTION.indexOf('if (command.data.data.allRooms) {');
-    expect(at, 'the branch must exist').toBeGreaterThan(-1);
-    const closes = ACTION.indexOf('\n    }', at);
-    expect(closes, 'the branch must be closed').toBeGreaterThan(at);
-    const branch = ACTION.slice(at, closes);
-    expect(branch).toContain('return fail(503');
-    expect(branch).not.toContain('setWelcomeMatNote({');
+    const note = await as(() => newSessionNoteTab({ name: 'Everywhere' }));
+    controller.answer = async (_candidate: string) => {
+      throw new RoomConfigUnavailableStub('the controller is down');
+    };
+
+    await expect(
+      as(() => setWelcomeMatNoteTab({ noteId: note.id, allRooms: true, pw: 'correct' }))
+    ).rejects.toMatchObject({ status: 503 });
+
+    expect(isWelcomeMat(note.id)).toBe(false);
   });
 
-  it('takes the room from the session, never from the form', () => {
-    expect(ACTION).toContain('const room = requireRoomShortCode(locals);');
+  it('takes the room from the session, never from the payload', async () => {
+    /*
+      `z.strictObject` is what makes a room on the wire unrepresentable rather than merely unused: an
+      extra field is REFUSED, so a future edit cannot quietly start honouring one. The cast is the
+      point — the payload type already forbids this at compile time, and what is proven here is that
+      the runtime does too.
+    */
+    const note = await as(() => newSessionNoteTab({ name: 'Here only' }));
+    controller.answer = async (_candidate: string) => ({
+      required: false,
+      ok: true,
+      rooms: [ROOM]
+    });
+
+    await expectSchemaRefusal(
+      as(() =>
+        setWelcomeMatNoteTab({
+          noteId: note.id,
+          allRooms: false,
+          pw: '',
+          roomShortCode: '9140'
+        } as unknown as { noteId: number; allRooms: boolean; pw: string })
+      ),
+      'roomShortCode on the payload'
+    );
+
+    expect(isWelcomeMat(note.id)).toBe(false);
   });
 });
 

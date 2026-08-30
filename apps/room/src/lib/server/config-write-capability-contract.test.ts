@@ -99,7 +99,19 @@ const READERS = [
     enumerate an account's rooms: the gate and the data it unlocks are one round trip, and a wrong
     password returns `{required, ok:false, rooms:[]}`. The endpoint's own header carries the rest.
   */
-  'checkWelcomeMatPasswordRemotely'
+  'checkWelcomeMatPasswordRemotely',
+  /*
+    `checkAlertDeletePasswordRemotely` — the fourth question-shaped POST, added 2026-08-30. It sends
+    a candidate the controller compares against `deleteAlertPW` and answers two booleans; nothing on
+    the controller changes, which is what decides the capability.
+
+    It is a FOURTH function against a FOURTH endpoint rather than a `credential` argument on the
+    notes one, and this list is where that reads as a decision rather than as duplication. A shared
+    endpoint taking a credential NAME would let any holder of a `config-read` token walk all seven
+    credential-shaped settings a guess at a time; `room-credential-prompt.ts` on the controller
+    carries the argument, and what IS shared is the constant-time comparison rather than the door.
+  */
+  'checkAlertDeletePasswordRemotely'
 ];
 
 describe('the capability minted for each controller call', () => {

@@ -71,9 +71,37 @@ export class RoomAdminNotes {
   /**
    * `manageAdminNotes()` for one member: clear the door if it is shut, then show what is behind it.
    *
-   * Called on the Enter Password button. The notes TAB calls `list.open` directly instead, because
-   * clicking a tab must not raise a password prompt — upstream's tab does not, and a dialog nobody
-   * asked for is worse than an empty panel.
+   * ## BOTH ENTRY POINTS CALL THIS — and the comment that used to sit here was WRONG
+   *
+   * It read: *"Called on the Enter Password button. The notes TAB calls `list.open` directly
+   * instead, because clicking a tab must not raise a password prompt — upstream's tab does not,
+   * and a dialog nobody asked for is worse than an empty panel."*
+   *
+   * The claim about upstream is false, and it was made without reading the bytes. UIM-06 read
+   * them. The tab strip is `J2e` at bundle byte 2,059,546:
+   *
+   * ```js
+   * function J2e(t,n){ if(1&t){ const e=Y();
+   *   d(0,"a",54), v(1," System "),  u(),
+   *   d(2,"a",55), v(3," Actions "), u(),
+   *   d(4,"a",56), x("click",function(){ return D(e), E(g(2).manageAdminNotes()) }),
+   *                v(5," Admin Notes "), u() } }
+   * ```
+   *
+   * — and const 56, decoded from that component's own table at 2,087,748, is
+   * `["id","nav-tab-notes", …, 1,"nav-item","nav-link", 3,"click"]`: the ONLY one of the three
+   * anchors carrying a click binding at all. The button (`pTe`, byte 2,064,649) calls the same
+   * method. Two callers upstream, and the room now has the same two.
+   *
+   * The reasoning behind the false claim was not silly — a dialog nobody asked for IS worse than an
+   * empty panel — it was just answered differently by the original: `manageAdminNotes()` at
+   * 2,081,768 prompts only when `needPasswordForUserNotes` is configured AND the door is still
+   * shut, and otherwise grants silently. `RoomNotesAccess.ask()` is both of those branches, so
+   * a room with no password never sees a prompt from clicking this tab either.
+   *
+   * The cost of leaving it was concrete: the Admin Notes tab switched panes and did nothing else,
+   * so the password door had exactly one caller and a presenter who clicked the tab saw the
+   * password paragraph instead of the prompt the reference raises.
    */
   async ask(subjectUserId: number): Promise<void> {
     await this.#access.ask();

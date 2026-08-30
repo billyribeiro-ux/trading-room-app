@@ -971,8 +971,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       not hold this class: it had no field, no lifecycle and nothing rendered, so it was never
       overlay state. The `why` below is now true of everything left.
     */
-    max: 242,
-    why: 'the overlay state machine - five fields the template reads and this class alone writes'
+    /*
+      RAISED 242 -> 307 on 2026-08-30, for the poll conversion — `TODO.md` row AG.
+
+      `submitPollAction(action, values)` was twelve lines: a `FormData` loop, ``fetch(`?/${action}`)``
+      and a boolean. It is five named methods and one shared failure policy now, and the whole of the
+      growth is that shape plus the WHY.
+
+      The raise is recorded as a decision rather than absorbed, because the standing rule is that a
+      ceiling only goes down and a raise is a conversation. What was bought for it:
+
+        - the endpoint is no longer assembled at runtime. `remote-call-sites-contract.test.ts` opens
+          with what that costs — `presenterCommand`'s action was deleted while its call site kept
+          posting to it for three commits, compiling the whole way. Five imported symbols cannot do
+          that;
+        - the arguments are typed at the call site rather than stringified into a form body;
+        - a refusal is logged instead of discarded. `submitPollAction` answered `false` and threw the
+          response away, so a presenter whose poll was refused saw nothing anywhere.
+
+      The alternative on offer was one method taking a union of five names — which is the defect
+      being removed, wearing a different call shape — or deleting the paragraphs that explain the
+      failure policy, which `CLAUDE.md` names directly: prose explaining a real subtlety is not
+      shaved to hit a number.
+    */
+    max: 307,
+    why: 'the overlay state machine, plus the five poll commands and the failure policy they share'
   },
   {
     file: 'lib/room/notes.svelte.ts',
@@ -1001,8 +1024,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       half: a viewer who may read notes but not edit them must not be handed an editor. In markup at
       one of two call sites, that rule is one refactor from being dropped.
     */
-    max: 219,
-    why: 'the notes tab - four actions, one flag, and the two link mounts that belong to them'
+    /*
+      RAISED 219 -> 311 on 2026-08-30, for the session-note conversion — `TODO.md` row AG.
+
+      `submitMutation` was ``fetch(`?/${action}`)`` over a six-member union of ACTION NAMES with a
+      `FormData` body and a `deserialize()` of the response. It is a discriminated union, a `switch`
+      over six imported commands, and a two-type-parameter signature that types each payload against
+      the command it reaches.
+
+      Recorded as a decision rather than absorbed. What was bought:
+
+        - deleting one of the six commands is now a build error at the line that calls it, where
+          before it compiled and silently did nothing — the `presenterCommand` failure exactly;
+        - `values` is checked per action at five of the six call sites, where it was
+          `Record<string, boolean | string | number>`;
+        - the two type assertions that remain are NAMED at the lines that perform them, and both were
+          already being performed invisibly by `deserialize<Success, …>`.
+
+      Roughly two thirds of the growth is the docblock, and most of that is one paragraph that has to
+      exist: the two-argument shape survives because the six call sites are prop callbacks in
+      `PresentationArea.svelte`, which another agent owned during this change. A raise with the
+      reason omitted is how the next reader "simplifies" the assertions back out.
+    */
+    max: 311,
+    why: 'the notes tab - four actions, one flag, the two link mounts, and the six-command dispatch'
   },
   {
     file: 'lib/room/recording.ts',
@@ -1298,8 +1343,43 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       with the style object bound and three inline handlers lifted to callbacks - so the extraction
       cannot have changed what the panel renders, and the browser suite is the check that it did not.
     */
-    max: 152,
+    /*
+      152 -> 171, 2026-08-30, UIM-16. Nineteen lines for a ONE-WORD change — `class="fw-bold"` on the
+      preview's `<strong>`, const 120 of the user-info modal's table.
+
+      The comment is eighteen of the nineteen and it is not padding: `fw-bold` on a `<strong>` looks
+      like a tautology, and a future reader deleting it as redundant would be making the same
+      judgement the original author of the bare tag made. What it records is why the reference put a
+      utility class on an already-bold element — Bootstrap's `font-weight: 700 !important` beats the
+      browser's `bolder` and survives a stylesheet that flattens typography — and that this preview's
+      whole job is to show a presenter what the real thing will look like.
+
+      Nothing to extract: this file IS the extraction, and one attribute does not warrant a second.
+    */
+    max: 171,
     why: 'the follow-chat colour and size editor - five inputs, a live example, three callbacks'
+  },
+  {
+    file: 'lib/components/AlertSendReportModal.svelte',
+    /*
+      The Alert Sent Report modal, lifted out of `ModalHost.svelte` on 2026-08-30 when RPT-01
+      through RPT-08 were dispositioned.
+
+      **It is ninety percent argument and ten percent markup, and that ratio is the reason it is a
+      file.** Six of upstream's controls for this surface — the fetch, the per-status rows, the
+      search box, the status select, the flot pie and the token dialog — all rest on a list of
+      per-recipient DELIVERY RECORDS. This product has none: 24 tables and not one records a
+      delivery, `alerts.dispatch` is five booleans naming which channels were requested rather than
+      what happened, no mail transport exists in the room at all and the controller's has no alert
+      caller, and `getAlertReport` has no server half anywhere in `apps/`. That measurement is what
+      the file mostly contains.
+
+      It renders one sentence. Somebody will one day decide to build the six controls, and they will
+      stand exactly here when they do — which is the whole argument for the explanation living with
+      the surface rather than in the host that opens it.
+    */
+    max: 165,
+    why: 'the alert-report modal — one honest notice, and the measurement that decided against six controls'
   },
   {
     file: 'lib/components/LogArchiveModals.svelte',
@@ -1582,7 +1662,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       day trade and swing genuinely own separate dialogs. A reader who meets one of them must not
       have to find the other to learn why it says what it says.
     */
-    max: 1056,
+    /*
+      1,056 -> 1,081, 2026-08-30, for UIM-04 and SRCH-03 — twenty-five lines, and this is exactly the
+      raise this file is happy to grant, because the alternative was a raise somewhere worse.
+
+      Fourteen of them are the `canPrivateChat` call: `canShowRosterPrivateChat(context, target)`,
+      answered HERE from the session and from the same `userActions.target` the modal is already
+      being handed. The reference's `canPM` is a five-input expression with the TARGET as one of the
+      inputs (byte 2,073,550), and `#lib/roster-private-chat.ts` has been its transcription since the
+      roster needed it. Drilling those five settings into `ModalHost` instead would have added them
+      to a props list of ninety and put a second copy of the rule in a component — which is the shape
+      the reference itself gets wrong, asking the question twice and disagreeing with itself once.
+
+      One line is `room={data.room}`, which removes two INVENTED literals from `ModalHost` — a room
+      key and a room name that appear nowhere in the 2,891,205-byte bundle. The remaining ten are the
+      import's note saying why one function now has two callers.
+
+      This is the composition root doing its job: resolve the answer where both halves of the
+      question are in scope, and hand over a boolean. Nothing to extract.
+    */
+    max: 1081,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2790,7 +2889,54 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Today's record so far: three components out (`RestreamPane`, `SessionHistoryPane`,
       `ReactionPrefsPane`, 324 lines) against a ceiling risen 147.
     */
-    max: 6482,
+    /*
+      6,482 -> 6,868, 2026-08-30, for the nine UIM rows and the eleven RPT/SRCH rows of
+      `docs/decoded/room-surface-audit-2026-08-30.md`. **+365, and it is the largest raise this entry
+      has ever taken**, so it gets the longest argument.
+
+      ## What the 365 actually is
+
+      Almost none of it is behaviour. The whole functional change across nine audit rows is about
+      forty lines: three class strings, one gate widened from one term to three, one handler that now
+      also persists, one tab rewired to a door it already had, one `{#if}` around a footer button,
+      one `catch`, one `{const}`, and two literals replaced by props. Every other line is the WHY,
+      and this repository's standard says in as many words never to shorten those to look tidy.
+
+      Four of those WHYs are long because the row was WRONG in an instructive way and the correction
+      is the useful artefact:
+
+        * UIM-08 — the audit says `user.isP` "has no counterpart in apps/room/src". It has one, and
+          the mapping was already written down in `private-chat.svelte.ts`. Recording where, so the
+          next reader does not re-derive it.
+        * UIM-06 — the reference's Admin Notes TAB does call `manageAdminNotes()`, which a comment in
+          `admin-notes.ts` had asserted it does not. The decoded template is at the code now.
+        * UIM-13 — two comments cited a byte offset 2,123 bytes away from the function they
+          transcribed. The correction has to say what IS at the wrong address or it reads as churn.
+        * UIM-11/12 — two icon values that were making each other worse, which is one explanation and
+          not two.
+
+      ## What was extracted to pay for it, and why it is a real extraction
+
+      `AlertSendReportModal.svelte` — 164 lines — takes the whole Alert Sent Report surface out.
+      That is not a slice chosen to make a number: six of the eleven RPT rows are ONE measured
+      refusal (no table in this product records a per-recipient delivery, nothing sends an alert to
+      anyone, `getAlertReport` has no server half), and the argument for it is longer than the markup
+      it governs. An argument that long about one surface is a document. This entry's own rule for
+      that situation — written five paragraphs up, on the day the page's ceiling stopped moving — is
+      "moving an explanation to the code it explains is the extraction itself".
+
+      Without it this ceiling would be 6,969 rather than 6,868.
+
+      ## The connectivity modal is still the next extraction, and it is still not this commit's
+
+      Named above, ~250 lines, four CONN rows open against it. It stays named rather than done for
+      the same reason it was last time and one more: this commit already carries twenty audit rows,
+      two contract files, a component extraction and a SHIP-STOPPER fix (a `$state` initializer
+      reading a `$derived` declared two hundred lines below it, which made the room answer 500 on
+      every render — see `state-initializer-order-contract.test.ts`). Adding a move with live media
+      state to that is how one reviewable change becomes none.
+    */
+    max: 6869,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2866,8 +3012,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       stream, per-CHANNEL content) is the one `message-mutation-frames.ts` exists for, and the next
       person to add a field to this frame needs to meet it here rather than three files away.
     */
-    max: 1709,
-    why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
+    /*
+      1,709 -> 1,005, 2026-08-30. SEVEN HUNDRED AND FOUR LINES LEFT, which is the largest fall this
+      entry has recorded and the one this ratchet exists to make permanent.
+
+      `TODO.md` row AG: the last seventeen form actions became remote functions in one change — the
+      six session notes for `session-notes.remote.ts`, the five polls for `polls.remote.ts`, the
+      three Swing and three Day Trade mutations for `swing-alerts.remote.ts` and
+      `day-trade-alerts.remote.ts`. Four helpers went with them (`refuseSwingAlert`,
+      `refuseDayTradeAlert` and the two field readers), along with every import only they used —
+      `fail` among them, because there is no longer an action in this file that can return one.
+
+      `logout` is all that is left of `export const actions`, and this file is now a LOAD plus one
+      redirect. The `why` below says so.
+    */
+    /*
+      1,005 -> 1,003, 2026-08-30. DOWN, and by a deletion rather than a move.
+
+      The `logout` action went: `routes/logout/+page.svelte` posts a form with no `action`, so it
+      reached its own route's `default` all along, and this one could not be invoked at all. Its
+      nine lines left; a note recording where it went, and where every action converted the same day
+      went, stayed. `remote-call-sites-contract.test.ts` asserts this file exports NO actions now,
+      which is a stronger statement than the list it used to pin.
+    */
+    max: 1003,
+    why: 'the loader, plus `logout`; 3,233 before the remote-function conversions began'
   },
   /*
     THE ROOM MODULES, capped from 2026-08-16 — and the reason they are here is that the three
@@ -3130,7 +3299,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines, and `RoomNotesAccess` owning the list cost that file 56. A file at its ceiling is a file
       where the next paragraph of wiring does not belong.
     */
-    max: 83,
+    /*
+      83 -> 111, 2026-08-30, UIM-06. Twenty-eight lines, ALL of them comment, and no code changed in
+      this file at all.
+
+      What they replace is a factual claim about the reference that was false: *"clicking a tab must
+      not raise a password prompt — upstream's tab does not"*. Upstream's tab does. `J2e` at bundle
+      byte 2,059,391 gives const 56 — the Admin Notes anchor, the only one of the three with a click
+      binding — the handler `manageAdminNotes()`. The claim had never been checked against the bytes,
+      and it is the reason the notes tab in this room switched panes and did nothing else.
+
+      The correction QUOTES the old sentence rather than deleting it, which is most of the twenty-
+      eight lines. A wrong claim silently removed is a wrong claim the next reader re-derives from
+      the same plausible reasoning — and the reasoning WAS plausible: a dialog nobody asked for is
+      worse than an empty panel. The original answered that differently (it prompts only when a
+      password is configured), and saying so is what stops this being reverted.
+
+      Nothing to extract: there is no code here to move, and moving a comment out of the class it
+      describes would be the opposite of what this ratchet asks for.
+    */
+    max: 111,
     why: 'the Admin Notes feature - the door, the list, and the rule that the grant loads'
   },
   {
@@ -3601,8 +3789,82 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a card opened from the main log with main focus emits nothing and the modal keeps the last
       extra-column answer. This records it on every open, which agrees in every case except that one.
     */
-    max: 706,
+    /*
+      LEVEL AT 706, 2026-08-30, and the ceiling does not move — which is the entry worth reading,
+      because a feature landed and the number did not.
+
+      `TODO.md` row AL had measured the `deleteAlertPW` door end to end and named ONE blocker:
+      *"the client prompt costs about thirty lines in `message-actions.svelte.ts`, which is AT its
+      ceiling… The blocker is therefore an extraction, not a design question. The candidates in that
+      file are the delete branch's optimistic hide, its Q&A special case, and its confirm-copy
+      ternary."*
+
+      All three went, to `room/message-delete.ts`, and the prompt went with them. What stayed is
+      `#runOperation` — a delete is still one of six operations sharing one wire call and one refusal
+      path — plus a collaborator field, a constructor option and a six-line arm that forwards. The
+      explanation moved with the code it explains, which is the distinction this file's own header
+      draws between an extraction and a shorter comment.
+    */
+    /*
+      706 -> 708, 2026-08-30, for RPT-08's entry-point guard — and the extraction came FIRST, which
+      is the order this rule asks for rather than the number.
+
+      Upstream refuses a report on a message with no id at the entry point:
+      `openAlertSendReport(e){e?emit(…):bootbox.alert("No reports found.")}`. This file holds the
+      only call to `#openModal('report')`, so the guard belongs here and nowhere else. It is four
+      lines where there was one, plus one import.
+
+      Paid for by sending the message-sender mapping to `room/modal-target.ts`: nine lines of object
+      literal became one call, and the same commit took sixty-three lines off `user-actions.svelte.ts`
+      for the same reason. That left this file two over rather than seventeen, and those two are the
+      guard itself. A raise this size after an extraction that large is the honest record; shaving a
+      comment to land on 706 would have been the dishonest one, and this file's header forbids it.
+    */
+    max: 708,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
+  },
+  {
+    file: 'lib/room/modal-target.ts',
+    /*
+      Created 2026-08-30 and capped in the same commit, at the size it actually landed.
+
+      It is the two mappings that build a `ModalTargetUser` — one from a roster row, one from a
+      message's sender — which lived on `RoomUserActions` and `RoomMessageActions` and had already
+      drifted apart once. `entitlement-shape-contract.test.ts` records what that cost: the second
+      construction was missing all five permission fields, so every checkbox drew unchecked whatever
+      the membership said, and Save then wrote `false` for each one it was not given.
+
+      It landed at 143 with two mappings and grew to 178 in the same commit, because gathering those
+      two let `entitlement-shape-contract.test.ts` ask a question it could not ask before — does
+      either class still assemble one of these? — and the answer was a THIRD, `openManagedInfo`,
+      building its own since long before either consolidation. The old assertion had searched for
+      `nick: user.displayName`; that one writes `nick: user.nick`.
+
+      Most of this file is that history and the reason each default is the value it is. The code is
+      about sixty lines and should stay there: a FOURTH source is the thing this module exists to
+      make obvious rather than to accommodate.
+    */
+    max: 178,
+    why: 'how a roster row, a message and a managed-chat row each become the modal’s target'
+  },
+  {
+    file: 'lib/room/message-delete.ts',
+    /*
+      Created 2026-08-30 and capped in the same commit, which is the habit the component block below
+      exists to teach: a module cannot be added without saying what too big means for it.
+    */
+    max: 294,
+    why: 'what it costs to delete one row: the confirmation, the password, the hide and its undo'
+  },
+  {
+    file: 'lib/room/message-actions-port.ts',
+    /*
+      Created 2026-08-30, and it is what PAID for the row-AL door: the composition root had one line
+      of headroom and this feature needed two. Six wires left `create-room.svelte.ts` so the seventh
+      could arrive without a raise.
+    */
+    max: 65,
+    why: 'the message menu wires, so the composition root holds none of them'
   },
   {
     file: 'lib/room/feeds.svelte.ts',
@@ -3965,7 +4227,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       counterpart here; `remotePresCommand` / `mutemic` is the same act addressed to one peer — is
       NOT restated: it is written once on `muteAllNonAdmins` above, and this method points at it.
     */
-    max: 935,
+    /*
+      935 -> 892, 2026-08-30, and DOWN is the direction worth noting.
+
+      `targetFor`'s mapping, the no-selection placeholder and `openManagedInfo`'s own inline literal
+      all left for `room/modal-target.ts`, where a message's sender is built the same way. This
+      class kept a three-line `targetFor` that delegates, because that is the name every caller and
+      contract test already uses.
+
+      The number follows the code rather than being left where it was: a ceiling parked above the
+      real figure reads like a limit while licensing every line back.
+    */
+    max: 892,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -4765,7 +5038,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       session. The widening to `Caption | null` is the fix and reads like a loosening, which is why
       it says so where it is declared.
     */
-    max: 1421,
+    /*
+      1421 -> 1411, 2026-08-30, and it went DOWN while a feature went IN — which is the only shape
+      this ratchet is ever pleased by.
+
+      `TODO.md` row AL needed a SEVENTH wire on `RoomMessageActions` (`checkAlertDeletePassword`, the
+      `deleteAlertPW` door). With one line of headroom, adding its import and its option would have
+      taken this file two lines over. The instruction here is to extract rather than raise, so the
+      six wires that were already inline left for `room/message-actions-port.ts` — the shape
+      `user-notes-port.ts` and `chat-archive-port.ts` already have — and the seventh arrived inside
+      it. Six option lines and an eight-line import block became one spread and one import.
+    */
+    max: 1411,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -4836,8 +5120,39 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',
-    max: 337,
-    why: 'ONE class, two instances; 9 of its 14 declaration pairs were byte-identical before the merge'
+    /*
+      RAISED 337 -> 504 on 2026-08-30, for the trade-alert conversion — `TODO.md` row AG.
+
+      This is the largest raise in the change and it deserves the most argument. `submit` was
+      fourteen lines: a `FormData` loop, ``fetch(`?/${action}`)``, a `deserialize()` and three
+      branches that flattened every server refusal into `'Unable to save.'`. It is two lines now. The
+      167 lines are everything that replaced the parts of it that were WRONG rather than merely
+      untyped:
+
+        - `send` on the feed descriptor, with a `switch` per feed over three imported commands. The
+          endpoint is no longer assembled at runtime, and a deleted command is a build error at the
+          line that calls it rather than a 404 that surfaced as "Unable to save";
+        - `TradeAlertMutationValues`, replacing `Record<string, string | number>`. Every key is
+          named, the two id keys are separate — so a Day Trade composer cannot hand a `swingAlertID`
+          to a Swing command and have it silently ignored — and `direction` carries its union;
+        - `draftFrom` and `idFrom`, which are `swingAlertFieldsFrom` and
+          `Number(formData.get('swingAlertID'))` arriving from `+page.server.ts`. They did not
+          disappear when the actions left; they moved to the edge that now holds the values, and
+          `+page.server.ts` fell by 704 lines in the same change.
+
+      Roughly half of the growth is comment, and the two paragraphs that could not be dropped are the
+      ones a later reader would otherwise undo: why `TradeAlertMutationValues` is one optional-field
+      shape rather than a discriminated union (there is no discriminant — `Action` is a class type
+      parameter, not a per-call literal), and why a missing field is a loud throw rather than `?? ''`
+      (the old default existed so the server schema could refuse it a round trip later).
+
+      The alternative on offer was splitting the file. It was refused: `TradeAlertFeed`, the two feed
+      constants and the class are one mechanism, and the whole justification for this file existing
+      is that the two features differ ONLY in that descriptor — a split would put half the evidence
+      for that claim in another file.
+    */
+    max: 504,
+    why: 'ONE class, two instances, and the two three-command dispatches that are the only difference'
   },
   /*
     ── THE SWEEP, 2026-08-28: THIRTY-SIX COMPONENTS THAT HAD NEVER BEEN CAPPED ────────────────────

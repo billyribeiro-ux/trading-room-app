@@ -18,6 +18,26 @@ export const MESSAGE_MENU_LABEL = {
 export type MessageMenuLabel = (typeof MESSAGE_MENU_LABEL)[keyof typeof MESSAGE_MENU_LABEL];
 
 /**
+ * RPT-08 — the refusal a presenter reads when Alert Send Report is pressed on a message with no id.
+ *
+ * `openAlertSendReport(e){e?…emit("doAlertSendReportModal",e):bootbox.alert("No reports found.")}`
+ * at bundle byte 1,349,819 — the audit row cites 1,349,868, which is mid-method; its own verifier
+ * had it right. The reference refuses at the ENTRY POINT: the modal is never constructed.
+ *
+ * It lived in `AlertSendReportModal.svelte` until 2026-08-30, rendered on the `{:else}` of an
+ * `{#if targetMessage?.id}` — the refusal one step late, inside a dialog that had already opened.
+ * That was recorded as HALF of the row at the time, because the component could not reach the
+ * opener. It can now: `RoomMessageActions` holds the dialogs primitive, so the guard sits where
+ * upstream's does and the `{:else}` it replaced was DELETED rather than left as a second answer to
+ * the same question. A branch nothing can reach is the thing this repository forbids by name.
+ *
+ * Here rather than beside the guard because this file is where the reference's message-menu strings
+ * are transcribed and pinned, and a captured string with one consumer still belongs with its
+ * siblings — that is what makes the next one easy to find.
+ */
+export const NO_REPORTS_FOUND = 'No reports found.';
+
+/**
  * ── RM-08 — THE COMPACT RENDERER'S MENU IS NOT THE CARD'S MENU, in exactly three entries ───────
  *
  * `MESSAGE_MENU_LABEL` above is a LOOKUP: it matches captured DOM entries to gates, and every

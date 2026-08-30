@@ -1,5 +1,6 @@
 import { isHttpError } from '@sveltejs/kit';
 
+import { NO_REPORTS_FOUND } from '#lib/message-behavior.js';
 import { toggleReaction } from '#lib/reaction-toggle.js';
 import type {
   MessageAction,
@@ -14,6 +15,8 @@ import type { RoomChat } from './chat.svelte';
 import type { RoomComposer } from './composer.svelte';
 import type { RoomDialogs } from './dialogs.svelte';
 import type { EvidencePatch } from './feeds.svelte';
+import { RoomMessageDeletion, type AlertDeleteCheck } from './message-delete';
+import { modalTargetFromMessage } from './modal-target';
 import type { RoomToasts } from './toasts.svelte';
 
 /** The one wire command every operation here goes through. */
@@ -83,7 +86,6 @@ export class RoomMessageActions {
     reactionKey: string;
     reactionEmoji: string;
   }) => Promise<void>;
-  readonly #deleteQuestion: (payload: { questionId: number }) => Promise<void>;
   readonly #editQuestion: (payload: { questionId: number; body: string }) => Promise<void>;
   readonly #replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
   readonly #openModal: (name: Exclude<ModalName, null>) => void;
@@ -95,6 +97,18 @@ export class RoomMessageActions {
   readonly #clearUnreadQa: (id: number) => void;
   readonly #focusComposer: () => void;
   readonly #onChanged: () => Promise<void>;
+
+  /**
+   * The delete branch, which is a collaborator rather than a region — see the `action === 'delete'`
+   * arm of {@link handle} for what moved and why, and `room/message-delete.ts` for the door it
+   * brought with it.
+   *
+   * **`#deleteQuestion` HAS NO FIELD ABOVE, and that is not an omission.** It is forwarded straight
+   * from the constructor into this collaborator, which is now its only caller, so a field here would
+   * be one nothing reads. The option is still accepted, and a reader who goes looking for the wire
+   * should find it there rather than conclude it was dropped.
+   */
+  readonly #deletion: RoomMessageDeletion;
 
   /**
    * Whether the user modal currently on screen was opened from the EXTRA chat column.
@@ -143,6 +157,12 @@ export class RoomMessageActions {
     /** The caret, which belongs to the element and so stays with the page. */
     focusComposer: () => void;
     onChanged: () => Promise<void>;
+    /**
+     * The `deleteAlertPW` door, forwarded to `RoomMessageDeletion`. Beside `sendOperation` rather
+     * than inside it: it is a question about this room's CONFIGURATION, not a seventh thing
+     * `messageAction` can do. See `room/message-delete.ts`.
+     */
+    checkAlertDeletePassword: AlertDeleteCheck;
   }) {
     this.#dialogs = options.dialogs;
     this.#toasts = options.toasts;
@@ -152,7 +172,6 @@ export class RoomMessageActions {
     this.#sendOperation = options.sendOperation;
     this.#askQuestion = options.askQuestion;
     this.#reactToQuestion = options.reactToQuestion;
-    this.#deleteQuestion = options.deleteQuestion;
     this.#editQuestion = options.editQuestion;
     this.#replyMessage = options.replyMessage;
     this.#openModal = options.openModal;
@@ -164,6 +183,17 @@ export class RoomMessageActions {
     this.#clearUnreadQa = options.clearUnreadQa;
     this.#focusComposer = options.focusComposer;
     this.#onChanged = options.onChanged;
+
+    this.#deletion = new RoomMessageDeletion({
+      dialogs: options.dialogs,
+      session: options.session,
+      // The shared wire call and its one refusal path, handed over rather than copied.
+      runDelete: (kind, item) => this.#runOperation(kind, item, 'delete'),
+      deleteQuestion: options.deleteQuestion,
+      patchEvidence: options.patchEvidence,
+      onChanged: options.onChanged,
+      checkAlertDeletePassword: options.checkAlertDeletePassword
+    });
 
     this.#selectedMessage = $state<MessageActionItem | null>(null);
   }
@@ -380,10 +410,11 @@ export class RoomMessageActions {
    * is an `alert_questions` entry rendered as `kind="alert"` because that is what the reference does
    * (`this.isQAMsg = !0, this.logType = "alerts"`, bundle byte 2,334,347).
    *
-   * TWO branches read it — `delete` and `reaction` — because those are the two that WRITE, and a
-   * question is addressed by its own id rather than by `{ kind, id }`. Everything else acts on the
-   * SENDER or on the text, which is the same act from either surface, and is deliberately shared:
-   * a second dispatcher for the thread would be five copies of a rule to keep in step.
+   * TWO branches read it — `delete`, which forwards it to `RoomMessageDeletion`, and `reaction` —
+   * because those are the two that WRITE, and a question is addressed by its own id rather than by
+   * `{ kind, id }`. Everything else acts on the SENDER or on the text, which is the same act from
+   * either surface, and is deliberately shared: a second dispatcher for the thread would be five
+   * copies of a rule to keep in step.
    *
    * `mention` is NOT here. It belongs to whichever composer is on screen, and the thread's composer
    * lives inside the modal — so `AlertQaModal` handles that one itself and forwards the rest, exactly
@@ -413,16 +444,7 @@ export class RoomMessageActions {
       if (action !== 'reaction') this.#closeMessageMenu();
       this.#selectedMessage = item;
     }
-    this.#selectUser({
-      id: item.senderId,
-      nick: item.senderName,
-      emailHash: item.senderEmailHash,
-      pic: item.senderAvatarUrl,
-      status: item.senderStatus ?? 'offline',
-      ...(item.senderStatus && item.senderStatus !== 'offline'
-        ? { userXrefID: String(item.senderId), _id: String(item.senderId) }
-        : {})
-    });
+    this.#selectUser(modalTargetFromMessage(item));
 
     if (action === 'user') {
       /* RM-20 — `doUserInfoExtra`, recorded for the modal's own @Mention button. */
@@ -433,7 +455,16 @@ export class RoomMessageActions {
       this.mention(item.senderName, this.#chat.mentionTargetIsExtra(fromExtraColumn));
     }
     if (action === 'reply') this.#openModal('reply');
-    if (action === 'report') this.#openModal('report');
+    if (action === 'report') {
+      /*
+        RPT-08. Upstream refuses at the ENTRY POINT, and this is it: the only call to
+        `#openModal('report')` in the repository, so this guard is the whole guard. The argument and
+        the reference bytes are at `NO_REPORTS_FOUND` in `lib/message-behavior.ts`, beside the
+        string, rather than restated here.
+      */
+      if (item.id) this.#openModal('report');
+      else this.#dialogs.alert = NO_REPORTS_FOUND;
+    }
     if (action === 'question') {
       // `openAlertQAModal` clears the marker as it opens:
       //   e.hasOwnProperty('unreadQA') && delete e.unreadQA
@@ -466,50 +497,20 @@ export class RoomMessageActions {
     if (action === 'image' && item.targetUrl) {
       this.#openImage(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
     }
+    /*
+      DELETION LEFT THIS CLASS ON 2026-08-30, for `room/message-delete.ts` — the confirm-copy
+      ternary, the Q&A special case and the optimistic hide, which are the three candidates
+      `TODO.md` row AL named, plus the `deleteAlertPW` prompt they were blocking. That module's
+      header carries the whole argument; this dispatcher keeps `#runOperation`, because a delete is
+      still one of the six operations sharing one wire call and one refusal path.
+    */
     if (action === 'delete') {
-      const event = payload instanceof MouseEvent ? payload : undefined;
-      const deleteMessage = () => {
-        /*
-          A Q&A entry is a row in `alert_questions` and has no captured-fixture twin — `askQuestion`
-          writes a real row even when the alert it hangs off is a fixture — so there is no optimistic
-          overlay to patch and nothing to put back. The refetch is the update.
-        */
-        if (surface === 'qa') {
-          void this.#deleteQuestion({ questionId: item.id })
-            .then(() => this.#onChanged())
-            .catch((cause: unknown) => {
-              this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'That did not work.';
-            });
-          return;
-        }
-        // Captured items used to stop here, hidden in this browser's memory and nowhere else - so
-        // a presenter deleting an alert watched it vanish while every member kept being served it
-        // from the fixture on every poll, forever. The local hide stays as the optimistic update,
-        // because the server round-trip and its invalidate take a moment and the row should not
-        // linger under the cursor; the server call is what makes it stick for the room.
-        if (item.evidenceKey) this.#patchEvidence(item, { hidden: true });
-        void this.#runOperation(kind, item, 'delete').then((succeeded) => {
-          // A member may only delete what the capture attributes to them, and the server is what
-          // decides that. Put a refused item back rather than leaving it hidden for this viewer
-          // alone - that is the same one-sided disappearance this change exists to remove.
-          if (!succeeded && item.evidenceKey) this.#patchEvidence(item, { hidden: false });
-        });
-      };
-      if (event?.shiftKey) {
-        deleteMessage();
-      } else {
-        const noun = kind === 'alert' ? 'alert' : 'message';
-        this.#dialogs.confirmation = {
-          message:
-            this.#session().user.role === 'staff' || this.#session().user.role === 'admin'
-              ? `Are you sure you want to delete this ${noun} by ${item.senderName}. text: ${item.body}`
-              : `Are you sure you want to delete your message: ${item.body}`,
-          onconfirm: () => {
-            this.#dialogs.confirmation = null;
-            deleteMessage();
-          }
-        };
-      }
+      this.#deletion.request(
+        kind,
+        item,
+        payload instanceof MouseEvent ? payload : undefined,
+        surface
+      );
     }
     if (action === 'mute') {
       if (item.senderId <= 0) {
@@ -667,11 +668,12 @@ export class RoomMessageActions {
     }
     if (action === 'reaction' && payload && !(payload instanceof MouseEvent) && 'key' in payload) {
       /*
-        Same divergence as the delete above, and the same reason: a question is addressed by its own
-        id. The reference cannot do that — `manageChatReactions(this.isQAMsg ? this.qaMsgID :
-        this.msg._id, …, this.msgIndex)` sends the PARENT alert and an ORDINAL, because its thread
-        entries live inside the alert document and have no identity. An ordinal moves when a
-        neighbour is deleted; an id does not.
+        Same divergence as the delete — now in `RoomMessageDeletion.#send`, which reads `surface`
+        for exactly this — and the same reason: a question is addressed by its own id. The reference
+        cannot do that — `manageChatReactions(this.isQAMsg ? this.qaMsgID : this.msg._id, …,
+        this.msgIndex)` sends the PARENT alert and an ORDINAL, because its thread entries live
+        inside the alert document and have no identity. An ordinal moves when a neighbour is
+        deleted; an id does not.
       */
       if (surface === 'qa') {
         const reactionPayload = payload;

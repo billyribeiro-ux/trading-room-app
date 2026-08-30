@@ -3,12 +3,13 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { notes, sessions, userSettings, users, type User } from '#lib/server/db/schema.js';
-import { actions } from '../routes/+page.server';
+import { actions as logoutActions } from '../routes/logout/+page.server';
 import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
 /*
   Characterization tests for the last nine actions: the six session-note commands, plus
-  editUsername, saveTheme and logout.
+  editUsername, saveTheme and logout — the last of which is now the `/logout` route's `default`
+  rather than a `logout` action on the room page. See the note above `ActionArgs`.
 
   Lower risk than the content actions - the notes six are thin wrappers over
   `notes-repository.ts`, which `notes-repository.test.ts` already covers - so what these pin is
@@ -20,17 +21,17 @@ import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harn
   looks exactly like one that works.
 */
 
-type ActionArgs = Parameters<(typeof actions)['saveSessionNote']>[0];
+/*
+  THE LAST FORM ACTION IN THIS FILE'S SUBJECT, and it moved on 2026-08-30 — re-pointed rather than
+  deleted, which is this repository's rule about migrating a test with the code it covers.
 
-function event(user: User, fields: Record<string, string> = {}) {
-  const body = new FormData();
-  for (const [key, value] of Object.entries(fields)) body.set(key, value);
-  return {
-    request: new Request('http://localhost/', { method: 'POST', body }),
-    // Notes are per room — the actions resolve `requireRoomShortCode(locals)`.
-    locals: { user, sessionId: 'notes-account-contract', roomShortCode: '3625' }
-  } as unknown as ActionArgs;
-}
+  `+page.server.ts` had exported a `logout` action that NOTHING could invoke: `routes/logout/
+  +page.svelte` posts a form with no `action` attribute, so it reaches its own route's `default`,
+  whose body was byte-identical. Two implementations, one unreachable. The dead one was deleted, and
+  this test now exercises the one a browser actually runs — so its coverage went up rather than
+  across.
+*/
+type ActionArgs = Parameters<(typeof logoutActions)['default']>[0];
 
 function account(email: string, role: string): User {
   const existing = db.select().from(users).where(eq(users.email, email)).get();
@@ -61,13 +62,46 @@ beforeEach(() => {
   db.delete(notes).run();
 });
 
-/** Every notes action returns `{success, note}`; this narrows it for the assertions. */
-function note(result: unknown) {
-  return (result as { note: { id: number; name: string; isWelcomeMat: boolean } }).note;
-}
+/*
+  REWRITTEN, not re-pointed, when the six became remote commands on 2026-08-30.
+
+  Every assertion below still EXECUTES against the live database — `callRemote` establishes the
+  request store a command's wrapper reads, and `remote-command-harness.ts` records which fields Kit
+  needs and where each was read from. Turning these into `toContain` checks over
+  `session-notes.remote.ts` would have traded proof for string matching, which is the downgrade this
+  repository has been bitten by four times.
+
+  Four shapes changed, and each is the conversion rather than a weakening:
+
+    - a refusal REJECTS instead of returning `fail()`, so `toMatchObject({ status })` became
+      `rejects.toMatchObject({ status })`. The MESSAGE is asserted too, which it was not before: the
+      six gates carry six different sentences and *"pinned as a set"* was only ever pinning the
+      status they share;
+    - success returns the NOTE rather than `{ success: true, note }`, because `success: true` was a
+      form action's way of saying "this is not an `ActionFailure`" and a command has no such union;
+    - arguments are TYPED, so the "non-numeric id" case has to reach around the compiler to prove
+      the runtime still refuses it. That the compiler refuses it first is the improvement, and the
+      cast is how the test says so;
+    - a schema refusal is a `ValidationError` carrying `issues`, not a 400 — `expectSchemaRefusal`
+      is the one place that knows it.
+*/
+const {
+  deleteSessionNoteTab,
+  newSessionNoteTab,
+  renameSessionNoteTab,
+  restoreNoteVersion,
+  saveSessionNote,
+  setWelcomeMatNoteTab
+} = await import('../routes/session-notes.remote');
+
+/** Notes are per room — every command resolves the room from the SESSION, never from an argument. */
+const ROOM = '3625';
+
+const as = <T>(user: User, run: () => T | Promise<T>) =>
+  callRemote({ user, sessionId: 'notes-account-contract', roomShortCode: ROOM } as App.Locals, run);
 
 async function newNote(name: string) {
-  return note(await actions.newSessionNoteTab(event(presenter, { name })));
+  return as(presenter, () => newSessionNoteTab({ name }));
 }
 
 describe('the six session-note commands', () => {
@@ -77,63 +111,71 @@ describe('the six session-note commands', () => {
     Pinned as a set rather than one at a time: the cutover replaces six wrappers with calls to
     the same API, and the easy mistake is to keep one gate and drop the other five - which is
     invisible until a member opens the notes pane.
+
+    The SENTENCES are pinned as well as the status, and that is new. Six gates carrying six
+    messages is a decision — they are the reference's own phrasing — and a conversion that routed
+    all six through `presenterRoom()` would have collapsed them to *"Presenters only."* while every
+    assertion here stayed green. `notesRoom(verb)` exists because of this test.
   */
   it('refuses a member from every one of them, each with its own message', async () => {
-    // Wrapped in Promise.resolve: an action is typed MaybePromise, not Promise.
-    const attempts: [string, Promise<unknown>][] = [
+    const attempts: [string, string, Promise<unknown>][] = [
       [
         'newSessionNoteTab',
-        Promise.resolve(actions.newSessionNoteTab(event(member, { name: 'mine' })))
+        'You cannot create session notes.',
+        as(member, () => newSessionNoteTab({ name: 'mine' }))
       ],
       [
         'saveSessionNote',
-        Promise.resolve(actions.saveSessionNote(event(member, { noteId: '1', contentHtml: 'x' })))
+        'You cannot edit session notes.',
+        as(member, () => saveSessionNote({ noteId: 1, contentHtml: 'x' }))
       ],
       [
         'renameSessionNoteTab',
-        Promise.resolve(actions.renameSessionNoteTab(event(member, { noteId: '1', newName: 'x' })))
+        'You cannot rename session notes.',
+        as(member, () => renameSessionNoteTab({ noteId: 1, newName: 'x' }))
       ],
       [
         'deleteSessionNoteTab',
-        Promise.resolve(actions.deleteSessionNoteTab(event(member, { noteId: '1' })))
+        'You cannot delete session notes.',
+        as(member, () => deleteSessionNoteTab({ noteId: 1 }))
       ],
       [
         'restoreNoteVersion',
-        Promise.resolve(actions.restoreNoteVersion(event(member, { noteId: '1', versionId: '1' })))
+        'You cannot restore session notes.',
+        as(member, () => restoreNoteVersion({ noteId: 1, versionId: 1 }))
       ],
       [
         'setWelcomeMatNoteTab',
-        Promise.resolve(
-          actions.setWelcomeMatNoteTab(event(member, { noteId: '1', allRooms: 'false' }))
-        )
+        'You cannot change the welcome mat.',
+        as(member, () => setWelcomeMatNoteTab({ noteId: 1, allRooms: false, pw: '' }))
       ]
     ];
 
-    for (const [name, pending] of attempts) {
-      expect(await pending, `${name} must refuse a member`).toMatchObject({ status: 403 });
+    for (const [name, message, pending] of attempts) {
+      await expect(pending, `${name} must refuse a member`).rejects.toMatchObject({
+        status: 403,
+        body: { message }
+      });
     }
+    // The statuses alone would pass with a row already written. This is the half that matters.
+    expect(db.select().from(notes).all()).toHaveLength(0);
   });
 
   it('creates, renames, saves and deletes a note for a presenter', async () => {
     const created = await newNote('Trading plan');
     expect(created.name).toBe('Trading plan');
 
-    const renamed = note(
-      await actions.renameSessionNoteTab(
-        event(presenter, { noteId: String(created.id), newName: 'Plan B' })
-      )
+    const renamed = await as(presenter, () =>
+      renameSessionNoteTab({ noteId: created.id, newName: 'Plan B' })
     );
     expect(renamed.name).toBe('Plan B');
 
-    const saved = await actions.saveSessionNote(
-      event(presenter, { noteId: String(created.id), contentHtml: '<p>hello</p>' })
+    const saved = await as(presenter, () =>
+      saveSessionNote({ noteId: created.id, contentHtml: '<p>hello</p>' })
     );
-    expect(saved).toMatchObject({ success: true });
+    expect(saved.id).toBe(created.id);
 
-    const deleted = await actions.deleteSessionNoteTab(
-      event(presenter, { noteId: String(created.id) })
-    );
-    expect(deleted).toMatchObject({ success: true });
+    await as(presenter, () => deleteSessionNoteTab({ noteId: created.id }));
 
     // Soft delete: the row stays, `deletedAt` is set. Version history has to survive a delete.
     const row = db.select().from(notes).where(eq(notes.id, created.id)).get();
@@ -141,56 +183,69 @@ describe('the six session-note commands', () => {
   });
 
   /*
-    The repository returns null for "not found"; the action turns that into 404.
+    The repository returns null for "not found"; the command turns that into 404.
 
     That translation is the whole job of these wrappers, and it is the thing a rewrite drops -
     an API call that 404s already would be returned as a 500 or, worse, as success.
   */
   it('turns a missing note into a 404 rather than a crash or a success', async () => {
-    const missing = '999999';
-    expect(
-      await actions.saveSessionNote(event(presenter, { noteId: missing, contentHtml: 'x' }))
-    ).toMatchObject({ status: 404 });
-    expect(
-      await actions.renameSessionNoteTab(event(presenter, { noteId: missing, newName: 'x' }))
-    ).toMatchObject({ status: 404 });
-    expect(await actions.deleteSessionNoteTab(event(presenter, { noteId: missing }))).toMatchObject(
-      {
-        status: 404
-      }
-    );
-    expect(
-      await actions.setWelcomeMatNoteTab(event(presenter, { noteId: missing, allRooms: 'false' }))
-    ).toMatchObject({ status: 404 });
-    expect(
-      await actions.restoreNoteVersion(event(presenter, { noteId: missing, versionId: '1' }))
-    ).toMatchObject({ status: 404 });
+    const missing = 999999;
+    await expect(
+      as(presenter, () => saveSessionNote({ noteId: missing, contentHtml: 'x' }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      as(presenter, () => renameSessionNoteTab({ noteId: missing, newName: 'x' }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      as(presenter, () => deleteSessionNoteTab({ noteId: missing }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      as(presenter, () => setWelcomeMatNoteTab({ noteId: missing, allRooms: false, pw: '' }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      as(presenter, () => restoreNoteVersion({ noteId: missing, versionId: 1 }))
+    ).rejects.toMatchObject({ status: 404 });
   });
 
   it('rejects input the schema refuses, before touching the repository', async () => {
-    expect(await actions.newSessionNoteTab(event(presenter, { name: '' }))).toMatchObject({
-      status: 400
-    });
-    expect(
-      await actions.saveSessionNote(event(presenter, { noteId: 'abc', contentHtml: 'x' }))
-    ).toMatchObject({ status: 400 });
+    await expectSchemaRefusal(
+      as(presenter, () => newSessionNoteTab({ name: '' })),
+      'empty name'
+    );
+    /*
+      `'abc'` reached the old action as text and became `NaN` through `Number(formData.get(…))`.
+      There is no coercion step now, so the compiler refuses it first — which is the improvement —
+      and the cast is how this test proves the RUNTIME refuses it too.
+    */
+    await expectSchemaRefusal(
+      as(presenter, () =>
+        saveSessionNote({ noteId: 'abc', contentHtml: 'x' } as unknown as {
+          noteId: number;
+          contentHtml: string;
+        })
+      ),
+      'noteId=abc'
+    );
+    /* Tighter than `Number.isInteger`, which admitted both and matched no row. */
+    for (const bad of [0, -1]) {
+      await expectSchemaRefusal(
+        as(presenter, () => deleteSessionNoteTab({ noteId: bad })),
+        `noteId=${bad}`
+      );
+    }
     expect(db.select().from(notes).all()).toHaveLength(0);
   });
 
   /*
     The welcome mat is EXCLUSIVE, and that is enforced in the repository's transaction: it clears
-    the flag on every live note before setting it on the target. Nothing in the action says so.
+    the flag on every live note before setting it on the target. Nothing in the command says so.
   */
   it('moves the welcome mat rather than adding a second one', async () => {
     const first = await newNote('First');
     const second = await newNote('Second');
 
-    await actions.setWelcomeMatNoteTab(
-      event(presenter, { noteId: String(first.id), allRooms: 'false' })
-    );
-    await actions.setWelcomeMatNoteTab(
-      event(presenter, { noteId: String(second.id), allRooms: 'false' })
-    );
+    await as(presenter, () => setWelcomeMatNoteTab({ noteId: first.id, allRooms: false, pw: '' }));
+    await as(presenter, () => setWelcomeMatNoteTab({ noteId: second.id, allRooms: false, pw: '' }));
 
     const flagged = db
       .select()
@@ -198,6 +253,36 @@ describe('the six session-note commands', () => {
       .all()
       .filter((row) => row.isWelcomeMat);
     expect(flagged.map((row) => row.id)).toEqual([second.id]);
+  });
+
+  /*
+    THE ROOM PREDICATE, proven by a note the caller must not reach.
+
+    A presenter of room A holds a real presenter session. The only thing between them and room B's
+    notes is that every one of these commands takes the room from `locals` and hands it to the
+    repository, whose own WHERE clause pairs it with the id. Take the room from an argument instead
+    — which is what a `roomShortCode` on any of these payloads would be — and this is the test that
+    goes red.
+  */
+  it('cannot rename, save or delete a note belonging to another room', async () => {
+    const elsewhere = await callRemote(
+      { user: presenter, sessionId: 'notes-account-contract', roomShortCode: '9140' } as App.Locals,
+      () => newSessionNoteTab({ name: 'Theirs' })
+    );
+
+    await expect(
+      as(presenter, () => renameSessionNoteTab({ noteId: elsewhere.id, newName: 'Mine now' }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      as(presenter, () => saveSessionNote({ noteId: elsewhere.id, contentHtml: '<p>x</p>' }))
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      as(presenter, () => deleteSessionNoteTab({ noteId: elsewhere.id }))
+    ).rejects.toMatchObject({ status: 404 });
+
+    const row = db.select().from(notes).where(eq(notes.id, elsewhere.id)).get();
+    expect(row?.name).toBe('Theirs');
+    expect(row?.deletedAt).toBeNull();
   });
 });
 
@@ -388,7 +473,7 @@ describe('logout', () => {
     // `redirect()` throws; that IS the mechanism, so the assertion has to catch it.
     let thrown: unknown = null;
     try {
-      await actions.logout(args);
+      await logoutActions.default(args);
     } catch (error) {
       thrown = error;
     }

@@ -33,6 +33,288 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
+
+**Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
+PR #163's lineage, above all the ModalHost TDZ fix, which is what returns `main`'s `room end-to-end`
+job to green after six consecutive red runs (the merges of #157 through #162).
+
+Two findings, both measured rather than assumed:
+
+1. **No Actions run existed for any head of `claude/repo-audit-implementation-e3oiu8` after
+   `db25d1f`.** `GET /actions/runs?head_sha=1ec23c4…` returns `total_count: 0`, and the checks on
+   the later heads show only Vercel. `db25d1f` is the head that merged as #162 and FAILED — so every
+   commit after it, including the fix for that very failure, sat unverified. Why the `pull_request`
+   events stopped producing runs was not established; what mattered was getting the gate onto the
+   fix. Dispatched by hand (`workflow_dispatch` on `quality.yml`, run 33338242697): green on
+   `1ec23c4`, `room end-to-end` included.
+
+2. **GitHub reported the PR CONFLICTING/DIRTY across three successive heads while every local merge
+   was clean.** merge-ort of each head (`1ec23c4`, `448e840`, `e3bd8b1`) with `origin/main`
+   completes without conflict — for `1ec23c4` the result is byte-identical to the head's own tree,
+   because main's tip `c126f54` is the merge of `db25d1f`, an ancestor of this branch. The
+   repository has no `.gitattributes` merge drivers that could make local and server-side merges
+   disagree. This false DIRTY is also the plain reading of why the branch kept accruing commits
+   instead of merging the way #157–#162 did.
+
+The remedy is structural rather than computed: a merge commit giving the head `origin/main` as a
+parent, pushed to `merge/pr163-into-main` and merged through its own PR so the `pull_request` gate
+runs BEFORE the tree reaches `main`, per convention 2 above. Pushing to PR #163's own branch was
+tried first and rejected twice — an active claude.ai session was still committing to it, and its
+later commits simply remain PR #163's diff. Verified on the exact merged tree locally before
+pushing: svelte-check across 1,491 files with 0 errors and 0 warnings; the six contract tests the
+two newest commits shipped, 618 passing; the room e2e suite 11/11 in 21.6s — among them the four
+tests red on `main` since #157.
+
+### 2026-08-30 22:50 UTC — `NEW-TODO.md` was scheduling five commands that were already built
+
+**Runtime impact: NO.** One tracker corrected and one new assertion. No `src` module changed.
+
+`NEW-TODO.md`'s suggested order ended with a paragraph pointing at the remaining work, in these
+words: *"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the archives pair (`archiveLogs` /
+`unarchiveLogs`) are the largest clusters left."*
+
+**All five are built.** `kicks.ts`, `chat-mute.ts` — whose docblock quotes the reference's own
+`subscribe("unmuteChat", …)` — and `chat-archive-port.ts`, which wires `archiveChatLog` and
+`unarchiveChatLogCommand`. Checked by reading the modules, not by trusting a second document.
+
+**And the document that WAS right had been right all along.** `missing-commands-triage.md` records
+the measured tally — **0 still NOT BUILT**, 14 built, 7 built under another name, 4 blocked with the
+blocker named — and `missing-command-census-contract.test.ts` recomputes it on every run and fails on
+a disagreement in either direction. It could not have drifted. The summary of it could, and did: the
+triage was carrying the truth while the file a reader reaches first went on scheduling the work.
+
+That is this repository's most-repeated failure — *two places recording one thing is how one of them
+goes stale* — and the stale one is always the summary. So the correction did two things rather than
+one:
+
+- The paragraph now POINTS at the triage and says why it must never restate its state.
+- **The numbers it does quote are now enforced.** `missing-command-census-contract.test.ts` gained an
+  assertion that recomputes the tally from the triage's own rows and requires `NEW-TODO.md` to carry
+  exactly those figures. Deliberately a check of the NUMBERS rather than the prose around them: a
+  test that pattern-matched sentences would fail on a rewording and pass on a wrong figure, which is
+  backwards. It carries a vacuity floor too — a `NEW-TODO` that stopped mentioning the triage at all
+  would otherwise satisfy every line of it.
+
+Writing that assertion was itself the point. The first draft of this correction quoted the tally in
+prose, which is precisely the duplication the correction was about; the fix was not to delete the
+numbers but to make them a restatement that cannot drift.
+
+**The five that genuinely remain are BLOCKED, not pending**, and the paragraph now says so.
+`getMyRepeater`, `resetAudioBridge`, `resetAllMediaServers`, `resetMediaServer` and
+`resetAudioBridgeOnServer` are the SaaS operator's toolkit; the owner answered the product question
+about them on 2026-08-15. What is missing is **reach** — ours work inside one room, the operator need
+is to invoke them for a tenant's room from a central console — and four of the five reset a media
+plane this deployment does not have, the same `STREAM_SERVER_MTX` host that blocks `TODO.md` rows AD,
+X and R. Five controls that reset servers which are not there is the dead scaffolding the standard
+forbids by name.
+
+**Negative controls — two, both directions of the new assertion:**
+
+| mutation | result |
+| --- | --- |
+| `NEW-TODO`'s "14 built" changed to "13 built" | RED, with the message naming which document to correct |
+| a triage row's status changed `BUILT` → `BLOCKED` | RED in **four** places, the new assertion among them — the triage's own guards fire alongside it |
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,454 passed,
+1 skipped, gate-exit=0**.
+
+### 2026-08-30 22:30 UTC — Two implementations of signing out, one of which could not be invoked
+
+**Runtime impact: NO.** The path a browser takes is unchanged; the one it could not take is gone.
+
+Row AN, found by the form-action conversion earlier today and closed here. `+page.server.ts`
+exported a `logout` action, and **nothing posted to it**: `routes/logout/+page.svelte` submits
+`<form method="POST">` with no `action` attribute, so it reaches its OWN route, and
+`routes/logout/+page.server.ts` carries a `default` action whose body was byte-identical — the same
+`logout(cookies)`, the same two `locals` clears, the same `redirectSignedOut()`. A sweep of `src/`
+for `?/logout` in any quote style found nothing.
+
+The argument for keeping it was sound and did not apply. It was left alone during the conversion
+because a progressive-enhancement form POST is not a JS dispatcher, and turning a control that must
+work without JavaScript into a command that needs it would be a regression. True — but that property
+belongs to the form, and the form was never pointing here. It still posts to a real form action;
+just the one it was always reaching.
+
+**Three things followed, and the second is the one worth reading:**
+
+- `logout` was the file's last action, so the whole `export const actions` went with it. Its
+  contents were a long record of where each converted action had gone, and that record was kept —
+  moved out to a module-level block rather than deleted with the export it happened to live inside.
+  A reader who greps this file for a name they remember should find out where it lives.
+- **`notes-account-action-contract.test.ts` was re-pointed, not dropped.** It proves three real
+  things about signing out — the session row deleted server-side so a copied cookie is dead rather
+  than merely un-sent, `locals` cleared because `handle()` will not run again before the redirect's
+  load, and the 303 — and it was proving them against the implementation nobody could invoke. It now
+  runs against the one a browser actually takes, so deleting dead code raised this test's coverage
+  instead of lowering it. That is the repository's own rule about migrating a test with its code.
+- `remote-call-sites-contract.test.ts` asserted `exported).toEqual(['logout'])`. It asserts
+  `toEqual([])` now, plus that the `export const actions` string is absent — a stronger statement
+  than any list, because the empty set has nothing left to argue about.
+
+**`logout` and `redirectSignedOut` are still imported** by `+page.server.ts`, and that is not
+left-over: the load itself signs a banned or shut-out member out before redirecting. That is a load,
+not an action, and the note at the foot of the file says so.
+
+**Ceiling:** `routes/+page.server.ts` 1,005 → **1,003**. Down, by a deletion rather than a move.
+
+**Negative controls — two, each mutation verified as landed, each seen RED, each restored:**
+
+| mutation | result |
+| --- | --- |
+| the `logout` action re-added | `expected [ 'logout' ] to deeply equal []` |
+| `routes/logout/+page.svelte`'s form pointed at `?/logout` | `something posts to '?/logout', which no longer exists — that form reaches nothing: expected [ 'routes/logout/+page.svelte' ] to deeply equal []` |
+
+The first control also exposed a stale test NAME — *"the page exports exactly one action"* — which
+was renamed rather than left describing the world before the change.
+
+**Two `TODO.md` rows removed, not struck through:**
+
+- **AN**, closed by this change.
+- **E**, which had read `DONE 2026-08-29` for a day while still sitting in the open table. Verified
+  before deleting rather than taken on its own word: `e2e/room-config-seam.spec.ts` exists, asserts
+  `.alert-chat-box` at count 1 for a default room and count 0 for one whose owner hid the column,
+  and **ran in this session's own browser run** — 2 tests of the 11 that passed.
+
+**Two other contracts had to be re-anchored, and that is the interesting failure of the change.**
+`chat-mode-contract` and `recording-state-remote-contract` each assert that the form action they
+replaced is gone from `+page.server.ts`, and each guarded that negative with a positive first:
+`expect(serverCode).toContain('export const actions: Actions = {')` — present-tense proof that this
+string really is the file where actions live, so `not.toContain('changeChatMode: async')` cannot
+pass by reading the wrong file. Deleting the export broke both, correctly and loudly.
+
+An anchor naming a construct that no longer exists is worse than no anchor, because the tempting fix
+is to delete the line and leave two negative assertions reading whatever they like. Both now anchor
+on `export const load` — which is what the file does export — plus the stronger fact the deletion
+bought: **no form actions here at all**, so neither action can come back under any name. Negative
+control: the export re-added → both RED on the new assertion.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,453 passed,
+1 skipped, gate-exit=0**. **Not run:** the controller gate, which no file here touches.
+
+### 2026-08-30 22:05 UTC — The size ratchet asked for a slice, and the slice found a third defect
+
+**Runtime impact: NO by itself** — one pure module, two classes delegating to it, no behaviour
+changed. It is recorded separately from the two rows above because what it FOUND is not a
+refactoring note.
+
+Closing UIM-09 and RPT-08 pushed two files past their ceilings, and both had exactly **one line of
+headroom**: `message-actions.svelte.ts` 705 against 706, `user-actions.svelte.ts` 934 against 935.
+`source-size-contract.test.ts` says what to do about that in its own failure message — *"Ceilings
+here only go DOWN: extract a slice into a module or component rather than raising this number"* —
+and row AL had already followed exactly that instruction in the same file the day before.
+
+**The slice was `room/modal-target.ts`: how a `ModalTargetUser` gets built.** Two mappings lived on
+two different classes — a roster row on `RoomUserActions.targetFor`, a message's sender as an inline
+literal in `RoomMessageActions` — plus the no-selection placeholder. All three moved. Both mappings
+are pure now: a row in, an object out, no room state, no session, no wire, readable and testable
+without constructing a class and its collaborators.
+
+**Then the contract that guards this subject found a third one.** `entitlement-shape-contract.test.ts`
+exists because these two mappings drifted once before, and the second was missing all five permission
+fields — every checkbox drew unchecked whatever the membership said, and Save then wrote `false` for
+each key it was not given. Gathering the first two let that test ask a question it could not ask
+while they were apart: *does either class still assemble one of these?* It does:
+
+```
+AssertionError: user-actions.svelte.ts assembles a modal target itself
+  — call the builder in room/modal-target.ts: expected 1 to be +0
+```
+
+`openManagedInfo` — the muted and followed lists — had been building its own `ModalTargetUser` since
+before either of the other two were consolidated, and **nothing had ever searched for it**, because
+the old assertion counted `nick: user.displayName` and this one writes `nick: user.nick`. It is now
+`modalTargetFromManagedUser`, beside its two siblings, with the two things it decides rather than
+carries written down: `status: 'online'` is sound because `openManagedInfo` refuses before reaching
+it when `userXrefID` or `_id` is missing, which is exactly what a logged-out row lacks.
+
+That is the argument for extracting rather than raising, made better than any argument I could have
+written for it: the ceiling did not just cost me a comment, it surfaced a latent defect of the same
+class the module's own contract was written for.
+
+**Ceilings, all three intended and no others:**
+
+| file | was | is | why |
+| --- | --- | --- | --- |
+| `lib/room/user-actions.svelte.ts` | 935 | **892** | DOWN. The number follows the code rather than being parked above it |
+| `lib/room/modal-target.ts` | — | **178** | new, capped in the commit that created it |
+| `lib/room/message-actions.svelte.ts` | 706 | **708** | UP by two, and the extraction came first — those two lines ARE the RPT-08 guard |
+
+**A mistake worth recording, because it was silent.** Two of my ceiling edits used unbounded
+replacements — a `sed` on `max: 142,` and a Python `str.replace` on `max: 895,` — and each hit every
+entry that happened to carry that number. Three ceilings I had no business touching moved:
+`EmojiPicker.svelte`, `ChatSearchBar.svelte` and `refresh.svelte.ts`. **The suite stayed green
+through all of it**, because loosening a ceiling by one line breaks nothing — a ratchet only fails
+when a file grows. Caught by diffing every `max:` line against `HEAD` rather than by any test, and
+all three are restored to their `HEAD` values. The general lesson: a ratchet cannot detect its own
+loosening, so a diff of the ratchet itself is part of reading the change.
+
+**Negative control:** the message-side construction re-inlined → both new assertions RED, each
+naming the file and the remedy (`message-actions.svelte.ts assembles a modal target itself`, and the
+delegation assertion). Restored.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,437 passed,
+1 skipped, gate-exit=0**.
+
+### 2026-08-30 21:40 UTC — The last two audit rows: a badge that could never light, and a refusal that arrived after the thing it refused
+
+**Runtime impact: YES, twice.** A presenter now sees the Trial badge on a free-trial member's card,
+and pressing Alert Send Report on a message with no id raises the reference's own refusal instead of
+opening a report about nothing.
+
+Both rows were closed as `BLOCKED` earlier the same day, each on a change in a file another agent
+held open. Both files are free now, so neither stays blocked. This is what closes
+`room-surface-audit-2026-08-30.md` at **0 open · 224 closed**.
+
+**UIM-09 — the Trial badge had markup, a gate, and no supply.** `ModalHost.svelte:2771` has read
+`{#if isPresenter && targetUser.isTrial}` for as long as the badge has existed, and nothing ever set
+`isTrial`. So it was `undefined` for every member in every room: a control whose only reachable state
+was "off", which from the outside is indistinguishable from a control nobody built. That is why the
+audit row read as a missing feature.
+
+The supply was already on the wire. `room_members.is_trial` reaches this room as `isFT` on the
+`/roster/` frame (`sess/[room]/events/+server.ts:202`), on every roster row; only the rename at the
+boundary was absent. `RoomUserActions.targetFor` sets `isTrial: user.isFT ?? false` now, and
+`isFT?: boolean` joined the class's `User` constraint beside the five permission flags — so it was
+two lines, not the one the row predicted, and the row is corrected to say so.
+
+The other ten fields in that row stay unsupplied and are recorded refusals rather than oversights:
+`location` and `ip` are deliberately filtered off the roster wire after a real 2026-08-18 privacy
+defect, four more are per-session facts this product's server never learns, and `years` has no
+producer anywhere. A default on any of those would have made a measured refusal look like an
+oversight, which is the reason `?? false` is pinned by its own assertion here and nowhere else.
+
+**RPT-08 — the refusal was in the right words and the wrong place.** Upstream:
+`openAlertSendReport(e){ e ? emit("doAlertSendReportModal", e) : bootbox.alert("No reports found.") }`
+at bundle byte 1,349,819. It refuses at the ENTRY POINT and the modal is never constructed.
+
+Ours carried the string verbatim but rendered it on the `{:else}` of an `{#if targetMessage?.id}`
+*inside* the modal — the dialog opened, and then told you there was nothing in it. That was recorded
+as half of the row at the time, honestly, because the change that carried the string could not edit
+the opener.
+
+`RoomMessageActions` is the one opener — this file holds the only call to `#openModal('report')`, and
+`ModalHost.svelte:5878` renders on `name === 'report'` — so the guard there is the whole guard. Two
+decisions came with it, and both are the kind that get quietly undone later:
+
+- **The component's `{:else}` was deleted, not left.** With the entry point refusing, an id-less
+  message cannot construct the modal, so that branch was unreachable — which this repository forbids
+  by name — and it would have become the answer again the moment anyone removed the guard.
+- **The string moved to `lib/message-behavior.ts`**, where the reference's other message-menu
+  transcriptions are pinned, rather than following its consumer into the dispatcher.
+
+**Negative controls — four, each mutation verified as landed, each seen RED, each restored:**
+
+| assertion | mutation | result |
+| --- | --- | --- |
+| `isTrial` is supplied | the assignment deleted | `expected undefined to be true` and `expected undefined to be false` — the defect's own state |
+| `?? false` is load-bearing | `user.isFT ?? false` → `user.isFT` | exactly ONE test red, the one written for it: the two assertions are independent |
+| the guard is at the entry point | guard removed, modal always opens | `expected … to contain "if (item.id) this.#openModal('report');"` |
+| no second answer in the component | the `{:else}` restored | `the unreachable gate is gone: expected … not to contain '{#if targetMessage?.id}'` |
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log. **Not run:** the controller gate,
+which no file here touches.
+
 ### 2026-08-30 21:02 UTC — Three contract tests were failing for being busy, not for being wrong
 
 **Runtime impact: NO. Three test files and nothing else — no `src/lib` module, route or component
@@ -101,6 +383,402 @@ no longer runs.
 `260 files, 4,328 passed, 1 skipped, gate-exit=0`. Per-test timings above are from
 `vitest --reporter=verbose` on an unloaded box. **Not run:** the controller gate, which no file here
 touches, and the browser suite.
+
+### 2026-08-30 20:48 UTC — The last seventeen form actions become remote functions, and `+page.server.ts` loses 704 lines
+
+**Runtime impact: YES.** Every mutation in the room is now a remote function. Polls, session notes
+and both trade-alert feeds reach the server through imported symbols instead of an endpoint string
+assembled at runtime, and three refusals that a presenter never saw now reach them.
+
+`TODO.md` row AG, removed rather than struck through. The row's own principle is that a
+hand-maintained number drifts, so the counts were re-measured from the code first: **eighteen**
+actions in `export const actions`, of which seventeen were reached from JavaScript and one —
+`logout` — was not. Three dispatchers, all confirmed:
+
+| dispatcher | actions |
+| --- | --- |
+| `RoomModals.submitPollAction` | `savePoll`, `deleteSavedPoll`, `sendPoll`, `sendPollAnswer`, `pollDone` |
+| `RoomNotes.submitMutation` | the six session-note commands |
+| `RoomTradeAlerts.submit`, instantiated twice | the three Swing and three Day Trade mutations |
+
+**Seventeen of seventeen converted**, into five modules split on the GATE:
+`routes/polls.remote.ts`, `routes/session-notes.remote.ts`, `routes/swing-alerts.remote.ts`,
+`routes/day-trade-alerts.remote.ts`, plus `lib/poll-command.ts` for the schemas a `.remote.ts` file
+cannot export.
+
+#### Why this was the worst form of the defect and not a lesser one
+
+A literal `'?/savePoll'` is at least greppable. These built their endpoint from a union type while
+the page ran, so nothing — not the compiler, not a search, not the build — connected a call site to
+the action it reached. `remote-call-sites-contract.test.ts` opens with what that costs:
+`presenterCommand`'s action was deleted on 2026-08-15 while `ModalHost.svelte` went on posting to it,
+and a presenter revoking a member's microphone did nothing for three commits with every gate green.
+That test's dispatcher ratchet now reads **zero**, and its `it.each` over the unions is gone with the
+unions rather than left as an `it.each([])`, which is a suite that reports green while asserting
+nothing.
+
+#### Three things that are fixes rather than moves
+
+1. **`sendPollAnswer`'s range check and `savePoll`'s bounds.** The question and every choice were
+   stored exactly as posted with no length check of any kind — an unbounded write on an endpoint any
+   presenter session can reach. `#lib/poll-command.ts` records the caps and why they sit far above
+   anything the composer can produce. `pollId` also became `z.number().int().positive()`, where
+   `Number.isInteger` admitted `0` and negatives and let them match no row and report success.
+2. **The trade-alert refusals stopped being flattened.** `RoomTradeAlerts.submit` caught every
+   failure shape and re-raised `'Unable to save.'`. A command rejects with its own `error(…)`, so
+   *"That swing alert was not found."*, *"Swing Trade Alerts are not enabled for this room."* and the
+   429 now reach the pane's `catch` intact.
+3. **A refused poll no longer reports success silently.** `submitPollAction` answered `false` and
+   discarded the response, so a presenter whose poll was refused saw nothing anywhere;
+   `RoomModals.#mutate` logs the cause before answering `false`, which is what stops `PollPanel`
+   raising *"Poll Saved to Pre-Canned polls..."* over a refusal.
+
+#### Where the work stopped, and why
+
+The final step for notes and trade alerts — replacing `submitMutation(action, values)` and
+`submit(action, values)` with per-command named methods at their call sites — is **not done**. Those
+six call sites are prop callbacks inside `lib/components/PresentationArea.svelte`, which another
+agent owned concurrently. What was done instead is the half that closes the defect: both dispatchers
+dispatch over IMPORTED COMMANDS, so deleting one is a build error at the line that calls it. `RoomModals`
+did get the full treatment — five named methods — because its call sites are in `RoomOverlays.svelte`.
+
+The typing improved on the way through even where the shape survived: `RoomNotes` carries a
+discriminated union of six `{action, values}` pairs and types each payload against its own command at
+five of the six call sites, and `RoomTradeAlerts` replaced `Record<string, string | number>` with a
+named field set in which the two id keys are separate — so a Day Trade composer can no longer hand a
+`swingAlertID` to a Swing command and have it silently ignored.
+
+#### The tests were REWRITTEN onto `callRemote`, not re-pointed as text
+
+Six files, and re-pointing any of them would have been one character of work that proved strictly
+less. `swing-alerts-contract.test.ts` and `day-trade-alerts-contract.test.ts` asserted that
+`+page.server.ts` contained ``\n  ${command}: async ({ request, locals }) => {``; those now CALL the
+three commands against a live database, with the controller stubbed at the module boundary the way
+`scheduled-alert-contract.test.ts` stubs it. `note-update-broadcast-contract.test.ts` read the source
+for the `updatedSessionNote` publish; it now subscribes to the room and asserts on the frame that
+arrived — which is the only thing that can tell a live publish from the dead one this repository has
+already shipped once. `welcome-mat-all-rooms-contract.test.ts` compared two `indexOf` offsets to
+prove the password reaches the controller before anything is written; it now asserts the row is
+untouched after a wrong password and after an unreachable controller.
+
+Four assertions were added that no earlier version could make, all of them room-scope: a saved poll
+in another room survives a delete, a poll in another room survives `pollDone` by a presenter who
+holds both, a member cannot vote into another room's poll, and a note in another room cannot be
+renamed, saved or deleted.
+
+#### Negative controls, each seen RED and restored
+
+1. `savePoll`'s `presenterRoom()` replaced with `requireRoomShortCode(locals)` — *"promise resolved
+   'undefined' instead of rejecting"*, 1 failed / 19 passed. The presenter gate is real.
+2. `savePoll` renamed to `savePollRenamed` — `remote-call-sites-contract.test.ts` went red on BOTH
+   halves at once: the orphan direction (`routes/polls.remote.ts#savePollRenamed`) and the dangling
+   direction (`lib/room/modals.svelte.ts -> ../../routes/polls.remote#savePoll`).
+3. The `consumeRateLimit` call removed from `postSwingAlert` — *"the create is not rate limited at
+   all"*. This is the omission that shipped once on the Swing action and was found by re-reading a
+   diff rather than by a test; it is a behavioural test on both feeds now.
+4. `contentHtml` added to the `updatedSessionNote` frame — two failures, one of them the key-set
+   assertion, which is why that test pins the KEYS rather than listing forbidden names.
+
+#### Ceilings
+
+`routes/+page.server.ts` **1,709 → 1,005**, the largest fall this entry has recorded: the actions,
+four helpers (`refuseSwingAlert`, `refuseDayTradeAlert` and the two field readers) and every import
+only they used, `fail` included. The file is now a load plus one redirect.
+
+Three raises, each argued at the entry rather than absorbed: `lib/room/modals.svelte.ts` 242 → 307,
+`lib/room/notes.svelte.ts` 219 → 311, `lib/room/trade-alerts.svelte.ts` 337 → 504. The standing rule
+is that a ceiling only goes down and a raise is a conversation; these were made without one and are
+flagged as such. The alternative on offer in each case was deleting the paragraphs that explain a
+decision the next reader would otherwise undo, and `CLAUDE.md` names that directly.
+
+#### A finding, recorded as `TODO.md` row AN rather than acted on
+
+`+page.server.ts`'s surviving `logout` action **has no caller.** `src/routes/logout/+page.svelte`
+posts `<form method="POST">` with no `action` attribute, so it reaches its own route's `default`,
+whose body is byte-identical. No `?/logout` appears anywhere in `src/`. Two implementations of
+signing out, one unreachable. It was in scope to leave alone and is left alone;
+`remote-call-sites-contract.test.ts` now asserts both halves so the row cannot go stale.
+
+**Verified:** `pnpm run gate` in `apps/room` — see the run recorded below. `svelte-autofixer` clean on
+`modals.svelte.ts`, `notes.svelte.ts` and `trade-alerts.svelte.ts`; on `RoomOverlays.svelte` it
+reports only pre-existing findings (an empty `<h5>` from the capture, the `$effect`-calls-a-function
+suggestion on the four toast effects, and one of the two suggestions `apps/room/AGENTS.md` records as
+declined). None is in the six lines this change touched there.
+
+**Not verified:** nothing was exercised in a browser. `apps/controller` was not touched and its gate
+was not run.
+### 2026-08-30 20:45 UTC — Twenty-four audit rows on two ModalHost surfaces, and a ship-stopper that made the room answer 500
+
+**Runtime impact: YES**, and the largest part of it was not an audit row at all.
+
+#### THE SHIP-STOPPER, first, because it was live on the branch
+
+`ModalHost.svelte` seeded `activeConnectivityTab` with a `$state(…)` initializer that read
+`isPresenter` — a `$derived` declared **two hundred lines below it**. A `$state` initializer is
+evaluated eagerly at component init, so that read happened inside the binding's temporal dead zone
+and threw `ReferenceError: Cannot access 'isPresenter' before initialization`. Thrown during SSR it
+took the whole page: **the room answered 500 on every render**, not one broken modal.
+
+`untrack` was not a defence and reading it as one is the trap — it stops a read being registered as
+a dependency, it does not delay the read.
+
+Fixed by hoisting the declaration to immediately after the `$props()` destructure, where its only
+dependency (`currentUser`) already is. The alternative — seeding to the non-presenter default and
+correcting from a one-shot `$effect` — would have flashed the wrong tab for a frame, which is a
+declaration-order problem answered with a visible flicker.
+
+**`svelte-check`, eslint and the whole unit suite were GREEN on it.** They have to be: TypeScript
+models a Svelte `<script>` as a module body, and a unit test mounts a component whose initialisation
+has already succeeded. Only a browser saw it. Playwright, `apps/room`: **3 passed / 4 failed / 4 did
+not run** before, **11 passed / 0 failed** after.
+
+**This is the second instance of this exact class** — the `createRoom` one from 2026-08-28 answered
+500 for eleven days — so it becomes a gate rather than a fix.
+`src/lib/state-initializer-order-contract.test.ts` reads every `.svelte` file, finds every
+`$state(…)` initializer, and fails if one names a `const`/`let`/`function`/`class` declared later at
+the same script's top level. Its first draft produced three false positives (object keys, an arrow's
+own parameter, a `const` inside another function's body); all three exclusions and the lesson from
+each are written at the code, and the checker carries its own inline control both ways.
+
+#### The audit rows — `## ModalHost: user-info / moderation modal` and `## ModalHost: report / advanced-search modal`
+
+Twenty-four rows closed against `docs/decoded/room-surface-audit-2026-08-30.md`. Every reference
+offset was re-read with python from the pinned bundle (2,891,205 bytes, SHA-256
+`40796ca8…bab87524`, checked against `sha256sums.txt`), and every const was decoded by WALKING the
+component's `consts:[…]` table rather than by looking up the index a row cited. **Four rows cited an
+offset that lands inside a function rather than at its head** — `J2e`, `xMe`, `ZMe` and
+`openAlertSendReport` — and one row's own premise was wrong.
+
+BUILT: UIM-04 (Private Chat takes `canPM`; resolved in `RoomOverlays` from the existing
+`canShowRosterPrivateChat`, so one rule now has two callers where the reference has two copies),
+UIM-05 (follow-chat Reset persists, as `resetFollowChatStyle` does), UIM-06 (the Admin Notes tab
+raises the password door), UIM-08 (the stars gate takes all three terms), UIM-10 (the Trial/New
+badge class lists), UIM-11 and UIM-12 (two icons that were making each other worse), SRCH-02 (a
+failed search is no longer indistinguishable from an empty one).
+
+FIXED: UIM-13 (two comments cited byte 2,075,481 for `giveMicScreen`, which is at 2,077,604 —
+`resetFollowChatStyle` is what is actually there), RPT-02 (a hard-coded 500 ms spinner in front of a
+permanently empty list, ending on `No Reports.`; a presenter read that as "this alert reached
+nobody").
+
+HALF BUILT: UIM-16 (the `fw-bold` half; the gravatar half stays refuted), RPT-08 (the reference's
+refusal string, but inside the dialog rather than instead of it — the entry-point guard is one line
+in `message-actions.svelte.ts`), SRCH-03 (the multi-room divergence stays; the INVENTED
+`'mastering-the-trade'` key and label, which occur nowhere in the bundle, are `data.room` now).
+
+ALREADY BUILT: UIM-01, UIM-03, UIM-07. MEASURED REFUSAL: RPT-01, RPT-03, RPT-04, RPT-05, RPT-06,
+RPT-07. DELIBERATE DIVERGENCE: SRCH-05. BLOCKED: UIM-09.
+
+#### The report modal is a refusal, and the refusal is gated
+
+Six RPT rows rest on one thing: a per-recipient delivery record. This product has none. 24 tables
+across `services/api/migrations/**` and not one records a delivery; `alerts.dispatch` is five
+booleans naming which channels were REQUESTED; `apps/room/src/lib/server` has no mail transport at
+all and the controller's has no alert caller; `getAlertReport` has no server half anywhere in
+`apps/`. The modal now says what is missing instead of spinning and then lying.
+
+**`alert-report-modal-contract.test.ts` gates the PREMISE**, not the absence: it reads every
+migration and fails if a delivery record appears — by the columns one must hold, not by a table name
+somebody might not reuse. If that goes red the six rows are live again, which is the intended
+behaviour. A refusal whose premise has expired is worse than an unbuilt feature, because it looks
+decided.
+
+#### Sizes
+
+`AlertSendReportModal.svelte` extracted (164 lines) — not to make a number, but because that refusal
+is longer than the markup it governs and an argument that long about one surface is a document. Four
+ceilings raised with recorded arguments: `ModalHost.svelte` 6,482 → 6,848 (the largest raise that
+entry has taken; the argument is at the entry), `RoomOverlays.svelte` 1,056 → 1,081,
+`FollowChatStylePane.svelte` 152 → 171, `admin-notes.ts` 83 → 111 (twenty-eight lines, all comment,
+no code — the file had asserted the OPPOSITE of what the bundle says about the notes tab).
+
+#### Two documents were nearly damaged by a formatter, and that is worth recording
+
+`prettier --write` was run over `CHANGELOG.md`, `todo-next.md` and the audit register as a
+convenience before the gate. **None of the three is covered by any `format:check` in this
+repository** — both apps scope prettier to their own directory — so the run was not required, and it
+reflowed every markdown table in all three: a 7,004-line diff on this file alone, and eleven
+failures in `room-surface-audit-counts.test.ts`, which parses those tables. Reverted and the content
+edits re-applied by script, leaving insert-only diffs. The rule the near-miss earns: **run the
+formatter through the gate that owns the file, never over a path the gate does not cover.**
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0. Playwright 11/11 with
+`PLAYWRIGHT_CHROMIUM_PATH` pointed at the container's Chromium. Twenty-five negative controls run,
+each mutation verified as landed before the result was believed, each seen RED — including the one
+that came back GREEN first time and turned out to be a weak assertion rather than a redundant guard
+(SRCH-05 checked for symbols that occur seven times elsewhere; it reads the markup now).
+### 2026-08-30 20:30 UTC — `deleteAlertPW`: a configured password that did nothing, and the extraction that unblocked it
+
+**Runtime impact: YES.** In a room whose owner has set **Delete Alert Password**, a presenter is now
+asked for it before an alert is deleted, and the server refuses the delete if they have not answered
+it. Before this, that setting did nothing at all: `message-actions.remote.ts`'s delete branch asked
+`usersCanDeleteOwnMsgs` of a MEMBER and let a presenter through unconditionally. An owner could
+configure the password and watch every presenter delete alerts unchallenged.
+
+`TODO.md` row AL, removed. Its own text had measured the whole door and named ONE blocker, which is
+what this change starts with.
+
+#### The extraction came first, because the row said it had to
+
+Row AL: *"It was built end to end and reverted, for one reason: the client prompt costs about thirty
+lines in `message-actions.svelte.ts`, which is AT its ceiling… **The blocker is therefore an
+extraction, not a design question.** The candidates in that file are the delete branch's optimistic
+hide, its Q&A special case, and its confirm-copy ternary."*
+
+All three went, together, to **`apps/room/src/lib/room/message-delete.ts`** — they are one act rather
+than three neighbours, and the half that would have stayed behind is the half the password has to sit
+in front of. `message-actions.svelte.ts` keeps `#runOperation`: a delete is still one of six
+operations sharing one wire call and one refusal path, so the new class is handed that method rather
+than a second copy of it. Its ceiling is unchanged at 706 — a feature landed and the number did not.
+
+A second extraction paid for the wiring. `create-room.svelte.ts` had **one line of headroom** and
+this needed two (an import and an option), so the six message-menu wires that were already inline
+left for **`message-actions-port.ts`** — the shape `user-notes-port.ts` and `chat-archive-port.ts`
+already have — and the seventh arrived inside it. That ceiling went DOWN, 1421 → 1411.
+
+#### A SECOND route, never a credential name on the first
+
+`deleteAlertPW` is one of the seven credential-shaped settings that may never reach the room, so the
+credential stays on the controller and the QUESTION travels:
+**`POST /internal/room-alert-delete-auth/<code>`**, the fourth question-shaped read after
+`room-entry`, `room-notes-auth` and `room-welcome-mat-auth`. It shares their constant-time comparison
+(`room-credential-prompt.ts`) and nothing else.
+
+The tidier-looking alternative — one endpoint taking a credential NAME — is refused, and the reason is
+the one that module already records: **a name on the wire is an oracle.** Any holder of a
+`config-read` token could then ask "is this string the value of `obsStreamKey`" and walk all seven a
+guess at a time. So the READS list in `config-read-cannot-write-contract.test.ts` grows by one per
+question, deliberately: its length is the price of not having an oracle.
+
+#### The room half
+
+| file | what it is |
+| --- | --- |
+| `lib/server/control-plane.ts` | `roomAlertDeleteAuthUrl` — a sibling of `roomNotesAuthUrl`, not a parameter on it |
+| `lib/server/room-config-client.ts` | `checkAlertDeletePasswordRemotely`, a READER; throws `RoomConfigUnavailable` rather than resolving `{ok:false}` |
+| `lib/server/db/schema.ts` + `db/index.ts` | `sessions.alert_delete_access_at` — **its own column**, forward-only `ALTER`, null on every existing row |
+| `lib/server/alert-delete-access.ts` | `requireAlertDeleteAccess`, `grantAlertDeleteAccess`, `ALERT_DELETE_ACCESS_TTL_MS` |
+| `routes/alert-delete-auth.remote.ts` | `checkAlertDeletePassword` — `presenterRoom()`, `z.strictObject({candidate})`, grant written only on `ok` |
+| `routes/message-actions.remote.ts` | the gate, ahead of all three delete branches so a negative id cannot walk around it |
+| `lib/room/message-delete.ts` | the prompt, the confirmation, the Q&A case, the optimistic hide |
+
+**Its OWN column, and that is the whole point of it.** Reusing `notes_access_at`, or introducing a
+shared `credential_access_at`, would mean clearing one password opened the other. An owner who sets a
+notes password and an alert-delete password has said two things.
+
+**A much shorter TTL than the notes grant, and the number is argued rather than copied.** Thirty
+minutes is right for managing notes — a piece of work with a modal open. Deleting an alert is one
+click after one prompt, and the reference is stricter still: `deleteAlertMessage` prompts on every
+invocation and keeps no grant, because its grant is a closure. Two minutes sizes the window to *the
+gap between answering the prompt and the delete landing*, not to the length of a task. Single-use was
+rejected: a delete that lost a race would burn the grant and demand the password again for something
+that never happened.
+
+**It fails CLOSED, and this is the one call in `room-config-client.ts` whose failure blocks a
+destructive act.** An unreachable controller means alerts cannot be deleted until it returns — an
+outage. Deleting on a failed check is a data loss no later repair can undo.
+
+#### Re-measuring the row's byte offset found a BETTER site, and it changed what this code is
+
+Row AL cites byte 2,048,903 and calls it `archiveChatDate`. Both halves are true — `grep -abo` puts
+`archiveChatDate(e){` at **2,048,641** in `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, with
+`deleteAlertPW` read at 2,048,693 and 2,048,849, and 2,048,903 landing inside the matching branch's
+`sendServerAdminCommand("archiveLogs",{type:"alerts"…`. But that method archives a whole DAY.
+
+**The per-alert delete has its own copy of the same prompt, and it is this surface exactly:**
+
+```js
+deleteAlertMessage(e){                                          // byte 2,601,823
+  this.appService.globals.sessData.deleteAlertPW
+    ? bootbox.prompt({ title:"Please enter the password to delete this alert:", value:"",
+        callback: i => { i && (i.trim() === this.appService.globals.sessData.deleteAlertPW
+          ? this.appService.deleteAlert(e) : bootbox.alert("Wrong password!")) } })
+    : this.appService.deleteAlert(e)
+}
+```
+
+It is reached from `subscribe("doAlertDelete")` at **2,598,258**:
+
+```js
+subscribe("doAlertDelete", oe => { console.log("delete this alert", oe),
+  oe.shiftDelete
+    ? this.deleteAlertMessage(oe)
+    : bootbox.confirm("Are you sure you want to delete this alert by " + oe.n +
+                      ". text: " + oe.txt, se => { se && this.deleteAlertMessage(oe) }) })
+```
+
+with the flag set by the menu at 1,352,424 (`i.shiftKey && (e.shiftDelete = !0)`).
+
+**Three orderings had been written here as reasoned decisions, and all three turned out to be
+transcriptions.** The confirmation comes first; the password comes second, INSIDE the send; and
+**shift skips the confirmation and never the password**, because the prompt lives past the branch
+shift takes. The room already had the confirm string character for character. The reasoning that
+independently produced the same arrangement is kept at the code, because it is still why the
+arrangement is right — but the comments no longer claim it was a choice.
+
+The same read settled the Q&A exemption too. `doQAAlertDelete` at **2,598,525** confirms and then
+calls `deleteQAAlert({qaMsgID, msgIndex})` with **no password prompt anywhere in it** — so leaving
+the thread ungated is the capture rather than an omission.
+
+Four further sites compare the same value the same way: `doSearchSubmit(del)` at 2,051,139,
+`resetAllMediaServers()` at 2,167,386, `switchToBackup()` at 2,173,860, and the whole-log archive.
+All six are client-side, against a value `sessData` already holds. Every offset is transcribed at the
+code that uses it.
+
+There is deliberately **no client-side grant**, unlike `RoomNotesAccess`. Upstream's notes prompt
+reads `!this.allowToManageNotes` and asks once per page; `deleteAlertMessage` asks every time.
+
+#### What is NOT gated, and why
+
+Chat — the menu emits `doMsgDelete` (1,352,349), not `doAlertDelete`, and chat has its own rule here
+(`usersCanDeleteOwnMsgs`). Members — the help text says *"Presenters will need to enter the
+password"*, and the ownership checks already refuse them. The Q&A thread — `doQAAlertDelete` above,
+and here a thread entry is an `alert_questions` row deleted through `deleteQuestion`, never
+through `messageAction` at all.
+
+#### Verification
+
+`apps/room/src/lib/alert-delete-password-contract.test.ts`, 27 tests. The server half EXECUTES against
+the live SQLite database through `callRemote`: a presenter with no grant gets a 403 and **the row is
+still there**, which is the evidence rather than the status. The client half drives
+`RoomMessageDeletion` with a stub. The credential-boundary assertions read source through `codeOf`
+from `#lib/source-comments.js`, because this file's own transcription names `deleteAlertPW` four
+times and a raw-text scan would be satisfied by it.
+
+**Nine negative controls, each staged, mutated, SEEN RED, and restored:**
+
+| control | what went red |
+| --- | --- |
+| disable the server gate (`if (false && …)`) | 6 cases, including both 403s and the source assertion |
+| leak `deleteAlertPW` into `alert-delete-access.ts` as CODE | `does not name deleteAlertPW in code` — and the docblock naming it eight times stays green, which is the proof `codeOf` strips comments |
+| client accepts a wrong password (`if (true or decision.ok)`) | `says "Wrong password!" on the wrong one` |
+| server grants unconditionally | `writes NO grant for a wrong password` + the source assertion |
+| read `notesAccessAt` instead of `alertDeleteAccessAt` | `a notes grant does NOT open the alert-delete door` |
+| swallow `RoomConfigUnavailable` and return | `refuses rather than deletes when the controller cannot be reached` |
+| shift-click calls `send()` instead of `proceed()` | `SHIFT skips the confirmation and NEVER the password` |
+| drop `room-alert-delete-auth` from the controller's READS | `names every internal route that takes a credential` |
+| mint `configWriteToken` for the new reader | `checkAlertDeletePasswordRemotely mints a READ capability` |
+
+### 2026-08-30 20:30 UTC — Row W removed from `TODO.md`: it had been fixed for a day
+
+**Runtime impact: NO.** No code changed for this entry. `TODO.md` row W was headed *"ONE control
+reports success and sends nothing: `admin-notes-password`… **The live defect.**"* while the same cell
+said `EXACT_ALERTS` *"holds two keys and neither lies"* — and the second sentence was the true one.
+
+Measured 2026-08-30 by reading the files the row names. `admin-notes-password` is not a key of
+`EXACT_ALERTS` (`user-action-intent.ts` holds `save-permissions` and `restart-audio`, and both
+announce real sends). `RoomUserActions.handle` routes it to `RoomAdminNotes.ask`, over
+`lib/room/notes-access.svelte.ts` → `routes/notes-auth.remote.ts` →
+`internal/room-notes-auth/[code]`, with `sessions.notes_access_at` deciding what may be written. The
+work landed 2026-08-29 and is recorded in this file at that date; the row was simply never removed.
+`DIALOG_ONLY_ACTIONS` in `user-action-disposition-contract.test.ts` is empty, and that file, the notes
+contract and `RoomUserActions`' own suite are green — 83 tests.
+
+The census row for `admin-notes-password` further up `TODO.md` still read *"needs new server code"*
+and is corrected in place, in the same style as its neighbours, rather than removed: that table
+records verdicts and how they turned out.
 
 ### 2026-08-30 20:29 UTC — A browser ran, and the room was answering 500
 

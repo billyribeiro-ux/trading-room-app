@@ -21,6 +21,12 @@ import {
 } from '#lib/user-action-intent.js';
 
 import { RoomChatMute } from './chat-mute';
+import {
+  MODAL_TARGET_PLACEHOLDER,
+  modalTargetFromManagedUser,
+  modalTargetFromRosterRow,
+  type RosterRowForTarget
+} from './modal-target';
 import type { UserActionCommands } from './user-action-commands';
 import type { RoomDialogs } from './dialogs.svelte';
 import { RoomKicks } from './kicks';
@@ -79,28 +85,7 @@ export interface UserActionSession<User> {
   `select` passes it on. `typeof` cannot survive the move to a thunk, and narrowing would break
   the hand-off, so the row type is a parameter.
 */
-export class RoomUserActions<
-  User extends {
-    id: number;
-    displayName: string;
-    email: string;
-    emailHash: string;
-    avatarUrl: string;
-    status: string;
-    role: string;
-    /*
-      The five permission checkboxes, optional because they reach this class through two paths and
-      `targetFor` must not care which. Both DO carry them — `+page.server.ts` on the load and
-      `sess/[room]/events` on the `/roster/` frame — but a member's copy is redacted to all-false at
-      the hub, so this type must not promise the truth, only the shape.
-    */
-    hasAdminChat?: boolean;
-    hasMic?: boolean;
-    hasScreen?: boolean;
-    hasCam?: boolean;
-    canEditNotes?: boolean;
-  }
-> {
+export class RoomUserActions<User extends RosterRowForTarget> {
   readonly #dialogs: RoomDialogs;
   readonly #sessionControl: RoomSessionControl;
   readonly #toasts: RoomToasts;
@@ -324,44 +309,20 @@ export class RoomUserActions<
       (connectedUser) => connectedUser.id === this.#selectedUserId
     );
     // No `User` at all: a placeholder for a modal that should not be open. See the contract test.
-    if (!user) {
-      return {
-        id: 0,
-        nick: '',
-        emailHash: 'undefined',
-        pic: 'https://secure.gravatar.com/avatar/undefined?d=mm&s=80',
-        status: 'offline',
-        ip: 'n/a'
-      };
-    }
+    if (!user) return MODAL_TARGET_PLACEHOLDER;
     return this.targetFor(user);
   }
 
+  /**
+   * A roster row as the modal sees it.
+   *
+   * The mapping itself is `modalTargetFromRosterRow` in `room/modal-target.ts`, with a message's
+   * sender beside it — one subject, one module, testable without building this class. This method
+   * stays because it is the name every caller and contract test already uses, and because `select`,
+   * `openInfoFor` and `mentionFromRoster` all route through it.
+   */
   targetFor(user: User): ModalTargetUser {
-    return {
-      id: user.id,
-      nick: user.displayName,
-      email: user.email,
-      emailHash: user.emailHash,
-      pic: user.avatarUrl,
-      status: user.status,
-      permissions: user.role === 'user' ? 'r' : 'a',
-      /*
-        THE FIVE CHECKBOXES, carried through — and note they land on FLAT fields while arriving in a
-        nested one. `ModalTargetUser.permissions` is already taken, by an unrelated `'r' | 'a'`
-        string one line above, so reusing the name here would have silently overwritten it.
-
-        Without this the modal read `undefined` for all five and `Boolean(undefined)` drew every box
-        unchecked, whatever the membership said. Cosmetic while Save sent nothing; a REVOCATION the
-        moment it started, because the endpoint writes `false` for every key it is not given.
-      */
-      hasMic: user.hasMic ?? false,
-      hasScreen: user.hasScreen ?? false,
-      hasCam: user.hasCam ?? false,
-      canEditNotes: user.canEditNotes ?? false,
-      hasAdminChat: user.hasAdminChat ?? false,
-      ...(user.status !== 'offline' ? { userXrefID: String(user.id), _id: String(user.id) } : {})
-    };
+    return modalTargetFromRosterRow(user);
   }
 
   select(user: User) {
@@ -535,15 +496,11 @@ export class RoomUserActions<
       this.#dialogs.alert = 'User is not logged in.';
       return;
     }
-    this.#selectedMessageUser = {
-      id: Number(user._id),
-      nick: user.nick,
-      emailHash: user.emailHash,
-      pic: user.pic,
-      status: 'online',
+    this.#selectedMessageUser = modalTargetFromManagedUser({
+      ...user,
       userXrefID: user.userXrefID,
       _id: user._id
-    };
+    });
     this.#openModal('user');
   }
 

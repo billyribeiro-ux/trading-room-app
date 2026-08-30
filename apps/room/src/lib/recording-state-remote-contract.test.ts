@@ -79,8 +79,19 @@ describe('the command', () => {
   });
 
   it('and the form action it replaced is gone from the file that held it', () => {
-    // `+page.server.ts` did contain this, so the guard is real rather than pointed at a new file.
-    expect(serverCode).toContain('export const actions: Actions = {');
+    /*
+      `+page.server.ts` did hold this action, so the guard is real rather than pointed at a new file.
+
+      The anchor was `toContain('export const actions: Actions = {')` until 2026-08-30, when that
+      export was deleted whole — `logout` was the last action in it and nothing could post to it.
+      An anchor naming a construct that no longer exists is worse than none, because the next person
+      is tempted to delete it and leave the two `not.toContain`s reading whatever file they like.
+      It is the load now, plus the stronger fact: no form actions here at all.
+    */
+    expect(serverCode, 'this is still +page.server.ts').toContain('export const load');
+    expect(serverCode, 'and it exports no form actions at all now').not.toContain(
+      'export const actions'
+    );
     expect(serverCode).not.toContain('recordingState: async');
     expect(serverCode).not.toContain("const allowed = new Set(['startRec'");
   });

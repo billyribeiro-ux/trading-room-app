@@ -425,6 +425,16 @@ export function ensureDatabase() {
   if (!sessionColumns.has('notes_access_at')) {
     sqlite.exec('ALTER TABLE sessions ADD COLUMN notes_access_at INTEGER');
   }
+  /*
+    The alert-delete grant, 2026-08-30 — TODO row AL. A SECOND column beside the notes one rather
+    than a shared "credential cleared" flag, because clearing one password must not open the other;
+    the column's own docblock in `schema.ts` carries the argument. Null on every existing row, which
+    is correct with no backfill: no session has cleared `deleteAlertPW` yet, and the check reads a
+    null grant as "not cleared".
+  */
+  if (!sessionColumns.has('alert_delete_access_at')) {
+    sqlite.exec('ALTER TABLE sessions ADD COLUMN alert_delete_access_at INTEGER');
+  }
 
   const messageColumns = new Set(
     (sqlite.pragma('table_info(messages)') as Array<{ name: string }>).map((column) => column.name)

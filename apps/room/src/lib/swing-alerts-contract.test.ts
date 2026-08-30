@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { render } from 'svelte/server';
+import { db, ensureDatabase } from '#lib/server/db/index.js';
+import { swingAlerts, users, type User } from '#lib/server/db/schema.js';
+import { callRemote } from '#lib/server/remote-command-harness.js';
 import SwingAlertsPane from './components/swing-alerts/SwingAlertsPane.svelte';
 import {
   SWING_ALERT_COMMANDS,
@@ -11,6 +14,7 @@ import {
   swingAlertsTabVisible
 } from './swing-alerts';
 import type { SwingAlertRow } from './types';
+import type { TradeAlertDraftFields as SwingAlertDraftFields } from './room/trade-alerts.svelte';
 
 /**
  * Swing Trade Alerts — the things that would regress SILENTLY.
@@ -65,6 +69,111 @@ function renderPane(props: {
   }).body;
 }
 
+/*
+  THE CONTROLLER, stubbed at the module boundary — the same shape `scheduled-alert-contract.test.ts`
+  uses, and for the same reason: the entitlement these commands re-ask on every write is a call to
+  the controller, and a room without one is not a room this test can construct.
+
+  `controller.settings` is written per test rather than fixed, because the ENTITLEMENT BEING FALSE
+  is itself one of the behaviours under test.
+*/
+const controller = { settings: {} as Record<string, unknown> };
+
+vi.mock('#lib/server/room-config-client.js', () => ({
+  RoomConfigUnavailable: class RoomConfigUnavailable extends Error {},
+  readRoomConfig: async (_key: object, shortCode: string, email?: string) => ({
+    room: {
+      shortCode,
+      name: `Room ${shortCode}`,
+      state: 'open',
+      logoUrl: null,
+      publicId: null,
+      maxUsers: 0
+    },
+    settings: controller.settings,
+    locked: [],
+    member: {
+      displayName: 'stub',
+      email: email ?? '',
+      role: 2,
+      nonPresenter: false,
+      isP: false,
+      isNonPresenterAdmin: false,
+      isFT: false,
+      denyArchivesAccess: false,
+      restrictPmUser: false,
+      muted: false,
+      banned: false,
+      permissions: {
+        hasMic: false,
+        hasScreen: false,
+        hasCam: false,
+        hasAdminChat: false,
+        canEditNotes: false
+      }
+    }
+  })
+}));
+
+const { deleteSwingAlert, editSwingAlert, postSwingAlert } =
+  await import('../routes/swing-alerts.remote');
+
+/** The room these alerts belong to. Taken from the SESSION by every command; never an argument. */
+const ROOM = '3625';
+
+function account(email: string, role: string): User {
+  const existing = db.select().from(users).where(eq(users.email, email)).get();
+  if (existing) return existing;
+  return db
+    .insert(users)
+    .values({
+      displayName: `swing contract ${role}`,
+      email,
+      role,
+      passwordHash: 'scrypt$00$00',
+      createdAt: new Date()
+    })
+    .returning()
+    .get();
+}
+
+/** A valid composer payload. Every field is required by the schema, so none of them is optional. */
+const draft = (overrides: Partial<SwingAlertDraftFields> = {}): SwingAlertDraftFields => ({
+  symbol: 'AAPL',
+  direction: 'long',
+  entryPrice: '123.57',
+  stop: '120.40',
+  target: '138.75',
+  image: '',
+  ...overrides
+});
+
+const as = <T>(user: User, run: () => T | Promise<T>) =>
+  callRemote({ user, sessionId: 'swing-alerts-contract', roomShortCode: ROOM } as App.Locals, run);
+
+let presenter: User;
+let member: User;
+/**
+ * A presenter used ONLY by the rate-limit test.
+ *
+ * `consumeRateLimit` is module state keyed by `alert:<userId>` and there is no reset between test
+ * files, so exhausting the bucket for the presenter above would make every later create in this
+ * file fail for a reason that has nothing to do with what it is asserting.
+ */
+let spender: User;
+
+beforeAll(() => {
+  ensureDatabase();
+  presenter = account('swing-alerts-presenter@example.test', 'staff');
+  member = account('swing-alerts-member@example.test', 'member');
+  spender = account('swing-alerts-spender@example.test', 'staff');
+});
+
+beforeEach(() => {
+  db.delete(swingAlerts).run();
+  controller.settings = {};
+});
+
 describe('the wire vocabulary', () => {
   /*
     The whole reason this file exists. Two independent decodes of the bundle had to correct the
@@ -94,22 +203,134 @@ describe('the wire vocabulary', () => {
     expect(SWING_ALERT_COMMANDS.mirrorEdit).toBe('editAlertMessageSwing');
   });
 
-  it('declares a server action for each mutation command', () => {
-    /*
-      SvelteKit action names must be literal keys, so they cannot be spelled from the const above.
-      Reading the file is what keeps the two in step: a renamed action is a 404 that surfaces to a
-      presenter only as "Unable to save".
-    */
-    const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
-    for (const command of [
+  /*
+    REWRITTEN, not re-pointed, when the three became remote commands on 2026-08-30.
+
+    This block asserted that `+page.server.ts` contained the literal
+    `\n  ${command}: async ({ request, locals }) => {` for each of the three names. That was the best
+    available check while the endpoint was a string the client built at runtime — the whole point was
+    that nothing else connected the two — and it is the wrong check now, for two reasons.
+
+    First, it no longer proves anything the compiler does not: `trade-alerts.svelte.ts` imports
+    `postSwingAlert`, `editSwingAlert` and `deleteSwingAlert` by name, so a renamed command is a
+    build error before any test runs. Second, and this is the reason it is REWRITTEN rather than
+    deleted, a text assertion about where a command LIVES has never been able to say whether it RUNS.
+    Re-pointing it at `swing-alerts.remote.ts` would have kept a green tick over a question nobody
+    was asking any more.
+
+    So the three names are now proven by CALLING them. `SWING_ALERT_COMMANDS` is still the single
+    place the vocabulary is written, and it is still what the assertions name — `SWING_ALERT_COMMANDS.create`
+    is the sentence *"the create command is the one this exported constant names"*, which is exactly
+    what it meant before, now answered by a row in the database instead of by a substring.
+  */
+  it('creates, edits and deletes a row through the three commands the constant names', async () => {
+    expect([
       SWING_ALERT_COMMANDS.create,
       SWING_ALERT_COMMANDS.edit,
       SWING_ALERT_COMMANDS.delete
-    ]) {
-      expect(server, `+page.server.ts must declare the ${command} action`).toContain(
-        `\n  ${command}: async ({ request, locals }) => {`
+    ]).toEqual(['swingAlertMsg', 'editSwingAlertMsg', 'deleteSwingAlertMsg']);
+
+    controller.settings = { hasSwingTradeAlerts: true };
+
+    await as(presenter, () => postSwingAlert(draft({ symbol: 'AAPL' })));
+    const created = db.select().from(swingAlerts).all();
+    expect(created).toHaveLength(1);
+    expect(created[0].symbol).toBe('AAPL');
+    // Taken from the SESSION, never from the payload — a client-supplied author is a client-supplied
+    // identity, and there is no field on the schema that could carry one.
+    expect(created[0].senderName).toBe(presenter.displayName);
+
+    await as(presenter, () =>
+      editSwingAlert({ ...draft({ symbol: 'MSFT' }), swingAlertID: created[0].id })
+    );
+    expect(db.select().from(swingAlerts).all()[0].symbol).toBe('MSFT');
+
+    await as(presenter, () => deleteSwingAlert({ swingAlertID: created[0].id }));
+    // A SOFT delete: the row stays and `deletedAt` is set, because the feed mirror needs the record.
+    expect(db.select().from(swingAlerts).all()[0].deletedAt).not.toBeNull();
+  });
+
+  it('refuses a member on all three, and a room without the entitlement on all three', async () => {
+    /*
+      TWO gates, and neither is the browser's. The composer is inside `{#if isPresenter}` in the pane
+      and the whole tab is behind the entitlement, and a hidden control has never been an
+      authorization decision here.
+
+      The entitlement answers 404 rather than 403 deliberately: in a room without the feature it does
+      not exist, and *"forbidden"* would confirm that it exists somewhere and this member is not
+      allowed it.
+    */
+    controller.settings = { hasSwingTradeAlerts: true };
+    await as(presenter, () => postSwingAlert(draft({ symbol: 'AAPL' })));
+    const [row] = db.select().from(swingAlerts).all();
+
+    for (const [name, run] of [
+      [SWING_ALERT_COMMANDS.create, () => postSwingAlert(draft({ symbol: 'HACK' }))],
+      [
+        SWING_ALERT_COMMANDS.edit,
+        () => editSwingAlert({ ...draft({ symbol: 'HACK' }), swingAlertID: row.id })
+      ],
+      [SWING_ALERT_COMMANDS.delete, () => deleteSwingAlert({ swingAlertID: row.id })]
+    ] as const) {
+      await expect(as(member, run), `${name} must refuse a member`).rejects.toMatchObject({
+        status: 403
+      });
+    }
+
+    controller.settings = {};
+    for (const [name, run] of [
+      [SWING_ALERT_COMMANDS.create, () => postSwingAlert(draft({ symbol: 'HACK' }))],
+      [
+        SWING_ALERT_COMMANDS.edit,
+        () => editSwingAlert({ ...draft({ symbol: 'HACK' }), swingAlertID: row.id })
+      ],
+      [SWING_ALERT_COMMANDS.delete, () => deleteSwingAlert({ swingAlertID: row.id })]
+    ] as const) {
+      await expect(
+        as(presenter, run),
+        `${name} must refuse a room without the entitlement`
+      ).rejects.toMatchObject({ status: 404 });
+    }
+
+    // Nothing was created and nothing was destroyed by any of the six refusals.
+    const after = db.select().from(swingAlerts).all();
+    expect(after).toHaveLength(1);
+    expect(after[0].symbol).toBe('AAPL');
+    expect(after[0].deletedAt).toBeNull();
+  });
+
+  /*
+    The create action posts into the MAIN alerts feed as its second write, so without the limiter it
+    is a way to spam that feed at whatever rate the network allows, straight past the one guarding
+    the composer. This action shipped WITHOUT it and the omission was found by re-reading a diff, not
+    by a test — `day-trade-alerts-contract.test.ts` grew the check first, reading the source, and it
+    is behavioural on both sides now.
+  */
+  it('spends the alert rate limit on the create, and only on the create', async () => {
+    controller.settings = { hasSwingTradeAlerts: true };
+
+    /*
+      The bucket is spent until it refuses. `consumeRateLimit` is module state keyed by
+      `alert:<userId>`, so this presenter is used by no other test in this file and the loop stops on
+      the first refusal rather than assuming a limit this test would then have to restate.
+    */
+    let refusal: unknown = null;
+    for (let attempt = 0; attempt < 200 && refusal === null; attempt++) {
+      refusal = await as(spender, () => postSwingAlert(draft({ symbol: 'AAPL' }))).then(
+        () => null,
+        (caught: unknown) => caught
       );
     }
+    expect(refusal, 'the create is not rate limited at all').toMatchObject({ status: 429 });
+
+    /* …and the edit and the delete are NOT, on the same exhausted bucket. */
+    const [row] = db.select().from(swingAlerts).all();
+    await expect(
+      as(spender, () => editSwingAlert({ ...draft({ symbol: 'MSFT' }), swingAlertID: row.id }))
+    ).resolves.toBeUndefined();
+    await expect(
+      as(spender, () => deleteSwingAlert({ swingAlertID: row.id }))
+    ).resolves.toBeUndefined();
   });
 });
 

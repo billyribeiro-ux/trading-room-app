@@ -185,8 +185,38 @@ describe('the Admin Notes tab has both of its states', () => {
     const composed = codeOf(read('lib/room/admin-notes.ts'));
     expect(composed).toContain('await this.#access.ask()');
     expect(composed).toContain('if (this.#access.granted) await this.#list.open(subjectUserId)');
-    /* And the tab itself loads without raising a prompt, because upstream's tab does not. */
-    expect(codeOf(MODAL)).toContain("if (tabId === 'notes') userNotes.open(targetUser.id)");
+    /*
+      ── CORRECTED 2026-08-30 by UIM-06: THIS ASSERTION ENCODED A FALSE CLAIM ABOUT THE REFERENCE ──
+
+      It was:
+
+        `expect(codeOf(MODAL)).toContain("if (tabId === 'notes') userNotes.open(targetUser.id)")`
+
+      with the comment *"the tab itself loads without raising a prompt, because upstream's tab does
+      not"*. Upstream's tab DOES. `J2e` at bundle byte 2,059,391 is the tab strip, and its third
+      anchor is
+
+        d(4,"a",56),x("click",function(){return D(e),E(g(2).manageAdminNotes())})
+
+      — const 56 being the Admin Notes anchor, the only one of the three carrying `3,"click"`,
+      decoded from that component's own consts table at 2,087,748. The claim had never been checked
+      against the bytes, and the assertion was pinning it in place: the notes tab switched panes and
+      did nothing else, so the password door had exactly one caller where the reference has two.
+
+      Both entry points now go through `onUserAction('admin-notes-password', …)`, which lands on
+      `RoomAdminNotes.ask()` — the door AND the load, which is what the rest of this test is about.
+      That the prompt does not appear for a room with no password configured is still true, and it
+      is `manageAdminNotes()`'s own doing (byte 2,081,768): it prompts only when
+      `needPasswordForUserNotes` is set and the door is still shut, and `RoomNotesAccess.ask()` is
+      both branches.
+
+      `user-info-modal-contract.test.ts` carries the reference read and the two-caller count.
+    */
+    expect(codeOf(MODAL)).toContain(
+      "if (tabId === 'notes') onUserAction('admin-notes-password', targetUser)"
+    );
+    /* And nothing calls the list directly any more — the prop shape does not even declare it. */
+    expect(codeOf(MODAL)).not.toContain('userNotes.open(');
   });
 
   it('transcribes both dialog strings exactly, including the space upstream leaves', () => {

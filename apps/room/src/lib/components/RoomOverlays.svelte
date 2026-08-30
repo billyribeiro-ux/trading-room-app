@@ -9,6 +9,16 @@
   import { viewerAlertPrefsFrom } from '#lib/viewer-alert-prefs.js';
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
+  /*
+    UIM-04 — `canPM`, resolved HERE and handed to `ModalHost` as one boolean.
+
+    This module is the transcription of the reference's own expression (byte 2,073,550) and it
+    already had one caller, `RoomPrivateChat.canOpenFor`, for the ROSTER row. The user card asks
+    the identical question about the identical target and was not asking it at all. Both call
+    sites now go through the one function, which is the point of it having been extracted: the
+    reference asks this question twice and disagrees with itself once.
+  */
+  import { canShowRosterPrivateChat } from '#lib/roster-private-chat.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
   import { downloadImage } from '#lib/download-image.js';
   import { ReactionArrivals } from '#lib/reaction-arrivals.js';
@@ -141,6 +151,8 @@
       reads four more. So the boundary this paragraph describes was not the one the file had for
       that object; the callbacks were a second path to something already in scope.
 
+      `submitPollAction` is five named methods since 2026-08-30 (see `RoomModals`); the five call
+      sites below changed shape with it and did NOT change owner — they already reached for `modals`.
       The two that remain are genuinely the page's. `changeChatMode` is the page's own async
       function — a remote command plus `invalidateAll()` — and belongs to no class here.
       `saveAlertFilter` is `RoomAlertsPane`'s, and that object is NOT a prop of this component, so
@@ -704,14 +716,12 @@
   onPostAlert={(submission) => composer.postAlert(submission)}
   onPastePostAlert={(submission) => composer.postPastedImage(submission)}
   onPollMinimize={() => modals.minimizePoll()}
-  onPollSave={(question, choices) =>
-    modals.submitPollAction('savePoll', { q: question, choices: JSON.stringify(choices) })}
-  onPollDelete={(pollId) => modals.submitPollAction('deleteSavedPoll', { pollId })}
-  onPollSend={(question, choices) =>
-    modals.submitPollAction('sendPoll', { q: question, choices: JSON.stringify(choices) })}
-  onPollAnswer={(choiceIndex) => modals.submitPollAction('sendPollAnswer', { a: choiceIndex })}
+  onPollSave={(question, choices) => modals.savePoll(question, choices)}
+  onPollDelete={(pollId) => modals.deleteSavedPoll(pollId)}
+  onPollSend={(question, choices) => modals.sendPoll(question, choices)}
+  onPollAnswer={(choiceIndex) => modals.sendPollAnswer(choiceIndex)}
   onPollPostResults={(body) => composer.postPollResults(body)}
-  onPollEnd={() => modals.submitPollAction('pollDone')}
+  onPollEnd={() => modals.pollDone()}
   onAlert={(message) => (dialogs.alert = message)}
   onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
   onReplySend={messageActions.sendReplyMessage}
@@ -747,6 +757,21 @@
   debugLog={debugLog.received}
   onUploadProfilePicture={(user, file) => userActions.uploadProfilePicture(user, file)}
   onRemoveProfilePicture={(user) => userActions.removeProfilePicture(user)}
+  room={data.room}
+  canPrivateChat={canShowRosterPrivateChat(
+    {
+      isPresenter,
+      userPmEnabled: data.sessData?.userPM,
+      userToPresenterPmEnabled: data.sessData?.userToPresenterPM,
+      currentUserIsTrial: data.user.isFT,
+      disablePmForTrials: data.sessData?.disablePMForTrials
+    },
+    {
+      id: userActions.target.id,
+      permissions: userActions.target.permissions,
+      hasAdminChat: userActions.target.hasAdminChat
+    }
+  )}
   privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
   onShowPrivateMessages={(user) => {
     modals.open('all-private');

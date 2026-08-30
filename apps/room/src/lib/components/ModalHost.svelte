@@ -54,6 +54,7 @@
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import type { MessageBadge } from '#lib/types.js';
   import AlertQaModal from './AlertQaModal.svelte';
+  import AlertSendReportModal from './AlertSendReportModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import MobileRestorePane from './MobileRestorePane.svelte';
@@ -284,7 +285,21 @@
       readonly error: string | null;
       add(): void;
       remove(note: UserNoteView): void;
-      open(subjectUserId: number): void;
+      /*
+        `open(subjectUserId)` WAS here and is deliberately gone — UIM-06.
+
+        This component used to call it from the Admin Notes tab, which meant the tab loaded the
+        list and the "Enter Password" button opened the door, two halves of one act split across
+        two entry points. The reference has ONE: both its tab (`J2e`, byte 2,059,546) and its
+        button (`pTe`, byte 2,064,649) call `manageAdminNotes()`, which asks for the password when
+        one is configured and then shows what is behind it.
+
+        Both call sites here now go through `onUserAction('admin-notes-password', …)`, which lands
+        on `RoomAdminNotes.ask()` — the door AND the load. Nothing in this component still needs
+        `open`, so it is not declared: a method on a structural prop that nothing calls is a
+        consumer that does not exist, and the next reader would have to prove that rather than
+        read it.
+      */
     };
     /**
      * The target member's badges, resolved by `RoomFeeds.badgesFor` on the page.
@@ -342,6 +357,78 @@
     privateMessageHistoryEnabled: boolean;
     /** Opens the all-user private-message modal for one peer. */
     onShowPrivateMessages: (user: ModalTargetUser) => void;
+    /**
+     * This room, as the CONTROLLER describes it — `data.room`, straight off the page load.
+     *
+     * One consumer: the advanced-search rooms dropdown, whose single entry used to be the invented
+     * literals `'mastering-the-trade'` / `'Mastering The Trade'`. See SRCH-03 at the markup for why
+     * the one-entry list is a deliberate divergence and the invented pair was not.
+     *
+     * The two fields this takes and no more. `roomConfig.room` also carries `state`, `logoUrl`,
+     * `publicId` and `maxUsers`, and passing the object whole would hand this component four facts
+     * nothing in it reads — which is how a prop stops describing what a component needs.
+     */
+    room: { shortCode: string; name: string };
+    /**
+     * `canPM` — whether the user card offers Private Chat to THIS target at all. UIM-04.
+     *
+     * ## The gate the footer was missing
+     *
+     * Bundle byte 2,096,067, the card's root update block, gates its four footer buttons like
+     * this:
+     *
+     *   O(17, o.checkIsMe() ? 17 : -1)               — @Mention
+     *   O(18, o.canPM && o.checkIsMe() ? 18 : -1)    — Private Chat
+     *   O(19, o.checkIsMe() ? 19 : -1)               — Follow / Mute
+     *
+     * `checkIsMe()` returns true when the target is NOT me (verified at 2,087,485), which is our
+     * `!isTargetCurrentUser`. Three of the four take that alone; Private Chat takes it **and**
+     * `canPM`. This component wrapped all four in one `{#if !isTargetCurrentUser}`, so Private
+     * Chat was offered to every non-self target in every room — including one whose owner had
+     * turned member-to-member PM off, and including a trial account in a room that disables PM
+     * for trials.
+     *
+     * ## Why it arrives resolved rather than as five settings
+     *
+     * `canPM` is
+     *
+     *   (isPresenter || sessData.userPM
+     *      || sessData.userToPresenterPM && ("a" === user.perms || user.hasAdminChat))
+     *   && !(globals.user.isFT && sessData.disablePMForTrials)
+     *
+     * (byte 2,073,550) — five inputs, one of which is the TARGET. `canShowRosterPrivateChat` in
+     * `#lib/roster-private-chat.ts` is already that transcription, and `RoomOverlays` already
+     * holds both the session and `userActions.target`, so it can answer the whole question in one
+     * place. Passing the five settings in and re-deriving here would be a second copy of a rule
+     * this repository has already written down once — the shape `canUseRTE` two hundred lines up
+     * refuses for the same reason, and which the reference itself gets wrong by asking twice.
+     *
+     * **A convenience, never the authority.** `private-chat.remote.ts` refuses on the server; this
+     * only stops a presenter being offered a conversation the room has not enabled.
+     *
+     * ## The default is `false`, and that is the half that had to be argued
+     *
+     * Every other optional gate on this component defaults to whatever keeps the surface looking
+     * unchanged. This one is a PERMISSION, so `CLAUDE.md`'s "every allow-list is deny-by-default"
+     * governs instead: a caller that forgets it hides a button, where a `true` default would reopen
+     * exactly the hole UIM-04 names, silently, for whoever wires the next call site.
+     *
+     * The reason it is written here and not beside `canPrivateChat = false` in the destructure —
+     * where it was first — is `unfed-props-contract.test.ts`. That file finds the destructure with a
+     * regular expression and takes the first word of every line in it as a prop name, so a
+     * multi-line comment inside it declared four props called `argued`, `looking`, `deny` and
+     * `reopen`. No other entry in that destructure carries a comment, which is the convention this
+     * restores rather than a limitation to work around: the reasoning belongs on the type, where it
+     * is one thing to read.
+     *
+     * **And the wording of THIS paragraph is load-bearing too**, which is worth one more line. It
+     * first spelled that regular expression's own opening — the destructure keyword, a brace, an
+     * ellipsis, the type annotation — out in full, and because the pattern is non-greedy it then
+     * matched from HERE to the real destructure and reported eleven of the interface's nested
+     * fields as unsupplied props. A comment quoting the pattern that reads it is the prose-as-code
+     * trap `source-comments.ts` exists for, arriving from the opposite direction.
+     */
+    canPrivateChat?: boolean;
     /**
      * What that modal is showing, why it is not, and whether it is still asking.
      *
@@ -587,6 +674,8 @@
     onManagedUserInfo,
     privateMessageHistoryEnabled,
     onShowPrivateMessages,
+    room,
+    canPrivateChat = false,
     peerHistory,
     currentUser,
     mobilePin = 'N/A',
@@ -620,6 +709,43 @@
     onsavealertfilter,
     onopenalertfilter
   }: Props = $props();
+
+  /**
+   * `globals.isPresenter` — the viewer's ROLE, and it is declared HERE for a load-bearing reason.
+   *
+   * ## THE POSITION IS THE FIX. Moving it back down returns a 500.
+   *
+   * This sat two hundred lines below `activeConnectivityTab`, whose `$state(…)` initializer READS
+   * it, and a `$state` initializer is evaluated EAGERLY at component init. So at that line
+   * `isPresenter` was still in its temporal dead zone, the initializer threw
+   * `ReferenceError: Cannot access 'isPresenter' before initialization`, and because it throws
+   * during SSR the whole PAGE answered **500** — not one broken modal, the entire room.
+   *
+   * `untrack` did not save it and could not: `untrack` stops a read being recorded as a dependency,
+   * it does not defer the read. The call still runs, synchronously, right there.
+   *
+   * ## Why hoisting is the right fix rather than a lazy seed
+   *
+   * The alternative was to seed `activeConnectivityTab` to the non-presenter default and correct it
+   * from a one-shot `$effect`. That works and is strictly worse: effects run after the first paint,
+   * so a presenter would see the Mobile tab for a frame and then watch it jump to Network. A
+   * declaration order problem answered with a visible flicker.
+   *
+   * Hoisting is clean because this derivation depends on exactly one thing — `currentUser`, which is
+   * destructured out of `$props()` on the line above. Nothing else moves.
+   *
+   * ## This is the SECOND time this class of defect has shipped from this repository
+   *
+   * `CHANGELOG.md` records the `createRoom` instance from 2026-08-28, which answered 500 for eleven
+   * days. Both were invisible to `svelte-check`, to eslint and to the whole unit suite, because a
+   * unit test mounts a component whose module scope is already initialised — the temporal dead zone
+   * only exists during that initialisation. Only a browser sees it.
+   *
+   * `state-initializer-order-contract.test.ts` now reads every `.svelte` file, finds every
+   * `$state(…)` initializer, and fails if one names a `const`/`let` declared later in the same
+   * script. It is a static check because the thing it is checking is static.
+   */
+  const isPresenter = $derived(currentUser.role === 'staff' || currentUser.role === 'admin');
 
   /**
    * TradingRoom v1's home, standing in for both store listings.
@@ -776,11 +902,45 @@
       });
       advancedSearchResults = filterAlerts(found.alerts.filter(alertSearchFilter), advancedSearch);
       advancedSearchTruncated = found.truncated;
+    } catch {
+      /*
+        ── SRCH-02: A FAILED SEARCH USED TO BE INDISTINGUISHABLE FROM AN EMPTY ONE ────────────────
+
+        There was no `catch` here at all. A refused, timed-out or 500'd `searchAlerts()` rejected
+        out of this handler, `finally` cleared the spinner, `advancedSearchResults` stayed `[]`,
+        and the modal fell through to *"No logs to display. Please, change the input fields."* —
+        the same words it shows for a search that ran perfectly and matched nothing.
+
+        Those two states are opposite advice. One says "your query is too narrow, widen it"; the
+        other says "nothing was searched, try again". A presenter told the first when the second is
+        true widens the range and gets the identical message, and concludes the log is empty.
+
+        The reference does not conflate them. `getAlertsAdvancedSearch` (byte 1,150,220) attaches
+        `.catch(s => { emit("getAlertsAdvancedSearchFailed", { success: !1, msg: "There was an
+        error searching for alerts, please try again or contact support" }) })`, and the modal
+        subscribes at byte 2,424,060 with `{ this.msgs = [], this.loading = !1, bootbox.alert(i.msg) }`
+        — clear the rows, stop the spinner, SAY SO. All three are reproduced: the rows are already
+        `[]` from the top of this function, `finally` stops the spinner, and `onAlert` is the
+        `BootboxDialog` this component already uses for every other alert.
+
+        The message is the reference's own string, verbatim including "contact support".
+
+        The rejection is not rethrown and not logged: `searchAlerts` is a remote function whose own
+        failure is already reported by the framework, and this is the USER-facing half. Swallowing
+        it would be the `.catch(() => {})` the root standard names — it is not swallowed, it is
+        answered.
+      */
+      advancedSearchTruncated = false;
+      onAlert(ADVANCED_SEARCH_FAILED);
     } finally {
       // `finally`, so a refused or timed-out search clears the spinner instead of hanging it.
       advancedSearchLoading = false;
     }
   }
+
+  /** The reference's own failure copy for an advanced search, byte 1,150,520. See the `catch`. */
+  const ADVANCED_SEARCH_FAILED =
+    'There was an error searching for alerts, please try again or contact support';
 
   function clearAdvancedSearch() {
     advancedSearch = clearInput();
@@ -900,7 +1060,6 @@
       ? rtmpIngestUrl(ingest.streamServerMTX, ingest.ingestPath, ingest.rtmpToken)
       : ''
   );
-  let reportLoading = $state(true);
   /*
     ── THE TWO TEXT-MODE RADIOS WERE DEAD, and this is the third control of that exact shape ────────
 
@@ -1761,8 +1920,25 @@
   /**
    * `giveMicScreen(e)` — hand this member mic and screenshare, or take them back.
    *
-   * Transcribed from the bundle at offset 2075481, on the SAME class as `saveCustomPerms` and
+   * Transcribed from the bundle at offset 2077604, on the SAME class as `saveCustomPerms` and
    * `startPrivateChat`, which is this modal:
+   *
+   * ## UIM-13 — THE CITATION WAS WRONG, TWICE, AND THE BODY BELOW WAS RIGHT
+   *
+   * Both this docblock and its twin at the Give/Take buttons said **offset 2075481** until
+   * 2026-08-30. Read that address and the bundle answers
+   * `aySound:!0}}resetFollowChatStyle(e){this.followChatStyle=this.loadDefaultFollowChatStyle(),…`
+   * — the tail of `loadDefaultFollowChatStyle` and the head of `resetFollowChatStyle`, two
+   * unrelated methods about the follow-chat style pane. `giveMicScreen` begins at **2077604**,
+   * 2,123 bytes further on, and the transcription quoted below matches it byte for byte.
+   *
+   * The failure mode is the one this repository keeps paying for in a different currency: the
+   * EVIDENCE was correct and the POINTER to it was not, so a future reader following the citation
+   * lands on working code about another feature and concludes the transcription was invented. Two
+   * comments pointed there, which is why the fix is in two places and why
+   * `user-info-modal-contract.test.ts` now asserts the number rather than trusting it — a byte
+   * offset in prose is exactly the kind of load-bearing claim DPE rule 4 says must become an
+   * executable assertion.
    *
    * ```js
    * giveMicScreen(e) {
@@ -2174,7 +2350,7 @@
   }
 
   const targetUserModalAvatar = $derived(gravatarAtSize(targetUser.pic, 80));
-  const isPresenter = $derived(currentUser.role === 'staff' || currentUser.role === 'admin');
+  /* `isPresenter` was declared here and is now hoisted above — see its docblock; the position is the fix. */
   const isTargetCurrentUser = $derived(targetUser.emailHash === currentUser.emailHash);
   /*
     `O(4, e.appService.globals.preferences.profilePic ? 5 : 4)` — the avatar menu's two states. See
@@ -2293,14 +2469,31 @@
     presenterBackgroundColor = seed.bgColor;
   });
 
-  $effect(() => {
-    if (name !== 'report') return;
-    reportLoading = true;
-    const timer = window.setTimeout(() => {
-      reportLoading = false;
-    }, 500);
-    return () => window.clearTimeout(timer);
-  });
+  /*
+    ── RPT-02: THE EFFECT THAT USED TO BE HERE, AND WHY THERE IS NOTHING IN ITS PLACE ─────────────
+
+    It was:
+
+      $effect(() => {
+        if (name !== 'report') return;
+        reportLoading = true;
+        const timer = window.setTimeout(() => { reportLoading = false; }, 500);
+        return () => window.clearTimeout(timer);
+      });
+
+    Five hundred milliseconds of spinner in front of nothing, and then the literal string
+    `No Reports.` — for every alert, in every room, always. The 500 is not in the reference and
+    corresponds to no work: there was no request behind it, no `reports` array, and no error state.
+
+    A spinner is a PROMISE that something is being fetched. This one promised a fetch that did not
+    exist and then reported an empty result as though it were an answer, which is worse than
+    showing nothing: a presenter reading `No Reports.` concludes the alert reached nobody. See the
+    modal itself for the measurement that decides RPT-01 and RPT-03 through RPT-07, and for what
+    is rendered instead.
+
+    `reportLoading` went with it — a `$state` with no writer is a variable that can only ever be
+    its initial value.
+  */
 
   $effect(() => {
     if (name !== 'session') return;
@@ -2431,8 +2624,34 @@
                     An event handler and not an `$effect` on `userInfoTab`. The load is a side
                     effect of a click, not a value derived from state, and an effect here would
                     re-fire on every unrelated reason the tab happened to be re-evaluated.
+
+                    ── UIM-06: WHAT THAT BINDING ACTUALLY IS, read rather than assumed ───────────
+
+                    It is `manageAdminNotes()`. `J2e` at bundle byte 2,059,546 is the tab strip,
+                    and the third anchor is
+                    `d(4,"a",56),x("click",function(){return D(e),E(g(2).manageAdminNotes())})`
+                    — const 56 being `["id","nav-tab-notes",…,3,"click"]`, decoded from the
+                    component's own consts table at 2,087,748 rather than from the row that cited
+                    it. `manageAdminNotes()` itself is at 2,081,768:
+
+                      needPasswordForUserNotes && !allowToManageNotes
+                        ? bootbox.prompt({ title: "Please enter the password to manage user's
+                            notes:", … })
+                        : allowToManageNotes = !0
+
+                    So the reference's TAB raises the password door, and grants silently when the
+                    room configured no password. `RoomAdminNotes.ask()` is that method, both
+                    branches, and `admin-notes.ts` used to carry a comment asserting the opposite
+                    — *"clicking a tab must not raise a password prompt — upstream's tab does
+                    not"*. That claim was false against these bytes; it has been corrected there
+                    rather than left as a second, disagreeing record of one fact.
+
+                    Calling the door for BOTH states, not just the ungranted one: `ask()` returns
+                    immediately when the door is already open and then loads the list, which is
+                    exactly `open()`'s job. One call site instead of a branch here means this tab
+                    cannot drift out of step with what the door decides.
                   */
-                  if (tabId === 'notes') userNotes.open(targetUser.id);
+                  if (tabId === 'notes') onUserAction('admin-notes-password', targetUser);
                 }}
               >
                 {label}
@@ -2524,13 +2743,77 @@
                           `item.badges` had a supply. `missing-settings-triage.md` carries it as
                           BLOCKED with what would unblock it.
                         -->
-                        {#if isPresenter && targetUser.isTrial}<span class="badge badge-danger"
-                            >Trial</span
+                        <!--
+                          UIM-10 — THE TWO BADGE CLASS LISTS, from the component's own consts.
+
+                          These were `badge badge-danger` and `badge badge-info`: Bootstrap 4
+                          contextual classes with no per-badge hook. Decoded from the user-info
+                          modal's consts table (walked from byte 2,087,748, 131 entries), the
+                          reference builds them from
+
+                            const 58 = [1,"badge","bg-danger","trial-badge"]   — `eTe`, " Trial "
+                            const 59 = [1,"badge","bg-warning","new-badge"]    — `tTe`, " New "
+
+                          Three differences, and all three matter. `bg-*` is the Bootstrap **5**
+                          spelling this room is built on, so `badge-info` was inheriting nothing.
+                          `New` is WARNING, not info — a different colour, not a different name for
+                          the same one. And `trial-badge` / `new-badge` are the hooks any room
+                          stylesheet hangs its own rules on; without them the modal was invisible
+                          to CSS that reaches every other surface.
+
+                          Our own sibling already had it right — `RoomMessage.svelte` renders
+                          `badge bg-danger trial-badge` and `badge bg-warning new-badge` — so this
+                          was one room drawing one badge two ways. The `Offline` badge two rows up
+                          is NOT changed: its const is 9 = [1,"badge","badge-danger"], which is the
+                          Bootstrap-4 spelling in the reference too, and copying a value means
+                          copying it where it disagrees with its neighbours as well.
+                        -->
+                        {#if isPresenter && targetUser.isTrial}<span
+                            class="badge bg-danger trial-badge">Trial</span
                           >{/if}
-                        {#if isPresenter && targetUser.isNew}<span class="badge badge-info"
-                            >New</span
+                        {#if isPresenter && targetUser.isNew}<span
+                            class="badge bg-warning new-badge">New</span
                           >{/if}
-                        {#if targetUser.years}
+                        <!--
+                          UIM-08 — THE STARS GATE HAD ONE OF ITS THREE TERMS.
+
+                          `O(21, sessData.disableStarYears || user.isP || !user.data.years ? -1 :
+                          21)` at bundle byte 2,061,001, read in full. Inverted (the reference names
+                          the reasons to HIDE; a Svelte `{#if}` names the reason to show) that is:
+
+                            !disableStarYears && !isP && years
+
+                          and this was `{#if targetUser.years}` — the third term alone.
+
+                          **`disableStarYears`** is a real, supplied room setting here: declared at
+                          `server/room-config-client.ts:81`, carried on `RoomMessageChrome`, and
+                          already obeyed by `RoomMessage.svelte:753` and `:1039`. It needs no new
+                          prop — `messageChrome` is already on this component for the Q&A thread —
+                          which is the whole reason that type exists: one room setting resolved
+                          once, so three renderers cannot disagree about it. Before this, a room
+                          that switched the membership star OFF still showed it here, and this
+                          modal was the only star in the room ignoring the owner's setting.
+
+                          **`user.isP`** — "is this member a presenter" — the audit row recorded as
+                          having no counterpart in `apps/room/src`. It has one, and the mapping is
+                          already written down: `private-chat.svelte.ts:432` builds a roster target
+                          as `permissions: user.isP ? 'a' : 'r'`, and `permissions` is the field
+                          this modal's own Permissions row reads two rows below to print
+                          "Presenter / Admin". So `targetUser.permissions !== 'a'` IS `!user.isP`,
+                          spelled in this room's vocabulary. The reference hides the membership
+                          star from presenters because a presenter's standing is their role, not
+                          their tenure.
+
+                          **`years` still has no supply**, and that is stated rather than papered
+                          over: `room-config-client.ts:82` records that `item.membershipYears` has
+                          no producer yet, and `ModalTargetUser.years` has none either — so this
+                          block renders for nobody today, exactly as it did before. Writing the
+                          gate correctly NOW is the cheap half: `RoomMessage.svelte:753` carries the
+                          same three-term shape over the same absent supply, so when a producer
+                          lands, both surfaces are already right. A gate written after the supply
+                          arrives is a gate written while somebody is watching a wrong star.
+                        -->
+                        {#if !messageChrome.disableStarYears && targetUser.permissions !== 'a' && targetUser.years}
                           <span class="stars-container">
                             <i class="fas fa-star stars-icon"></i>
                             <span class="stars-num">{targetUser.years}</span>
@@ -2622,7 +2905,10 @@
                             <!--
                               `giveMicScreen(true|false)`.
 
-                              The method is transcribed byte-for-byte (bundle offset 2075481) and
+                              The method is transcribed byte-for-byte (bundle offset 2077604 — this
+                              said 2075481 until UIM-13; see the docblock on `giveMicScreen` for
+                              what is actually at that address and why the wrong pointer mattered
+                              more than a wrong pointer usually does) and
                               belongs to this component, proven by its neighbours `saveCustomPerms`
                               and `startPrivateChat`. The BUTTONS are ours: the calling element is
                               still not located in the decoded template, so the affordance is a
@@ -2795,18 +3081,51 @@
                     ><i class="icon fa fa-desktop"></i>&nbsp;<i class="icon fa fa-stop-circle"></i> Stop
                     Screens</button
                   >
+                  <!--
+                    UIM-11 and UIM-12 — TWO ICONS IN THIS COLUMN WERE NOT THE REFERENCE'S, and the
+                    two errors were making each other worse.
+
+                    Read at bundle byte 2,064,155, the peer-command column emits, in order:
+
+                      T(13,"i",71), v(14,"\xa0"), T(15,"i",41), v(16," Restart Screens ")
+                      T(18,"i",89),                             v(19," Start Rec ")
+                      T(21,"i",88),                             v(22," Stop Rec ")
+
+                    and the consts they name — walked out of this component's own table at
+                    2,087,748 rather than looked up from the row that cited them — are:
+
+                      71 = [1,"icon","fa","fa-desktop"]
+                      41 = [1,"icon","fa","fa-sync"]
+                      89 = [1,"icon","fa","fa-play-circle"]
+                      88 = [1,"icon","fa","fa-stop-circle"]
+
+                    **Restart Screens** was `fa-desktop` + `fa-play-circle`. The screen half was
+                    right; the action half was not. `fa-sync` is the circular-arrows glyph — the
+                    same one this column's own "Force Reload" already uses — and it is what makes
+                    RESTART read as restart.
+
+                    **Start Rec** was `fa-record-vinyl`. That class occurs **zero times** in the
+                    2,891,205-byte bundle; it was invented here. Its real const is
+                    `fa-play-circle`.
+
+                    The two together are why this is one comment and not two. `play-circle` was on
+                    the wrong button, so fixing only UIM-12 would have put Start Rec's icon next to
+                    Restart Screens' — two different acts drawn identically, which is precisely the
+                    confusion `local-capture.svelte.ts:797` already warns about in prose for
+                    Restart Screens vs Stop Screens. Corrected together, the column reads
+                    desktop+sync / play / stop, and no two buttons share a glyph.
+                  -->
                   <button
                     type="button"
                     class="btn btn-block btn-outline-light"
                     onclick={() => onUserAction('restart-screens', targetUser)}
-                    ><i class="icon fa fa-desktop"></i>&nbsp;<i class="icon fa fa-play-circle"></i> Restart
-                    Screens</button
+                    ><i class="icon fa fa-desktop"></i>&nbsp;<i class="icon fa fa-sync"></i> Restart Screens</button
                   >
                   <button
                     type="button"
                     class="btn btn-block btn-outline-light"
                     onclick={() => onUserAction('start-recording', targetUser)}
-                    ><i class="icon fa fa-record-vinyl"></i> Start Rec</button
+                    ><i class="icon fa fa-play-circle"></i> Start Rec</button
                   >
                   <button
                     type="button"
@@ -2977,9 +3296,45 @@
         </div>
       </div>
     {:else if isTargetFollowed}
+      <!--
+        UIM-05 — RESET RESET NOTHING THAT SURVIVED THE MODAL CLOSING.
+
+        `onreset` was `followChatStyle = defaultFollowStyle()`: local `$state`, and nothing else.
+        A presenter pressed Reset, watched the preview go back to the defaults, closed the modal,
+        and the followed member's saved style was exactly what it had been. The one control on this
+        pane that LOOKED like it had taken effect was the one that had not.
+
+        The reference at bundle byte 2,075,493 is two statements, not one:
+
+          resetFollowChatStyle(e) {
+            this.followChatStyle = this.loadDefaultFollowChatStyle(),
+            this.appService.updateUserInList(
+              { emailHash: e, followChatStyle: this.followChatStyle }, "followedUsers")
+          }
+
+        and its neighbour twelve bytes later shows why that second line is not incidental:
+
+          saveFollowChatStyle(e) {
+            this.appService.updateUserInList(
+              { emailHash: e, followChatStyle: this.followChatStyle }, "followedUsers")
+          }
+
+        — `resetFollowChatStyle` IS `saveFollowChatStyle` with a seed in front of it. Both write
+        immediately; neither waits for a separate Save. Our "Save changes" button already called
+        `onFollowStyleChange`, so the persistence path was built and this one control simply did
+        not use it.
+
+        The two statements are written in that ORDER and read `followChatStyle` back rather than
+        passing `defaultFollowStyle()` twice: the pane binds this same variable, so what is
+        persisted is what the preview is showing, and a future change to the seed cannot make the
+        saved value and the drawn value disagree.
+      -->
       <FollowChatStylePane
         bind:style={followChatStyle}
-        onreset={() => (followChatStyle = defaultFollowStyle())}
+        onreset={() => {
+          followChatStyle = defaultFollowStyle();
+          onFollowStyleChange(targetUser, followChatStyle);
+        }}
         onsave={() => onFollowStyleChange(targetUser, followChatStyle)}
         ontestsound={() => onUserAction('test-follow-sound', targetUser)}
       />
@@ -2996,16 +3351,25 @@
         >
           @Mention
         </button>
-        <button
-          type="button"
-          class="btn btn-outline-light"
-          onclick={() => {
-            onPrivateChat(targetUser);
-            onclose();
-          }}
-        >
-          Private Chat
-        </button>
+        <!--
+          UIM-04 — the second term. `O(18, o.canPM && o.checkIsMe() ? 18 : -1)`; see the
+          `canPrivateChat` prop for the decoded expression and why it arrives already answered.
+          A nested `{#if}` rather than widening the surrounding one, because the surrounding one is
+          `checkIsMe()` and it is shared with @Mention, Follow and Mute — which do NOT take this
+          term.
+        -->
+        {#if canPrivateChat}
+          <button
+            type="button"
+            class="btn btn-outline-light"
+            onclick={() => {
+              onPrivateChat(targetUser);
+              onclose();
+            }}
+          >
+            Private Chat
+          </button>
+        {/if}
         <button
           type="button"
           class="btn btn-outline-info"
@@ -5500,29 +5864,18 @@
     {/snippet}
   </Modal>
 </app-scheduled-alerts-modal>
-<app-alert-send-report-modal>
-  <Modal
-    id="alert-send-report-modal"
-    open={name === 'report'}
-    ariaLabelledby="alert-send-report-modal"
-    title={`Alert Sent Report. AlertID: ${targetMessage?.id ?? ''}`}
-    {onclose}
-    footerClass="text-center"
-  >
-    {#if reportLoading}
-      <div class="text-center my-4">
-        <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
-      </div>
-    {:else}
-      <div class="mt-3 text-center">No Reports.</div>
-    {/if}
-    {#snippet footer()}
-      <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
-        Close
-      </button>
-    {/snippet}
-  </Modal>
-</app-alert-send-report-modal>
+<!--
+  The Alert Sent Report modal is its OWN COMPONENT — `AlertSendReportModal.svelte`.
+
+  Not because this file was over its ceiling (it was), but because what lives there is a hundred
+  lines of measured refusal about one surface: six of upstream's controls rest on a per-recipient
+  delivery record this product does not have, in any table, written by anything. That argument is a
+  document about that modal, and `source-size-contract.test.ts`'s own rule for this situation is to
+  move the explanation to the code it explains rather than to shorten it.
+
+  Both of its strings went with it. They are that component's copy, not this one's.
+-->
+<AlertSendReportModal open={name === 'report'} {targetMessage} {onclose} />
 <app-all-user-pmmodal>
   <Modal
     id="all-user-pm-modal"
@@ -5704,23 +6057,57 @@
             class={roomDropdownOpen ? 'dropdown-menu w-100 show' : 'dropdown-menu w-100'}
             style={roomDropdownOpen ? 'display: block;' : undefined}
           >
+            <!--
+              ── SRCH-03: THE DIVERGENCE STAYS, THE INVENTED VALUE GOES ───────────────────────────
+
+              The reference builds this list by ITERATION — `ZMe` at bundle byte 2,420,598 is
+              `d(0,"li",35), x("click", … g().toggleSess(o.key, o.value))` over `{key, value}`
+              pairs, and its source (`ngOnInit`, byte 2,423,600) is `localstorage.getObject(
+              "userSessions")` seeded by `getAllSTRoomsForUser()`. That is a multi-room directory:
+              one account, many rooms, pick which to search.
+
+              **That half is a deliberate divergence and remains one.** This application is a
+              single room per deployment — there is no rooms endpoint, no `userSessions` key, and
+              `syncRooms()` already answers with `SYNC_ROOMS_UNAVAILABLE` for exactly this reason.
+              An `{#each}` over a one-element list would be the same markup wearing a loop.
+
+              **The other half was not a divergence, it was an INVENTION.** The key and the label
+              were the literals `'mastering-the-trade'` and `'Mastering The Trade'`, hard-coded
+              here. Neither string occurs in the bundle; they were made up, and they named a room
+              that is not necessarily the room the presenter is standing in. So the one entry in
+              this dropdown could be ticked, could appear in `selectedRoomsStr` at the top of the
+              modal, and did not identify anything real.
+
+              `room.shortCode` and `room.name` are what the controller says this room IS — the same
+              pair `+page.server.ts` puts on the page load and `RoomBranding` draws in the navbar.
+              The control now names its own room, which is the honest single-room reading of
+              `toggleSess(o.key, o.value)`: the directory has one entry, and this is it.
+
+              `{const}` and not `{@const}` — the latter is legacy in this repository as of
+              2026-08-30 and `declaration-tag-contract.test.ts` refuses it.
+
+              **And `$derived`, which the first draft of this line got wrong.** It was a bare
+              `{const roomKey = room.shortCode}` with a comment arguing that nothing here is
+              recomputed. That test refuses a bare declaration tag outright, and it is right to: a
+              bare `{const}` compiles to no derived and is evaluated once when its block is created,
+              so it goes stale silently the moment its source does. `room` is a PROP — it comes off
+              `data.room`, and `depends('room:data')` means the page load can re-run — so "cannot
+              change" was not even true here. The rule is the authority and the argument was wrong.
+            -->
+            {const roomKey = $derived(room.shortCode)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
             <li
               onclick={() => {
-                advancedSearch.rooms = toggleKey(
-                  advancedSearch.rooms,
-                  'mastering-the-trade',
-                  'Mastering The Trade'
-                );
+                advancedSearch.rooms = toggleKey(advancedSearch.rooms, roomKey, room.name);
               }}
             >
               <!-- svelte-ignore a11y_missing_attribute -->
               <a class="dropdown-item">
-                {#if advancedSearch.rooms['mastering-the-trade']}
+                {#if advancedSearch.rooms[roomKey]}
                   <i class="fas fa-check-square me-1"></i>
                 {/if}
-                Mastering The Trade
+                {room.name}
               </a>
             </li>
             {#if selectedRoomsStr}

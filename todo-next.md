@@ -74,14 +74,14 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,481 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,868 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
 | 3 | `routes/+page.svelte` | 1,729 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
-| 8 | `lib/components/RoomOverlays.svelte` | 1,055 | no |
+| 8 | `lib/components/RoomOverlays.svelte` | 1,080 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 895 | no |
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 34,354 lines · 3.2%.**
+**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -151,7 +151,7 @@ guessed.
 | 60 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 61 | `routes/logout/+page.svelte` | 31 | no |
 | 62 | `routes/+layout.svelte` | 27 | no |
-| 63 | `lib/components/FollowChatStylePane.svelte` | 151 | no |
+| 63 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
 | 64 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 65 | `lib/components/LogArchiveModals.svelte` | 147 | no |
 | 66 | `lib/components/ChatArchivePane.svelte` | 143 | no |
@@ -160,6 +160,7 @@ guessed.
 | 69 | `lib/components/RestreamPane.svelte` | 105 | no |
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
+| 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

@@ -157,7 +157,20 @@ describe('every internal route verifies the credential its job needs', () => {
     Had it been split in two, the list endpoint would have been the read that leaks, and this list
     would have had to say so.
   */
+  /*
+    `room-alert-delete-auth` joined 2026-08-30, and it is the FOURTH question-shaped read. It POSTs a
+    candidate the controller compares against `deleteAlertPW` and answers two booleans; nothing on
+    the controller changes, which is what puts it here rather than in WRITES.
+
+    It is a SECOND ROUTE rather than a `credential` parameter on `room-notes-auth`, and this list is
+    where that shows up as a decision rather than as a copied paragraph. One endpoint taking a
+    credential NAME would let any holder of a `config-read` token ask "is this string the value of
+    `obsStreamKey`" and walk all seven credential-shaped settings a guess at a time. So the count of
+    READS grows by one per question, deliberately: the length of this list is the price of not having
+    an oracle, and `room-credential-prompt.ts` carries the full argument.
+  */
   const READS = [
+    'room-alert-delete-auth',
     'room-config',
     'room-entry',
     'room-notes-auth',

@@ -303,11 +303,32 @@ it was planning.
    `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
 3. **Part 3 v5** — when an account is cleared for it.
 
-**Then the 25 confirmed gaps in `docs/decoded/missing-commands-triage.md`**, which is the only
-complete list of what the reference has and we do not. Moderation (`kickUser`, `unmuteChat`,
-`lockSession`) and the archives pair (`archiveLogs` / `unarchiveLogs`) are the largest clusters left.
-Five media-server admin commands are deliberately parked as UNCLEAR: whether a presenter should be
-able to reset shared media infrastructure is a product and safety decision, not a porting question.
+**Then `docs/decoded/missing-commands-triage.md`** — the only complete list of what the reference has
+and we do not. **This paragraph pointed at work that is finished, and is corrected 2026-08-30 by
+reading that document rather than by remembering it.**
+
+It used to say *"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the archives pair
+(`archiveLogs` / `unarchiveLogs`) are the largest clusters left."* Every one of those five is built:
+`kicks.ts`, `chat-mute.ts` (whose docblock quotes the reference's own `subscribe("unmuteChat", …)`),
+and `chat-archive-port.ts`, which wires `archiveChatLog` and `unarchiveChatLogCommand`. The triage's
+own measured tally is **0 still NOT BUILT** — 14 built, 7 built under another name, 4 blocked with
+the blocker named — and `apps/room/src/lib/missing-command-census-contract.test.ts` recomputes that
+tally on every run and fails on a disagreement **in either direction**, so the triage cannot go
+stale. This file could, and did.
+
+**The rule that follows is the one this repository keeps re-learning:** the triage is the tracker for
+those commands, so this file must POINT at it and never restate its state. Two places recording one
+thing is how one of them goes stale, and the stale one is always the summary.
+
+**Five remain, and they are blocked rather than pending.** `getMyRepeater`, `resetAudioBridge`,
+`resetAllMediaServers`, `resetMediaServer` and `resetAudioBridgeOnServer` — the SaaS operator's
+toolkit, and the owner answered the product question about them on 2026-08-15: they are not "should a
+presenter reset shared infrastructure", they are what an operator uses when a tenant has a problem.
+The triage says what is actually missing and it is not the commands: **reach**. Ours work inside one
+room; the operator need is to invoke them for a tenant's room from a central console. On top of that,
+four of the five reset a media plane this deployment does not have — the same `STREAM_SERVER_MTX`
+host that blocks `TODO.md` rows AD, X and R. Building five controls that reset servers which are not
+there is the dead scaffolding the standard forbids by name.
 
 ## Evidence — two of these four are NOT committed, corrected 2026-08-29
 

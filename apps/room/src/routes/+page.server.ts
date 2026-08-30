@@ -1,26 +1,21 @@
-import { fail } from '@sveltejs/kit';
+// `fail` is gone, and so is every form action: this file exports a load and nothing else. Each
+// mutation is a remote command now, and a command's refusal is `error(…)` — a rejected promise the
+// caller can see — not a value it may ignore. See the block at the foot of the file for where each
+// action went, and why the last one was deleted rather than moved.
 import { and, asc, desc, eq, gt } from 'drizzle-orm';
 // `isEmptyChatHtml` and `sanitizeChatHtml` left with the two paths that sanitise — `sendMessage` in
 // `chat-messages.remote.ts` and the edit branch in `message-actions.remote.ts`.
 // `pruneDeadPreferenceKeys` left with `savePreference` for `user-settings.remote.ts`; the browser
 // half went to `mirrorPreferenceToLocalStorage`, beside the list it evicts.
 import { calculatePollTotals, parsePollChoices } from '#lib/poll-behavior.js';
-import {
-  deleteSessionNoteTabSchema,
-  newSessionNoteTabSchema,
-  renameSessionNoteTabSchema,
-  restoreNoteVersionSchema,
-  saveSessionNoteSchema,
-  setWelcomeMatNoteTabSchema
-} from '#lib/notes-command.js';
+// The six note-command schemas left with the commands they validate, for
+// `session-notes.remote.ts`. `#lib/notes-command.ts` is still their home and still carries the
+// captured `{cmd, data}` envelope and its own test; nothing in this file parses one any more.
 import { db, ensureDatabase } from '#lib/server/db/index.js';
-import {
-  isPresenterRole,
-  logout,
-  requireRoomShortCode,
-  requireSessionId,
-  requireUser
-} from '#lib/server/auth.js';
+// `isPresenterRole` left with the gates that call it — `notesRoom`, `swingAlertsRoom` and
+// `dayTradeAlertsRoom` in the three new `.remote.ts` modules, and `presenterRoom` in `auth.ts` for
+// the rest. Nothing in this file decides authority any more; the load reports it.
+import { logout, requireRoomShortCode, requireSessionId, requireUser } from '#lib/server/auth.js';
 import { redirectSignedOut } from '#lib/server/control-plane.js';
 import {
   CAPTURE_REFERENCE_ROOM,
@@ -38,18 +33,18 @@ import { parseReactions } from '#lib/server/reactions.js';
 // `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
 // `writeRoomSetting` and `alertSoundCommandValue` left with `overwriteCashRegisterSound` for
 // `files-pane.remote.ts`; nothing else in this file writes a room setting.
-import {
-  checkWelcomeMatPasswordRemotely,
-  readRoomConfig,
-  requestStreamReadToken
-} from '#lib/server/room-config-client.js';
+// `checkWelcomeMatPasswordRemotely` left with `setWelcomeMatNoteTab` for
+// `session-notes.remote.ts`, which is the only caller it ever had.
+import { readRoomConfig, requestStreamReadToken } from '#lib/server/room-config-client.js';
 import { memberDeniedArchives } from '#lib/roster-gates.js';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
-import { consumeRateLimit } from '#lib/server/rate-limit.js';
+// `consumeRateLimit` left with the two trade-alert creates, which were the last writers in this
+// file to spend the `alert` bucket. `post-alert.remote.ts` and the two new alert modules share it.
 import { mediaSignallingUrl } from '#lib/server/media-grant.js';
-// `publishToUsers` left with the private-message commands for `private-chat.remote.ts`; the three
-// publishes remaining here are all room-wide broadcasts.
-import { publishToRoom } from '#lib/server/room-events.js';
+// `publishToUsers` left with the private-message commands for `private-chat.remote.ts`, and
+// `publishToRoom` followed it on 2026-08-30: the last three publishes in this file were
+// `updatedSessionNote` and the two trade-alert feed mirrors, and all three left with their commands.
+// This file now READS the room and announces nothing.
 // `grantMediaElevation` / `revokeMediaElevation` left with `giveMicScreen` for
 // `presenter-commands.remote.ts`; nothing else in this file elevates anybody.
 // `deleteStoredFile` and `storeUpload` left with the Files-pane commands; nothing here stores a
@@ -72,39 +67,20 @@ import { loadConversations } from '#lib/server/private-chat.js';
  * The key is the controller's four-digit short code, taken from the session rather than a
  * parameter, so a client cannot subscribe itself to somebody else's room by editing a URL.
  */
-import {
-  createNote,
-  deleteNote,
-  getNotes,
-  renameNote,
-  restoreNoteVersion,
-  saveNote,
-  setWelcomeMatNote,
-  setWelcomeMatNoteEverywhere
-} from '#lib/server/notes-repository.js';
-import {
-  createSwingAlert,
-  deleteSwingAlert,
-  editSwingAlert,
-  getSwingAlerts
-} from '#lib/server/swing-alerts-repository.js';
-import {
-  deleteSwingAlertMsgSchema,
-  editSwingAlertMsgSchema,
-  swingAlertMsgSchema
-} from '#lib/swing-alerts-command.js';
+// `createNote`, `deleteNote`, `renameNote`, `restoreNoteVersion`, `saveNote`, `setWelcomeMatNote`
+// and `setWelcomeMatNoteEverywhere` left with the six commands for `session-notes.remote.ts`. What
+// stays is the READ, which the loader still sends with the room.
+import { getNotes } from '#lib/server/notes-repository.js';
+// The three Swing mutations and their schemas left for `swing-alerts.remote.ts`, where the
+// entitlement is re-asked on every write. What stays is the READ, plus `swingAlertsTabVisible` —
+// the load tells the page whether to draw the tab at all, and it is the same setting read from the
+// same config, deliberately: a tab drawn against one answer and a write refused against another is
+// how the two get to disagree.
+import { getSwingAlerts } from '#lib/server/swing-alerts-repository.js';
 import { SWING_ALERT_INITIAL_DAYS, swingAlertsTabVisible } from '#lib/swing-alerts.js';
-import {
-  createDayTradeAlert,
-  deleteDayTradeAlert,
-  editDayTradeAlert,
-  getDayTradeAlerts
-} from '#lib/server/day-trade-alerts-repository.js';
-import {
-  dayTradeAlertMsgSchema,
-  deleteDayTradeAlertMsgSchema,
-  editDayTradeAlertMsgSchema
-} from '#lib/day-trade-alerts-command.js';
+// The three Day Trade mutations and their schemas left for `day-trade-alerts.remote.ts`, the same
+// way and for the same reason as their Swing twins. What stays is the READ and the tab gate.
+import { getDayTradeAlerts } from '#lib/server/day-trade-alerts-repository.js';
 import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '#lib/day-trade-alerts.js';
 import {
   capturedItemOverrides,
@@ -130,118 +106,23 @@ import type { ActivePoll } from '#lib/types.js';
 */
 // `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` left for `#lib/message-bounds.ts`, which exists because a
 // `.remote.ts` file cannot export a constant and three commands across two modules need them.
-import type { Actions, PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
-/**
- * The two gates every Swing Trade Alerts mutation passes, in cost order.
- *
- * Returns an `ActionFailure` to hand straight back, or `null` to proceed.
- *
- * **Presenter first, entitlement second.** The role check is a field read on a row already in
- * memory; the entitlement is a call to the controller with a two-second timeout. Asking the cheap
- * question first means a member who should never have reached this action does not cost a round
- * trip, and it means a controller outage cannot be used to probe for it.
- *
- * The entitlement is re-asked here rather than trusted from the page load, because the load ran
- * against a different request: a presenter whose owner turned the feature off mid-session must stop
- * being able to write, and this is the only place that can know. `readRoomConfig` throws when the
- * controller cannot be reached, which fails the action closed — the correct direction for a feature
- * switch, and the same behaviour the page load has.
- */
-async function refuseSwingAlert(
-  request: Request,
-  locals: App.Locals,
-  verb: string
-): Promise<ReturnType<typeof fail> | null> {
-  const user = requireUser(locals);
-  if (!isPresenterRole(user.role)) {
-    return fail(403, { message: `You cannot ${verb}.` });
-  }
-  const { settings } = await readRoomConfig(request, requireRoomShortCode(locals), user.email);
-  if (!swingAlertsTabVisible(settings)) {
-    // 404 rather than 403: in a room without the entitlement the feature does not exist, and
-    // saying "forbidden" would confirm that it exists somewhere and this member is not allowed it.
-    return fail(404, { message: 'Swing Trade Alerts are not enabled for this room.' });
-  }
-  return null;
-}
+/*
+  `refuseSwingAlert`, `refuseDayTradeAlert`, `swingAlertFieldsFrom` and `dayTradeAlertFieldsFrom`
+  left with the six mutations they served.
 
-/**
- * The six typed fields, read off the form untouched.
- *
- * No coercion and no defaulting beyond `''` for an absent field: the zod schema trims, bounds and
- * refuses, and doing any of that twice in two places is how the two get to disagree. In particular
- * the three price fields stay strings — they came from `type="text"` inputs and are rendered back
- * verbatim.
- */
-function swingAlertFieldsFrom(formData: FormData) {
-  return {
-    symbol: String(formData.get('symbol') ?? ''),
-    direction: String(formData.get('direction') ?? ''),
-    entryPrice: String(formData.get('entryPrice') ?? ''),
-    stop: String(formData.get('stop') ?? ''),
-    target: String(formData.get('target') ?? ''),
-    image: String(formData.get('image') ?? '')
-  };
-}
+  The two GUARDS are `swingAlertsRoom` and `dayTradeAlertsRoom` in the two `.remote.ts` modules,
+  still two functions rather than one taking a predicate, and still asking the cheap question first.
+  The two READERS became one `draftFrom` at the client edge, because a command's payload arrives as
+  a typed object rather than as a `FormData` — see `lib/room/trade-alerts.svelte.ts`, which records
+  why a missing field is now a loud refusal instead of `?? ''`.
 
-/**
- * The two gates every Day Trade Alerts mutation passes, in cost order.
- *
- * The port of {@link refuseSwingAlert}, and a SEPARATE function rather than a parameterised one:
- * the entitlement it consults is a different room setting, the message it returns names a different
- * feature, and a shared guard taking a predicate would be one place where turning Swing off could
- * be made to turn Day Trade off too.
- *
- * **Presenter first, entitlement second.** The role check is a field read on a row already in
- * memory; the entitlement is a call to the controller with a two-second timeout. Asking the cheap
- * question first means a member who should never have reached this action does not cost a round
- * trip, and it means a controller outage cannot be used to probe for it.
- *
- * The entitlement is re-asked here rather than trusted from the page load, because the load ran
- * against a different request: a presenter whose owner turned the feature off mid-session must stop
- * being able to write, and this is the only place that can know. `readRoomConfig` throws when the
- * controller cannot be reached, which fails the action closed — the correct direction for a feature
- * switch, and the same behaviour the page load has.
- */
-async function refuseDayTradeAlert(
-  request: Request,
-  locals: App.Locals,
-  verb: string
-): Promise<ReturnType<typeof fail> | null> {
-  const user = requireUser(locals);
-  if (!isPresenterRole(user.role)) {
-    return fail(403, { message: `You cannot ${verb}.` });
-  }
-  const { settings } = await readRoomConfig(request, requireRoomShortCode(locals), user.email);
-  if (!dayTradeAlertsTabVisible(settings)) {
-    // 404 rather than 403: in a room without the entitlement the feature does not exist, and
-    // saying "forbidden" would confirm that it exists somewhere and this member is not allowed it.
-    return fail(404, { message: 'Day Trade Alerts are not enabled for this room.' });
-  }
-  return null;
-}
-
-/**
- * The six typed fields, read off the form untouched.
- *
- * Identical in shape to `swingAlertFieldsFrom` and deliberately not shared with it: the two forms
- * post the same six field names today, and the day one of them gains a seventh is the day a shared
- * reader starts silently dropping it for the other. No coercion and no defaulting beyond `''` for
- * an absent field — the zod schema trims, bounds and refuses, and doing any of that twice in two
- * places is how the two get to disagree. In particular the three price fields stay strings: they
- * came from `type="text"` inputs and are rendered back verbatim.
- */
-function dayTradeAlertFieldsFrom(formData: FormData) {
-  return {
-    symbol: String(formData.get('symbol') ?? ''),
-    direction: String(formData.get('direction') ?? ''),
-    entryPrice: String(formData.get('entryPrice') ?? ''),
-    stop: String(formData.get('stop') ?? ''),
-    target: String(formData.get('target') ?? ''),
-    image: String(formData.get('image') ?? '')
-  };
-}
+  Their long docblocks went with them rather than being summarised here. The one thing worth leaving
+  behind is the reason the two guards were never merged: the entitlement each consults is a
+  DIFFERENT room setting, so a shared guard taking a predicate would be one place where turning
+  Swing off could be made to turn Day Trade off too.
+*/
 
 export const load: PageServerLoad = async ({ depends, locals, request, cookies }) => {
   ensureDatabase();
@@ -855,854 +736,267 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
   };
 };
 
-export const actions: Actions = {
-  logout: async ({ cookies, locals }) => {
-    logout(cookies);
-    // handle() ran before this action and will not run again before the redirect's load, so the
-    // stale user has to be cleared here as well.
-    locals.user = null;
-    locals.sessionId = undefined;
-    // Back to the controller, which is where signing in happens now.
-    redirectSignedOut();
-  },
-
-  newSessionNoteTab: async ({ request, locals }) => {
-    ensureDatabase();
-    if (requireUser(locals).role !== 'staff' && requireUser(locals).role !== 'admin') {
-      return fail(403, { message: 'You cannot create session notes.' });
-    }
-
-    const formData = await request.formData();
-    const command = newSessionNoteTabSchema.safeParse({
-      cmd: 'newSessionNoteTab',
-      data: { name: String(formData.get('name') ?? '') }
-    });
-    if (!command.success) return fail(400, { message: 'A valid note name is required.' });
-
-    return {
-      success: true,
-      note: createNote({
-        room: requireRoomShortCode(locals),
-        name: command.data.data.name,
-        now: new Date(),
-        userId: requireUser(locals).id
-      })
-    };
-  },
-
-  saveSessionNote: async ({ request, locals }) => {
-    ensureDatabase();
-    if (requireUser(locals).role !== 'staff' && requireUser(locals).role !== 'admin') {
-      return fail(403, { message: 'You cannot edit session notes.' });
-    }
-
-    const formData = await request.formData();
-    const command = saveSessionNoteSchema.safeParse({
-      cmd: 'saveSessionNote',
-      data: {
-        noteId: Number(formData.get('noteId')),
-        contentHtml: String(formData.get('contentHtml') ?? '')
-      }
-    });
-    if (!command.success) return fail(400, { message: 'Invalid session note content.' });
-
-    const note = saveNote({
-      room: requireRoomShortCode(locals),
-      contentHtml: command.data.data.contentHtml,
-      noteId: command.data.data.noteId,
-      now: new Date(),
-      userId: requireUser(locals).id
-    });
-    if (note === null) return fail(404, { message: 'Session note was not found.' });
-
-    /*
-      ── A SAVED NOTE TOLD NOBODY ────────────────────────────────────────────────────────────────
-
-      ```js
-      case "updatedSessionNote":
-        for (let se = 0; se < this.globals.sessionNotes.length; se++) {
-          let _e = this.globals.sessionNotes[se];
-          _e._id == i.tab._id && (this.globals.sessionNotes[se].noteContent = i.tab.noteContent,
-            this.appEventBus.emit("noteTabUpdated", { id: _e._id, name: _e.name })) }
-        break;                                                        // bundle byte 1,022,762
-      ```
-
-      This action wrote the row and returned. Every other viewer's Notes pane kept the previous text
-      until they happened to reload — a presenter edits the room's notes during a session and the
-      room does not see it, which is the whole point of the pane.
-
-      USM-11 is the popup half of this, and it could not exist without the frame.
-
-      THE PAYLOAD IS THE ID AND THE NAME, not the content. `invalidateAll()` re-reads the row, which
-      is the authority — the same argument the four message-mutation frames make. The name rides
-      along because the toast needs it and a note's TAB NAME is already rendered to everyone who can
-      see the pane at all; the note's BODY is not sent, so the frame carries nothing the recipient
-      could not already read.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmds',
-      data: {
-        cmd: 'updatedSessionNote',
-        noteId: note.id,
-        noteName: note.name,
-        actorUserId: requireUser(locals).id
-      }
-    });
-    return { success: true, note };
-  },
-
-  restoreNoteVersion: async ({ request, locals }) => {
-    ensureDatabase();
-    if (requireUser(locals).role !== 'staff' && requireUser(locals).role !== 'admin') {
-      return fail(403, { message: 'You cannot restore session notes.' });
-    }
-
-    const formData = await request.formData();
-    const command = restoreNoteVersionSchema.safeParse({
-      cmd: 'restoreNoteVersion',
-      data: {
-        noteId: Number(formData.get('noteId')),
-        versionId: Number(formData.get('versionId'))
-      }
-    });
-    if (!command.success) return fail(400, { message: 'Invalid session note version.' });
-
-    const note = restoreNoteVersion({
-      room: requireRoomShortCode(locals),
-      noteId: command.data.data.noteId,
-      now: new Date(),
-      userId: requireUser(locals).id,
-      versionId: command.data.data.versionId
-    });
-    return note === null
-      ? fail(404, { message: 'Session note version was not found.' })
-      : { success: true, note };
-  },
-
-  renameSessionNoteTab: async ({ request, locals }) => {
-    ensureDatabase();
-    if (requireUser(locals).role !== 'staff' && requireUser(locals).role !== 'admin') {
-      return fail(403, { message: 'You cannot rename session notes.' });
-    }
-
-    const formData = await request.formData();
-    const command = renameSessionNoteTabSchema.safeParse({
-      cmd: 'renameSessionNoteTab',
-      data: {
-        noteId: Number(formData.get('noteId')),
-        newName: String(formData.get('newName') ?? '')
-      }
-    });
-    if (!command.success) return fail(400, { message: 'A valid note name is required.' });
-
-    const note = renameNote({
-      room: requireRoomShortCode(locals),
-      name: command.data.data.newName,
-      noteId: command.data.data.noteId,
-      now: new Date(),
-      userId: requireUser(locals).id
-    });
-    return note === null
-      ? fail(404, { message: 'Session note was not found.' })
-      : { success: true, note };
-  },
-
-  deleteSessionNoteTab: async ({ request, locals }) => {
-    ensureDatabase();
-    if (requireUser(locals).role !== 'staff' && requireUser(locals).role !== 'admin') {
-      return fail(403, { message: 'You cannot delete session notes.' });
-    }
-
-    const formData = await request.formData();
-    const command = deleteSessionNoteTabSchema.safeParse({
-      cmd: 'deleteSessionNoteTab',
-      data: { noteId: Number(formData.get('noteId')) }
-    });
-    if (!command.success) return fail(400, { message: 'A valid note is required.' });
-
-    const note = deleteNote({
-      room: requireRoomShortCode(locals),
-      noteId: command.data.data.noteId,
-      now: new Date(),
-      userId: requireUser(locals).id
-    });
-    return note === null
-      ? fail(404, { message: 'Session note was not found.' })
-      : { success: true, note };
-  },
-
-  setWelcomeMatNoteTab: async ({ request, locals }) => {
-    ensureDatabase();
-    if (requireUser(locals).role !== 'staff' && requireUser(locals).role !== 'admin') {
-      return fail(403, { message: 'You cannot change the welcome mat.' });
-    }
-
-    const formData = await request.formData();
-    const command = setWelcomeMatNoteTabSchema.safeParse({
-      cmd: 'setWelcomeMatNoteTab',
-      data: {
-        noteId: Number(formData.get('noteId')),
-        allRooms: String(formData.get('allRooms')) === 'true',
-        pw: String(formData.get('pw') ?? '')
-      }
-    });
-    if (!command.success) return fail(400, { message: 'A valid note is required.' });
-
-    const room = requireRoomShortCode(locals);
-    const now = new Date();
-    const userId = requireUser(locals).id;
-
-    /*
-      ── THE ALL-ROOMS BRANCH, BUILT 2026-08-30 ────────────────────────────────────────────────
-
-      The paragraph that stood here recorded an honest gap: *"the all-rooms variant needs a
-      controller endpoint that enumerates the account's rooms and verifies `allRoomsWelcomeMatPW`."*
-      `internal/room-welcome-mat-auth` is that endpoint, and it answers both halves in one call for a
-      reason its own header gives — a separate list endpoint would let any holder of a `config-read`
-      token enumerate an account's rooms without knowing the password.
-
-      **THE AUTHORITY IS THE SERVER'S, WHICH THE REFERENCE'S IS NOT.** Upstream compares the typed
-      password in the browser against `sessData.allRoomsWelcomeMatPW`, so a member who can read
-      `sessData` can send this command with any `pw` and have it obeyed. Here the room forwards the
-      candidate and obeys the answer; it never learns the password and cannot be talked out of asking.
-
-      Fails CLOSED. `checkWelcomeMatPasswordRemotely` throws when the controller cannot be reached,
-      and that is not caught into a per-room fallback: applying to this room only would be a quiet,
-      wrong answer to a request that named every room.
-    */
-    if (command.data.data.allRooms) {
-      let decision;
-      try {
-        decision = await checkWelcomeMatPasswordRemotely(room, command.data.data.pw);
-      } catch {
-        return fail(503, {
-          message: 'The welcome mat could not be replaced everywhere right now. Try again shortly.'
-        });
-      }
-
-      /* `Wrong password!` is the reference's own string, at byte 1,474,217. */
-      if (!decision.ok) return fail(403, { message: 'Wrong password!' });
-
-      const everywhere = setWelcomeMatNoteEverywhere({
-        sourceRoom: room,
-        rooms: decision.rooms,
-        noteId: command.data.data.noteId,
-        now,
-        userId
-      });
-      return everywhere === null
-        ? fail(404, { message: 'Session note was not found.' })
-        : { success: true, note: everywhere };
-    }
-
-    const note = setWelcomeMatNote({ room, noteId: command.data.data.noteId, now, userId });
-    return note === null
-      ? fail(404, { message: 'Session note was not found.' })
-      : { success: true, note };
-  },
-
-  /*
-    ── Swing Trade Alerts ──────────────────────────────────────────────────────────────────────
-
-    The three mutations, named for the wire commands they reproduce — `swingAlertMsg`,
-    `editSwingAlertMsg`, `deleteSwingAlertMsg`. `SWING_ALERT_COMMANDS` in `#lib/swing-alerts.js` holds
-    those three plus the log read and the two feed-mirror commands, and
-    `swing-alerts-contract.test.ts` asserts that the actions declared here still match it, because a
-    renamed action is a 404 the browser reports only as "Unable to save".
-
-    **Create is `swingAlertMsg`, never `newSwingAlertMsg`.** That name is a payload KEY on the edit
-    command and, separately, the server→client push. Two independent decodes had to correct it.
-
-    Every one of the three is gated twice and neither gate is the browser's: the room must have the
-    entitlement, and the caller must be a presenter. A hidden form is not a check.
-  */
-
-  /**
-   * `swingAlertMsg` — post a swing alert.
-   *
-   * Two writes, in one transaction: the row, and the mirrored message the reference also posts into
-   * the main alerts feed with `alertMsg`. See `swing-alerts-repository.ts`.
-   */
-  swingAlertMsg: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const guard = await refuseSwingAlert(request, locals, 'post swing trade alerts');
-    if (guard) return guard;
-
-    /*
-      The SAME bucket `postAlert` spends, and that is the point rather than a copy-paste.
-
-      This action posts into the main alerts feed — that is the second of its two writes — so
-      without this it is a way to post alerts at any rate the network allows, straight past the
-      limiter guarding the composer that posts the identical row. Found by re-reading the diff
-      against `postAlert`, not by a test. Only the create needs it: edit rewrites a message that
-      already exists and delete removes one.
-    */
-    const limit = consumeRateLimit('alert', user.id);
-    if (!limit.allowed) {
-      return fail(429, {
-        message: `You are posting alerts too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
-      });
-    }
-
-    const formData = await request.formData();
-    const command = swingAlertMsgSchema.safeParse({
-      cmd: 'swingAlertMsg',
-      data: swingAlertFieldsFrom(formData)
-    });
-    if (!command.success) return fail(400, { message: 'That swing alert is not valid.' });
-
-    const created = createSwingAlert({
-      room: requireRoomShortCode(locals),
-      alert: command.data.data,
-      now: new Date(),
-      // `senderName: globals.user.nick || globals.user.name` — taken from the session, never sent
-      // by the client, because a client-supplied author is a client-supplied identity.
-      senderName: user.displayName,
-      userId: user.id
-    });
-
-    /*
-      Tell the room about the mirrored message, on the same channel and in the same shape as
-      `postAlert` — writing the row made the alert exist, it did not make anyone see it.
-
-      Only the CREATE announces. Edits and deletes of an alert are not published anywhere in this
-      room today (`messageAction`'s delete branch writes and returns), so they reach other members
-      on their next load. Publishing an edit on this channel would append a SECOND copy of the alert
-      to every open feed, which is worse than the delay. Named here rather than left as a surprise.
-    */
-    if (created.mirror.alertId !== null) {
-      publishToRoom(requireRoomShortCode(locals), {
-        channel: 'alerts',
-        data: {
-          id: created.mirror.alertId,
-          senderId: user.id,
-          senderName: user.displayName,
-          body: created.mirror.body ?? '',
-          kind: 'text',
-          nonTrade: false
-        }
-      });
-    }
-    return { success: true, swingAlert: created.row };
-  },
-
-  /**
-   * `editSwingAlertMsg` — rewrite a swing alert and its mirrored feed message.
-   *
-   * The reference sends `editAlertMessageSwing` as a second command to update the mirror; here the
-   * repository does both halves in one transaction, keyed by the recorded `alert_id` rather than by
-   * re-deriving the old text and scanning the feed for it.
-   */
-  editSwingAlertMsg: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const guard = await refuseSwingAlert(request, locals, 'edit swing trade alerts');
-    if (guard) return guard;
-
-    const formData = await request.formData();
-    const command = editSwingAlertMsgSchema.safeParse({
-      cmd: 'editSwingAlertMsg',
-      data: {
-        swingAlertID: Number(formData.get('swingAlertID')),
-        ...swingAlertFieldsFrom(formData)
-      }
-    });
-    if (!command.success) return fail(400, { message: 'That swing alert is not valid.' });
-
-    const updated = editSwingAlert({
-      room: requireRoomShortCode(locals),
-      swingAlertID: command.data.data.swingAlertID,
-      alert: command.data.data,
-      senderName: user.displayName,
-      userId: user.id
-    });
-    if (updated === null) return fail(404, { message: 'That swing alert was not found.' });
-    return { success: true, swingAlert: updated.row };
-  },
-
-  /** `deleteSwingAlertMsg` — soft-delete the row, hard-delete its mirrored feed message. */
-  deleteSwingAlertMsg: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const guard = await refuseSwingAlert(request, locals, 'delete swing trade alerts');
-    if (guard) return guard;
-
-    const formData = await request.formData();
-    const command = deleteSwingAlertMsgSchema.safeParse({
-      cmd: 'deleteSwingAlertMsg',
-      data: { swingAlertID: Number(formData.get('swingAlertID')) }
-    });
-    if (!command.success) return fail(400, { message: 'A valid swing alert is required.' });
-
-    const deleted = deleteSwingAlert({
-      room: requireRoomShortCode(locals),
-      swingAlertID: command.data.data.swingAlertID,
-      now: new Date(),
-      userId: user.id
-    });
-    if (deleted === null) return fail(404, { message: 'That swing alert was not found.' });
-    return { success: true };
-  },
-
-  /*
-    ── Day Trade Alerts ────────────────────────────────────────────────────────────────────────
-
-    The three mutations, named for the wire commands they reproduce — `dayTradeAlertMsg`,
-    `editDayTradeAlertMsg`, `deleteDayTradeAlertMsg`. `DAY_TRADE_ALERT_COMMANDS` in
-    `#lib/day-trade-alerts.js` holds those three plus the log read and the two feed-mirror commands,
-    and `day-trade-alerts-contract.test.ts` asserts that the actions declared here still match it,
-    because a renamed action is a 404 the browser reports only as "Unable to save".
-
-    **Create is `dayTradeAlertMsg`, never `newDayTradeAlertMsg`.** That name is a payload KEY on the
-    edit command and, separately, the server→client push. It is the same trap the Swing build hit,
-    with the same shape and a different word in the middle.
-
-    **The edit's second command keeps the word `Swing`.** `editAlertMessageSwing` is sent by this
-    feature too (byte 1,987,189); `editAlertMessageDayTrade` exists nowhere in the bundle. The
-    repository does both halves of that edit in one transaction rather than sending two commands, so
-    no action here is named for it — but the name is pinned in the contract test, because inventing
-    the analogous one is the port's most tempting mistake.
-
-    Every one of the three is gated twice and neither gate is the browser's: the room must have the
-    entitlement, and the caller must be a presenter. A hidden form is not a check.
-  */
-
-  /**
-   * `dayTradeAlertMsg` — post a day trade alert.
-   *
-   * Two writes, in one transaction: the row, and the mirrored message the reference also posts into
-   * the main alerts feed with `alertMsg`. See `day-trade-alerts-repository.ts`.
-   */
-  dayTradeAlertMsg: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const guard = await refuseDayTradeAlert(request, locals, 'post day trade alerts');
-    if (guard) return guard;
-
-    /*
-      The SAME bucket `postAlert` and `swingAlertMsg` spend, and that is the point rather than a
-      copy-paste.
-
-      This action posts into the main alerts feed — that is the second of its two writes — so
-      without this it is a way to post alerts at any rate the network allows, straight past the
-      limiter guarding the composer that posts the identical row. The Swing action was written
-      WITHOUT it and the omission was found by re-reading the diff against `postAlert`, not by a
-      test; it is here from the first line for that reason. Only the create needs it: edit rewrites
-      a message that already exists and delete removes one.
-
-      One bucket for both features and not two, deliberately: `alert` names the feed being written,
-      and two buckets would mean a presenter could post at twice the rate by alternating tabs.
-    */
-    const limit = consumeRateLimit('alert', user.id);
-    if (!limit.allowed) {
-      return fail(429, {
-        message: `You are posting alerts too quickly. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s.`
-      });
-    }
-
-    const formData = await request.formData();
-    const command = dayTradeAlertMsgSchema.safeParse({
-      cmd: 'dayTradeAlertMsg',
-      data: dayTradeAlertFieldsFrom(formData)
-    });
-    if (!command.success) return fail(400, { message: 'That day trade alert is not valid.' });
-
-    const created = createDayTradeAlert({
-      room: requireRoomShortCode(locals),
-      alert: command.data.data,
-      now: new Date(),
-      // `senderName: globals.user.nick || globals.user.name` — taken from the session, never sent
-      // by the client, because a client-supplied author is a client-supplied identity.
-      senderName: user.displayName,
-      userId: user.id
-    });
-
-    /*
-      Tell the room about the mirrored message, on the same channel and in the same shape as
-      `postAlert` — writing the row made the alert exist, it did not make anyone see it.
-
-      Only the CREATE announces. Edits and deletes of an alert are not published anywhere in this
-      room today (`messageAction`'s delete branch writes and returns), so they reach other members
-      on their next load. Publishing an edit on this channel would append a SECOND copy of the alert
-      to every open feed, which is worse than the delay. Named here rather than left as a surprise.
-    */
-    if (created.mirror.alertId !== null) {
-      publishToRoom(requireRoomShortCode(locals), {
-        channel: 'alerts',
-        data: {
-          id: created.mirror.alertId,
-          senderId: user.id,
-          senderName: user.displayName,
-          body: created.mirror.body ?? '',
-          kind: 'text',
-          nonTrade: false
-        }
-      });
-    }
-    return { success: true, dayTradeAlert: created.row };
-  },
-
-  /**
-   * `editDayTradeAlertMsg` — rewrite a day trade alert and its mirrored feed message.
-   *
-   * The reference sends `editAlertMessageSwing` as a second command to update the mirror — that
-   * exact literal, on this path — while here the repository does both halves in one transaction,
-   * keyed by the recorded `alert_id` rather than by re-deriving the old text and scanning the feed
-   * for it. That scan is worse on this feature than on Swing: its loop has no `break`, so it walks
-   * the whole feed and the last match wins.
-   */
-  editDayTradeAlertMsg: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const guard = await refuseDayTradeAlert(request, locals, 'edit day trade alerts');
-    if (guard) return guard;
-
-    const formData = await request.formData();
-    const command = editDayTradeAlertMsgSchema.safeParse({
-      cmd: 'editDayTradeAlertMsg',
-      data: {
-        dayTradeAlertID: Number(formData.get('dayTradeAlertID')),
-        ...dayTradeAlertFieldsFrom(formData)
-      }
-    });
-    if (!command.success) return fail(400, { message: 'That day trade alert is not valid.' });
-
-    const updated = editDayTradeAlert({
-      room: requireRoomShortCode(locals),
-      dayTradeAlertID: command.data.data.dayTradeAlertID,
-      alert: command.data.data,
-      senderName: user.displayName,
-      userId: user.id
-    });
-    if (updated === null) return fail(404, { message: 'That day trade alert was not found.' });
-    return { success: true, dayTradeAlert: updated.row };
-  },
-
-  /** `deleteDayTradeAlertMsg` — soft-delete the row, hard-delete its mirrored feed message. */
-  deleteDayTradeAlertMsg: async ({ request, locals }) => {
-    ensureDatabase();
-    const user = requireUser(locals);
-    const guard = await refuseDayTradeAlert(request, locals, 'delete day trade alerts');
-    if (guard) return guard;
-
-    const formData = await request.formData();
-    const command = deleteDayTradeAlertMsgSchema.safeParse({
-      cmd: 'deleteDayTradeAlertMsg',
-      data: { dayTradeAlertID: Number(formData.get('dayTradeAlertID')) }
-    });
-    if (!command.success) return fail(400, { message: 'A valid day trade alert is required.' });
-
-    const deleted = deleteDayTradeAlert({
-      room: requireRoomShortCode(locals),
-      dayTradeAlertID: command.data.data.dayTradeAlertID,
-      now: new Date(),
-      userId: user.id
-    });
-    if (deleted === null) return fail(404, { message: 'That day trade alert was not found.' });
-    return { success: true };
-  },
-
-  /*
-    `editUsername` left for `src/routes/username.remote.ts` — a module of ONE, deliberately not
-    folded in with the settings writes beside it. Those name nobody; this takes a `userId` and can
-    rename any account when the caller is a presenter, so it is split on the GATE.
-
-    The whole dead-`'user'`-role story went with it, along with the positive restatement that
-    replaced it. New at the boundary: `z.number().int().positive()` also refuses 0 and negatives,
-    where `Number.isInteger` let them through to match no row and report success; and
-    `displayName` gained a 200-character bound it never had.
-  */
-
-  /*
-    `sendMessage` and `replyMessage` left together for `src/routes/chat-messages.remote.ts`;
-    `askQuestion` for `src/routes/alert-questions.remote.ts`; `postAlert` for
-    `src/routes/post-alert.remote.ts`. Three modules for four commands, split on the GATE: chat and
-    replies are open to any member of the room, asking a question is too, posting an alert is
-    presenter-only — and a presenter-only function living among open ones is how a gate drifts.
-
-    READING THE TWO CHAT PATHS SIDE BY SIDE IS WHAT MADE THIS WORTH DOING. Eighty lines apart they
-    had drifted three ways, and every one of them is a fix rather than a move:
-
-      1. THE MUTE APPLIED TO ONE OF THEM. `sendMessage` refused while a live `chat_mutes` row
-         existed; `replyMessage` never looked. A muted member could not send and could reply, into
-         the same log — so `mute24`, a control that says it stops somebody posting for a day, did
-         not. Both call `refuseIfMuted` now. **A muted member who could previously reply cannot.**
-      2. THE LENGTH BOUND APPLIED TO ONE OF THEM. `MAX_MESSAGE_BODY` was checked on send and not on
-         reply, and `askQuestion` had no bound at all. All three are bounded now, from
-         `#lib/message-bounds.ts` — which exists because a `.remote.ts` file cannot export a
-         constant, so the alternative was the same number written three times.
-      3. The rate limit and the `chat` publish were written out verbatim twice. Declared once.
-
-    `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` were declared at the top of this file and went with
-    them. `sendMessage`'s hand-written html-to-text derivation became `stripHtmlToText` — the same
-    function the composer's optimistic copy already used, whose docstring said "the two must agree"
-    and had no way to enforce it.
-  */
-
-  /*
-    TWO form actions WERE here and are gone, and both left their docblocks behind.
-
-    `remotePresCommand` moved to `presenter-commands.remote.ts` as `presenterCommand` on 2026-08-15.
-    `forceReload` followed it on 2026-08-23: it had ZERO call sites — both ends shipped and nothing
-    joined them — and is now reached by the "Force Reload" button that used to raise a fixed alert
-    and send nothing. Removing it took the actions export from nineteen to eighteen.
-
-    The `remotePresCommand` docblock sat here until 2026-08-26 describing an action this file has not
-    exported for eleven days, immediately above this note explaining that the OTHER one had left.
-    Nothing saw it, because the orphan gate policed `+page.svelte` and `lib/room/*` and this is
-    neither. Its content is not lost: the deny-by-default enum is argued at `presenterCommand`
-    itself, and the peer-side mapping — `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`,
-    `mutescreens` -> `stopSharingAll()`, which is why this is a command and not a mutation — is
-    recorded verbatim on `revokePermission` in `ModalHost.svelte`, next to the checkboxes that send it.
-  */
-
-  /**
-   * The Files pane upload, from `app-presentationarea`'s `doFileUpload()`:
-   *
-   * ```js
-   * let l = `${apiROOT}/sessions/v2/upload/${sessionID}/${sesionToken}/1/files`,
-   *     c = new FormData;
-   * c.append("file", e); c.append("originalname", e.name);
-   * $.ajax({ url: l, method: "POST", processData: !1, contentType: !1, data: c, ... })
-   * ```
-   *
-   * One request per file - `doFileListUpload()` loops and awaits each one - so this takes a single
-   * `file`, and the client drives the loop. Same field names as the capture.
-   *
-   * Presenter-only, matching `O(81, o.isP ? 81 : -1)` on the button that opens the modal. Gating
-   * the button alone would leave the action reachable by anyone who can post a form.
-   */
-  /*
-    `giveMicScreen` left for `src/routes/presenter-commands.remote.ts`, beside `presenterCommand`
-    and `focusOnScreen` — same gate, same `cmds` channel, same room scope. The media-elevation row
-    and the reason it is written on the server went with it unchanged.
-
-    IT WAS THE TWELFTH CALL SITE AND IT WAS NOT IN `+page.svelte`. Neither was `presenterCommand`'s,
-    and that one was a LIVE DEFECT: `presenterCommand`'s action was removed on 2026-08-15 while
-    `ModalHost.svelte` went on posting `fetch('?/presenterCommand')` to an action that no longer
-    existed, so revoking a member's mic or camera from the user-info modal did nothing for three
-    commits. Found by grepping the whole of `src/` rather than the one file being edited — which is
-    what should have happened the first time.
-  */
-
-  savePoll: async ({ request, locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    const data = await request.formData();
-    const question = String(data.get('q') ?? '');
-    const choices = parsePollChoices(String(data.get('choices') ?? ''));
-    if (!choices) return fail(400, { message: 'Invalid poll choices.' });
-
-    db.insert(savedPolls)
-      .values({
-        // A saved poll is a presenter's re-usable template for THIS room's poll list.
-        roomShortCode: requireRoomShortCode(locals),
-        question,
-        choicesJson: JSON.stringify(choices),
-        createdByUserId: requireUser(locals).id,
-        createdAt: new Date()
-      })
-      .run();
-
-    return { success: true };
-  },
-
-  deleteSavedPoll: async ({ request, locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    const data = await request.formData();
-    const pollId = Number(data.get('pollId'));
-    if (!Number.isInteger(pollId)) return fail(400, { message: 'A saved poll ID is required.' });
-
-    db.delete(savedPolls)
-      .where(
-        and(eq(savedPolls.roomShortCode, requireRoomShortCode(locals)), eq(savedPolls.id, pollId))
-      )
-      .run();
-    return { success: true };
-  },
-
-  sendPoll: async ({ request, locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    const data = await request.formData();
-    const question = String(data.get('q') ?? '');
-    const choices = parsePollChoices(String(data.get('choices') ?? ''));
-    if (!choices) return fail(400, { message: 'Invalid poll choices.' });
-
-    const endedAt = new Date();
-    /*
-      Close the previously active poll in THIS room before opening another.
-
-      Without the room predicate this closed the live poll in every room on the deployment: one
-      presenter starting a poll ended everybody else's mid-vote. Only one poll is active per room,
-      which is why the room has to be part of the condition.
-    */
-    db.update(polls)
-      .set({ status: 'done', endedAt })
-      .where(and(eq(polls.roomShortCode, requireRoomShortCode(locals)), eq(polls.status, 'active')))
-      .run();
-    const poll = db
-      .insert(polls)
-      .values({
-        roomShortCode: requireRoomShortCode(locals),
-        senderId: requireUser(locals).id,
-        question,
-        choicesJson: JSON.stringify(choices),
-        status: 'active',
-        createdAt: endedAt
-      })
-      .returning({ id: polls.id })
-      .get();
-
-    return { success: true, pollId: poll.id };
-  },
-
-  sendPollAnswer: async ({ request, locals }) => {
-    ensureDatabase();
-    const data = await request.formData();
-    const choiceIndex = Number(data.get('a'));
-    if (!Number.isInteger(choiceIndex)) return fail(400, { message: 'A poll choice is required.' });
-
-    /*
-      THIS room's active poll.
-
-      Unscoped, a member voting resolved whichever poll was open anywhere on the deployment and
-      recorded their answer against it — a vote cast into a room they are not in, and a stranger's
-      vote counted in yours. `poll_answers` needs no room column of its own because it reaches its
-      poll through `pollId`, and this is the lookup that makes that safe.
-    */
-    const activePoll = db
-      .select()
-      .from(polls)
-      .where(and(eq(polls.roomShortCode, requireRoomShortCode(locals)), eq(polls.status, 'active')))
-      .orderBy(desc(polls.createdAt))
-      .get();
-    if (!activePoll) return fail(404, { message: 'No active poll was found.' });
-
-    const choices = parsePollChoices(activePoll.choicesJson) ?? [];
-    if (choiceIndex < 0 || choiceIndex >= choices.length) {
-      return fail(400, { message: 'The poll choice is out of range.' });
-    }
-
-    const existingAnswer = db
-      .select({ id: pollAnswers.id })
-      .from(pollAnswers)
-      .where(
-        and(eq(pollAnswers.pollId, activePoll.id), eq(pollAnswers.senderId, requireUser(locals).id))
-      )
-      .get();
-    if (!existingAnswer) {
-      db.insert(pollAnswers)
-        .values({
-          pollId: activePoll.id,
-          senderId: requireUser(locals).id,
-          choiceIndex,
-          createdAt: new Date()
-        })
-        .run();
-    }
-
-    /*
-      `handleServerCmdAdmin(e, i) { "gotPollAnswer" === e && emit("gotPollAnswer", i) }` — one
-      command, on presenter-only `/cmdsAdmin/`, which is also why the frame carries no payload. IT
-      SAT AFTER THE `return` UNTIL 2026-08-30; see `poll-actions-contract.test.ts`.
-    */
-    publishToRoom(requireRoomShortCode(locals), {
-      channel: 'cmdsAdmin',
-      data: { cmd: 'gotPollAnswer' }
-    });
-
-    return { success: true };
-  },
-
-  pollDone: async ({ locals }) => {
-    ensureDatabase();
-    const isPresenter =
-      requireUser(locals).role === 'staff' || requireUser(locals).role === 'admin';
-    if (!isPresenter) return fail(403);
-
-    /*
-      Ending the poll ends it here.
-
-      The sender predicate limited the blast radius to this presenter's own polls, but a presenter
-      who owns rooms A and B would have closed both at once. The room is what "done" means.
-    */
-    db.update(polls)
-      .set({ status: 'done', endedAt: new Date() })
-      .where(
-        and(
-          eq(polls.roomShortCode, requireRoomShortCode(locals)),
-          eq(polls.status, 'active'),
-          eq(polls.senderId, requireUser(locals).id)
-        )
-      )
-      .run();
-    return { success: true };
-  }
-
-  /*
-    `messageAction` left for `src/routes/message-actions.remote.ts` — 314 lines and six operations,
-    the largest single thing in this file.
-
-    ONE command and not six. The six share the room scope, the captured-fixture resolution, the
-    override upsert and the presenter-or-author rule; split six ways those become six copies, which
-    is exactly how `sendMessage` and `replyMessage` drifted apart. What they do NOT share is their
-    argument shape, and as a form action that was invisible — every field was an optional string, so
-    `delete` sent a `targetUserId` nothing read and `edit` sent none at all.
-    `z.discriminatedUnion('operation', …)` gives each one its own fields and refuses the rest.
-
-    Three tightenings went with it, none of them a move:
-      - `kind` is `z.enum(['alert', 'chat'])`. It was a bare string compared with `kind === 'alert'`,
-        so every other value — a typo, the empty string — fell through to the chat branch.
-      - `mute24`'s `targetUserId` is `.positive()`; `Number.isInteger` let 0 and negatives through.
-      - the edit path is bounded by `MAX_MESSAGE_BODY`, which it never was.
-
-    `mute24` and `unmuteChat` are now the only pair left split across two files, and the note below
-    is why that is recorded rather than left to be searched for.
-  */
-
-  /*
-    `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote
-    function in this application. The DATABASE half is unchanged and carried across intact: the same
-    single conditional DELETE, the same room scope, the same live-mutes-only clause, the same
-    per-user `privCmds` publish, and the reasoning for each.
-
-    Three things at the BOUNDARY did change, and are named here so nobody reads "moved" as "identical":
-    `Number.isInteger` became a zod schema (which also refuses 0 and negatives, where the old guard
-    let them through to match nothing); `fail(400)` became the schema's own rejection; and `fail(403)`
-    became `error(403)`, because `fail` returns a value only a form action's caller understands and a
-    command has no such caller.
-
-    What the move bought is that boundary. As an action it was reached by `fetch('?/unmuteChat')` with
-    a hand-built `FormData`, so the endpoint name, the argument's type and the meaning of a failure
-    were all agreements nothing checked. This note is left here because `mute24` is still in this file
-    and the pair should not have to be searched for.
-  */
-
-  /*
-    `saveTheme` and `savePreference` left together for `src/routes/user-settings.remote.ts` — one
-    module because they share the only gate either has: the row written is always the CALLER's, with
-    no target on the argument.
-
-    Two changes that are not moves, and both are stated there at length:
-
-      - `saveTheme` refuses an unrecognised value where this read
-        `data.get('theme') === 'dark' ? 'dark' : 'light'` and silently made everything else `light`.
-      - `savePreference`'s value crosses as a VALUE. The client stringified, this parsed inside a
-        `try`, and an unparseable string was a `fail(400)`. devalue carries the real value and
-        `z.json()` is the schema for exactly what the blob can store — so the failure mode is gone
-        rather than relocated. `key` also gained a 100-character bound, because this blob is parsed
-        and rewritten on every preference write.
-  */
-};
+/*
+  ── THIS FILE EXPORTS NO FORM ACTIONS, and the notes below are what used to be here ─────────────
+
+  `logout` was the last one and it was DELETED on 2026-08-30, not converted: nothing could reach it.
+  `routes/logout/+page.svelte` posts a form with no `action`, so it reaches its OWN route's
+  `default`, whose body was byte-identical. The full argument and both halves of the guard are in
+  `remote-call-sites-contract.test.ts`, which is what enforces it.
+
+  `logout` and `redirectSignedOut` are still IMPORTED here, and that is not left-over: the load
+  signs a banned or shut-out member out before redirecting. That is a load, not an action.
+
+  The rest of this block records where each action went, because a reader who greps this file for a
+  name they remember should find out where it lives rather than nothing at all.
+*/
+/*
+  THE SIX SESSION-NOTE ACTIONS left together for `src/routes/session-notes.remote.ts`.
+
+  `newSessionNoteTab`, `saveSessionNote`, `restoreNoteVersion`, `renameSessionNoteTab`,
+  `deleteSessionNoteTab` and `setWelcomeMatNoteTab` were reached by `RoomNotes.submitMutation` —
+  ``fetch(`?/${action}`)`` over a six-member union, with a hand-built `FormData` body and a
+  `deserialize()` of the response. Nothing connected the endpoint to the action it named, which is
+  the `presenterCommand` failure in its least visible form.
+
+  ONE module for all six, because they share the gate exactly: presenter, and the caller's own
+  room, with the room taken from the session and never from an argument. What they do not share is
+  the SENTENCE each refusal carries — *"You cannot create session notes."* against *"…edit…"*,
+  *"…rename…"*, *"…delete…"*, *"…restore…"* and *"You cannot change the welcome mat."* — so the
+  gate there is a small local helper that takes the verb rather than `presenterRoom()`. It keeps
+  the property that matters: the room is returned only after the role check, so "may they" and
+  "which room" cannot be applied separately.
+
+  Three things at the BOUNDARY changed, and none of them is a move:
+
+    - `Number(formData.get('noteId'))` is gone. It produced `NaN` for `'abc'`, which the schema
+      then refused as a `fail(400)`; there is no coercion step now, so a non-number is refused as
+      a number.
+    - `String(formData.get('allRooms')) === 'true'` is gone. `allRooms` crosses as a real boolean.
+    - `fail(…)` became `error(…)`, because `fail` returns a value only a form action's caller
+      understands and a command has no such caller.
+
+  THE SCHEMAS DID NOT MOVE. `#lib/notes-command.ts` still holds one `strictObject` per command,
+  transcribed from the captured `{cmd, data}` envelope and tested by `notes-command.test.ts`; each
+  command validates with that schema's `.shape.data`, so every bound is declared exactly once and
+  the envelope keeps its own test.
+
+  `notes-account-action-contract.test.ts` and `note-update-broadcast-contract.test.ts` were
+  rewritten onto `callRemote` rather than re-pointed as text — including the `updatedSessionNote`
+  frame, which is now proven by a real subscriber on the room instead of by reading the source.
+*/
+/*
+  THE SIX TRADE ALERT ACTIONS left for TWO modules: `src/routes/swing-alerts.remote.ts` and
+  `src/routes/day-trade-alerts.remote.ts`.
+
+  `swingAlertMsg`, `editSwingAlertMsg`, `deleteSwingAlertMsg`, `dayTradeAlertMsg`,
+  `editDayTradeAlertMsg` and `deleteDayTradeAlertMsg` were reached by ONE dispatcher — the generic
+  `RoomTradeAlerts.submit(action, values)`, instantiated twice, posting ``fetch(`?/${action}`)``
+  over two exported type aliases. One `fetch`, two unions, six names assembled at runtime and
+  connected to nothing that could check them.
+
+  TWO modules and not one, split on the GATE — which is the same reason `refuseSwingAlert` and
+  `refuseDayTradeAlert` stood here as two functions with the same shape rather than one taking a
+  predicate. The entitlement each consults is a DIFFERENT room setting and the sentence each
+  refuses with names a different feature; a shared guard would be one place where turning Swing
+  off could be made to turn Day Trade off too. Both readers left with their own module, and both
+  kept the cost order the docblocks argued for: the role check is a field read on a row already in
+  memory, the entitlement is a controller call with a two-second timeout, so the cheap question is
+  asked first and a controller outage cannot be used to probe for the feature.
+
+  `swingAlertFieldsFrom` and `dayTradeAlertFieldsFrom` went too, and they went to the CLIENT edge
+  rather than to the server modules: `draftFrom` in `lib/room/trade-alerts.svelte.ts` is what reads
+  the six fields off a composer's payload now, because the values arrive as a typed object rather
+  than as a `FormData`. Their rule travelled unchanged — no coercion, no trimming, the schema
+  decides — and the one thing that changed is that a MISSING field is now a loud refusal instead of
+  `?? ''` producing a value the server would reject a round trip later.
+
+  Three things at the BOUNDARY changed, and none of them is a move:
+
+    - `Number(formData.get('swingAlertID'))` and `String(formData.get('symbol') ?? '')` are gone.
+      The ids cross as numbers and the fields as strings, and `direction` crosses as its own union
+      rather than as `string`.
+    - `fail(…)` became `error(…)`, because `fail` returns a value only a form action's caller
+      understands and a command has no such caller. The visible effect is that the pane's own
+      `catch` now shows what the SERVER said — *"That swing alert was not found."*, *"Swing Trade
+      Alerts are not enabled for this room."*, the 429 — where `submit` used to flatten all of
+      them into `'Unable to save.'`.
+    - the schemas did NOT move: `#lib/swing-alerts-command.ts` and `#lib/day-trade-alerts-command.ts`
+      still hold the captured `{cmd, data}` envelopes and their own tests, and each command
+      validates with that schema's `.shape.data`.
+
+  `swing-alerts-contract.test.ts` and `day-trade-alerts-contract.test.ts` had assertions that read
+  THIS FILE for `\n  <command>: async ({ request, locals }) => {`. Those were rewritten onto
+  `callRemote` rather than re-pointed at the new modules — a text assertion about where an action
+  lives proves nothing about whether it runs, and re-pointing one is how it starts passing for the
+  wrong reason.
+*/
+/*
+  `editUsername` left for `src/routes/username.remote.ts` — a module of ONE, deliberately not
+  folded in with the settings writes beside it. Those name nobody; this takes a `userId` and can
+  rename any account when the caller is a presenter, so it is split on the GATE.
+
+  The whole dead-`'user'`-role story went with it, along with the positive restatement that
+  replaced it. New at the boundary: `z.number().int().positive()` also refuses 0 and negatives,
+  where `Number.isInteger` let them through to match no row and report success; and
+  `displayName` gained a 200-character bound it never had.
+*/
+
+/*
+  `sendMessage` and `replyMessage` left together for `src/routes/chat-messages.remote.ts`;
+  `askQuestion` for `src/routes/alert-questions.remote.ts`; `postAlert` for
+  `src/routes/post-alert.remote.ts`. Three modules for four commands, split on the GATE: chat and
+  replies are open to any member of the room, asking a question is too, posting an alert is
+  presenter-only — and a presenter-only function living among open ones is how a gate drifts.
+
+  READING THE TWO CHAT PATHS SIDE BY SIDE IS WHAT MADE THIS WORTH DOING. Eighty lines apart they
+  had drifted three ways, and every one of them is a fix rather than a move:
+
+    1. THE MUTE APPLIED TO ONE OF THEM. `sendMessage` refused while a live `chat_mutes` row
+       existed; `replyMessage` never looked. A muted member could not send and could reply, into
+       the same log — so `mute24`, a control that says it stops somebody posting for a day, did
+       not. Both call `refuseIfMuted` now. **A muted member who could previously reply cannot.**
+    2. THE LENGTH BOUND APPLIED TO ONE OF THEM. `MAX_MESSAGE_BODY` was checked on send and not on
+       reply, and `askQuestion` had no bound at all. All three are bounded now, from
+       `#lib/message-bounds.ts` — which exists because a `.remote.ts` file cannot export a
+       constant, so the alternative was the same number written three times.
+    3. The rate limit and the `chat` publish were written out verbatim twice. Declared once.
+
+  `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` were declared at the top of this file and went with
+  them. `sendMessage`'s hand-written html-to-text derivation became `stripHtmlToText` — the same
+  function the composer's optimistic copy already used, whose docstring said "the two must agree"
+  and had no way to enforce it.
+*/
+
+/*
+  TWO form actions WERE here and are gone, and both left their docblocks behind.
+
+  `remotePresCommand` moved to `presenter-commands.remote.ts` as `presenterCommand` on 2026-08-15.
+  `forceReload` followed it on 2026-08-23: it had ZERO call sites — both ends shipped and nothing
+  joined them — and is now reached by the "Force Reload" button that used to raise a fixed alert
+  and send nothing. Removing it took the actions export from nineteen to eighteen.
+
+  The `remotePresCommand` docblock sat here until 2026-08-26 describing an action this file has not
+  exported for eleven days, immediately above this note explaining that the OTHER one had left.
+  Nothing saw it, because the orphan gate policed `+page.svelte` and `lib/room/*` and this is
+  neither. Its content is not lost: the deny-by-default enum is argued at `presenterCommand`
+  itself, and the peer-side mapping — `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`,
+  `mutescreens` -> `stopSharingAll()`, which is why this is a command and not a mutation — is
+  recorded verbatim on `revokePermission` in `ModalHost.svelte`, next to the checkboxes that send it.
+*/
+
+/**
+ * The Files pane upload, from `app-presentationarea`'s `doFileUpload()`:
+ *
+ * ```js
+ * let l = `${apiROOT}/sessions/v2/upload/${sessionID}/${sesionToken}/1/files`,
+ *     c = new FormData;
+ * c.append("file", e); c.append("originalname", e.name);
+ * $.ajax({ url: l, method: "POST", processData: !1, contentType: !1, data: c, ... })
+ * ```
+ *
+ * One request per file - `doFileListUpload()` loops and awaits each one - so this takes a single
+ * `file`, and the client drives the loop. Same field names as the capture.
+ *
+ * Presenter-only, matching `O(81, o.isP ? 81 : -1)` on the button that opens the modal. Gating
+ * the button alone would leave the action reachable by anyone who can post a form.
+ */
+/*
+  `giveMicScreen` left for `src/routes/presenter-commands.remote.ts`, beside `presenterCommand`
+  and `focusOnScreen` — same gate, same `cmds` channel, same room scope. The media-elevation row
+  and the reason it is written on the server went with it unchanged.
+
+  IT WAS THE TWELFTH CALL SITE AND IT WAS NOT IN `+page.svelte`. Neither was `presenterCommand`'s,
+  and that one was a LIVE DEFECT: `presenterCommand`'s action was removed on 2026-08-15 while
+  `ModalHost.svelte` went on posting `fetch('?/presenterCommand')` to an action that no longer
+  existed, so revoking a member's mic or camera from the user-info modal did nothing for three
+  commits. Found by grepping the whole of `src/` rather than the one file being edited — which is
+  what should have happened the first time.
+*/
+
+/*
+  THE FIVE POLL ACTIONS left together for `src/routes/polls.remote.ts`, and they left as a set.
+
+  `savePoll`, `deleteSavedPoll`, `sendPoll`, `sendPollAnswer` and `pollDone` were the last actions
+  in this file reached by a DYNAMIC dispatcher: `RoomModals.submitPollAction` built its endpoint as
+  ``fetch(`?/${action}`)`` over a five-member union, so no compiler, search or build connected any
+  of these five names to the call site that produced it. That is the failure `presenterCommand`
+  already had once, in its least visible form.
+
+  Four are presenter-only and `sendPollAnswer` is not, which is normally the split this repository
+  makes — and deliberately is not here. The fifth is the OTHER SIDE of the same object: its range
+  check is `choices.length` of the row `sendPoll` inserted, and the "one active poll per room"
+  predicate is read by both. That predicate was written twice once already and BOTH copies were
+  unscoped, so a member's vote resolved whichever poll was open anywhere on the deployment. Keeping
+  every reader of it in one module is what stops one copy being fixed and the other not.
+
+  Three things at the BOUNDARY changed, and none of them is a move:
+
+    - `choices` crosses as a REAL ARRAY. The browser `JSON.stringify`d it and the server re-parsed
+      it with `parsePollChoices`, so "not an array of strings" was a runtime string parse whose
+      `null` became a hand-written `fail(400)`. devalue carries the array, so that failure mode is
+      gone rather than relocated. `parsePollChoices` stays in this file for the LOAD, which reads
+      `choicesJson` back out of the database and has always needed it.
+    - `pollId` became `z.number().int().positive()`, which also refuses 0 and negatives where
+      `Number.isInteger` let them through to match no row and report success.
+    - the question and the choices gained LENGTH BOUNDS they never had — see `#lib/poll-command.ts`,
+      which records why they are set far above anything the composer can produce.
+
+  `poll-actions-contract.test.ts` was rewritten onto `callRemote` rather than re-pointed as text,
+  including the `gotPollAnswer` publish that sat after a `return` and never ran.
+*/
+
+/*
+  `messageAction` left for `src/routes/message-actions.remote.ts` — 314 lines and six operations,
+  the largest single thing in this file.
+
+  ONE command and not six. The six share the room scope, the captured-fixture resolution, the
+  override upsert and the presenter-or-author rule; split six ways those become six copies, which
+  is exactly how `sendMessage` and `replyMessage` drifted apart. What they do NOT share is their
+  argument shape, and as a form action that was invisible — every field was an optional string, so
+  `delete` sent a `targetUserId` nothing read and `edit` sent none at all.
+  `z.discriminatedUnion('operation', …)` gives each one its own fields and refuses the rest.
+
+  Three tightenings went with it, none of them a move:
+    - `kind` is `z.enum(['alert', 'chat'])`. It was a bare string compared with `kind === 'alert'`,
+      so every other value — a typo, the empty string — fell through to the chat branch.
+    - `mute24`'s `targetUserId` is `.positive()`; `Number.isInteger` let 0 and negatives through.
+    - the edit path is bounded by `MAX_MESSAGE_BODY`, which it never was.
+
+  `mute24` and `unmuteChat` are now the only pair left split across two files, and the note below
+  is why that is recorded rather than left to be searched for.
+*/
+
+/*
+  `unmuteChat` was an action here and is now `src/routes/chat-mute.remote.ts` — the first remote
+  function in this application. The DATABASE half is unchanged and carried across intact: the same
+  single conditional DELETE, the same room scope, the same live-mutes-only clause, the same
+  per-user `privCmds` publish, and the reasoning for each.
+
+  Three things at the BOUNDARY did change, and are named here so nobody reads "moved" as "identical":
+  `Number.isInteger` became a zod schema (which also refuses 0 and negatives, where the old guard
+  let them through to match nothing); `fail(400)` became the schema's own rejection; and `fail(403)`
+  became `error(403)`, because `fail` returns a value only a form action's caller understands and a
+  command has no such caller.
+
+  What the move bought is that boundary. As an action it was reached by `fetch('?/unmuteChat')` with
+  a hand-built `FormData`, so the endpoint name, the argument's type and the meaning of a failure
+  were all agreements nothing checked. This note is left here because `mute24` is still in this file
+  and the pair should not have to be searched for.
+*/
+
+/*
+  `saveTheme` and `savePreference` left together for `src/routes/user-settings.remote.ts` — one
+  module because they share the only gate either has: the row written is always the CALLER's, with
+  no target on the argument.
+
+  Two changes that are not moves, and both are stated there at length:
+
+    - `saveTheme` refuses an unrecognised value where this read
+      `data.get('theme') === 'dark' ? 'dark' : 'light'` and silently made everything else `light`.
+    - `savePreference`'s value crosses as a VALUE. The client stringified, this parsed inside a
+      `try`, and an unparseable string was a `fail(400)`. devalue carries the real value and
+      `z.json()` is the schema for exactly what the blob can store — so the failure mode is gone
+      rather than relocated. `key` also gained a 100-character bound, because this blob is parsed
+      and rewritten on every preference write.
+*/
