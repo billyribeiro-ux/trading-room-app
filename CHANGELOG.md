@@ -33,6 +33,97 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 19:50 UTC — The emoji picker: 1,821 cells on a click, a duplicate id, and a popover that positioned itself over the wrong composer
+
+**Runtime impact: YES.** The picker opens without building every one of its 1,821 cells first. Two
+pickers open at once no longer share one element id, so each label operates its own search field.
+Enter in the search box picks the first result. The palette follows the machine's colour scheme
+instead of always being dark. The extra chat column's picker positions itself over its own composer.
+And sliding across a row no longer flashes the idle preview between every pair of cells.
+
+Ten rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `EMOJI-02` through `EMOJI-12` — which
+closes the `EmojiPicker + reactions` surface. **34 open · 190 closed · 224 rows.**
+
+Four of the ten (`EMOJI-02` / `03` / `04` / `05`) were **already built** earlier the same day and had
+never been dispositioned. They are recorded now rather than rebuilt — a row that reads open is a row
+somebody re-opens — and `EMOJI-02`'s disposition carries the architectural difference worth keeping:
+the reference computes `{n, emoji, remove}` at the clicking browser and puts it on the wire, while
+this room DERIVES the same three facts at the receiving browser by diffing the row's own reaction
+map. It has to: this hub's stream is per ROOM while chat is per CHANNEL, so a frame carrying a
+reaction's text or author would put admin-channel content on every subscriber's wire. It also fixes a
+defect the per-event shape has — a reaction added while a tab was hidden is invisible to an event and
+is caught by a diff.
+
+#### `EMOJI-08` — building it uncovered a crash the row did not name
+
+`MediaQuery`'s constructor calls `window.matchMedia` **immediately**, so constructing one where the
+API is absent throws — while upstream's `"function" != typeof matchMedia || …` yields `false` and
+renders the light palette. So the guard is transcribed, and it is not defensiveness: without it this
+component crashes where the reference degrades. jsdom is such an environment, and every mount in the
+new contract failed with `TypeError: window.matchMedia is not a function` until the guard went in.
+
+Recorded honestly at the code: the server has no `matchMedia` either, so SSR emits light and a
+dark-scheme machine gains the class on hydration — a one-frame swap on a popover the reader has just
+clicked open. Svelte's docs prefer a CSS media query for this, and it is not available: both palettes
+are keyed off `.emoji-mart-dark` in a captured stylesheet, so doing it in CSS would mean duplicating
+that stylesheet rather than reading it.
+
+#### `EMOJI-06` — a guard transcribed, then deleted, because a control stayed green
+
+Upstream's `!this.query` guard went in first, on the reading that "the box is empty" and "there are
+no results" are different tests. **The negative control that deleted it stayed GREEN**, so the
+reading was checked instead of the test being strengthened — and it is wrong here: `runSearch`
+returns `null` for an empty string and `null` again for a whitespace-only one, so the result check
+already covers every case the guard did. Upstream's `SEARCH_CATEGORY.emojis` is null only before any
+search has run, so there the two really are different questions.
+
+One statement of the fact, with the whitespace case added as a test — which is what makes it a
+checked claim rather than an argument. This is the second time a green control has found redundant
+state in this repository rather than a missing assertion.
+
+#### `EMOJI-09` — the staging, and the timer upstream leaks
+
+`emoji-data.ts` holds 1,821 entries and this built every one of them synchronously, inside a click
+handler, before the popover could paint. Three categories are committed now with the last capped at
+sixty cells, and the rest arrive on a bare `setTimeout` — capped by INDEX (`stagedCount - 1`) rather
+than the literal 2, because that is what upstream's `s-1` means.
+
+The timer is cleared on teardown, where upstream leaks it: closing the picker inside that first frame
+would otherwise leave a callback writing to a destroyed component.
+
+#### `EMOJI-07` and `EMOJI-10` — two defects that needed two instances to see
+
+The search field's id was the literal `emoji-mart-search-2` in every instance, and two pickers are
+mountable at once. `$props.id()` is Svelte's documented answer and is preferred over a module counter
+for a reason the docs give: it is consistent between server and client, where a counter numbers the
+two independently and hydration finds two different ids for one field. The contract **mounts two
+pickers**, because a duplicate-id defect is not observable in one.
+
+`EMOJI-10` is the sharpest of the ten. The extra column's trigger advertised `ngb-popover-extra`
+while the picker it mounted took the default `ngb-popover-3`, so `portalPopover`'s `querySelector`
+found either nothing — leaving the popover at the hardcoded inline transform it ships with, an
+arbitrary place on screen — or, when the main column's picker was also open, **that column's trigger,
+positioning this popover over the wrong composer**. Three other call sites pass a matching id.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **259 test files, 4,300 tests, 1
+skipped.** `svelte-check` clean at 1,474 files. **Nine negative controls, each seen red** (and one
+seen green, which is the `EMOJI-06` finding above): the hardcoded id restored; the sixty-cell cap
+removed; the staging made synchronous; the keyup binding removed; the dark class hardcoded; the
+synchronous preview clear restored; the extra column's `popoverId` removed; and the result check
+short-circuited so an empty box selects something.
+
+`svelte-autofixer` returns no issues on the changed component and three suggestions, all the same
+one — `staged` assigned inside an `$effect`. Declined and recorded at the code: a `$derived` cannot
+express "one macrotask has passed since mount", because there is no value to derive from; the whole
+content of the flag is that time has moved.
+
+`ResizeObserver` is stubbed in the new contract file rather than in `vitest.setup.ts`, and
+`matchMedia` deliberately is not — `EMOJI-08` is precisely about what happens where it is absent, and
+stubbing it would hide the thing the mounts proved. Two size ceilings raised with their arguments.
+**Nothing was opened in a browser.**
+
 ### 2026-08-30 19:25 UTC — The Files pane: a list up to five seconds stale, a click that fired twice, and const numbers nobody could check
 
 **Runtime impact: YES.** Opening the Files tab or the video player refetches the room instead of

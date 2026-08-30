@@ -85,11 +85,11 @@ guessed.
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 895 | no |
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
-| 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
+| 12 | `lib/components/EmojiPicker.svelte` | 893 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 625 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 639 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
 | 18 | `lib/components/FilesPane.svelte` | 585 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 33,893 lines · 3.2%.**
+**2 of 71 surfaces audited · 1,072 of 34,098 lines · 3.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

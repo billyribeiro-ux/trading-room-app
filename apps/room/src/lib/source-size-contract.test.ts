@@ -4987,7 +4987,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/EmojiPicker.svelte',
-    max: 703,
+    /*
+      703 -> 894, 2026-08-30, for six rows at once — `EMOJI-06` through `EMOJI-12` — and the ratio is
+      the one this file exists to produce rather than apologise for.
+
+      `EMOJI-09` is the largest and the least visible. `emoji-data.ts` holds 1,821 entries and this
+      built every one of them synchronously, inside a click handler, before the popover could paint;
+      the reference commits three categories with the third capped at sixty cells and lets the rest
+      arrive on the next macrotask. Reproducing that is fifteen lines and explaining WHY the cap is
+      indexed `s-1` rather than written as 2, and why the timer is cleared where upstream leaks it,
+      is the rest.
+
+      `EMOJI-08` earns its lines twice over. The class was hardcoded dark; computing it needs
+      `MediaQuery`, whose constructor calls `window.matchMedia` — so it is built behind upstream's
+      own `typeof matchMedia === 'function'` guard, WITHOUT WHICH THIS COMPONENT THROWS where the
+      reference degrades to the light palette. That was found by mounting it in jsdom, and the
+      paragraph recording it is what stops the guard being tidied away as defensive.
+
+      `EMOJI-06`'s docblock is a deletion argued rather than a transcription: upstream's `!this.query`
+      guard is NOT reproduced, because a negative control that deleted it stayed green and the reason
+      turned out to be real — `runSearch` returns null for an empty and for a whitespace-only query,
+      so the result check already covers it. Upstream's `SEARCH_CATEGORY.emojis` does not have that
+      property, which is why the guard is right there and redundant here.
+    */
+    max: 894,
     why: 'the emoji chooser and its captured category strip'
   },
   {
@@ -5019,7 +5042,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       chat gear does — `toggleChatToolbar()`, byte 1,435,047 — and a prop whose name says one thing
       while its handler does another is how the next reader wires the wrong one.
     */
-    max: 626,
+    /*
+      626 -> 640, 2026-08-30, for `EMOJI-10`, which is fourteen lines of comment and one attribute.
+
+      The picker was mounted with no `popoverId` while its trigger advertised `ngb-popover-extra`, so
+      `portalPopover`'s `querySelector` found either nothing — leaving the popover at the hardcoded
+      inline transform it ships with — or, when the MAIN column's picker was also open, that column's
+      trigger, and positioned this popover over the wrong composer. Three other call sites pass a
+      matching id; this was the one that did not, which is why the audit filed it as a `defect`.
+    */
+    max: 640,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

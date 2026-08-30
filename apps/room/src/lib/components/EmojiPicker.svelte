@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { MediaQuery } from 'svelte/reactivity';
+
   import { EMOJI_DUMP_DATA, type EmojiDumpEntry } from '#lib/emoji-data.js';
 
   interface Props {
@@ -8,6 +10,56 @@
   }
 
   let { onselect, onentry, popoverId = 'ngb-popover-3' }: Props = $props();
+
+  /**
+   * `EMOJI-07` — the search field's id, per INSTANCE.
+   *
+   * ```js
+   * inputId = "emoji-mart-search-" + ++Qee;   // counter initialised Qee=0 at byte 736,204
+   * ```                                                                       // byte 736,424
+   *
+   * This emitted the literal `emoji-mart-search-2` on the input and again on its `<label for>`, in
+   * every instance — and two pickers can be mounted at once here: the main composer's and the extra
+   * column's, or two message reaction pickers, since `reactionPickerOpen` is per `RoomMessage`. Two
+   * elements with one id makes the second picker's label operate the first picker's field.
+   *
+   * `$props.id()` rather than a module counter, and the difference is server rendering: the rune is
+   * documented as *"unique to the current component instance"* and *"when hydrating a
+   * server-rendered component, the value will be consistent between server and client"*. A counter
+   * would number the server's instances and the client's independently, and hydration would find
+   * two different ids for one field.
+   */
+  const uid = $props.id();
+  const searchInputId = `emoji-mart-search-${uid}`;
+
+  /**
+   * `EMOJI-08` — `darkMode`, which the reference COMPUTES and this hardcoded.
+   *
+   * ```js
+   * Rh("emoji-mart ", o.darkMode ? "emoji-mart-dark" : "", "")                // byte 754,689
+   * darkMode = !("function" != typeof matchMedia || !matchMedia("(prefers-color-scheme: dark)").matches)
+   * ```                                                                       // byte 744,873
+   *
+   * The application leaves the field at that default, so on a light-scheme machine the reference's
+   * picker renders the light palette and ours was always dark. Both palettes ship in
+   * `protradingroom-source.css`, so only the decision differed.
+   *
+   * `MediaQuery` from `svelte/reactivity` is the documented way to read this reactively — and it is
+   * CONSTRUCTED BEHIND UPSTREAM'S OWN GUARD, which is not defensiveness copied for its own sake.
+   * `MediaQuery`'s constructor calls `window.matchMedia` immediately, so building one where the API
+   * does not exist throws; upstream's `"function" != typeof matchMedia ||` is exactly that check,
+   * and without it this component would crash in an environment where the reference degrades to the
+   * light palette. jsdom is one such environment, which is how it was found.
+   *
+   * The server is another: nothing is constructed there, so SSR emits the light palette and a
+   * dark-scheme machine gains the class on hydration. That is a one-frame palette swap on a popover
+   * the reader has just opened by clicking, and it is the cost of the reference applying a CLASS
+   * rather than a media query — the two palettes live in `protradingroom-source.css` keyed off
+   * `.emoji-mart-dark`, so doing it in CSS as Svelte's docs prefer would mean duplicating a captured
+   * stylesheet rather than reading it.
+   */
+  const prefersDark =
+    typeof matchMedia === 'function' ? new MediaQuery('prefers-color-scheme: dark') : null;
 
   /*
     Constants read off the deployed picker (docs/source/main.d6d3c112b59b7d0d.js):
@@ -209,6 +261,46 @@
     if (!searchResults) syncSelectedCategory();
   }
 
+  /**
+   * `EMOJI-06` — Enter picks the first result.
+   *
+   * ```js
+   * handleEnterKey(e, i) { if (!i && null !== this.SEARCH_CATEGORY.emojis &&
+   *   this.SEARCH_CATEGORY.emojis.length) { if (!(i = this.SEARCH_CATEGORY.emojis[0])) return;
+   *   wC(this.emojiSelect, this.ngZone, {$event: e, emoji: i}) } … }           // byte 750,272
+   *
+   * setupKeyupListener() { … fromEvent(input, "keyup") … subscribe(e => {
+   *   !this.query || "Enter" !== e.key || (this.enterKeyOutsideAngular.emit(e), e.preventDefault())
+   * }) }                                                                       // byte 737,093
+   * ```
+   *
+   * `keyup`, which is upstream's own event and the right one here for the same reason `poll-08`
+   * gives: holding Enter repeats `keydown`, and a repeat would insert the emoji once per repeat into
+   * whatever composer the picker is feeding.
+   *
+   * ## Upstream's `!this.query` guard is NOT transcribed, and a negative control is why
+   *
+   * It was, at first, on the reading that "the box is empty" and "there are no results" are
+   * different tests. The control that deleted it stayed GREEN, so the reading was checked instead of
+   * the test being strengthened — and it is wrong HERE, though it is right upstream.
+   *
+   * `runSearch` returns `null` for an empty string and `null` again for a whitespace-only one (its
+   * `terms.filter(Boolean)` empties), so in this component `searchResults?.[0]` is already undefined
+   * in every case `!query` covers. Upstream's `SEARCH_CATEGORY.emojis` is not that: it is null only
+   * before any search has run, so there the two really are different questions.
+   *
+   * One statement of a fact rather than two. The behaviour is unchanged and the tests that pin it —
+   * empty box, and a query matching nothing — both still pass, which is the evidence that this is a
+   * deletion and not a regression.
+   */
+  function handleSearchKeyup(event: KeyboardEvent) {
+    if (event.key !== 'Enter') return;
+    const first = searchResults?.[0];
+    if (!first) return;
+    event.preventDefault();
+    selectEmoji(first);
+  }
+
   function clearQuery() {
     query = '';
     if (emojiSearchInput) emojiSearchInput.value = '';
@@ -328,11 +420,69 @@
       .filter((entry): entry is EmojiDumpEntry => Boolean(entry))
   );
 
+  /*
+    ── `EMOJI-09`: THE STAGED FIRST RENDER ─────────────────────────────────────────────────────────
+
+    ```js
+    const s = Math.min(this.categories.length, 3);
+    this.setActiveCategories(this.activeCategories = this.categories.slice(0, s));
+    const r = this.categories[s-1].emojis.slice();
+    this.categories[s-1].emojis = r.slice(0, 60),
+    setTimeout(() => { this.categories[s-1].emojis = r,
+      this.setActiveCategories(this.categories), this.ref.detectChanges(), … })  // byte 747,768
+    ```
+
+    `emoji-data.ts` holds 1,821 entries. Opening the picker built every one of them — 1,821 spans,
+    each with a composed sprite `style` string — synchronously, inside a click handler, before the
+    popover could paint. The reference commits THREE categories with the third capped at sixty cells
+    and lets the rest arrive on the next macrotask, which is the difference between a picker that
+    opens and a picker that opens after a stutter.
+
+    A bare `setTimeout` with no delay, exactly as upstream: the point is to yield to the browser once,
+    not to wait for a duration. `$effect` owns it so the timer is cleared if the picker is closed
+    inside that first frame — upstream leaks that timeout and its callback then writes to a destroyed
+    component's fields, which is harmless there and would be a warning here.
+
+    `svelte-autofixer` returns no issues and three suggestions on this block, all the same one: *"the
+    stateful variable `staged` is assigned inside an $effect… consider using `$derived` if
+    possible."* DECLINED, and recorded rather than ignored, the same way `PresentationArea` and
+    `ExtraChatPane` record their own declines.
+
+    **A `$derived` cannot express "one macrotask has passed since mount".** It is a function of the
+    values it reads, and there is no value here to read — the whole content of `staged` is that time
+    has moved, which is the definition of a side effect. The suggestion exists to catch a derivation
+    written as an effect; this is the opposite, and rewriting it as one would mean inventing a
+    reactive clock to derive from.
+  */
+  const STAGED_CATEGORIES = 3;
+  const STAGED_LAST_CELLS = 60;
+
+  let staged = $state(true);
+
+  $effect(() => {
+    const timer = setTimeout(() => {
+      staged = false;
+    });
+    return () => clearTimeout(timer);
+  });
+
+  /** `Math.min(this.categories.length, 3)` — and the whole list once the first frame is past. */
+  const stagedCount = $derived(Math.min(EMOJI_DUMP_DATA.categories.length, STAGED_CATEGORIES));
+  const visibleCategories = $derived(
+    staged ? EMOJI_DUMP_DATA.categories.slice(0, stagedCount) : EMOJI_DUMP_DATA.categories
+  );
+
   function entriesFor(categoryIndex: number) {
     // Category 0 is Recent, which is data rather than dump markup.
-    return categoryIndex === 0
-      ? frequentEntries
-      : EMOJI_DUMP_DATA.categories[categoryIndex].entries;
+    const entries =
+      categoryIndex === 0 ? frequentEntries : EMOJI_DUMP_DATA.categories[categoryIndex].entries;
+    /*
+      `this.categories[s-1].emojis = r.slice(0, 60)` — the LAST committed category, not the third:
+      the reference indexes `s-1`, so a picker with fewer than three categories caps whichever one is
+      last. Reproduced by index rather than by the literal 2.
+    */
+    if (staged && categoryIndex === stagedCount - 1) return entries.slice(0, STAGED_LAST_CELLS);
+    return entries;
   }
 
   // ---------------------------------------------------------------- selection & preview
@@ -341,6 +491,43 @@
     onentry?.(entry);
     onselect(entry.glyph);
     rememberFrequent(entry);
+  }
+
+  /**
+   * `EMOJI-12` — the preview clears one animation frame LATE, and is cancelled by the next cell.
+   *
+   * ```js
+   * handleEmojiOver(e) { … cancelAnimationFrame(this.animationFrameRequestId) … }
+   * handleEmojiLeave() { !this.showPreview || !this.previewRef ||
+   *   (this.animationFrameRequestId = requestAnimationFrame(() => {
+   *     this.previewEmoji = null, this.ref.detectChanges() })) }               // byte 750,893
+   * ```
+   *
+   * The pair is the feature. Sliding across a row fires `mouseleave` on one cell and `mouseenter` on
+   * the next, in that order, so clearing synchronously flashes the idle preview between every pair
+   * of cells — nine flashes crossing one line. Deferring the clear by a frame and cancelling it on
+   * the way in means the preview only ever returns to idle when the pointer has actually left the
+   * grid.
+   *
+   * A plain field: nothing renders from the handle, and an effect that read it would re-run on the
+   * write meant to end it — the same reason `arrivals.ts` keeps its markers plain.
+   */
+  let previewClearFrame: number | null = null;
+
+  function hoverEnter(entry: EmojiDumpEntry) {
+    if (previewClearFrame !== null) {
+      cancelAnimationFrame(previewClearFrame);
+      previewClearFrame = null;
+    }
+    hovered = entry;
+  }
+
+  function hoverLeave() {
+    if (previewClearFrame !== null) cancelAnimationFrame(previewClearFrame);
+    previewClearFrame = requestAnimationFrame(() => {
+      previewClearFrame = null;
+      hovered = null;
+    });
   }
 
   const previewEntry = $derived(hovered ?? EMOJI_DUMP_DATA.preview);
@@ -472,7 +659,10 @@
   ></div>
   <div class="popover-body">
     <svelte:element this={"emoji-mart"}>
-      <section class="emoji-mart emoji-mart-dark" style="width: {pickerWidth}px;">
+      <section
+        class={['emoji-mart', { 'emoji-mart-dark': prefersDark?.current === true }]}
+        style="width: {pickerWidth}px;"
+      >
         <div class="emoji-mart-bar">
           <svelte:element this={"emoji-mart-anchors"}>
             <div class="emoji-mart-anchors">
@@ -513,14 +703,15 @@
         <svelte:element this={"emoji-search"}>
           <div class="emoji-mart-search">
             <input
-              id="emoji-mart-search-2"
+              id={searchInputId}
               class="ng-untouched ng-pristine ng-valid"
               type="search"
               placeholder="Search"
               bind:this={emojiSearchInput}
               oninput={(event) => handleSearch(event.currentTarget.value)}
+              onkeyup={handleSearchKeyup}
             />
-            <label class="emoji-mart-sr-only" for="emoji-mart-search-2">Search</label>
+            <label class="emoji-mart-sr-only" for={searchInputId}>Search</label>
             <button
               class="emoji-mart-search-icon"
               type="button"
@@ -566,8 +757,8 @@
                     <span
                       class="emoji-mart-emoji"
                       aria-label={entry.ariaLabel}
-                      onmouseenter={() => (hovered = entry)}
-                      onmouseleave={() => (hovered = null)}
+                      onmouseenter={() => hoverEnter(entry)}
+                      onmouseleave={hoverLeave}
                       onclick={() => selectEmoji(entry)}
                       onkeydown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') selectEmoji(entry);
@@ -600,7 +791,7 @@
             </section>
           </svelte:element>
 
-          {#each EMOJI_DUMP_DATA.categories as category, categoryIndex (category.name)}
+          {#each visibleCategories as category, categoryIndex (category.name)}
             <svelte:element this={"emoji-category"}>
               <section
                 {@attach captureCategorySection(categoryIndex)}
@@ -618,8 +809,8 @@
                       <span
                         class="emoji-mart-emoji"
                         aria-label={entry.ariaLabel}
-                        onmouseenter={() => (hovered = entry)}
-                        onmouseleave={() => (hovered = null)}
+                        onmouseenter={() => hoverEnter(entry)}
+                        onmouseleave={hoverLeave}
                         onclick={() => selectEmoji(entry)}
                         onkeydown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') selectEmoji(entry);
