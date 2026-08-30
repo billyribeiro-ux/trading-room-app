@@ -33,6 +33,110 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 15:28 UTC — Session Control decides who it is for, and the member with a microphone finally gets in
+
+**Runtime impact: YES.** A member whose membership carries the mic permission now has a **Session
+Control** item in the navbar and gets the device picker behind it — they could already produce audio
+and had no way to choose which microphone it came from. And the modal's presenter body now states its
+own audience instead of relying on the navbar to hide it.
+
+**The session-control slice is finished: SC-14 and SC-17 built, SC-06 / SC-07 blocked, SC-08 an owner
+decision.** Seventeen rows, closed over three commits today.
+
+#### The two that were built are one change, and doing them together is the point
+
+SC-17 filed itself `low` because nothing was exposed in practice: both entry points sat inside
+`RoomNavbar`'s `{#if isPresenter}`, and every button in the body is server-authorised. Its own words
+were *"one navbar edit away from rendering Hard Reset and Lock Session to a member"* — **and SC-14 is
+that navbar edit.** So the gate went in first.
+
+```js
+O(8, isPresenter ? 8 : -1)                                          // the presenter body
+O(9, !isPresenter && user.hasMic ? 9 : -1)                          // byte 2,184,295
+O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29) // byte 2,489,576
+function f4e(t,n){ … v(4,"Session Control") … }
+```
+
+Slot 29 is the navbar's Session Control item, and it is the **one** entry in that presenter block
+whose gate is wider than `isPresenter`. The `!isLimitedPresenter` term looks redundant beside
+`isPresenter || hasMic` and is not: `giveMicScreen` assigns
+`globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`, so somebody
+handed mic and screen at runtime satisfies the first term — and upstream deliberately withholds room
+administration from exactly those people. A temporary grant is not administration. `hasMic` is the
+durable membership permission, one of the five `permissions_json` keys, ticked in this modal's own
+user-info pane.
+
+Two divergences on the member's body, recorded at the code, **and the second is forced by one of our
+own**: it applies on change rather than on submit (keeping `submitNewDevices`'s button would mean one
+modal where the identical control behaves two ways depending on who opened it), and it HAS a Refresh
+button that the reference's form does not — SC-02's divergence means this room never enumerates
+devices on open, so without Refresh a member would read "Please connect audio devices." forever with
+no way to answer it.
+
+#### A contract that found itself twice, and the second one was new
+
+The first draft asserted containment by POSITION — every marker's index greater than the gate's. That
+is true of everything after the gate's opening whatever it encloses, so a control that moved the
+`{/if}` up to close straight after the tab strip stayed **green** with Hard Reset and Lock Session
+outside the gate. **Third time in this repository a control has found the test rather than the code,
+and all three were the same mistake: nesting asserted as order.** `card-class-lists-contract` (RM-22)
+and `av-device-pane-contract` (SC-09, this morning) both ended up counting depth for the same reason.
+
+Switching to a depth walk was still not enough, and this half is new: **every tab id also appears in
+the `{#each}` array that draws the tab STRIP**, so a gate enclosing only the strip still contained
+`lock-session`, `close-session` and the rest. The assertion uses each panel's own `id="…"` now, which
+only the panels carry. Eight controls on this change, all seen red.
+
+#### The three that were not built, and what each is actually waiting on
+
+**SC-06 — BLOCKED**, and it is the seeding half of SC-04/SC-05: `getPlayerLink()` reads
+`rc.enablePlayer` and `rc.playerURL` off a `streamStatus` answer from a server that is not in the
+capture. There is nothing to seed from. The pane's `false` is not a stale default any more — SC-04's
+close removed the state entirely, and the literal sits beside two disabled buttons and a panel saying
+the stream player is not available in this deployment. Seeding it would be seeding a lie.
+
+**SC-07 — BLOCKED on a backup media cluster, and its password gate would not be reproduced anyway.**
+Decoded at byte 2,173,860: `switchToBackup()` compares the typed password **in the browser** against
+`sessData.deleteAlertPW` — one of the seven credentials this room's boundary refuses, and the exact
+shape of the 2026-08-07 privilege escalation. Third control found doing this, after
+`allRoomsWelcomeMatPW` and `needPasswordForUserNotes`, and the correct shape is the one those settled:
+the credential stays on the controller and the question travels. That half is designable today; what
+blocks the row is that `swapBackupClusterID` names a second MediaMTX cluster this deployment does not
+have.
+
+**SC-08 — OWNER DECISION, and the credential is NOT the obstacle.** Decoded end to end at bytes
+2,175,167 and 1,153,962: the client posts `{sessID, token}` to `/sessions/v2/loginToAdminFromRoom` and
+the SERVER answers `{success, loginURL}` or refuses. `modAdminLoginList` never reaches a browser,
+upstream or here — the shape is already this repository's own doctrine. What it needs is one answer:
+**may a presenter inside a room be handed an authenticated session for the controller, and for which
+account?** That controller manages billing, room creation and every credential on this list; minting a
+session for it from a room handoff is new authentication surface, not a link. Both answers are costed
+in the audit row and either is a day's work. The button is deliberately absent rather than
+present-and-inert.
+
+#### The ceilings did the work again, in both directions
+
+SC-17's gate and its evidence added 79 lines to `ModalHost.svelte`. Ceilings only go down and prose is
+never trimmed to hit a number, so something left instead: **`SessionHistoryPane.svelte`** took 120
+lines out, and ModalHost lands at **6,280 against an unchanged ceiling of 6,335** — smaller than
+before the feature. `RoomNavbar.svelte` is raised 1,137 → 1,173 for the one gate and its citation,
+argued at the ceiling; `RoomOverlays.svelte` and `+page.svelte` by one line each, for the same
+permission reaching two components with no shared holder between them but the page.
+
+`session-history-contract.test.ts` followed the pane rather than being loosened — every assertion
+unchanged, only the file it reads.
+
+**Verified:** `session-control-audience-contract.test.ts` 8/8 (new), `session-history-contract.test.ts`
+17/17, `source-size-contract.test.ts` 502/502, `room-surface-audit-counts.test.ts` 15/15,
+`todo-next-coverage-contract.test.ts` 10/10. **Eight negative controls run and seen red** — the modal
+gate removed, the gate closing after the tab strip, the gate wrapping only the last panel, the else
+arm dropped, the navbar's limited-presenter term dropped, the whole presenter block widened instead,
+Session Control put back inside it, and `hasMic` fed from the runtime elevation. Full `pnpm run gate`
+in `apps/room`: **246 files, 4,062 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed
+into. Controller untouched by this change. **Nothing was opened in a browser, and the Svelte MCP
+server has been disconnected for this entire session**, so `svelte-autofixer` was not run;
+`svelte-check` is clean at 1,452 files.
+
 ### 2026-08-30 14:50 UTC — The restream URL a presenter set on themselves, and the third allow-list it needed
 
 **Runtime impact: YES.** A presenter's Restream pane now opens showing the destination the room is

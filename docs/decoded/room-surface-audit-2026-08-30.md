@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**105 open · 119 closed · 224 rows.**
+**100 open · 124 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1092,6 +1092,10 @@ function yDe(t,n){if(1&t){const e=Y();d(0,"div")(1,"div",105)(2,"label",106),v(3
 
 ### SC-06 — Stream player state is never seeded from the server (`streamStatus` / getPlayerLink), so the readout always says false on open
 
+**BLOCKED 2026-08-30 15:28 UTC, on the same absent server as SC-04 and SC-05 — it is their seeding half.** The row's own evidence is the argument: `getPlayerLink()` awaits `invokeAdminCmd("streamStatus")` and reads `rc.enablePlayer` and `rc.playerURL` off the answer. Both values come FROM a server that is not in the capture, and the client composes neither. There is nothing here to seed from.
+
+**What the pane says now is not the defect this row describes, and the difference matters.** `streamPlayerEnabled` no longer exists: SC-04's close removed the dead per-user preference and the state it fed, and the readout is a literal `false` in red beside two `disabled` buttons and an `alert alert-info` saying *"The stream player is not available in this deployment: it needs a public playback page, and there is no server here that issues one."* So `false` is the TRUE state of this deployment rather than a stale default — a seeded value would be seeding a lie. **Unblocked by:** the same two things SC-04 names — a decision on anonymous playback authorization, and a MediaMTX host.
+
 **medium** · `missing-behaviour` · reference byte **2,170,505**
 
 ```
@@ -1104,6 +1108,26 @@ getPlayerLink(){var e=this;return I(function*(){let i=yield e.appService.invokeA
 
 ### SC-07 — "Swap Primary and Backup Media Servers" button absent, with its password gate and confirm
 
+**BLOCKED 2026-08-30 15:28 UTC on a backup media cluster, and its password gate is a DELIBERATE DIVERGENCE that would not be reproduced even if the cluster existed.** Decoded at byte 2,173,860:
+
+```js
+switchToBackup() {
+  this.appService.globals.sessData.deleteAlertPW
+    ? bootbox.prompt({ title: "Please enter the password for this action:", …
+        callback: e => { e && (e.trim() === this.appService.globals.sessData.deleteAlertPW
+          ? bootbox.confirm("Are you sure you want to switch to the backup cluster? …",
+              o => { o && (this.appService.invokeAdminCmd("swapBackupClusterID", {}), …) })
+          : bootbox.alert("Wrong password!")) } })
+    : bootbox.confirm("Are you sure you want to switch to the backup cluster? …", …)
+}
+```
+
+Two independent blockers, and they are not the same kind of thing.
+
+**The credential.** The gate compares the typed password **in the browser** against `sessData.deleteAlertPW` — one of the seven credentials this room's boundary refuses outright, and the exact shape of the 2026-08-07 privilege escalation: a member who can read `sessData` reads the password and answers their own prompt. This is the third control found doing it (`allRoomsWelcomeMatPW` on the welcome mat, and `needPasswordForUserNotes`), and the correct shape is the one those two settled on: **the credential stays on the controller and the QUESTION travels**. That half is designable today and is not what blocks the row.
+
+**The cluster.** `swapBackupClusterID` swaps the room onto `backupClusterID`, a media-server identity this deployment does not have — there is one media plane here and no second cluster to fail over to, so the command has nothing to name. `backupClusterID` and `primaryClusterID` are unwired controller settings, and their manage-page note already records that they stay unwired for this reason. **Unblocked by:** a second MediaMTX cluster, at which point the password gate is built as a server-side check on the controller and never as a string comparison in a browser.
+
 **medium** · `missing-control` · reference byte **2,140,720**
 
 ```
@@ -1115,6 +1139,31 @@ function lDe(t,n){if(1&t){const e=Y();d(0,"button",89),x("click",function(){retu
 > Verified: I could not find the control in apps/room/src under any name. The session-control reset pane in ModalHost.svelte runs Reload Session Config -> Refresh Roster & Count -> Soft Reset Session (:4169) -> Hard Reset/All Reload (:4182) -> Hard Reset and Revoke Tokens (:4193) with no swap control between them; the only occurrence of "backup" anyw…
 
 ### SC-08 — "Admin Dashboard Login" button (and its preceding <hr>) absent
+
+**OWNER DECISION 2026-08-30 15:28 UTC. The shape is not in doubt and the credential is not the obstacle — the question is whether a room may hand somebody a signed-in controller session.** Decoded end to end, at bytes 2,175,167 and 1,153,962:
+
+```js
+adminLogin() { bootbox.confirm("Are you sure you want to login to the Admin Dashboard?",
+                 e => { e && this.appService.doAdminLogin() }) }
+
+doAdminLogin() { this.httpClient
+  .post(`${globals.apiROOT}/sessions/v2/loginToAdminFromRoom`, { sessID, token })
+  .subscribe({ next: i => i?.success && i.loginURL
+      ? window.open(i.loginURL.startsWith("https://") ? i.loginURL : "https://" + i.loginURL, "_blank")
+      : bootbox.alert(i?.msg || "There was an error logging in, …"),
+    error: i => bootbox.alert(i?.error?.msg || "Not authorized or there was a server error.") }) }
+```
+
+**`modAdminLoginList` never reaches the browser here or upstream.** The client posts its session id and token and the SERVER answers `{success, loginURL}` or refuses; the list is consulted where it lives. That is this repository's own doctrine — *every authority decision is made on the server from data the server owns* — so the row is **not** blocked on the credential boundary the way SC-07's password gate is, and the audit's note that `modAdminLoginList` is unwired is true but not the obstacle.
+
+What it is blocked on is one question the owner has to answer, because `CLAUDE.md` forbids inventing an authority decision: **may a presenter inside a room be handed an authenticated session for the controller, and for which account?** The controller here is not a read-only dashboard — it manages billing, room creation and every credential on this list. Minting a session for it from a room handoff is new authentication surface, not a link.
+
+Two answers are costed and either is buildable in a day:
+
+* **Yes, mint one.** `internal/room-admin-login/[code]` on the controller, on the read capability, checking the named member against the room's `modAdminLoginList` and its owner, and returning a one-shot login URL with a short TTL. The room's half is a presenter-gated remote function and the confirm above.
+* **No, just point at it.** The same endpoint answers a boolean and the room opens the controller's ordinary login page. No session is minted and nothing is authenticated by the room; the member signs in themselves. Diverges from the reference, which auto-logs-in, and the divergence would be recorded.
+
+**Not built either way until that is answered**, and the button is deliberately absent rather than present-and-inert: an "Admin Dashboard Login" that opens a login form somebody cannot pass is worse than no button.
 
 **medium** · `missing-control` · reference byte **2,140,887**
 
@@ -1200,6 +1249,20 @@ startRestream(e=!1){if(e)return this.appService.invokeAdminCmd("setRestreamURL",
 
 ### SC-14 — Non-presenter (hasMic) body — the ngForm device-change flow — is not built, and there is no other working device picker for a non-presenter
 
+**BUILT 2026-08-30 15:16 UTC, with SC-17 — they are one change, and the verifier's correction is what made it small.** The verifier was right that the picker itself already exists (`AvDevicePane`); what was missing was the ARM that renders it for a member and the navbar item that reaches it. Both halves are decoded rather than assumed:
+
+```js
+O(9, !isPresenter && user.hasMic ? 9 : -1)                              // the body,   byte 2,184,295
+O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)     // the navbar, byte 2,489,576
+function f4e(t,n){ d(0,"li",192), x("click", () => doSessionControl()), … v(4,"Session Control") … }
+```
+
+Slot 29 is the navbar's **Session Control** item, and it is the ONE entry in that presenter block whose gate is wider than `isPresenter`. So upstream a member holding the mic permission gets the item, and the modal answers them with the device picker alone. Here they could produce audio — `joinsMediaAsProducer(isPresenter || hasCam || hasMic || hasScreen)` has been honoured since the permissions work — and had no way to choose which microphone it came from.
+
+`!isLimitedPresenter` is the reference's own term and is not redundant: `giveMicScreen` assigns `globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`, so somebody handed mic and screen at runtime satisfies `isPresenter`, and upstream deliberately withholds room administration from them. `hasMic` is the durable membership permission, one of the five `permissions_json` keys.
+
+**Two divergences recorded at the code, and the second is forced by one of ours.** (1) It applies on CHANGE rather than on submit: `submitNewDevices(form)` writes the same two preference keys the presenter's selects write, only later, and keeping the submit button would mean one modal in which the identical control behaves two ways depending on who opened it. (2) It HAS a Refresh button, which `LDe` does not — SC-02's divergence means this room does not enumerate on open, so without Refresh a member would read "Please connect audio devices." forever with no way to answer it.
+
 **medium** · `missing-control` · reference byte **2,156,909**
 
 ```
@@ -1239,6 +1302,12 @@ z("disabled",e.devicesLoading),m(),z("ngClass",e.devicesLoading?"fa-spinner fa-s
 > Verified: I could not refute it. Reference: at offset 2141078 the bundle reads `function dDe(t,n){1&t&&(d(0,"div",49),T(1,"i",91),v(2," Loading devices...
 
 ### SC-17 — Body is not gated on isPresenter inside the component — the presenter body is the only body and renders for whoever opens the modal
+
+**BUILT 2026-08-30 15:16 UTC, and building it WITH SC-14 is the point rather than a convenience.** The row files this `low` because nothing was exposed in practice: both entry points sat inside `RoomNavbar`'s `{#if isPresenter}`, and every button in the body is server-authorised, so it was defence-in-depth. **SC-14 is precisely the navbar edit that row named** — *"one navbar edit away from rendering Hard Reset and Lock Session to a member"* — so the two were done in one change, gate first.
+
+`{#if isPresenter}` now opens before the tab strip and closes after the last panel, with `{:else if hasMic}` beside it and `Done` outside both, which is the reference's own shape (`O(8, …)` / `O(9, …)` and the footer outside).
+
+**Its contract found itself twice, and both are recorded in that file's header.** The first draft asserted containment by POSITION — every marker's index greater than the gate's — which is true of everything after the gate's opening whatever it encloses; a control that moved the `{/if}` up to close straight after the tab strip left it green with Hard Reset and Lock Session outside. **Third time in this repository a control has found the test rather than the code, and all three were the same mistake**: nesting asserted as order. The second: switching to a depth walk was still not enough, because every tab id also appears in the `{#each}` array that draws the tab STRIP — the assertion now uses each panel's own `id="…"`, which only the panels carry.
 
 **low** · `divergence` · reference byte **2,184,295**
 

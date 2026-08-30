@@ -1060,6 +1060,7 @@
         -->
         <RoomNavbar
           {isPresenter}
+          hasMic={data.user.hasMic === true}
           bind:sidebarOpen
           bind:mobileNavOpen
           {media}

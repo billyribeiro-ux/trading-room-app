@@ -603,6 +603,7 @@
   mobileIosUrl={data.sessData?.customMobileAppEnabled ? data.sessData?.customMobileAppIOSUrl : null}
   hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
   isLimitedPresenter={media.limitedPresenter}
+  hasMic={data.user.hasMic === true}
   canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
   alertSearchFilter={feeds.alertSearchFilter}
   {chatMode}

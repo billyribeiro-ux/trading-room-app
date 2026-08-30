@@ -613,7 +613,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       for RS-09's `tip={tipButtonFor(data.sessData)}` on the navbar, which is the same resolver the
       sidebar already reads.
     */
-    max: 1542,
+    /*
+      1,542 -> 1,543, 2026-08-30, for SC-14: one line, `hasMic={data.user.hasMic === true}` on
+      `RoomNavbar`. The value has to arrive here as well as at `RoomOverlays` because the navbar is
+      rendered by the PAGE and the modal by the overlays — two components, one permission, and no
+      shared holder between them that is not the page itself.
+    */
+    max: 1543,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1407,6 +1413,10 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       renders — which is what every other call site in this room passes and must keep getting.
     */
     /*
+      954 -> 955, 2026-08-30, for SC-14: one line, `hasMic={data.user.hasMic === true}`, reaching
+      `ModalHost`'s non-presenter arm. Read here for the reason this entry gives five times over —
+      this component holds `data`.
+
       951 -> 954, 2026-08-30, for SC-12 and SC-13. THREE lines: the `restream-url` import, the
       `restreamUrl={data.sessData?.restreamToURL}` seed, and the one-line handler.
 
@@ -1417,7 +1427,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       leaving the twenty lines of markup where they were and raising ModalHost instead, which is the
       trade this rule exists to force.
     */
-    max: 954,
+    max: 955,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -4460,6 +4470,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the Restream tab - one seeded value, the rtmp validation, and the room-level write'
   },
   {
+    file: 'lib/components/SessionHistoryPane.svelte',
+    /*
+      The session-control modal's Session History tab, extracted 2026-08-30 with SC-14 and SC-17.
+
+      `source-size-contract` is what moved it, and the sequence is the point: SC-17's gate and its
+      evidence added 79 lines to `ModalHost.svelte`, ceilings only go down, and prose is never
+      trimmed to hit a number — so something had to leave instead. This pane was the right thing to
+      send, because it owns three pieces of state, one fetch and nothing else, and none of its six
+      tab neighbours touch any of them.
+
+      SC-01 is what it fixes and the fix is preserved here: `No session history.` used to render
+      unconditionally above a `Load History` button with no `onclick` at all.
+    */
+    max: 146,
+    why: 'the Session History tab - three pieces of state, one fetch, and both of upstream branches'
+  },
+  {
     file: 'lib/components/CloseSessionPane.svelte',
     max: 105,
     why: 'the session-control close pane'
@@ -4930,7 +4957,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       A refusal costs lines exactly once and saves the next reader a re-derivation, which is the
       trade this file exists to make. It is not licence for the next one.
     */
-    max: 1137,
+    /*
+      1,137 -> 1,172, 2026-08-30, for SC-14. Thirty-five lines, and thirty-two of them are the
+      reason: this is the ONE item in the presenter block whose gate upstream is not `isPresenter`,
+      and the whole change is that gate.
+
+        O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)   byte 2,489,576
+        f4e -> `Session Control`
+
+      The `!isLimitedPresenter` term is the part that needs the citation. It looks redundant beside
+      `isPresenter || hasMic` and is not: `giveMicScreen` assigns
+      `globals.user.isPresenter = globals.isLimitedPresenter = e.give`, so a runtime grant satisfies
+      the first term, and upstream deliberately withholds room administration from exactly those
+      people. A reader without that quotation deletes the term as dead weight.
+
+      WHY NOT AN EXTRACTION. There is nothing here to extract — the change is one `{#if}` moved and
+      the citation that keeps it. The extraction this commit DID make went the other way and is why
+      the raise is defensible: `SessionHistoryPane.svelte` took 120 lines out of `ModalHost.svelte`,
+      which ABSORBED the same feature's other 79 lines and still lands at 6,280 against an unchanged
+      ceiling of 6,335. **The pair is eighty-five lines smaller than doing neither.**
+    */
+    max: 1173,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

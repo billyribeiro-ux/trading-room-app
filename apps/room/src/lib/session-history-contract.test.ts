@@ -40,7 +40,16 @@ import {
  * `room_state` test: a fact somebody arriving later has to be able to find.
  */
 
-const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+/*
+  The pane left `ModalHost.svelte` on 2026-08-30 and this file followed it rather than being
+  loosened: SC-17's gate and its evidence pushed that component over its ceiling, ceilings only go
+  down, and `SessionHistoryPane.svelte` is what was sent out instead. Every assertion below is
+  unchanged — only where they are read from moved.
+*/
+const MODAL = readFileSync(
+  new URL('./components/SessionHistoryPane.svelte', import.meta.url),
+  'utf8'
+);
 /* Comments stripped — the component quotes the markup it renders, and this file quotes the old one. */
 const modalCode = MODAL.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
 

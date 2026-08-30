@@ -7,6 +7,7 @@
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
+  import SessionHistoryPane from './SessionHistoryPane.svelte';
   import RestreamPane from './RestreamPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
@@ -41,9 +42,7 @@
   } from '#lib/types.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
-  import { mediumDateFormatter, sameCalendarDay } from '#lib/message-formatters.js';
-  import type { SessionHistoryEntry } from '#lib/server/session-history.js';
-  import { getSessionHistory } from '../../routes/session-history.remote';
+  import { sameCalendarDay } from '#lib/message-formatters.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import {
     PRESENTER_COLOR_DEFAULTS,
@@ -394,6 +393,15 @@
      */
     isLimitedPresenter?: boolean;
     /**
+     * `globals.user.hasMic` — the DURABLE membership permission, not the runtime grant.
+     *
+     * One of the five `permissions_json` keys, ticked in this modal's own user-info pane
+     * (`hasMicChk`). It is what opens the session-control modal's non-presenter body — see the
+     * `{:else if hasMic}` arm at the modal itself for the decoded gate and why it is not
+     * `isLimitedPresenter`.
+     */
+    hasMic?: boolean;
+    /**
      * `canEditUsername` — `sessData.allowUsersToChangeUsername`, the member's own rename.
      *
      * The fallback branch of `O(9)`. Different action from the presenter's: `editUsernameByUser`
@@ -527,6 +535,7 @@
     onPreferenceChange,
     restreamUrl,
     onSaveRestreamUrl,
+    hasMic = false,
     onDoNotDisturbChange,
     onSaveDataChange,
     onPlayYoutube,
@@ -879,42 +888,6 @@
       ? rtmpIngestUrl(ingest.streamServerMTX, ingest.ingestPath, ingest.rtmpToken)
       : ''
   );
-  /*
-    The Session History pane's three pieces of state — `SC-01`.
-
-    `$state.raw` on the list: it is replaced wholesale by every fetch and never mutated, so a deep
-    proxy over it would be overhead on every row rendered.
-
-    NOT loaded when the modal opens. Upstream's empty branch draws a `Load History` button, which
-    only makes sense if the pane starts empty — the presenter asks. A fetch on open would make that
-    button unreachable and would query on every open of a modal whose other six tabs are the common
-    ones.
-  */
-  let sessionHistoryEntries = $state.raw<SessionHistoryEntry[]>([]);
-  let sessionHistoryLoading = $state(false);
-  let sessionHistoryError = $state<string | null>(null);
-
-  /**
-   * `fetchSessionHistory()` — byte 1,145,917, and both buttons call it.
-   *
-   * Upstream has no failure path at all: `i && i.data && (globals.sessionHistory = i.data)` leaves
-   * the pane exactly as it was when the call fails, so a presenter clicking Refresh on a broken
-   * connection sees nothing happen. Shown here instead, for the reason every refusal in this file is
-   * shown: silence is indistinguishable from success.
-   */
-  async function loadSessionHistory() {
-    if (sessionHistoryLoading) return;
-    sessionHistoryLoading = true;
-    sessionHistoryError = null;
-    try {
-      sessionHistoryEntries = await getSessionHistory();
-    } catch (cause) {
-      sessionHistoryError = refusalMessage(cause, 'Could not load the session history.');
-    } finally {
-      sessionHistoryLoading = false;
-    }
-  }
-
   let reportLoading = $state(true);
   /*
     ── THE TWO TEXT-MODE RADIOS WERE DEAD, and this is the third control of that exact shape ────────
@@ -4371,266 +4344,293 @@
     dialogClass="modal-lg"
     {onclose}
   >
-    <ul id="myTab" role="tablist" class="nav nav-tabs">
-      {#each [['reset-session', 'Session Control / Reset'], ['close-session', 'Close Session'], ['lock-session', 'Lock Session'], ['av-device-selection', 'A/V Device Selection'], ['streaming-selection', 'Streaming'], ['session-history', 'Session History'], ['webinar-tools', 'Webinar Tools']] as [tabId, label] (tabId)}
-        <li role="presentation" class="nav-item">
-          <!-- svelte-ignore a11y_interactive_supports_focus -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a
-            id="{tabId}-tab"
-            data-bs-toggle="tab"
-            data-bs-target="#{tabId}"
-            role="tab"
-            aria-controls={tabId}
-            aria-selected={sessionControlTab === tabId}
-            class={['nav-link', { active: sessionControlTab === tabId }]}
-            onclick={(event) => {
-              event.preventDefault();
-              sessionControlTab = tabId as typeof sessionControlTab;
-            }}>{label}</a
-          >
-        </li>
-      {/each}
-    </ul>
-    <div id="myTabContent" class="tab-content">
-      <div
-        id="reset-session"
-        role="tabpanel"
-        aria-labelledby="reset-session-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'reset-session',
-            active: sessionControlTab === 'reset-session'
-          }
-        ]}
-      >
-        <div class="row mt-4">
-          <div class="col border-right pr-4">
-            <button
-              type="button"
-              class="btn btn-outline-light mr-2"
-              onclick={() => onUserAction('session-reload-config', targetUser)}
+    <!--
+      ── SC-17 AND SC-14 — WHO THIS MODAL IS FOR, DECIDED HERE AND NOT ONLY AT THE DOOR ──────────
+
+      ```js
+      O(8, isPresenter ? 8 : -1)
+      O(9, !isPresenter && user.hasMic ? 9 : -1)      // byte 2,184,295
+      ```
+
+      Two bodies upstream, and this component had ONE — the presenter's — with no role condition
+      anywhere in it. Nothing was exposed in practice, because both entry points sit inside
+      `RoomNavbar`'s `{#if isPresenter}`; it was one navbar edit away from rendering Hard Reset and
+      Lock Session to a member. Every one of those buttons is server-authorised, so this is
+      defence-in-depth rather than an escalation being closed — and it is exactly the kind of
+      second check this repository asks for, because the navbar edit that would have exposed it is
+      the one made directly below for SC-14.
+
+      `hasMic` is the DURABLE permission (one of the five `permissions_json` keys, ticked in this
+      modal's own user-info pane) and NOT `isLimitedPresenter`. The reference is explicit about the
+      difference: `giveMicScreen` assigns
+      `globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`, so
+      somebody handed mic and screen at runtime becomes a presenter and takes the FIRST arm. This
+      arm is for a member whose membership carries the mic permission without the promotion.
+
+      `Done` stays outside both, which is the reference's shape and the only sensible one: a body
+      that renders nothing must still be closable.
+    -->
+    {#if isPresenter}
+      <ul id="myTab" role="tablist" class="nav nav-tabs">
+        {#each [['reset-session', 'Session Control / Reset'], ['close-session', 'Close Session'], ['lock-session', 'Lock Session'], ['av-device-selection', 'A/V Device Selection'], ['streaming-selection', 'Streaming'], ['session-history', 'Session History'], ['webinar-tools', 'Webinar Tools']] as [tabId, label] (tabId)}
+          <li role="presentation" class="nav-item">
+            <!-- svelte-ignore a11y_interactive_supports_focus -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_missing_attribute -->
+            <a
+              id="{tabId}-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#{tabId}"
+              role="tab"
+              aria-controls={tabId}
+              aria-selected={sessionControlTab === tabId}
+              class={['nav-link', { active: sessionControlTab === tabId }]}
+              onclick={(event) => {
+                event.preventDefault();
+                sessionControlTab = tabId as typeof sessionControlTab;
+              }}>{label}</a
             >
-              Reload Session Config
-            </button>
-            <h5 class="small mt-2">
-              Reloads the session configuration, useful if something changed and you want it to take
-              effect.
-            </h5>
-            <br />
-            <button
-              type="button"
-              class="btn btn-outline-light mr-2"
-              onclick={() => onUserAction('session-refresh-roster', targetUser)}
-            >
-              Refresh Roster &amp; Count (User List)
-            </button>
-            <h5 class="small mt-2">
-              This clears the user list and forces all "stale" connections out.
-              <strong style="text-decoration: underline;"
-                >It will take up to 1/2 minute for changes to take effect</strong
+          </li>
+        {/each}
+      </ul>
+      <div id="myTabContent" class="tab-content">
+        <div
+          id="reset-session"
+          role="tabpanel"
+          aria-labelledby="reset-session-tab"
+          class={[
+            'tab-pane fade',
+            {
+              show: sessionControlTab === 'reset-session',
+              active: sessionControlTab === 'reset-session'
+            }
+          ]}
+        >
+          <div class="row mt-4">
+            <div class="col border-right pr-4">
+              <button
+                type="button"
+                class="btn btn-outline-light mr-2"
+                onclick={() => onUserAction('session-reload-config', targetUser)}
               >
-            </h5>
-            <hr />
-            <button
-              type="button"
-              class="btn btn-primary mr-2"
-              onclick={() => onUserAction('session-soft-reset', targetUser)}
-            >
-              Soft Reset Session
-            </button>
-            <h5 class="small mt-2">
-              Use this before a hard reset. Resets the media state of the room, Makes all users
-              reconnect to the media servers gently. Works Well... Swap to your backup media servers
-              if the primary are not working, and vice versa.
-            </h5>
-            <br /><br />
-            <button
-              type="button"
-              class="btn btn-danger mr-2"
-              onclick={() => onUserAction('session-hard-reset', targetUser)}
-            >
-              Hard Reset/ All Reload
-            </button>
-            <h5 class="small mt-2">
-              Hard Resetting forces everyone to reload the session and page.
-            </h5>
-            <br />
-            <button
-              type="button"
-              class="btn btn-danger mr-2"
-              onclick={() => onUserAction('session-hard-reset-revoke', targetUser)}
-            >
-              Hard Reset and Revoke Tokens
-            </button>
-            <br />
-            <h5 class="small mt-2">
-              Hard Resetting forces everyone to reload the session and page, also revokes session
-              tokens, forcing users to log in again.
-            </h5>
-          </div>
-          <div class="col pl-4">
-            <h3><i class="fas fa-comments"></i> Group Chat Control</h3>
-            <div class="custom-control custom-radio my-2">
-              <input
-                type="radio"
-                id="customRadio1"
-                value="g"
-                name="customRadio"
-                class="custom-control-input"
-                {@attach setInputChecked(groupChatMode === 'g')}
-                onchange={() => requestSessionChatMode('g')}
-              />
-              <label for="customRadio1" class="custom-control-label">Regular Group Chat</label>
-            </div>
-            <div class="custom-control custom-radio my-2">
-              <input
-                type="radio"
-                id="customRadio2"
-                value="p"
-                name="customRadio"
-                class="custom-control-input"
-                {@attach setInputChecked(groupChatMode === 'p')}
-                onchange={() => requestSessionChatMode('p')}
-              />
-              <label for="customRadio2" class="custom-control-label"
-                >Webinar Mode (Regular users don't see each others posts)</label
+                Reload Session Config
+              </button>
+              <h5 class="small mt-2">
+                Reloads the session configuration, useful if something changed and you want it to
+                take effect.
+              </h5>
+              <br />
+              <button
+                type="button"
+                class="btn btn-outline-light mr-2"
+                onclick={() => onUserAction('session-refresh-roster', targetUser)}
               >
-              <p>
-                In this mode, presenters will see everyones questions/comments, but users will not
-                see each others' chats.
-              </p>
+                Refresh Roster &amp; Count (User List)
+              </button>
+              <h5 class="small mt-2">
+                This clears the user list and forces all "stale" connections out.
+                <strong style="text-decoration: underline;"
+                  >It will take up to 1/2 minute for changes to take effect</strong
+                >
+              </h5>
+              <hr />
+              <button
+                type="button"
+                class="btn btn-primary mr-2"
+                onclick={() => onUserAction('session-soft-reset', targetUser)}
+              >
+                Soft Reset Session
+              </button>
+              <h5 class="small mt-2">
+                Use this before a hard reset. Resets the media state of the room, Makes all users
+                reconnect to the media servers gently. Works Well... Swap to your backup media
+                servers if the primary are not working, and vice versa.
+              </h5>
+              <br /><br />
+              <button
+                type="button"
+                class="btn btn-danger mr-2"
+                onclick={() => onUserAction('session-hard-reset', targetUser)}
+              >
+                Hard Reset/ All Reload
+              </button>
+              <h5 class="small mt-2">
+                Hard Resetting forces everyone to reload the session and page.
+              </h5>
+              <br />
+              <button
+                type="button"
+                class="btn btn-danger mr-2"
+                onclick={() => onUserAction('session-hard-reset-revoke', targetUser)}
+              >
+                Hard Reset and Revoke Tokens
+              </button>
+              <br />
+              <h5 class="small mt-2">
+                Hard Resetting forces everyone to reload the session and page, also revokes session
+                tokens, forcing users to log in again.
+              </h5>
             </div>
-            <div class="custom-control custom-radio my-2">
-              <input
-                type="radio"
-                id="customRadio3"
-                value="d"
-                name="customRadio"
-                class="custom-control-input"
-                {@attach setInputChecked(groupChatMode === 'd')}
-                onchange={() => requestSessionChatMode('d')}
-              />
-              <label for="customRadio3" class="custom-control-label">Disable Group Chat</label>
+            <div class="col pl-4">
+              <h3><i class="fas fa-comments"></i> Group Chat Control</h3>
+              <div class="custom-control custom-radio my-2">
+                <input
+                  type="radio"
+                  id="customRadio1"
+                  value="g"
+                  name="customRadio"
+                  class="custom-control-input"
+                  {@attach setInputChecked(groupChatMode === 'g')}
+                  onchange={() => requestSessionChatMode('g')}
+                />
+                <label for="customRadio1" class="custom-control-label">Regular Group Chat</label>
+              </div>
+              <div class="custom-control custom-radio my-2">
+                <input
+                  type="radio"
+                  id="customRadio2"
+                  value="p"
+                  name="customRadio"
+                  class="custom-control-input"
+                  {@attach setInputChecked(groupChatMode === 'p')}
+                  onchange={() => requestSessionChatMode('p')}
+                />
+                <label for="customRadio2" class="custom-control-label"
+                  >Webinar Mode (Regular users don't see each others posts)</label
+                >
+                <p>
+                  In this mode, presenters will see everyones questions/comments, but users will not
+                  see each others' chats.
+                </p>
+              </div>
+              <div class="custom-control custom-radio my-2">
+                <input
+                  type="radio"
+                  id="customRadio3"
+                  value="d"
+                  name="customRadio"
+                  class="custom-control-input"
+                  {@attach setInputChecked(groupChatMode === 'd')}
+                  onchange={() => requestSessionChatMode('d')}
+                />
+                <label for="customRadio3" class="custom-control-label">Disable Group Chat</label>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <CloseSessionPane
-        active={sessionControlTab === 'close-session'}
-        {closedMessage}
-        onOpenSession={() => onUserAction('session-open', targetUser)}
-        onSave={onSaveCloseMessage}
-      />
-      <div
-        id="lock-session"
-        role="tabpanel"
-        aria-labelledby="lock-session-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'lock-session',
-            active: sessionControlTab === 'lock-session'
-          }
-        ]}
-      >
-        <button
-          type="button"
-          class="btn btn-warning m-2"
-          onclick={() => onUserAction('session-lock', targetUser)}
+        <CloseSessionPane
+          active={sessionControlTab === 'close-session'}
+          {closedMessage}
+          onOpenSession={() => onUserAction('session-open', targetUser)}
+          onSave={onSaveCloseMessage}
+        />
+        <div
+          id="lock-session"
+          role="tabpanel"
+          aria-labelledby="lock-session-tab"
+          class={[
+            'tab-pane fade',
+            {
+              show: sessionControlTab === 'lock-session',
+              active: sessionControlTab === 'lock-session'
+            }
+          ]}
         >
-          Lock Session
-        </button>
-        <button
-          type="button"
-          class="btn btn-danger m-2"
-          onclick={() => onUserAction('session-lock-kick', targetUser)}
-        >
-          Lock Session &amp; kick users.
-        </button>
-        <button
-          type="button"
-          class="btn btn-success m-2"
-          onclick={() => onUserAction('session-unlock', targetUser)}
-        >
-          Unlock Session
-        </button>
-        <h4 class="small mt-2">
-          Lock Session? If locked only presenters/admins will be able to use the room. Regular users
-          will not be allowed to enter until you unlock it.
-        </h4>
-      </div>
-      <div
-        id="av-device-selection"
-        role="tabpanel"
-        aria-labelledby="av-device-selection-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'av-device-selection',
-            active: sessionControlTab === 'av-device-selection'
-          }
-        ]}
-      >
-        <AvDevicePane {capture} {onPreferenceChange} />
-      </div>
-      <div
-        id="streaming-selection"
-        role="tabpanel"
-        aria-labelledby="streaming-selection-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'streaming-selection',
-            active: sessionControlTab === 'streaming-selection'
-          }
-        ]}
-      >
-        <ul id="streaming-settings-tab" role="tablist" class="nav nav-tabs">
-          {#each [['obs-streaming', 'Stream RTMP/WHIP/OBS'], ['restream', 'Restream'], ['stream-player', 'Stream Player']] as [tabId, label] (tabId)}
-            <li class="nav-item">
-              <a
-                id="{tabId}-tab"
-                data-bs-toggle="tab"
-                href="#{tabId}"
-                role="tab"
-                aria-controls={tabId}
-                aria-selected={streamingControlTab === tabId}
-                class={['nav-link', { active: streamingControlTab === tabId }]}
-                onclick={(event) => {
-                  event.preventDefault();
-                  streamingControlTab = tabId as typeof streamingControlTab;
-                }}>{label}</a
-              >
-            </li>
-          {/each}
-        </ul>
-        <div id="streaming-settings-tabContent" class="tab-content">
-          <div
-            id="stream-player"
-            role="tabpanel"
-            aria-labelledby="stream-player-tab"
-            class={[
-              'tab-pane fade',
-              {
-                show: streamingControlTab === 'stream-player',
-                active: streamingControlTab === 'stream-player'
-              }
-            ]}
+          <button
+            type="button"
+            class="btn btn-warning m-2"
+            onclick={() => onUserAction('session-lock', targetUser)}
           >
-            <p>
-              The stream player tool allows you to create a link you can share with others to watch
-              your stream. This is useful if you want to share your stream with others who are not
-              logged in to the trading room. They will just see the screenshare sections (no
-              chat/notes/files/etc)
-            </p>
-            <p>
-              Stream Player enabled:
-              <span style:color="red">false</span>
-            </p>
-            <!--
+            Lock Session
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger m-2"
+            onclick={() => onUserAction('session-lock-kick', targetUser)}
+          >
+            Lock Session &amp; kick users.
+          </button>
+          <button
+            type="button"
+            class="btn btn-success m-2"
+            onclick={() => onUserAction('session-unlock', targetUser)}
+          >
+            Unlock Session
+          </button>
+          <h4 class="small mt-2">
+            Lock Session? If locked only presenters/admins will be able to use the room. Regular
+            users will not be allowed to enter until you unlock it.
+          </h4>
+        </div>
+        <div
+          id="av-device-selection"
+          role="tabpanel"
+          aria-labelledby="av-device-selection-tab"
+          class={[
+            'tab-pane fade',
+            {
+              show: sessionControlTab === 'av-device-selection',
+              active: sessionControlTab === 'av-device-selection'
+            }
+          ]}
+        >
+          <AvDevicePane {capture} {onPreferenceChange} />
+        </div>
+        <div
+          id="streaming-selection"
+          role="tabpanel"
+          aria-labelledby="streaming-selection-tab"
+          class={[
+            'tab-pane fade',
+            {
+              show: sessionControlTab === 'streaming-selection',
+              active: sessionControlTab === 'streaming-selection'
+            }
+          ]}
+        >
+          <ul id="streaming-settings-tab" role="tablist" class="nav nav-tabs">
+            {#each [['obs-streaming', 'Stream RTMP/WHIP/OBS'], ['restream', 'Restream'], ['stream-player', 'Stream Player']] as [tabId, label] (tabId)}
+              <li class="nav-item">
+                <a
+                  id="{tabId}-tab"
+                  data-bs-toggle="tab"
+                  href="#{tabId}"
+                  role="tab"
+                  aria-controls={tabId}
+                  aria-selected={streamingControlTab === tabId}
+                  class={['nav-link', { active: streamingControlTab === tabId }]}
+                  onclick={(event) => {
+                    event.preventDefault();
+                    streamingControlTab = tabId as typeof streamingControlTab;
+                  }}>{label}</a
+                >
+              </li>
+            {/each}
+          </ul>
+          <div id="streaming-settings-tabContent" class="tab-content">
+            <div
+              id="stream-player"
+              role="tabpanel"
+              aria-labelledby="stream-player-tab"
+              class={[
+                'tab-pane fade',
+                {
+                  show: streamingControlTab === 'stream-player',
+                  active: streamingControlTab === 'stream-player'
+                }
+              ]}
+            >
+              <p>
+                The stream player tool allows you to create a link you can share with others to
+                watch your stream. This is useful if you want to share your stream with others who
+                are not logged in to the trading room. They will just see the screenshare sections
+                (no chat/notes/files/etc)
+              </p>
+              <p>
+                Stream Player enabled:
+                <span style:color="red">false</span>
+              </p>
+              <!--
               ── THESE TWO BUTTONS ARE INERT, AND SAYING SO IS THE FIX ────────────────────────────
 
               They used to flip a local `streamPlayerEnabled` and write
@@ -4660,106 +4660,112 @@
               `SC-04` / `SC-05` in the surface audit. `streamingPlayerEnabled` joins
               `dead-preference-keys.ts` so the copies already written are pruned.
             -->
-            <div class="mt-4">
-              <button class="btn btn-outline-primary btn-sm m-1" disabled>
-                <i class="fas fa-desktop"></i> Enable Stream Player
-              </button>
-              <button class="btn btn-outline-danger btn-sm m-1" disabled>
-                <i class="fas fa-stop"></i> Disable Stream Player
-              </button>
-            </div>
-            <div class="alert alert-info m-2">
-              The stream player is not available in this deployment: it needs a public playback
-              page, and there is no server here that issues one. The buttons above are shown because
-              the tool exists upstream, and are disabled because pressing them would change nothing.
-            </div>
-          </div>
-          <div
-            id="obs-streaming"
-            role="tabpanel"
-            aria-labelledby="obs-streaming-tab"
-            class={[
-              'tab-pane fade',
-              {
-                show: streamingControlTab === 'obs-streaming',
-                active: streamingControlTab === 'obs-streaming'
-              }
-            ]}
-          >
-            <div class="form-group m-4 w-100 text-center">
-              <div class="form-check form-check-inline">
-                <input
-                  type="radio"
-                  name="streaming-rtmp"
-                  id="streaming-rtmp"
-                  value="RTMP"
-                  required
-                  class="form-check-input"
-                  bind:group={streamingProtocol}
-                  onchange={() => onPreferenceChange('streamingType', streamingProtocol)}
-                />
-                <label for="streaming-rtmp" class="form-check-label font-weight-bold"> Rtmp </label>
+              <div class="mt-4">
+                <button class="btn btn-outline-primary btn-sm m-1" disabled>
+                  <i class="fas fa-desktop"></i> Enable Stream Player
+                </button>
+                <button class="btn btn-outline-danger btn-sm m-1" disabled>
+                  <i class="fas fa-stop"></i> Disable Stream Player
+                </button>
               </div>
-              <div class="form-check form-check-inline">
-                <input
-                  type="radio"
-                  name="streaming-whip"
-                  id="streaming-whip"
-                  value="WHIP"
-                  required
-                  class="form-check-input"
-                  bind:group={streamingProtocol}
-                  onchange={() => onPreferenceChange('streamingType', streamingProtocol)}
-                />
-                <label for="streaming-whip" class="form-check-label font-weight-bold"> Whip </label>
+              <div class="alert alert-info m-2">
+                The stream player is not available in this deployment: it needs a public playback
+                page, and there is no server here that issues one. The buttons above are shown
+                because the tool exists upstream, and are disabled because pressing them would
+                change nothing.
               </div>
             </div>
-            <!--
+            <div
+              id="obs-streaming"
+              role="tabpanel"
+              aria-labelledby="obs-streaming-tab"
+              class={[
+                'tab-pane fade',
+                {
+                  show: streamingControlTab === 'obs-streaming',
+                  active: streamingControlTab === 'obs-streaming'
+                }
+              ]}
+            >
+              <div class="form-group m-4 w-100 text-center">
+                <div class="form-check form-check-inline">
+                  <input
+                    type="radio"
+                    name="streaming-rtmp"
+                    id="streaming-rtmp"
+                    value="RTMP"
+                    required
+                    class="form-check-input"
+                    bind:group={streamingProtocol}
+                    onchange={() => onPreferenceChange('streamingType', streamingProtocol)}
+                  />
+                  <label for="streaming-rtmp" class="form-check-label font-weight-bold">
+                    Rtmp
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input
+                    type="radio"
+                    name="streaming-whip"
+                    id="streaming-whip"
+                    value="WHIP"
+                    required
+                    class="form-check-input"
+                    bind:group={streamingProtocol}
+                    onchange={() => onPreferenceChange('streamingType', streamingProtocol)}
+                  />
+                  <label for="streaming-whip" class="form-check-label font-weight-bold">
+                    Whip
+                  </label>
+                </div>
+              </div>
+              <!--
               The RTMP half — the reference's `_De`, which renders only when `streamingType` is
               RTMP (`O(153, "RTMP" === e.streamingType ? 153 : -1)`, byte 2152300). The intro
               sentence lives INSIDE that conditional upstream, typo `streraming` and all, so it
               moves here with it.
             -->
-            {#if streamingProtocol === 'RTMP'}
-              <p>
-                If you want to stream directly from OBS into this room, you can use the following
-                interface to get your WHIP streraming link.
-              </p>
-              <!-- `gDe`, gated on `streamingLinkRTMP` being non-empty. No link, no block. -->
-              {#if streamingLinkRTMP}
-                <div class="m-2">
-                  <div class="d-flex align-items-center">
-                    <label for="streaming-link-rtmp" class="form-label me-2">
-                      Streaming link:
-                    </label>
-                    <button
-                      class="btn btn-outline-info btn-sm m-1"
-                      onclick={() => copyIngestField(streamingLinkRtmpNode)}
-                    >
-                      <i class="fas fa-copy"></i> Copy
-                    </button>
-                    <button
-                      class="btn btn-outline-info btn-sm m-1"
-                      disabled={ingestLoading}
-                      onclick={getNewToken}
-                    >
-                      <i class="fas fa-sync"></i> New Link
-                    </button>
-                  </div>
-                  <textarea
-                    bind:this={streamingLinkRtmpNode}
-                    id="streaming-link-rtmp"
-                    readonly
-                    class="form-control border border-danger"
-                    style="height: 100px;"
-                    value={streamingLinkRTMP}></textarea>
-                  <p>
-                    IN OBS or any RTMP compatible broadcaster enter the above link. Replace
-                    <strong>"name="</strong> with your desired name
-                  </p>
-                  <p>
-                    Note: you can re-stream this incoming stream to another rtmp destination, click
-                    <!--
+              {#if streamingProtocol === 'RTMP'}
+                <p>
+                  If you want to stream directly from OBS into this room, you can use the following
+                  interface to get your WHIP streraming link.
+                </p>
+                <!-- `gDe`, gated on `streamingLinkRTMP` being non-empty. No link, no block. -->
+                {#if streamingLinkRTMP}
+                  <div class="m-2">
+                    <div class="d-flex align-items-center">
+                      <label for="streaming-link-rtmp" class="form-label me-2">
+                        Streaming link:
+                      </label>
+                      <button
+                        class="btn btn-outline-info btn-sm m-1"
+                        onclick={() => copyIngestField(streamingLinkRtmpNode)}
+                      >
+                        <i class="fas fa-copy"></i> Copy
+                      </button>
+                      <button
+                        class="btn btn-outline-info btn-sm m-1"
+                        disabled={ingestLoading}
+                        onclick={getNewToken}
+                      >
+                        <i class="fas fa-sync"></i> New Link
+                      </button>
+                    </div>
+                    <textarea
+                      bind:this={streamingLinkRtmpNode}
+                      id="streaming-link-rtmp"
+                      readonly
+                      class="form-control border border-danger"
+                      style="height: 100px;"
+                      value={streamingLinkRTMP}></textarea>
+                    <p>
+                      IN OBS or any RTMP compatible broadcaster enter the above link. Replace
+                      <strong>"name="</strong> with your desired name
+                    </p>
+                    <p>
+                      Note: you can re-stream this incoming stream to another rtmp destination,
+                      click
+                      <!--
                       The reference makes this a clickable `<strong>` (consts index 112:
                       `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
                       carries the SAME three classes instead, which is a deliberate and visually
@@ -4772,18 +4778,18 @@
                       The button chrome is stripped by `#session-control-modal button.restream-link`
                       in `app.css`, beside the captured hover rule it belongs with.
                     -->
-                    <button
-                      type="button"
-                      class="text-primary fw-bold restream-link"
-                      onclick={openRestreamTab}>here</button
-                    > to set that up.
-                  </p>
-                </div>
-                <hr />
+                      <button
+                        type="button"
+                        class="text-primary fw-bold restream-link"
+                        onclick={openRestreamTab}>here</button
+                      > to set that up.
+                    </p>
+                  </div>
+                  <hr />
+                {/if}
               {/if}
-            {/if}
 
-            <!--
+              <!--
               The WHIP half — the reference's `vDe`, `O(154, "WHIP" === e.streamingType ? 154 : -1)`.
 
               Its `bDe` child (Start/Stop WHIP Streaming) is deliberately NOT reproduced. Upstream it
@@ -4792,49 +4798,50 @@
               those buttons never render in the reference for this configuration either; building
               them here would be two controls calling nothing.
             -->
-            {#if streamingProtocol === 'WHIP'}
-              <div class="mt-1">
-                <div class="m-2">
-                  <div class="d-flex align-items-center">
-                    <label for="streaming-link" class="form-label me-2"> Streaming link: </label>
-                    <button
-                      class="btn btn-outline-info btn-sm m-1"
-                      onclick={() => copyIngestField(streamingLinkNode)}
-                    >
-                      <i class="fas fa-copy"></i> Copy
-                    </button>
-                  </div>
-                  <div class="mb-2">
-                    <label for="streaming-link">Streaming Link</label>
-                    <textarea
-                      bind:this={streamingLinkNode}
-                      id="streaming-link"
-                      readonly
-                      rows="2"
-                      class="form-control border border-danger"
-                      style="height: auto; overflow-y: scroll;"
-                      value={streamingLink}></textarea>
-                  </div>
-                  <div class="mb-2">
-                    <label for="stream-whip-key">Bearer</label>
-                    <button
-                      class="btn btn-outline-info btn-sm m-1"
-                      onclick={() => copyIngestField(streamWhipKeyNode)}
-                    >
-                      <i class="fas fa-copy"></i> Copy
-                    </button>
-                    <textarea
-                      bind:this={streamWhipKeyNode}
-                      id="stream-whip-key"
-                      readonly
-                      rows="2"
-                      class="form-control border border-danger"
-                      style="height: auto; overflow-y: scroll;"
-                      value={streamKey}></textarea>
-                  </div>
-                  <p>
-                    Note: you can re-stream this incoming stream to another rtmp destination, click
-                    <!--
+              {#if streamingProtocol === 'WHIP'}
+                <div class="mt-1">
+                  <div class="m-2">
+                    <div class="d-flex align-items-center">
+                      <label for="streaming-link" class="form-label me-2"> Streaming link: </label>
+                      <button
+                        class="btn btn-outline-info btn-sm m-1"
+                        onclick={() => copyIngestField(streamingLinkNode)}
+                      >
+                        <i class="fas fa-copy"></i> Copy
+                      </button>
+                    </div>
+                    <div class="mb-2">
+                      <label for="streaming-link">Streaming Link</label>
+                      <textarea
+                        bind:this={streamingLinkNode}
+                        id="streaming-link"
+                        readonly
+                        rows="2"
+                        class="form-control border border-danger"
+                        style="height: auto; overflow-y: scroll;"
+                        value={streamingLink}></textarea>
+                    </div>
+                    <div class="mb-2">
+                      <label for="stream-whip-key">Bearer</label>
+                      <button
+                        class="btn btn-outline-info btn-sm m-1"
+                        onclick={() => copyIngestField(streamWhipKeyNode)}
+                      >
+                        <i class="fas fa-copy"></i> Copy
+                      </button>
+                      <textarea
+                        bind:this={streamWhipKeyNode}
+                        id="stream-whip-key"
+                        readonly
+                        rows="2"
+                        class="form-control border border-danger"
+                        style="height: auto; overflow-y: scroll;"
+                        value={streamKey}></textarea>
+                    </div>
+                    <p>
+                      Note: you can re-stream this incoming stream to another rtmp destination,
+                      click
+                      <!--
                       The reference makes this a clickable `<strong>` (consts index 112:
                       `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
                       carries the SAME three classes instead, which is a deliberate and visually
@@ -4847,165 +4854,116 @@
                       The button chrome is stripped by `#session-control-modal button.restream-link`
                       in `app.css`, beside the captured hover rule it belongs with.
                     -->
-                    <button
-                      type="button"
-                      class="text-primary fw-bold restream-link"
-                      onclick={openRestreamTab}>here</button
-                    > to set that up.
-                  </p>
-                  <p>
-                    IN OBS, under streaming, select "WHIP", and enter the above link. Replace
-                    <strong>"name="</strong> with your desired name
-                  </p>
+                      <button
+                        type="button"
+                        class="text-primary fw-bold restream-link"
+                        onclick={openRestreamTab}>here</button
+                      > to set that up.
+                    </p>
+                    <p>
+                      IN OBS, under streaming, select "WHIP", and enter the above link. Replace
+                      <strong>"name="</strong> with your desired name
+                    </p>
+                  </div>
                 </div>
-              </div>
-            {/if}
+              {/if}
 
-            <!--
+              <!--
               Not in the reference, and deliberately added: it has no state in which the ingest
               server is missing, because its `streamServerMTX` is always populated. Ours can be
               unset, and the repository's rule is that an absent value is REPORTED rather than
               filled in — the alternative is a panel that composes `http://:8889/…` and looks like
               a working link.
             -->
-            {#if ingestError}
-              <div class="alert alert-danger m-2">{ingestError}</div>
-            {:else if ingest && !ingest.configured}
-              <div class="alert alert-info m-2">
-                No ingest server is configured for this deployment, so there is no link to publish
-                to yet. Your stream key has still been issued.
-              </div>
-            {/if}
+              {#if ingestError}
+                <div class="alert alert-danger m-2">{ingestError}</div>
+              {:else if ingest && !ingest.configured}
+                <div class="alert alert-info m-2">
+                  No ingest server is configured for this deployment, so there is no link to publish
+                  to yet. Your stream key has still been issued.
+                </div>
+              {/if}
+            </div>
+            <RestreamPane
+              active={streamingControlTab === 'restream'}
+              {restreamUrl}
+              {onSaveRestreamUrl}
+              oninvalid={() => onUserAction('invalid-restream-link', targetUser)}
+            />
           </div>
-          <RestreamPane
-            active={streamingControlTab === 'restream'}
-            {restreamUrl}
-            {onSaveRestreamUrl}
-            oninvalid={() => onUserAction('invalid-restream-link', targetUser)}
-          />
         </div>
-      </div>
-      <div
-        id="session-history"
-        role="tabpanel"
-        aria-labelledby="session-history-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'session-history',
-            active: sessionControlTab === 'session-history'
-          }
-        ]}
-      >
-        <!--
-          ── THE BUTTON HAD NO HANDLER AT ALL ─────────────────────────────────────────────────────
-
-          Not a handler that did nothing — no `onclick`. `No session history.` was rendered
-          unconditionally above it, so the pane said the same thing whatever the room had done.
-          `SC-01`, and the exact shape `CLAUDE.md` names: a control whose only effect is nothing.
-
-          Both of upstream's branches now, decoded with `app-session-control-modal`'s own consts
-          table (119 = `[1,"list-group","text-dark"]`, 120 = `[1,"p-4","text-center"]`,
-          121 = the `btn btn-primary`, 122 = `[1,"fas","fa","fa-sync"]`, 123 = the list-group item,
-          124 = `[1,"d-flex","w-100","justify-content-between"]`, 125 = `[1,"mb-1"]`):
-
-            EDe (empty)  "No session history." + a `Load History` button
-            DDe (loaded) a `Refresh` button, then one `<a>` per entry: `<h5>` eventName,
-                         `<small>` created through `date:'medium'`, `<p>` eventValue
-
-          The `<a>` carries no `href` upstream and none here: it is a styled row, not a link, which
-          is why it has no click of its own either. `aria-current="true"` is the capture's, on every
-          row rather than on one — reproduced rather than corrected, because these strings are what a
-          DOM diff compares.
-
-          `mediumDateFormatter` already existed for the Files pane's uploaded-at column; Angular's
-          `date:'medium'` is one format and this room resolves it in one place.
-        -->
-        {#if sessionHistoryError}
-          <div class="alert alert-danger m-4">{sessionHistoryError}</div>
-        {/if}
-        {#if sessionHistoryEntries.length === 0}
-          <div class="p-4 text-center">No session history.</div>
-          <div class="p-4 text-center">
-            <button type="button" class="btn btn-primary" onclick={loadSessionHistory}
-              ><i class="fas fa fa-sync"></i>
-              {sessionHistoryLoading ? 'Loading…' : 'Load History'}
+        <SessionHistoryPane active={sessionControlTab === 'session-history'} />
+        <div
+          id="webinar-tools"
+          role="tabpanel"
+          aria-labelledby="webinar-tools-tab"
+          class={[
+            'tab-pane fade',
+            {
+              show: sessionControlTab === 'webinar-tools',
+              active: sessionControlTab === 'webinar-tools'
+            }
+          ]}
+        >
+          <div class="p-4">
+            <button
+              type="button"
+              class="btn btn-outline-info m-2"
+              onclick={() => onUserAction('session-send-video', targetUser)}
+            >
+              <i class="fas fa-video me-1"></i> Send video to room
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-info m-2"
+              onclick={() => onUserAction('session-send-sales-image', targetUser)}
+            >
+              <i class="fas fa-image me-1"></i> Send sales image to chat
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-info m-2"
+              onclick={() => onUserAction('session-send-users-url', targetUser)}
+            >
+              <i class="fas fa-link me-1"></i> Send users to URL
             </button>
           </div>
-        {:else}
-          <div class="list-group text-dark">
-            <div class="p-4 text-center">
-              <button type="button" class="btn btn-primary" onclick={loadSessionHistory}
-                ><i class="fas fa fa-sync"></i>
-                {sessionHistoryLoading ? 'Loading…' : 'Refresh'}
-              </button>
-            </div>
-            {#each sessionHistoryEntries as entry (entry.id)}
-              <!--
-                `<a>` with no `href`, which is the capture's own element and is why the warning is
-                suppressed rather than fixed. The three alternatives are all worse:
-
-                  a `<div>`   changes the rendered DOM these class strings are diffed against, for
-                              no behavioural gain — the element is inert upstream too;
-                  an `href`   invents a link that goes nowhere, which is the defect this repository
-                              removes rather than adds;
-                  a `<button>` announces an action to a screen reader that does not exist.
-
-                `list-group-item-action` is Bootstrap's hover/focus styling and the capture applies
-                it here despite there being no action. Reproduced with the rest of the string.
-              -->
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a
-                aria-current="true"
-                class="list-group-item list-group-item-action border-bottom border-top border-dark"
-              >
-                <div class="d-flex w-100 justify-content-between">
-                  <h5 class="mb-1">{entry.eventName}</h5>
-                  <small>{mediumDateFormatter.format(new Date(entry.created))}</small>
-                </div>
-                <p class="mb-1">{entry.eventValue}</p>
-              </a>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      <div
-        id="webinar-tools"
-        role="tabpanel"
-        aria-labelledby="webinar-tools-tab"
-        class={[
-          'tab-pane fade',
-          {
-            show: sessionControlTab === 'webinar-tools',
-            active: sessionControlTab === 'webinar-tools'
-          }
-        ]}
-      >
-        <div class="p-4">
-          <button
-            type="button"
-            class="btn btn-outline-info m-2"
-            onclick={() => onUserAction('session-send-video', targetUser)}
-          >
-            <i class="fas fa-video me-1"></i> Send video to room
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-info m-2"
-            onclick={() => onUserAction('session-send-sales-image', targetUser)}
-          >
-            <i class="fas fa-image me-1"></i> Send sales image to chat
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-info m-2"
-            onclick={() => onUserAction('session-send-users-url', targetUser)}
-          >
-            <i class="fas fa-link me-1"></i> Send users to URL
-          </button>
         </div>
       </div>
-    </div>
+    {:else if hasMic}
+      <!--
+        ── SC-14 — THE NON-PRESENTER BODY ────────────────────────────────────────────────────────
+
+        ```js
+        function LDe(t,n){ d(0,"form",131,0), x("ngSubmit", () => submitNewDevices(form)),
+            H(2,PDe,…)(3,RDe,…)(4,ODe,…)(5,NDe,…), d(6,"button",132), v(7," Change Devices ") …
+            …then the three processing checkboxes, consts 55 / 57 / 59 }   // byte 2,156,909
+        131 [1,"mt-2",3,"ngSubmit"]   132 ["type","submit",1,"btn","btn-primary"]
+        133 ["id","audio-deviceList","name","audioID", … 1,"form-select"]
+        134 ["id","video-deviceList","name","videoID", … 1,"form-select"]
+        ```
+
+        What that form contains is: the two device selects, their two "Please connect …" fallbacks,
+        and the same three processing checkboxes the presenter's pane has. `AvDevicePane` already
+        IS all six of those, so it is rendered rather than transcribed a second time.
+
+        ## TWO recorded divergences, and the second is forced by one of ours
+
+        1. **It applies on CHANGE, not on submit.** `submitNewDevices(form)` reads
+           `form.value.audioID` / `videoID` and writes `audioDeviceID` / `videoDeviceID` — the same
+           two preference keys the presenter's selects write, only later. Keeping the submit button
+           would mean one modal in which the identical control behaves two different ways depending
+           on who opened it, which is worse than the divergence.
+
+        2. **It has a Refresh button, which the reference's non-presenter form does not.** That is
+           forced by SC-02's divergence: this room deliberately does NOT enumerate devices when the
+           pane opens, because `loadDevices` calls `getUserMedia` and opening a settings pane must
+           not prompt somebody for their camera. Upstream enumerates in `ngAfterViewInit`, so its
+           form arrives populated. Without Refresh, a member would see "Please connect audio
+           devices." forever and have no way to answer it — a form that cannot be filled in.
+      -->
+      <AvDevicePane {capture} {onPreferenceChange} />
+    {/if}
     {#snippet footer()}
       <button type="button" class="btn btn-success btn-block" onclick={onclose}>Done</button>
     {/snippet}

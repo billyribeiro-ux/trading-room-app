@@ -29,6 +29,14 @@
 
   interface Props {
     isPresenter: boolean;
+    /**
+     * `globals.user.hasMic` — the durable membership permission, which widens ONE item below.
+     *
+     * `O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)` at bundle byte
+     * 2,489,576, where slot 29 is `f4e` — the `Session Control` item. It is the only entry in the
+     * presenter block whose gate is not plain `isPresenter`, and it is why this prop exists.
+     */
+    hasMic?: boolean;
     /*
       BINDABLE, both of them, and that is a defect this extraction nearly shipped.
 
@@ -209,6 +217,7 @@
 
   let {
     isPresenter,
+    hasMic = false,
     sidebarOpen = $bindable(),
     mobileNavOpen = $bindable(),
     media,
@@ -853,6 +862,33 @@
             <a><i class="fas fa-2x fa-spinner fa-spin"></i></a>
           </li>
         {/if}
+      {/if}
+      <!--
+        ── SC-14 — SESSION CONTROL IS NOT PLAIN `isPresenter` ──────────────────────────────────
+
+        ```js
+        O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)     // byte 2,489,576
+        function f4e(t,n){ d(0,"li",192), x("click", () => doSessionControl()),
+            d(1,"a",193), T(2,"i",194), d(3,"span",108), v(4,"Session Control") … }
+        ```
+
+        This item sat inside the presenter block with everything else, and it is the one entry there
+        whose gate upstream is wider: rendered when `(isPresenter || user.hasMic)` AND NOT
+        `isLimitedPresenter`. A member whose membership carries the mic permission gets it, and the
+        modal answers them with the device picker alone (`ModalHost.svelte`'s `{:else if hasMic}`
+        arm, SC-14/SC-17). Without this they could produce audio and had no way to choose which
+        microphone it came from.
+
+        `media.limitedPresenter` is the reference's own term and it is not redundant: `giveMicScreen`
+        assigns `globals.user.isPresenter = globals.isLimitedPresenter = e.give`, so somebody handed
+        mic and screen at runtime satisfies `isPresenter` — and upstream deliberately withholds this
+        item from them. A temporary grant is not room administration.
+
+        The three sibling items above (recording, microphone, screenshare) stay on plain
+        `isPresenter`: those drive what the room SENDS to everybody, which is the reason recorded at
+        the top of that block.
+      -->
+      {#if (isPresenter || hasMic) && !media.limitedPresenter}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <li
