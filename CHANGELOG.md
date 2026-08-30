@@ -33,6 +33,145 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 21:02 UTC — Three contract tests were failing for being busy, not for being wrong
+
+**Runtime impact: NO. Three test files and nothing else — no `src/lib` module, route or component
+changed.**
+
+The gate went red on two contracts after the first Playwright run:
+
+```
+FAIL src/lib/comment-safety-contract.test.ts > never leaks a comment CLOSER into the rendered page
+FAIL src/lib/user-action-intent.test.ts    > dispatches to the command with the TARGET user, not the caller
+```
+
+Neither was an assertion. Both read `Error: Test timed out in 5000ms.` — vitest's default — and both
+test bodies are **synchronous**, so there was nothing to await and nothing hanging. They were simply
+not given 5,000ms of CPU: three sub-agents were running their own suites on this box. Re-run alone,
+both passed; re-run as a full suite, 260 files and 4,328 tests passed with exit 0.
+
+**That diagnosis is the least interesting part.** A contract that reports `FAIL` when the machine is
+busy is worse than a slow one, because the only honest reading of a red gate is "the code is wrong",
+and here it wasn't. The next person to see it learns to re-run rather than to look, and that habit is
+what the whole gate exists to prevent. So the cost was measured rather than the timeout raised:
+
+| test | body was | now | where the time went |
+| --- | --- | --- | --- |
+| `comment-safety-contract` — comment CLOSER | 2,104ms | **13ms** | 74 `parse()` calls, 2,718ms; the AST walk they fed was 63ms |
+| `user-action-intent` — force-reload | 3,388ms | **2ms** | three `await import()`s of rune modules, inside the timed body |
+| `dom-reference-contract` — found attachments | 3,349ms | **0ms** | the component corpus parsed twice, 2,344ms per pass |
+| `dom-reference-contract` — unsanctioned attachment | 2,378ms | **1ms** | the second of those two passes |
+
+The third file was not failing. It was found by timing the whole suite afterwards, sitting at 67% of
+the same budget — the same defect one bad afternoon away from the same symptom.
+
+**None of the three rules was weakened, and the fixes are not timeout bumps.** Each is a shape fix of
+the kind `CLAUDE.md` asks for — *what does this cost, and what bounds it*:
+
+- **`comment-safety-contract`** now screens with a regex before it parses. The screen is sound, not a
+  heuristic, and the argument is written at the code: a `Text` node's data is always a substring of
+  the source lying OUTSIDE a comment, so stripping every well-formed comment with the same
+  `<!--`-to-next-`-->` pairing the parser itself uses leaves any orphan closer standing. A file with
+  no residual `-->` cannot produce one. The screen only decides **what to parse** — a `-->` inside a
+  `<script>`, an attribute or an expression tag survives stripping and is still adjudicated by the
+  compiler, which is the whole point of the rule.
+- **`user-action-intent`** imports its three room classes at module scope, like every other test that
+  builds them. Its dynamic imports were the **only three in the suite** inside an `it()`. The cost
+  did not disappear — it moved to the file's import phase, which vitest measures separately and does
+  not time out. File duration went 3.74s → 3.56s: nothing hidden, nothing slower.
+- **`dom-reference-contract`** enumerates once at describe scope and both tests read the result, and
+  `attachmentsIn` skips a source with no `@attach` token. That screen was proved equivalence-
+  preserving before it was committed rather than argued: 125 attachments found either way, identical
+  file/line/expression sets, 35 files parsed instead of 74.
+
+**Negative controls, all three run, all three RED, each restored:**
+
+| rule | mutation | result |
+| --- | --- | --- |
+| comment CLOSER | an orphan `-->` added to `ChatTabStrip.svelte`, placed **immediately after** a well-formed comment — the exact adjacency where a naive strip would swallow it | `ChatTabStrip.svelte:65 — A comment whose opener never existed.` |
+| force-reload target | `forceReload(user.id)` → `forceReload(this.#session().user.id)` | `expected [ 1 ] to deeply equal [ 9 ]` |
+| unsanctioned attachment | `{@attach captureNavItem}` added to a `<li>` | `ChatTabStrip.svelte:70 — {@attach captureNavItem}` |
+
+The first control was run twice. The first attempt wrote `this.#deps.session()`, a field that does
+not exist on that class, and the file failed to load at all — `Tests no tests`. A mutation that does
+not compile is not a negative control, and had it been read as one it would have "proved" a test that
+no longer runs.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code read from a log rather than from the harness —
+`260 files, 4,328 passed, 1 skipped, gate-exit=0`. Per-test timings above are from
+`vitest --reporter=verbose` on an unloaded box. **Not run:** the controller gate, which no file here
+touches, and the browser suite.
+
+### 2026-08-30 20:29 UTC — A browser ran, and the room was answering 500
+
+**Runtime impact: NO from this commit — it changes one test-harness config and this file.** But what
+the change made possible is a shipping defect on this branch, recorded here so it cannot be lost:
+**the room's own page has been answering 500 on every render**, and every gate this repository has is
+green on it.
+
+#### The seam, and why the suite could not run at all
+
+`playwright.config.ts` takes `PLAYWRIGHT_CHROMIUM_PATH` when it is set. CI installs its own Chromium
+(`playwright install --with-deps chromium` in `quality.yml`) and does not set the variable, so CI
+behaviour is untouched.
+
+It exists because a pinned Playwright wants a pinned browser build and a sandbox that ships one
+cannot supply the other. Measured: this repository pins `@playwright/test` **1.62.1**, which looks
+for `chromium_headless_shell-1234`; the container has build **1194** at `/opt/pw-browsers`. Every
+spec failed with *"Executable doesn't exist"* before the first assertion ran — so **the one kind of
+failure this suite exists to catch was unreachable in the one environment where the code is being
+written**, which is exactly why every verification note in this file has said "nothing was opened in
+a browser".
+
+Downloading a second browser is the alternative and it is worse: a ~150MB fetch per environment for a
+binary already on disk. Pinning the path in the config would break CI. An env var is the seam that
+lets both be right.
+
+#### What the first run found
+
+With the browser launching: **3 passed, 4 failed, 4 did not run.** All four failures have one root
+cause, and it is a temporal dead zone:
+
+```
+ReferenceError: Cannot access 'isPresenter' before initialization
+    at src/lib/components/ModalHost.svelte:992:20
+    at ModalHost (src/lib/components/ModalHost.svelte:1:1)
+    at $$render_inner (src/lib/components/RoomOverlays.svelte:641:29)
+```
+
+`ModalHost.svelte:991-993` seeds `activeConnectivityTab` with
+`$state(untrack(() => (isPresenter ? 'network' : 'mobile')))`, and `isPresenter` is declared as a
+`$derived` at line **2177**. A `$state(...)` initializer is evaluated EAGERLY at component init, so
+the read happens while the binding is still in its dead zone. `untrack` does not defer evaluation —
+it only stops the read being tracked — so it does not help. On the server the initializer runs
+immediately and throws, which is why the whole page 500s rather than one modal misbehaving.
+
+It came from the CONN-03 work earlier the same day and it is on the pushed branch.
+
+**This is the second instance of the same class, and the first is recorded three entries below**:
+`createRoom` sat above ten page bindings its dependency thunks closed over, and answered 500 on every
+room render for ELEVEN DAYS before the room-e2e job was added on 2026-08-28.
+
+#### The part worth keeping
+
+`svelte-check` (1,475 files), ESLint, `prettier --check`, `svelte-autofixer` and the full
+**4,328-test** unit suite are ALL GREEN on this defect. Every one of them is structurally blind to
+it, because they mount components with stubs that are already initialised. Only a browser sees it.
+
+That is the argument for the room-e2e job restated by a second instance, and it is why this entry
+exists even though the fix lands separately: a repository whose entire gate can be green while its
+product surface answers 500 has learned something about its gate, not just about one file.
+
+#### Verification
+
+`PLAYWRIGHT_CHROMIUM_PATH=… npx playwright test` in `apps/room` — **3 passed, 4 failed, 4 did not
+run**, exit 1, from a logged exit code. The three that pass are the login page, the signed handoff
+and the refused handoff; the four that fail all need a rendered room. `pnpm run gate` is green and
+always was, which is the point.
+
+The fix belongs in `ModalHost.svelte` and is being made by the session that holds that file, with the
+before/after Playwright counts as its evidence. This entry records the measurement and the seam.
+
 ### 2026-08-30 20:24 UTC — The screenshare panes: one share feeding two decoders, an empty box that never said why, and a consumer that came up 0x0
 
 **Runtime impact: YES.** Detaching a screen now blanks the pane it came from and offers a way back,

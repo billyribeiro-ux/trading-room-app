@@ -47,6 +47,21 @@ export default defineConfig(
     'node_modules/**',
     'test-results/**',
     /*
+      `playwright-report/**` sits beside `test-results/**` and was missing until 2026-08-30, when the
+      browser suite was first run in a sandbox rather than only in CI.
+
+      Both are Playwright output and `.gitignore:4-5` has always covered BOTH; this list covered one.
+      The report directory carries a bundled trace VIEWER — CodeMirror, a settings view, a snapshot
+      renderer — so linting it produced **3,326 errors in third-party minified JavaScript** and the
+      gate failed on code nobody in this repository wrote.
+
+      It was invisible for as long as it was, because CI uploads the report as an artefact and never
+      lints afterwards, and nothing local had ever produced one: the room's Playwright config pins a
+      browser build no sandbox here had, so `pnpm run test:e2e` failed before it could write a report.
+      Two gaps hiding each other, and closing the browser one is what surfaced this.
+    */
+    'playwright-report/**',
+    /*
       THE CAPTURE DIRECTORIES ARE EVIDENCE, and linting them would be a category error.
 
       `docs/source/**` holds the decoded production bundle — 2.8 MB of minified Angular — and its

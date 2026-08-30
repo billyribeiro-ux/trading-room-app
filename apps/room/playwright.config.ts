@@ -162,7 +162,33 @@ export default defineConfig({
       ]
     }
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  /**
+   * The browser, and the one affordance that lets this suite run outside CI.
+   *
+   * CI installs its own Chromium (`playwright install --with-deps chromium`, `quality.yml`) and
+   * `PLAYWRIGHT_CHROMIUM_PATH` is unset there, so this resolves to `undefined` and Playwright uses
+   * the build it downloaded — CI behaviour is untouched.
+   *
+   * **It exists because a pinned Playwright wants a pinned browser build, and a sandbox that ships
+   * one cannot supply the other.** Measured here on 2026-08-30: this repository pins
+   * `@playwright/test` 1.62.1, which looks for `chromium_headless_shell-1234`, while the container
+   * had build 1194 pre-installed at `/opt/pw-browsers`. Every spec failed with *"Executable doesn't
+   * exist"* before the first assertion ran — so the ONE kind of failure this suite exists to catch
+   * was unreachable in the one environment where the code was being written.
+   *
+   * Downloading a second browser is the alternative and it is worse: it is a ~150MB fetch per
+   * environment for a binary that is already on disk, and pinning the path in the config would break
+   * CI. An env var is the seam that lets both be right.
+   */
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined }
+      }
+    }
+  ],
   webServer: [
     {
       // The stub first: the room's very first page load asks it for the configuration.
