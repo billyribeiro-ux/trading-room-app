@@ -1,4 +1,5 @@
 import { arrivalSoundFor } from '#lib/chat-arrival-sound.js';
+import { isMessageMutationFrame } from '#lib/message-mutation-frames.js';
 import { invalidate, invalidateAll } from '$app/navigation';
 
 import { resolveArrivalAnnouncement } from '#lib/arrival-announcement.js';
@@ -467,6 +468,29 @@ export class RoomEventStream<Entry> {
             whatever arrives on a socket.
           */
           void invalidateAll();
+        }
+        if (isMessageMutationFrame(command?.cmd)) {
+          /*
+            A message in this room is no longer what this tab is holding — it was reacted to,
+            edited, marked answered, deleted, or its Q&A thread changed.
+
+            Nine commands used to do all of that and tell nobody: a presenter deleted a message and
+            every other viewer kept it on screen, a reaction was visible only to the person who
+            clicked it, and a question landed with no badge moving anywhere but the asker's tab.
+            `#lib/message-mutation-frames.ts` holds the four reference frame names, the byte offsets
+            they were read at, and why ours carry no payload where the reference's carry the whole
+            row.
+
+            The SKIP is the same one the `chat` and `alerts` channels make one screen down, in their
+            own words: *"Our own post already refetched. Re-invalidating would refetch twice."* The
+            browser that sent the command awaits it and then calls `invalidateAll()` itself.
+
+            One refetch for all four, deliberately. `invalidateAll()` re-reads the whole page load,
+            which is where messages, alerts, question counts and captured overrides all come from —
+            so distinguishing them here would buy a reader four branches and the room nothing.
+          */
+          if (command.actorUserId !== this.#session().user.id) void invalidateAll();
+          return;
         }
         if (command?.cmd === 'presenterColorsChanged') {
           /*

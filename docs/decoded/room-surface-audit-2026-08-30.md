@@ -2229,6 +2229,8 @@ z("ngClass",ct(2,$0e,!e.isDetached&&(!e.isConnected||e.isPresentingThisScreen&&!
 
 ### EMOJI-01 — A reaction is never pushed to other viewers — no realtime channel for reactions
 
+**BUILT 2026-08-30 03:19 UTC**, and the audit found one third of it. Nine commands mutated a rendered row and published nothing — reaction, edit, delete, mark-answered, and the four Q&A commands. All nine announce now, on the reference's own four frame names (`updateChatMsg` / `updateAlertMsg` / `deleteChatMsg` / `deleteAlertMsg`, bytes 1,011,021 / 1,011,303 / 1,021,604 / 1,021,717). `message-mutation-frames.ts` holds them; `message-mutation-broadcast-contract.test.ts` drives all nine through the real hub and asserts on what a SECOND connection received. Ours are triggers where the reference's `update` pair carry the whole row — the row is the authority, and a frame carrying a body would put admin-channel text on a per-room stream.
+
 **high** · `missing-behaviour` · reference byte **1,152,627**
 
 ```

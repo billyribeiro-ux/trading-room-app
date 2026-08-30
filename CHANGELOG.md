@@ -33,6 +33,108 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:19 UTC — Nine commands changed a message and told nobody
+
+**Runtime impact: YES.** A reaction, an edit, a deletion, a mark-answered and every Q&A change now
+reach every other browser in the room within one SSE frame. Before this, they reached nobody.
+
+#### The defect, and the audit found a third of it
+
+`EMOJI-01` reports that a reaction is never pushed. It is right, and it is one of nine. Asking which
+OTHER branches of the same two files announce nothing turned up all of them:
+
+| file | commands that mutated a rendered row and published nothing |
+| --- | --- |
+| `message-actions.remote.ts` | `delete`, `reaction`, `edit`, `markAnswered` — eleven return points |
+| `alert-questions.remote.ts` | `askQuestion`, `reactToQuestion`, `editQuestion`, `deleteQuestion` |
+
+So a presenter deleted a message and every other viewer kept it on screen. A reaction was visible
+only to the browser that clicked it. A member asked a question and the presenter's Q&A badge did not
+move until they happened to reload. The only refresh was the actor's own `invalidateAll()` — the one
+browser that already knew.
+
+Every one of those commands returned 200, wrote its row, and passed its own tests, because every one
+of those tests asserts on the row. That is the whole shape of this defect class.
+
+#### Four frame names, read rather than recalled
+
+| frame | byte | what it announces |
+| --- | ---: | --- |
+| `updateChatMsg` | 1,011,021 | a chat row changed — reaction or edit |
+| `updateAlertMsg` | 1,011,303 | an alert row changed — reaction, edit, or anything in its Q&A thread |
+| `deleteChatMsg` | 1,021,604 | a chat row is gone |
+| `deleteAlertMsg` | 1,021,717 | an alert row is gone |
+
+**Q&A rides on `updateAlertMsg`.** `updatedQAMsg`, `deletedQA` and `qaReactionDetails` are FIELDS of
+that frame, not names beside it — which is correct, because the thread hangs off the alert and the
+alert row carries `question_count` and `question_answered`. Reading that is what stopped a fifth,
+invented frame name being added.
+
+Three of the four leave `ABSENT_FROM_OUR_SOURCE`; `updateAlertMsg` was never on it.
+
+#### Ours carry no row, and there are two reasons rather than one
+
+The reference's `update` pair carry the whole message and the client splices it into its log. Ours
+carry the name and who acted, and the receiver calls `invalidateAll()`.
+
+The first reason is the one `changeChatMode` and `presenterColorsChanged` already give: the row the
+server wrote is the authority, and a payload is a second copy the client can disagree with.
+
+The second is specific to this room and is a privacy constraint rather than a preference.
+`publishChatToRoom` exists because this hub's SSE stream is per ROOM while chat is per CHANNEL — so
+a frame carrying a message body would put admin-channel text on every subscriber's wire. A
+trigger-only frame cannot. That is why "match the reference more closely" is not an improvement
+available here.
+
+#### `actorUserId`, and what it is allowed to decide
+
+The browser that sent the command awaits it and calls `invalidateAll()` itself, so a frame that did
+not name its actor would cost that browser two full page-data refetches per click. The frame carries
+the actor's id and the receiver skips its own — the same skip the `chat` and `alerts` channels
+already make, in their own words: *"Our own post already refetched."*
+
+An id on a wire is exactly the shape of the 2026-08-07 privilege escalation, so its limit is written
+beside it in both halves of the contract: it is only ever compared against the recipient's own id,
+the frame carries no payload for a forged one to unlock, and the server applied every rule before
+publishing.
+
+#### One module, because the wire has four ends
+
+`cmds-frame.ts` already records the problem: the client's frame type and the server's `RoomEvent`
+union "are two declarations of one contract, in two files, joined by nothing". These four strings are
+published by two server modules and matched by one client dispatcher. `#lib/message-mutation-frames.ts`
+is one `as const` list that all four import, so a typo is a compile error instead of a message that
+silently stops propagating.
+
+**Verified:** the contract EXECUTES all nine commands through `callRemote` against a live SQLite
+database with a second connection subscribed to the real `publishToRoom`/`subscribeToRoom` hub, and
+asserts on what that other browser received. Source assertions were deliberately not used for the
+publishes: the nine branches return at eleven different points, and a publish placed after the wrong
+`return` is invisible to any amount of grep. One case asserts the reverse — a refused command puts
+NOTHING on the wire, because a frame for a change that never happened is the same defect running
+backwards.
+
+`pnpm run gate` in `apps/room`, exit code 0 read directly: prettier and eslint clean, `svelte-check`
+0 errors, 3,559 tests passing (1 skipped), build done.
+
+**Ten negative controls, each run and each seen RED**, on the committed tree and reverted after: the
+chat delete, the alert reaction, the chat edit, `markAnswered`, `askQuestion`, and
+`reactToQuestion` + `editQuestion` each stop announcing; the two chat frame names swapped (five
+tests); `actorUserId` dropped from the frame (seven); the self-skip removed; and a REFUSED alert
+delete made to announce anyway, which is the control on the one assertion here that proves an
+absence. An eleventh mutation was written with an ambiguous anchor, did not apply, and the run that
+stayed green was recorded as a no-op rather than as a control — it was re-run properly against the
+alert-reaction branch.
+
+**Not verified:** nothing was opened in a browser, so "two tabs, one deletes, the other updates" is
+proven at the hub rather than at the screen. The self-skip is the one assertion here read from source
+rather than run — it lives in an `EventSource` handler only a browser can drive — and what makes that
+safe is that the exact `actorUserId` it compares against is executed by every case above.
+
+**The Svelte MCP server is still disconnected in this session.** No `.svelte` file changed in this
+commit, so the mandated loop had nothing to run against; recorded for consistency with the entries
+around it.
+
 ### 2026-08-30 03:06 UTC — The presenter colour pickers now change what everyone sees, which is what their own heading has always claimed
 
 **Runtime impact: YES.** A presenter's two message colours are stored per room, applied to every

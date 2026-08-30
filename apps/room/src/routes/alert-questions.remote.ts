@@ -10,8 +10,38 @@ import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { alertQuestions, alerts } from '#lib/server/db/schema.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
 import { readRoomConfig } from '#lib/server/room-config-client.js';
+import { publishToRoom } from '#lib/server/room-events.js';
+import { messageMutationFrame } from '#lib/message-mutation-frames.js';
 import { toggleReaction } from '#lib/reaction-toggle.js';
 import { parseReactions } from '#lib/server/reactions.js';
+
+/**
+ * The room is told that an alert's thread changed.
+ *
+ * ## Why `updateAlertMsg` and not a frame of its own
+ *
+ * Because that is what the reference sends. `updatedQAMsg`, `deletedQA` and `qaReactionDetails` are
+ * FIELDS of `updateAlertMsg` (bundle byte 1,011,303), not names beside it — asking, answering,
+ * reacting to and deleting a question are all "this alert changed", which is what they are: the
+ * thread hangs off the alert and the alert row carries `question_count` and `question_answered`.
+ *
+ * ## What was wrong before 2026-08-30
+ *
+ * All four commands in this file wrote their rows and told nobody. A member asked a question and
+ * the presenter's Q&A badge did not move until they reloaded; a presenter answered and the asker
+ * saw nothing. The commands returned 200 and every test passed, because every test asserts on the
+ * row. `#lib/message-mutation-frames.ts` carries the four frames and why ours are triggers rather
+ * than payloads.
+ *
+ * `actorUserId` lets the browser that sent the command skip its own frame — it has already called
+ * `invalidateAll()`. It is not authority and nothing reads it as such.
+ */
+function announceThreadChange(room: string, actorUserId: number): void {
+  publishToRoom(room, {
+    channel: 'cmds',
+    data: { cmd: messageMutationFrame('alert', 'update'), actorUserId }
+  });
+}
 
 /*
   Asking a question against an alert.
@@ -166,6 +196,8 @@ export const askQuestion = command(
           .run();
       }
     });
+
+    announceThreadChange(shortCode, user.id);
   }
 );
 
@@ -264,6 +296,8 @@ export const reactToQuestion = command(
       .set({ reactionsJson: JSON.stringify(reactions) })
       .where(and(eq(alertQuestions.roomShortCode, shortCode), eq(alertQuestions.id, questionId)))
       .run();
+
+    announceThreadChange(shortCode, user.id);
   }
 );
 
@@ -337,6 +371,8 @@ export const deleteQuestion = command(
           .run();
       }
     });
+
+    announceThreadChange(shortCode, user.id);
   }
 );
 
@@ -428,5 +464,7 @@ export const editQuestion = command(
       .set({ body })
       .where(and(eq(alertQuestions.roomShortCode, shortCode), eq(alertQuestions.id, questionId)))
       .run();
+
+    announceThreadChange(shortCode, user.id);
   }
 );

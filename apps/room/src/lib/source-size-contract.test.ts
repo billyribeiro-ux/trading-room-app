@@ -689,7 +689,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       room, so what a socket says must not be what answers it. A future reader comparing the two
       files will see a divergence; this is why it is there.
     */
-    max: 947,
+    /*
+      947 -> 971, 2026-08-30. The message-mutation receiver — one `if`, one comparison, and
+      twenty-two lines of citation.
+
+      Nine commands used to mutate a rendered row and tell nobody: a presenter deleted a message and
+      every other viewer kept it on screen, a reaction was visible only to the browser that clicked
+      it, a question landed with no badge moving. The receiver is small because
+      `#lib/message-mutation-frames.ts` owns the four names and the argument; what is here is the
+      one thing that cannot live there — the self-skip, and why the actor's id on this frame is not
+      authority.
+    */
+    max: 971,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -3083,7 +3094,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       was written here and then removed, because a paragraph about a field that does not exist, in a
       file of field declarations, is the kind of thing that goes stale first. The producer says it.
     */
-    max: 59,
+    /*
+      59 -> 68, 2026-08-30. `actorUserId`, and nine lines saying what it is allowed to decide.
+
+      An id on a wire is exactly the shape of the 2026-08-07 privilege escalation, so a field that
+      names a person needs its limit written next to it rather than inferred: this one is only ever
+      compared against the recipient's own, the frame carries no payload for a forged id to unlock,
+      and the server applied every rule before publishing. The comment IS the change.
+    */
+    max: 68,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
   },
   {
