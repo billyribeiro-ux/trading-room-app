@@ -15,6 +15,8 @@
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
   import type { NoteVersion } from '#lib/types.js';
   import type { SessionImageFile } from '#lib/session-image-files.js';
+
+  import CarouselDialog from './CarouselDialog.svelte';
   import {
     PtrCarousel,
     findCarousel,
@@ -30,11 +32,6 @@
     'align' | 'color' | 'emoji' | 'font' | 'fontSize' | 'lineHeight' | 'style' | 'table';
 
   type EditorDialog = 'carousel' | 'image' | 'link' | 'video';
-
-  /** The modal's rows carry an identity for the keyed each block; the node's slides do not. */
-  type EditorCarouselSlide = CarouselSlide & {
-    key: number;
-  };
 
   interface Props {
     readonly contentHtml: string;
@@ -203,116 +200,19 @@
   let imageFiles = $state.raw<readonly File[]>([]);
   let videoUrl = $state('');
   /**
-   * Which carousel slide the image browser is filling, or `null` when it is closed.
+   * What the carousel dialog OPENS on — a seed, not live state.
    *
-   * `fileBrowserTargetIndex` upstream, set by `openFileBrowser(e)` and read by `selectFileForSlide`.
-   * An INDEX and not a slide key, because that is what `updateCarouselSlide` already addresses a row
-   * by — and because the browser is closed before the list can change under it.
+   * `CarouselDialog` owns everything the presenter types; this holds only what it starts from, and
+   * the dialog is mounted inside `{#if dialog === 'carousel'}` so it is re-seeded on every open.
+   * Plain {@link CarouselSlide}s: the each-block key and the URL staging field are the dialog's own
+   * bookkeeping and never leave it.
    */
-  let fileBrowserTargetIndex = $state<number | null>(null);
+  let carouselSeed = $state.raw<{
+    slides: readonly CarouselSlide[];
+    interval: number;
+    height: number;
+  }>({ slides: [], interval: 5, height: 90 });
 
-  /**
-   * Which slide is mid-upload, by its KEY rather than its index.
-   *
-   * `r.uploading` upstream is a flag on the slide object itself, and an index would be the same
-   * thing badly: `removeCarouselSlide` renumbers every row after the one it drops, so an upload in
-   * flight would light up the wrong spinner the moment a presenter deletes a slide above it. The key
-   * is already the identity this list is keyed by.
-   *
-   * One at a time, because the upload is one `await` — a second `Upload` click on another row while
-   * the first is running simply moves the spinner, which is what upstream's per-slide flag would do
-   * anyway with two flags set and one visible.
-   */
-  let uploadingSlideKey = $state<number | null>(null);
-
-  /**
-   * `uploadCarouselImage(e, i)` — byte 1,476,460.
-   *
-   * ```js
-   * uploadCarouselImage(e, i) {
-   *   const o = e.target, s = o.files?.[0];
-   *   if (!s) return;
-   *   const r = this.carouselImages[i];
-   *   r.uploading = !0;
-   *   … POST FormData{image, name} to `${upload_server}/image/${sessionID}` …
-   *   success: h => { r.url = h.data.link, r.uploading = !1 },
-   *   error:   h => { r.uploading = !1, bootbox.alert("Image upload failed.") }
-   *   o.value = ""
-   * }
-   * ```
-   *
-   * Four things are transcribed and one is not.
-   *
-   * **The FIRST file only** — `o.files?.[0]`, even though the input is not `multiple`. Upstream is
-   * defensive about a browser handing it more; so is this.
-   *
-   * **The input is cleared unconditionally**, at the END rather than in either callback — so
-   * choosing the same file twice in a row fires `change` again. Without it the second attempt after
-   * a failure is silent.
-   *
-   * **The failure is a dialog**, not a console line: `bootbox.alert("Image upload failed.")`. This
-   * component's own `errorMessage` raises the same primitive every other failure here uses.
-   *
-   * **The URL lands in the slide, and only on success.** A failed upload leaves whatever was there.
-   *
-   * What is NOT transcribed is the POST. `onUploadImages` already carries this room's upload — CDN
-   * when configured, `composer-image.remote.ts` otherwise — and it is the prop the Insert Image
-   * dialog has always used. Reproducing the reference's `$.ajax` here would be a second uploader
-   * with its own credential handling.
-   */
-  async function uploadCarouselImage(event: Event, index: number) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    /* Cleared unconditionally and FIRST here rather than last: the `await` below means a `return`
-       inside it would otherwise leave the input holding a file it has already consumed. */
-    input.value = '';
-    if (!file) return;
-
-    const slide = carouselSlides[index];
-    if (!slide) return;
-    uploadingSlideKey = slide.key;
-    try {
-      const [url] = await onUploadImages([file]);
-      /* Addressed by KEY on the way back, because a slide may have been deleted while this ran. */
-      const at = carouselSlides.findIndex((entry) => entry.key === slide.key);
-      if (url && at !== -1) updateCarouselSlide(at, 'url', url);
-      else if (!url) errorMessage = 'Image upload failed.';
-    } catch {
-      errorMessage = 'Image upload failed.';
-    } finally {
-      uploadingSlideKey = null;
-    }
-  }
-
-  /** `openFileBrowser(e)` — byte 1,477,053, minus the fetch. See `session-image-files.ts`. */
-  function openFileBrowser(index: number) {
-    fileBrowserTargetIndex = index;
-  }
-
-  /**
-   * `selectFileForSlide(file)` — put the chosen image in the slide and close the browser.
-   *
-   * The URL goes in the slide's `url`, never its `link`: the reference's own binding is
-   * `z("src", e.vidPath)` on the thumbnail and the slide's image field is what it fills. A presenter
-   * who wants the slide to link somewhere types that separately, which is why the row has two
-   * inputs.
-   */
-  function selectFileForSlide(file: SessionImageFile) {
-    const index = fileBrowserTargetIndex;
-    fileBrowserTargetIndex = null;
-    if (index === null) return;
-    updateCarouselSlide(index, 'url', file.url);
-  }
-
-  let carouselSlideKey = 1;
-  let carouselSlides = $state.raw<readonly EditorCarouselSlide[]>([newCarouselSlide()]);
-  let carouselInterval = $state(5);
-  let carouselHeight = $state(90);
-  /*
-    Which carousel the modal is currently editing, as a document position, or null when it is going
-    to insert a new one. The reference keeps a separate `isEditingCarousel` boolean beside the
-    element it found; one value that is either a position or nothing cannot disagree with itself.
-  */
   let editingCarouselPos = $state<number | null>(null);
   let giphyOpen = $state(false);
   let revisionQueued = false;
@@ -403,10 +303,6 @@
     };
   });
 
-  function newCarouselSlide(): EditorCarouselSlide {
-    return { key: carouselSlideKey++, url: '', link: '' };
-  }
-
   /*
     `carouselInNote` in the reference, which computes it once when the editor opens as
     `(this.tab.noteContent || '').includes('data-ptr-carousel')`. Ours tracks the live document
@@ -451,13 +347,13 @@
     openMenu = null;
     giphyOpen = false;
     const slides = normalizeSlides(target.attrs.slides);
-    // `0 === h.length && h.push({...})` — an empty carousel still opens with one blank row to fill.
-    carouselSlides =
-      slides.length === 0
-        ? [newCarouselSlide()]
-        : slides.map((slide) => ({ ...slide, key: carouselSlideKey++ }));
-    carouselInterval = numericRange(target.attrs.interval, 1, 60, 5);
-    carouselHeight = numericRange(target.attrs.height, 10, 100, 90);
+    // An empty carousel still opens with one blank row to fill — `CarouselDialog` applies that rule
+    // (`0 === h.length && h.push({...})`), because it is the one that owns the rows.
+    carouselSeed = {
+      slides,
+      interval: numericRange(target.attrs.interval, 1, 60, 5),
+      height: numericRange(target.attrs.height, 10, 100, 90)
+    };
     editingCarouselPos = target.pos;
     dialog = 'carousel';
   }
@@ -555,9 +451,7 @@
     } else if (kind === 'video') {
       videoUrl = '';
     } else {
-      carouselSlides = [newCarouselSlide()];
-      carouselInterval = 5;
-      carouselHeight = 90;
+      carouselSeed = { slides: [], interval: 5, height: 90 };
       // Opened from the toolbar, so this places a NEW carousel however the last one was reached.
       editingCarouselPos = null;
     }
@@ -609,31 +503,27 @@
     dialog = null;
   }
 
-  function addCarouselSlide(): void {
-    carouselSlides = [...carouselSlides, newCarouselSlide()];
-  }
-
-  function updateCarouselSlide(index: number, field: keyof CarouselSlide, value: string): void {
-    carouselSlides = carouselSlides.map((slide, slideIndex) =>
-      slideIndex === index ? { ...slide, [field]: value } : slide
-    );
-  }
-
-  function removeCarouselSlide(index: number): void {
-    carouselSlides = carouselSlides.filter((_slide, slideIndex) => slideIndex !== index);
-    if (carouselSlides.length === 0) carouselSlides = [newCarouselSlide()];
-  }
-
-  function insertCarousel(): void {
+  /**
+   * What `CarouselDialog` hands back, put into the document.
+   *
+   * The dialog edits; this decides where the result lands, because only the editor knows whether
+   * the modal was opened over an existing node. The `https://` filter stays HERE rather than moving
+   * with the rows: it is a rule about what the document will accept, not about what a presenter may
+   * type, and `parseCarouselSlides` applies the same one on the way back in.
+   */
+  function insertCarousel(config: {
+    slides: readonly CarouselSlide[];
+    interval: number;
+    height: number;
+  }): void {
     const instance = editor;
-    const slides = carouselSlides.filter(({ url }) => url.trim().startsWith('https://'));
+    const slides = config.slides.filter(({ url }) => url.trim().startsWith('https://'));
     if (slides.length === 0 || instance === null) return;
 
     const attrs = {
-      // `key` is the each-block identity for the rows in the modal and has no business on the node.
       slides: slides.map(({ link, url }) => ({ link, url })),
-      interval: numericRange(carouselInterval, 1, 60, 5),
-      height: numericRange(carouselHeight, 10, 100, 90)
+      interval: numericRange(config.interval, 1, 60, 5),
+      height: numericRange(config.height, 10, 100, 90)
     };
     const pos = editingCarouselPos;
 
@@ -1451,224 +1341,27 @@
     </div>
   </div>
 {:else if dialog === 'carousel'}
-  <div
-    class="note-modal open note-carousel-modal"
-    aria-hidden="false"
-    role="dialog"
-    aria-label={carouselDialogTitle}
-  >
-    <div class="note-modal-content">
-      <div class="note-modal-header">
-        <!--
-          Dismissing has to clear the target as well as the dialog. The reference does the same in
-          its modal's rejection handler: `() => { this.isEditingCarousel = !1; }`. Without it the
-          next carousel inserted from the toolbar would overwrite the one last opened for editing.
-        -->
-        <button
-          type="button"
-          class="close"
-          aria-label="Close"
-          onclick={() => {
-            dialog = null;
-            editingCarouselPos = null;
-          }}><i class="note-icon-close"></i></button
-        >
-        <h4 class="note-modal-title">{carouselDialogTitle}</h4>
-      </div>
-      <div class="note-modal-body">
-        {#each carouselSlides as slide, index (slide.key)}
-          <div class="carousel-slide-row">
-            <label for={`${componentId}-carousel-url-${index}`}>Image URL</label>
-            <input
-              id={`${componentId}-carousel-url-${index}`}
-              name={`noteCarouselUrl${index}`}
-              class="form-control"
-              type="url"
-              value={slide.url}
-              oninput={(event) => updateCarouselSlide(index, 'url', event.currentTarget.value)}
-            />
-            <label for={`${componentId}-carousel-link-${index}`}>Link / URL</label>
-            <input
-              id={`${componentId}-carousel-link-${index}`}
-              name={`noteCarouselLink${index}`}
-              class="form-control"
-              type="url"
-              value={slide.link}
-              oninput={(event) => updateCarouselSlide(index, 'link', event.currentTarget.value)}
-            />
-            <!--
-              ── THE TWO WAYS TO FILL A SLIDE, `E0e` at byte 1,462,300 ─────────────────────────────
+  <!--
+    The carousel modal, its file browser and its two confirmations are `CarouselDialog.svelte`.
 
-              Decoded with this component's consts (58 the hidden file input, 59 the Upload label,
-              60/62 the two icons, 61 the Browse button, 63 the separator):
-
-                <input type="file" accept="image/*" style="display:none" id="cfi_{i}"
-                       (change)="uploadCarouselImage($event, i)">
-                <label class="btn btn-sm btn-outline-secondary mb-0" for="cfi_{i}">
-                  <i class="fas fa-upload"></i> Upload</label>
-                <button type="button" class="btn btn-sm btn-outline-info mb-0 ml-1"
-                        (click)="openFileBrowser(i)"><i class="fas fa-folder-open"></i> Browse</button>
-                <span class="text-muted small mx-2">or paste a URL:</span>
-
-              The label-for-hidden-input pattern is the reference's own and is what gives the file
-              picker a styled trigger; `cfi_{index}` is its id and the `for` that reaches it.
-
-              **THE BROWSE BUTTON WAS LABELLED "Select Image" WHEN IT SHIPPED EARLIER TODAY**, which
-              was wrong: that string is the MODAL's title (` Select Image `, byte 1,466,205) and the
-              button's is ` Browse `. Corrected here with its classes and icon, which were invented
-              too.
-            -->
-            <input
-              type="file"
-              accept="image/*"
-              style="display: none"
-              id="cfi_{index}"
-              onchange={(event) => uploadCarouselImage(event, index)}
-            />
-            <label class="btn btn-sm btn-outline-secondary mb-0" for="cfi_{index}"
-              ><i class="fas fa-upload"></i> Upload</label
-            >
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-info mb-0 ml-1"
-              onclick={() => openFileBrowser(index)}
-              disabled={sessionImages.length === 0}
-              title={sessionImages.length === 0
-                ? 'No images have been uploaded to this room yet.'
-                : 'Choose an image already uploaded to this room'}
-              ><i class="fas fa-folder-open"></i> Browse</button
-            >
-            <!--
-              `D0e` — the per-slide spinner, byte 1,462,280. Const 52 is the icon and 53 the caption.
-              It replaces nothing: the reference shows it beside the row while `r.uploading` is set,
-              which is what tells a presenter that a slow upload is still running rather than lost.
-            -->
-            {#if uploadingSlideKey === slide.key}
-              <span class="mx-2"
-                ><i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
-                <span class="small mt-1">Uploading...</span></span
-              >
-            {/if}
-            <button type="button" class="btn btn-danger" onclick={() => removeCarouselSlide(index)}
-              >Delete slide</button
-            >
-          </div>
-        {/each}
-        <button type="button" class="btn btn-secondary" onclick={addCarouselSlide}>Add slide</button
-        >
-        <label for={`${componentId}-carousel-interval`}>Interval (seconds)</label>
-        <input
-          id={`${componentId}-carousel-interval`}
-          name="noteCarouselInterval"
-          class="form-control"
-          type="number"
-          min="1"
-          max="60"
-          bind:value={carouselInterval}
-        />
-        <label for={`${componentId}-carousel-height`}>Height (%)</label>
-        <input
-          id={`${componentId}-carousel-height`}
-          name="noteCarouselHeight"
-          class="form-control"
-          type="number"
-          min="10"
-          max="100"
-          bind:value={carouselHeight}
-        />
-      </div>
-      <div class="note-modal-footer">
-        <button
-          type="button"
-          class="btn btn-primary note-btn note-btn-primary"
-          onclick={insertCarousel}>{carouselDialogAction}</button
-        >
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!--
-  ── THE IMAGE BROWSER — `O0e`, byte 1,466,205 ────────────────────────────────────────────────────
-
-  A presenter who had already uploaded an image through Files had no way to reach it from a carousel
-  slide: the row offered a bare URL box and nothing else (`note-editor-file-browser-modal`).
-
-  Decoded with this component's own consts table:
-
-    73  [1,"text-center","py-4"]                            the loading state's wrapper
-    75  [1,"text-center","py-4","text-muted"]               the empty state's
-    76  [1,"fas","fa-images","fa-2x","mb-2"]                its icon
-    77  [1,"file-browser-grid"]
-    79  [1,"file-browser-item",3,"click","title"]
-    80  [1,"file-browser-thumb",3,"src","alt"]
-    81  [1,"file-browser-name"]
-
-  and the strings verbatim: ` Select Image `, `No images found. Upload images via Files first.`,
-  ` Cancel `. The four CSS rules are in this component's `<style>` below, transcribed from the
-  reference's own scoped block at byte 1,486,651.
-
-  ## THE LOADING STATE IS NOT DRAWN, and that is a measured omission
-
-  Upstream's switch is `O(7, fileBrowserLoading ? 7 : 0 === fileBrowserImages.length ? 8 : 9)` —
-  three branches, because it POSTs `getSessionFiles` every time the browser opens. This room's list
-  arrives with the page load and is invalidated by every upload path, so there is no moment at which
-  it is loading. Drawing `Loading images...` here would be a branch that can never render, which is a
-  branch that can never be checked — the dead-control shape this repository removes rather than adds.
-  `session-image-files.ts` carries the rest of that argument.
--->
-{#if fileBrowserTargetIndex !== null}
-  <div class="note-modal open">
-    <div class="note-modal-dialog">
-      <div class="note-modal-content">
-        <div class="note-modal-header">
-          <h4 class="modal-title"><i class="fas fa-images"></i> Select Image</h4>
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Close"
-            onclick={() => (fileBrowserTargetIndex = null)}
-          ></button>
-        </div>
-        <div class="note-modal-body">
-          {#if sessionImages.length === 0}
-            <div class="text-center py-4 text-muted">
-              <i class="fas fa-images fa-2x mb-2"></i>
-              <div>No images found. Upload images via Files first.</div>
-            </div>
-          {:else}
-            <div class="file-browser-grid">
-              {#each sessionImages as file (file.url)}
-                <!--
-                  A BUTTON where the reference uses a clickable `<div>` (const 79 carries `click` on
-                  a plain div). This one diverges deliberately: the element exists to be activated,
-                  so it has to be reachable from a keyboard, and `type="button"` is what keeps it out
-                  of the enclosing form. The three class strings are the capture's and are what the
-                  transcribed CSS targets.
-                -->
-                <button
-                  type="button"
-                  class="file-browser-item"
-                  title={file.name}
-                  onclick={() => selectFileForSlide(file)}
-                >
-                  <img class="file-browser-thumb" src={file.url} alt={file.name} />
-                  <div class="file-browser-name">{file.name}</div>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-        <div class="note-modal-footer">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            onclick={() => (fileBrowserTargetIndex = null)}>Cancel</button
-          >
-        </div>
-      </div>
-    </div>
-  </div>
+    Mounted inside this branch rather than kept alive and hidden, deliberately: the dialog seeds its
+    own state from these props at construction, so closing it is what discards a half-typed carousel
+    and opening it is what re-reads the note. The note at the top of that file carries the rest.
+  -->
+  <CarouselDialog
+    title={carouselDialogTitle}
+    action={carouselDialogAction}
+    slides={carouselSeed.slides}
+    interval={carouselSeed.interval}
+    height={carouselSeed.height}
+    {sessionImages}
+    {onUploadImages}
+    ondismiss={() => {
+      dialog = null;
+      editingCarouselPos = null;
+    }}
+    onsubmit={insertCarousel}
+  />
 {/if}
 
 {#if giphyApiKey && openMenu === null && dialog === null}
@@ -1745,70 +1438,6 @@
     max-height: calc(100vh - 40px);
     margin: 20px auto;
     overflow: auto;
-  }
-
-  /*
-    The image browser's four rules, transcribed value for value from the reference's own scoped block
-    at byte 1,486,651 with the `[_ngcontent-%COMP%]` attribute selectors dropped — Svelte's `<style>`
-    gives this component the same scoping Angular's attribute did.
-
-    `object-fit: cover` on the thumb and the three ellipsis properties on the name are what make a
-    grid of differently-shaped uploads read as a grid; `minmax(130px, 1fr)` with `auto-fill` is what
-    makes it reflow instead of scrolling sideways.
-  */
-  .file-browser-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 10px;
-    max-height: 60vh;
-    overflow-y: auto;
-  }
-
-  .file-browser-item {
-    cursor: pointer;
-    border: 2px solid transparent;
-    border-radius: 6px;
-    overflow: hidden;
-    text-align: center;
-    padding: 4px;
-    transition:
-      border-color 0.15s,
-      background 0.15s;
-    /* OURS: the element is a `<button>` here rather than the capture's clickable `<div>`, so the
-       three properties a button brings and a div does not are reset to the div's. */
-    background: none;
-    width: 100%;
-    display: block;
-  }
-
-  .file-browser-item:hover {
-    border-color: #0d6efd;
-    background: #f0f6ff;
-  }
-
-  .file-browser-thumb {
-    width: 100%;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 4px;
-    display: block;
-  }
-
-  .file-browser-name {
-    font-size: 0.72rem;
-    color: #555;
-    margin-top: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .carousel-slide-row {
-    display: grid;
-    gap: 4px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #ddd;
   }
 
   /*

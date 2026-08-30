@@ -622,6 +622,8 @@ openFileBrowser(e){this.fileBrowserTargetIndex=e,this.fileBrowserImages=[],this.
 
 ### note-editor-carousel-destructive-confirms — Deleting a slide and replacing a slide image happen with no confirmation
 
+**BUILT 2026-08-30 05:52 UTC.** Both questions, in the reference's own words and with its own button classes: `Delete this slide?` (`Delete`/`btn-danger`, byte 1,475,669) and `Change this image?` (`Change`/`btn-warning`, byte 1,476,242), raised through `BootboxDialog` — the primitive `NotesPane` already uses for delete-note, revert-version and welcome-mat, which this path was the one to skip. `clearCarouselImage` moves the old URL INTO the staging field rather than discarding it, so a presenter who changes their mind can press the check and have it back. The pending question is keyed by SLIDE and re-found on accept, because an upload can land while the dialog is open. `note-carousel-slide-contract.test.ts`.
+
 **medium** · `missing-behaviour` · reference byte **1,475,669**
 
 ```
@@ -719,6 +721,8 @@ W.onmouseenter=()=>W.style.background="rgba(0,0,0,0.75)",W.onmouseleave=()=>W.st
 
 ### note-editor-carousel-labels — Carousel modal label text differs from the captured strings
 
+**BUILT 2026-08-30 05:52 UTC.** Every string in this row: `Rotation interval (seconds)`, the `Slides` group label, `Link URL ` with its `(optional — clicking the image opens this)` hint span, `Image ` + `span.text-danger` `*`, ` Add slide ` with `fa-plus`, and the icon-only `i.fas.fa-trash` where a text `Delete slide` button was. `note-carousel-slide-contract.test.ts` asserts each, and asserts the three invented ones are gone.
+
 **low** · `wrong-constant` · reference byte **1,463,957**
 
 ```
@@ -731,6 +735,8 @@ v(11,"Link URL "),d(12,"span",50),v(13,"(optional — clicking the image opens t
 
 ### note-editor-carousel-modal-chrome — Carousel modal chrome: no Cancel button, no slide index badge, no delete-disabled-at-one
 
+**BUILT 2026-08-30 05:52 UTC.** All three: the footer ` Cancel ` (const 41, `btn btn-outline-dark`), the `#N` badge (const 44, `Ne("#", i+1, "")`), and `disabled={carouselSlides.length === 1}` on the trash. The last REPLACES a behaviour this row described fairly as reaching the same end state by a different route — deleting the last row spliced it out and silently re-added a blank one, so the presenter's row appeared to survive a delete they had just asked for. `note-carousel-slide-contract.test.ts`.
+
 **low** · `missing-control` · reference byte **1,465,110**
 
 ```
@@ -742,6 +748,8 @@ d(21,"button",38),x("click",function(){return D(e),E(g().addCarouselImage())}),T
 > Verified: All three sub-items are genuinely absent from our source, and the reference genuinely has all three (I re-read the bundle bytes at the cited offsets myself). (1) No Cancel button.
 
 ### note-editor-carousel-slide-preview — Filled-slide image preview and ' Change image ' button are missing
+
+**BUILT 2026-08-30 05:52 UTC.** `k0e` at byte 1,463,604 — const 68 `[1,"carousel-img-preview","mb-2"]`, 69 `[1,"carousel-preview-img",3,"src"]`, 70 the button, 71 `fa-times` — and with it the three-state row `O(6, e.uploading ? 6 : e.url ? 8 : 7)` this row said was one flat state here. The two `.carousel-img-preview` rules at byte 1,488,253 now have their consumer. The `<img>` is registered UNSIZEABLE with its reason: upstream bounds it `max-height: 140px; max-width: 100%` with `object-fit: contain` on purpose, because that state exists to show the WHOLE image and a fixed box would letterbox or crop the very thing being checked. `note-carousel-slide-contract.test.ts`.
 
 **low** · `missing-control` · reference byte **1,463,604**
 
@@ -802,6 +810,8 @@ codeviewIframeWhitelistSrcBase:["docs.google.com",".protradingroom.com","protrad
 > Verified: I could not refute it. Our note iframe host allow-list exists in two places and neither contains protradingroom.com in any form.
 
 ### note-editor-paste-url-regex — pendingUrl two-step and the image-URL paste auto-confirm are not reproduced
+
+**BUILT 2026-08-30 05:52 UTC.** `pendingUrl`, its check button (const 67, disabled on an empty trim), Enter, and the paste interception with the regex transcribed character for character, `jfif` included. **This row's own reasoning was wrong and is worth saying why:** it recorded the divergence as harmless because "with a directly-bound field the confirm step has nothing left to do". That was true only while our row had ONE state. `url` is what decides which of the three renders, so a directly bound box flips the row into an `<img src="h">` on the first keystroke and takes the box off the screen. The staging field is what lets the row stay an input until there is something worth previewing. The regex's `^https?://` anchor and `(\?.*)?$` tail are also what make running it on a paste safe — no `javascript:` or `data:` payload can match — and the value lands in an `<img src>`. `note-carousel-slide-contract.test.ts`.
 
 **low** · `divergence` · reference byte **1,475,962**
 

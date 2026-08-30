@@ -1500,6 +1500,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       first draft of this feature's contract walked straight into.
     */
     /*
+      1855 -> 1480, 2026-08-30, and this is the entry FINALLY DOING WHAT IT SAID.
+
+      Two paragraphs above name the toolbar as the obvious extraction and say it is "not bundled
+      with a settings wire". The carousel came out first, and it came out because this gate refused
+      the row rebuild: rewriting the slide row to the reference's three states put the file at 2,214
+      lines, and the rule is `Ceilings here only go DOWN: extract a slice into a module or component
+      rather than raising this number`. `CarouselDialog.svelte` is that slice — the modal, the file
+      browser, the two confirmations and eight CSS rules, none of which touches the editor.
+
+      The toolbar is STILL the next one, and it is still not bundled with anything.
+    */
+    /*
       1740 -> 1855, 2026-08-30. The per-slide UPLOAD — the other half of the same `E0e` row.
 
       The browser above can only offer what is already in the room. `uploadCarouselImage` (byte
@@ -1518,8 +1530,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The toolbar extraction named above is still the answer to this file's size and is still not
       bundled with a feature.
     */
-    max: 1855,
+    max: 1480,
     why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
+  },
+  {
+    file: 'lib/components/notes/CarouselDialog.svelte',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30 — which is the whole point of the check that demanded it. Four
+      components were found uncapped in two days and 36 by one measurement; a component that arrives
+      with a ceiling cannot join them.
+
+      Set at what it lands at rather than at something aspirational. It is `app-note`'s carousel
+      surface in one file: the modal (`M0e`), the three-state slide row (`x0e` switching `D0e`/`E0e`/
+      `k0e`), the file browser (`O0e`), the two `bootbox.confirm` questions, and eight CSS rules
+      transcribed from the reference's own scoped blocks. Most of the length is transcription and the
+      reasons for four deliberate divergences — the POST that is not reproduced, the spinner keyed by
+      slide rather than index, the grid item that is a button, and the loading branch that is not
+      drawn.
+
+      If this number climbs, the thing to check is whether the dialog has started reaching for the
+      EDITOR. It must not: it is handed the values a carousel is made of and hands them back once,
+      and `NoteEditor` is what knows whether that is an insert or an edit-in-place.
+    */
+    max: 880,
+    why: "app-note's carousel: the modal, its three-state slide row, the file browser and two confirms"
   },
   {
     file: 'lib/components/notes/NotesPane.svelte',

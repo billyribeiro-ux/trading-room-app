@@ -74,11 +74,14 @@ const SHEETS = [
  * no stylesheet at all, and the failure would be a rule "not found" rather than a path that is
  * wrong.
  *
- * `NoteEditor` is here because the reference's own rules for its image browser are component-scoped
- * (`[_ngcontent-%COMP%]`), which is exactly what a Svelte `<style>` gives — so they are transcribed
- * beside the markup they scope to rather than moved into a shared sheet to satisfy this verifier.
+ * `CarouselDialog` is here because the reference's own rules for the carousel and its image browser
+ * are component-scoped (`[_ngcontent-%COMP%]`), which is exactly what a Svelte `<style>` gives — so
+ * they are transcribed beside the markup they scope to rather than moved into a shared sheet to
+ * satisfy this verifier. It was `NoteEditor.svelte` until 2026-08-30, when the carousel modal was
+ * extracted; the rules travelled with the markup they scope, which is the whole argument for
+ * component-scoped rules being written beside it.
  */
-const SCOPED_SHEETS = ['lib/components/notes/NoteEditor.svelte'] as const;
+const SCOPED_SHEETS = ['lib/components/notes/CarouselDialog.svelte'] as const;
 
 interface SizedEntry {
   /** How many images in this file share this `src` and this disposition. The count IS the assertion. */
@@ -123,15 +126,15 @@ const SIZED_BY_CSS: Record<string, Record<string, SizedEntry>> = {
       why: 'the per-tab avatar in the private-chat tab strip.'
     }
   },
-  'lib/components/notes/NoteEditor.svelte': {
+  'lib/components/notes/CarouselDialog.svelte': {
     '{file.url}': {
       count: 1,
       /* This component's OWN `<style>` block — see the extraction note in the verifier below. */
-      sheet: 'lib/components/notes/NoteEditor.svelte',
+      sheet: 'lib/components/notes/CarouselDialog.svelte',
       selector: '.file-browser-thumb',
       width: '100%',
       height: '100px',
-      why: "the carousel image browser's thumbnail. A fixed 100px row height with `object-fit: cover` is what keeps a grid of differently-shaped uploads from reflowing as each one lands — transcribed from the reference at byte 1,486,651."
+      why: "the carousel image browser's thumbnail. A fixed 100px row height with `object-fit: cover` is what keeps a grid of differently-shaped uploads from reflowing as each one lands — transcribed from the reference at byte 1,486,651. It moved here with the markup on 2026-08-30 when the carousel came out of `NoteEditor.svelte`."
     }
   },
   'lib/components/RoomSidebar.svelte': {
@@ -195,6 +198,12 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
     '{item.url}': {
       count: 1,
       why: 'a shared file thumbnail. `app-presentationarea .fileDriveImg` bounds it at `max-width: 200px`; the height follows the uploaded image and is not knowable here.'
+    }
+  },
+  'lib/components/notes/CarouselDialog.svelte': {
+    '{slide.url}': {
+      count: 1,
+      why: "the carousel slide's own preview, an image a presenter just uploaded or pasted by URL. The reference bounds it at `max-height: 140px; max-width: 100%` with `object-fit: contain` (byte 1,488,253) and gives it no box on purpose — the point of that state is to show the WHOLE image, and a fixed width or height would letterbox or crop the very thing the presenter is checking. It sits inside an already-open modal, so nothing below it can be pushed."
     }
   },
   'lib/components/GifConfirmDialog.svelte': {

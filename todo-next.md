@@ -75,62 +75,63 @@ guessed.
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
-| 2 | `lib/components/notes/NoteEditor.svelte` | 1,850 | no |
-| 3 | `routes/+page.svelte` | 1,482 | no |
+| 2 | `routes/+page.svelte` | 1,482 | no |
+| 3 | `lib/components/notes/NoteEditor.svelte` | 1,479 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,077 | no |
-| 6 | `lib/components/PresentationArea.svelte` | 987 | no |
-| 7 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
-| 8 | `lib/components/PollPanel.svelte` | 824 | no |
-| 9 | `lib/components/RoomOverlays.svelte` | 905 | no |
-| 10 | `lib/components/RoomSidebar.svelte` | 774 | no |
-| 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
-| 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
-| 13 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
-| 14 | `lib/components/StreamingView.svelte` | 604 | no |
-| 15 | `lib/components/FilesPane.svelte` | 556 | no |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
+| 7 | `lib/components/PresentationArea.svelte` | 987 | no |
+| 8 | `lib/components/RoomOverlays.svelte` | 905 | no |
+| 9 | `lib/components/notes/CarouselDialog.svelte` | 878 | no |
+| 10 | `lib/components/PollPanel.svelte` | 824 | no |
+| 11 | `lib/components/RoomSidebar.svelte` | 774 | no |
+| 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
+| 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
+| 14 | `lib/components/PostAlertModal.svelte` | 608 | no |
+| 15 | `lib/components/StreamingView.svelte` | 604 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 595 | no |
-| 17 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
-| 18 | `lib/components/PostAlertModal.svelte` | 608 | no |
-| 19 | `lib/components/notes/NotesPane.svelte` | 451 | no |
+| 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
+| 18 | `lib/components/FilesPane.svelte` | 556 | no |
+| 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
 | 20 | `lib/components/ScreenPane.svelte` | 470 | no |
-| 21 | `lib/components/VideoPlayer.svelte` | 413 | no |
-| 22 | `lib/components/PrivateChatPanel.svelte` | 401 | no |
-| 23 | `lib/components/MainTabStrip.svelte` | 371 | no |
-| 24 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
-| 25 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 350 | no |
-| 26 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 320 | no |
-| 27 | `lib/components/StreamTabs.svelte` | 305 | no |
-| 28 | `lib/components/ScreenTabs.svelte` | 300 | no |
-| 29 | `lib/components/MessageMenu.svelte` | 292 | no |
-| 30 | `lib/components/ScheduledAlerts.svelte` | 271 | no |
-| 31 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
-| 32 | `lib/components/RoomShell.svelte` | 238 | no |
-| 33 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
-| 34 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
-| 35 | `lib/components/RichTextEditor.svelte` | 191 | no |
-| 36 | `lib/components/Modal.svelte` | 157 | no |
-| 37 | `lib/components/GiphyPicker.svelte` | 152 | no |
-| 38 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
-| 39 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 40 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
-| 41 | `lib/components/BootboxDialog.svelte` | 131 | no |
-| 42 | `lib/components/MobileRestorePane.svelte` | 130 | no |
-| 43 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 44 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 45 | `lib/components/CloseSessionPane.svelte` | 104 | no |
-| 46 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 47 | `lib/components/ChatSearchBar.svelte` | 88 | no |
-| 48 | `lib/components/CompactMessageRow.svelte` | 77 | no |
-| 49 | `lib/components/PositionsContainer.svelte` | 74 | no |
-| 50 | `lib/components/ModeratorMessage.svelte` | 73 | no |
-| 51 | `lib/components/ToastHost.svelte` | 64 | no |
-| 52 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 53 | `lib/components/ChatTabStrip.svelte` | 55 | no |
-| 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
+| 21 | `lib/components/notes/NotesPane.svelte` | 451 | no |
+| 22 | `lib/components/VideoPlayer.svelte` | 413 | no |
+| 23 | `lib/components/PrivateChatPanel.svelte` | 401 | no |
+| 24 | `lib/components/MainTabStrip.svelte` | 371 | no |
+| 25 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
+| 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 350 | no |
+| 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 320 | no |
+| 28 | `lib/components/StreamTabs.svelte` | 305 | no |
+| 29 | `lib/components/ScreenTabs.svelte` | 300 | no |
+| 30 | `lib/components/MessageMenu.svelte` | 292 | no |
+| 31 | `lib/components/ScheduledAlerts.svelte` | 271 | no |
+| 32 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
+| 33 | `lib/components/RoomShell.svelte` | 238 | no |
+| 34 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
+| 35 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
+| 36 | `lib/components/RichTextEditor.svelte` | 191 | no |
+| 37 | `lib/components/Modal.svelte` | 157 | no |
+| 38 | `lib/components/GiphyPicker.svelte` | 152 | no |
+| 39 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 40 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 41 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
+| 42 | `lib/components/BootboxDialog.svelte` | 131 | no |
+| 43 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 44 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 45 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 46 | `lib/components/CloseSessionPane.svelte` | 104 | no |
+| 47 | `lib/components/RoomBranding.svelte` | 91 | no |
+| 48 | `lib/components/ChatSearchBar.svelte` | 88 | no |
+| 49 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 50 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 51 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 52 | `lib/components/ToastHost.svelte` | 64 | no |
+| 53 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 54 | `lib/components/ChatTabStrip.svelte` | 55 | no |
+| 55 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 56 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 64 surfaces audited · 1,072 of 30,066 lines · 3.6%.**
+**2 of 65 surfaces audited · 1,072 of 30,573 lines · 3.5%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

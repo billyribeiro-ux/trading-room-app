@@ -193,14 +193,19 @@ describe('the render graph is walkable at all', () => {
   all fifty-five would be a large, risky sweep for a hazard that, measured, bites exactly one file
   today:
 
-    NoteEditor.svelte        LOSES `<BootboxDialog>` — `accept="image/*"` at :1278 opens a window
-                             the regex closes 7,000 characters later, over the real render at :1430
+    NoteEditor.svelte        LOSES `<BootboxDialog>` and `<CarouselDialog>` — `accept="image/*"` in
+                             its Insert Image dialog opens a window the regex closes thousands of
+                             characters later, over the real renders below it
+    CarouselDialog.svelte    the same, from 2026-08-30: the carousel's per-slide file input carries
+                             `accept="image/*"` too, and it was extracted OUT of `NoteEditor` — so
+                             the hazard travelled with the markup rather than being introduced. It
+                             loses `<BootboxDialog>` for exactly the same reason
     PostAlertModal.svelte    has `accept="image/*"`, and NO `*&#47;` follows it anywhere in the file
     ImageUploadDialog.svelte the same
     RoomOverlays.svelte      its glued `/*` is inside a comment that DISCUSSES `/*`. Harmless.
 
-  So the honest scope is ONE file, and it is this gate's own subject — now fixed. The other three
-  were checked and are not hazards, which is worth stating precisely because the first draft of this
+  So the honest scope is TWO files, both of them this gate's own subject and both read correctly by
+  the tests that matter. The other three were checked and are not hazards, which is worth stating precisely because the first draft of this
   paragraph called two of them "latent" and that was wrong: a non-greedy `/\*[\s\S]*?\*&#47;` with no
   closing `*&#47;` anywhere after it matches NOTHING, so those two files lose not one character. The
   control written for them did not fire, and chasing why is what produced this measurement.
@@ -212,8 +217,8 @@ describe('the render graph is walkable at all', () => {
   ## What this asserts
 
   That the naive strip and the correct one agree on which components a file renders. They agree today
-  for every file but `NoteEditor`, which this gate reads correctly and the naive one does not — so
-  `NoteEditor` is the one recorded exception, by name, with its measurement.
+  for every file but `NoteEditor` and `CarouselDialog`, which this gate reads correctly and the naive
+  one does not — so those two are the recorded exceptions, by name, with their measurements.
 
   A new hazardous file fails here, naming itself, and whoever meets it can then decide whether the
   test that reads it needs `svelteCodeOf`. That is a tripwire rather than a fix, and it is called
@@ -232,12 +237,20 @@ describe('no NEW file becomes hazardous to a naive comment strip', () => {
     new Set([...source.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)].map((match) => match[1]));
 
   /**
-   * Measured 2026-08-29 and left in place deliberately: `accept="image/*"` at :1278 opens a window
-   * the naive regex closes 7,002 characters later, swallowing `<BootboxDialog>` at :1430. The
-   * attribute is correct markup and the render is correct markup; it is the STRIPPER that is wrong,
-   * which is why this is an exception here and not a change to that component.
+   * Measured 2026-08-29 and left in place deliberately: `accept="image/*"` opens a window the naive
+   * regex closes thousands of characters later, swallowing the renders after it. The attribute is
+   * correct markup and the render is correct markup; it is the STRIPPER that is wrong, which is why
+   * these are exceptions here and not changes to those components.
+   *
+   * `CarouselDialog` joined on 2026-08-30 when the carousel modal was extracted out of `NoteEditor`
+   * — the per-slide file input went with it, and so did the hazard. `NoteEditor` now loses the
+   * extracted component's own tag as well, which is the clearest possible statement of what the
+   * naive strip costs: the render this gate exists to find is the one it eats.
    */
-  const KNOWN = new Map([['lib/components/notes/NoteEditor.svelte', ['BootboxDialog']]]);
+  const KNOWN = new Map([
+    ['lib/components/notes/NoteEditor.svelte', ['BootboxDialog', 'CarouselDialog']],
+    ['lib/components/notes/CarouselDialog.svelte', ['BootboxDialog']]
+  ]);
 
   it('loses no component tag that the correct stripper keeps', () => {
     const hazards: string[] = [];

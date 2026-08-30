@@ -38,8 +38,15 @@ import { svelteCodeOf } from './source-comments.js';
  * ` Cancel ` — and four CSS rules at byte 1,486,651.
  */
 
+/*
+  `CarouselDialog.svelte` since 2026-08-30, `NoteEditor.svelte` before it. The carousel modal, this
+  browser, the per-slide upload and the two confirmations were extracted into their own component
+  when the three-state slide row put the editor at 2,214 lines and `source-size-contract` refused it
+  — its rule is that ceilings only go down and a slice comes out instead. Nothing about the markup
+  below changed in that move, which is why these assertions are re-pointed rather than rewritten.
+*/
 const EDITOR = readFileSync(
-  new URL('./components/notes/NoteEditor.svelte', import.meta.url),
+  new URL('./components/notes/CarouselDialog.svelte', import.meta.url),
   'utf8'
 );
 const AREA = readFileSync(new URL('./components/PresentationArea.svelte', import.meta.url), 'utf8');
@@ -47,7 +54,7 @@ const AREA = readFileSync(new URL('./components/PresentationArea.svelte', import
   Comments stripped — the component quotes the very markup and consts it renders.
 
   `svelteCodeOf` and NOT the two-line `replace` every other contract test uses, because this is one
-  of the four files where that one is wrong: `NoteEditor.svelte` contains `accept="image/*"`, an
+  of the files where that one is wrong: `CarouselDialog.svelte` contains `accept="image/*"`, an
   ordinary HTML attribute whose `/*` opens a block comment the naive pattern closes thousands of
   characters later. Half this file vanished on the first draft of these assertions. A `toContain`
   fails loudly, which is how it was caught; a `not.toContain` would have passed for a defect that is
@@ -326,8 +333,18 @@ describe('the per-slide upload', () => {
   });
 
   it('draws the reference s spinner, by its consts', () => {
-    /* 52 the icon, 53 `[1,"small","mt-1"]`, and `D0e`'s caption verbatim. */
+    /*
+      `D0e` is `d(0,"div",47), T(1,"i",52), d(2,"div",53), v(3,"Uploading...")` — const 47
+      `[1,"text-center","py-2"]`, 52 the icon, 53 `[1,"small","mt-1"]`.
+
+      IT SHIPPED THIS MORNING AS `<span class="mx-2">` around a `<span class="small mt-1">`, both
+      invented. Corrected when the three-state row was transcribed and the whole of `x0e` was
+      decoded rather than only the parts a feature needed — which is the argument for reading a
+      template end to end before writing any of it.
+    */
+    expect(editorCode).toContain('<div class="text-center py-2">');
     expect(editorCode).toContain('<i class="fas fa-spinner fa-spin fa-2x text-primary"></i>');
-    expect(editorCode).toContain('<span class="small mt-1">Uploading...</span>');
+    expect(editorCode).toContain('<div class="small mt-1">Uploading...</div>');
+    expect(editorCode).not.toContain('<span class="mx-2"');
   });
 });

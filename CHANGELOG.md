@@ -33,6 +33,90 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 05:52 UTC — The carousel slide row, rebuilt to its three states, and the modal extracted because the ratchet said to
+
+**Runtime impact: YES.** A carousel slide now previews the image it holds, asks before deleting a
+slide or replacing an image, refuses to delete the last row, numbers its rows, and has a footer
+`Cancel`. A pasted image URL fills the slide by itself.
+
+**Five audit rows, one piece of work, and that was forced.** `note-editor-carousel-slide-preview`,
+`note-editor-paste-url-regex`, `note-editor-carousel-destructive-confirms`,
+`note-editor-carousel-modal-chrome` and `note-editor-carousel-labels` all describe the same element:
+`x0e` at reference byte 1,464,150, whose per-slide row switches three ways on
+`O(6, e.uploading ? 6 : e.url ? 8 : 7)`. Ours was ONE flat state — two `type="url"` boxes and a
+`Delete slide` button, rendered identically whether the slide was empty, filling or filled — and
+that is why none of the five could be built alone: ` Change image ` has nothing to change while the
+box holding the URL is already on screen.
+
+**Decoded, not recalled.** The component's whole consts table was walked and each entry transcribed
+by value: 37 `[1,"carousel-slide-row","card","mb-2","p-2"]`, 43/44/45/46 the badge line and the
+icon-only trash, 47/52/53 the spinner, 54–67 the empty state, 68–71 the preview and ` Change image `,
+41/42 the footer. Reading the whole template rather than the parts a feature needed **found two of my
+own inventions from three hours earlier**: the spinner shipped as `<span class="mx-2">` around a
+`<span class="small mt-1">` where `D0e` is `div` const 47 around `div` const 53, and
+`.carousel-slide-row` was a hand-written grid with a bottom border where upstream's is a bordered
+card on a tinted ground (byte 1,488,253). Both corrected; the test now pins the transcribed shapes
+and asserts the invented ones are gone.
+
+**One audit row's reasoning was wrong, and the record says so.** `note-editor-paste-url-regex` filed
+the missing `pendingUrl` two-step as a harmless divergence because "with a directly-bound field the
+confirm step has nothing left to do". True only while our row had one state. `url` decides which of
+the three renders, so a bound box flips the row into an `<img src="h">` on the first keystroke and
+takes itself off the screen. The staging field is what lets the row stay an input until there is
+something worth previewing. The paste regex is transcribed character for character (`jfif`
+included); its `^https?://` anchor and `(\?.*)?$` tail are also what make running it on a paste safe,
+since no `javascript:` or `data:` payload can match and the value lands in an `<img src>`.
+
+**THE EXTRACTION WAS THE GATE'S CALL, NOT MINE.** The rebuild put `NoteEditor.svelte` at 2,214 lines
+and `source-size-contract` refused it in its own words — *ceilings only go DOWN: extract a slice into
+a module or component rather than raising this number.* Two entries in that file had named the
+toolbar as the obvious extraction and deferred it twice. The carousel came out instead, because it is
+the slice this change was already holding: `CarouselDialog.svelte`, 878 lines — the modal, the
+three-state row, the file browser, the two confirmations and eight transcribed CSS rules, none of
+which touches the editor. `NoteEditor.svelte` is **1,479** lines, down from 1,855, and its ceiling
+was lowered to match rather than left slack. The toolbar is still the next one.
+
+**The seam is values, not the editor.** `CarouselDialog` holds no Tiptap instance, no selection and
+no document; it is handed what a carousel is made of, edits it, and hands it back once.
+`NoteEditor` decides where that lands, because only it knows whether the modal was opened over an
+existing node — and the `https://` filter stays there with it, because it is a rule about what the
+document will accept and `parseCarouselSlides` applies the same one on the way in. The dialog's state
+is SEEDED from its props with `untrack`, which is load-bearing: reading a prop in a component body is
+exactly what `state_referenced_locally` warns about, and here the snapshot IS the intent. That is
+only sound because the component is mounted inside `{#if dialog === 'carousel'}` — closing the modal
+destroys it, and a `$derived` would throw away everything the presenter had typed.
+
+**Three more gates fired on the way, all of them right.**
+
+- `orphan-component-contract` — the `accept="image/*"` hazard TRAVELLED with the markup.
+  `CarouselDialog` now hides `<BootboxDialog>` from a naive comment strip, and `NoteEditor` now hides
+  `<CarouselDialog>` itself, which is the clearest statement of what that strip costs: the render the
+  gate exists to find is the one it eats. Both registered by name with their measurements.
+- `img-dimensions-contract` — the `.file-browser-thumb` rule moved with its markup, so its
+  `SIZED_BY_CSS` entry and `SCOPED_SHEETS` moved too; the new preview `<img>` is registered
+  UNSIZEABLE with the reason above.
+- `slice-anchor-contract` — two inline `indexOf` bounds in the new test, again. Both are locals now
+  and both are asserted; the inlined count is back at 142 and was not raised.
+
+**Negative controls, all ten seen RED after the commit.** Reordering the three states so `url` wins
+over `uploading`; binding the input straight to `url`; moving `preventDefault` in front of the paste
+regex; keying the pending confirmation by index; discarding the old URL on `Change this image?`
+instead of staging it; re-enabling delete-at-one; deleting the footer `Cancel`; putting `Link / URL`
+back; dropping `untrack` from the seed; and moving the `https://` filter into the dialog. Nine went
+red first time. **The tenth did not, and the test was right:** my mutation was written at the wrong
+indentation and never applied — re-run against the real text it failed with
+`expected [ …(1) ] to have a length of 2`. A control that does not fire is investigated, not counted.
+
+**Verified.** `note-carousel-slide-contract.test.ts` 21 new assertions;
+`note-image-browser-contract` 20; `source-size-contract` 470 after lowering `NoteEditor`'s ceiling to
+1,480 and capping `CarouselDialog` at 880 on arrival; `orphan-component-contract` 7;
+`img-dimensions-contract` 6; `todo-next-coverage-contract` 13 after adding the surface (64 → 65) and
+correcting both line totals. Whole `src/lib` suite 3,711 passed, 1 skipped. `svelte-check` 1,419
+files, **0 errors and 0 warnings**. Full `pnpm run gate` before the push, with `gate-exit` echoed
+into the log and read from there. **Nothing was opened in a browser**, and the **Svelte MCP has been
+unavailable for this entire session** — the official-docs step this repository requires on every
+`.svelte` change could not be run, and is not claimed.
+
 ### 2026-08-30 05:18 UTC — The note carousel's per-slide upload, and the label I invented three hours earlier
 
 **Runtime impact: YES.** A presenter building a note carousel can upload an image directly from a
