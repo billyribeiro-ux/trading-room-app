@@ -7,6 +7,7 @@ import {
   deleteNote,
   getNotes,
   getNoteVersions,
+  NOTE_VERSION_LIMIT,
   renameNote,
   restoreNoteVersion,
   saveNote
@@ -27,7 +28,8 @@ const TEST_NAMES = [
   'notes repository historical read test',
   'notes repository restore test',
   'notes repository rename test',
-  'notes repository delete test'
+  'notes repository delete test',
+  'notes repository version cap test'
 ];
 
 let primaryUserId = 0;
@@ -154,6 +156,56 @@ describe('notes repository', () => {
     });
 
     expect(getNoteVersions(ROOM, note.id)?.map(({ version }) => version)).toEqual([3, 2, 1]);
+  });
+
+  test('keeps only the newest NOTE_VERSION_LIMIT versions, and DELETES the rest', () => {
+    /*
+      `this.maxVersions = 3` — reference byte 1,468,359, enforced on every save at 1,469,897:
+
+      ```js
+      this.prevVersions.unshift(i),
+      this.prevVersions.length > this.maxVersions &&
+        (this.prevVersions = this.prevVersions.slice(0, this.maxVersions))
+      ```
+
+      There was NO cap on this side. `getNoteVersions` was an unbounded `SELECT`, `NotesPane`
+      reissues it on every three-second autosave, and one row per result is rendered behind
+      `Version History (N)` — so the read path grew without bound on a long-lived note and the
+      count stopped meaning what the reference's means.
+
+      This asserts the DELETE and not only the read. A `LIMIT` alone would leave the table growing
+      forever with rows nothing can reach, so the row count is checked directly rather than through
+      the function that is capped — otherwise the assertion could not tell the two apart.
+
+      Each save is 31 minutes past the last so the 30-second coalescing window never merges two.
+    */
+    const note = createNote({
+      room: ROOM,
+      name: TEST_NAMES[7],
+      now: new Date('2036-07-27T15:00:00.000Z'),
+      userId: primaryUserId
+    });
+
+    for (let n = 1; n <= 5; n += 1) {
+      saveNote({
+        room: ROOM,
+        contentHtml: `<p>save ${n}</p>`,
+        noteId: note.id,
+        now: new Date(Date.UTC(2036, 6, 27, 15 + n, 0, 0)),
+        userId: primaryUserId
+      });
+    }
+
+    expect(getNoteVersions(ROOM, note.id)?.map(({ version }) => version)).toEqual([5, 4, 3]);
+    expect(getNoteVersions(ROOM, note.id)).toHaveLength(NOTE_VERSION_LIMIT);
+
+    /* The rows are GONE, not merely unread — which a LIMIT on the query could not tell you. */
+    const stored = db
+      .select({ version: noteVersions.version })
+      .from(noteVersions)
+      .where(eq(noteVersions.noteId, note.id))
+      .all();
+    expect(stored.map(({ version }) => version).sort((a, b) => b - a)).toEqual([5, 4, 3]);
   });
 
   test('sanitizes historical rows again whenever notes and versions are read', () => {

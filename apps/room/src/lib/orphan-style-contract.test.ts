@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 
+import { codeOf } from './source-comments.js';
+
 /**
  * EVERY CLASS `app.css` STYLES IS WORN BY SOMETHING, OR SAYS WHY IT IS NOT.
  *
@@ -130,16 +132,25 @@ function declaredClasses(): Map<string, number[]> {
  * here than in most gates, because THIS codebase quotes the reference's class lists constantly —
  * every transcription note is a potential false wearer.
  *
- * The strip is the whole-file regex the rest of the corpus uses. It is imprecise in the direction
- * that is safe here: an over-eager strip can only DELETE candidate wearers, which makes a class look
- * orphaned and fails loudly, never the reverse.
+ * ## THE STRIP WAS THE WHOLE-FILE REGEX, AND IT PRODUCED A FALSE ORPHAN ON 2026-08-30
+ *
+ * The paragraph that used to sit here argued the naive strip was safe in this file because "an
+ * over-eager strip can only DELETE candidate wearers, which makes a class look orphaned and fails
+ * loudly, never the reverse". Loudly, yes. **Correctly, no** — and this file's own docblock explains
+ * why that is the more expensive direction, twice, about `mic-status-*` and about `mid`: a matcher
+ * that answers "no" for the wrong reason files WORKING CODE as absent, and the answer looks like
+ * work.
+ *
+ * `above-note-modal` was reported orphaned while worn in two components, because both carry
+ * `accept="image/*"` and the `/*` in that ordinary HTML attribute opens a comment the whole-file
+ * regex closes thousands of characters later — over the markup that wears it.
+ * `orphan-component-contract.test.ts` measured that hazard on 2026-08-29, records both files by
+ * name, and says exactly this: give the test that reads them a Svelte-aware stripper.
+ *
+ * {@link codeOf} dispatches to that stripper. It strips JS comments only INSIDE `<script>` and `<style>`,
+ * where a `/*` can only be a comment, and leaves the template to the HTML rule — so the attribute
+ * stays and the comments still go.
  */
-function withoutComments(source: string): string {
-  return source
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-}
 
 /**
  * Everything that could wear a class: markup, scripts, and the modules that build class strings.
@@ -151,7 +162,12 @@ const WEARERS = [
   ...globSync('**/*.svelte', { cwd: ROOT }),
   ...globSync('**/*.ts', { cwd: ROOT }).filter((file) => !file.endsWith('.test.ts'))
 ]
-  .map((file) => withoutComments(readFileSync(`${ROOT}${file}`, 'utf8')))
+  /*
+    `codeOf` and not `svelteCodeOf`: this corpus is BOTH kinds, and `svelteCodeOf` over a `.ts` file
+    strips nothing at all — a `.ts` file has no `<!-- -->` — so every comment in it would survive and
+    count as a wearer. That is the false-YES direction this file's docblock opens with.
+  */
+  .map((file) => codeOf(file, readFileSync(`${ROOT}${file}`, 'utf8')))
   .join('\n');
 
 function escapeForRegExp(value: string): string {

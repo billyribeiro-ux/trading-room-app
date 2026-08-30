@@ -70,3 +70,22 @@ export function svelteCodeOf(source: string): string {
         open + tsCodeOf(body) + close
     );
 }
+
+/**
+ * A source file with its comments removed, chosen by EXTENSION.
+ *
+ * ## Why this exists, and the trap it closes
+ *
+ * The two functions above are not interchangeable, and the failure is silent in the worse direction.
+ * {@link svelteCodeOf} applied to a `.ts` file strips only `<!-- -->` — a `.ts` file has none — so
+ * **every JavaScript comment in it survives**. A gate that reads the result then counts prose as
+ * code, which is the false-WEARER half of the same defect this module exists for, and the half that
+ * reports a clean sweep while measuring nothing.
+ *
+ * `orphan-style-contract.test.ts` reads a corpus of both kinds and reached for `svelteCodeOf` for
+ * all of it on 2026-08-30, one minute after the naive stripper had produced a false orphan there.
+ * One rule, two file types, one dispatch — rather than each caller remembering which is which.
+ */
+export function codeOf(path: string, source: string): string {
+  return path.endsWith('.svelte') ? svelteCodeOf(source) : tsCodeOf(source);
+}

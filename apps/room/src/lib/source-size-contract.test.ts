@@ -1530,7 +1530,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The toolbar extraction named above is still the answer to this file's size and is still not
       bundled with a feature.
     */
-    max: 1480,
+    /*
+      1480 -> 1502, 2026-08-30. `note-editor-insert-carousel-silent-noop`.
+
+      Twenty-two lines, twenty of them the reason: `insertCarousel` returned silently when no slide
+      carried an `https://` URL, so the always-enabled primary button closed nothing, inserted
+      nothing and said nothing. The reference alerts (byte 1,478,230) and `CLAUDE.md`'s fail-loud
+      rule agrees with it. The note also records what is NOT that message — a missing editor is a bug
+      in this component, not a mistake by the presenter.
+    */
+    max: 1502,
     why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
   },
   {
@@ -1552,7 +1561,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       EDITOR. It must not: it is handed the values a carousel is made of and hands them back once,
       and `NoteEditor` is what knows whether that is an insert or an edit-in-place.
     */
-    max: 880,
+    /*
+      880 -> 920, 2026-08-30, on the day it was capped. `note-editor-add-slide-scroll`.
+
+      `addCarouselImage` scrolls the new row into view (byte 1,475,568) and this appended and
+      stopped — with the list now a `max-height: 50vh` scroller, a presenter with six slides pressed
+      ` Add slide ` and nothing appeared to happen. The lines are the handler, the bound element, and
+      the note on why `tick()` replaces upstream's bare `setTimeout` and why the query is scoped to
+      this dialog's own list rather than to `document`.
+
+      A ceiling raised on the day it was set is worth a second look, and this one was taken: the
+      addition is one behaviour from the same `x0e` row the rest of this component transcribes, not
+      a new concern arriving. If the NEXT raise is also same-day, that is the signal to split the
+      file rather than the number.
+    */
+    max: 920,
     why: "app-note's carousel: the modal, its three-state slide row, the file browser and two confirms"
   },
   {

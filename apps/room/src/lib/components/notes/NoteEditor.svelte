@@ -518,7 +518,24 @@
   }): void {
     const instance = editor;
     const slides = config.slides.filter(({ url }) => url.trim().startsWith('https://'));
-    if (slides.length === 0 || instance === null) return;
+    /*
+      `window.bootbox.alert("Please add at least one image URL.")` — byte 1,478,230, the else of the
+      reference's own `generateCarouselHtml()` check. This RETURNED SILENTLY, which is the shape
+      `CLAUDE.md` names outright: the primary button is always enabled, so pressing Insert Carousel
+      with an empty or non-`https://` slide list closed nothing, inserted nothing and said nothing.
+
+      The dialog is deliberately left OPEN — the presenter is being told to fix the thing in front of
+      them, and closing it would take away the rows they have to fix. That is upstream's order too:
+      only the success branch dismisses.
+
+      A missing editor is NOT this message. That is a bug in this component, not a mistake by the
+      presenter, and telling them to add an image URL would send them to look at working input.
+    */
+    if (instance === null) return;
+    if (slides.length === 0) {
+      errorMessage = 'Please add at least one image URL.';
+      return;
+    }
 
     const attrs = {
       slides: slides.map(({ link, url }) => ({ link, url })),
@@ -1369,7 +1386,12 @@
 {/if}
 
 {#if errorMessage !== null}
-  <BootboxDialog mode="alert" message={errorMessage} onclose={() => (errorMessage = null)} />
+  <BootboxDialog
+    mode="alert"
+    className="above-note-modal"
+    message={errorMessage}
+    onclose={() => (errorMessage = null)}
+  />
 {/if}
 
 <style>

@@ -33,6 +33,92 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 06:20 UTC — Four guards the note surface never had, and the stacking bug that was hiding two of them
+
+**Runtime impact: YES.** Pressing Insert Carousel with no image URL now says so instead of doing
+nothing; a new slide scrolls into view; the rendered carousel's arrows lighten on hover and no longer
+navigate away from a linked note when paged; a note keeps three versions instead of growing forever.
+And every dialog raised from inside a note modal is now visible.
+
+**`note-editor-insert-carousel-silent-noop`.** `insertCarousel` returned silently when no slide
+carried an `https://` URL — the primary button is always enabled, so pressing it closed nothing,
+inserted nothing and said nothing. The reference alerts `Please add at least one image URL.` (byte
+1,478,230) and `CLAUDE.md`'s fail-loud rule agrees. The dialog stays OPEN, which is upstream's order
+too: only the success branch dismisses, and closing it would take away the rows the presenter has to
+fix. **A missing editor is deliberately not that message** — that is a bug in the component, not a
+mistake by the presenter, and the two were one `||` before this.
+
+**`note-editor-add-slide-scroll`.** `scrollIntoView({behavior:'smooth', block:'nearest'})` on the
+last row, byte 1,475,568. The `.carousel-slides-list` scroller landed an hour earlier with the
+three-state rebuild, which is what made this visible: a presenter with six slides pressed ` Add
+slide ` and nothing appeared to happen. `tick()` replaces upstream's bare `setTimeout` — both wait
+for the DOM, `tick` waits for exactly the render that added the row — and the query is scoped to this
+dialog's own list rather than `document`, because upstream's is scoped only by there being one such
+modal on the page.
+
+**`note-editor-carousel-arrow-hover`.** Both handlers, byte 1,480,561, and the two calls the click
+was missing. The inline style string already declared `transition: background 0.2s`, transcribed with
+the rest of it, and nothing ever changed the background — a declared transition with no trigger is
+the same defect class as a class with no CSS. `preventDefault` and `stopPropagation` are the half
+that matters more: a slide may be wrapped in `slide.link` and an arrow sits inside it, so paging a
+linked carousel navigated away from the note.
+
+**`note-editor-version-cap`, and the fix that looks tidier is the wrong one.** `NOTE_VERSION_LIMIT`
+is 3 (`this.maxVersions = 3`, byte 1,468,359). There was no cap at all: `getNoteVersions` was an
+unbounded `SELECT`, `NotesPane` reissues it on every three-second autosave, and one row per result is
+rendered — the read path grew without bound on a long-lived note, which is the first question
+`CLAUDE.md` says to ask of one. A `LIMIT 3` alone would have bounded the query and left the table
+growing forever with rows nothing can reach. So the surplus is DELETED, in the same transaction as
+the insert; on the insert branch only, because the coalescing update rewrites the newest row in place
+and the count cannot have changed there; ordered by `version` rather than by arithmetic on it,
+because the restore path writes a new version rather than rewinding the counter. The test saves five
+times and asserts the rows are gone, not merely unread — which a capped query could not tell you.
+
+**AND A DEFECT NOBODY WAS LOOKING FOR: every note-surface dialog was painting behind its own modal.**
+Three numbers, all read from the sheets that ship — Bootstrap's `.modal` at 1055 and
+`.modal-backdrop` at 1050, against Summernote's `.note-modal.open` at 1070, transcribed into both
+note components. So a `<BootboxDialog>` raised while a note modal was open was present, focused and
+answering the keyboard, and invisible underneath the modal that had asked the question.
+`NoteEditor`'s upload and save failures had done that since it was written, and the carousel's two
+confirmations joined them an hour before this was measured. Fixed opt-in — the components that raise
+a dialog from inside their own modal pass `className="above-note-modal"`, and 1075/1074 lives once in
+`app.css` beside the numbers it has to beat. Lifting the whole `.bootbox` class would have been a
+different and wrong claim. The contract re-reads each component's own z-index and fails if either is
+ever raised past it, so the dialog cannot quietly disappear again.
+
+**A FOURTH INSTANCE OF THE `accept="image/*"` STRIPPER BUG, and this one produced a FALSE ORPHAN.**
+`orphan-style-contract` reported `above-note-modal` as a class nothing wears, while it was worn in
+two components — both of which carry `accept="image/*"`, whose `/*` opens a comment the whole-file
+regex closes thousands of characters later. That file's own docblock explains twice why that is the
+expensive direction: a matcher answering "no" for the wrong reason files working code as absent, and
+the answer looks like work. Its paragraph arguing the naive strip was "safe in the direction that
+matters here" was simply wrong and is replaced with the measurement.
+
+Fixing it surfaced a second trap in the shared stripper: `svelteCodeOf` over a `.ts` file strips
+nothing at all — a `.ts` file has no `<!-- -->` — so every comment in it would have survived and
+counted as a wearer, which is the false-YES half of the same defect. `source-comments.ts` now exports
+`codeOf(path, source)`, which dispatches on extension, and that corpus reads both kinds.
+
+**Negative controls, all ten seen RED after the commit.** Removing the alert; merging the two
+guards back into one `||`; deleting the `scrollIntoView`; swapping the bound list for
+`document.querySelectorAll`; deleting both hover handlers; deleting `stopPropagation`; reducing the
+version cap to a `LIMIT` with no prune; raising the cap to 99; lowering the z-index lift below the
+note modal; and dropping `className` from the editor's own alert. Nine went red first time; the tenth
+(the hover handlers) did not, because prettier had collapsed the two calls onto single lines and my
+mutation targeted the wrapped form — re-run against the real text it failed. **That is the second
+control this session whose first attempt never applied**, which is itself the argument for running
+them: a control that does not fire is investigated, never counted.
+
+**Verified.** `note-carousel-guards-contract.test.ts` 15 new assertions;
+`notes-repository.test.ts` 7 including the behavioural cap; `orphan-style-contract` 6 with the
+corrected stripper; `source-size-contract` 480 after raising `NoteEditor` 1,480 → 1,502 and
+`CarouselDialog` 880 → 920, each with its reason at the entry; `slice-anchor-contract` after binding
+one more inline bound, its count unchanged at 142. Whole `src/lib` suite 3,727 passed, 1 skipped.
+`svelte-check` 0 errors and 0 warnings. Full `pnpm run gate` before the push, `gate-exit` echoed into
+the log and read from there. **Nothing was opened in a browser** — which is exactly how the z-index
+defect survived, and it is fixed by reading three numbers rather than by looking, so the fix is as
+verified as the finding and no more. The **Svelte MCP has been unavailable for this entire session**.
+
 ### 2026-08-30 05:52 UTC — The carousel slide row, rebuilt to its three states, and the modal extracted because the ratchet said to
 
 **Runtime impact: YES.** A carousel slide now previews the image it holds, asks before deleting a

@@ -265,7 +265,7 @@ describe('the seam between the dialog and the editor', () => {
       getting a snapshot. Here the snapshot IS the intent — a `$derived` would throw away everything
       the presenter typed the moment anything upstream re-evaluated.
     */
-    expect(DIALOG).toContain("import { untrack } from 'svelte';");
+    expect(DIALOG).toContain("import { tick, untrack } from 'svelte';");
     expect(DIALOG).toContain('let carouselInterval = $state(untrack(() => initialInterval));');
     expect(DIALOG).toContain('let carouselHeight = $state(untrack(() => initialHeight));');
   });

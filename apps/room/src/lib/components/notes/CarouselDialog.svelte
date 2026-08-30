@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import type { SessionImageFile } from '#lib/session-image-files.js';
@@ -212,8 +212,38 @@
   let carouselInterval = $state(untrack(() => initialInterval));
   let carouselHeight = $state(untrack(() => initialHeight));
 
-  function addCarouselSlide(): void {
+  /**
+   * `addCarouselImage()` — byte 1,475,568. The new row is scrolled INTO VIEW.
+   *
+   * ```js
+   * addCarouselImage() {
+   *   this.carouselImages.push({url:"", link:"", pendingUrl:"", uploading:!1}),
+   *   setTimeout(() => {
+   *     const e = document.querySelectorAll(".carousel-slide-row");
+   *     e[e.length - 1]?.scrollIntoView({behavior:"smooth", block:"nearest"})
+   *   })
+   * }
+   * ```
+   *
+   * This appended and stopped, and the row it appended landed below the fold: the list is a
+   * `max-height: 50vh` scroller inside a `max-height: calc(100vh - 40px)` dialog, so a presenter
+   * with six slides pressed ` Add slide ` and nothing appeared to happen.
+   *
+   * `tick()` rather than upstream's bare `setTimeout`: both wait for the DOM, and `tick` waits for
+   * exactly the render that added the row rather than for the next macrotask, so it cannot scroll
+   * before the element exists or long after.
+   *
+   * Scoped to THIS dialog's list rather than `document.querySelectorAll`. The selector is scoped in
+   * the reference by there being one such modal on the page; here it is scoped by holding the
+   * element, which does not depend on that staying true.
+   */
+  let slidesList = $state<HTMLDivElement | null>(null);
+
+  async function addCarouselSlide(): Promise<void> {
     carouselSlides = [...carouselSlides, newCarouselSlide()];
+    await tick();
+    const rows = slidesList?.querySelectorAll('.carousel-slide-row');
+    rows?.[rows.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function updateCarouselSlide(
@@ -447,7 +477,7 @@
         </div>
       </div>
       <span class="font-weight-bold">Slides</span>
-      <div class="carousel-slides-list">
+      <div class="carousel-slides-list" bind:this={slidesList}>
         {#each carouselSlides as slide, index (slide.key)}
           <div class="carousel-slide-row card mb-2 p-2">
             <!--
@@ -734,6 +764,7 @@
 {#if carouselConfirm !== null}
   <BootboxDialog
     mode="confirm"
+    className="above-note-modal"
     message={carouselConfirm.kind === 'delete-slide' ? 'Delete this slide?' : 'Change this image?'}
     onclose={() => (carouselConfirm = null)}
     onconfirm={acceptCarouselConfirm}
@@ -757,7 +788,12 @@
 {/if}
 
 {#if errorMessage !== null}
-  <BootboxDialog mode="alert" message={errorMessage} onclose={() => (errorMessage = null)} />
+  <BootboxDialog
+    mode="alert"
+    className="above-note-modal"
+    message={errorMessage}
+    onclose={() => (errorMessage = null)}
+  />
 {/if}
 
 <style>

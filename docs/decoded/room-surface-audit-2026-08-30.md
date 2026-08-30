@@ -660,6 +660,8 @@ popover:{image:[["custom",["imageAttributes"]],["image",["resizeFull","resizeHal
 
 ### note-editor-insert-carousel-silent-noop — insertCarousel with no valid slide fails silently instead of alerting
 
+**BUILT 2026-08-30 06:20 UTC.** `Please add at least one image URL.` — the reference's own string, raised through `BootboxDialog`, with the dialog left OPEN because the presenter is being told to fix the rows in front of them and only the success branch dismisses upstream either. **A missing editor is deliberately NOT this message:** that is a bug in the component, not a mistake by the presenter, and the two conditions were one `||` before this. `note-carousel-guards-contract.test.ts`.
+
 **medium** · `missing-behaviour` · reference byte **1,478,230**
 
 ```
@@ -671,6 +673,8 @@ popover:{image:[["custom",["imageAttributes"]],["image",["resizeFull","resizeHal
 > Verified: The reference alerts on the empty case; ours returns silently, and I found no implementation of that alert anywhere in apps/room/src. Reference at observed offset 1478231: `insertCarousel(){const e=this.generateCarouselHtml();e?(...):window.bootbox.alert("Please add at least one image URL.")}`, with `generateCarouselHtml()` at observed of…
 
 ### note-editor-version-cap — Version history is unbounded; the reference caps it at 3
+
+**BUILT 2026-08-30 06:20 UTC.** `NOTE_VERSION_LIMIT = 3` (`this.maxVersions = 3`, byte 1,468,359), enforced as a DELETE inside the same transaction as the insert, plus a `LIMIT` on the read. **The delete is the decision and the limit alone would have been the wrong fix:** a capped query leaves the table growing forever with rows nothing can reach, and the count behind `Version History (N)` stops meaning what the reference's means. Pruned on the insert branch only — the coalescing update rewrites the newest row in place, so the count cannot have changed there. Ordered by `version` rather than doing arithmetic on it, because the restore path writes a NEW version rather than rewinding the counter. `notes-repository.test.ts` saves five times and asserts the surplus rows are GONE, not merely unread.
 
 **medium** · `wrong-constant` · reference byte **1,468,359**
 
@@ -696,6 +700,8 @@ setAsWelcomeTab(e){e?this.appService.globals.sessData.allRoomsWelcomeMatPW?bootb
 
 ### note-editor-add-slide-scroll — Adding a slide does not scroll the new row into view
 
+**BUILT 2026-08-30 06:20 UTC.** `scrollIntoView({ behavior: 'smooth', block: 'nearest' })` on the last row, byte 1,475,568. The `.carousel-slides-list` scroller this row also named landed with the three-state rebuild an hour earlier, which is what made the missing scroll visible: a presenter with six slides pressed ` Add slide ` and nothing appeared to happen. **Two deliberate divergences:** `tick()` rather than upstream's bare `setTimeout`, so it waits for exactly the render that added the row; and the query is scoped to this dialog's own list rather than `document`, because upstream's selector is scoped only by there being one such modal on the page. `note-carousel-guards-contract.test.ts`.
+
 **low** · `missing-behaviour` · reference byte **1,475,568**
 
 ```
@@ -708,6 +714,8 @@ elImage(){this.carouselImages.push({url:"",link:"",pendingUrl:"",uploading:!1}),
 - /home/user/trading-room-app/apps/room/src/lib/components/notes/NoteEditor.svelte:499-501 is the whole handler: `function addCarouselSlide(): void { carouselSlides =…
 
 ### note-editor-carousel-arrow-hover — Carousel arrow buttons have no hover background change
+
+**BUILT 2026-08-30 06:20 UTC.** Both handlers and both missing calls, byte 1,480,561. The inline style string already declared `transition: background 0.2s` — transcribed with the rest of it — and nothing ever changed the background, so it described an animation that could not happen. `preventDefault` and `stopPropagation` are the half that matters more: a slide may be wrapped in `slide.link` and an arrow sits inside it, so without them paging a linked carousel navigated away from the note. `note-carousel-guards-contract.test.ts`.
 
 **low** · `missing-behaviour` · reference byte **1,480,561**
 
