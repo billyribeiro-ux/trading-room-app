@@ -9,6 +9,16 @@
   import { viewerAlertPrefsFrom } from '#lib/viewer-alert-prefs.js';
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
+  /*
+    UIM-04 — `canPM`, resolved HERE and handed to `ModalHost` as one boolean.
+
+    This module is the transcription of the reference's own expression (byte 2,073,550) and it
+    already had one caller, `RoomPrivateChat.canOpenFor`, for the ROSTER row. The user card asks
+    the identical question about the identical target and was not asking it at all. Both call
+    sites now go through the one function, which is the point of it having been extracted: the
+    reference asks this question twice and disagrees with itself once.
+  */
+  import { canShowRosterPrivateChat } from '#lib/roster-private-chat.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
   import { downloadImage } from '#lib/download-image.js';
   import { ReactionArrivals } from '#lib/reaction-arrivals.js';
@@ -747,6 +757,21 @@
   debugLog={debugLog.received}
   onUploadProfilePicture={(user, file) => userActions.uploadProfilePicture(user, file)}
   onRemoveProfilePicture={(user) => userActions.removeProfilePicture(user)}
+  room={data.room}
+  canPrivateChat={canShowRosterPrivateChat(
+    {
+      isPresenter,
+      userPmEnabled: data.sessData?.userPM,
+      userToPresenterPmEnabled: data.sessData?.userToPresenterPM,
+      currentUserIsTrial: data.user.isFT,
+      disablePmForTrials: data.sessData?.disablePMForTrials
+    },
+    {
+      id: userActions.target.id,
+      permissions: userActions.target.permissions,
+      hasAdminChat: userActions.target.hasAdminChat
+    }
+  )}
   privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
   onShowPrivateMessages={(user) => {
     modals.open('all-private');

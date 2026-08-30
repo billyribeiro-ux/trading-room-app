@@ -55,7 +55,13 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**24 open · 200 closed · 224 rows.**
+**0 open · 224 closed · 224 rows.**
+
+Every row in this document now carries a disposition. That is not the same as every row being
+built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
+read, measured and deliberately not built is indistinguishable from a row nobody has opened unless
+the difference is written down, which is how work gets done twice. Two rows closed on 2026-08-30 are
+`BLOCKED` on a one-line change each, and each names that line.
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1840,6 +1846,17 @@ function mTe(t,n){if(1&t){const e=Y();d(0,"div",38)(1,"div",93),ht(2,fTe,7,8,"di
 
 ### UIM-03 — `user.hidePrivateInfo` — the three privacy gates that suppress the extra tabs, the Last Login/Email/Badges/Location rows and the Permissions row — does not exist anywhere in our source
 
+**ALREADY BUILT — the outcome, by three server-side refusals and one render gate.** Confirmed
+2026-08-30 by re-reading the refutation above against the code rather than re-deriving it: the
+`{#if isPresenter && !isLimitedPresenter}` block opens at the user card's tab list and closes after
+the Admin Notes pane, so every row `hidePrivateInfo` would have suppressed is presenter-only and a
+member sees no body at all. `authority-gate-contract.test.ts` finds that block by what it CONTAINS
+and asserts each row falls inside its offsets. Under it, `email` and `locStr` are filtered off the
+SSE roster frame (`roster-privacy.test.ts`), and Last Login and Email in that card come from
+`user-detail.remote.ts`, which is presenter-only on the server. The reference's flag is a client
+switch over data that still arrives; this is stricter. Carrying the disposition line the refutation
+earned, so the row stops reading as open.
+
 **high** · `missing-control` · reference byte **2,068,025**
 
 ```
@@ -1869,6 +1886,31 @@ O(5,e.user.hidePrivateInfo?-1:5),m(11),Ze(e.user.nick),m(),O(17,e.user.hidePriva
 
 ### UIM-09 — System tab, Location, Last Login, Trial/New and Temporary Access Only have no data supply — every value resolves to 'n/a' or false
 
+**BLOCKED — one field has a live supply and the one-line change is in a file this change does not
+own; the rest are measured refusals.** Taken field by field, because the row groups eleven that have
+different answers:
+
+* **`loggedIn` and `email` are SUPPLIED now** — `user-detail.remote.ts` and `RoomUserDetail.decorate`,
+  the presenter-only `userInfoDB` lookup. The row predates them. Both cells fill.
+* **`isTrial` HAS a supply and is one line away.** `room_members.is_trial` reaches this room as
+  `isFT` on the SSE roster frame (`routes/sess/[room]/events/+server.ts:202`), so every roster `User`
+  carries it. What is missing is `isTrial: user.isFT` in `RoomUserActions.targetFor`
+  (`src/lib/room/user-actions.svelte.ts:340`) — a file another agent owns concurrently. **That is the
+  whole unblock.** The Trial badge's markup and its gate are already correct here (UIM-10).
+* **`temporaryAccessOnly` is a recorded refusal, not a gap**, and the row's stated danger is gone:
+  `permission-keys.ts` explains that it is in neither the reference's own permission log line nor the
+  controller's `PERMISSION_KEYS`, so there is no column to write it to — and Save sends
+  `ROOM_PERMISSION_KEYS` only, which does not include it. The five keys it DOES send all come through
+  `targetFor` now, so the silent-revocation the row warns about cannot happen.
+* **`years` has no supply anywhere**, stated at `server/room-config-client.ts:82` in its own words:
+  `item.membershipYears` has no producer. UIM-08 writes the gate correctly over it anyway, for the
+  reason recorded there.
+* **`location`, `ip`, `userAgent`, `appVersion`, `streamServer`, `serverId`, `isNew` — MEASURED
+  REFUSAL.** `location` and `ip` are deliberately filtered off the roster wire (`roster-privacy.test.ts`,
+  after a real 2026-08-18 defect) and `readUserDetail` answers with `email` and `loggedIn` only. The
+  other four are per-SESSION facts the reference's socket server owns and this product's server never
+  learns; `isNew`'s absence is already measured and written up at the Badges cell in `ModalHost`.
+
 **high** · `missing-behaviour` · reference byte **2,068,096**
 
 ```
@@ -1880,6 +1922,13 @@ O(5,e.user.hidePrivateInfo?-1:5),m(11),Ze(e.user.nick),m(),O(17,e.user.hidePriva
 > Verified: I tried to refute this and could not. The reference text is real: I read the bundle and `e.user.privData.uaStr` occurs at observed offset 2068127 (slice printed from 2068000), with `e.user.data.streamServer` at 2063568 — the compiled row list is App Version (`data.cver`), IP (`privData.ip`), System (`privData.uaStr`), Stream Server (`data…
 
 ### UIM-01 — Avatar edit dropdown (Setup Gravatar / Or upload a picture / Remove profile picture) is entirely absent
+
+**ALREADY BUILT.** `AvatarOptionsMenu.svelte` renders the dropdown, mounted at
+`ModalHost.svelte`'s `edit-user-avatar` cluster behind `{#if isTargetCurrentUser}` — which is the
+reference's own gate, `O(6, o.user.userXrefID === o.appService.globals.user.userXrefID ? 6 : -1)` at
+byte 2,095,583, with no role term. `onRemoveProfilePicture` and the upload picker are both wired, and
+`roomForAvatarChange` in `profile-picture.remote.ts` is the server half that is the actual authority.
+Built after this row was written; the CSS it called dead has a consumer now.
 
 **medium** · `missing-control` · reference byte **2,058,852**
 
@@ -1893,6 +1942,19 @@ function K2e(t,n){if(1&t&&(d(0,"div",6)(1,"span",16),T(2,"i",17),u(),d(3,"ul",18
 
 ### UIM-04 — Footer 'Private Chat' is not gated on `canPM` — only on `checkIsMe()`
 
+**BUILT 2026-08-30.** The footer's Private Chat button takes its second term. `O(18, o.canPM &&
+o.checkIsMe() ? 18 : -1)` at byte 2,096,067 — read beside its three siblings, which take
+`checkIsMe()` alone — is a nested `{#if canPrivateChat}` inside the existing
+`{#if !isTargetCurrentUser}`, so @Mention, Follow and Mute are untouched.
+
+The answer arrives RESOLVED, from `RoomOverlays`, through `canShowRosterPrivateChat` — the existing
+transcription of `(isPresenter || sessData.userPM || sessData.userToPresenterPM && ("a" === user.perms
+|| user.hasAdminChat)) && !(globals.user.isFT && sessData.disablePMForTrials)` (byte 2,073,550). That
+function had one caller, the roster's; the card asks the identical question about the identical target
+and was not asking it at all. Two call sites, one rule — which the reference itself does not manage,
+asking twice and disagreeing once. The prop defaults to `false`: it is a permission, so deny-by-default
+governs. `user-info-modal-contract.test.ts`.
+
 **medium** · `missing-control` · reference byte **2,096,067**
 
 ```
@@ -1904,6 +1966,14 @@ O(18,o.canPM&&o.checkIsMe()?18:-1),m(),O(19,o.checkIsMe()?19:-1))
 > Verified: The reference gates the user-info modal's Private Chat button on TWO conditions — `O(18,o.canPM&&o.checkIsMe()?18:-1)` — while @Mention (17) and Follow/Mute (19) get only `checkIsMe()` (which returns true when the target is NOT me, verified at offset 2087485). Our ModalHost opens a single `{#if !isTargetCurrentUser}` at ModalHost.svelte:2…
 
 ### UIM-05 — Follow-chat 'Reset' resets local state only; the reference resets AND persists to followedUsers
+
+**BUILT 2026-08-30.** `onreset` reseeds AND persists, in that order:
+`followChatStyle = defaultFollowStyle(); onFollowStyleChange(targetUser, followChatStyle)`.
+`resetFollowChatStyle` at byte 2,075,493 is two statements, and its neighbour twelve bytes on shows
+what the second one is — `saveFollowChatStyle` is that call alone, so Reset IS Save with a seed in
+front of it. Both write immediately; neither waits for the Save button. The persistence path was
+already built and this one control simply did not use it, so a presenter who pressed Reset and closed
+the modal left the saved style untouched. `user-info-modal-contract.test.ts`.
 
 **medium** · `missing-behaviour` · reference byte **2,075,493**
 
@@ -1917,6 +1987,25 @@ resetFollowChatStyle(e){this.followChatStyle=this.loadDefaultFollowChatStyle(),t
 
 ### UIM-06 — Clicking the 'Admin Notes' tab does not invoke manageAdminNotes() — the password prompt is reachable only from the Enter Password button
 
+**BUILT 2026-08-30 — and the row understated it: a comment in our source asserted the OPPOSITE of
+what the bundle says.** The Admin Notes tab now calls `onUserAction('admin-notes-password', …)`, the
+same door the Enter Password button uses, which is `RoomAdminNotes.ask()` — the prompt and then the
+load.
+
+Read rather than trusted: `J2e` begins at **2,059,391** (the row cites 2,059,546, which is inside the
+click handler), and its third anchor is
+`d(4,"a",56),x("click",function(){return D(e),E(g(2).manageAdminNotes())})`. Const 56 — walked out of
+this component's consts table at 2,087,748 — is the only one of the three tab anchors carrying
+`3,"click"`. `manageAdminNotes()` at 2,081,768 prompts only when `needPasswordForUserNotes` is
+configured and the door is still shut, and otherwise grants silently; `RoomNotesAccess.ask()` is both
+branches, so a room with no password sees no prompt from this click either.
+
+`admin-notes.ts` carried *"clicking a tab must not raise a password prompt — upstream's tab does
+not"*. That claim was false and had never been checked against the bytes. It is corrected there, with
+the decoded template quoted beside it and the old sentence kept so the plausible reasoning behind it
+is answered rather than deleted. `userNotes.open` is gone from `ModalHost`'s prop shape with it —
+nothing calls it any more.
+
 **medium** · `missing-behaviour` · reference byte **2,059,546**
 
 ```
@@ -1928,6 +2017,12 @@ manageAdminNotes())}),v(5," Admin Notes "),u()}}function Z2e(t,n){1&t&&(d(0,"spa
 > Verified: I could not refute it. In our source the Admin Notes tab anchor does nothing but switch panes, and the notes-password door has exactly one caller.
 
 ### UIM-07 — The 'Badges:' cell renders an empty div — no parseBadges, no innerHTML supply
+
+**ALREADY BUILT.** The Badges cell renders `{#each targetBadges as badge}` — the reference's own
+`user-badge-img` / `badge px-1 mx-1 user-badge` markup, fed by `RoomFeeds.badgesFor` through the
+`targetBadges` prop. `user-badges-contract.test.ts` pins it, including the one thing deliberately NOT
+copied: upstream binds `innerHTML` here and marks it `noSanitize`, over label and colour values an
+owner types into a controller form. These are ELEMENTS. Built after this row was written.
 
 **medium** · `missing-behaviour` · reference byte **2,060,779**
 
@@ -1941,6 +2036,25 @@ z("innerHTML",Ct(18,14,e.badges,"html"),wn),m(2),O(19,e.appService.globals.isPre
 
 ### UIM-08 — Stars/years gate drops two of its three terms — `disableStarYears` and `user.isP`
 
+**BUILT 2026-08-30, all three terms — and the row's second claim is REFUTED.**
+`O(21, sessData.disableStarYears || user.isP || !user.data.years ? -1 : 21)` at byte 2,061,001,
+inverted, is `!disableStarYears && !isP && years`. This was the third term alone.
+
+`disableStarYears` needed no new prop: it is on `RoomMessageChrome`, which this component already
+takes, and `RoomMessage.svelte:753` and `:1039` already obey it. The modal was the one star in the
+room ignoring the owner's setting.
+
+**`user.isP` DOES have a counterpart here**, and the mapping was already written down —
+`private-chat.svelte.ts:432` builds a roster target as `permissions: user.isP ? 'a' : 'r'`, and
+`permissions` is what this modal's own Permissions row reads to print "Presenter / Admin". So
+`targetUser.permissions !== 'a'` is `!user.isP` in this room's vocabulary. The row's "no counterpart
+in apps/room/src" is the shape the register's own preface warns about: a gap stated as a missing NAME.
+
+`years` still has no supply (see UIM-09), so this block renders for nobody today — as it did before.
+The gate is written correctly now for the same reason `RoomMessage` already carries the same
+three-term shape over the same absent supply: a gate written after the supply lands is a gate written
+while somebody is looking at a wrong star. `user-info-modal-contract.test.ts`.
+
 **medium** · `missing-control` · reference byte **2,061,001**
 
 ```
@@ -1952,6 +2066,18 @@ O(21,e.appService.globals.sessData.disableStarYears||e.user.isP||!e.user.data.ye
 > Verified: The reference gate is three-term: O(21, sessData.disableStarYears || user.isP || !user.data.years ? -1 : 21).
 
 ### UIM-13 — Our own source cites the wrong bundle offset for giveMicScreen — twice
+
+**FIXED 2026-08-30.** Both citations now say **2,077,604**, which is where
+`giveMicScreen(e){` actually starts — read with python from the pinned bundle, along with what is at
+the address they used to name: `aySound:!0}}resetFollowChatStyle(e){…`, the tail of
+`loadDefaultFollowChatStyle` and the head of `resetFollowChatStyle`, 2,123 bytes earlier and about a
+different feature entirely.
+
+The correction says what is at the wrong address rather than silently swapping a number, because the
+transcribed BODY under those comments was byte-correct and a reader who followed the old pointer
+would have concluded it was invented. `user-info-modal-contract.test.ts` asserts the offset against
+the bundle instead of trusting it — a byte offset in prose is the load-bearing claim DPE rule 4 says
+must become an executable assertion.
 
 **medium** · `defect` · reference byte **2,077,604**
 
@@ -1965,6 +2091,17 @@ giveMicScreen(e){if(this.user.userXrefID==this.appService.globals.user.userXrefI
 
 ### UIM-10 — Trial and New badge classes diverge from the reference (and from our own RoomMessage.svelte)
 
+**BUILT 2026-08-30.** `badge bg-danger trial-badge` and `badge bg-warning new-badge`, from consts
+58 and 59 of this component's own table (walked from 2,087,748, 131 entries). Three differences and
+all three mattered: `bg-*` is the Bootstrap **5** spelling this room is built on, so `badge-info` was
+inheriting nothing; `New` is WARNING rather than info, a different colour and not a different name for
+the same one; and `trial-badge` / `new-badge` are the hooks a room stylesheet hangs rules on.
+
+The `Offline` badge two rows up is deliberately NOT changed — its const is 9 =
+`[1,"badge","badge-danger"]`, the Bootstrap-4 spelling in the reference too. Copying a value means
+copying it where it disagrees with its neighbours. `user-info-modal-contract.test.ts` asserts both
+directions.
+
 **low** · `wrong-constant` · reference byte **2,090,982**
 
 ```
@@ -1976,6 +2113,11 @@ giveMicScreen(e){if(this.user.userXrefID==this.appService.globals.user.userXrefI
 > Verified: I could not refute this. Our user-info modal renders the Trial/New badges with Bootstrap-4 contextual badge classes and no per-badge hook, while the reference's const array for that same modal uses the utility+hook form that our own RoomMessage.svelte already matches.
 
 ### UIM-11 — 'Restart Screens' second icon is fa-play-circle in ours, fa-sync in the reference
+
+**BUILT 2026-08-30, together with UIM-12** — see that row for why one comment covers both. Restart
+Screens is `fa-desktop` + `fa-sync`, consts 71 and 41 as emitted at byte 2,064,155. `fa-sync` is the
+circular-arrows glyph this column's own Force Reload already uses, and it is what makes RESTART read
+as restart.
 
 **low** · `wrong-constant` · reference byte **2,064,155**
 
@@ -1989,6 +2131,17 @@ T(13,"i",71),v(14,"\xa0"),T(15,"i",41),v(16," Restart Screens "),u(),d(17,"butto
 
 ### UIM-12 — 'Start Rec' icon `fa-record-vinyl` appears nowhere in the reference bundle
 
+**BUILT 2026-08-30.** Start Rec is `fa-play-circle`, const 89. `fa-record-vinyl` occurs **zero**
+times in the 2,891,205-byte bundle — a full-file search, not a slice — so it was invented here, and
+the contract test asserts it appears nowhere in our source rather than merely that this one button
+stopped using it.
+
+Fixed in the same change as UIM-11 because the two errors were making each other worse: `play-circle`
+was on the wrong button, so correcting only this row would have put Start Rec's icon beside Restart
+Screens'. Corrected together the column reads desktop+sync / play / stop, and the contract asserts no
+two buttons in it share an icon RUN — not that no glyph repeats, because upstream reuses `fa-desktop`
+and `fa-stop-circle` on purpose.
+
 **low** · `invented-value` · reference byte **2,064,315**
 
 ```
@@ -2000,6 +2153,19 @@ T(18,"i",89),v(19," Start Rec "),u(),d(20,"button",40),x("click",functio
 > Verified: The control is built, but the claimed VALUE is not. The button, its " Start Rec " label and the start-recording intent all exist in our source (ModalHost.svelte:2517-2521, with the captured wire counterpart remotePresCommand("startRec") documented at user-action-intent.ts:177), so this is not a missing surface.
 
 ### UIM-16 — Header avatar has no `user.pic ||` gravatar fallback, and the follow-chat preview's <strong> loses its fw-bold class
+
+**HALF BUILT 2026-08-30 — which is what the row's own verifier said it should be.** Half 1 (the
+gravatar fallback) stays REFUTED and is not reproduced.
+
+Half 2 is built: `<strong class="fw-bold">Username:</strong>` in `FollowChatStylePane.svelte`, from
+const 120 = `[1,"fw-bold"]`, bound at `d(35,"div",119)(36,"strong",120),v(37,"Username:")` — byte
+2,070,269, and the `d(` there belongs to the div, which is why the assertion reads `(36,"strong",120)`
+rather than a plausible `d(36,…` the bundle does not contain.
+
+`fw-bold` on a `<strong>` looks like a tautology and the comment at the code says why it is not:
+Bootstrap's `font-weight: 700 !important` beats the browser's `bolder` and survives a stylesheet that
+flattens typography, and this preview's whole job is to show a presenter what the real thing will look
+like. Every other `<strong>` in that component is bare, so the class is deliberate upstream.
 
 **low** · `wrong-constant` · reference byte **2,095,583**
 
@@ -2229,6 +2395,41 @@ postAlert(){let e={txt:this.alertTxt,n:this.appService.globals.user.name,sendTxt
 
 ### RPT-01 — Report modal never fetches a report — no getAlertReport call, no resp.queue, no error state
 
+**MEASURED REFUSAL 2026-08-30. One measurement decides this row and five others** — RPT-03 through
+RPT-07 — so it is written once, in full, at `AlertSendReportModal.svelte`, and each of those rows
+points here.
+
+Every field the reference's report holds (`status`, `name`, `email`, `sentTime`, `latency`,
+`failReason`, `token`) is a fact about one attempt to deliver one alert to one person. **This product
+records no such attempt, anywhere:**
+
+* **No table.** 24 tables across `services/api/migrations/**` — alert_media, alert_questions, alerts,
+  audit_log, enterprises, files, follows, invite_tokens, member_notes, message_reactions, messages,
+  mutes, note_versions, notes, poll_responses, polls, private_messages, refresh_tokens, room_channels,
+  room_members, room_state, rooms, users. Searched for `queue`, `latency`, `fail_reason`, `sent_time`,
+  `delivery`: the only hits are `alerts.dispatch` and two prose lines in a migration comment.
+* **`alerts.dispatch` is the REQUEST, not the outcome** — a jsonb object constrained to exactly five
+  booleans (sms, email, twitter, push, crossPost) recording which channels the presenter ticked. No
+  recipient, no status, no timestamp behind it.
+* **Nothing sends an alert to anyone.** `apps/room/src/lib/server` has no mail transport at all; the
+  product's only one is the controller's `mail.ts`, whose two callers are `email-verification.ts` and
+  `member-email.ts` (welcome + webinar reminder), and whose own header records that as of that commit
+  nothing can be sent because there is no provider account.
+* **`getAlertReport` has no server half** — zero occurrences across `apps/`, and no endpoint under
+  `src/routes/api`.
+
+So the queue this modal is a view onto does not exist, is not written, and has no producer. Building
+the fetch would be a request to nothing.
+
+**The refusal is gated rather than asserted.** `alert-report-modal-contract.test.ts` reads every
+migration and fails if a delivery record appears — by the COLUMNS one must hold, not by a table name
+somebody might not reuse. If that goes red, these six rows are live again, which is the intended
+behaviour: a refusal whose premise has expired is worse than an unbuilt feature, because it looks
+decided.
+
+**What would close it:** a table of delivery attempts per alert per recipient, something that writes
+to it when `alerts.dispatch` fans out, and a presenter-only read.
+
 **high** · `missing-behaviour` · reference byte **2,413,317**
 
 ```
@@ -2240,6 +2441,27 @@ showTokenReport(e){bootbox.alert({title:"Token",message:e})}loadReports(){var e=
 > Verified: Our report modal has no fetch of any kind — only a cosmetic 500 ms timer. `apps/room/src/lib/components/ModalHost.svelte:2095-2102` is the entire "load": `$effect(() => { if (name !== 'report') return; reportLoading = true; const timer = window.setTimeout(() => { reportLoading = false; }, 500); return () => window.clearTimeout(timer); });…
 
 ### RPT-02 — reportLoading is driven by a hard-coded 500 ms timer that describes no work
+
+**FIXED 2026-08-30.** The effect and `reportLoading` are gone. It was:
+
+```js
+$effect(() => {
+  if (name !== 'report') return;
+  reportLoading = true;
+  const timer = window.setTimeout(() => { reportLoading = false; }, 500);
+  return () => window.clearTimeout(timer);
+});
+```
+
+Five hundred milliseconds of spinner in front of nothing, then the literal `No Reports.`, for every
+alert in every room. A spinner is a PROMISE that something is being fetched; this one promised a fetch
+that did not exist and then reported an empty result as though it were an answer — so a presenter read
+`No Reports.` under a heading carrying a real AlertID and concluded the alert had reached nobody.
+
+The modal now says what is missing (`REPORT_UNAVAILABLE`, ours and marked as ours, sibling to
+`SYNC_ROOMS_UNAVAILABLE` for the identical situation). Deliberately NOT the reference's `No Reports.`
+— that is upstream's `AMe` and means "the fetch returned an empty queue", which is the same lie told
+as a sentence instead of as an animation.
 
 **high** · `invented-value` · reference byte **2,412,261**
 
@@ -2253,6 +2475,18 @@ this.appService.guiEventBus.subscribe("doAlertSendReportModal",e=>{this.alertID=
 
 ### RPT-03 — Report rows (list-group, per-status colours, name/email, sent time + latency, failure reason, token click) are entirely absent
 
+**MEASURED REFUSAL 2026-08-30 — see RPT-01 for the measurement.** `xMe` was read in full (it begins
+at **2,410,233**; the row cites 2,410,281, inside the click handler): the row's ngClass maps
+`sent`/`failed`/`queued` to `text-success`/`text-danger`/`text-warning`, and it renders
+`{name}&nbsp;`, `({email})`, a `.sent-time` block with `{sentTime|date:'medium'}` and
+`Latency: {latency} secs`, and a `.failed-reason`. Seven fields, every one of them a property of a
+delivery attempt this product does not record.
+
+The captured CSS at `captured-runtime-components.css:5747-5805` stays unconsumed, and that is the
+honest state rather than a reason to build markup for it — the stylesheet is a capture, not a
+requirement. `alert-report-modal-contract.test.ts` asserts none of `list-group-item`, `sent-time` or
+`failed-reason` is drawn over a list that cannot exist.
+
 **high** · `missing-control` · reference byte **2,410,281**
 
 ```
@@ -2264,6 +2498,12 @@ function xMe(t,n){if(1&t){const e=Y();d(0,"div",30)(1,"div",31),x("click",functi
 > Verified: The report modal in our source is a stub: ModalHost.svelte:5334-5356 renders only the title, a spinner driven by a cosmetic 500ms timer (ModalHost.svelte:736 `let reportLoading = $state(true)` and the $effect at ModalHost.svelte:2095-2102, which has no fetch behind it), the literal `<div class="mt-3 text-center">No Reports.</div>`, and a…
 
 ### RPT-04 — Report search box, clear addon, search addon and the searchReports pipe are absent
+
+**MEASURED REFUSAL 2026-08-30 — see RPT-01.** The pipe was decoded: `searchReports` (registered at
+2,409,220) filters `status === searchStatus` and then `email.toLowerCase().includes(searchTxt)`. Both
+predicates are over fields of a delivery record. A search box, a clear addon and a search addon over
+an array that is empty by construction is three controls whose only effect is their own presence —
+refused by name in `CLAUDE.md` and by DPE rule 3.
 
 **medium** · `missing-control` · reference byte **2,409,220**
 
@@ -2277,6 +2517,12 @@ function xMe(t,n){if(1&t){const e=Y();d(0,"div",30)(1,"div",31),x("click",functi
 
 ### RPT-05 — Report status <select> (All / Sent / Queued / Failed) and onSelectChange are absent
 
+**MEASURED REFUSAL 2026-08-30 — see RPT-01.** Consts 18-21 at 2,414,516 are the four options — All,
+sent, queued, failed — and `onSelectChange` writes `searchStatus`, which only the `searchReports` pipe
+reads. A status filter over a list with no statuses in it filters nothing. The shipped rule
+`#search-select-addon{padding:0;border:0;margin:0}` stays unconsumed for the same reason RPT-03's CSS
+does.
+
 **medium** · `missing-control` · reference byte **2,414,516**
 
 ```
@@ -2289,6 +2535,12 @@ function xMe(t,n){if(1&t){const e=Y();d(0,"div",30)(1,"div",31),x("click",functi
 
 ### RPT-06 — Pie chart (calcPieData + flot #pie-container) is absent
 
+**MEASURED REFUSAL 2026-08-30 — see RPT-01, plus one reason of its own.** `calcPieData` at 2,412,738
+counts sent/failed/queued, turns each into a percentage of `reports.length`, and hands the result to
+`$.plot("#pie-container", …)` — **jQuery flot**. Two blockers, not one: there is no data to divide,
+and this room loads neither jQuery nor flot and should not start for a chart. `PollPanel`'s own
+`drawPieChart` is the shape a pie would take here if the data ever existed.
+
 **medium** · `missing-behaviour` · reference byte **2,412,738**
 
 ```
@@ -2300,6 +2552,11 @@ function xMe(t,n){if(1&t){const e=Y();d(0,"div",30)(1,"div",31),x("click",functi
 > Verified: I could not refute this. Our alert-send-report modal is a stub with no data path at all, let alone a pie: apps/room/src/lib/components/ModalHost.svelte:5334-5356 renders `<app-alert-send-report-modal>` whose whole body is `{#if reportLoading}` a spinner `{:else}` the literal text `No Reports.`, and the only thing that drives it is a fake…
 
 ### RPT-07 — showTokenReport() — clicking a report row opens a bootbox titled 'Token'
+
+**MEASURED REFUSAL 2026-08-30 — see RPT-01.** `showTokenReport(e){bootbox.alert({title:"Token",
+message:e})}` at 2,413,317 is one line and `BootboxDialog` is not the blocker, as the row correctly
+says. What is missing is the `token` — a per-delivery value on a row that does not exist, reached only
+by clicking a row that is not drawn. The dialog is trivial; its subject is the refusal.
 
 **medium** · `missing-control` · reference byte **2,413,317**
 
@@ -2327,6 +2584,20 @@ function iAe(t,n){if(1&t){const e=Y();d(0,"app-st-message",46),x("click",functio
 
 ### SRCH-02 — A failed search shows no message — the reference raises bootbox.alert(msg); ours has no catch at all
 
+**BUILT 2026-08-30.** `runAdvancedSearch()` has a `catch` that raises the reference's own copy —
+*"There was an error searching for alerts, please try again or contact support"*, read at byte
+1,150,520 inside `getAlertsAdvancedSearch`'s `.catch`, which emits `getAlertsAdvancedSearchFailed`;
+the modal's subscriber at 2,424,060 answers it with `{ this.msgs = [], this.loading = !1,
+bootbox.alert(i.msg) }`. All three halves are reproduced: the rows are already `[]` from the top of
+the function, `finally` stops the spinner, and `onAlert` is the `BootboxDialog` this component already
+uses everywhere else.
+
+The defect was that a failed search and an empty one were the same screen — both fell through to
+*"No logs to display. Please, change the input fields."* Those two states give opposite advice, and a
+presenter told to widen a range that ran perfectly will widen it, get the same words, and conclude the
+log is empty. The truncation flag is cleared in the same branch so a failure cannot inherit the last
+search's footnote.
+
 **medium** · `missing-behaviour` · reference byte **2,424,060**
 
 ```
@@ -2338,6 +2609,24 @@ this.appService.appEventBus.subscribe("getAlertsAdvancedSearchFailed",i=>{this.m
 > Verified: I could not find any failure handling for the advanced alert search in apps/room/src. `runAdvancedSearch()` in ModalHost.svelte:573-591 wraps the `searchAlerts()` call in `try { … } finally { advancedSearchLoading = false }` with no `catch` — the only failure behaviour is clearing the spinner (the comment at :588 says exactly that and not…
 
 ### SRCH-03 — Room dropdown is a single hard-coded room; no userSessions localStorage, no getAllSTRoomsForUser, and rooms are never sent
+
+**HALF BUILT 2026-08-30 — the divergence stays, the INVENTION is gone.** The row is two claims and
+they have different answers.
+
+**Multi-room: DELIBERATE DIVERGENCE, unchanged.** `ZMe` (which begins at **2,420,490**; the row cites
+2,420,598, inside the click handler) iterates `{key, value}` pairs through `toggleSess(o.key,
+o.value)`, seeded from `localstorage.getObject("userSessions")` and `getAllSTRoomsForUser()`. This
+application is one room per deployment: no rooms endpoint, no such key, and `syncRooms()` already
+answers with `SYNC_ROOMS_UNAVAILABLE`. An `{#each}` over a one-element list would be the same markup
+wearing a loop.
+
+**The key and the label: INVENTED, and now real.** They were the literals `'mastering-the-trade'` and
+`'Mastering The Trade'`, hard-coded. Neither string occurs anywhere in the 2,891,205-byte bundle —
+full-file search, and the contract test asserts it — so the one entry in this dropdown could be
+ticked, could appear in `selectedRoomsStr`, and identified nothing. It is `room.shortCode` /
+`room.name` now, from `data.room`: what the controller says this room IS, the same pair
+`+page.server.ts` puts on the page load. That is the honest single-room reading of
+`toggleSess(o.key, o.value)` — the directory has one entry, and this is it.
 
 **medium** · `divergence` · reference byte **2,423,600**
 
@@ -2351,6 +2640,19 @@ ngOnInit(){this.clearInput();const e=this.appService.localstorage.getObject("use
 
 ### RPT-08 — Entry-point guard: a message with no id must raise bootbox 'No reports found.' instead of opening the modal
 
+**HALF BUILT 2026-08-30, and marked as half.** The reference's own string is carried, verbatim:
+`openAlertSendReport(e){e?…:bootbox.alert("No reports found.")}` at **1,349,819** (the row cites
+1,349,868, which is mid-method; its own verifier had it right). `AlertSendReportModal.svelte` renders
+it on the `{:else}` of `{#if targetMessage?.id}`, so an id-less report no longer opens a heading
+reading `Alert Sent Report. AlertID: ` — a real title with an empty identifier, which reads as a report
+about nothing rather than as a refusal.
+
+**What is NOT built is the guard's POSITION.** Upstream refuses at the entry point and the modal never
+opens. Here the modal is opened by `RoomMessageActions` — `src/lib/room/message-actions.svelte.ts:380`,
+`if (action === 'report') this.#openModal('report')` — which this change does not own. **The unblock is
+one line there:** refuse with the dialogs primitive when the selected message has no id, instead of
+opening the modal. `MessageMenu.svelte:220` is the wrong layer for it; it holds no dialog.
+
 **low** · `missing-behaviour` · reference byte **1,349,868**
 
 ```
@@ -2362,6 +2664,21 @@ openAlertSendReport(e){e?this.appService.guiEventBus.emit("doAlertSendReportModa
 > Verified: The reference's entry-point refusal is genuinely absent from our source. Reference, bytes read at observed offset 1349819 of main.d1d09071be31f1ba.js: `openAlertSendReport(e){e?this.appService.guiEventBus.emit("doAlertSendReportModal",e):bootbox.alert("No reports found.")}` — the modal opens only when the message argument is truthy, other…
 
 ### SRCH-05 — advancedSearchTruncated / 'Showing the newest 500 matches' has no reference counterpart
+
+**DELIBERATE DIVERGENCE — kept, and now gated.** Re-measured rather than re-asserted: the substring
+`truncated` occurs **exactly once** in the whole bundle, at 1,643,312, inside hls.js ("last AAC PES
+packet truncated…"). The reference's success handler reads only `i.alerts`. This is ours.
+
+Kept because a silent cap is the worse failure: 500 results with no note reads as "that is all there
+is". `alert-report-modal-contract.test.ts` now asserts the full-file count AND the rendered notice, so
+the divergence cannot be tidied away for symmetry with the reference — which is the only way a
+deliberate divergence is actually lost.
+
+**The first version of that assertion was too weak and its negative control caught it**, which is
+worth recording here because it is the same lesson the register's preface teaches: it checked for the
+SYMBOLS `advancedSearchTruncated` and `ALERT_SEARCH_LIMIT`, which occur seven times between them
+across a declaration, three resets and an assignment — so deleting the notice left it green. It reads
+the markup now.
 
 **low** · `divergence` · reference byte **2,424,205**
 

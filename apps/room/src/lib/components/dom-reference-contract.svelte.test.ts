@@ -185,26 +185,39 @@ describe('every capture attachment has a reason bind:this cannot serve', () => {
   };
 
   /*
-    Parsed ONCE, at describe scope, and read by both tests below.
+    EVERY COMPONENT READ ONCE AND PARSED ONCE, shared by the three assertions below.
 
-    They each enumerated the whole corpus independently, so every component was read and parsed
-    twice — 2,344ms per pass, measured. That put the first test at 3,349ms against vitest's 5,000ms
-    default, and a test whose body is 67% budget is a test that goes red for being busy: two others
-    in this suite did exactly that on 2026-08-30 while the box was loaded, and reported themselves
-    as failing contracts. Collection-time work is not charged to a test's timeout, so this both
-    halves the work and puts what remains where it cannot masquerade as a failure.
+    This was `components.flatMap((file) => attachmentsIn(file, readFileSync(file, 'utf8')))` inside
+    the first `it`, and the identical loop again inside the second, and a third read of every file
+    in the third — so the Svelte compiler parsed the whole component tree three times for three
+    questions about the same syntax trees.
+
+    It stopped being merely wasteful on 2026-08-30, twice on the same day and from both directions.
+    `ModalHost.svelte` grew by ~390 lines, every parse of it got proportionally slower, and the
+    first `it` crossed vitest's 5-second per-test budget and FAILED — a green suite turned red by a
+    file getting longer, with nothing wrong in it. Independently, with three agents' suites loading
+    the box, the same `it` was measured at 3,349ms and the second at 2,378ms: 67% and 48% of budget
+    on a quiet machine, which is a contract one busy afternoon from reporting itself as broken. Two
+    other tests in this suite did exactly that and had to be diagnosed as timeouts rather than
+    assertions.
+
+    Raising the timeout would have been treating the symptom; the shape was the problem, and it is
+    the shape `CLAUDE.md` names third: work repeated per consumer instead of done once. Note also
+    that collection-time work is not charged to any test's timeout, so moving it here does not
+    merely halve the cost — it puts what remains where it cannot masquerade as a failure.
+
+    One read, one parse. Same assertions; the test bodies now run in single-digit milliseconds.
   */
-  const ALL_ATTACHMENTS = components.flatMap((file) =>
-    attachmentsIn(file, readFileSync(file, 'utf8'))
-  );
+  const SOURCES = new Map(components.map((file) => [file, readFileSync(file, 'utf8')]));
+  const ATTACHMENTS = components.flatMap((file) => attachmentsIn(file, SOURCES.get(file)!));
 
   it('found attachments to inspect', () => {
-    expect(ALL_ATTACHMENTS.length, 'no attachments were found at all').toBeGreaterThan(50);
+    expect(ATTACHMENTS.length, 'no attachments were found at all').toBeGreaterThan(50);
   });
 
   it('no capture-shaped attachment is an unsanctioned hand-rolled bind:this', () => {
     const offenders: string[] = [];
-    for (const attachment of ALL_ATTACHMENTS) {
+    for (const attachment of ATTACHMENTS) {
       // The bare identifier or the factory head, e.g. `captureCategorySection(index)`.
       const name = attachment.expr.match(/^([A-Za-z_$][\w$]*)/)?.[1];
       if (!name || !CAPTURE_SHAPE.test(name)) continue;
@@ -227,7 +240,7 @@ describe('every capture attachment has a reason bind:this cannot serve', () => {
       draft got that wrong: `captureAlertsScroller` is a PROP that `holdAlertsScroller` CALLS, so it
       is never an attachment expression itself and was reported stale while being very much alive.
     */
-    const sources = components.map((file) => readFileSync(file, 'utf8')).join('\n');
+    const sources = [...SOURCES.values()].join('\n');
     const stale = Object.keys(SANCTIONED).filter((name) => !sources.includes(name));
     expect(stale, `${stale.join(', ')} is sanctioned but appears in no component`).toEqual([]);
   });
