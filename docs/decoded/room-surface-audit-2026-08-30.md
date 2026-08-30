@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**78 open · 146 closed · 224 rows.**
+**73 open · 151 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -3337,6 +3337,14 @@ d(36,"li",26)(37,"a",27),T(38,"i",28),d(39,"span",29),v(40,"Connectivity/Mic Che
 
 ### dta-01 — Edit button does not flash the composer form (`animated flash`, 500 ms) in either pane
 
+**BUILT 2026-08-30 17:19 UTC, in both panes.** `#lib/flash-on-edit.ts`, worn by both forms as `{@attach flashOnEdit(flashNonce)}`.
+
+**The row's last sentence is the whole reason upstream spends an animation on this**, and it survived the build: the composer sits ABOVE a table that can be scrolled past it, so pressing Edit on row forty fills a form the presenter cannot see. Without the flash the button reads as broken — they press it again, and the second press overwrites the draft the first one made.
+
+An ATTACHMENT rather than an `$effect` or jQuery, which is what `CLAUDE.md` names as the Svelte 5 replacement for imperative DOM plumbing, and the official docs were read on it: *"Attachments are functions that run in an effect when an element is mounted to the DOM or when state read inside the function updates"*, and *"they can return a function that is called before the attachment re-runs"*. Both halves are load-bearing here.
+
+**A COUNTER and not a boolean**, and the control on it was seen red: with a boolean, Edit pressed twice inside 500 ms leaves the value already `true`, nothing re-runs, and the FIRST timer strips the class off the SECOND flash — the presenter presses Edit, sees nothing, and is back to the defect.
+
 **medium** · `missing-behaviour` · reference byte **1,988,722**
 
 ```
@@ -3348,6 +3356,10 @@ ii(".day-trade-alert-form").addClass("animated flash");const s=setTimeout(()=>{i
 > Verified: The Edit-button flash is genuinely absent from both panes. `requestEdit` in each pane sets the composer draft and does nothing else, and no flash exists anywhere else in the chain: no `use:` action on either form, no scrollIntoView/focus, no helper (`flashElement`/`addClass(`), no `*FLASH*` constant other than the unrelated SSE `RECONNECT…
 
 ### dta-02 — Image-preview lightbox has no `Download Image` button in either pane
+
+**BUILT 2026-08-30 17:19 UTC, in both panes.** `buttons: { download: … }` REPLACES bootbox's default OK, so Download Image is the dialog's only control and the header's close button is how it is dismissed without saving — upstream and here. `BootboxDialog`'s `footer` snippet is what expresses that; passing it suppresses the default OK. Saving closes the dialog too, which is the reference's own shape (its callback returns undefined, which bootbox reads as "close") and the right one: the presenter opened the picture to get a copy of it.
+
+**The row named the capability as already present and it was, in the wrong place.** `RoomModals.downloadImage` had exactly one caller, and it was never modal state — no field, no lifecycle, nothing rendered. It is `#lib/download-image.ts` now, because handing a pane the room's whole modal state so it can save a file is the coupling this repository keeps taking back out. **A method whose class it never touches is a function that has not been extracted yet.** Its two filename rules are the reference's and are not cosmetic: without them a presenter saving a screenshot gets `a3f9c1_chart_1024.png` instead of `chart.png`.
 
 **medium** · `missing-control` · reference byte **1,992,730**
 
@@ -3361,6 +3373,10 @@ showImagePreview(e,i=""){e&&bootbox.dialog({title:i,message:`…<img src="${e}" 
 
 ### dta-04 — Paste-to-upload confirm has no `Upload this image?` question in either pane
 
+**BUILT 2026-08-30 17:19 UTC, in both panes**, with the reference's inline `max-height: 50vh` that the row records as the secondary half. Without the heading this was an unlabelled OK/Cancel over a picture: the presenter pasted, a dialog appeared, and nothing on it said what OK does.
+
+**The chat composer's twin has carried the heading since it was built**, which is why the contract COUNTS the occurrences rather than checking for one — a `toContain` was already satisfied before either pane had it. `50vh` stays inline rather than folded into `.img-fluid`, which is 70vh and shared with the alert lightbox that wants the extra height.
+
 **medium** · `missing-behaviour` · reference byte **1,992,250**
 
 ```
@@ -3373,6 +3389,8 @@ onImagePaste(e,i){…bootbox.confirm({message:'<div class="text-center"><h4>Uplo
 
 ### dta-03 — Image-preview lightbox is not opened at `size:"large"`
 
+**BUILT 2026-08-30 17:19 UTC, in both panes** — `className="modal-lg"`, which is what this repository already uses for a bootbox `size:"large"` at three other call sites the row itself names. Built with dta-02 because they are one dialog.
+
 **low** · `missing-behaviour` · reference byte **1,992,730**
 
 ```
@@ -3384,6 +3402,10 @@ size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download I
 > Verified: I could not find the large-size image lightbox implemented anywhere for these two panes. The reference's showImagePreview opens bootbox with size:"large" (bootbox puts modal-lg on the .modal-dialog element).
 
 ### dta-05 — Linked-room log override (`linkedRoom${e}AlertsOther`) is deliberately not carried
+
+**DELIBERATE DIVERGENCE — verified by reading 2026-08-30 17:19 UTC; the row is its own disposition and the code already carries the reason.** `linkedRoom${e}AlertsOther` lets a room fetch ANOTHER room's alert log, with the room named by the BROWSER: `sendServerCommand(\`get${e}AlertsLog\`, { sessionID: s || globals.sessionID, days: i })`. Both endpoints here take the room from the session row instead and say so in place (`api/day-trade-alerts/+server.ts:20-31`, `api/swing-alerts/+server.ts:21-25`), the setting is excluded from the room config at `room-config-client.ts:452` and `:480`, and `trade-alerts.svelte.ts` sends no session parameter at all.
+
+**This is the 2026-08-07 privilege escalation's exact shape** — an authority decision asserted by the client — so carrying it would mean reintroducing the thing `CLAUDE.md` names as never to be reintroduced. The honest cost is stated rather than hidden: a room configured upstream to mirror another room's alert log shows its own here. Building it correctly would mean the mirror being resolved on the CONTROLLER from the room's own settings and never named on the wire, which is a real feature and not this row.
 
 **low** · `divergence` · reference byte **1,993,565**
 

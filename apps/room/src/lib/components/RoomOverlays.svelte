@@ -10,6 +10,7 @@
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
+  import { downloadImage } from '#lib/download-image.js';
   import { ReactionArrivals } from '#lib/reaction-arrivals.js';
   import { chatReactionNotice, questionReactionNotice } from '#lib/room/reaction-notices.js';
   import { playSoundEffect } from '#lib/sound-effects.js';
@@ -839,8 +840,30 @@
     onclose={() => swingAlerts.closeImagePaste()?.resolve(null)}
     onconfirm={() => void swingAlerts.confirmImagePaste()}
   >
+    <!--
+      `dta-04` — `<h4>Upload this image?</h4>` and the reference's own inline height.
+
+      ```js
+      bootbox.confirm({ message: '<div class="text-center"><h4>Upload this image?</h4>' +
+        '<img style="max-width:100%; max-height: 50vh;" src="' + a + '" /> </div>', … })
+                                                                  // bundle byte 1,992,250
+      ```
+
+      Without the question this is an unlabelled OK/Cancel over a picture: the presenter pasted, a
+      dialog appeared, and nothing on it says what OK does. The chat composer's twin has carried the
+      heading since it was built — these two were the copies that did not.
+
+      `max-height: 50vh` is inline upstream and inline here rather than folded into `.img-fluid`,
+      which is 70vh and is shared with the alert lightbox that WANTS the extra height.
+    -->
     <div class="text-center">
-      <img src={pastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
+      <h4>Upload this image?</h4>
+      <img
+        src={pastePreviewUrl}
+        class="img-fluid"
+        style="max-height: 50vh;"
+        alt="Pasted screenshot"
+      />
     </div>
   </BootboxDialog>
 {/if}
@@ -871,8 +894,30 @@
     onclose={() => dayTradeAlerts.closeImagePaste()?.resolve(null)}
     onconfirm={() => void dayTradeAlerts.confirmImagePaste()}
   >
+    <!--
+      `dta-04` — `<h4>Upload this image?</h4>` and the reference's own inline height.
+
+      ```js
+      bootbox.confirm({ message: '<div class="text-center"><h4>Upload this image?</h4>' +
+        '<img style="max-width:100%; max-height: 50vh;" src="' + a + '" /> </div>', … })
+                                                                  // bundle byte 1,992,250
+      ```
+
+      Without the question this is an unlabelled OK/Cancel over a picture: the presenter pasted, a
+      dialog appeared, and nothing on it says what OK does. The chat composer's twin has carried the
+      heading since it was built — these two were the copies that did not.
+
+      `max-height: 50vh` is inline upstream and inline here rather than folded into `.img-fluid`,
+      which is 70vh and is shared with the alert lightbox that WANTS the extra height.
+    -->
     <div class="text-center">
-      <img src={dayTradePastePreviewUrl} class="img-fluid" alt="Pasted screenshot" />
+      <h4>Upload this image?</h4>
+      <img
+        src={dayTradePastePreviewUrl}
+        class="img-fluid"
+        style="max-height: 50vh;"
+        alt="Pasted screenshot"
+      />
     </div>
   </BootboxDialog>
 {/if}
@@ -999,7 +1044,7 @@
             <hr />
             <button
               class="btn btn-primary btn-sm"
-              onclick={() => modals.downloadImage(modals.selectedImageUrl as string)}
+              onclick={() => downloadImage(modals.selectedImageUrl as string)}
               ><i class="fa fa-download"></i> Download Image</button
             >
           </div>

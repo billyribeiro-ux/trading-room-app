@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 17:19 UTC — The trade-alert panes: an Edit that looked broken, and a picture you could not save
+
+**Runtime impact: YES.** Pressing Edit on a trade alert flashes the composer, so it no longer reads
+as a dead button when the form is scrolled off screen. The image lightbox opens large and has the
+Download Image button that is its only control upstream. The paste-to-upload confirm asks its
+question instead of showing an unlabelled OK/Cancel over a picture.
+
+**dta-01, dta-02, dta-03 and dta-04 built in BOTH panes; dta-05 recorded. The day-trade and
+swing-alert panes are complete.** The audit stands at **73 open · 151 closed**.
+
+#### Every row was missing from both twins, so every assertion runs twice
+
+Day trade and swing are two components with one behaviour. All four rows were absent from **both** —
+which is how a pair comes to need four identical fixes — so `trade-alert-pane-contract.test.ts` uses
+`it.each` over the pair rather than checking one and trusting the other.
+
+#### dta-01 is not decoration, and the row said why
+
+```js
+ii(".day-trade-alert-form").addClass("animated flash");
+const s = setTimeout(() => { ii(".day-trade-alert-form").removeClass("animated flash"),
+                             clearTimeout(s) }, 500)                    // byte 1,988,722
+```
+
+The composer sits **above** a table that can be scrolled past it. Pressing Edit on row forty fills a
+form the presenter cannot see, so without the flash the button reads as broken — they press it again,
+and the second press overwrites the draft the first one made.
+
+An **attachment**, which `CLAUDE.md` names as the Svelte 5 replacement for imperative DOM plumbing,
+and the official docs were read on it now that the MCP is up: *"Attachments … run in an effect when
+an element is mounted to the DOM or when state read inside the function updates"* and *"can return a
+function that is called before the attachment re-runs"*. Both halves are load-bearing.
+
+**The nonce is a COUNTER and not a boolean**, and that control was seen red: with a boolean, Edit
+pressed twice inside 500 ms leaves the value already `true`, nothing re-runs, and the **first** timer
+strips the class off the **second** flash — the presenter presses Edit, sees nothing, and is back to
+the defect the row is about.
+
+#### dta-02 moved a method that was never modal state
+
+`buttons: { download: … }` **replaces** bootbox's default OK, so Download Image is the dialog's only
+control and the header's close button is how it is dismissed without saving. `BootboxDialog`'s
+`footer` snippet expresses that; passing it suppresses the default OK. Saving closes the dialog too,
+which is the reference's shape and the right one — the presenter opened the picture to get a copy.
+
+The row noted the capability already existed, and it did, in the wrong place.
+`RoomModals.downloadImage` had exactly one caller and no field, no lifecycle and nothing rendered.
+**A method whose class it never touches is a function that has not been extracted yet.** It is
+`#lib/download-image.ts` now, and `modals.svelte.ts`'s ceiling **goes down** 263 → 242 — the
+direction that file exists for. Its two filename rules are the reference's and are not cosmetic:
+without them a presenter saving a screenshot gets `a3f9c1_chart_1024.png` instead of `chart.png`.
+
+#### dta-05 is the 2026-08-07 escalation wearing a feature request
+
+`linkedRoom${e}AlertsOther` lets a room fetch **another room's** alert log, with the room named by
+the browser: `sendServerCommand(\`get${e}AlertsLog\`, { sessionID: s || globals.sessionID, days: i })`.
+Both endpoints here take the room from the session row instead, and say so in place. Carrying it
+would reintroduce the exact thing `CLAUDE.md` says must never be reintroduced. The honest cost is
+stated rather than hidden: a room configured upstream to mirror another room's log shows its own
+here. Building it correctly means resolving the mirror on the **controller**, from the room's own
+settings, never named on the wire — a real feature, and not this row.
+
+#### Two controls stayed green, and both were my mutation rather than the test
+
+`className="modal-lg"` and one of the filename rules: my `sed` patterns did not match what Prettier
+had produced, so nothing was mutated. Re-run against the real text, both fail. Recorded because "the
+control passed" is only evidence when the mutation is known to have landed — this is the same class
+as the `ScreenShareMenu` artefact two hours ago, and it is worth counting.
+
+**Verified:** `trade-alert-pane-contract.test.ts` 16/16 (new). **Ten negative controls run and seen
+red** — the attachment removed from the day-trade form, the swing pane not bumping the nonce, the
+nonce turned into a boolean, the previous timer not cancelled, `modal-lg` dropped, the download
+footer dropped from swing, saving no longer closing the dialog, one paste heading removed, one 50vh
+removed, and a filename rule dropped. Full `pnpm run gate` in `apps/room`: **252 files, 4,169 passed,
+1 skipped, `gate-exit=0`**, read from the log it was echoed into. Controller untouched.
+
+**A correction to the 17:15 entry:** it said the autofixer had run whole on six components and none
+of the larger ones. `BootboxDialog.svelte` and `ScheduledAlerts.svelte` were run immediately after
+it was written and are both clean, so the honest figure is **eight of sixteen**. The eight not yet
+covered are the ones between 500 and 5,000 lines stripped, and that remains named outstanding work.
+
 ### 2026-08-30 17:15 UTC — The Svelte MCP came back, and the mandatory gate finally ran
 
 **Runtime impact: NO.** No component behaviour changed. `apps/room/AGENTS.md` gains a section; that

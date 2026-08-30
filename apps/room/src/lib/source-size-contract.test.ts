@@ -910,7 +910,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       The same commit lowers `user-actions.svelte.ts` by fifteen, so the room's total cap falls.
     */
-    max: 263,
+    /*
+      263 -> 242 on 2026-08-30, and a ceiling going DOWN is the direction this file exists for.
+      `downloadImage` left for `#lib/download-image.ts` when `dta-02` needed it in two panes that do
+      not hold this class: it had no field, no lifecycle and nothing rendered, so it was never
+      overlay state. The `why` below is now true of everything left.
+    */
+    max: 242,
     why: 'the overlay state machine - five fields the template reads and this class alone writes'
   },
   {
@@ -1474,7 +1480,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the caller owns (who am I, am I a presenter, which of three preferences applies), and passing
       the room instead would have made a notification module reach for the whole room.
     */
-    max: 1011,
+    /*
+      1,011 -> 1,056, 2026-08-30, for `dta-04`: the paste-confirm heading and the reference's inline
+      `max-height: 50vh` on BOTH trade-alert dialogs, each with the seventeen-line citation.
+
+      The citation is duplicated because the DIALOGS are, and that duplication is itself upstream's:
+      `imgUpload` takes the feature name and `doImggurUpload` dispatches on it deny-by-default, so
+      day trade and swing genuinely own separate dialogs. A reader who meets one of them must not
+      have to find the other to learn why it says what it says.
+    */
+    max: 1056,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -3844,6 +3859,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the reaction diff between two page loads, and why it is not read off the wire'
   },
   {
+    file: 'lib/flash-on-edit.ts',
+    /*
+      `dta-01` — flash the trade-alert composer when Edit is pressed.
+
+      Most of the file is why it is a COUNTER: with a boolean, Edit pressed twice inside 500 ms
+      leaves the value already true, nothing re-runs, and the first timer ends the second flash.
+      That is the row's own defect coming back, and its control was seen red.
+    */
+    max: 47,
+    why: 'the 500ms composer flash, as an attachment, and why the nonce is a counter'
+  },
+  {
+    file: 'lib/download-image.ts',
+    /*
+      Saving an image the room is showing. It was a method on `RoomModals` with one caller, and
+      `dta-02` needed two more in components that do not hold `RoomModals` and should not.
+
+      It was never modal state — no field, no lifecycle, nothing rendered. A method whose class it
+      never touches is a function that has not been extracted yet.
+    */
+    max: 55,
+    why: 'save a shown image, with the reference two filename rules that are not cosmetic'
+  },
+  {
     file: 'lib/room/note-update-notice.ts',
     /*
       USM-11's receiver, extracted from `events.svelte.ts` on 2026-08-30 in the commit that wrote it.
@@ -5326,12 +5365,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/day-trade-alerts/DayTradeAlertForm.svelte',
-    max: 357,
+    /*
+      357 -> 361, 2026-08-30, for `dta-01`: the `flashNonce` prop, its docblock and the
+      `{@attach flashOnEdit(flashNonce)}` on the form element. The reasoning is in
+      `#lib/flash-on-edit.ts`, which is where the byte offsets and the counter-versus-boolean
+      argument live.
+    */
+    max: 361,
     why: 'the day-trade alert composer form'
   },
   {
     file: 'lib/components/day-trade-alerts/DayTradeAlertsPane.svelte',
-    max: 583,
+    /*
+      583 -> 623, 2026-08-30, for `dta-01` / `dta-02` / `dta-03`: the flash nonce, the `modal-lg`
+      lightbox and its Download Image footer, with the citation for why that footer is the dialog's
+      ONLY button. Two modules came out in the same commit — `flash-on-edit.ts` and
+      `download-image.ts` — and the second took a method off `RoomModals` that never belonged there.
+    */
+    max: 623,
     why: 'the day-trade alerts tab'
   },
   {
@@ -5341,12 +5392,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/swing-alerts/SwingAlertForm.svelte',
-    max: 327,
+    /* 327 -> 331, 2026-08-30. The swing twin of the four lines on the day-trade form above. */
+    max: 331,
     why: 'the swing alert composer form'
   },
   {
     file: 'lib/components/swing-alerts/SwingAlertsPane.svelte',
-    max: 538,
+    /*
+      538 -> 578, 2026-08-30. The swing twin of the day-trade pane raise above, line for line: these
+      two panes are one behaviour in two components, and the whole point of `dta-01` … `dta-04` is
+      that all four rows were missing from BOTH.
+    */
+    max: 578,
     why: 'the swing alerts tab'
   }
 ];
