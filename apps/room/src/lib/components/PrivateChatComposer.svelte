@@ -30,6 +30,13 @@
     /** The Giphy key, or empty when the room has none. */
     readonly giphyApiKey: string;
     readonly onsend: () => void;
+    /**
+     * `onTextareaFocus()` — the member is looking at the composer, G27.
+     *
+     * Upstream's method does two things and only one crosses: it stops the tab-title flash, and it
+     * attaches the `input` listener `autoExpand` needs — which this component binds declaratively.
+     */
+    readonly onfocus: () => void;
     readonly onimageupload: () => void;
     readonly onselectgif: (title: string, url: string) => void;
     readonly onemoji: (glyph: string) => void;
@@ -41,6 +48,7 @@
     webinarMode,
     giphyApiKey,
     onsend,
+    onfocus,
     onimageupload,
     onselectgif,
     onemoji
@@ -157,6 +165,7 @@
         bind:value={draft}
         bind:this={textarea}
         oninput={autoExpand}
+        onfocus={() => onfocus()}
         onkeydown={(event) => {
           if (event.key !== 'Enter') return;
           event.preventDefault();

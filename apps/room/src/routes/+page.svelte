@@ -1454,6 +1454,7 @@
       {canPostImages}
       {webinarMode}
       {giphyApiKey}
+      oncomposerfocus={() => privateChat.composerFocused()}
       onimageupload={() => privateChat.beginImageUpload()}
       onselectgif={(_title, url) => {
         /*

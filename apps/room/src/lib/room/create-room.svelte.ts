@@ -667,6 +667,13 @@ export function createRoom(deps: RoomDeps) {
       its composer is `O(4, e.isConnected && e.chatEnabled ? 4 : -1)`. One authority, asked once.
     */
     canPost: () => deps.chatEnabled(),
+    /* G27 — `globals.sessionName`, which is what the flashing tab title returns to. */
+    roomName: () => data.sessData?.name?.trim() || 'PTRChat',
+    /* `!$("#textAreaTxtPM").is(":focus")` — asked of the DOM here so the class does not reach for it. */
+    composerHasFocus: () =>
+      typeof document !== 'undefined' &&
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.id === 'textAreaTxtPM',
     /* G1 — the room's uploader. This class knows what to do with a URL, not how bytes get there. */
     uploadImages: (files) => composer.uploadAlertFiles(files),
     notify: (title, body, icon, emailHash) => {

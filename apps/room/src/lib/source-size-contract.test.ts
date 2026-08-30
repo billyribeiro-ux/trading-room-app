@@ -585,7 +585,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the Giphy key and three callbacks handed to the panel, plus `chatEnabled` crossing into
       `RoomDeps` so the `canPost` refusal asks the same authority the main composer renders on.
     */
-    max: 1512,
+    /*
+      1512 -> 1508, 2026-08-30, and DOWN. `oncomposerfocus` added; the number falls because the
+      previous raise anticipated more than the composer extraction ended up needing here.
+    */
+    max: 1508,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1684,7 +1688,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It must not: `canPostImages` arrives already answered, and `canPost` is enforced in
       `RoomPrivateChat.send` from the room's own gate.
     */
-    max: 325,
+    /*
+      325 -> 335, 2026-08-30. `onfocus` for G27 — `onTextareaFocus()` stops the tab-title flash — and
+      the note saying which half of upstream's method crosses and which this component binds
+      declaratively.
+    */
+    max: 335,
     why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
@@ -1744,7 +1753,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       buttons, both popovers, the webinar notice and `autoExpand`. The panel is smaller than it was
       before the feature, which is what an extraction is supposed to look like.
     */
-    max: 520,
+    /*
+      520 -> 524, 2026-08-30. `oncomposerfocus` passed through for G27. Four lines, three of them the
+      prop's docblock.
+    */
+    max: 524,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -3343,6 +3356,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: "the private-chat log's two scrolls, and the two transcribed numbers they turn on"
   },
   {
+    file: 'lib/room/private-chat-title-flash.ts',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30. The tab-title flasher — `"<sender> messaged you - <room>"`
+      alternating with the room name every two seconds, bytes 2,207,480 and 2,204,266.
+
+      A module because `RoomPrivateChat` is at its ceiling and this is self-contained: one interval
+      and the document's title, told when to start and stop, reading nothing from the panel. The same
+      seam `private-chat-scroll.ts` was cut on.
+
+      `moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt,
+      with an assertion designed to fire when either appeared. It fired.
+
+      If this grows, the thing to check is whether it has started deciding WHEN to flash. It must
+      not: that gate is two conditions in `RoomPrivateChat.ingest`, where the message is.
+    */
+    max: 90,
+    why: 'the tab-title flash for an unread private message, and the one interval behind it'
+  },
+  {
     file: 'lib/room/private-chat.svelte.ts',
     /* +3, 2026-08-16: the same `#lib/*.js` import reflow as `files.svelte.ts` above. */
     /*
@@ -3398,7 +3430,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       So the net of two features is +16 lines. The next seam, if this grows again, is the SEARCH —
       `search`, `#searchResults` and the `log` getter's choice between two buckets.
     */
-    max: 928,
+    /*
+      928 -> 990, 2026-08-30. G27 — the tab-title flash.
+
+      The decisions are here and the mechanism is not: WHEN to flash (a message that is not mine,
+      with the composer unfocused), when to stop (the composer taking focus, the tab closing, the
+      panel closing), and the gate's two halves transcribed from byte 2,207,480.
+      `private-chat-title-flash.ts` owns the interval and the title.
+
+      The seam named in the entry below is still the SEARCH, and it is still the next cut.
+    */
+    max: 990,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -3956,7 +3998,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1365 -> 1382, 2026-08-30. `canPost` and `uploadImages` for the private composer (G13, G1), each
       with the sentence saying which authority it forwards and why this file does not compute one.
     */
-    max: 1382,
+    /*
+      1382 -> 1390, 2026-08-30. `roomName` and `composerHasFocus` for G27 — the second asked of the
+      DOM here so the panel class does not reach into it for a decision.
+    */
+    max: 1390,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

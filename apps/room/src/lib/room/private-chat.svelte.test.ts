@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomDialogs } from './dialogs.svelte';
+import { TITLE_FLASH_MS } from './private-chat-title-flash';
 import {
   type PrivateChatMessage,
   type PrivateChatSession,
@@ -50,6 +51,8 @@ const make = (
     chatPopup?: boolean;
     /** `canPost` — the room's answer to whether this member may post at all (G13). */
     canPost?: boolean;
+    /** Whether the private composer has focus — G27's other gate. */
+    composerHasFocus?: boolean;
     /** What the injected uploader hands back, so `completeImageUpload` can be executed. */
     uploadUrls?: readonly string[];
   } = {}
@@ -96,6 +99,8 @@ const make = (
     onlineUserIds: () => onlineIds,
     notify: (title, body, icon, emailHash) => notified.push({ title, body, icon, emailHash }),
     canPost: () => options.canPost ?? true,
+    roomName: () => 'Test Room',
+    composerHasFocus: () => options.composerHasFocus ?? false,
     uploadImages: (files) => (uploaded.push(...files), Promise.resolve(uploadUrls)),
     onCleared: () => cleared.push(1),
     onThreadDeleted: () => ((invalidated += 1), Promise.resolve())
@@ -407,6 +412,8 @@ describe('paging', () => {
       onlineUserIds: () => new Set<number>(),
       notify: () => {},
       canPost: () => true,
+      roomName: () => 'Test Room',
+      composerHasFocus: () => false,
       uploadImages: () => Promise.resolve([]),
       onCleared: () => {},
       onThreadDeleted: () => Promise.resolve()
@@ -588,5 +595,115 @@ describe('the composer s two behaviours that live in the class', () => {
       expect(harness.dialogs.alert).toBe('Upload Failed...');
       expect(harness.sent).toEqual([]);
     });
+  });
+});
+
+describe('the tab-title flash — G27', () => {
+  /*
+    `moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt,
+    with an assertion designed to fire when either appeared: *"this assertion exists so that adding
+    either without updating that document fails here."* It fired.
+
+    A private message arriving while the tab is in the background produced a `pling` and nothing
+    else — and a muted tab, headphones on the presenter's audio, or a browser suppressing sound
+    before any click all make that no signal at all. The title is what a background tab can show.
+  */
+  const flashOff = () => {
+    document.title = 'Test Room';
+  };
+
+  it('flashes the sender s name, alternating with the room s', () => {
+    flashOff();
+    const harness = make();
+    harness.chat.ingest(message({ _id: 't1', uid: 9, n: 'Bea' }));
+
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title).toBe('Bea messaged you - Test Room');
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title, 'and back').toBe('Test Room');
+
+    harness.chat.close();
+  });
+
+  it('does NOT flash for my own message, or while the composer has focus', () => {
+    /*
+      `(!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine`. Somebody typing into the
+      box is already looking at it, and flashing the title at them is noise.
+
+      ## ONE interval, and the first draft of this test advanced by TWO
+
+      Advancing by `TITLE_FLASH_MS * 2` flips the title twice — flash, then back to the room name —
+      so it reads `'Test Room'` whether or not a flash was running, and the assertion passed against
+      both answers. Its negative controls caught it: deleting `!isMine` and deleting the focus check
+      both left this green. **A test that cannot fail is worse than no test**, and the shape here is
+      the one the whole ratchet of negative controls exists to find.
+
+      One interval, so the flash — if it happened — is on the sender's half.
+    */
+    flashOff();
+    const mine = make();
+    mine.chat.ingest(message({ _id: 't2', uid: 1, recvdID: 9 }));
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title, 'my own echo').toBe('Test Room');
+    mine.chat.close();
+
+    flashOff();
+    const focused = make({ composerHasFocus: true });
+    focused.chat.ingest(message({ _id: 't3', uid: 9, n: 'Bea' }));
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title, 'the composer has focus').toBe('Test Room');
+    focused.chat.close();
+  });
+
+  it('names the LATEST sender when a second message arrives', () => {
+    /* `this.notificationInterval && clearInterval(this.notificationInterval)` — upstream's first line. */
+    flashOff();
+    const harness = make();
+    harness.chat.ingest(message({ _id: 't4', uid: 9, n: 'Bea' }));
+    harness.chat.ingest(message({ _id: 't5', uid: 8, n: 'Cass' }));
+
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title).toBe('Cass messaged you - Test Room');
+    harness.chat.close();
+  });
+
+  it('stops and restores the title when the composer takes focus', () => {
+    flashOff();
+    const harness = make();
+    harness.chat.ingest(message({ _id: 't6', uid: 9, n: 'Bea' }));
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title).toBe('Bea messaged you - Test Room');
+
+    harness.chat.composerFocused();
+    expect(document.title, 'restored immediately').toBe('Test Room');
+    /* One interval, not two — see the note above on why an even advance proves nothing here. */
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title, 'and it stays restored').toBe('Test Room');
+  });
+
+  it('stops when the panel or the tab closes', () => {
+    flashOff();
+    const closing = make();
+    closing.chat.ingest(message({ _id: 't7', uid: 9, n: 'Bea' }));
+    closing.chat.close();
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title).toBe('Test Room');
+
+    flashOff();
+    const tab = make();
+    tab.chat.ingest(message({ _id: 't8', uid: 9, n: 'Bea' }));
+    tab.chat.closeTab();
+    vi.advanceTimersByTime(TITLE_FLASH_MS);
+    expect(document.title).toBe('Test Room');
+  });
+
+  it('leaves the title alone when nothing was flashing', () => {
+    /*
+      The clear is conditional and the restore is not — a component unmounting with no flash running
+      must not overwrite a title something else had set.
+    */
+    document.title = 'Something Else';
+    make().chat.close();
+    expect(document.title).toBe('Something Else');
   });
 });

@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 10:40 UTC — The tab-title flash, and the tripwire that was built to stop it being built quietly
+
+**Runtime impact: YES.** A private message arriving while the tab is in the background now flashes
+the browser tab: `<sender> messaged you - <room>` alternating with the room's name every two seconds,
+until the composer takes focus or the conversation is closed.
+
+**PrivateChatPanel's last open row.** Twenty-one rows on that surface, all now closed — seven built
+this morning, six this afternoon, three with the composer, four verified already-built by reading,
+and one recorded as a measured refusal.
+
+**Why the sound already there was not enough.** `ingest` fired a `pling` and nothing else. A muted
+tab, headphones carrying the presenter's audio, or a browser suppressing sound before anything has
+been clicked each make that no signal at all — and the whole point of a private message is that it
+reaches one person. The title is what a background tab can still show, and it is why the reference
+has this at all.
+
+**The gate is transcribed from byte 2,207,480 and both halves matter.**
+`(!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine` — not my own echo, and not
+while somebody is typing into the box, because they are already looking at it. A restart names the
+LATEST sender, which is upstream's first line in `newMessage`. It stops on `onTextareaFocus`, on
+closing the tab and on closing the panel, each from its own site in the capture.
+
+**THE ASSERTION THAT GUARDED ITS ABSENCE IS WHAT REPORTED IT.**
+`moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt, and
+said in its own words why the assertion existed: *"this assertion exists so that adding either
+without updating that document fails here."* It went red on the first run after the module landed.
+That is a tripwire doing precisely its job, and it is worth naming because most of this session's
+gates have caught mistakes — this one caught intended work and made the record follow it. The
+assertion is narrowed to the consumer that IS still a gap (the transcript window's `&name=`, bytes
+1,958,716 and 2,532,633), and `private-chat-strip-contract` now asserts the string is present in the
+module that owns it, so the two together still say where it may and may not appear.
+
+**A module, and the class is at its ceiling for the third time today.**
+`private-chat-title-flash.ts` owns one interval and the document's title; `RoomPrivateChat` decides
+when. The clear is conditional and the restore is not — a panel closing with no flash running must
+not overwrite a title something else had set, and that asymmetry is asserted rather than described.
+`roomName` and `composerHasFocus` are injected, the second asked of the DOM at the construction site
+so this class does not reach into it for a decision.
+
+**NEGATIVE CONTROLS FOUND A TEST THAT COULD NOT FAIL.** Ten were run after the commit; eight went
+red first time — a restart that keeps the old sender, an unconditional restore, a 500ms interval, each
+of the three stops removed, reading the title back instead of taking it as an argument, the flasher
+appearing on the page, and the module no longer naming the string.
+
+**Two did not: deleting `!isMine`, and deleting the composer-focus check.** Both assertions advanced
+the fake clock by `TITLE_FLASH_MS * 2`, which flips the title twice — flash, then back to the room
+name — so they read `'Test Room'` whether or not a flash was running and passed against both answers.
+Corrected to a single interval, so the flash lands on the sender's half; re-run against both
+mutations, both now fail. A test that cannot fail is worse than no test, and this is the exact shape
+the control ritual exists to find — the second time this session it has caught the test rather than
+the code.
+
+**Verified.** `private-chat.svelte.test.ts` 40, six new and executed against fake timers — the flash,
+both halves of its gate, the latest-sender restart, all three stops, and the case where nothing was
+flashing. `private-chat-strip-contract.test.ts` 33, four new. Whole `src/lib` suite 3,845 passed, 1
+skipped. One module capped on arrival; `+page.svelte`'s ceiling came DOWN four lines, because the
+previous raise anticipated more than the extraction needed. `svelte-check` 0 errors, 0 warnings. Full
+`pnpm run gate` before the push, `gate-exit` echoed into the log and read from there. **Nothing was
+opened in a browser**, and the **Svelte MCP has been unavailable for this entire session**.
+
 ### 2026-08-30 10:05 UTC — The private composer's button column, and an extraction that made the panel smaller than before the feature
 
 **Runtime impact: YES.** A private conversation can now carry an emoji, an image and a GIF. The

@@ -1,6 +1,7 @@
 import { isHttpError } from '@sveltejs/kit';
 
 import { restoreAfterLoadMore, scrollPrivateChatToBottom } from './private-chat-scroll';
+import { startTitleFlash, stopTitleFlash } from './private-chat-title-flash';
 
 import {
   mergeOlderMessagesBy,
@@ -180,6 +181,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   #notify;
   #canPost;
   #uploadImages;
+  #roomName;
+  #composerHasFocus;
   /** The composer's image dialog while it is open — see `beginImageUpload`. */
   #imageUpload;
   /** `loadMoreLastID` — the row to scroll back to once older history lands. See `loadMore`. */
@@ -237,6 +240,19 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
      */
     uploadImages: (files: readonly File[]) => Promise<readonly string[]>;
     /**
+     * The room's name, which is what the tab title returns to — G27's `globals.sessionName`.
+     *
+     * A thunk because it comes from the page's data and is replaced on every `invalidateAll()`.
+     */
+    roomName: () => string;
+    /**
+     * Whether the private composer has focus — the other half of G27's gate.
+     *
+     * `!$("#textAreaTxtPM").is(":focus")`. Injected rather than queried here so this class does not
+     * reach into the DOM for a decision, which is the split every other collaborator here makes.
+     */
+    composerHasFocus: () => boolean;
+    /**
      * `canPost` — may this member post at all, G13.
      *
      * The room's answer, injected, because it already decides who may chat and a second opinion
@@ -270,6 +286,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#notify = options.notify;
     this.#canPost = options.canPost;
     this.#uploadImages = options.uploadImages;
+    this.#roomName = options.roomName;
+    this.#composerHasFocus = options.composerHasFocus;
     this.#onCleared = options.onCleared;
     this.#onThreadDeleted = options.onThreadDeleted;
 
@@ -513,6 +531,28 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
       this.#notify(`Message from ${message.n}`, message.txt, message.pic, message.avt);
     }
 
+    /*
+      ── THE TAB TITLE — G27, byte 2,207,480 ─────────────────────────────────────────────────
+
+      ```js
+      (!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine &&
+        (this.notificationInterval = setInterval(…, 2e3))
+      ```
+
+      Not mine, and only when the composer does not have focus — somebody typing into the box is
+      already looking at it, and flashing the title at them is noise. `document.hasFocus()` answers
+      the `!window.onfocus` half: the reference is testing whether the WINDOW is focused at all, and
+      that is the case the whole feature exists for.
+
+      Restarting replaces whatever was flashing, which is the first line of upstream's `newMessage`
+      — a message from somebody else must name THAT sender.
+
+      `private-chat-title-flash.ts` owns the interval and the title; this decides when.
+    */
+    if (!isMine && !this.#composerHasFocus()) {
+      startTitleFlash(message.n, this.#roomName());
+    }
+
     if (this.#peerId === peerId) this.scrollToBottom();
   }
 
@@ -681,6 +721,25 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.scrollToBottom();
   }
 
+  /**
+   * `onTextareaFocus()` — the member is looking at the composer, so stop flashing at them.
+   *
+   * ```js
+   * onTextareaFocus() {
+   *   this.notificationInterval && clearInterval(this.notificationInterval),
+   *   document.title !== this.appService.globals.sessionName &&
+   *     (document.title = this.appService.globals.sessionName)
+   *   …
+   * }
+   * ```
+   *
+   * The rest of upstream's method attaches the `input` listener that `autoExpand` needs;
+   * `PrivateChatComposer` binds that declaratively, so only this half crosses.
+   */
+  composerFocused(): void {
+    stopTitleFlash(this.#roomName());
+  }
+
   /** Whether the composer's image dialog is on screen — G1's `imgUpload()`. */
   get imageUpload(): boolean {
     return this.#imageUpload;
@@ -809,6 +868,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
    * "No active chat".
    */
   close() {
+    /* `closePanel(){ …, this.notificationInterval && (clearInterval(…), document.title = …), … }` */
+    stopTitleFlash(this.#roomName());
     this.#open = false;
     this.#peerId = null;
     this.#onCleared();
@@ -833,6 +894,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
    * This closes the conversation and leaves the panel open, which is why the two are not one method.
    */
   closeTab(): void {
+    /* `closePanel` clears the interval and restores the title; closing the tab is the same act. */
+    stopTitleFlash(this.#roomName());
     this.#peerId = null;
     this.#searchTerm = '';
     this.#searching = false;

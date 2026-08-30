@@ -8,6 +8,7 @@ import { codeOf } from './source-comments.js';
   named came due. The values are unchanged; only their home is.
 */
 import { LOAD_MORE_OVERSCROLL_PX, PRIVATE_CHAT_RESCROLL_MS } from './room/private-chat-scroll.js';
+import { TITLE_FLASH_MS } from './room/private-chat-title-flash.js';
 
 /**
  * Seven rows of the `PrivateChatPanel` surface audit, and one defect none of them was looking for.
@@ -433,5 +434,55 @@ describe('the composer button column — G1, G11 and G13', () => {
     expect(OVERLAYS).toContain('{#if privateChat.imageUpload}');
     expect(OVERLAYS).toContain('void privateChat.completeImageUpload(files)');
     expect(STATE).toContain('beginImageUpload(): void {');
+  });
+});
+
+describe('the tab-title flash — G27', () => {
+  const FLASH = read('./room/private-chat-title-flash.ts');
+
+  it('is where it belongs, and NOT on the page', () => {
+    /*
+      `moderator-message-contract.test.ts` keeps the other half of this: the page must not carry the
+      flasher, because a second thing writing `document.title` gives no way to tell which won. This
+      asserts it IS in the module that owns it, so the two together say where it may appear.
+    */
+    expect(FLASH).toContain('`${senderName} messaged you - ${roomName}`');
+    expect(TITLE_FLASH_MS).toBe(2_000);
+  });
+
+  it('takes the room name as an argument rather than reading the title back', () => {
+    /*
+      The title is the thing being changed; reading it back would capture whichever half of the
+      flash happened to be showing, and the restore would then leave the flashing text in place.
+    */
+    expect(FLASH).toContain(
+      'export function startTitleFlash(senderName: string, roomName: string)'
+    );
+    expect(FLASH).toContain('export function stopTitleFlash(roomName: string)');
+  });
+
+  it('clears conditionally and restores unconditionally', () => {
+    /*
+      With no flash running, `stopTitleFlash` must leave the title alone — a panel closing must not
+      overwrite a title something else had set. The restore inside is unconditional because
+      assigning the same string is free; upstream's `document.title !== sessionName &&` only avoids
+      a redundant DOM write.
+    */
+    const at = FLASH.indexOf('export function stopTitleFlash');
+    expect(at, 'the function must exist').toBeGreaterThan(-1);
+    const end = FLASH.indexOf('\n}', at);
+    expect(end, 'the function must be closed').toBeGreaterThan(at);
+    const body = FLASH.slice(at, end);
+    expect(body.indexOf('if (timer === null) return;')).toBeLessThan(
+      body.indexOf('document.title = roomName;')
+    );
+  });
+
+  it('is gated on the message and the focus, in the class that has both', () => {
+    expect(STATE).toContain('if (!isMine && !this.#composerHasFocus()) {');
+    expect(STATE).toContain('startTitleFlash(message.n, this.#roomName());');
+    /* Three stops, each transcribed from its own site: focus, tab close, panel close. */
+    const stops = [...STATE.matchAll(/stopTitleFlash\(this\.#roomName\(\)\);/g)];
+    expect(stops, 'onTextareaFocus, closeTab and closePanel').toHaveLength(3);
   });
 });

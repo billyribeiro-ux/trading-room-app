@@ -65,7 +65,8 @@ interface Calls {
   switchuser: number[];
   loadmore: number;
   send: number;
-  /** The composer button column's three, G1. */
+  /** The composer button column's three, G1, and the focus that stops the title flash. */
+  composerfocus: number;
   imageupload: number;
   selectgif: string[];
   emoji: string[];
@@ -82,6 +83,7 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     switchuser: [],
     loadmore: 0,
     send: 0,
+    composerfocus: 0,
     imageupload: 0,
     selectgif: [],
     emoji: []
@@ -98,6 +100,7 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
       canPostImages: true,
       webinarMode: false,
       giphyApiKey: 'giphy-test-key',
+      oncomposerfocus: () => (calls.composerfocus += 1),
       onimageupload: () => (calls.imageupload += 1),
       onselectgif: (_title: string, url: string) => calls.selectgif.push(url),
       onemoji: (glyph: string) => calls.emoji.push(glyph),

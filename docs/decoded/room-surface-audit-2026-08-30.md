@@ -386,6 +386,12 @@ clearSearchTerm(){this.pmSearchTerm="",this.appService.guiEventBus.emit("setSear
 
 ### G27 — Title-flash notification interval is absent (recorded elsewhere as a known gap)
 
+**BUILT 2026-08-30 10:40 UTC**, and the tripwire that guarded its absence is what said so. `moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt with an assertion designed to fire when either appeared — *"this assertion exists so that adding either without updating that document fails here"* — and it fired. That assertion is narrowed to the one that IS still a gap (the transcript window's `&name=`), and `private-chat-strip-contract.test.ts` now asserts the string is present in the module that owns it, so the two together still say where it may and may not appear.
+
+The title alternates every two seconds between the room's name and `<sender> messaged you - <room>`, for a message that is not mine and only while the composer does not have focus — `(!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine` at byte 2,207,480. It stops on `onTextareaFocus`, on closing the tab and on closing the panel, each transcribed from its own site. A restart names the LATEST sender, which is upstream's first line in `newMessage`.
+
+**Why it matters more than the sound already there:** a private message arriving in a background tab produced a `pling` and nothing else, and a muted tab, headphones carrying the presenter's audio, or a browser suppressing sound before any click each make that no signal at all. `private-chat-title-flash.ts` owns the interval and the title; the panel decides when. The clear is conditional and the restore is not, so a panel closing with no flash running cannot overwrite a title something else had set.
+
 **low** · `missing-behaviour` · reference byte **2,205,471**
 
 ```

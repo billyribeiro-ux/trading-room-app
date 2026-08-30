@@ -106,6 +106,8 @@
     webinarMode: boolean;
     /** The Giphy key, or empty when the room has none. */
     giphyApiKey: string;
+    /** `onTextareaFocus()` — stops the tab-title flash, G27. */
+    oncomposerfocus: () => void;
     /** `imgUpload()` — open this conversation's own image dialog. */
     onimageupload: () => void;
     /** `sendGif(title, url)` — the double-clicked GIF. */
@@ -156,6 +158,7 @@
     canPostImages,
     webinarMode,
     giphyApiKey,
+    oncomposerfocus,
     onimageupload,
     onselectgif,
     onemoji,
@@ -505,6 +508,7 @@
             {webinarMode}
             {giphyApiKey}
             {onsend}
+            onfocus={oncomposerfocus}
             {onimageupload}
             {onselectgif}
             {onemoji}
