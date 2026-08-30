@@ -1,6 +1,6 @@
 # The room surfaces, audited against the pinned v4 bundle — 2026-08-30
 
-**223 verified gaps across 18 surfaces.** Every entry names a byte offset in
+**222 verified gaps across 18 surfaces.** Every entry names a byte offset in
 `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, what this room does instead, and
 the file and line where it does it.
 
@@ -17,8 +17,8 @@ it.
 | surfaces read | 18 |
 | reference components not found in the bundle | 0 |
 | differences claimed | 274 |
-| **survived verification** | **223** |
-| refuted | 51 |
+| **survived verification** | **222** |
+| refuted | 52 |
 | false-claim rate | 19% |
 
 **The 19% false-claim rate is the number to keep.** Nearly one claimed gap in five was wrong —
@@ -27,6 +27,14 @@ reference code that does not do what the offset appeared to say (dead handlers, 
 branches). Without the second pass this document would carry fifty-one items of work that does not
 need doing, and no way to tell which fifty-one. That is why the refuted list is kept below rather
 than discarded.
+
+**And a fifty-second was refuted after this document was committed** — UIM-03, annotated in place
+below rather than moved, because the annotation is the useful part. Two adversarial verifiers had
+passed it. The reason both missed it is worth recording: the claim was framed as *"`hidePrivateInfo`
+does not exist anywhere in our source"*, which is TRUE, and the verifiers checked that. What neither
+checked is whether the outcome is achieved another way — and it is, by three server-side refusals
+that are stricter than the flag. **A gap stated as a missing NAME is the shape most likely to
+survive verification while being wrong**, and it is the shape to distrust in the entries above.
 
 Also recorded per surface: how many reference behaviours were confirmed **present** here. A list of
 only gaps reads as though nothing works, and 965 behaviours were confirmed built.
@@ -1435,6 +1443,23 @@ O(5,e.user.hidePrivateInfo?-1:5),m(11),Ze(e.user.nick),m(),O(17,e.user.hidePriva
 **Ours:** grep for "hidePrivateInfo" over the whole of apps/room/src returns ZERO hits (source and tests). Slot 5 is J2e, the System/Actions/Admin Notes tab list (read at 2059391); slot 17 is oTe, the Last Login / Email / Badges / Location rows (read at 2060099); slot 23 is lTe, the Permissions row (read at 2062977). We render all three unconditionally: ModalHost.svelte:2053 emits all four tabs from one `{#each}`, :2091 the Last Login row, :2165 the Permissions row. In a multi-tenant fintech room this flag is the one that keeps a member's email, IP, UA and permissions out of the modal, and we have no equivalent.
 
 > Verified: I could not refute this. `hidePrivateInfo` — and every synonym I could construct for it — is absent from apps/room/src.
+
+> **REFUTED on 2026-08-30, after the register was committed.** Read the markup rather than grepped
+> for the flag name: `ModalHost.svelte`'s `{#if isPresenter && !isLimitedPresenter}` opens at the
+> user card's tab list and closes after the Admin Notes pane, so the tabs AND every row inside them
+> — Last Login, Email, Badges, Location, Permissions — are presenter-only. There is no `{:else}`: a
+> member opening a card sees the header and the footer buttons and no body at all. Confirmed with
+> the Svelte compiler's own AST, and pinned by `authority-gate-contract.test.ts`, which finds the
+> block by what it CONTAINS and asserts each row falls inside its offsets.
+>
+> Two further refusals sit under it, and neither is a render gate: `email` and `locStr` are filtered
+> off the SSE roster frame (`roster-privacy.test.ts`, after a real 2026-08-18 defect), and Last
+> Login and Email in that card come from `user-detail.remote.ts`, which is presenter-only on the
+> server. The reference's `hidePrivateInfo` is a client flag over data that still arrives; this is
+> three server-side refusals, which is strictly stronger.
+>
+> **What the investigation did find, and it was worth more than the claim:** nothing asserted that
+> gate. The privacy of every field in that card rested on one `{#if}` with no test. It has one now.
 
 ### UIM-09 — System tab, Location, Last Login, Trial/New and Temporary Access Only have no data supply — every value resolves to 'n/a' or false
 

@@ -551,7 +551,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       from the class that now owns them. The page is the only wiring point between the two, so this
       is the same irreducible two lines the composition root pays whenever a value crosses.
     */
-    max: 1473,
+    /*
+      1,473 -> 1,474, 2026-08-30. One line: `showPmButton={gates.showPmButton}` reaching the main
+      chat column, beside the one the extra column has always had.
+    */
+    max: 1474,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1947,7 +1951,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file entered the day at 6,189 and leaves it at 6,005, because the A/V pane and the report
       of what it cost went out. The ratchet took 190 lines and gave 7 back for a feature.
     */
-    max: 6006,
+    /*
+      6,006 -> 6,014, 2026-08-30. An `{#if isPresenter && !isLimitedPresenter}` around the group chat
+      radios and the six lines saying why — a gate the reference has (byte 2,288,249) that this file
+      rendered without, so every member saw three radios whose only possible effect was a 403.
+      Eight lines to stop a room's authority rules looking arbitrary.
+    */
+    /*
+      6,014 -> 6,022, 2026-08-30. Eight lines: `{#if isPresenter}` around the three presenter actions
+      in the settings modal — `O(135, isPresenter ? 135 : -1)` at byte 2,285,714, which this file
+      rendered without, so every member was shown "Mute Microphone for all non-admins" and
+      "Get my token". The fourth button in that div stays outside the gate, as the reference has it.
+    */
+    max: 6022,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3552,7 +3568,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
       security-relevant half of the change; this entry carries its part.
     */
-    max: 1188,
+    /*
+      1,188 -> 1,200, 2026-08-30. The private-chat entry point in the MAIN column was ungated while
+      the identical control in the extra column was not — `gates.showPmButton` existed, and this
+      component had no prop for it, so a free-trial member in a room with `disablePMForTrials` was
+      refused in one column and offered it in the other. Twelve lines: the prop, its docblock and
+      the `{#if}`.
+    */
+    max: 1200,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {

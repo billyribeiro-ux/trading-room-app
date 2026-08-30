@@ -33,6 +33,228 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:55 UTC — Three presenter actions were drawn for every member, and every gate assertion in this file was rebuilt on the compiler's tree
+
+**Runtime impact: YES.** "Remove webcam/screenpreview windows", "Mute Microphone for all non-admins"
+and "Get my token" are no longer shown to members in the settings modal. "Edit my Info and Avatar"
+stays, as the reference has it.
+
+#### Which three, settled by reading the slot rather than the wrapper
+
+`O(135, isPresenter ? 135 : -1)` at byte 2,285,714. Slot 135 is the template function `ake`, and it
+holds exactly those three buttons and nothing else. "Edit my Info and Avatar" is the const
+immediately after the `[1,"mx-3"]` wrapper (byte 2,263,375) and is unconditional. All four sat inside
+one ungated `<div class="mx-3">` here.
+
+`isPresenter` alone, **not** the `&& !isLimitedPresenter` used on the user card. A member handed mic
+and screen by `giveMicScreen` has preview windows to remove and a microphone in the room, so the
+reference lets them at these. Transcribed rather than tightened: the narrower gate would be a guess
+about what that grant is for.
+
+#### Every gate assertion in this file was hollow, and a control proved it again
+
+The first version of the new assertion used `lastIndexOf('{#if ', button)` and checked the slice
+contained `isPresenter`. **Removing the gate entirely left all three green** — because `lastIndexOf`
+finds the nearest PRECEDING `{#if}` in the text, which is not the block that contains the marker. A
+sibling that closed before it, or an unrelated gate further up, satisfies it just as well.
+
+That is the third time in two days. So the whole file was rebuilt on the Svelte compiler's tree:
+
+```
+parsed.blocks   every {#if} in ModalHost.svelte, with its condition and its extent
+gateChain(o)    every block CONTAINING that offset, innermost first
+enclosingIf(o)  the innermost one — the gate that actually decides
+at(marker)      the offset, asserted to exist so a renamed control fails loudly
+```
+
+Each assertion now names the exact condition it expects — `toBe('{#if isPresenter}')` rather than
+`toContain('isPresenter')` — so a widened gate fails as loudly as a removed one. The two chat
+columns are separate files and are not covered by that tree, so their assertion counts its gate
+instead of assuming it is unique.
+
+#### Negative controls — six, across all four gates
+
+| mutation | result |
+| --- | --- |
+| the three buttons ungated | RED ×3 |
+| **the same, before the rebuild** | **GREEN — the hollow assertion** |
+| the gate widened to `&& !isLimitedPresenter` | RED ×3 |
+| the gate swallowing "Edit my Info" | RED |
+| the group-chat gate losing a term | RED |
+| the user-card body gate widened | RED ×4 |
+| the main column's PM gate removed | RED |
+
+The earlier three gates were re-run against the rebuilt assertions rather than assumed to still
+hold, which is the point of rebuilding them together.
+
+#### Measured and NOT built: the presenter colour Save
+
+`USM-06` reports that the settings modal's presenter colours write
+`onPreferenceChange('presenterStyle', …)`, a per-viewer settings-blob key that **nothing reads** —
+under a heading that says *"These colors will affect how ALL USERS see your messages and alerts"*.
+That heading is false, and the audit is right about it.
+
+Measured before deciding, and it is not a gate fix:
+
+* `savePresenterColors` is already tracked as absent, in `feature-coverage-contract.test.ts`'s
+  `ABSENT_FROM_OUR_SOURCE`.
+* `messages.background_color` / `font_color` exist and `RoomMessage.svelte:225` renders from them —
+  **and no insert path writes either.** Both are unfed columns.
+* So the feature needs a room-scoped per-presenter colour store, a presenter-gated command, a
+  page-load read, a render-precedence decision against the existing `followedStyle` / `chatStyle`
+  chain, and a broadcast so open tabs update.
+
+That is a feature, not a gate, and it is being scoped separately rather than half-shipped. Nothing
+about it is guessed here.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,512 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
+### 2026-08-30 03:20 UTC — A claimed privacy gap was refuted, and the investigation found the real one: nothing asserted the gate
+
+**Runtime impact: NO.** No behaviour changed. What changed is that the user card's privacy is now
+pinned by a test, and the audit register carries a correction it did not have.
+
+#### The claim, and why it was wrong
+
+The surface audit reported UIM-03 at high severity: the reference's `user.hidePrivateInfo` — the
+flag suppressing the extra tabs (slot 5), the Last Login / Email / Badges / Location rows (slot 17)
+and the Permissions row (slot 23), at byte 2,068,025 — *"does not exist anywhere in our source"*,
+concluding that this room renders all three unconditionally.
+
+Read rather than grepped: `ModalHost.svelte`'s `{#if isPresenter && !isLimitedPresenter}` opens at
+the user card's tab list and closes after the Admin Notes pane. **The tabs and every row inside them
+are presenter-only, and there is no `{:else}`** — a member opening a card sees the header and the
+footer buttons and no body at all. Confirmed against the Svelte compiler's own AST, not by eye.
+
+Two further refusals sit under it, and neither is a render gate:
+
+| field | refusal |
+| --- | --- |
+| `email`, `locStr` | filtered off the SSE roster frame — `roster-privacy.test.ts`, after a real 2026-08-18 defect |
+| Last Login, Email | `user-detail.remote.ts`, presenter-only on the server |
+
+The reference's `hidePrivateInfo` is a client flag over data that still arrives. This is three
+server-side refusals, which is strictly stronger.
+
+#### Why two adversarial verifiers passed it, which is the part worth keeping
+
+The claim was framed as *"`hidePrivateInfo` does not exist anywhere in our source"*. **That is true**,
+and both verifiers checked it. Neither checked whether the OUTCOME is achieved another way.
+
+**A gap stated as a missing NAME is the shape most likely to survive verification while being
+wrong** — and the register now says so at the top, because 222 other entries share that risk.
+
+#### What the investigation actually found
+
+**Nothing asserted that gate.** The privacy of every field in the user card — another member's
+email, last login, location, permissions — rested on one `{#if}` with no test anywhere.
+
+It has one now, and it is built the hard way on purpose. The gate is found in the **tree**, by what
+it contains, because `ModalHost.svelte` holds three `isPresenter && !isLimitedPresenter` gates plus
+two comments quoting the shape — and the previous commit records a `toContain` in this very file
+proving to be about the wrong occurrence. Each row is then asserted to fall inside that block's
+offsets, which a text slice cannot do: the first draft tried, and tripped on an `{:else}` belonging
+to a nested block several levels in. Only the tree knows which `{:else}` belongs to which `{#if}`.
+
+#### One more shape corrected, for the second time today
+
+Parsing at module scope means an unparseable `ModalHost.svelte` throws during COLLECTION, and vitest
+reports the file as having no tests — the failure shape that reads as absence rather than breakage.
+A negative control produced exactly that output. The parse is caught now and a failure is a named
+assertion, the same correction `package-scripts-contract.test.ts` carries.
+
+#### Negative controls — three
+
+| mutation | result |
+| --- | --- |
+| the card body gate widened to any presenter | RED ×5 |
+| the gate deleted with the compiler, leaving the body unconditional | RED ×4 |
+| the same, before the parse was caught | **"no tests"** — the shape above |
+
+The second control also showed an OUTER gate stepping into the deleted one's place, so the finder
+now asserts it matched **exactly one** block, which is what its title always claimed.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,508 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
+### 2026-08-30 02:50 UTC — Two gates the reference has that this room rendered without, and a hollow assertion of my own
+
+**Runtime impact: YES.** A free-trial member in a room with `disablePMForTrials` is no longer offered
+private chat in the main chat column, and the three radios that change the room's chat mode for
+everybody are no longer drawn for members.
+
+#### Both are the same failure: the gate exists here, and one of its call sites forgot it
+
+**The private-chat entry point** — `O(9, o.showPMBtn ? 9 : -1)`, byte 1,453,980.
+`gates.showPmButton` has computed the rule since it was written, and `ExtraChatPane` gates on it with
+a comment quoting that exact line. `AlertChatArea` — the MAIN column — took no such prop and rendered
+the entry point unconditionally. A trial member was refused private chat in the extra column and
+offered it in the main one, which makes a room's rules look arbitrary rather than enforced.
+
+**The group chat control** — `O(290, isPresenter && !isLimitedPresenter ? 290 : -1)`, byte 2,288,249.
+Three radios that change the chat mode for everybody, rendered for every member.
+
+#### What that second one was, precisely, because the distinction matters
+
+**Not a privilege escalation.** `chat-mode.remote.ts` calls `presenterRoom()`, so the server refuses
+a member and the room's mode never moved. What a member actually got was a confirm dialog and a 403
+— a control whose only possible effect is a refusal. The audit that surfaced it rated it as a
+`missing-control` at high severity; the accurate reading is a UI leak over a server that already
+holds, and it is worth saying so rather than banking the more alarming version.
+
+`!isLimitedPresenter` carries its own weight. `giveMicScreen` makes a member a presenter at runtime
+(`globals.user.isPresenter = globals.isLimitedPresenter = e.give`), and disabling the room's chat is
+not among the things that grant hands over. The same three-way test is already used twice in that
+file, which is where the shape was read from.
+
+#### A hollow assertion of mine, caught by its own negative control
+
+The first version of `authority-gate-contract.test.ts` asserted
+`expect(modalHost).toContain('{#if isPresenter && !isLimitedPresenter}')`.
+
+`ModalHost.svelte` contains **three** such gates — the username row, the administrative body, and
+this one — plus two comments quoting the shape. So the assertion was satisfied by a gate elsewhere
+in the file: **removing `!isLimitedPresenter` from the block under test left it green.** The
+position check beside it was no better, because it took `indexOf` of the first match, which was one
+of the others.
+
+Both assertions are anchored to their control now — `lastIndexOf('{#if ', control)` finds the gate
+that actually precedes the markup, and asserts on the text between them. The same correction was
+applied to the private-chat assertion, which had the same shape and had not yet been caught.
+
+That is the second time in this session a `toContain` has proved to be about a different occurrence
+than the one intended, and the second time only a negative control found it.
+
+#### One more assertion, deliberately
+
+`chat-mode.remote.ts` still calling `presenterRoom()` is pinned here. Hiding a control is not the
+same as refusing the act, and a later reader who notices the radios are now presenter-only might
+reasonably think the server check became redundant. It did not.
+
+#### Negative controls — five, two of which found the flaw above
+
+| mutation | result |
+| --- | --- |
+| the main column drops its gate | RED |
+| **the group gate loses `!isLimitedPresenter`** | **GREEN — the hollow assertion** |
+| the same, after anchoring | RED |
+| the group gate removed entirely | RED |
+| only one column is fed the getter | RED |
+| the server gate removed | RED |
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,502 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
+Not verified: no browser. Both are `{#if}`s over markup and are asserted at the source, which is the
+form that can see a call site with no prop at all — the thing a mount test structurally cannot.
+
 ### 2026-08-30 02:15 UTC — Five viewer preferences had live consumers and no control anywhere, and four of them were ON
 
 **Runtime impact: YES.** A presenter can now silence the beep and the popup that fire on every

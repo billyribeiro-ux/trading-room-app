@@ -3309,24 +3309,32 @@
 
         <div class="p-2 text-mode-box">
           <div class="mx-3">
-            <button
-              class="btn btn-danger btn-sm m-1"
-              onclick={() => onUserAction('remove-preview-windows', targetUser)}
-            >
-              <i class="fas fa-video-slash me-1"></i> Remove webcam/screenpreview windows
-            </button>
-            <button
-              class="btn btn-danger btn-sm m-1"
-              onclick={() => onUserAction('mute-all-non-admins', targetUser)}
-            >
-              <i class="fas fa-microphone-slash me-1"></i> Mute Microphone for all non-admins
-            </button>
-            <button
-              class="btn btn-info btn-sm m-1"
-              onclick={() => onUserAction('get-my-token', targetUser)}
-            >
-              <i class="fas fa-user-tie me-1"></i> Get my token
-            </button>
+            <!--
+              `O(135, isPresenter ? 135 : -1)`, byte 2,285,714 — slot 135 is `ake` and holds exactly
+              these three, while "Edit my Info and Avatar" below is outside it and drawn for
+              everybody. All four sat in one ungated div here. `isPresenter` alone, not the
+              `&& !isLimitedPresenter` the user card uses: transcribed, not tightened.
+            -->
+            {#if isPresenter}
+              <button
+                class="btn btn-danger btn-sm m-1"
+                onclick={() => onUserAction('remove-preview-windows', targetUser)}
+              >
+                <i class="fas fa-video-slash me-1"></i> Remove webcam/screenpreview windows
+              </button>
+              <button
+                class="btn btn-danger btn-sm m-1"
+                onclick={() => onUserAction('mute-all-non-admins', targetUser)}
+              >
+                <i class="fas fa-microphone-slash me-1"></i> Mute Microphone for all non-admins
+              </button>
+              <button
+                class="btn btn-info btn-sm m-1"
+                onclick={() => onUserAction('get-my-token', targetUser)}
+              >
+                <i class="fas fa-user-tie me-1"></i> Get my token
+              </button>
+            {/if}
             <button
               class="btn btn-warning btn-sm m-1"
               onclick={() => onUserAction('edit-my-info', targetUser)}
@@ -3692,57 +3700,66 @@
           </div>
         </div>
 
-        <div class="p-2 text-mode-box">
-          <div id="groupChatControl" title="Group Chat Control" class="pb-2">
-            <i class="fas fa-comments"></i>
-            <span class="pl-2">Group Chat Control:</span>
-          </div>
-          <div class="ml-5">
-            <input
-              type="radio"
-              name="regular-group-chat"
-              value="g"
-              id="regular-group-chat"
-              aria-checked={groupChatMode === 'g'}
-              class="form-check-input"
-              {@attach setInputChecked(groupChatMode === 'g')}
-              onchange={() => requestSettingsChatMode('g')}
-            />
-            <label for="regular-group-chat" class="form-check-label">Regular Group Chat</label>
-          </div>
-          <div class="ml-5">
-            <input
-              type="radio"
-              name="webinar-group-chat"
-              value="p"
-              id="webinar-group-chat"
-              aria-checked={groupChatMode === 'p'}
-              class="form-check-input"
-              {@attach setInputChecked(groupChatMode === 'p')}
-              onchange={() => requestSettingsChatMode('p')}
-            />
-            <label for="webinar-group-chat" class="form-check-label"
-              >Webinar Mode (Regular users don't see each others posts)</label
-            >
-            <div class="form-text text-white">
-              In this mode, presenters will see everyones questions/comments, but users will not see
-              each others' chats.
+        <!--
+          `O(290, isPresenter && !isLimitedPresenter ? 290 : -1)`, byte 2,288,249, and it was missing:
+          the three radios rendered for everybody. Not an escalation — `chat-mode.remote.ts` calls
+          `presenterRoom()` — but a control whose only possible effect for a member is a 403.
+          `!isLimitedPresenter` carries its own weight: `giveMicScreen` makes a member a presenter at
+          runtime, and disabling the room's chat is not part of what that grant hands over.
+        -->
+        {#if isPresenter && !isLimitedPresenter}
+          <div class="p-2 text-mode-box">
+            <div id="groupChatControl" title="Group Chat Control" class="pb-2">
+              <i class="fas fa-comments"></i>
+              <span class="pl-2">Group Chat Control:</span>
+            </div>
+            <div class="ml-5">
+              <input
+                type="radio"
+                name="regular-group-chat"
+                value="g"
+                id="regular-group-chat"
+                aria-checked={groupChatMode === 'g'}
+                class="form-check-input"
+                {@attach setInputChecked(groupChatMode === 'g')}
+                onchange={() => requestSettingsChatMode('g')}
+              />
+              <label for="regular-group-chat" class="form-check-label">Regular Group Chat</label>
+            </div>
+            <div class="ml-5">
+              <input
+                type="radio"
+                name="webinar-group-chat"
+                value="p"
+                id="webinar-group-chat"
+                aria-checked={groupChatMode === 'p'}
+                class="form-check-input"
+                {@attach setInputChecked(groupChatMode === 'p')}
+                onchange={() => requestSettingsChatMode('p')}
+              />
+              <label for="webinar-group-chat" class="form-check-label"
+                >Webinar Mode (Regular users don't see each others posts)</label
+              >
+              <div class="form-text text-white">
+                In this mode, presenters will see everyones questions/comments, but users will not
+                see each others' chats.
+              </div>
+            </div>
+            <div class="ml-5">
+              <input
+                type="radio"
+                name="disabled-group-chat"
+                value="d"
+                id="disabled-group-chat"
+                aria-checked={groupChatMode === 'd'}
+                class="form-check-input"
+                {@attach setInputChecked(groupChatMode === 'd')}
+                onchange={() => requestSettingsChatMode('d')}
+              />
+              <label for="disabled-group-chat" class="form-check-label">Disable Group Chat</label>
             </div>
           </div>
-          <div class="ml-5">
-            <input
-              type="radio"
-              name="disabled-group-chat"
-              value="d"
-              id="disabled-group-chat"
-              aria-checked={groupChatMode === 'd'}
-              class="form-check-input"
-              {@attach setInputChecked(groupChatMode === 'd')}
-              onchange={() => requestSettingsChatMode('d')}
-            />
-            <label for="disabled-group-chat" class="form-check-label">Disable Group Chat</label>
-          </div>
-        </div>
+        {/if}
       </div>
 
       {#if isPresenter}

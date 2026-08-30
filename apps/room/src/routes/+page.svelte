@@ -1219,6 +1219,7 @@
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
+              showPmButton={gates.showPmButton}
               onexpandcomposer={autoExpandComposer}
               ontyped={(value) => typing.main.typed(value)}
               onstoppedtyping={() => typing.main.stop()}
