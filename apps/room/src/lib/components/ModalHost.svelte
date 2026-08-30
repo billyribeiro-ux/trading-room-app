@@ -980,7 +980,17 @@
   });
   type ConnectivityTestState = 'pending' | 'passed' | 'failed' | 'unconfigured';
   type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
-  let activeConnectivityTab = $state<'network' | 'mic' | 'mobile'>('network');
+  /*
+    CONN-03 — `this.activeTab = this.appService.globals.isPresenter ? "network" : "mobile"` at byte
+    2,444,097, in the constructor. This was the bare literal `'network'`, which is the tab a
+    non-presenter is not allowed to see at all (CONN-02).
+
+    `untrack` because this is a SEED: the member then clicks, and a `$derived` would drag them back
+    to the default on any re-read of page data.
+  */
+  let activeConnectivityTab = $state<'network' | 'mic' | 'mobile'>(
+    untrack(() => (isPresenter ? 'network' : 'mobile'))
+  );
 
   let testResults = $state({ udp: false, tcp: false, stun: false, turn: false });
   /**
@@ -6033,7 +6043,7 @@
     open={name === 'connectivity'}
     closedAriaHidden
     ariaLabelledby="webrtc-troubleshooter-modal"
-    title="Connectivity/Mic Troubleshooter"
+    title={isPresenter ? 'Connectivity/Mic Troubleshooter' : 'Connectivity Troubleshooter'}
     titleClass="modal-title"
     titleTag="h3"
     dialogStyle="max-width: 540px;"
@@ -6041,16 +6051,29 @@
   >
     {#snippet beforeBody()}
       <ul role="tablist" class="nav nav-tabs troubleshooter-tabs">
-        <li role="presentation" class="nav-item">
-          <button
-            type="button"
-            role="tab"
-            class={['nav-link', { active: activeConnectivityTab === 'network' }]}
-            onclick={() => onConnectivityTabChange('network')}
-          >
-            <i class="fas fa-network-wired me-1"></i> Network Test
-          </button>
-        </li>
+        <!--
+          CONN-02 — `H(9,hAe,4,2,"li",8)` and `H(14,pAe,4,2,"li",8)` are BOTH behind
+          `z("ngIf", globals.isPresenter)` at byte 2,456,395; only the Mobile App `li` between them
+          is unconditional. This room had it the other way round — Network Test unconditional, Mic
+          Test gated — so a member could run the WebRTC connectivity test, which the reference never
+          exposes to one.
+
+          Diagnostic rather than privileged, so this is defence in depth rather than a hole being
+          closed. It is closed anyway, and the BODY and the footer carry the same term for the reason
+          SC-17 records: a gate on the way IN is not a statement about what the thing is for.
+        -->
+        {#if isPresenter}
+          <li role="presentation" class="nav-item">
+            <button
+              type="button"
+              role="tab"
+              class={['nav-link', { active: activeConnectivityTab === 'network' }]}
+              onclick={() => onConnectivityTabChange('network')}
+            >
+              <i class="fas fa-network-wired me-1"></i> Network Test
+            </button>
+          </li>
+        {/if}
         <!--
           The Mobile App tab, `d(10,"li",9)(11,"button",10)` at 2,456,143 — consts 9
           `["role","presentation",1,"nav-item"]`, 10 `["type","button","role","tab",1,"nav-link",3,"click"]`
@@ -6091,7 +6114,7 @@
         {/if}
       </ul>
     {/snippet}
-    {#if activeConnectivityTab === 'network'}
+    {#if isPresenter && activeConnectivityTab === 'network'}
       <div>
         <p class="text-muted mb-4">
           This tool checks your network and connectivity to essential WebRTC servers.
@@ -6145,8 +6168,25 @@
           </div>
         {/if}
       </div>
-    {:else if activeConnectivityTab === 'mobile'}
+    {:else if activeConnectivityTab === 'mobile' && mobileAppAvailable}
       <MobileRestorePane onrestore={onrestoremobiletokens} />
+    {:else if !isPresenter && !mobileAppAvailable}
+      <!--
+        A GAP OUR OWN GATE CREATES, and upstream cannot have it.
+
+        The reference draws the Mobile App `li` unconditionally, so a non-presenter always has one
+        tab. Ours draws it behind `mobileAppAvailable` — correctly: a room with no mobile app has
+        nothing for Restore Connectivity to restore, which is recorded on that prop. Put together
+        with CONN-02's gate, a member in such a room would open this modal onto NOTHING.
+
+        An empty modal is the shape this repository refuses hardest — a control whose only effect is
+        that it opened. So it says why it is empty. Same reasoning as SC-14's Refresh button: a
+        divergence forced by an earlier divergence of ours is still ours to answer for.
+      -->
+      <p class="text-muted my-4 text-center">
+        There is nothing to troubleshoot from here. Connectivity checks are run by the room's
+        presenters, and this room has no mobile app to reconnect.
+      </p>
     {:else if activeConnectivityTab === 'mic'}
       <div class="mic-test-container">
         {#if micDevices.length === 0 && !micDevicesLoading && micDevicesLoaded}
@@ -6264,7 +6304,7 @@
       </div>
     {/if}
     {#snippet footer()}
-      {#if activeConnectivityTab === 'network'}
+      {#if isPresenter && activeConnectivityTab === 'network'}
         <button
           type="button"
           class="btn btn-primary"

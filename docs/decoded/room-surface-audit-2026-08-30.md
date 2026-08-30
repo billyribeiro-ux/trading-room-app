@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**87 open · 137 closed · 224 rows.**
+**78 open · 146 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -2075,6 +2075,10 @@ this.appService.appEventBus.subscribe("inlineAlertEntry",i=>{this.selectedTab="t
 
 ### PAM-05 — "Send Later?" / "Cancel" toggle pair, and the mutual exclusion between "Post Alert" and "Send Later", are absent
 
+**BUILT.** `showSendLater` gates five nodes, and node 71 is the one that mattered: `O(71, showSendLater ? -1 : 71)` **removes Post Alert while the scheduler is open.** This room rendered the whole scheduling pane inline and kept the green button beside it, so a presenter who had just typed a date and a repeat could press Post Alert and send immediately — losing both, with nothing on screen to say so. `send-later-contract.test.ts` holds it, and its first draft is the one that taught this document about `indexOf` returning -1: `expect(branch.indexOf('{:else}')).toBeLessThan(branch.indexOf('Post Alert'))` is satisfied by the marker being GONE.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
+
 **low** · `missing-control` · reference byte **2,122,278**
 
 ```
@@ -2086,6 +2090,10 @@ function JTe(t,n){if(1&t){const e=Y();d(0,"button",76),x("click",function(){retu
 > Verified: I searched apps/room/src exhaustively and could not find the control under any name. `grep -rn "showSendLater" src/` returns 0 hits.
 
 ### PAM-07 — Repeat select option TEXT is "Off" / "Daily" / "Weekly" in the reference; ours renders the raw lowercase mode strings
+
+**BUILT.** `Off` / `Daily` / `Weekly` (byte 2,120,818) instead of `{mode || 'off'}` over `REPEAT_MODES`, which rendered the room's own STORAGE format as a label — the shape this repository calls a control describing its implementation rather than its effect. The `aria-label` and the `form-select form-select-sm` classes came with it.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
 
 **low** · `wrong-constant` · reference byte **2,120,818**
 
@@ -2099,6 +2107,10 @@ d(14,"select",65),Ve("ngModelChange",function(o){D(e);const s=g();return He(s.re
 
 ### PAM-08 — Ignore-weekends label text differs: "Ignore weekends?" vs our "Skip weekends"
 
+**BUILT.** `Ignore weekends?` verbatim (byte 2,120,631), with the id and the `form-check mb-2` wrapper. The row's own note that the GATE already matched — `weekendsApply = repeat === 'daily'` against `'daily' === o.repeatScheduledAlert` — held, so this was the label alone.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
+
 **low** · `wrong-constant` · reference byte **2,120,631**
 
 ```
@@ -2110,6 +2122,10 @@ function YTe(t,n){if(1&t){const e=Y();d(0,"div",69)(1,"input",72),Ve("ngModelCha
 > Verified: I could not refute it. The string "Ignore weekends" appears ZERO times anywhere under apps/room/src (case-insensitive grep across .svelte/.ts/.test.ts, plus targeted greps of src/lib/*.ts and src/lib/room/*.ts for a label-text or i18n constant module).
 
 ### PAM-09 — The send-later timezone NOTE and the two field labels ("Send on this date & time:", "Repeat:") are absent
+
+**BUILT.** The note, its underlined span and both labels (byte 2,120,860). It is the smallest row of the slice and the one a presenter would most notice missing: a `datetime-local` field always raises *whose* 09:00 this is, the behaviour was already correct — `ScheduledAlerts.svelte` documents that the value is parsed as local time — and the sentence saying so was the only part not on screen.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
 
 **low** · `missing-control` · reference byte **2,120,860**
 
@@ -3237,6 +3253,10 @@ function e2e(t,n){if(1&t&&(d(0,"tr"),H(1,Zwe,24,17),u()),2&t){const e=n.$implici
 
 ### CONN-01 — The entire "Mobile App" tab is absent: tab button, body, and the `restoreMobileAppTokens` server command
 
+**ALREADY BUILT — verified by reading 2026-08-30 17:01 UTC, not rebuilt.** All three exist: the tab (`fa-mobile-alt me-1`, between Network Test and Mic Test, where upstream puts it), `MobileRestorePane.svelte` as the body — `PAe` at byte 2,438,242 transcribed whole, **including the reference's own missing full stop after "notifications"**, which is now asserted rather than trusted because it is the kind of thing a well-meaning edit repairs — and `onrestoremobiletokens` reaching the server command. The audit was produced against an earlier tree.
+
+**One divergence stands and it is the one that creates CONN-02's problem:** the tab is behind `mobileAppAvailable`, where upstream draws it unconditionally. That gate is right — a room with no mobile app has nothing for Restore Connectivity to restore — and it is what made the empty-modal branch necessary below.
+
 **high** · `missing-control` · reference byte **2,445,023**
 
 ```
@@ -3248,6 +3268,12 @@ onTabChange(e){e!==this.activeTab&&("mic"===this.activeTab&&this.cleanupMicTest(
 > Verified: I could not find any implementation of the Mobile App tab in apps/room/src, under its own name or any rename. ModalHost.svelte:795 declares `let activeConnectivityTab = $state<'network' | 'mic'>('network')` and ModalHost.svelte:859 `onConnectivityTabChange(tab: 'network' | 'mic')` — a two-member union with no third member; the tablist at…
 
 ### CONN-02 — For a non-presenter the reference modal has NO tab we render — Mobile App is its only tab and its default; ours shows them the Network tab instead
+
+**BUILT 2026-08-30 17:01 UTC.** `z("ngIf", globals.isPresenter)` on BOTH `H(9,hAe,…)` and `H(14,pAe,…)` at byte 2,456,395, with only the Mobile App `li` between them unconditional. This room had it the other way round — Network Test open, Mic Test gated — so a member could run the WebRTC connectivity test, which the reference never exposes to one.
+
+**Diagnostic rather than privileged**, so this is defence in depth rather than a hole being closed, and it is worth saying so plainly. The BODY and the footer's Start Test button carry the same term as the tab, for the reason SC-17 records: a gate on the way IN is not a statement about what the thing is for.
+
+**And it forced an answer to a case upstream cannot have.** With the Mobile App tab behind `mobileAppAvailable` (CONN-01's recorded divergence) and Network Test now behind `isPresenter`, a member in a room with no mobile app would have opened this modal onto NOTHING. An empty modal is a control whose only effect is that it opened. It says why it is empty instead — the same reasoning as SC-14's Refresh button: **a divergence forced by an earlier divergence of ours is still ours to answer for.**
 
 **medium** · `missing-behaviour` · reference byte **2,456,395**
 
@@ -3261,6 +3287,8 @@ onTabChange(e){e!==this.activeTab&&("mic"===this.activeTab&&this.cleanupMicTest(
 
 ### CONN-03 — Initial-tab rule is not conditional on isPresenter
 
+**BUILT 2026-08-30 17:01 UTC.** `this.activeTab = globals.isPresenter ? "network" : "mobile"` at byte 2,444,097, in the reference's constructor. This was the bare literal `'network'` — the one tab a non-presenter is not allowed to see at all once CONN-02 is applied, which is why the two had to be built together. `untrack`, because it is a seed: the member then clicks, and a reactive read would drag them back to the default on the next refetch.
+
 **medium** · `missing-behaviour` · reference byte **2,444,097**
 
 ```
@@ -3273,6 +3301,8 @@ this.isPlayingBack=!1,this.playbackAudio=null,this.activeTab=this.appService.glo
 
 ### CONN-04 — Modal title is hard-coded; the reference swaps it on isPresenter
 
+**BUILT 2026-08-30 17:01 UTC.** `O(5, isPresenter ? 5 : 6)` between `dAe` (` Connectivity/Mic Troubleshooter `) and `uAe` (` Connectivity Troubleshooter `) at byte 2,433,777. The row's own observation is the reason it is not cosmetic: the title promised a mic troubleshooter to a viewer who — correctly, even before CONN-02 — could not see one.
+
 **medium** · `missing-behaviour` · reference byte **2,433,777**
 
 ```
@@ -3284,6 +3314,10 @@ function dAe(t,n){1&t&&v(0," Connectivity/Mic Troubleshooter ")}function uAe(t,n
 > Verified: I could not disprove it. Our connectivity modal passes a single string literal `title="Connectivity/Mic Troubleshooter"` to `Modal`, and `Modal.svelte` renders `{title}` verbatim (line 128) — the `header` snippet that could override it is NOT passed by the connectivity modal (it passes only `title`, `titleClass`, `titleTag`, `beforeBody`,…
 
 ### CONN-07 — Second sidebar label variant 'Connectivity/Mic Check' is not rendered anywhere
+
+**MEASURED REFUSAL 2026-08-30 17:01 UTC.** The literal is genuinely absent and the row's own last sentence is the disposition: *"only relevant if the second shell is a surface we are meant to build."* It is not. The bundle carries TWO shells with different labels for the same target, and the one this room implements is the other — `RoomSidebar.svelte` matches its label, icon and span at bytes 2,470,954 / 2,534,049 / 2,572,801 exactly.
+
+The shell that says `Connectivity/Mic Check` is `app-closed-session-page`, which this room does not build at all: a closed room here is answered by `session/+page.server.ts` with the close message, which is a deliberate architectural difference recorded with `room_state.closed_message`. Adding one label out of a page we do not render would be a string with no surface. **Unblocked by** a decision to build that shell, at which point its whole sidebar comes with it and this label is one line of it.
 
 **low** · `missing-behaviour` · reference byte **2,576,810**
 

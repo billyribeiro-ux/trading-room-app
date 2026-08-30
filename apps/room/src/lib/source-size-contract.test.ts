@@ -2617,7 +2617,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `SessionHistoryPane.svelte` and `ReactionPrefsPane.svelte`, 324 lines between them — against a
       ceiling that has risen 107 in total. The trade this file asks for is being made.
     */
-    max: 6442,
+    /*
+      6,442 -> 6,482, 2026-08-30, for CONN-02 / CONN-03 / CONN-04. Forty lines, thirty-six of them
+      the reason: the three gates are small and the WHY is not — the reference withholds two of
+      three tabs from a member, and our own `mobileAppAvailable` divergence then leaves one with no
+      tab at all, which needed answering rather than shipping as an empty modal.
+
+      THE NEXT EXTRACTION FROM THIS FILE IS THE CONNECTIVITY MODAL, and it is named here rather than
+      left for somebody to rediscover. It is ~250 self-contained lines — the tab strip, the WebRTC
+      test, the mic test and its playback — with four CONN rows still open against it, so the next
+      one lands in a component instead of here. It was not done in this commit because it is a large
+      move with live media state in it and this commit was already three gates and a contract; doing
+      both would have made one reviewable change into two unreviewable ones.
+
+      Today's record so far: three components out (`RestreamPane`, `SessionHistoryPane`,
+      `ReactionPrefsPane`, 324 lines) against a ceiling risen 147.
+    */
+    max: 6482,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's

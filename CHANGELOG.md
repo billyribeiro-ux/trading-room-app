@@ -33,6 +33,86 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 17:01 UTC — A member could run the room's WebRTC test, and four PostAlertModal rows read as open while the code said otherwise
+
+**Runtime impact: YES.** The connectivity troubleshooter is now the reference's shape: a member gets
+the Mobile App tab and a title without "/Mic", a presenter gets all three, and the modal opens on the
+tab its viewer is allowed to see.
+
+**CONN-02, CONN-03 and CONN-04 built; CONN-01 already built; CONN-07 refused. The connectivity modal
+is complete.** And four PostAlertModal rows that were built hours ago got the disposition lines they
+never received.
+
+#### The gates were the wrong way round
+
+```js
+z("ngIf", globals.isPresenter)   // the Network Test li
+Tt("active", "mobile" === o.activeTab)   // the Mobile App li, UNCONDITIONAL
+z("ngIf", globals.isPresenter)   // the Mic Test li                       // byte 2,456,395
+this.activeTab = globals.isPresenter ? "network" : "mobile"               // byte 2,444,097
+O(5, globals.isPresenter ? 5 : 6)   // dAe "Connectivity/Mic" | uAe "Connectivity"
+```
+
+The reference gates **both** the Network Test and Mic Test tabs and leaves only Mobile App open. This
+room gated the Mic Test and left Network Test open, so a member could run the WebRTC connectivity
+test. Diagnostic rather than privileged — defence in depth rather than a hole being closed — and it
+is said that way rather than dressed up. The body and the footer's Start Test button carry the same
+term as the tab, for the reason SC-17 records: a gate on the way IN is not a statement about what the
+thing is for.
+
+**CONN-01 was found already built**, including `MobileRestorePane.svelte` transcribed whole with the
+reference's own missing full stop after "notifications" — which is now asserted, because it is
+exactly the kind of thing a well-meaning edit repairs.
+
+#### A divergence of ours forced an answer upstream never needs
+
+Our Mobile App tab sits behind `mobileAppAvailable` where upstream draws it unconditionally, and that
+gate is right: a room with no mobile app has nothing for Restore Connectivity to restore. Put
+together with CONN-02, a member in such a room would have opened this modal onto **nothing**. An
+empty modal is a control whose only effect is that it opened. It says why it is empty instead — the
+same reasoning as SC-14's Refresh button: **a divergence forced by an earlier divergence of ours is
+still ours to answer for.**
+
+**CONN-07 is refused** rather than deferred. The bundle carries two shells with different sidebar
+labels for the same target; this room implements the other one, exactly. The shell that says
+`Connectivity/Mic Check` is `app-closed-session-page`, which this room does not build at all — a
+closed room here is answered by `session/+page.server.ts` with the stored close message. One label
+out of a page we do not render is a string with no surface.
+
+#### A control found an array assertion that could not see the mutation
+
+"leaves the Mobile App tab out of that gate" used `not.toContain('isPresenter')` on the ARRAY of
+enclosing gates — which tests for an exact element, so a gate reading `isPresenter &&
+mobileAppAvailable` satisfied it. That is precisely the mutation the row exists to refuse, and its
+control stayed green. Every enclosing gate is checked for the term now, not the list for the string.
+
+#### And the tracker was understating itself by four rows
+
+`PAM-05`, `PAM-07`, `PAM-08` and `PAM-09` were built at 13:54 and their disposition lines were never
+written; the per-surface check added at 15:36 is what surfaced it. Understating progress is the safe
+direction and is still a defect — **a row that reads open is a row somebody re-opens.** All four are
+verified against the source and recorded with that note. `PostAlertModal.svelte` is complete at 14 of
+14.
+
+The audit stands at **78 open · 146 closed · 224 rows**, from 107 open when this stretch began.
+
+`ModalHost.svelte`'s ceiling rises 6,442 → 6,482, and **the next extraction from it is named at the
+ceiling**: the connectivity modal, ~250 self-contained lines with four CONN-adjacent rows still
+against it. It was not done here because it carries live media state and this commit was already
+three gates and a contract; doing both would have turned one reviewable change into two unreviewable
+ones.
+
+**Verified:** `connectivity-audience-contract.test.ts` 10/10 (new). **Nine negative controls run and
+seen red** — the Network tab ungated, the Mobile App tab swept into the presenter gate, its
+entitlement gate removed, the body losing its own term, the initial tab back to a literal, the seed
+made reactive, the title back to one string, the empty-state branch removed, and the blurb's missing
+full stop repaired. `troubleshooter-retained-contract.test.ts` followed the title binding rather than
+being relaxed — both strings are still there, which is what that row is about. Full `pnpm run gate`
+in `apps/room`: **251 files, 4,146 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed
+into. Controller untouched. **Nothing was opened in a browser, and the Svelte MCP server has been
+disconnected for this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at
+1,461 files.
+
 ### 2026-08-30 16:50 UTC — Being told somebody reacted to your message, without putting it on everyone's wire
 
 **Runtime impact: YES.** A reaction on your chat message, or on a question you asked, now raises a

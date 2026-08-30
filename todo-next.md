@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,441 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,481 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
 | 3 | `routes/+page.svelte` | 1,558 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 33,074 lines · 3.2%.**
+**2 of 71 surfaces audited · 1,072 of 33,114 lines · 3.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
