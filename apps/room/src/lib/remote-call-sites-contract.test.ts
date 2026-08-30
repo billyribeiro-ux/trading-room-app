@@ -166,7 +166,7 @@ describe('the form actions still reached from JavaScript', () => {
     expect(new Set(found)).toEqual(new Set(DISPATCHERS.map((entry) => entry.file)));
   });
 
-  it('and the page exports exactly one action, which no JavaScript reaches', () => {
+  it('and the page exports no form actions at all, so there is nothing left to reach', () => {
     /*
       THE OTHER HALF, and the one the sweep above cannot do.
 
@@ -174,28 +174,45 @@ describe('the form actions still reached from JavaScript', () => {
       consistent with "converted" and with "left behind". This reads the actions `+page.server.ts`
       still exports and pins the set, so the next one added has to be argued for here.
 
-      Eighteen until 2026-08-30 — the seventeen converted, plus `logout`.
+      Eighteen until 2026-08-30 — the seventeen converted, plus `logout`. **NONE now**, and the
+      empty set is a stronger statement than any list this could pin.
 
-      **`logout` is the one that stays, and it is NOT reached from this page.** It was left alone
-      deliberately during the conversion: it is a progressive-enhancement form POST rather than a JS
-      dispatcher, and converting a control that must work without JavaScript into a command that
-      cannot would be a regression. What the conversion DID find is that nothing posts to it either
-      — `src/routes/logout/+page.svelte` submits `<form method="POST">` to its OWN route, whose
-      `+page.server.ts` carries an identical `default` action, and no `?/logout` appears anywhere in
-      `src/`. Two implementations of signing out, one of them unreachable. `TODO.md` carries it with
-      this evidence; it is recorded rather than deleted here because deleting it is a separate
-      change with its own blast radius, and a duplicate that nobody has written down is how the
-      wrong one gets fixed.
+      `logout` was the survivor for about an hour, on the argument that a progressive-enhancement
+      form POST is not a JS dispatcher and converting one into a command that needs JavaScript would
+      be a regression. That argument was sound and did not apply, because the conversion also found
+      that NOTHING POSTS TO IT: `src/routes/logout/+page.svelte` submits `<form method="POST">` with
+      no `action` attribute, so it reaches its OWN route, and `routes/logout/+page.server.ts` carries
+      a `default` action whose body was byte-identical. Two implementations of signing a member out,
+      one of them impossible to invoke.
+
+      It was deleted rather than kept, and the progressive-enhancement property is untouched: the
+      form that a browser without JavaScript submits still posts to a real form action, just the one
+      it was always reaching. `notes-account-action-contract.test.ts` was re-pointed at that action
+      rather than dropped, so the behaviour it proves — the session row deleted server-side, `locals`
+      cleared because `handle()` will not run again before the redirect's load, and the 303 — is now
+      asserted against the path a browser actually takes.
+
+      The `?/logout` sweep below stays and is no longer about a stale TODO row: it is what catches
+      somebody re-adding the action by pointing a form at it.
     */
     const exported = [...SERVER.code.matchAll(/^ {2}(\w+): async \(/gm)].map((match) => match[1]);
-    expect(exported).toEqual(['logout']);
+    expect(
+      exported,
+      '`+page.server.ts` exports a form action again — every mutation on this page is a remote ' +
+        'command, and a command refuses with `error(…)` rather than a value a caller may ignore'
+    ).toEqual([]);
+
+    expect(
+      SERVER.code,
+      'the `actions` export is back; the load is all this file should carry'
+    ).not.toContain('export const actions');
 
     const posted = FILES.filter((file) => /['"`]\?\/logout['"`]/.test(file.code)).map(
       (file) => file.path
     );
     expect(
       posted,
-      'something now posts to `?/logout` — the TODO row saying it is unreachable is stale'
+      'something posts to `?/logout`, which no longer exists — that form reaches nothing'
     ).toEqual([]);
   });
 

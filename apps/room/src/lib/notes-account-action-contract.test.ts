@@ -3,12 +3,13 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { notes, sessions, userSettings, users, type User } from '#lib/server/db/schema.js';
-import { actions } from '../routes/+page.server';
+import { actions as logoutActions } from '../routes/logout/+page.server';
 import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
 /*
   Characterization tests for the last nine actions: the six session-note commands, plus
-  editUsername, saveTheme and logout.
+  editUsername, saveTheme and logout — the last of which is now the `/logout` route's `default`
+  rather than a `logout` action on the room page. See the note above `ActionArgs`.
 
   Lower risk than the content actions - the notes six are thin wrappers over
   `notes-repository.ts`, which `notes-repository.test.ts` already covers - so what these pin is
@@ -20,7 +21,17 @@ import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harn
   looks exactly like one that works.
 */
 
-type ActionArgs = Parameters<(typeof actions)['logout']>[0];
+/*
+  THE LAST FORM ACTION IN THIS FILE'S SUBJECT, and it moved on 2026-08-30 — re-pointed rather than
+  deleted, which is this repository's rule about migrating a test with the code it covers.
+
+  `+page.server.ts` had exported a `logout` action that NOTHING could invoke: `routes/logout/
+  +page.svelte` posts a form with no `action` attribute, so it reaches its own route's `default`,
+  whose body was byte-identical. Two implementations, one unreachable. The dead one was deleted, and
+  this test now exercises the one a browser actually runs — so its coverage went up rather than
+  across.
+*/
+type ActionArgs = Parameters<(typeof logoutActions)['default']>[0];
 
 function account(email: string, role: string): User {
   const existing = db.select().from(users).where(eq(users.email, email)).get();
@@ -462,7 +473,7 @@ describe('logout', () => {
     // `redirect()` throws; that IS the mechanism, so the assertion has to catch it.
     let thrown: unknown = null;
     try {
-      await actions.logout(args);
+      await logoutActions.default(args);
     } catch (error) {
       thrown = error;
     }

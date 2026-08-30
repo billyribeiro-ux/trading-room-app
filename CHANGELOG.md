@@ -33,6 +33,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 22:30 UTC — Two implementations of signing out, one of which could not be invoked
+
+**Runtime impact: NO.** The path a browser takes is unchanged; the one it could not take is gone.
+
+Row AN, found by the form-action conversion earlier today and closed here. `+page.server.ts`
+exported a `logout` action, and **nothing posted to it**: `routes/logout/+page.svelte` submits
+`<form method="POST">` with no `action` attribute, so it reaches its OWN route, and
+`routes/logout/+page.server.ts` carries a `default` action whose body was byte-identical — the same
+`logout(cookies)`, the same two `locals` clears, the same `redirectSignedOut()`. A sweep of `src/`
+for `?/logout` in any quote style found nothing.
+
+The argument for keeping it was sound and did not apply. It was left alone during the conversion
+because a progressive-enhancement form POST is not a JS dispatcher, and turning a control that must
+work without JavaScript into a command that needs it would be a regression. True — but that property
+belongs to the form, and the form was never pointing here. It still posts to a real form action;
+just the one it was always reaching.
+
+**Three things followed, and the second is the one worth reading:**
+
+- `logout` was the file's last action, so the whole `export const actions` went with it. Its
+  contents were a long record of where each converted action had gone, and that record was kept —
+  moved out to a module-level block rather than deleted with the export it happened to live inside.
+  A reader who greps this file for a name they remember should find out where it lives.
+- **`notes-account-action-contract.test.ts` was re-pointed, not dropped.** It proves three real
+  things about signing out — the session row deleted server-side so a copied cookie is dead rather
+  than merely un-sent, `locals` cleared because `handle()` will not run again before the redirect's
+  load, and the 303 — and it was proving them against the implementation nobody could invoke. It now
+  runs against the one a browser actually takes, so deleting dead code raised this test's coverage
+  instead of lowering it. That is the repository's own rule about migrating a test with its code.
+- `remote-call-sites-contract.test.ts` asserted `exported).toEqual(['logout'])`. It asserts
+  `toEqual([])` now, plus that the `export const actions` string is absent — a stronger statement
+  than any list, because the empty set has nothing left to argue about.
+
+**`logout` and `redirectSignedOut` are still imported** by `+page.server.ts`, and that is not
+left-over: the load itself signs a banned or shut-out member out before redirecting. That is a load,
+not an action, and the note at the foot of the file says so.
+
+**Ceiling:** `routes/+page.server.ts` 1,005 → **1,003**. Down, by a deletion rather than a move.
+
+**Negative controls — two, each mutation verified as landed, each seen RED, each restored:**
+
+| mutation | result |
+| --- | --- |
+| the `logout` action re-added | `expected [ 'logout' ] to deeply equal []` |
+| `routes/logout/+page.svelte`'s form pointed at `?/logout` | `something posts to '?/logout', which no longer exists — that form reaches nothing: expected [ 'routes/logout/+page.svelte' ] to deeply equal []` |
+
+The first control also exposed a stale test NAME — *"the page exports exactly one action"* — which
+was renamed rather than left describing the world before the change.
+
+**Two `TODO.md` rows removed, not struck through:**
+
+- **AN**, closed by this change.
+- **E**, which had read `DONE 2026-08-29` for a day while still sitting in the open table. Verified
+  before deleting rather than taken on its own word: `e2e/room-config-seam.spec.ts` exists, asserts
+  `.alert-chat-box` at count 1 for a default room and count 0 for one whose owner hid the column,
+  and **ran in this session's own browser run** — 2 tests of the 11 that passed.
+
+**Two other contracts had to be re-anchored, and that is the interesting failure of the change.**
+`chat-mode-contract` and `recording-state-remote-contract` each assert that the form action they
+replaced is gone from `+page.server.ts`, and each guarded that negative with a positive first:
+`expect(serverCode).toContain('export const actions: Actions = {')` — present-tense proof that this
+string really is the file where actions live, so `not.toContain('changeChatMode: async')` cannot
+pass by reading the wrong file. Deleting the export broke both, correctly and loudly.
+
+An anchor naming a construct that no longer exists is worse than no anchor, because the tempting fix
+is to delete the line and leave two negative assertions reading whatever they like. Both now anchor
+on `export const load` — which is what the file does export — plus the stronger fact the deletion
+bought: **no form actions here at all**, so neither action can come back under any name. Negative
+control: the export re-added → both RED on the new assertion.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,453 passed,
+1 skipped, gate-exit=0**. **Not run:** the controller gate, which no file here touches.
+
 ### 2026-08-30 22:05 UTC — The size ratchet asked for a slice, and the slice found a third defect
 
 **Runtime impact: NO by itself** — one pure module, two classes delegating to it, no behaviour

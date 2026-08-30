@@ -3026,7 +3026,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `logout` is all that is left of `export const actions`, and this file is now a LOAD plus one
       redirect. The `why` below says so.
     */
-    max: 1005,
+    /*
+      1,005 -> 1,003, 2026-08-30. DOWN, and by a deletion rather than a move.
+
+      The `logout` action went: `routes/logout/+page.svelte` posts a form with no `action`, so it
+      reached its own route's `default` all along, and this one could not be invoked at all. Its
+      nine lines left; a note recording where it went, and where every action converted the same day
+      went, stayed. `remote-call-sites-contract.test.ts` asserts this file exports NO actions now,
+      which is a stronger statement than the list it used to pin.
+    */
+    max: 1003,
     why: 'the loader, plus `logout`; 3,233 before the remote-function conversions began'
   },
   /*
