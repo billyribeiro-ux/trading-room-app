@@ -1153,7 +1153,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       why: their markup is not quoted anywhere in the evidence, and a spinner invented rather than
       read is not something this repository ships.
     */
-    max: 1465,
+    /*
+      1465 -> 1535, 2026-08-30, for `SV-SP-04`'s retry.
+
+      A consumer that negotiates and delivers no frames renders a 0x0 video, which on screen is an
+      empty pane that never fills — indistinguishable from a presenter who has not started sharing,
+      so nothing about it looks like a fault to report.
+
+      The three constants are the reference's and are named rather than inlined. What the lines
+      mostly carry is the ONE deliberate difference: upstream reads the size at `playing` and then
+      has to exclude Firefox and Edge, because those report 0 for a frame or two on the codepath it
+      was written for. Reading it after the same 3,000 ms the retry would wait makes those exclusions
+      unnecessary rather than merely omitted — and a browser sniff that nothing needs is a branch
+      with no consumer.
+    */
+    max: 1535,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -1256,7 +1270,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       route: upstream has one sentence for every microphone failure and this method branches on the
       actual error, so a member is told what went wrong rather than a paragraph of things to try.
     */
-    max: 992,
+    /*
+      992 -> 1011, 2026-08-30. One statement for `SV-SP-08` and eighteen lines saying why it is here:
+      this is the reference's `presUnmuted` moment, and the OTHER half of that handler —
+      `startTalking` — arrives inbound from the room socket in this application rather than being
+      sent, which is why only one half needed building.
+    */
+    max: 1011,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -2295,7 +2315,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `PA-05` is the one with a runtime cost, and it is a phone: the reference's mobile host has four
       children and no `app-webcam-holder` at all, because a phone's presentation column is short.
     */
-    max: 1089,
+    /*
+      1089 -> 1105, 2026-08-30. Sixteen lines at the `<ScreenPane>` call site: four new props for
+      `SV-SP-02`/`03`, two callbacks for `SV-SP-04`, and the note recording that NO `volume` and no
+      `muted` are passed any more and why that is the fix rather than an omission.
+    */
+    max: 1105,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -3478,7 +3503,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lookup, and the correction kept in place beside them — see `forceStopScreen` in
       `presenter-commands.remote.ts` for the full argument and the byte offsets.
     */
-    max: 396,
+    /*
+      396 -> 478, 2026-08-30, for `SV-SP-02` and `SV-SP-08`.
+
+      Most of it is one distinction that upstream's own naming hides. `isDetached` and
+      `isDetachedCtrl` differ by four characters and mean opposite ends of the same gesture: the
+      SOURCE window asking "have I sent this screen elsewhere?" and the POPOUT asking "am I a
+      popout?". This class had only the second, so the source pane kept rendering the screen it had
+      just detached — one producer feeding two live decoders, with no way back but closing the popout.
+
+      `SV-SP-08`'s method is six lines and its docblock is the finding: the WRITE was never missing.
+      `#selectedScreenTab` has held that value all along; what did not exist was a reader outside the
+      component tree, which is why the row sits on this surface and its trigger is on the microphone
+      one.
+    */
+    max: 478,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
@@ -5544,7 +5583,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `toggleFullscreen` fullscreens — a watermark outside it is clipped away in exactly the state a
       recording would be made in. The contract asserts that by NESTING rather than by line order.
     */
-    max: 471,
+    /*
+      471 -> 678, 2026-08-30, for four rows at once — `SV-SP-02`, `SV-SP-03`, `SV-SP-04` and
+      `SV-SP-10` — and the largest of them is a pane that rendered NOTHING.
+
+      Before this, a screen whose consumer had not arrived showed an empty box: the `<video>` is
+      hidden while `stream` is null and nothing stood in its place, so "loading" and "broken" looked
+      identical. `StreamingView` has had its `Loading Stream...` counterpart all along.
+
+      Three of the four turn on reading a gate correctly and the comments are mostly that.
+      `O(4, isConnected || isPresentingThisScreen || isDetached ? -1 : 4)` is a NEGATION — the line
+      shows while NONE of the three holds — and read the other way round it builds a spinner over
+      every screen that IS connected. `isPresentingThisScreen` is false by construction here, which
+      the file already said, and the consequence it did NOT say is that a presenter would otherwise
+      watch a spinner over their own screen forever.
+
+      `SV-SP-10` REMOVES code and still costs lines: the `volume`/`muted` props are gone and the
+      paragraph where they were records why. Const 8 carries `muted` in the static attribute run and
+      no `volume` in its binding list, and `newScreenStream` re-asserts `i.muted = !0` twice more —
+      the reference makes this element silent three separate ways, and this bound it to the room's
+      master volume. Harmless only while `addRemoteScreen` refuses a non-video producer.
+    */
+    max: 678,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -5601,7 +5661,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 301,
+    /*
+      301 -> 342, 2026-08-30, for `SV-SP-06` — the locked-screen badge.
+
+      The asymmetry is worth the lines because it is what hid the gap: `StreamTabs.svelte` has
+      rendered this badge from the same const all along, on the bar where upstream it can never
+      appear, while the bar that actually locks screens had none. `lockedScreenId` reached this
+      component and was read for exactly one thing — flipping a dropdown item's label — so a locked
+      screen showed no indicator anywhere and the only way out was the right item in the right menu.
+    */
+    max: 342,
     why: 'the screenshare tab strip'
   },
   {

@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**34 open · 190 closed · 224 rows.**
+**24 open · 200 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -2569,6 +2569,27 @@ function Q0e(t,n){if(1&t&&(d(0,"span",9),v(1),u()),2&t){const e=g();m(),Ne(" ",e
 
 ### SV-SP-02 — No detached state on the source pane: the reference blanks the original pane and offers 'click here to re-attach'
 
+**BUILT 2026-08-30.** `RoomScreens.isDetachedHere` / `reattach`, and the pane's blanked state with
+the captured `Screen Detached.. Click here to re-attach` heading (const 10,
+`[1,"mt-4","text-center",3,"click"]`, byte 1,492,830).
+
+**The distinction upstream's own naming hides is the whole row.** `isDetached` and `isDetachedCtrl`
+differ by four characters and mean opposite ends of one gesture: the SOURCE window asking "have I
+sent this screen elsewhere?" and the POPOUT asking "am I a popout?". This class had only the second,
+so detaching left the original pane rendering the same producer — **one share feeding two live
+decoders** — with no way back except finding and closing the popout window.
+
+**One divergence, and it is the accessible one.** Upstream hangs the click on the `<h3>`: not
+focusable, not keyboard operable, announced to a screen reader as a heading. A real `<button>` inside
+the captured heading keeps the class, the text and the position exactly where the capture has them.
+`role="button"` plus a tabindex on the heading was tried first and is precisely what
+`a11y_no_noninteractive_element_to_interactive_role` refuses, with reason: it would have SAID button
+and still been a heading.
+
+Un-detaching happens in ONE place — the popout's `beforeunload` — because a viewer can close that
+window by hand, and a second implementation of "put it back" is a second thing to drift. Two controls
+seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,492,849**
 
 ```
@@ -2580,6 +2601,20 @@ return D(e),E(g().reAttachScren())}),v(1," Screen Detached.. Click here to re-at
 > Verified: I could not find it. Our detach path opens the popout but never marks the SOURCE pane detached, never stops watching the producer, and offers no re-attach control.
 
 ### SV-SP-03 — No 'Connecting To Screen of …' state — an un-arrived screen shows an empty pane with no feedback
+
+**BUILT 2026-08-30.** `q0e` transcribed — const 3
+`[1,"text-center","mt-4","animated","fadeIn",2,"color","#fff"]`, const 12 the `fas fa-spinner
+fa-pulse` glyph, and the hyphen between the two names, which is the capture's own separator.
+
+**The gate is a NEGATION and that is what makes it worth a test.**
+`O(4, o.isConnected || o.isPresentingThisScreen || o.isDetached ? -1 : 4)` at byte 1,501,699 shows
+the line while NONE of the three holds; read the other way round it builds a spinner over every
+screen that IS connected.
+
+`isPresentingThisScreen` is `ownScreen` here: a screen this browser shares renders from the local
+capture rather than from a consumer, so it is connected the moment it exists. Without that term a
+presenter would watch a spinner over their own screen forever — this file already recorded that the
+term is false by construction and did not record what depends on it. Two controls seen red.
 
 **medium** · `missing-behaviour` · reference byte **1,493,278**
 
@@ -2593,6 +2628,26 @@ function q0e(t,n){if(1&t&&(d(0,"h3",3),T(1,"i",12),v(2),u()),2&t){const e=g();m(
 
 ### SV-SP-04 — No too-small-video retry: a screen consumer that comes up 0x0 is never re-requested
 
+**BUILT 2026-08-30.** `ScreenPane` measures, `RoomMediaTransport.retryScreen` re-consumes — the
+same decision-versus-effect split every other feature here draws: the pane owns the element and can
+see `videoWidth`, and only the transport can ask for the producer again.
+
+The three constants are the reference's and are named rather than inlined: three attempts, 3,000 ms
+apart, ten pixels. Below ten in either axis is a decoder that produced nothing, not a small window.
+The budget is per producer and resets on a good picture (`i.tooSmallRetries = 0`), or a long session
+would exhaust it on unrelated blips.
+
+**The Firefox and Edge exclusions are deliberately NOT reproduced, and that is measured rather than
+lazy.** They exist upstream because those browsers report `videoWidth` as 0 for a frame or two after
+`playing` on the codepath it was written for, so the retry fired on healthy streams. This
+implementation does not take the measurement at `playing` — it takes it after the same settling delay
+the retry would wait and re-reads it before acting, so the case those exclusions guard against cannot
+arise. A browser sniff that nothing needs is a branch with no consumer.
+
+Why it mattered: a 0x0 video is an empty pane that never fills, which on screen is indistinguishable
+from a presenter who has not started sharing. Nothing about it looks like a fault to report. Control
+seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,499,022**
 
 ```
@@ -2604,6 +2659,24 @@ if(clearTimeout(i.screenConnectChecker),P("------webcam playing event fired....w
 > Verified: I could not refute this. Our screen attach path is ScreenPane.svelte:219-241 (`attachStream`), read in full: it assigns `srcObject`, sets volume/muted, calls `node.play()` with a `console.warn` on rejection, and returns a teardown that pauses and nulls `srcObject`.
 
 ### SV-SP-05 — Screen tabs do not start/stop watching: every shared screen is consumed on arrival, not only the selected one
+
+**OWNER DECISION, recorded 2026-08-30.** The row files itself this way — *"a real shape difference
+with a cost the reference does not pay… Filed as a divergence to be decided on, not as a defect"* —
+and the verifier adds that its cost argument is overstated because a renamed counterpart exists.
+
+The divergence is architectural and already recorded in two places
+(`save-data-gate-contract.test.ts` and `room-mtx.svelte.ts`): `addRemoteScreen` consumes EVERY remote
+screen producer the moment it is announced. At N screens shared this room pulls N video consumers
+where the reference pulls 1.
+
+**What makes it a decision rather than a fix:** the consume-on-arrival shape is what
+`selectScreenTabOfId`, the detached popout, the alerts overlay and `applyScreenLayers` are all built
+on — a screen has to be consumed before it can be laid out, previewed or burned into. Changing it is
+a media-plane redesign, and the bandwidth it would save is a number nobody here has measured on a
+room with several simultaneous shares. That measurement is what should decide it.
+
+`SV-SP-02` removed the sharpest instance of the cost — the source pane no longer decodes a screen it
+has detached — without touching the shape.
 
 **medium** · `divergence` · reference byte **1,968,584**
 
@@ -2617,6 +2690,20 @@ onScreenShareTabChange(e,i=!0){P(`onScreenShareTabChange tab: ${e}. selectedScre
 
 ### SV-SP-06 — ScreenTabs renders no locked-screen badge, so a locked screen has no indicator and no one-click unlock
 
+**BUILT 2026-08-30.** `oSe` transcribed — const 82
+`["placement","bottom","tooltip","Unlock this screen?",1,"mr-2",3,"click"]` and const 83
+`["aria-hidden","true",1,"fas","fa-lock"]` — immediately after the forced-screen eye badge, which is
+the reference's order and is asserted as such.
+
+**The asymmetry the row names is exactly what hid it.** `StreamTabs.svelte` has rendered this badge
+from the same const all along, on the bar where upstream it can never appear, while the bar that
+actually locks screens had none. `lockedScreenId` reached this component and was read for one thing:
+flipping a dropdown item's label. So a locked screen showed no indicator anywhere and the only way
+out was the right item in the right menu.
+
+`stopPropagation` because the badge lives inside the tab's own anchor — without it, clicking Unlock
+would also select the tab, which is not what the reference's separate `click` does. Control seen red.
+
 **medium** · `missing-control` · reference byte **1,918,843**
 
 ```
@@ -2628,6 +2715,25 @@ function oSe(t,n){if(1&t){const e=Y();d(0,"span",82),x("click",function(){D(e);c
 > Verified: I could not refute this. The reference claim checks out and our ScreenTabs genuinely has no lock badge.
 
 ### SV-SP-08 — globals.currScreenID is never written, so the presenter-unmutes-refocus path has nothing to read
+
+**BUILT 2026-08-30, and the row's own verifier had the important half right: the WRITE was never
+missing.**
+
+`#selectedScreenTab` has held that value all along. What did not exist was a READER outside the
+component tree — which is why the row sits on this surface and its trigger sits on the microphone
+one. `RoomScreens.focusRoomOnSelectedScreen()` is that reader, called from
+`RoomLocalCapture.#enableMicrophone`, which is this application's `presUnmuted` moment.
+
+It takes no argument: the screen is whichever one this presenter is looking at, by definition. It
+goes through `bringEveryoneTo` rather than a second `focusOnScreen` call, because the two are the
+same act — that method re-checks the presenter role and moves this browser first so the presenter's
+own view responds without a round trip, and a parallel path would be a second place for that rule to
+drift. Silent when no screen is selected: a presenter can be sharing a producer that has not yet
+produced a tab.
+
+The other half of upstream's handler — `startTalking` — arrives INBOUND from the room socket here
+rather than being sent, which `media.svelte.ts` already records and which is why only one half needed
+building. Two controls seen red.
 
 **low** · `missing-behaviour` · reference byte **1,968,960**
 
@@ -2641,6 +2747,19 @@ this.appService.globals.currScreenID=this.selectedScreenShareTab
 
 ### SV-SP-09 — No presenter self-preview deferral: our own screen always renders full video instead of the 'click here for larger preview' line
 
+**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The reference does not decode a presenter's own
+screen until they click *"(You are sharing your screen as X click here for larger preview)"*; this
+room renders it from the LOCAL capture, so it is already on screen and there is nothing to defer.
+
+**The two are not the same trade.** Upstream defers because its own screen would otherwise be a
+second WebRTC consumer of a producer it is already producing — a real cost. Ours is a direct
+`srcObject` from the capture that already exists for the encoder: no consumer, no negotiation, and no
+extra decode beyond compositing a stream the browser is holding regardless. Reproducing the deferral
+would mean hiding a picture that costs nothing to show, and adding a click to get it back.
+
+`SV-SP-03` depends on this being stated: `ownScreen` short-circuits the connecting spinner precisely
+because our own screens are connected the moment they exist.
+
 **low** · `missing-behaviour` · reference byte **1,493,170**
 
 ```
@@ -2652,6 +2771,21 @@ Ne(" (You are sharing your screen as ",e.muser.mediaValue.screenName," click her
 > Verified: I could not find any implementation or renamed equivalent in apps/room/src. Searched: 'largePreview', 'large preview', 'larger preview' (zero hits across all of apps/** in .ts/.svelte/.md); the label text 'You are sharing' and 'sharing your screen as' (zero hits in any template); 'localpreview'/'localPreview' (hits ONLY inside comments qu…
 
 ### SV-SP-10 — The screenshare <video> is statically muted upstream; ours binds volume and muted from the room master
+
+**FIXED 2026-08-30.** `muted` is a static attribute on the element, the `volume`/`muted` props are
+gone from `ScreenPane`, and `PresentationArea` passes neither.
+
+Read from const 8 rather than inferred: `muted` sits in the STATIC attribute run BEFORE the `3`
+marker, and the binding run after it holds only `click`, `controls`, `ngClass` and `id` — no
+`volume`. `newScreenStream` then re-asserts `i.muted = !0` twice more (byte 1,497,239). **The
+reference makes this element silent three separate ways**, which is not the sort of thing a codebase
+does by accident.
+
+The row's own assessment is the right one: harmless TODAY, because `addRemoteScreen` refuses any
+producer whose `kind !== 'video'` so the consumed stream carries no audio track — and that is **one
+guard away** from playing screenshare audio through an element the reference guarantees is silent. A
+screen is a picture; the room's volume control is for the room's audio. Removing the props is what
+makes the second predicate unwritable rather than merely absent. Control seen red.
 
 **low** · `divergence` · reference byte **1,500,765**
 
@@ -2665,6 +2799,20 @@ Ne(" (You are sharing your screen as ",e.muser.mediaValue.screenName," click her
 
 ### SV-SP-13 — Fullscreen keeps only the standard API; the reference carries moz/webkit/ms fallbacks on both fullscreen paths
 
+**MEASURED REFUSAL, recorded 2026-08-30.** The row states its own answer — *"Cosmetic/compat only
+on any browser from the last several years"* — and the standard this repository holds decides the
+rest: **nothing exists without a consumer.**
+
+`document.mozCancelFullScreen`, `webkitExitFullscreen` and `msExitFullscreen` are `undefined` in every
+browser this room supports, so each added branch is a line that can never run. That is the same
+`.flipped`-class-with-no-CSS shape `CLAUDE.md` names by name, in executable form.
+
+What IS worth keeping is the measurement, so nobody re-derives the row as a gap: the vendor chain is
+real and is at bytes 1,491,771 and 1,492,211, both of our fullscreen call sites reach the same
+`#video-screen-container-{id}` target the reference does, and the difference is exclusively in
+branches that cannot be reached. If this room ever has to support a browser that needs one, the
+evidence is here and the change is four lines.
+
 **low** · `missing-behaviour` · reference byte **1,491,771**
 
 ```
@@ -2676,6 +2824,16 @@ onDoubleClicked(){try{let e=null;e=document.querySelector(`#video-screen-contain
 > Verified: Could not refute. Both of our fullscreen call sites use the standard API only, with no vendor fallbacks anywhere in apps/room/src.
 
 ### SV-SP-14 — The detached zoom cluster has no hidden binding, so it paints over a pane that has no picture
+
+**BUILT 2026-08-30.** `$0e = t => ({hidden: t})` over the same condition that hides the `<video>`,
+so a popout whose stream has not arrived — or one with `saveData` on — does not float a magnifier and
+a camera button over an empty box.
+
+**ONE derived feeds both**, which is more than the row asked for and is the point: the cluster and the
+picture cannot drift into different conditions, and the contract asserts both read `pictureHidden`.
+The row's verifier notes that the one place this was previously reasoned about reached its
+"equivalent" conclusion by conflating two distinct fields in the reference component — `isDetached`
+and `isDetachedCtrl` again, which is the same confusion `SV-SP-02` untangles. Control seen red.
 
 **low** · `missing-behaviour` · reference byte **1,493,686**
 

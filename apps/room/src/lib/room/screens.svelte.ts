@@ -58,6 +58,7 @@ export class RoomScreens {
   readonly #forceStopScreen: (target: ForceStopScreenTarget) => Promise<unknown>;
 
   #selectedScreenTab: string | null;
+  #detachedHere: readonly string[];
   #forcedScreenId: string | null;
   #lockedScreenId: string | null;
   #isFullScreenshare: boolean;
@@ -98,6 +99,19 @@ export class RoomScreens {
     this.#forceStopScreen = options.forceStopScreen;
 
     this.#selectedScreenTab = $state<string | null>(null);
+    /*
+      `SV-SP-02` — which screens THIS window has detached into a popout.
+
+      NOT `detachedScreenId` below, and the two are easy to confuse because upstream names them alike.
+      That one is `isDetachedCtrl`: the POPOUT asking "am I a popout?", read from the query string.
+      This is the SOURCE window asking "have I sent this screen elsewhere?", which is what
+      `isDetached` gates in `app-screenshare-view` — the blanked pane and its re-attach line.
+
+      A `$state.raw` list rather than the `#screenPopouts` map it shadows, because that map is a plain
+      `Map` holding `Window` handles and nothing renders from it. Two facts, two shapes: one is the
+      handle to close, the other is what the pane draws.
+    */
+    this.#detachedHere = $state.raw<readonly string[]>([]);
 
     /** The screen every viewer is taken to; renders the eye badge on that tab. */
     this.#forcedScreenId = $state<string | null>(null);
@@ -138,6 +152,38 @@ export class RoomScreens {
 
   get selectedTab(): string | null {
     return this.#selectedScreenTab;
+  }
+
+  /**
+   * `SV-SP-02` — is this screen detached out of THIS window?
+   *
+   * ```js
+   * detachScreen() { this.isDetached = !0, this.stopWatchScreenOf(this.muser._id), … }
+   * reAttachScren() { this.isDetached = !1, … }                              // byte 1,499,638
+   * ```
+   *
+   * The pane reads it to blank itself and offer the re-attach line. Before this the source window
+   * kept rendering the same screen after detaching it, so one producer fed TWO live decoders and
+   * there was no way back except closing the popout.
+   */
+  isDetachedHere(screenId: string): boolean {
+    return this.#detachedHere.includes(screenId);
+  }
+
+  /**
+   * `reAttachScren` — bring it back, which upstream does by clicking the blanked pane itself.
+   *
+   * Closing the popout is what re-attaches: its `beforeunload` already clears the flag and re-selects
+   * the tab, so this has one job and the un-detaching is not written twice. A popout the viewer has
+   * already closed by hand leaves the flag set until that handler runs, so the list is cleared here
+   * too rather than trusted to arrive.
+   */
+  reattach(screenId: string): void {
+    const popout = this.#screenPopouts.get(screenId);
+    this.#screenPopouts.delete(screenId);
+    this.#detachedHere = this.#detachedHere.filter((entry) => entry !== screenId);
+    if (popout && !popout.closed) popout.close();
+    this.#selectTabOfId(screenId);
   }
 
   /** The detached window selects its own screen on open; nothing else writes this directly. */
@@ -299,11 +345,16 @@ export class RoomScreens {
       return;
     }
     this.#screenPopouts.set(screenId, popout);
+    // `SV-SP-02` — the SOURCE pane blanks now. See `isDetachedHere`.
+    if (!this.#detachedHere.includes(screenId)) {
+      this.#detachedHere = [...this.#detachedHere, screenId];
+    }
 
     // `s.onbeforeunload = () => appEventBus.emit("reatachScreenShare", i.pres._id)` - closing the
     // window puts the screen back in the room rather than leaving it detached and invisible.
     popout.addEventListener('beforeunload', () => {
       this.#screenPopouts.delete(screenId);
+      this.#detachedHere = this.#detachedHere.filter((entry) => entry !== screenId);
       this.#selectTabOfId(screenId);
     });
   }
@@ -360,6 +411,37 @@ export class RoomScreens {
     this.#selectedScreenTab = screenId;
     if (!this.#isPresenter()) return;
     void this.#focusOnScreen(screenId).catch((cause) => console.error('[focusOnScreen]', cause));
+  }
+
+  /**
+   * `SV-SP-08` — a presenter who unmutes while sharing pulls the room to the screen they last chose.
+   *
+   * ```js
+   * subscribe("presUnmuted", e => { … , this.globals.isScreenSharing &&
+   *   this.sendServerAdminCommand("focusOnScreen", {id: this.globals.currScreenID}) })
+   * ```                                                                      // byte 1,141,836
+   *
+   * with `globals.currScreenID = this.selectedScreenShareTab` written by `onScreenShareTabChange`
+   * (byte 1,968,960).
+   *
+   * **The write was never what was missing here.** `#selectedScreenTab` has held that value all
+   * along; what did not exist was a READER outside the component tree, which is why the row is filed
+   * against this surface and its consumer lives on the microphone one. So this is the reader, and it
+   * takes no argument: the screen is whichever one this presenter is looking at, by definition.
+   *
+   * `bringEveryoneTo` rather than a second `focusOnScreen` call, because the two are the same act —
+   * it re-checks the presenter role, moves this browser first so the presenter's own view responds
+   * without a round trip, and the server re-checks authority regardless. A parallel path would be a
+   * second place for that rule to drift.
+   *
+   * Silent when there is no selected screen. A presenter can be sharing a producer that has not yet
+   * produced a tab, and `focusOnScreen` with nothing to focus on is a command the room would have to
+   * ignore.
+   */
+  focusRoomOnSelectedScreen(): void {
+    const screenId = this.#selectedScreenTab;
+    if (!screenId) return;
+    this.bringEveryoneTo(screenId);
   }
 
   stop(screenId: string) {
