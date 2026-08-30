@@ -1,7 +1,15 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
-import { alerts, chatMutes, messages, users, type User } from '#lib/server/db/schema.js';
+import {
+  alerts,
+  capturedItemOverrides,
+  chatMutes,
+  hiddenRoomItems,
+  messages,
+  users,
+  type User
+} from '#lib/server/db/schema.js';
 import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 import { parseReactions } from '#lib/server/reactions.js';
 
@@ -18,10 +26,17 @@ import { parseReactions } from '#lib/server/reactions.js';
   parts where being wrong is silent: a guard that lets the wrong person through looks identical to
   one that works, which is the same reasoning `authorization-contract.test.ts` was written under.
 
-  HONEST GAP: only the real-row branches (`id > 0`) are covered. The captured-item branches
-  (`id < 0`, which write to `captured_item_overrides` and `hidden_room_items` instead of to a
-  table) are not, because they need the fixture wired up. They carry the same guards, and they are
-  where the "deleted alert comes back for everyone else" defect lived. Worth doing next.
+  THAT GAP IS CLOSED, 2026-08-30 — see the last describe in this file.
+
+  It read: *"only the real-row branches (`id > 0`) are covered. The captured-item branches (`id < 0`
+  … ) are not, because they need the fixture wired up."* The fixture needed no wiring: it is
+  `server/captured-message-fixture.json`, a tracked JSON file that `captured-room.ts` imports
+  directly, and it resolves in any environment. The blocker was inherited rather than measured, and
+  re-measuring it is what closed it — the same lesson `missing-settings-triage.md` records about
+  `altChatRender`.
+
+  They carry the same guards, and they are where the "deleted alert comes back for everyone else"
+  defect lived.
 */
 
 /*
@@ -63,7 +78,26 @@ vi.mock('#lib/server/room-config-client.js', () => ({
     settings: roomSettings,
     locked: [],
     member: null
-  })
+  }),
+  /*
+    THE TWO CREDENTIAL DOORS, stubbed as "not required" — added 2026-08-30 when the alert-delete
+    door shipped and this file's mock stopped being complete.
+
+    `deleteAlertPW` put a `checkAlertDeletePasswordRemotely` call in front of every alert delete, so
+    without this entry the whole delete branch throws `No "…" export is defined on the mock` and
+    every assertion here fails for a reason that has nothing to do with what it tests.
+
+    `required: false` is the RIGHT stub for this file rather than a convenience: these tests are
+    about the authorisation matrix — who may delete what — and a room that has configured no
+    password is the state in which that matrix is the only thing deciding. The door's own behaviour
+    is `alert-delete-password-contract.test.ts`, which stubs the same function with a controller it
+    can steer, and that file is where a configured password belongs.
+
+    The notes door is stubbed beside it for the reason that file records: the two grants must be
+    provably independent, and a mock that omits one makes that failure look like this one.
+  */
+  checkAlertDeletePasswordRemotely: async () => ({ required: false, ok: true }),
+  checkNotesPasswordRemotely: async () => ({ required: false, ok: true })
 }));
 
 const { messageAction } = await import('../routes/message-actions.remote');
@@ -154,6 +188,18 @@ beforeEach(() => {
   db.delete(chatMutes).run();
   db.delete(messages).run();
   db.delete(alerts).run();
+  /*
+    The two tables the CAPTURED-item branches write to, cleared here for the same reason as the
+    three above and added with the tests that first wrote to them.
+
+    They were missing while nothing in this file touched them, and the omission was invisible: a
+    table nothing writes needs no clearing. The first captured-delete assertion is what exposed it —
+    its hide survived into the next test and made a refusal look like a write. A `beforeEach` that
+    lists some of the tables a file writes is worse than one that lists none, because it reads as
+    complete.
+  */
+  db.delete(hiddenRoomItems).run();
+  db.delete(capturedItemOverrides).run();
 });
 
 describe('delete', () => {
@@ -524,5 +570,101 @@ describe('presenter-only operations', () => {
       );
     }
     expect(db.select().from(chatMutes).all()).toHaveLength(0);
+  });
+});
+
+/*
+  ── THE CAPTURED-ITEM BRANCHES (`id < 0`), which write no row to the table they appear to ────────
+
+  Eighteen items of the forensic capture are served to the reference room as messages with NEGATIVE
+  ids. They live in `server/captured-message-fixture.json`, not in `messages` or `alerts`, so every
+  mutation of one has to be recorded somewhere else: a delete becomes a row in `hidden_room_items`,
+  and an edit or a reaction becomes a column of `captured_item_overrides`.
+
+  ## Why these branches, specifically
+
+  They carry the SAME authorisation rules as the real-row branches and none of the same code, which
+  is the shape that goes wrong quietly. `message-action-contract` covered `id > 0` in full and left
+  these named as an honest gap; the "deleted alert comes back for everyone else" defect lived here.
+
+  ## The room scoping is the security assertion, and it is not obvious
+
+  `capturedRoomItem` refuses any room but `CAPTURE_REFERENCE_ROOM`, and its own comment says what
+  that guard is for: *"Without this, a negative id posted from any room resolved against the fixture
+  and let somebody delete or edit a captured item from a room that is not rendering the capture at
+  all."* Every room is served the SAME fixture rows, so an unscoped negative id is a cross-room
+  write — one tenant's action landing on evidence another tenant is being shown. That is the
+  multi-tenant failure this repository exists to refuse, and it is asserted below by driving the
+  identical command from a room that is not the capture's.
+*/
+const CAPTURED_ALERT_ID = -1;
+const CAPTURED_ALERT_KEY = 'app-room-complete:app-st-message:1';
+
+describe('the captured-item branches carry the same guards as the real rows', () => {
+  it('a presenter deleting a captured alert records it, in THIS room only', async () => {
+    const presenter = account('captured-presenter@example.test', 'staff');
+    await act(presenter, { operation: 'delete', kind: 'alert', id: CAPTURED_ALERT_ID });
+
+    const hidden = db.select().from(hiddenRoomItems).all();
+    expect(hidden, 'exactly one hide was recorded').toHaveLength(1);
+    expect(hidden[0].evidenceKey).toBe(CAPTURED_ALERT_KEY);
+    /*
+      The room is on the row, and that is the whole point of the column. Every room is served the
+      same fixture item, so a hide keyed on the evidence alone would blank it for every tenant at
+      once — the delete equivalent of the cross-room overwrite `recordOverride`'s conflict target
+      records at the command.
+    */
+    expect(hidden[0].roomShortCode, 'hidden here, not everywhere').toBe(ROOM);
+    expect(hidden[0].hiddenByUserId).toBe(presenter.id);
+
+    /* And nothing was deleted from the real tables, because there was never a row to delete. */
+    expect(db.select().from(alerts).all()).toHaveLength(0);
+    expect(db.select().from(messages).all()).toHaveLength(0);
+  });
+
+  it('refuses a member the capture does not attribute to them', async () => {
+    const member = account('captured-member@example.test', 'member');
+    await expect(
+      act(member, { operation: 'delete', kind: 'alert', id: CAPTURED_ALERT_ID })
+    ).rejects.toMatchObject({ status: 403 });
+    expect(db.select().from(hiddenRoomItems).all(), 'a refused delete writes nothing').toHaveLength(
+      0
+    );
+  });
+
+  it('REFUSES the same id from a room that is not the capture’s, with a 404', async () => {
+    /*
+      The cross-room assertion. Same user, same command, same negative id — only the room differs,
+      and `capturedRoomItem` returns undefined for it, so the branch 404s before it can write.
+
+      A 404 rather than a 403 is correct and deliberate: from a room that is not rendering the
+      capture, that item does not exist. Answering 403 would confirm it exists somewhere, which is
+      an oracle over another tenant's content.
+    */
+    const presenter = account('captured-presenter@example.test', 'staff');
+    await expect(
+      callRemote(
+        { user: presenter, sessionId: 'captured-cross-room', roomShortCode: '9999' } as App.Locals,
+        () => messageAction({ operation: 'delete', kind: 'alert', id: CAPTURED_ALERT_ID })
+      )
+    ).rejects.toMatchObject({ status: 404 });
+    expect(db.select().from(hiddenRoomItems).all()).toHaveLength(0);
+  });
+
+  it('an edit of a captured item lands in the overrides, keyed by room as well as evidence', async () => {
+    const presenter = account('captured-presenter@example.test', 'staff');
+    await act(presenter, {
+      operation: 'edit',
+      kind: 'alert',
+      id: CAPTURED_ALERT_ID,
+      newBody: 'corrected copy'
+    });
+
+    const overrides = db.select().from(capturedItemOverrides).all();
+    expect(overrides).toHaveLength(1);
+    expect(overrides[0].evidenceKey).toBe(CAPTURED_ALERT_KEY);
+    expect(overrides[0].roomShortCode, 'edited here, not in every room').toBe(ROOM);
+    expect(overrides[0].body).toBe('corrected copy');
+    expect(overrides[0].updatedByUserId).toBe(presenter.id);
   });
 });

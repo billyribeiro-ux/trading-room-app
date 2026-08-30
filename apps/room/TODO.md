@@ -366,8 +366,14 @@ The two writes needed no change: `savePoll` and `deleteSavedPoll` were already
 
 ## 9. The server layer had no behavioural tests — and that hid a leaked password hash
 
-**Status:** the leak is **fixed**; the coverage gap is **closed for all 20 actions**, with two
-named remainders below. 2026-08-04.
+**Status:** the leak is **fixed**; the coverage gap is **closed for all 20**, and the two remainders
+this entry named for itself are closed too — 2026-08-30. 2026-08-04.
+
+**They are not "actions" any more, and the distinction matters to anyone reading this entry now.**
+All twenty became remote functions during 2026-08-30; `routes/+page.server.ts` exports no form
+actions at all and a contract asserts the empty set. The coverage this entry is about survived the
+conversion because each test was rewritten onto `callRemote` rather than re-pointed as text — every
+assertion still executes against the live database.
 
 ### The leak
 
@@ -413,14 +419,41 @@ Note the count: this entry said 19 actions for most of the day. It is **20** —
 was missed by an `awk` over the file and only turned up when the list was enumerated properly at
 the end. Enumerate, do not estimate.
 
-### Two remainders, deliberately named rather than quietly skipped
+### Two remainders — both CLOSED 2026-08-30, and one of them had a blocker that was never true
 
-1. **The captured-item branches inside `messageAction` (`id < 0`)** write to
-   `captured_item_overrides` and `hidden_room_items` instead of to a table, and need the fixture
-   wired up. They carry the same guards as the real-row branches and they are where the "deleted
-   alert comes back for everyone else" defect lived.
-2. **`restoreNoteVersion`'s happy path.** Its 403, 400 and 404 are covered; restoring an actual
-   version is exercised by `notes-repository.test.ts` beneath it, not through the action.
+1. **The captured-item branches inside `messageAction` (`id < 0`)** — covered, in
+   `message-action-contract.test.ts`. This entry said they *"need the fixture wired up"*. The
+   fixture needed no wiring: it is `server/captured-message-fixture.json`, a tracked JSON file that
+   `captured-room.ts` imports directly and which resolves anywhere. The blocker was inherited rather
+   than measured, and re-measuring it is the whole of what closed it — the same lesson
+   `missing-settings-triage.md` records about `altChatRender`.
+
+   Four assertions: a presenter's delete records a `hidden_room_items` row **keyed to this room**, a
+   member the capture does not attribute to gets 403, an edit lands in `captured_item_overrides`
+   with the same room key, and — the one worth having — **the same negative id from a room that is
+   not the capture's is refused 404**. Every room is served the same fixture rows, so an unscoped
+   negative id is a cross-tenant write: one room's delete landing on evidence another room is being
+   shown. Control: removing `capturedRoomItem`'s room check makes that delete SUCCEED from room
+   9999. 404 rather than 403 is deliberate — from a room not rendering the capture the item does not
+   exist, and 403 would confirm it exists somewhere, which is an oracle over another tenant.
+
+   Two things were found on the way in. The file's `vi.mock` predated the `deleteAlertPW` door and
+   omitted `checkAlertDeletePasswordRemotely`, so the whole delete branch threw before reaching any
+   assertion; and its `beforeEach` cleared three tables but not these two, so the first hide
+   survived into the next test and made a refusal look like a write. A `beforeEach` listing SOME of
+   the tables a file writes is worse than one listing none, because it reads as complete.
+
+2. **`restoreNoteVersion`'s happy path** — covered, in `notes-account-action-contract.test.ts`,
+   through the command rather than beneath it. The repository test proves the restore; what it
+   cannot prove is what the wrapper adds — that the room comes from the SESSION and not an argument,
+   that the caller's id is what lands in `updatedById`, and that a null becomes 404 rather than 500
+   or success. The restore is performed by a DIFFERENT presenter from the one who wrote the version,
+   because restoring your own would pass whether the command passed the caller through or the
+   version's author. Controls: crediting a fixed user id, and reusing the latest version number
+   instead of appending — both red.
+
+   `saveNote` COALESCES a same-author save inside its window, so two saves by one person make ONE
+   version. The first draft asserted two and its own vacuity guard caught it.
 
 ### Divergences from the API these tests caught
 
