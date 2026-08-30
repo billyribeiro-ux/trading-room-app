@@ -410,6 +410,12 @@ The title alternates every two seconds between the room's name and `<sender> mes
 
 ### RM-01 — app-st-compactmessage has its own component stylesheet; our compact branch renders inside the app-st-message host and inherits the CARD styles
 
+**BUILT 2026-08-30 11:20 UTC.** Two hosts, one per mode — the reference's own split, since `app-st-message` and `app-st-compactmessage` are two components with two `styles:[…]` blocks — and `lib/styles/compact-message.css`, the compact component's block transcribed from bundle bytes 1,400,248–1,404,709.
+
+**It could not come from the generator, and that is why it is a separate file.** `captured-runtime-components.css` is generated from `css/complete-app-styles.css`, and that capture carries exactly ONE `.msg-box[…]` scope — `ng-c1254915701`, the card. There is no second one. The compact component's rules exist only inside the JavaScript bundle, so no run of `pnpm css:sync-captured` can produce them and editing the generated file by hand is what its own header forbids. The new file states that provenance at the top; it is the only hand-written captured sheet in the tree.
+
+**NOT a component per mode.** The compact branch reads two dozen values off `RoomMessage` — every gate, both formatters, the menu's allow-list, six style deriveds — so a component taking those as props would be two dozen props whose only purpose is to reach back. That is the trade `source-size-contract` records for the note editor's toolbar, made again: the seam the REFERENCE draws is the host element and its stylesheet, and that is exactly what crossed. The date separator became a `{#snippet}` so there is still exactly one implementation, which `alert-chat-style-contract` asserts.
+
 **medium** · `missing-behaviour` · reference byte **1,400,248**
 
 ```
@@ -421,6 +427,8 @@ The title alternates every two seconds between the room's name and `<sender> mes
 > Verified: I could not refute it; the claim is accurate on every point I checked, and our own CHANGELOG corroborates it. (1) MARKUP: RoomMessage.svelte:578 opens <app-st-message> unconditionally and the compact branch {#if displayMode === 'c'} runs 585-744 nested inside it, with no app-st-compactmessage host of its own (line 587 is a comment).
 
 ### RM-02 — Compact ALERT row has no "Ask a question" button and no `short` timestamp — our compact branch renders the bracketed chat time for every kind
+
+**BUILT 2026-08-30 11:20 UTC.** The compact row branches on the log as `O(26, "alerts" === e.logType ? 26 : 27)` does at byte 1,380,680: `r_e` gives the alerts row a `[1,"created-at","mr-2",3,"ngStyle"]` span with Angular's `short` date — `M/d/yy, h:mm a`, which is what `alertDateFormatter` already produces for the card — and the `alert-qa` button gated `!isQAMsg && hasQAOnAlerts`, with the `btn-danger animated flash` unread marker. `a_e` keeps the bracketed `h:mm a` for chat. An alerts log switched to compact mode had lost the Q&A entry point entirely, and the button now has a rule to be styled by, since `.alert-qa` is in the compact block too.
 
 **medium** · `missing-control` · reference byte **1,377,704**
 
@@ -434,6 +442,8 @@ Ze(Ct(3,3,e.msg.t,"short")),m(2),O(4,!e.isQAMsg&&e.appService.globals.sessData.h
 
 ### RM-03 — Compact body drops mentionColor / questionColor
 
+**BUILT 2026-08-30 11:20 UTC.** A `bodyColorClasses` derived carrying the two conditions once, applied by the card body and both compact bodies — `Kn(13, Ew, e.msg.isMention && !e.hasCustomFollowedUserColors, e.msg.txt.includes("?") && !e.hasCustomFollowedUserColors)`, which the compact member body `p_e` and reply body `f_e` read exactly as the card's does. A member mentioned in compact mode got no highlight at all, and the mention colour is the one signal that says a message is addressed to you.
+
 **medium** · `missing-behaviour` · reference byte **1,378,659**
 
 ```
@@ -445,6 +455,8 @@ Kn(13,Ew,e.msg.isMention&&!e.hasCustomFollowedUserColors,e.msg.txt.includes("?")
 > Verified: Confirmed, not refuted. In the reference both compact branches of `app-st-compactmessage` bind the mention/question ngClass: member body `p_e` and member reply body `f_e` use `Ew=(t,n)=>({mentionColor:t,questionColor:n})`, and the admin body `B1e` (const 25) uses `b1e=(t,n,e)=>({mentionColor:t,questionColor:n,"presenter-msg-right flex-fil…
 
 ### RM-04 — Compact reaction strip has no add-reaction pill
+
+**BUILT 2026-08-30 11:20 UTC.** `g_e` at byte 1,380,270, gated as both compact containers gate it — `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)`. In compact mode a reaction could previously be added ONLY through the kebab menu, which is the control a member is least likely to open for something the card offers in one click. `menuAllows.reaction` still gates the strip, so this room's own answer and the capture's compose rather than duplicate.
 
 **medium** · `missing-control` · reference byte **1,380,270**
 
@@ -481,6 +493,8 @@ if(!(a>0&&" "!=e.charAt(a)))
 > Verified: I read the reference bytes and confirmed the guard, then searched apps/room/src exhaustively for any counterpart and found none. REFERENCE (read, not searched): at byte offset 1327300 of apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js the bytes are `if(!(a>0&&" "!=e.charAt(a)))`, inside `parseStock(e,i,o){var s=e.match(new Re…
 
 ### RM-07 — questionColor is gated on `kind === 'chat'` here; the reference applies it on alerts too
+
+**BUILT 2026-08-30 11:20 UTC.** The gate was ours: the reference's two conditions mention no log type. An alert containing a question mark is tinted upstream and was not here — which matters most on the surface where questions are the point, since `hasQAOnAlerts` exists to invite one.
 
 **medium** · `divergence` · reference byte **1,331,638**
 
@@ -542,6 +556,8 @@ z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ng
 
 ### RM-13 — `chat-reaction-hover` is applied by our add-reaction pill but by NO reference template — it only exists in the card stylesheet, so the reference pill is always visible
 
+**FIXED 2026-08-30 11:20 UTC, and it had cost a CONTROL.** The class is real and captured — `.msg-box:hover .chat-reaction-hover{display:inline-block}` with `.chat-reaction-hover{display:none}` at byte 1,366,420 — but no reference template applies it. Wearing it meant the add-reaction pill sat at `display: none` until the enclosing `.msg-box` was hovered, and **there is no hover on a phone**: adding a reaction was impossible on a touch device. A rule with no wearer upstream is a rule upstream does not use, and reading one as an instruction is how a stylesheet becomes a spec. The captured RULE stays where it is — that file is evidence, and deleting one because we stopped wearing it would edit the record.
+
 **low** · `invented-value` · reference byte **1,360,390**
 
 ```
@@ -553,6 +569,8 @@ z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ng
 > Verified: I could not refute the claim; both halves check out. Our add-reaction pill really does carry `chat-reaction-hover` (RoomMessage.svelte:982) and our transcribed rules really do hide it until the row is hovered (captured-runtime-components.css:8151-8156), and the rule is live for us because `msg-box` is a genuine ancestor (RoomMessage.svelt…
 
 ### RM-14 — `answered-check` class is ours; the reference's ✅ div carries `ms-1 private-reply`
+
+**FIXED 2026-08-30 11:20 UTC.** `function Age(t,n){1&t&&(d(0,"div",27),v(1,"\u2705"),u())}` at byte 1,331,360, with const 27 `[1,"ms-1","private-reply"]`. `answered-check` was ours and carried no CSS anywhere in this repository — a class with no rule. The reference reuses the reply wrapper's own classes for the tick, which reads oddly and is what it does.
 
 **low** · `invented-value` · reference byte **1,359,087**
 
@@ -577,6 +595,8 @@ const c=s?`gifExtra_${o}`:`gif_${o}`
 > Verified: I could not refute this. The reference's `urlwrapImg(e,i,o,s)` selects `gifExtra_${o}` vs `gif_${o}` on its fourth argument, and our RoomMessage.svelte emits `id="gif_{item.id}"` unconditionally with no column-aware input under any name: a case-insensitive grep for "extra" across the whole 1,007-line RoomMessage.svelte returns zero hits,…
 
 ### RM-19 — copyMessage mutates msg.txt upstream before writing to the clipboard
+
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone. Recorded rather than silently improved — this is a place where matching the reference would mean reproducing a defect, and the next person comparing the two should find the reason rather than assume the line was missed.
 
 **low** · `divergence` · reference byte **1,355,969**
 
@@ -625,6 +645,8 @@ dge=t=>({"justify-content-end":t})
 > Verified: I could not find any of the four class-list details implemented anywhere in apps/room/src. (1) justify-content-end: the reference binds it on the admin card's body-row div (const 26 = [1,"d-flex",3,"ngClass"], node 34 of Bge) via dge/presenterMsgsOnTheRight; the member card (f1e node 36) uses const 65 = plain [1,"d-flex"].
 
 ### RM-24 — `title="Copy order"` on the trade span has no reference counterpart
+
+**FIXED 2026-08-30 11:20 UTC.** The reference's span is `'<span class="tradeColor" id="id_' + o._id + '">'` at byte 1,414,920 and carries no title, so a member hovering an order in the original sees nothing. `aria-label` takes its place rather than nothing at all, and the two are not the same thing: `title` shows a tooltip to everyone, `aria-label` names the control for a screen reader and is invisible. That span is `role="button"` here — ours, because the capture puts a click handler on a bare span — and a button whose only content is the order text needs a name saying what activating it does.
 
 **low** · `invented-value` · reference byte **1,414,968**
 

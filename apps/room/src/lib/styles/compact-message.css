@@ -1,0 +1,310 @@
+/*
+ * ── `app-st-compactmessage`'s COMPONENT STYLESHEET ──────────────────────────────────────────
+ *
+ * Transcribed by hand from the v4 bundle, `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`,
+ * bytes 1,400,248 – 1,404,709 — the `styles:[…]` array on that component's definition.
+ *
+ * ## WHY THIS IS NOT IN `captured-runtime-components.css`
+ *
+ * That file is GENERATED from `css/complete-app-styles.css`, and **this component's block is not in
+ * that capture**: `complete-app-styles.css` carries exactly one `.msg-box[…]` scope,
+ * `ng-c1254915701`, which is the CARD component. There is no second one. The compact component's
+ * rules exist only inside the JavaScript bundle, so no run of `pnpm css:sync-captured` can ever
+ * produce them and editing the generated file by hand is what its own header forbids.
+ *
+ * That is why this file exists and why it is the only hand-written captured sheet in the tree. Its
+ * provenance is a different capture, and saying so here is the whole reason it is a separate file
+ * rather than a paste into `app.css` among our own rules.
+ *
+ * ## What its absence cost — surface-audit row RM-01
+ *
+ * Both compact hosts rendered with NO rules of their own. `RoomMessage.svelte`'s compact branch sat
+ * inside `<app-st-message>` and inherited the CARD's — 16px text where the compact component sets
+ * 14px, a 35px avatar where it sets 25px, `font-weight: 900` on the username where it sets 800 — and
+ * `CompactMessageRow.svelte`, the private-chat row, inherited nothing at all. Two classes the
+ * markup already wore, `nowrap` and `reactions-container`, had no rule anywhere in this repository:
+ * classes with no CSS, which is the defect `CLAUDE.md` names by that description.
+ *
+ * ## The translation
+ *
+ * `X[_ngcontent-%COMP%]` becomes `app-st-compactmessage X:not(:root)` — the same rewrite the
+ * generator performs, and for the same reason: Angular's per-component attribute becomes the
+ * captured custom-element host, and `:not(:root)` preserves the original cascade specificity so a
+ * rule that lost to another one upstream still loses to it here.
+ *
+ * Rules are otherwise verbatim, in source order, values untouched. Where the reference's shorthand
+ * is odd — `border-bottom: 2px` with no style, which computes to nothing — it is kept, because the
+ * point of a transcription is that it says what the original says.
+ *
+ * `compact-message-styles-contract.test.ts` reads this file and the bundle together.
+ */
+
+app-st-compactmessage .msg-box:not(:root) {
+  font-weight: 100;
+  font-size: 14px;
+  word-wrap: normal;
+  text-align: inherit;
+  width: 100%;
+  background-color: var(--msgs-bg);
+  border-top: 1px solid var(--msg-border-color);
+}
+
+app-st-compactmessage .msg-box-adm:not(:root) {
+  background-color: var(--msgs-bg-adm);
+  border-bottom: 2px;
+  padding-top: 2px;
+}
+
+app-st-compactmessage .private-reply:not(:root) {
+  font-size: 12px;
+}
+
+app-st-compactmessage .private-reply-message:not(:root) {
+  border-left: 2px solid #00bc8c;
+  margin-left: 10px;
+  margin-bottom: 3px;
+  padding: 3px 3px 3px 5px;
+}
+
+app-st-compactmessage .private-reply-bg-light:not(:root) {
+  background-color: #f4f4f4;
+}
+
+app-st-compactmessage .private-reply-bg-dark:not(:root) {
+  background-color: #161515;
+}
+
+/*
+  The card component declares this same keyframe. It is unreferenced in BOTH stylesheets —
+  nothing in either template animates with it — so it is recorded here and not emitted.
+*/
+app-st-compactmessage .avatar:not(:root) {
+  display: inline;
+}
+
+app-st-compactmessage .avatar:not(:root) img:not(:root) {
+  width: 25px;
+  height: 25px;
+  object-fit: cover;
+}
+
+app-st-compactmessage .username:not(:root) {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--username-color);
+  font-weight: 800;
+}
+
+app-st-compactmessage .msg-left:not(:root),
+app-st-compactmessage .msg-right:not(:root) {
+  color: var(--msg-color);
+  word-break: break-word;
+}
+
+app-st-compactmessage .msg-right:not(:root) {
+  text-align: right;
+  margin-right: 5px;
+}
+
+app-st-compactmessage .presenter-msg-right:not(:root) {
+  text-align: right !important;
+  margin-right: 5px;
+  padding-left: 10px;
+}
+
+app-st-compactmessage .presenter-reactions-right:not(:root) {
+  text-align: right !important;
+  margin: 0 0 0 -50px !important;
+  display: inline-block;
+  width: 100%;
+}
+
+app-st-compactmessage .alert-qa:not(:root) {
+  font-size: 10px;
+  padding: 1px 3px;
+}
+
+app-st-compactmessage .msg-left:not(:root) {
+  text-align: left;
+  margin-left: 5px;
+  padding-right: 10px;
+}
+
+app-st-compactmessage .created-at:not(:root) {
+  font-size: 12px;
+  color: var(--date-color);
+}
+
+app-st-compactmessage .options-left:not(:root) {
+  right: 0;
+}
+
+app-st-compactmessage .options-right:not(:root) {
+  left: 0;
+}
+
+app-st-compactmessage .options:not(:root) {
+  display: none;
+  opacity: 0;
+  position: absolute;
+  top: 0;
+}
+
+app-st-compactmessage .options:not(:root) button:not(:root) {
+  color: var(--dark-brown);
+  border: 1px solid var(--border-color);
+  padding: 2px 8px;
+  min-width: 30px;
+  min-height: 20px;
+  cursor: pointer;
+}
+
+app-st-compactmessage .options:not(:root) button:not(:root):first-child {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+
+app-st-compactmessage .options:not(:root) button:not(:root):last-child {
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+app-st-compactmessage .options:not(:root) button:not(:root):hover {
+  color: var(--dark-black);
+}
+
+app-st-compactmessage .options:not(:root) i:not(:root) {
+  font-size: 16px;
+}
+
+app-st-compactmessage .bubble-box-left:not(:root):hover .options:not(:root),
+app-st-compactmessage .bubble-box-right:not(:root):hover .options:not(:root) {
+  display: block;
+  z-index: 1000;
+  opacity: 1;
+}
+
+app-st-compactmessage .smallChatLog:not(:root) {
+  font-size: 16px;
+  font-weight: 200;
+}
+
+app-st-compactmessage .smallChatLogBkg:not(:root) {
+  background-color: var(--light-black);
+}
+
+app-st-compactmessage .smallChatLog:not(:root) img:not(:root) {
+  max-width: 16px;
+  max-height: 16px;
+}
+
+app-st-compactmessage .img-container:not(:root) {
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  padding: 3px;
+}
+
+app-st-compactmessage .uploaded-img:not(:root) {
+  max-width: 150px;
+  max-height: 150px;
+}
+
+app-st-compactmessage .imgur-modal:not(:root) {
+  text-align: center;
+}
+
+app-st-compactmessage .imgur-modal:not(:root) .modal-dialog:not(:root) {
+  max-width: 90%;
+  max-height: 90%;
+}
+
+app-st-compactmessage .imgur-modal:not(:root) img:not(:root) {
+  width: inherit;
+  height: inherit;
+  max-width: 100%;
+  max-height: calc(100vh - 150px);
+}
+
+app-st-compactmessage .preText:not(:root) {
+  white-space: pre-wrap;
+}
+
+app-st-compactmessage .chatNameAvatar:not(:root) {
+  display: inline;
+}
+
+app-st-compactmessage .msgMenu:not(:root) {
+  padding-left: 5px;
+  font-size: 20px;
+  color: var(--username-color) !important;
+}
+
+app-st-compactmessage .msgMenu:not(:root):hover {
+  color: var(--light-brown) !important;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+app-st-compactmessage .chatDPMenu:not(:root) {
+  font-size: 12px;
+  text-align: right;
+}
+
+app-st-compactmessage .chat-stars:not(:root) {
+  font-size: 8px;
+  vertical-align: text-top !important;
+}
+
+app-st-compactmessage span.chat-stars:not(:root) {
+  margin-top: 2px;
+  margin-left: 2px;
+  display: inline-block;
+}
+
+app-st-compactmessage span.chat-stars:not(:root) {
+  color: var(--username-color);
+}
+
+app-st-compactmessage .stars-container:not(:root) {
+  position: relative;
+}
+
+app-st-compactmessage .stars-container:not(:root) .stars-icon:not(:root) {
+  color: var(--msg-color);
+}
+
+app-st-compactmessage .stars-num:not(:root) {
+  position: absolute;
+  color: var(--msgs-bg);
+  left: 6px;
+  top: 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+app-st-compactmessage a:not(:root) {
+  color: var(--light-black);
+}
+
+app-st-compactmessage .nowrap:not(:root) {
+  white-space: nowrap;
+  display: table;
+}
+
+app-st-compactmessage .separator:not(:root) {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  background-color: var(--msgs-separator-bg) !important;
+}
+
+app-st-compactmessage .separator:not(:root) a:not(:root) {
+  color: var(--msgs-separator-color) !important;
+  margin: 0 auto;
+  font-size: 13px;
+}
+
+app-st-compactmessage .reactions-container:not(:root) {
+  margin-left: 20px;
+}

@@ -2969,7 +2969,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       same expression that says "alert") and why there is no optimistic `#patchEvidence` (a thread
       entry is never a fixture row — `askQuestion` writes a real one even for a captured alert).
     */
-    max: 630,
+    /*
+      630 -> 656, 2026-08-30. RM-19 — the paragraph recording that we deliberately do NOT reproduce
+      `copyMessage`'s mutation.
+
+      Twenty-six lines and all of them prose: upstream writes the stripped text back onto the
+      MESSAGE before copying, so copying silently rewrites the one on screen. This is a place where
+      matching the reference would mean reproducing a defect, and the next person comparing the two
+      needs to find the reason rather than assume the line was missed.
+    */
+    max: 656,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -4456,7 +4465,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       default before it asserts the suppression — a prop that defaulted the other way would strip
       the kebab from the whole room silently.
     */
-    max: 1078,
+    /*
+      1078 -> 1270, 2026-08-30. Eight rows of the surface audit, and most of the addition is why.
+
+      RM-01 is the structural one: TWO HOSTS, one per mode, which is the reference's own split —
+      `app-st-message` and `app-st-compactmessage` are two components with two `styles:[…]` blocks,
+      and this rendered both modes inside the card's host so the compact branch wore the card's
+      stylesheet. The date separator became a `{#snippet}` so there is still exactly one of it, which
+      `alert-chat-style-contract` asserts and is right to.
+
+      **NOT a component per mode, and that is the same trade this file records for the note editor's
+      toolbar.** The compact branch reads two dozen values off this component — every gate, both
+      formatters, the menu's allow-list, six style deriveds — and a component taking those as props
+      would be two dozen props whose only purpose is to reach back here. The seam the REFERENCE draws
+      is the host element and its stylesheet, and that is exactly what crossed:
+      `lib/styles/compact-message.css`.
+
+      The rest: RM-02 the compact alerts row (its `short` date and the Ask-a-question button), RM-03
+      the two colour classes the compact body was missing, RM-04 the add-reaction pill, RM-07
+      `questionColor` on alerts, RM-13/14/24 three invented values removed.
+
+      If this grows again the seam is the BODY SEGMENTS renderer — `bodySegments` and the six segment
+      kinds it switches on are one concern, they take a segment list and nothing else, and they are
+      already a snippet.
+    */
+    max: 1270,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

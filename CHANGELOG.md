@@ -33,6 +33,85 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 11:20 UTC — The compact message row got its own stylesheet, its Q&A button and three of our inventions removed
+
+**Runtime impact: YES.** Compact rows are the size the reference makes them — 14px text, a 25px
+avatar — instead of inheriting the card's. An alerts log in compact mode has its Ask-a-question
+button and its unread marker back. A mention is highlighted in compact mode. A reaction can be added
+in one click instead of only through the kebab. **And the add-reaction pill is reachable on a phone.**
+
+**RM-01 — the compact component's stylesheet was missing entirely, and could not have come from the
+generator.** `captured-runtime-components.css` is generated from `css/complete-app-styles.css`, and
+that capture carries exactly ONE `.msg-box[…]` scope: `ng-c1254915701`, the CARD. There is no second
+one. The compact component's rules exist only inside the JavaScript bundle, so no run of
+`pnpm css:sync-captured` can produce them and editing the generated file by hand is what its own
+header forbids. `lib/styles/compact-message.css` is the transcription — bytes 1,400,248–1,404,709,
+52 rules, `X[_ngcontent-%COMP%]` rewritten to `app-st-compactmessage X:not(:root)` exactly as the
+generator does — and it states that provenance at the top, because it is the only hand-written
+captured sheet in the tree.
+
+Two hosts now, one per mode, which is the reference's own split. `nowrap` and `reactions-container`
+were in the compact markup and defined in NO stylesheet here — classes with no CSS.
+
+**NOT a component per mode, and it is the same trade the note editor's toolbar records.** The compact
+branch reads two dozen values off `RoomMessage`; a component taking those as props would be two dozen
+props whose only purpose is to reach back. The seam the REFERENCE draws is the host element and its
+stylesheet, and that is exactly what crossed. The date separator became a `{#snippet}`, so
+`alert-chat-style-contract`'s "exactly one shared separator" still holds — and it was right to.
+
+**THREE OF THE NINE WERE OURS, and inventions are the more expensive kind of defect.** An omission
+looks unfinished; an invention looks finished and behaves differently.
+
+- **RM-13 cost a control.** Our add-reaction pill wore `chat-reaction-hover`. The class is real and
+  captured — `.msg-box:hover .chat-reaction-hover{display:inline-block}` with
+  `.chat-reaction-hover{display:none}` — but **no reference template applies it**. So the pill sat at
+  `display: none` until the enclosing box was hovered, and there is no hover on a phone: adding a
+  reaction was impossible on a touch device. A rule with no wearer upstream is a rule upstream does
+  not use, and reading one as an instruction is how a stylesheet becomes a spec. The captured rule
+  stays where it is — that file is evidence, and deleting one because we stopped wearing it would
+  edit the record.
+- **RM-14** — `answered-check` had no CSS anywhere. The reference's tick is `ms-1 private-reply`.
+- **RM-24** — `title="Copy order"` on the trade span, which the capture's span does not carry.
+  `aria-label` replaces it, and the two differ: `title` shows a tooltip to everyone, `aria-label`
+  names the control for a screen reader and is invisible.
+
+**RM-19 is a divergence we KEEP, recorded rather than silently improved.** `copyMessage` writes the
+stripped text back onto the MESSAGE before copying, so copying silently rewrites the one on screen —
+formatting, links and ticker colouring gone from the log, with nothing to put them back. The
+clipboard is identical either way. Matching the reference here would mean reproducing a defect, and
+the reason is at the code so the next comparison finds it rather than assuming a missed line.
+
+**The rest.** RM-02: the compact row branches on the log as `O(26, "alerts" === e.logType ? 26 : 27)`
+does, giving alerts Angular's `short` date and the `alert-qa` button; a compact alerts log had lost
+the Q&A entry point entirely. RM-03: `bodyColorClasses`, one derived carrying the two conditions,
+applied by the card body and both compact bodies — a member mentioned in compact mode got no
+highlight, and that colour is the one signal saying a message is addressed to you. RM-04: the add
+pill, gated as `g_e` is. RM-07: `questionColor` was gated on `kind === 'chat'` here and the
+reference's conditions mention no log type — which matters most on alerts, since `hasQAOnAlerts`
+exists to invite a question.
+
+**A FIFTH instance of prose voting in a source assertion.** `alert-chat-style-contract` counted
+`<app-st-message>` over raw text, and a comment explaining the two-host split quoted it — so the
+count read 2 for a file with one. Same fix as the four before it (`dead-export-contract`,
+`orphan-style-contract`, `evidence-gap-register-counts`, `private-chat-delivery`): `svelteCodeOf`.
+
+**Negative controls, all eleven seen RED after the commit, all first time.** Putting the compact
+branch back inside the card host (six assertions plus the separator contract); the compact
+`font-size` back to the card's 16px; the sheet imported before the generated one instead of after;
+the alerts branch removed; the Ask-a-question button removed; `bodyColorClasses` dropped from the
+compact body; `questionColor` gated on chat again; the compact add pill removed;
+`chat-reaction-hover` put back on it; `answered-check` restored; and the RM-19 note deleted — that
+last one is what makes the divergence a decision rather than an omission, so it is guarded like any
+other.
+
+**Verified.** `compact-message-contract.test.ts` 16 new assertions, four of them reading the two
+stylesheets through postcss so the 14px-against-16px comparison is the real one rather than a text
+match. Full `pnpm run gate` green — 233 files, 3,862 passed, 1 skipped, `gate-exit=0` read from the
+log. `svelte-check` refused a `walkDecls` callback whose arrow body returned a `Map` where postcss
+types `false | void`; braced, because the API is saying the return means something. **Nothing was
+opened in a browser** — so the type sizes are verified from the two stylesheets and not from pixels,
+which is stated rather than implied. The **Svelte MCP has been unavailable for this entire session**.
+
 ### 2026-08-30 10:40 UTC — The tab-title flash, and the tripwire that was built to stop it being built quietly
 
 **Runtime impact: YES.** A private message arriving while the tab is in the background now flashes

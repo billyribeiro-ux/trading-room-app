@@ -3,6 +3,12 @@
 @import 'animate.css/animate.min.css';
 @import './lib/styles/tokens.css';
 @import './lib/styles/captured-runtime-components.css';
+/*
+  `app-st-compactmessage`'s own block. LAST, so it wins over the card's rules for anything the
+  compact host encloses — which is the cascade Angular's per-component attributes gave upstream, and
+  the reason it is imported here rather than folded into the generated file it cannot come from.
+*/
+@import './lib/styles/compact-message.css';
 
 .fa-disk::before,
 .fa-floppy-o::before {
