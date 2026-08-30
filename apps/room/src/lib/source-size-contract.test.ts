@@ -623,7 +623,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rendered by the PAGE and the modal by the overlays — two components, one permission, and no
       shared holder between them that is not the page itself.
     */
-    max: 1544,
+    /*
+      1,544 -> 1,559, 2026-08-30, for USM-17. Fourteen lines: `savedChatStyle`, the two-statement
+      `setTheme`, and the two-statement `mergeGlobalChatStyle` that keeps them in step.
+
+      WHY NOT AN EXTRACTION — and the answer is that one was made. The REASONING left, to
+      `chatStyleAfterThemeSwitch` in `#lib/chat-style.ts`, which is where the citation and the
+      "saved wins" rule now live; the page keeps a one-line call. What is left here cannot leave: it
+      is a page field and two page callbacks, which is the composition root doing its job. The same
+      commit also sent four preference side effects out of `create-room.svelte.ts`, whose ceiling is
+      NOT raised.
+    */
+    max: 1559,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -762,7 +773,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one thing that cannot live there — the self-skip, and why the actor's id on this frame is not
       authority.
     */
-    max: 971,
+    /*
+      971 -> 983, 2026-08-30, for USM-11: twelve lines, and eleven of them are the CALL — the four
+      dependencies `noteUpdateNotice` takes, each supplied from the room's own state rather than
+      from the frame. The reasoning itself left, to `#lib/room/note-update-notice.ts`, which is the
+      trade this file asks for; what remains is a dispatcher branch, which is what this file is.
+    */
+    max: 983,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -893,7 +910,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       The same commit lowers `user-actions.svelte.ts` by fifteen, so the room's total cap falls.
     */
-    max: 263,
+    /*
+      263 -> 242 on 2026-08-30, and a ceiling going DOWN is the direction this file exists for.
+      `downloadImage` left for `#lib/download-image.ts` when `dta-02` needed it in two panes that do
+      not hold this class: it had no field, no lifecycle and nothing rendered, so it was never
+      overlay state. The `why` below is now true of everything left.
+    */
+    max: 242,
     why: 'the overlay state machine - five fields the template reads and this class alone writes'
   },
   {
@@ -953,7 +976,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It goes DOWN if the preview window ever leaves for a module of its own, which is the next real
       extraction here. It does not go up again.
     */
-    max: 406,
+    /*
+      406 -> 423, 2026-08-30, for USM-12: `showRecPreview` refuses when `prefs.recPreviewWindow` is
+      off, with the eleven lines that say why that refusal is a deliberate divergence.
+
+      Upstream reads the preference only to seed its checkbox and to close on the way off. Refusing
+      to OPEN is ours, and the reason is the row itself: a preference whose only effect is closing
+      something already open does nothing at all on the next session, which is the defect being
+      fixed rather than a shape to reproduce.
+    */
+    max: 423,
     why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
@@ -1438,7 +1470,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       leaving the twenty lines of markup where they were and raising ModalHost instead, which is the
       trade this rule exists to force.
     */
-    max: 965,
+    /*
+      965 -> 1,011, 2026-08-30, for USM-08 / USM-09 / USM-10. Forty lines, and the shape of them is
+      the argument: two trackers, one roster lookup, and two CALLS with their context objects
+      spelled out. The reasoning — both byte offsets, both audiences, why Do Not Disturb is on the
+      sound and not on the popup — left with the behaviour, to `#lib/room/reaction-notices.ts`.
+
+      The context objects are what cost the lines and they are not padding: each field is a decision
+      the caller owns (who am I, am I a presenter, which of three preferences applies), and passing
+      the room instead would have made a notification module reach for the whole room.
+    */
+    /*
+      1,011 -> 1,056, 2026-08-30, for `dta-04`: the paste-confirm heading and the reference's inline
+      `max-height: 50vh` on BOTH trade-alert dialogs, each with the seventeen-line citation.
+
+      The citation is duplicated because the DIALOGS are, and that duplication is itself upstream's:
+      `imgUpload` takes the feature name and `doImggurUpload` dispatches on it deny-by-default, so
+      day trade and swing genuinely own separate dialogs. A reader who meets one of them must not
+      have to find the other to learn why it says what it says.
+    */
+    max: 1056,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2553,7 +2604,51 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       6,334 -> 6,335, 2026-08-30. One line: `onconfirm={onConfirm}` on `PostAlertModal`, so PAM-11's
       confirm reaches the scheduler pane through the callback `PollPanel` next door already uses.
     */
-    max: 6335,
+    /*
+      6,335 -> 6,356, 2026-08-30, for USM-12 and USM-18. Twenty lines, nineteen of them the reason:
+      three defects in one Recording Preview checkbox (persisting nothing, read by nothing, drawn
+      for everyone), and why USM-18's `defaultImagePreview` conjunct is refused rather than missed.
+
+      This file ALREADY paid for today's work twice over: `RestreamPane.svelte` and
+      `SessionHistoryPane.svelte` took 225 lines out of it earlier in the day, against a ceiling
+      that has not moved since. A third extraction to absorb twenty lines of citation would be
+      churn, and the rule this file states about itself is that prose is never trimmed to fit.
+    */
+    /*
+      6,356 -> 6,390, 2026-08-30, for USM-11's checkbox: the control, its `on`/`off` pair, and a
+      six-line pointer at `#lib/room/note-update-notice.ts`, which is where the frame, both byte
+      offsets and both refusals now live.
+
+      Two extractions have already come out of this file today — `RestreamPane.svelte` and
+      `SessionHistoryPane.svelte`, 225 lines — and its reasoning left with the behaviour here rather
+      than sitting beside the markup. What is left is a checkbox.
+    */
+    /*
+      6,390 -> 6,442, 2026-08-30, for USM-08 / USM-09 / USM-10: the Alert tab's QA Reactions Sound
+      box with its fifteen-line citation, the three mapping rows, and the call to the pane that took
+      the other two boxes.
+
+      THREE extractions have now come out of this file today — `RestreamPane.svelte`,
+      `SessionHistoryPane.svelte` and `ReactionPrefsPane.svelte`, 324 lines between them — against a
+      ceiling that has risen 107 in total. The trade this file asks for is being made.
+    */
+    /*
+      6,442 -> 6,482, 2026-08-30, for CONN-02 / CONN-03 / CONN-04. Forty lines, thirty-six of them
+      the reason: the three gates are small and the WHY is not — the reference withholds two of
+      three tabs from a member, and our own `mobileAppAvailable` divergence then leaves one with no
+      tab at all, which needed answering rather than shipping as an empty modal.
+
+      THE NEXT EXTRACTION FROM THIS FILE IS THE CONNECTIVITY MODAL, and it is named here rather than
+      left for somebody to rediscover. It is ~250 self-contained lines — the tab strip, the WebRTC
+      test, the mic test and its playback — with four CONN rows still open against it, so the next
+      one lands in a component instead of here. It was not done in this commit because it is a large
+      move with live media state in it and this commit was already three gates and a contract; doing
+      both would have made one reviewable change into two unreviewable ones.
+
+      Today's record so far: three components out (`RestreamPane`, `SessionHistoryPane`,
+      `ReactionPrefsPane`, 324 lines) against a ceiling risen 147.
+    */
+    max: 6482,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2620,7 +2715,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       replaced by the branch it described — and by the argument that the authority is the SERVER's,
       which the reference's client-side compare is not.
     */
-    max: 1680,
+    /*
+      1,680 -> 1,709, 2026-08-30, for USM-11: `saveSessionNote` publishes `updatedSessionNote` now,
+      with the twenty-line citation that says why the frame carries the note's NAME and not its
+      content.
+
+      That paragraph earns its place: this is a server file, the rule it is applying (per-ROOM
+      stream, per-CHANNEL content) is the one `message-mutation-frames.ts` exists for, and the next
+      person to add a field to this frame needs to meet it here rather than three files away.
+    */
+    max: 1709,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
@@ -3103,7 +3207,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       neighbours default true, because `!== false` would have flipped every existing member's panel
       on the first load after this shipped.
     */
-    max: 685,
+    /*
+      685 -> 709, 2026-08-30, for USM-12's `recPreviewWindow`: a field, a seed, a boolean case, a
+      getter, and the two docblocks that say what the preference is for and where it is read.
+
+      The seed's note carries the byte offset of the reference's own default (979,890) because the
+      polarity is the whole point — `!== false`, so an unset preference does not switch a presenter's
+      preview off for them.
+    */
+    /*
+      709 -> 725, 2026-08-30, for USM-11's `noteUpdatePopup`: field, seed, boolean case, getter and
+      the note recording that the preference had no control, no consumer and no EVENT before today.
+    */
+    /*
+      725 -> 759, 2026-08-30, for the three reaction preferences: three fields, three seeds sharing
+      one docblock, three boolean cases and three getters. The seed note carries the two default
+      objects' offsets because all three default ON, and an unset preference silencing a
+      notification is the polarity that would be wrong in the expensive direction.
+    */
+    max: 759,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -3711,6 +3833,86 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
   {
+    file: 'lib/room/reaction-notices.ts',
+    /*
+      USM-08 / USM-09 / USM-10's two notices, extracted from `RoomOverlays.svelte` in the commit
+      that wrote them.
+
+      Most of the file is the WHY, and it is why worth keeping: the reference reads a reaction off a
+      frame field carrying the reacted-to message BODY and then filters to the recipient IN THE
+      BROWSER. This room cannot do either — the stream is per ROOM — so both audiences are decided
+      over rows the server already chose to send this viewer.
+    */
+    max: 116,
+    why: 'who is told about a reaction, and the Do Not Disturb split the reference has'
+  },
+  {
+    file: 'lib/reaction-arrivals.ts',
+    /*
+      Which reactions are NEW since the last load — the diff those two notices run on.
+
+      Its header records a control's finding: it had a `#primed` flag copied from `RoomArrivals` and
+      the flag did nothing, because the guard that makes a NEW row silent already makes the FIRST
+      PASS silent. Deleting it left every test green, which is what a redundant field looks like.
+    */
+    max: 115,
+    why: 'the reaction diff between two page loads, and why it is not read off the wire'
+  },
+  {
+    file: 'lib/flash-on-edit.ts',
+    /*
+      `dta-01` — flash the trade-alert composer when Edit is pressed.
+
+      Most of the file is why it is a COUNTER: with a boolean, Edit pressed twice inside 500 ms
+      leaves the value already true, nothing re-runs, and the first timer ends the second flash.
+      That is the row's own defect coming back, and its control was seen red.
+    */
+    max: 47,
+    why: 'the 500ms composer flash, as an attachment, and why the nonce is a counter'
+  },
+  {
+    file: 'lib/download-image.ts',
+    /*
+      Saving an image the room is showing. It was a method on `RoomModals` with one caller, and
+      `dta-02` needed two more in components that do not hold `RoomModals` and should not.
+
+      It was never modal state — no field, no lifecycle, nothing rendered. A method whose class it
+      never touches is a function that has not been extracted yet.
+    */
+    max: 55,
+    why: 'save a shown image, with the reference two filename rules that are not cosmetic'
+  },
+  {
+    file: 'lib/room/note-update-notice.ts',
+    /*
+      USM-11's receiver, extracted from `events.svelte.ts` on 2026-08-30 in the commit that wrote it.
+
+      `source-size-contract` moved it and the module is the better home: that file is a dispatcher,
+      and this is a behaviour with four paragraphs attached — the two byte offsets, why the saver is
+      skipped, why upstream's `alertsService.clear()` is refused, and why the control is NOT gated on
+      `sessData.beepOnUserJoin`. Most of the file is those four.
+    */
+    max: 76,
+    why: 'a note somebody else saved: the refetch, the toast, and the two refusals'
+  },
+  {
+    file: 'lib/room/preference-side-effects.ts',
+    /*
+      The four preference writes that are NOT preferences, extracted from `createRoom` on
+      2026-08-30 when USM-12 and USM-13 added the third and fourth.
+
+      `source-size-contract` is what moved them and the module is the better home on its own terms:
+      `create-room.svelte.ts` is a wiring file, and this is a decision table whose every row is a
+      defect somebody fixed with a reason worth keeping. Most of the file is those reasons.
+
+      Two of the four act on a class constructed AFTER the hook, so all five dependencies are
+      thunks — a closure, never a read at construction, which is also what makes this testable
+      without building a room.
+    */
+    max: 111,
+    why: 'the four preference writes that are not preferences, and why each one exists'
+  },
+  {
     file: 'lib/room/restream-url.ts',
     /*
       SC-13's one act, 2026-08-30, and deliberately the same shape as `close-message.ts` below it: a
@@ -3852,7 +4054,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       compared against the recipient's own, the frame carries no payload for a forged id to unlock,
       and the server applied every rule before publishing. The comment IS the change.
     */
-    max: 68,
+    /*
+      68 -> 77, 2026-08-30, for `noteName` — the ONE string on this frame that is displayed, and
+      nine lines saying why that is safe: the frame is published by `saveSessionNote` on our own
+      server rather than relayed from a client, and a note's tab name is already drawn for anyone
+      who can see the pane. The body is deliberately not sent.
+    */
+    max: 77,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
   },
   {
@@ -4462,6 +4670,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 146,
     why: 'the dialog primitive this repository uses in place of bootbox'
+  },
+  {
+    file: 'lib/components/ReactionPrefsPane.svelte',
+    /*
+      The user-settings modal's two reaction-notice checkboxes, extracted 2026-08-30.
+
+      A real slice rather than a convenience: these two share one gate apiece, one consumer, and
+      nothing at all with the alert-sound boxes they sat beside. `setInputChecked` is copied rather
+      than shared — four lines whose only reason to exist is that `bind:checked` over a plain
+      `Record` loses every race with the DOM, and sharing it would mean a module for a closure.
+    */
+    max: 100,
+    why: 'the two reaction popups and the two room settings that decide whether they exist'
   },
   {
     file: 'lib/components/RestreamPane.svelte',
@@ -5144,12 +5365,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/day-trade-alerts/DayTradeAlertForm.svelte',
-    max: 357,
+    /*
+      357 -> 361, 2026-08-30, for `dta-01`: the `flashNonce` prop, its docblock and the
+      `{@attach flashOnEdit(flashNonce)}` on the form element. The reasoning is in
+      `#lib/flash-on-edit.ts`, which is where the byte offsets and the counter-versus-boolean
+      argument live.
+    */
+    max: 361,
     why: 'the day-trade alert composer form'
   },
   {
     file: 'lib/components/day-trade-alerts/DayTradeAlertsPane.svelte',
-    max: 583,
+    /*
+      583 -> 623, 2026-08-30, for `dta-01` / `dta-02` / `dta-03`: the flash nonce, the `modal-lg`
+      lightbox and its Download Image footer, with the citation for why that footer is the dialog's
+      ONLY button. Two modules came out in the same commit — `flash-on-edit.ts` and
+      `download-image.ts` — and the second took a method off `RoomModals` that never belonged there.
+    */
+    max: 623,
     why: 'the day-trade alerts tab'
   },
   {
@@ -5159,12 +5392,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/swing-alerts/SwingAlertForm.svelte',
-    max: 327,
+    /* 327 -> 331, 2026-08-30. The swing twin of the four lines on the day-trade form above. */
+    max: 331,
     why: 'the swing alert composer form'
   },
   {
     file: 'lib/components/swing-alerts/SwingAlertsPane.svelte',
-    max: 538,
+    /*
+      538 -> 578, 2026-08-30. The swing twin of the day-trade pane raise above, line for line: these
+      two panes are one behaviour in two components, and the whole point of `dta-01` … `dta-04` is
+      that all four rows were missing from BOTH.
+    */
+    max: 578,
     why: 'the swing alerts tab'
   }
 ];

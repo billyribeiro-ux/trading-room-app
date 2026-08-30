@@ -33,6 +33,455 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 17:19 UTC — The trade-alert panes: an Edit that looked broken, and a picture you could not save
+
+**Runtime impact: YES.** Pressing Edit on a trade alert flashes the composer, so it no longer reads
+as a dead button when the form is scrolled off screen. The image lightbox opens large and has the
+Download Image button that is its only control upstream. The paste-to-upload confirm asks its
+question instead of showing an unlabelled OK/Cancel over a picture.
+
+**dta-01, dta-02, dta-03 and dta-04 built in BOTH panes; dta-05 recorded. The day-trade and
+swing-alert panes are complete.** The audit stands at **73 open · 151 closed**.
+
+#### Every row was missing from both twins, so every assertion runs twice
+
+Day trade and swing are two components with one behaviour. All four rows were absent from **both** —
+which is how a pair comes to need four identical fixes — so `trade-alert-pane-contract.test.ts` uses
+`it.each` over the pair rather than checking one and trusting the other.
+
+#### dta-01 is not decoration, and the row said why
+
+```js
+ii(".day-trade-alert-form").addClass("animated flash");
+const s = setTimeout(() => { ii(".day-trade-alert-form").removeClass("animated flash"),
+                             clearTimeout(s) }, 500)                    // byte 1,988,722
+```
+
+The composer sits **above** a table that can be scrolled past it. Pressing Edit on row forty fills a
+form the presenter cannot see, so without the flash the button reads as broken — they press it again,
+and the second press overwrites the draft the first one made.
+
+An **attachment**, which `CLAUDE.md` names as the Svelte 5 replacement for imperative DOM plumbing,
+and the official docs were read on it now that the MCP is up: *"Attachments … run in an effect when
+an element is mounted to the DOM or when state read inside the function updates"* and *"can return a
+function that is called before the attachment re-runs"*. Both halves are load-bearing.
+
+**The nonce is a COUNTER and not a boolean**, and that control was seen red: with a boolean, Edit
+pressed twice inside 500 ms leaves the value already `true`, nothing re-runs, and the **first** timer
+strips the class off the **second** flash — the presenter presses Edit, sees nothing, and is back to
+the defect the row is about.
+
+#### dta-02 moved a method that was never modal state
+
+`buttons: { download: … }` **replaces** bootbox's default OK, so Download Image is the dialog's only
+control and the header's close button is how it is dismissed without saving. `BootboxDialog`'s
+`footer` snippet expresses that; passing it suppresses the default OK. Saving closes the dialog too,
+which is the reference's shape and the right one — the presenter opened the picture to get a copy.
+
+The row noted the capability already existed, and it did, in the wrong place.
+`RoomModals.downloadImage` had exactly one caller and no field, no lifecycle and nothing rendered.
+**A method whose class it never touches is a function that has not been extracted yet.** It is
+`#lib/download-image.ts` now, and `modals.svelte.ts`'s ceiling **goes down** 263 → 242 — the
+direction that file exists for. Its two filename rules are the reference's and are not cosmetic:
+without them a presenter saving a screenshot gets `a3f9c1_chart_1024.png` instead of `chart.png`.
+
+#### dta-05 is the 2026-08-07 escalation wearing a feature request
+
+`linkedRoom${e}AlertsOther` lets a room fetch **another room's** alert log, with the room named by
+the browser: `sendServerCommand(\`get${e}AlertsLog\`, { sessionID: s || globals.sessionID, days: i })`.
+Both endpoints here take the room from the session row instead, and say so in place. Carrying it
+would reintroduce the exact thing `CLAUDE.md` says must never be reintroduced. The honest cost is
+stated rather than hidden: a room configured upstream to mirror another room's log shows its own
+here. Building it correctly means resolving the mirror on the **controller**, from the room's own
+settings, never named on the wire — a real feature, and not this row.
+
+#### Two controls stayed green, and both were my mutation rather than the test
+
+`className="modal-lg"` and one of the filename rules: my `sed` patterns did not match what Prettier
+had produced, so nothing was mutated. Re-run against the real text, both fail. Recorded because "the
+control passed" is only evidence when the mutation is known to have landed — this is the same class
+as the `ScreenShareMenu` artefact two hours ago, and it is worth counting.
+
+**Verified:** `trade-alert-pane-contract.test.ts` 16/16 (new). **Ten negative controls run and seen
+red** — the attachment removed from the day-trade form, the swing pane not bumping the nonce, the
+nonce turned into a boolean, the previous timer not cancelled, `modal-lg` dropped, the download
+footer dropped from swing, saving no longer closing the dialog, one paste heading removed, one 50vh
+removed, and a filename rule dropped. Full `pnpm run gate` in `apps/room`: **252 files, 4,169 passed,
+1 skipped, `gate-exit=0`**, read from the log it was echoed into. Controller untouched.
+
+**A correction to the 17:15 entry:** it said the autofixer had run whole on six components and none
+of the larger ones. `BootboxDialog.svelte` and `ScheduledAlerts.svelte` were run immediately after
+it was written and are both clean, so the honest figure is **eight of sixteen**. The eight not yet
+covered are the ones between 500 and 5,000 lines stripped, and that remains named outstanding work.
+
+### 2026-08-30 17:15 UTC — The Svelte MCP came back, and the mandatory gate finally ran
+
+**Runtime impact: NO.** No component behaviour changed. `apps/room/AGENTS.md` gains a section; that
+is the whole diff.
+
+**Every CHANGELOG entry today has ended with the same sentence: *"the Svelte MCP server has been
+disconnected for this entire session, so `svelte-autofixer` was not run."*** It reconnected at 17:07.
+`CLAUDE.md` calls that tool "the last gate, every time", so it was run before anything else.
+
+#### What it found on the six components authored today
+
+| component | result |
+| --- | --- |
+| `RestreamPane.svelte` | no issues, no suggestions |
+| `ReactionPrefsPane.svelte` | no issues, no suggestions |
+| `SessionHistoryPane.svelte` | no issues, no suggestions |
+| `ScreenShareMenu.svelte` | clean |
+| `AvDevicePane.svelte` | four suggestions, all one kind |
+| `MessageBody.svelte` | one suggestion, already decided elsewhere |
+
+**No issues at all**, and both recurring suggestions turn out to be refusals this repository has
+already argued for. So they are recorded in `AGENTS.md` rather than either silently ignored or
+"fixed" into a regression:
+
+**"Unexpected mustache interpolation with a string literal value."** `{' Retry '}`,
+`{' Reconnecting Chat... '}`, `{' Please connect audio devices. '}` and about forty siblings. Those
+braces preserve the reference's own **leading and trailing spaces** — `v(5," Retry ")`,
+`Ne(" ", e.devicesLoadError, " ")` — which plain text loses to Prettier and to HTML whitespace
+folding. Every capture comparison here diffs rendered strings, so the spaces are evidence rather than
+formatting. The idiom predates today.
+
+**"Each block should have a key."** Already decided in the other direction, and enforced:
+`each-key-contract.test.ts` records that those segment arrays are parsed from one message body and
+replaced wholesale, so a segment has no identity to key by — and an index key produces DOM reuse
+identical to no key while *claiming* the reuse is safe. The keys were removed deliberately.
+
+Step 3 of the workflow said "repeat until it reports no issues or suggestions", which is not
+reachable here. It now says "no issues, or every remaining suggestion is one of the declined ones
+below" — because **a rule nobody can satisfy is a rule people stop running**, and that is a worse
+outcome than a recorded exception. A third entry needs the same treatment: a measurement, a reason,
+and a test if the decision can drift.
+
+#### What was NOT run, said plainly
+
+The autofixer takes code inline, so it was run **whole** on the six components authored today and on
+none of the ten larger ones modified today — `ModalHost.svelte` alone is 6,482 lines. Passing
+fragments of those would have checked a fragment and reported a component, which is the shape of
+claim this repository refuses. What covers them instead is `svelte-check`, clean at **1,461 files**,
+and the gate, green. Running the autofixer over the large components is real outstanding work and is
+named here rather than implied to be done.
+
+One finding on `ScreenShareMenu.svelte` was an artefact of my own comment-stripped reconstruction
+rather than of the file — the real file's `svelte-ignore` pair is `a11y_click_events_have_key_events`
++ `a11y_no_static_element_interactions`, and I had substituted the wrong second one. Recorded because
+a tool result read against the wrong input is exactly the failure mode this repository keeps finding
+in its own tests.
+
+**Verified:** full `pnpm run gate` in `apps/room` after the documentation change: **251 files, 4,146
+passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into. Nothing was opened in a
+browser.
+
+### 2026-08-30 17:01 UTC — A member could run the room's WebRTC test, and four PostAlertModal rows read as open while the code said otherwise
+
+**Runtime impact: YES.** The connectivity troubleshooter is now the reference's shape: a member gets
+the Mobile App tab and a title without "/Mic", a presenter gets all three, and the modal opens on the
+tab its viewer is allowed to see.
+
+**CONN-02, CONN-03 and CONN-04 built; CONN-01 already built; CONN-07 refused. The connectivity modal
+is complete.** And four PostAlertModal rows that were built hours ago got the disposition lines they
+never received.
+
+#### The gates were the wrong way round
+
+```js
+z("ngIf", globals.isPresenter)   // the Network Test li
+Tt("active", "mobile" === o.activeTab)   // the Mobile App li, UNCONDITIONAL
+z("ngIf", globals.isPresenter)   // the Mic Test li                       // byte 2,456,395
+this.activeTab = globals.isPresenter ? "network" : "mobile"               // byte 2,444,097
+O(5, globals.isPresenter ? 5 : 6)   // dAe "Connectivity/Mic" | uAe "Connectivity"
+```
+
+The reference gates **both** the Network Test and Mic Test tabs and leaves only Mobile App open. This
+room gated the Mic Test and left Network Test open, so a member could run the WebRTC connectivity
+test. Diagnostic rather than privileged — defence in depth rather than a hole being closed — and it
+is said that way rather than dressed up. The body and the footer's Start Test button carry the same
+term as the tab, for the reason SC-17 records: a gate on the way IN is not a statement about what the
+thing is for.
+
+**CONN-01 was found already built**, including `MobileRestorePane.svelte` transcribed whole with the
+reference's own missing full stop after "notifications" — which is now asserted, because it is
+exactly the kind of thing a well-meaning edit repairs.
+
+#### A divergence of ours forced an answer upstream never needs
+
+Our Mobile App tab sits behind `mobileAppAvailable` where upstream draws it unconditionally, and that
+gate is right: a room with no mobile app has nothing for Restore Connectivity to restore. Put
+together with CONN-02, a member in such a room would have opened this modal onto **nothing**. An
+empty modal is a control whose only effect is that it opened. It says why it is empty instead — the
+same reasoning as SC-14's Refresh button: **a divergence forced by an earlier divergence of ours is
+still ours to answer for.**
+
+**CONN-07 is refused** rather than deferred. The bundle carries two shells with different sidebar
+labels for the same target; this room implements the other one, exactly. The shell that says
+`Connectivity/Mic Check` is `app-closed-session-page`, which this room does not build at all — a
+closed room here is answered by `session/+page.server.ts` with the stored close message. One label
+out of a page we do not render is a string with no surface.
+
+#### A control found an array assertion that could not see the mutation
+
+"leaves the Mobile App tab out of that gate" used `not.toContain('isPresenter')` on the ARRAY of
+enclosing gates — which tests for an exact element, so a gate reading `isPresenter &&
+mobileAppAvailable` satisfied it. That is precisely the mutation the row exists to refuse, and its
+control stayed green. Every enclosing gate is checked for the term now, not the list for the string.
+
+#### And the tracker was understating itself by four rows
+
+`PAM-05`, `PAM-07`, `PAM-08` and `PAM-09` were built at 13:54 and their disposition lines were never
+written; the per-surface check added at 15:36 is what surfaced it. Understating progress is the safe
+direction and is still a defect — **a row that reads open is a row somebody re-opens.** All four are
+verified against the source and recorded with that note. `PostAlertModal.svelte` is complete at 14 of
+14.
+
+The audit stands at **78 open · 146 closed · 224 rows**, from 107 open when this stretch began.
+
+`ModalHost.svelte`'s ceiling rises 6,442 → 6,482, and **the next extraction from it is named at the
+ceiling**: the connectivity modal, ~250 self-contained lines with four CONN-adjacent rows still
+against it. It was not done here because it carries live media state and this commit was already
+three gates and a contract; doing both would have turned one reviewable change into two unreviewable
+ones.
+
+**Verified:** `connectivity-audience-contract.test.ts` 10/10 (new). **Nine negative controls run and
+seen red** — the Network tab ungated, the Mobile App tab swept into the presenter gate, its
+entitlement gate removed, the body losing its own term, the initial tab back to a literal, the seed
+made reactive, the title back to one string, the empty-state branch removed, and the blurb's missing
+full stop repaired. `troubleshooter-retained-contract.test.ts` followed the title binding rather than
+being relaxed — both strings are still there, which is what that row is about. Full `pnpm run gate`
+in `apps/room`: **251 files, 4,146 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed
+into. Controller untouched. **Nothing was opened in a browser, and the Svelte MCP server has been
+disconnected for this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at
+1,461 files.
+
+### 2026-08-30 16:50 UTC — Being told somebody reacted to your message, without putting it on everyone's wire
+
+**Runtime impact: YES.** A reaction on your chat message, or on a question you asked, now raises a
+toast naming who reacted and with what — behind three preferences, each behind the room setting that
+turns its feature on. Nothing new goes on the wire.
+
+**USM-08, USM-09 and USM-10 built. The user-settings modal is thirteen of seventeen.**
+
+#### The reference's mechanism could not be copied, and that IS the design
+
+```js
+subscribe("updateChatMsgReaction", i => preferences.reactionsPopup &&
+  alertsService.info(`${i.n}: ${i.remove?"removed":""} ${i.emoji} on "${i.txt}"`,
+                     "Message Reaction", {enableHtml:!0}))            // byte 2,509,044
+```
+
+Both toasts render **`txt` — the reacted-to message body** — read off `reactionDetails` /
+`qaReactionDetails`, fields on an inbound frame. And the socket layer then filters that payload to
+the right recipient **in the browser** (`reactionDetails.msgUID === globals.user.userXrefID`, byte
+1,011,021).
+
+`message-mutation-frames.ts` already says why neither is available here, in its own words: *"this
+hub's SSE stream is per ROOM while chat is per CHANNEL, so a frame carrying a message body would put
+admin-channel text on every subscriber's wire."*
+
+So the frame stays a trigger. `invalidateAll()` re-reads the rows the server decided this member may
+see, and a reaction is noticed by **diffing two of those reads** — `reaction-arrivals.ts`, the same
+shape `RoomArrivals` uses for new messages and alerts, one level down: rows instead of a list,
+reactors instead of rows. Everything the toast renders was already in this browser's page data, and
+the audience filter runs on the server's own answer rather than on a payload. The reactor's name
+comes from the roster, because a reaction stores an md5 email hash and nothing else.
+
+#### Two asymmetries reproduced deliberately
+
+**Do Not Disturb is on the sound and not on the popup.** `doNotDisturbOn || (c && qaReactionSoundOn
+&& qaAlert.play())` at byte 1,408,850, with the popup on the following line *outside* that guard.
+The contract asserts the gap between the two gates contains no `doNotDisturbOn`, because reproducing
+half of an asymmetry is worse than reproducing neither half.
+
+**The two audiences differ.** Chat: the message's owner and nobody else. Q&A: everyone who has asked
+on that alert, plus every presenter, never the actor — which is the audience `deliverQaNotice`
+already uses for a new question, because it is the same audience.
+
+#### A control found a redundant field, and another found a blind assertion
+
+`ReactionArrivals` had a `#primed` flag copied from its sibling. Deleting it left every test green —
+because the guard that makes a NEW row silent already makes the FIRST PASS silent, so the flag never
+decided anything. `RoomArrivals` needs one because its question ("is this row new?") is
+indistinguishable from "have I run before?" on the first pass; this one asks whether a row's
+reactions *changed*, and a row with no previous entry has no answer either way. The flag is gone and
+the reasoning is recorded so nobody adds it back from the sibling.
+
+And "skips the reactor's own reaction" was satisfied by `toContain` while the chat branch's copy was
+deleted, because the Q&A branch has the same line. It counts both now. **Second time this session an
+assertion has been caught by counting rather than by review.**
+
+#### The coverage gate caught a name collision
+
+`const chatReactions = new ReactionArrivals()` turned the enumeration red: **`chatReactions` is a
+reference COMMAND name** on `feature-coverage-contract`'s absent list, and a local called that would
+have made the report claim this room implements a command it does not. The scanner is right to be
+literal — that is what caught it — and the fix is the local's name, not the list.
+
+#### Three extractions, so the two host files gave back most of what they took
+
+`reaction-notices.ts` (the two audiences), `reaction-arrivals.ts` (the diff) and
+`ReactionPrefsPane.svelte` (the two App-tab checkboxes). `ModalHost.svelte` has now sent 324 lines to
+three components today against a ceiling that has risen 107 in total. Three ceilings move, argued at
+each: `RoomOverlays.svelte` 965 → 1,011 (two trackers and two calls whose context objects are the
+caller's own decisions), `ModalHost.svelte` 6,390 → 6,442, `prefs.svelte.ts` 725 → 759.
+
+**Verified:** `reaction-notice-contract.test.ts` 18/18 (new), including eight behavioural tests of
+the diff itself — first pass silent, additions, removals, two reactors on one row, a row that is new,
+a change already reported, a row that left the list, and one person's two emoji. **Eleven negative
+controls run and seen red** — the owner filter dropped, each self-skip dropped separately, the Q&A
+audience widened, Do Not Disturb applied to the popup, the line's `removed` term dropped, the
+entitlement gates removed, the roster fallback removed, removals not reported, a new row's reactions
+announced, and the marker map grown instead of replaced. Full `pnpm run gate` in `apps/room`: **250
+files, 4,135 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into. Controller
+untouched. **Nothing was opened in a browser, and the Svelte MCP server has been disconnected for
+this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at 1,461 files.
+
+### 2026-08-30 16:25 UTC — Saving a session note told nobody
+
+**Runtime impact: YES.** A presenter editing the room's session notes is now visible to everyone in
+it, instead of nobody seeing the change until they happened to reload. Viewers get a toast naming the
+note, behind a preference they can switch off.
+
+**USM-11 built.** Ten of the user-settings modal's seventeen rows are closed.
+
+#### The row named the popup; the defect was one level under it
+
+`saveSessionNote` in `+page.server.ts` wrote its row and **published nothing**. Every other viewer's
+Notes pane kept the previous text until they reloaded — a presenter editing the room's notes during
+a session was invisible to the room, which is the entire point of the pane. The audit row asks for a
+checkbox. The checkbox could not exist without the frame, so the frame was the work.
+
+`updatedSessionNote` is the reference's own name, read at byte **1,022,762**; its receiver emits
+`noteTabUpdated {id, name}` and the toast hangs off that at 1,962,777. That matters because
+`message-mutation-frames.ts` sets the rule for a fifth frame: *"Adding one means finding it in the
+bundle first — an invented frame name is the `alertDisplayMode` defect wearing a wire format."*
+
+**The frame carries the id and the NAME and not the content**, and the contract asserts the absence.
+`invalidateAll()` re-reads the row, which is the authority — the argument the four message-mutation
+frames already make — and this SSE stream is per ROOM while chat is per channel, which is the second
+reason that module gives for trigger-only frames. A note's tab name is already drawn for anyone who
+can see the pane, so the frame carries nothing its recipient could not read anyway.
+
+#### Two divergences, both refusals rather than omissions
+
+Upstream's handler calls `alertsService.clear()` before raising the toast. That wipes **every** toast
+on screen — including the media-outage banner `RoomToasts` deliberately gives `timeOut: 0`, which a
+note being edited must not dismiss. De-duplication is what that call was there for, and `RoomToasts.show`
+already does it.
+
+And upstream renders the checkbox under `z("ngIf", sessData.beepOnUserJoin)` at byte 2,285,196 — the
+**join-beep room setting**, which has nothing to do with session notes, which nothing else in that
+block shares, and which no handler reads alongside it. It reads as a markup slip; reproducing it
+would mean an owner who switches off the join beep silently loses control of note popups.
+
+#### One extraction, so the dispatcher's reasoning went with the behaviour
+
+`note-update-notice.ts` took the receiver out of `events.svelte.ts` — that file is a dispatcher, and
+this is a behaviour with four paragraphs attached. `ModalHost.svelte` keeps a six-line pointer at it
+instead of the citation. Four ceilings move, each argued: `+page.server.ts` 1,680 → 1,709 (the
+publish and its twenty-line reason, which belongs on the server where the rule applies),
+`ModalHost.svelte` 6,356 → 6,390, `prefs.svelte.ts` 709 → 725, `cmds-frame.ts` 68 → 77 (nine lines
+saying why the one displayed string on that frame is safe), `events.svelte.ts` 971 → 983 (the call,
+not the reasoning).
+
+**Verified:** `note-update-broadcast-contract.test.ts` 10/10 (new). **Nine negative controls run and
+seen red** — the publish removed, the note content put on the frame, the publish moved before the
+404 branch, the saver notified too, the toast ignoring the preference, upstream's `clear()`
+reproduced, the mapping row removed, the control gated on the join beep as upstream gates it, and the
+preference default flipped. Full `pnpm run gate` in `apps/room`: **249 files, 4,105 passed, 1
+skipped, `gate-exit=0`**, read from the log it was echoed into. Controller untouched. **Nothing was
+opened in a browser, and the Svelte MCP server has been disconnected for this entire session**, so
+`svelte-autofixer` was not run; `svelte-check` is clean at 1,457 files.
+
+### 2026-08-30 16:00 UTC — Three settings that wrote a value nothing read, and a theme switch that left the colours behind
+
+**Runtime impact: YES.** The presenter's captions toggle starts and stops recognition the moment it
+is pressed instead of waiting for the microphone to be restarted. The Recording Preview checkbox
+persists, closes an open preview when switched off, and is presenter-only. Switching theme now moves
+the chat colours the viewer never chose.
+
+**USM-12, USM-13 and USM-17 built; USM-18 half built; USM-01 blocked.** Five more of the
+user-settings modal's seventeen rows — **nine of seventeen closed**.
+
+#### One shape, three times over
+
+Each of these writes a preference, and for each the preference had **no reader**. That is the defect
+class `CLAUDE.md` names first — *a control whose only effect is changing its own label* — and this
+one modal held three of them at once.
+
+**USM-12 is three defects in one checkbox**, and the first two are why the third was never noticed:
+`app-recording-preview-window` was absent from `updateSettingCheck`'s id→preference table, which has
+**no fallback by design**, so it persisted nothing; nothing anywhere read `recPreviewWindow`, so
+there was nothing for a stored value to restore even if it had been written; and it rendered for
+every viewer while the window it governs belongs to the presenter who is recording. All three closed,
+with one recorded divergence: `showRecPreview` also **refuses to open** when the preference is off,
+which upstream does not do. Upstream reads the value only to seed its own checkbox and to close on
+the way off — and a preference whose only effect is closing something already open does nothing at
+all on the next session, which is the defect being fixed rather than a shape to reproduce.
+
+**USM-13 is two lines, because the guards were already right.** The only callers of
+`beginSpeechRecognition` were the two mic-START paths, so turning captions on mid-session did nothing
+until the microphone was restarted and turning them off did not stop a recognition already running.
+The reference's `micProducer && !micMuted` guard is deliberately **not** repeated, and the contract
+asserts its absence: `beginSpeechRecognition` already refuses without a live session, the preference,
+the room entitlement or presenter authority, and it is the method both mic paths call. Two copies of
+one guard is how the copies come to disagree.
+
+**USM-17 turned out to be half already built.** The row names two behaviours; the presenter-colour
+half was there, because the settings modal's open-time effect reads `theme` and therefore re-runs on
+a switch — asserted rather than duplicated, since two effects keyed on one question are two answers
+to it. The chat-style half needed a **second field**, and that is the interesting part.
+`chatStyle = JSON.parse(localStorage.getItem("chatStyle")) || globals.chatStyle[e]` means **saved
+wins**: what the viewer stored survives the switch and only what they never chose follows the theme.
+`globalChatStyle` is already the two merged and cannot answer *which of these did they choose?* — so
+re-seeding from it would pin the opening theme's defaults for the life of the session. That is the
+V8 negative control on this change, and it was seen red.
+
+**USM-18's other half is refused, not missed.** The label carries its `on`/`off` span now. The
+`smallImagePreview && defaultImagePreview` conjunct is not reproduced because **neither preference
+has a consumer here**: the class the pair drives, `chat-uploaded-img-sm`, has no rule in any of the
+52 stylesheets, which `settings-preference-wiring-contract.test.ts` already proves. ANDing two values
+nothing reads would be scaffolding on scaffolding.
+
+**USM-01 is blocked** on a Discord application registration. `doDiscordAuth` is decoded (byte
+2,256,837) and the part that would **not** be reproduced is named: it puts the room's session token
+in the query string of a third-party OAuth start URL, which is the same shape as RS-12's Benzinga
+default and is already an owner decision for the same reason.
+
+#### The contract caught its own helper, on a change that was correct
+
+`gatesAround` asked `blockAt(source, '{#if isPresenter}')` for the enclosing block — and that gate
+occurs **seven times** in `ModalHost.svelte`. `blockAt` measured the FIRST one and the length was
+then compared against a different block's position, so a marker inside the fourth read as enclosed by
+nothing. The suite went red on a correct change, which is the good direction to fail in; the match
+position is passed explicitly now.
+
+#### Two extractions, so three of five ceilings did not move
+
+`source-size-contract` refused the change and got two modules out of it. **`preference-side-effects.ts`**
+took the four preference writes that are not preferences out of `createRoom` — which is a wiring
+file, while that is a decision table whose every row is a defect somebody fixed — and its ceiling is
+**not** raised. **`chatStyleAfterThemeSwitch`** took USM-17's reasoning into `chat-style.ts`, leaving
+the page a one-line call.
+
+Four ceilings are raised, each argued at the ceiling: `+page.svelte` 1,544 → 1,559 (a field and two
+callbacks, which is the composition root doing its job), `ModalHost.svelte` 6,335 → 6,356 (nineteen
+of the twenty lines are the citations, and this file already gave up 225 lines to two extractions
+earlier today against a ceiling that has not moved), `recording.ts` 406 → 423, `prefs.svelte.ts`
+685 → 709.
+
+**Verified:** `user-settings-effects-contract.test.ts` 12/12 (new), `user-settings-gates-contract.test.ts`
+9/9, `source-size-contract.test.ts` 507/507. **Ten negative controls run and seen red** — the mapping
+row removed, the presenter gate removed, `showRecPreview` no longer consulting the preference, the
+close side-effect removed, the `doSpeechReco` branch removed, the mic guard duplicated into it, the
+theme switch reverted to one statement, the re-seed taken from the merged style instead of the saved
+one, the preference default flipped, and the on/off span removed. Full `pnpm run gate` in `apps/room`:
+**248 files, 4,090 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into.
+Controller untouched. **Nothing was opened in a browser, and the Svelte MCP server has been
+disconnected for this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at
+1,455 files.
+
 ### 2026-08-30 15:36 UTC — A limited presenter had the whole Presenter Settings pane, and a caption toggle that captioned nothing
 
 **Runtime impact: YES.** A member handed mic and screen no longer gets the Presenter Settings tab —

@@ -42,8 +42,7 @@ const modal = () => codeOf(MODAL_PATH, readFileSync(MODAL_PATH, 'utf8'));
  * a bare `indexOf`. `session-control-audience-contract.test.ts` records why, at length: three
  * assertions in this repository have claimed nesting and measured order.
  */
-const blockAt = (source: string, opening: string) => {
-  const from = source.indexOf(opening);
+const blockAt = (source: string, opening: string, from = source.indexOf(opening)) => {
   expect(from, `\`${opening}\` is not in the source`).toBeGreaterThan(-1);
   let depth = 0;
   let cursor = from;
@@ -69,7 +68,13 @@ const gatesAround = (source: string, marker: string) => {
   expect(at, `${marker} must be rendered`).toBeGreaterThan(-1);
   const enclosing: string[] = [];
   for (const found of source.matchAll(/\{#if ([^}]+)\}/g)) {
-    const block = blockAt(source, found[0]);
+    /*
+      `found.index` is passed EXPLICITLY, and that is not tidiness. `{#if isPresenter}` occurs seven
+      times in this file; without it `blockAt` measures the FIRST one and the length is compared
+      against a different block's position, so a marker inside the fourth `{#if isPresenter}` reads
+      as enclosed by nothing. The gate suite went red on exactly that, on a change that was correct.
+    */
+    const block = blockAt(source, found[0], found.index);
     if (found.index < at && found.index + block.length > at) enclosing.push(found[1]);
   }
   return enclosing;

@@ -91,6 +91,11 @@ export class RoomPrefs {
   #makeUsersFollowMyScreens;
   #alwaysScrollToBottom;
   #recordingStartSound;
+  #recPreviewWindow;
+  #noteUpdatePopup;
+  #reactionsPopup;
+  #reactionsPopupQA;
+  #qaReactionSoundOn;
   #recordingStopSound;
   #enableRTE;
   #extraChatColumn;
@@ -248,6 +253,42 @@ export class RoomPrefs {
     this.#recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
 
     this.#recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
+
+    /**
+     * `preferences.recPreviewWindow` — USM-12, and it had no home at all before 2026-08-30.
+     *
+     * The checkbox that writes it (`#app-recording-preview-window`) rendered for every viewer,
+     * routed through `updateSettingCheck`, and was ABSENT from that function's id→preference table —
+     * which has no fallback, so it persisted nothing and was forgotten on reload. Three defects in
+     * one control: no persistence, no side effect, and no presenter gate.
+     *
+     * Default ON, read rather than chosen: the reference's defaults object carries
+     * `recPreviewWindow:!0` at byte 979,890, so an unset preference must not switch the preview off
+     * for somebody who never touched the box.
+     */
+    this.#recPreviewWindow = $state(loadedSettings.recPreviewWindow !== false);
+
+    /**
+     * `preferences.noteUpdatePopup` — USM-11. Default ON, from `noteUpdatePopup:!0` at byte 979,948.
+     *
+     * It had no preference, no control and no EVENT: saving a session note published nothing at
+     * all, so another viewer's Notes pane kept the old text until they happened to reload. The
+     * popup is the visible half of a broadcast that did not exist.
+     */
+    this.#noteUpdatePopup = $state(loadedSettings.noteUpdatePopup !== false);
+
+    /**
+     * The three reaction notices — USM-08, USM-09 and USM-10. All default ON, from
+     * `reactionsPopup:!0` / `reactionsPopupQA:!0` (byte 979,890's object) and
+     * `qaReactionSoundOn:!0` (byte 979,369's).
+     *
+     * `#lib/reaction-arrivals.ts` is what makes them possible here: the reference reads a reaction
+     * off a field on the inbound frame, and that field carries the reacted-to message BODY, which
+     * this room's per-ROOM stream may not put on the wire.
+     */
+    this.#reactionsPopup = $state(loadedSettings.reactionsPopup !== false);
+    this.#reactionsPopupQA = $state(loadedSettings.reactionsPopupQA !== false);
+    this.#qaReactionSoundOn = $state(loadedSettings.qaReactionSoundOn !== false);
 
     /**
      * `preferences.enableRTE` — the presenter's own half of the rich text editor gate.
@@ -501,6 +542,36 @@ export class RoomPrefs {
     return this.#alwaysScrollToBottom;
   }
 
+  /**
+   * USM-12. Read in TWO places, which is what makes it a preference rather than a stored click:
+   * `RoomRecording.showRecPreview` refuses when it is off, and `create-room`'s `onSideEffect` closes
+   * an open preview the moment it is switched off — the reference's own
+   * `guiEventBus.emit("closeRecPreviewWindow")` at byte 2,250,601.
+   */
+  get recPreviewWindow() {
+    return this.#recPreviewWindow;
+  }
+
+  /** USM-11 — whether an `updatedSessionNote` frame raises a toast for this viewer. */
+  get noteUpdatePopup() {
+    return this.#noteUpdatePopup;
+  }
+
+  /** USM-08 — a reaction on one of MY chat messages raises a toast. */
+  get reactionsPopup() {
+    return this.#reactionsPopup;
+  }
+
+  /** USM-09 — a reaction on a question I asked, or on any question when I am a presenter. */
+  get reactionsPopupQA() {
+    return this.#reactionsPopupQA;
+  }
+
+  /** USM-10 — the same event, as a sound. Suppressed by Do Not Disturb; the popup is not. */
+  get qaReactionSoundOn() {
+    return this.#qaReactionSoundOn;
+  }
+
   get recordingStartSound() {
     return this.#recordingStartSound;
   }
@@ -621,6 +692,11 @@ export class RoomPrefs {
       */
       if (key === 'recordingStartSound') this.#recordingStartSound = value;
       if (key === 'recordingStopSound') this.#recordingStopSound = value;
+      if (key === 'recPreviewWindow') this.#recPreviewWindow = value;
+      if (key === 'noteUpdatePopup') this.#noteUpdatePopup = value;
+      if (key === 'reactionsPopup') this.#reactionsPopup = value;
+      if (key === 'reactionsPopupQA') this.#reactionsPopupQA = value;
+      if (key === 'qaReactionSoundOn') this.#qaReactionSoundOn = value;
       if (key === 'pushToTalk') this.#pushToTalk = value;
       if (key === 'doSpeechReco') this.#doSpeechReco = value;
       if (key === 'alwaysScrollToBottom') this.#alwaysScrollToBottom = value;

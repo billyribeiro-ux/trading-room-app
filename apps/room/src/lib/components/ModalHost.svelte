@@ -8,6 +8,7 @@
   import { shortWhen } from '#lib/short-when.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import SessionHistoryPane from './SessionHistoryPane.svelte';
+  import ReactionPrefsPane from './ReactionPrefsPane.svelte';
   import RestreamPane from './RestreamPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
@@ -949,6 +950,10 @@
     'app-recording-start-sound': true,
     'app-recording-stop-sound': true,
     'app-recording-preview-window': true,
+    'note-update-popup': true,
+    'app-reactions-popup': true,
+    'app-reactions-popup-qa': true,
+    'app-reactions-sound-qa': true,
     'pm-window-layout': false,
     'app-disable-video': true,
     'app-speech-reco-overlay': false,
@@ -975,7 +980,17 @@
   });
   type ConnectivityTestState = 'pending' | 'passed' | 'failed' | 'unconfigured';
   type MicStatus = 'idle' | 'testing' | 'success' | 'no-audio' | 'error';
-  let activeConnectivityTab = $state<'network' | 'mic' | 'mobile'>('network');
+  /*
+    CONN-03 — `this.activeTab = this.appService.globals.isPresenter ? "network" : "mobile"` at byte
+    2,444,097, in the constructor. This was the bare literal `'network'`, which is the tab a
+    non-presenter is not allowed to see at all (CONN-02).
+
+    `untrack` because this is a SEED: the member then clicks, and a `$derived` would drag them back
+    to the default on any re-read of page data.
+  */
+  let activeConnectivityTab = $state<'network' | 'mic' | 'mobile'>(
+    untrack(() => (isPresenter ? 'network' : 'mobile'))
+  );
 
   let testResults = $state({ udp: false, tcp: false, stun: false, turn: false });
   /**
@@ -1856,6 +1871,19 @@
       'longer-alert-popup': 'longerAlertPopup',
       'app-recording-start-sound': 'recordingStartSound',
       'app-recording-stop-sound': 'recordingStopSound',
+      /* USM-12. `recPreviewWindowOnChange` at byte 2,250,601 persists `recPreviewWindow`; the id
+         was absent from this table and the table has no fallback, so the box wrote nothing at all. */
+      'app-recording-preview-window': 'recPreviewWindow',
+      /* USM-11. `noteUpdatePopupOnChange` at byte 2,251,541 persists `noteUpdatePopup`; the
+         consumer is the `updatedSessionNote` frame's handler in `events.svelte.ts`. */
+      'note-update-popup': 'noteUpdatePopup',
+      /* USM-08 / USM-09 / USM-10. `reactionsPopupOnChange`, `reactionsPopupQAOnChange` and
+         `reactionsSoundQAOnChange` at bytes 2,250,601 / 2,250,812 / 2,251,363. Their consumer is
+         `RoomOverlays`, which notices a reaction by diffing two loads — see
+         `#lib/reaction-arrivals.ts` for why it cannot come off the wire. */
+      'app-reactions-popup': 'reactionsPopup',
+      'app-reactions-popup-qa': 'reactionsPopupQA',
+      'app-reactions-sound-qa': 'qaReactionSoundOn',
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
@@ -3432,21 +3460,39 @@
               ></label
             >
           </div>
-          <div class="ml-5">
-            <input
-              type="checkbox"
-              name="app-recording-preview-window"
-              value="Do not disturb"
-              id="app-recording-preview-window"
-              class="form-check-input"
-              {@attach setInputChecked(settingChecks['app-recording-preview-window'])}
-              onchange={updateSettingCheck}
-            />
-            <label for="app-recording-preview-window" class="form-check-label"
-              >Recording Preview
-              <span>{settingChecks['app-recording-preview-window'] ? 'on' : 'off'}</span></label
-            >
-          </div>
+          <!--
+            USM-12 — `O(115, isPresenter ? 115 : -1)`, byte 2,285,015. THREE defects in one control,
+            and the first two are why the third was never noticed:
+
+              1. `app-recording-preview-window` was absent from `updateSettingCheck`'s
+                 id→preference table, which has NO fallback, so the box persisted nothing and was
+                 forgotten on reload.
+              2. Nothing read `recPreviewWindow` anywhere in this room, so there was nothing for a
+                 stored value to restore even if it had been written.
+              3. It rendered for every viewer, while the preview window it governs belongs to the
+                 presenter who is recording.
+
+            All three are closed: the preference exists on `RoomPrefs`, `showRecPreview` refuses when
+            it is off, `create-room`'s `onSideEffect` closes an open preview when it is switched off
+            (the reference's own `closeRecPreviewWindow`), and this is the gate.
+          -->
+          {#if isPresenter}
+            <div class="ml-5">
+              <input
+                type="checkbox"
+                name="app-recording-preview-window"
+                value="Do not disturb"
+                id="app-recording-preview-window"
+                class="form-check-input"
+                {@attach setInputChecked(settingChecks['app-recording-preview-window'])}
+                onchange={updateSettingCheck}
+              />
+              <label for="app-recording-preview-window" class="form-check-label"
+                >Recording Preview
+                <span>{settingChecks['app-recording-preview-window'] ? 'on' : 'off'}</span></label
+              >
+            </div>
+          {/if}
         </div>
 
         <div class="p-2 text-mode-box">
@@ -3473,6 +3519,47 @@
 
         <ViewerAlertPrefsPane {viewerAlerts} {isPresenter} {onPreferenceChange} />
 
+        <!--
+          USM-11 — `note-update-popup`, `v(3," Note Update Popup ")` at byte 2,269,438.
+
+          Its consumer had to be built first and that was the larger half: `saveSessionNote`
+          published NOTHING, so another viewer's Notes pane kept the old text until they reloaded.
+          `#lib/room/note-update-notice.ts` holds the frame, both byte offsets and the two refusals —
+          including why this control is NOT gated on `sessData.beepOnUserJoin` the way upstream
+          gates it at byte 2,285,196.
+        -->
+        <!--
+          USM-08 and USM-09 — the two reaction popups, each behind the ROOM setting that turns its
+          feature on. `ReactionPrefsPane.svelte` holds them, both gate offsets, and why a room with
+          reactions switched off must not draw them at all.
+        -->
+        <ReactionPrefsPane
+          enableReactions={messageChrome.enableReactions}
+          enableQaReactions={messageChrome.enableQaReactions}
+          {settingChecks}
+          onchange={updateSettingCheck}
+        />
+        <div class="p-2 text-mode-box">
+          <div id="appNoteUpdatePopup" title="Note Update Popup" class="pb-2">
+            <i class="fas fa-sticky-note"></i>
+            <span class="pl-2">Note Update Popup:</span>
+          </div>
+          <div class="ml-5">
+            <input
+              type="checkbox"
+              name="note-update-popup"
+              value="Do not disturb"
+              id="note-update-popup"
+              class="form-check-input"
+              {@attach setInputChecked(settingChecks['note-update-popup'])}
+              onchange={updateSettingCheck}
+            />
+            <label for="note-update-popup" class="form-check-label"
+              >Note Update Popup
+              <span>{settingChecks['note-update-popup'] ? 'on' : 'off'}</span></label
+            >
+          </div>
+        </div>
         <!--
           USM-15 — `O(132, globals.hasSpeechRecognition ? 132 : -1)`, byte 2,285,653, and its twin
           on the presenter pane below.
@@ -3630,6 +3717,36 @@
               >QA sound <span>{qaSoundOn ? 'on' : 'off'}</span></label
             >
           </div>
+          <!--
+            USM-10 — `app-reactions-sound-qa`, `v(3," QA Reactions Sound ")` at byte 2,232,964, sat
+            beside the QA sound above it and was missing.
+
+            Same event as USM-09's popup, and note which gate is on which: upstream suppresses this
+            SOUND with Do Not Disturb and does NOT suppress the popup —
+            `preferences.doNotDisturbOn || (c && preferences.qaReactionSoundOn && qaAlert.play())`
+            at byte 1,408,850, with the popup on the line after, outside that guard. Reproduced,
+            asymmetry included, because it is the shape every other notification here has.
+
+            Gated on `enableQAReactions` for the reason its two neighbours in the App tab are: a
+            room with Q&A reactions off has nothing for this to silence.
+          -->
+          {#if messageChrome.enableQaReactions}
+            <div class="ml-5">
+              <input
+                type="checkbox"
+                name="app-reactions-sound-qa"
+                value="Do not disturb"
+                id="app-reactions-sound-qa"
+                class="form-check-input"
+                {@attach setInputChecked(settingChecks['app-reactions-sound-qa'])}
+                onchange={updateSettingCheck}
+              />
+              <label for="app-reactions-sound-qa" class="form-check-label"
+                >QA Reactions Sound
+                <span>{settingChecks['app-reactions-sound-qa'] ? 'on' : 'off'}</span></label
+              >
+            </div>
+          {/if}
           <div class="ml-5">
             <input
               type="checkbox"
@@ -3748,7 +3865,22 @@
               {@attach setInputChecked(settingChecks['small-image-preview'])}
               onchange={updateSettingCheck}
             />
-            <label for="small-image-preview" class="form-check-label">Smaller image preview</label>
+            <!--
+              USM-18 — `v(218," Smaller image preview "), H(219,Cke,…)(220,Ske,…)` at byte 2,281,312,
+              where `Cke` and `Ske` are `<span>on</span>` and `<span>off</span>`. Every other
+              checkbox in this modal carries that pair and this one did not.
+
+              The row's OTHER half is deliberately not reproduced. Upstream both the `checked`
+              binding and the span gate are `smallImagePreview && defaultImagePreview`; here neither
+              preference has a consumer, because the class the pair drives — `chat-uploaded-img-sm` —
+              has no rule in any of the 52 stylesheets. `settings-preference-wiring-contract.test.ts`
+              proves that and keeps the id out of `updateSettingCheck`'s table. Adding the conjunct
+              would be ANDing two values nothing reads.
+            -->
+            <label for="small-image-preview" class="form-check-label"
+              >Smaller image preview
+              <span>{settingChecks['small-image-preview'] ? 'on' : 'off'}</span></label
+            >
           </div>
         </div>
 
@@ -5911,7 +6043,7 @@
     open={name === 'connectivity'}
     closedAriaHidden
     ariaLabelledby="webrtc-troubleshooter-modal"
-    title="Connectivity/Mic Troubleshooter"
+    title={isPresenter ? 'Connectivity/Mic Troubleshooter' : 'Connectivity Troubleshooter'}
     titleClass="modal-title"
     titleTag="h3"
     dialogStyle="max-width: 540px;"
@@ -5919,16 +6051,29 @@
   >
     {#snippet beforeBody()}
       <ul role="tablist" class="nav nav-tabs troubleshooter-tabs">
-        <li role="presentation" class="nav-item">
-          <button
-            type="button"
-            role="tab"
-            class={['nav-link', { active: activeConnectivityTab === 'network' }]}
-            onclick={() => onConnectivityTabChange('network')}
-          >
-            <i class="fas fa-network-wired me-1"></i> Network Test
-          </button>
-        </li>
+        <!--
+          CONN-02 — `H(9,hAe,4,2,"li",8)` and `H(14,pAe,4,2,"li",8)` are BOTH behind
+          `z("ngIf", globals.isPresenter)` at byte 2,456,395; only the Mobile App `li` between them
+          is unconditional. This room had it the other way round — Network Test unconditional, Mic
+          Test gated — so a member could run the WebRTC connectivity test, which the reference never
+          exposes to one.
+
+          Diagnostic rather than privileged, so this is defence in depth rather than a hole being
+          closed. It is closed anyway, and the BODY and the footer carry the same term for the reason
+          SC-17 records: a gate on the way IN is not a statement about what the thing is for.
+        -->
+        {#if isPresenter}
+          <li role="presentation" class="nav-item">
+            <button
+              type="button"
+              role="tab"
+              class={['nav-link', { active: activeConnectivityTab === 'network' }]}
+              onclick={() => onConnectivityTabChange('network')}
+            >
+              <i class="fas fa-network-wired me-1"></i> Network Test
+            </button>
+          </li>
+        {/if}
         <!--
           The Mobile App tab, `d(10,"li",9)(11,"button",10)` at 2,456,143 — consts 9
           `["role","presentation",1,"nav-item"]`, 10 `["type","button","role","tab",1,"nav-link",3,"click"]`
@@ -5969,7 +6114,7 @@
         {/if}
       </ul>
     {/snippet}
-    {#if activeConnectivityTab === 'network'}
+    {#if isPresenter && activeConnectivityTab === 'network'}
       <div>
         <p class="text-muted mb-4">
           This tool checks your network and connectivity to essential WebRTC servers.
@@ -6023,8 +6168,25 @@
           </div>
         {/if}
       </div>
-    {:else if activeConnectivityTab === 'mobile'}
+    {:else if activeConnectivityTab === 'mobile' && mobileAppAvailable}
       <MobileRestorePane onrestore={onrestoremobiletokens} />
+    {:else if !isPresenter && !mobileAppAvailable}
+      <!--
+        A GAP OUR OWN GATE CREATES, and upstream cannot have it.
+
+        The reference draws the Mobile App `li` unconditionally, so a non-presenter always has one
+        tab. Ours draws it behind `mobileAppAvailable` — correctly: a room with no mobile app has
+        nothing for Restore Connectivity to restore, which is recorded on that prop. Put together
+        with CONN-02's gate, a member in such a room would open this modal onto NOTHING.
+
+        An empty modal is the shape this repository refuses hardest — a control whose only effect is
+        that it opened. So it says why it is empty. Same reasoning as SC-14's Refresh button: a
+        divergence forced by an earlier divergence of ours is still ours to answer for.
+      -->
+      <p class="text-muted my-4 text-center">
+        There is nothing to troubleshoot from here. Connectivity checks are run by the room's
+        presenters, and this room has no mobile app to reconnect.
+      </p>
     {:else if activeConnectivityTab === 'mic'}
       <div class="mic-test-container">
         {#if micDevices.length === 0 && !micDevicesLoading && micDevicesLoaded}
@@ -6142,7 +6304,7 @@
       </div>
     {/if}
     {#snippet footer()}
-      {#if activeConnectivityTab === 'network'}
+      {#if isPresenter && activeConnectivityTab === 'network'}
         <button
           type="button"
           class="btn btn-primary"

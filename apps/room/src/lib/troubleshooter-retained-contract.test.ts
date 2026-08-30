@@ -87,7 +87,16 @@ describe('the reference still ships the troubleshooter', () => {
 describe('and this room still has it', () => {
   it('renders the modal the row would have had us delete', () => {
     expect(MODAL_HOST).toContain('id="webrtc-troubleshooter-modal"');
-    expect(MODAL_HOST).toContain('title="Connectivity/Mic Troubleshooter"');
     expect(MODAL_HOST).toContain('troubleshooter-tabs');
+    /*
+      The title stopped being a literal on 2026-08-30 with CONN-04: the reference swaps between
+      ` Connectivity/Mic Troubleshooter ` and ` Connectivity Troubleshooter ` on `isPresenter`
+      (`O(5, isPresenter ? 5 : 6)`, byte 2,433,777), because a member has no Mic tab to troubleshoot.
+      Both strings are still here, which is what this row is about — the modal was not deleted — so
+      the assertion follows the binding rather than being relaxed.
+    */
+    expect(MODAL_HOST).toContain(
+      "title={isPresenter ? 'Connectivity/Mic Troubleshooter' : 'Connectivity Troubleshooter'}"
+    );
   });
 });

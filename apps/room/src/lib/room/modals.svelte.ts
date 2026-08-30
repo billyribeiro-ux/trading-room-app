@@ -235,27 +235,6 @@ export class RoomModals {
     this.#selectedImageUrl = url;
   }
 
-  downloadImage(url: string) {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.responseType = 'blob';
-    xhr.onload = () => {
-      const urlCreator = window.URL;
-      const imageUrl = urlCreator.createObjectURL(xhr.response);
-      const tag = document.createElement('a');
-      let imageName = url.split('/').pop() || 'image.jpg';
-      imageName = imageName.replace(/^[^_]+_/, '').replace(/_[^_]+(\.[^.]+)$/, '$1');
-      tag.href = imageUrl;
-      tag.download = imageName;
-      tag.style.display = 'none';
-      document.body.appendChild(tag);
-      tag.click();
-      tag.remove();
-      urlCreator.revokeObjectURL(imageUrl);
-    };
-    xhr.send();
-  }
-
   toggleTopMenu(menu: 'recording' | 'soundcloud' | 'screen') {
     this.#menus.toggleTop(menu);
   }

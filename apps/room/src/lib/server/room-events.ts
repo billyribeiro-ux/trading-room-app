@@ -143,6 +143,16 @@ export type RoomEvent =
          */
         noteId?: number;
         /**
+         * `updatedSessionNote`'s tab NAME — USM-11.
+         *
+         * The frame carries the id and the name and deliberately not the content: `invalidateAll()`
+         * re-reads the row, which is the authority, and a note's tab name is already rendered to
+         * everyone who can see the pane. Byte 1,022,762 carries the whole `tab` upstream; ours
+         * carries the two fields the toast needs, for the reason `message-mutation-frames.ts` gives
+         * about this stream being per ROOM.
+         */
+        noteName?: string;
+        /**
          * Who performed the act, on the four message-mutation frames.
          *
          * `updateChatMsg` / `updateAlertMsg` / `deleteChatMsg` / `deleteAlertMsg` —

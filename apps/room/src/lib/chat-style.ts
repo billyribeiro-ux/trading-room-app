@@ -88,3 +88,34 @@ export function defaultFollowChatStyle(theme: Theme): FollowChatStyle {
         playSound: true
       };
 }
+
+/**
+ * The chat style after a THEME SWITCH — USM-17.
+ *
+ * ```js
+ * switchTheme(e) {
+ *   this.alertStyle = JSON.parse(localStorage.getItem("alertStyle")) || globals.alertStyle[e],
+ *   this.chatStyle  = JSON.parse(localStorage.getItem("chatStyle"))  || globals.chatStyle[e],
+ *   … }                                                                   // bundle byte 2,253,925
+ * ```
+ *
+ * The room switched theme and the chat colours did not, so a viewer who moved to light kept the
+ * dark theme's yellow-on-black chat until they pressed Reset — which the reference's own
+ * `switchTheme` effectively does for them.
+ *
+ * **SAVED WINS, and that is the whole shape of upstream's expression.** What the viewer stored
+ * survives the switch; only the parts they never chose follow the theme. So this takes the STORED
+ * style rather than the one on screen: the displayed style is already the theme's defaults with the
+ * stored values merged over them, and re-seeding from it would carry the opening theme's defaults
+ * forward for the life of the session.
+ *
+ * Ours lives in server preferences rather than `localStorage`, which is a deliberate architectural
+ * divergence recorded elsewhere and does not change this rule — `saved` is whatever `prefs.save`
+ * last persisted under `chatStyle`, kept in step by the page's `mergeGlobalChatStyle`.
+ */
+export function chatStyleAfterThemeSwitch(
+  theme: Theme,
+  saved: Partial<FollowChatStyle>
+): FollowChatStyle {
+  return { ...defaultChatStyleForTheme(theme), ...saved };
+}

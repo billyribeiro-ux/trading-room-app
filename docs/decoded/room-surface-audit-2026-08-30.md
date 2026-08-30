@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**96 open · 128 closed · 224 rows.**
+**73 open · 151 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1404,6 +1404,10 @@ savePresenterStyle(){this.appService.sendServerAdminCommand("savePresenterColors
 
 ### USM-01 — Discord tab, pane and its three handlers are absent entirely
 
+**BLOCKED 2026-08-30 15:52 UTC — on a Discord application registration, which does not exist for this deployment.** The row's own reading is right and the settings enumeration reached the same verdict independently: `enableDiscord` is the last entry on `REFERENCE_READS_AND_WE_DO_NOT` in `setting-coverage-contract.test.ts`, recorded there as needing a registration nobody has made.
+
+What is decoded and would be built the day one exists: `doDiscordAuth()` opens `${apiROOT}/discord/v2/auth/start?token=${sesionToken}` in a new tab (byte 2,256,837), with `revokeDiscord` and `checkDiscordStatus` beside it. **The token in that query string is the part that would NOT be reproduced**: a room session token on a third-party OAuth start URL is the same shape as RS-12's Benzinga default, which is already an OWNER DECISION for the same reason. The correct form here is a server-minted, single-purpose state parameter. **Unblocked by:** a Discord application (client id and secret) plus the owner's answer on that. Recorded rather than deferred.
+
 **medium** · `missing-control` · reference byte **2,268,143**
 
 ```
@@ -1430,6 +1434,14 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 
 ### USM-08 — 'Reactions Response' popup checkbox missing (gated on sessData.enableReactions)
 
+**BUILT 2026-08-30 16:38 UTC.** `app-reactions-popup` behind `O(116, sessData.enableReactions ? 116 : -1)` (byte 2,285,066), with the reference's own line — `` `${n}: ${remove ? "removed" : ""} ${emoji} on "${txt}"` `` under the title `Message Reaction`, byte 2,509,044.
+
+**MY messages only, and never my own reaction.** Upstream's socket layer emits `updateChatMsgReaction` only when `reactionDetails.msgUID === globals.user.userXrefID` (byte 1,011,021); here that filter runs on the server's own rows.
+
+The mechanism is shared with USM-08/09/10 and is the interesting part: **the reference's cannot be copied.** Both of its toasts render `txt` — the reacted-to message BODY — read off `reactionDetails` / `qaReactionDetails`, fields on an inbound frame, and then filter to the right recipient IN THE BROWSER. `message-mutation-frames.ts` already says why this room's frames carry nothing: *"this hub's SSE stream is per ROOM while chat is per CHANNEL, so a frame carrying a message body would put admin-channel text on every subscriber's wire."*
+
+So the frame stays a trigger, `invalidateAll()` re-reads the rows the server decided this member may see, and a reaction is noticed by DIFFING two of those reads — `#lib/reaction-arrivals.ts`. Everything the toast renders was already in this browser's page data, and the audience filter runs on the server's own answer rather than on a payload. The reactor's NAME comes from the roster, because a reaction stores an email hash and nothing else.
+
 **medium** · `missing-control` · reference byte **2,269,041**
 
 ```
@@ -1441,6 +1453,10 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 > Verified: I could not refute it. Exhaustive case-insensitive search of apps/room/src for reactionsPopup, reactionsPopupQA, app-reactions-popup, reaction-popup, reactionsResponse, "Reactions Response", reactionsSoundOn, qaReactionSoundOn, updateChatMsgReaction and "Message Reaction" returned zero hits.
 
 ### USM-09 — 'Reactions QA Response' popup checkbox missing (gated on sessData.enableQAReactions)
+
+**BUILT 2026-08-30 16:38 UTC**, with USM-08 and USM-10 — one mechanism, three rows. `app-reactions-popup-qa` behind `O(117, sessData.enableQAReactions ? 117 : -1)` (byte 2,285,130), title `QA Reaction`.
+
+**The audience is the one the question notice beside it already uses**, and it is upstream's: everyone who has asked on that alert (`for (let _ of o.qa) _.uid === myId`), plus every presenter (the `globals.user.isPresenter && (…the same…)` copy), never the actor — byte 1,408,850.
 
 **medium** · `missing-control` · reference byte **2,269,235**
 
@@ -1454,6 +1470,10 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 
 ### USM-10 — 'QA Reactions Sound' checkbox missing from the Alert tab
 
+**BUILT 2026-08-30 16:38 UTC.** `app-reactions-sound-qa`, `v(3," QA Reactions Sound ")` at byte 2,232,964, on the Alert tab beside the QA sound it sat next to upstream.
+
+**Which gate is on which is the part worth recording.** `preferences.doNotDisturbOn || (c && preferences.qaReactionSoundOn && qaAlert.play())` at byte 1,408,850 suppresses the SOUND with Do Not Disturb; the popup on the following line is outside that guard and is not suppressed. Reproduced with the asymmetry intact, because it is the shape every other notification in this room already has — and the contract asserts the gap between the two gates contains no `doNotDisturbOn`, because reproducing half of an asymmetry is worse than reproducing neither half.
+
 **medium** · `missing-control` · reference byte **2,271,175**
 
 ```
@@ -1465,6 +1485,14 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 > Verified: I could not find it. The reference control is real and I read it: the template render function at offset 2232964 emits `d(0,"div",17)(1,"input",157),x("change",function(){return D(e),E(g().reactionsSoundQAOnChange())}),u(),d(2,"label",158),v(3," QA Reactions Sound ")` bound to `e.appService.globals.preferences.qaReactionSoundOn`; its attr…
 
 ### USM-11 — 'Note Update Popup' checkbox missing
+
+**BUILT 2026-08-30 16:19 UTC — and the row named the popup while the defect was one level under it.** `saveSessionNote` in `+page.server.ts` wrote its row and **published nothing**. Every other viewer's Notes pane kept the previous text until they happened to reload, so a presenter editing the room's notes during a session was invisible to the room — which is the entire point of the pane. The checkbox could not exist without the frame, so the frame was the work.
+
+`updatedSessionNote` is the reference's own name, read at byte **1,022,762**, which is what `message-mutation-frames.ts` requires of a fifth frame: *"Adding one means finding it in the bundle first — an invented frame name is the `alertDisplayMode` defect wearing a wire format."* Its receiver emits `noteTabUpdated {id, name}` and the toast hangs off that at byte 1,962,777.
+
+**The frame carries the id and the NAME and not the content.** `invalidateAll()` re-reads the row, which is the authority — the argument the four message-mutation frames already make — and this SSE stream is per ROOM, which is the second reason that module gives for trigger-only frames. A note's tab name is already drawn for anyone who can see the pane at all, so the frame carries nothing its recipient could not read anyway.
+
+**Two divergences, both refusals rather than omissions.** Upstream's handler calls `alertsService.clear()` before the toast; that wipes every toast on screen, and one of them may be the media-outage banner `RoomToasts` deliberately gives `timeOut: 0` — a note being edited must not dismiss it, and `RoomToasts` already de-duplicates, which is what that call was for. And upstream renders this control under `z("ngIf", sessData.beepOnUserJoin)` at byte 2,285,196 — the JOIN-BEEP room setting, which has nothing to do with session notes and which nothing else in that block shares. It reads as a markup slip; reproducing it would mean an owner who switches off the join beep silently loses control of note popups.
 
 **medium** · `missing-control` · reference byte **2,269,438**
 
@@ -1478,6 +1506,12 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 
 ### USM-12 — 'Recording Preview' checkbox persists nothing, has no disable side-effect, and is not gated on isPresenter
 
+**BUILT 2026-08-30 15:52 UTC. Three defects in one control, and the first two are why the third was never noticed.** `app-recording-preview-window` was absent from `updateSettingCheck`'s id→preference table, which has NO fallback by design, so the box persisted nothing; nothing anywhere read `recPreviewWindow`, so there was nothing for a stored value to restore even if it had been written; and it rendered for every viewer while the window it governs belongs to the presenter who is recording.
+
+All three closed. `RoomPrefs.recPreviewWindow` seeds from `loadedSettings.recPreviewWindow !== false` — default ON, read rather than chosen, from `recPreviewWindow:!0` at byte **979,890**. The mapping row exists, which in this file is the DECLARATION that a control has a consumer. `create-room`'s `onSideEffect` closes an open preview when the box goes off, which is the reference's own `guiEventBus.emit("closeRecPreviewWindow")` at byte 2,250,601. And `O(115, isPresenter ? 115 : -1)` at 2,285,015 is the gate.
+
+**One recorded divergence:** `showRecPreview` also REFUSES to open when the preference is off, which upstream does not do — it reads the value only to seed its checkbox and to close on the way off. A preference whose only effect is closing something already open does nothing at all on the next session, which is the defect this row is about rather than a shape to reproduce.
+
 **medium** · `defect` · reference byte **2,285,015**
 
 ```
@@ -1489,6 +1523,10 @@ O(115,o.appService.globals.isPresenter?115:-1)
 > Verified: I could not find it built anywhere in apps/room/src. All three limbs verified against our source and the reference bundle.
 
 ### USM-13 — Presenter CC toggle does not start or stop speech recognition immediately
+
+**BUILT 2026-08-30 15:52 UTC, and it is two lines because the guards were already right.** `speechRecoCCOnChange` at byte 2,246,212 persists and then acts; ours persisted `doSpeechReco` and stopped. The only callers of `beginSpeechRecognition` were the two mic-START paths, so turning captions on mid-session did nothing until the microphone was restarted, and turning them off did not stop a recognition already running — **a toggle that says `Enabled` and captions nobody.**
+
+The branch lives in `create-room`'s `onSideEffect`, the seam `prefs.save` already offers for exactly this. **The reference's `micProducer && !micMuted` guard is deliberately NOT repeated**, and the contract asserts its absence: `beginSpeechRecognition` already refuses without a live session, without the preference, without the room entitlement and without presenter authority, and it is the method both mic paths call. Two copies of one guard is how the copies come to disagree.
 
 **medium** · `missing-behaviour` · reference byte **2,246,212**
 
@@ -1515,6 +1553,12 @@ O(18,o.appService.globals.isPresenter&&!o.appService.globals.isLimitedPresenter?
 > Verified: Could not refute. Both gates on the user-settings modal's Presenter Settings tab and pane read `{#if isPresenter}` with no `!isLimitedPresenter` term, while the reference applies the pair to both.
 
 ### USM-17 — Switching theme does not reset the chat style or re-seed presenter colours
+
+**HALF BUILT 2026-08-30 15:52 UTC — the chat-style half was missing, the presenter-colour half was already here.** The row names two behaviours and the second turned out to be built: the settings modal's open-time effect reads `theme`, so switching theme while it is open re-seeds the presenter swatches, which is verbatim what `switchTheme` does at byte 2,254,236. The contract asserts that rather than adding a second seeder — two effects keyed on one question are two answers to it.
+
+The chat-style half is built now, and the shape of the reference's expression is the whole point: `chatStyle = JSON.parse(localStorage.getItem("chatStyle")) || globals.chatStyle[e]` means **saved wins, and only what the viewer never chose follows the theme**. Reproducing that needed a second field — `savedChatStyle` — because `globalChatStyle` is already the theme defaults with the stored values merged on top and cannot answer *which of these did they choose?* Re-seeding from it would pin the opening theme's defaults for the life of the session; that is the V8 control on this change, and it was seen red.
+
+The row's own note that our chat style living in server preferences rather than `localStorage` is a deliberate architectural divergence is correct and unaffected: the write path is `prefs.save` → `onSideEffect` → `mergeGlobalChatStyle`, which is the single place both fields are kept in step.
 
 **medium** · `missing-behaviour` · reference byte **2,253,925**
 
@@ -1543,6 +1587,10 @@ O(132,o.appService.globals.hasSpeechRecognition?132:-1)
 > Verified: Both closed-captions sections in our user-settings modal render with no entitlement condition, while the reference gates each on globals.hasSpeechRecognition. In ModalHost.svelte the #appSpeechRecoOverlay block (currently :3324-3344, +33 from the claim's line numbers because the working tree has uncommitted edits) has NO enclosing {#if} a…
 
 ### USM-18 — 'Smaller image preview' label has no on/off span and its checked term drops defaultImagePreview
+
+**HALF BUILT 2026-08-30 15:52 UTC, and the half NOT built is the row's own recorded reason.** The label carries `<span>on</span>` / `<span>off</span>` now — `v(218," Smaller image preview "), H(219,Cke,…)(220,Ske,…)` at byte 2,281,312, where both are bare `<span>`s. Every other checkbox in this modal already had the pair.
+
+The `defaultImagePreview` conjunct is refused, not overlooked. Upstream both the `checked` binding and the span gate are `smallImagePreview && defaultImagePreview`; here NEITHER preference has a consumer, because the class the pair drives — `chat-uploaded-img-sm` — has no rule in any of the 52 stylesheets. `settings-preference-wiring-contract.test.ts` proves that and keeps the id out of `updateSettingCheck`'s table; the new contract asserts it stays out. ANDing two values nothing reads would be scaffolding on scaffolding.
 
 **low** · `divergence` · reference byte **2,286,816**
 
@@ -2027,6 +2075,10 @@ this.appService.appEventBus.subscribe("inlineAlertEntry",i=>{this.selectedTab="t
 
 ### PAM-05 — "Send Later?" / "Cancel" toggle pair, and the mutual exclusion between "Post Alert" and "Send Later", are absent
 
+**BUILT.** `showSendLater` gates five nodes, and node 71 is the one that mattered: `O(71, showSendLater ? -1 : 71)` **removes Post Alert while the scheduler is open.** This room rendered the whole scheduling pane inline and kept the green button beside it, so a presenter who had just typed a date and a repeat could press Post Alert and send immediately — losing both, with nothing on screen to say so. `send-later-contract.test.ts` holds it, and its first draft is the one that taught this document about `indexOf` returning -1: `expect(branch.indexOf('{:else}')).toBeLessThan(branch.indexOf('Post Alert'))` is satisfied by the marker being GONE.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
+
 **low** · `missing-control` · reference byte **2,122,278**
 
 ```
@@ -2038,6 +2090,10 @@ function JTe(t,n){if(1&t){const e=Y();d(0,"button",76),x("click",function(){retu
 > Verified: I searched apps/room/src exhaustively and could not find the control under any name. `grep -rn "showSendLater" src/` returns 0 hits.
 
 ### PAM-07 — Repeat select option TEXT is "Off" / "Daily" / "Weekly" in the reference; ours renders the raw lowercase mode strings
+
+**BUILT.** `Off` / `Daily` / `Weekly` (byte 2,120,818) instead of `{mode || 'off'}` over `REPEAT_MODES`, which rendered the room's own STORAGE format as a label — the shape this repository calls a control describing its implementation rather than its effect. The `aria-label` and the `form-select form-select-sm` classes came with it.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
 
 **low** · `wrong-constant` · reference byte **2,120,818**
 
@@ -2051,6 +2107,10 @@ d(14,"select",65),Ve("ngModelChange",function(o){D(e);const s=g();return He(s.re
 
 ### PAM-08 — Ignore-weekends label text differs: "Ignore weekends?" vs our "Skip weekends"
 
+**BUILT.** `Ignore weekends?` verbatim (byte 2,120,631), with the id and the `form-check mb-2` wrapper. The row's own note that the GATE already matched — `weekendsApply = repeat === 'daily'` against `'daily' === o.repeatScheduledAlert` — held, so this was the label alone.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
+
 **low** · `wrong-constant` · reference byte **2,120,631**
 
 ```
@@ -2062,6 +2122,10 @@ function YTe(t,n){if(1&t){const e=Y();d(0,"div",69)(1,"input",72),Ve("ngModelCha
 > Verified: I could not refute it. The string "Ignore weekends" appears ZERO times anywhere under apps/room/src (case-insensitive grep across .svelte/.ts/.test.ts, plus targeted greps of src/lib/*.ts and src/lib/room/*.ts for a label-text or i18n constant module).
 
 ### PAM-09 — The send-later timezone NOTE and the two field labels ("Send on this date & time:", "Repeat:") are absent
+
+**BUILT.** The note, its underlined span and both labels (byte 2,120,860). It is the smallest row of the slice and the one a presenter would most notice missing: a `datetime-local` field always raises *whose* 09:00 this is, the behaviour was already correct — `ScheduledAlerts.svelte` documents that the value is parsed as local time — and the sentence saying so was the only part not on screen.
+
+*(Built 2026-08-30 13:54 UTC with the rest of the PostAlertModal slice; the disposition line was not written at the time and is added on 2026-08-30 16:55 after `room-surface-audit-counts.test.ts` grew a per-surface check and this section came out four rows short of what the code says. The tracker understating progress is the safe direction and is still a defect — a row that reads open is a row somebody re-opens.)*
 
 **low** · `missing-control` · reference byte **2,120,860**
 
@@ -3189,6 +3253,10 @@ function e2e(t,n){if(1&t&&(d(0,"tr"),H(1,Zwe,24,17),u()),2&t){const e=n.$implici
 
 ### CONN-01 — The entire "Mobile App" tab is absent: tab button, body, and the `restoreMobileAppTokens` server command
 
+**ALREADY BUILT — verified by reading 2026-08-30 17:01 UTC, not rebuilt.** All three exist: the tab (`fa-mobile-alt me-1`, between Network Test and Mic Test, where upstream puts it), `MobileRestorePane.svelte` as the body — `PAe` at byte 2,438,242 transcribed whole, **including the reference's own missing full stop after "notifications"**, which is now asserted rather than trusted because it is the kind of thing a well-meaning edit repairs — and `onrestoremobiletokens` reaching the server command. The audit was produced against an earlier tree.
+
+**One divergence stands and it is the one that creates CONN-02's problem:** the tab is behind `mobileAppAvailable`, where upstream draws it unconditionally. That gate is right — a room with no mobile app has nothing for Restore Connectivity to restore — and it is what made the empty-modal branch necessary below.
+
 **high** · `missing-control` · reference byte **2,445,023**
 
 ```
@@ -3200,6 +3268,12 @@ onTabChange(e){e!==this.activeTab&&("mic"===this.activeTab&&this.cleanupMicTest(
 > Verified: I could not find any implementation of the Mobile App tab in apps/room/src, under its own name or any rename. ModalHost.svelte:795 declares `let activeConnectivityTab = $state<'network' | 'mic'>('network')` and ModalHost.svelte:859 `onConnectivityTabChange(tab: 'network' | 'mic')` — a two-member union with no third member; the tablist at…
 
 ### CONN-02 — For a non-presenter the reference modal has NO tab we render — Mobile App is its only tab and its default; ours shows them the Network tab instead
+
+**BUILT 2026-08-30 17:01 UTC.** `z("ngIf", globals.isPresenter)` on BOTH `H(9,hAe,…)` and `H(14,pAe,…)` at byte 2,456,395, with only the Mobile App `li` between them unconditional. This room had it the other way round — Network Test open, Mic Test gated — so a member could run the WebRTC connectivity test, which the reference never exposes to one.
+
+**Diagnostic rather than privileged**, so this is defence in depth rather than a hole being closed, and it is worth saying so plainly. The BODY and the footer's Start Test button carry the same term as the tab, for the reason SC-17 records: a gate on the way IN is not a statement about what the thing is for.
+
+**And it forced an answer to a case upstream cannot have.** With the Mobile App tab behind `mobileAppAvailable` (CONN-01's recorded divergence) and Network Test now behind `isPresenter`, a member in a room with no mobile app would have opened this modal onto NOTHING. An empty modal is a control whose only effect is that it opened. It says why it is empty instead — the same reasoning as SC-14's Refresh button: **a divergence forced by an earlier divergence of ours is still ours to answer for.**
 
 **medium** · `missing-behaviour` · reference byte **2,456,395**
 
@@ -3213,6 +3287,8 @@ onTabChange(e){e!==this.activeTab&&("mic"===this.activeTab&&this.cleanupMicTest(
 
 ### CONN-03 — Initial-tab rule is not conditional on isPresenter
 
+**BUILT 2026-08-30 17:01 UTC.** `this.activeTab = globals.isPresenter ? "network" : "mobile"` at byte 2,444,097, in the reference's constructor. This was the bare literal `'network'` — the one tab a non-presenter is not allowed to see at all once CONN-02 is applied, which is why the two had to be built together. `untrack`, because it is a seed: the member then clicks, and a reactive read would drag them back to the default on the next refetch.
+
 **medium** · `missing-behaviour` · reference byte **2,444,097**
 
 ```
@@ -3225,6 +3301,8 @@ this.isPlayingBack=!1,this.playbackAudio=null,this.activeTab=this.appService.glo
 
 ### CONN-04 — Modal title is hard-coded; the reference swaps it on isPresenter
 
+**BUILT 2026-08-30 17:01 UTC.** `O(5, isPresenter ? 5 : 6)` between `dAe` (` Connectivity/Mic Troubleshooter `) and `uAe` (` Connectivity Troubleshooter `) at byte 2,433,777. The row's own observation is the reason it is not cosmetic: the title promised a mic troubleshooter to a viewer who — correctly, even before CONN-02 — could not see one.
+
 **medium** · `missing-behaviour` · reference byte **2,433,777**
 
 ```
@@ -3236,6 +3314,10 @@ function dAe(t,n){1&t&&v(0," Connectivity/Mic Troubleshooter ")}function uAe(t,n
 > Verified: I could not disprove it. Our connectivity modal passes a single string literal `title="Connectivity/Mic Troubleshooter"` to `Modal`, and `Modal.svelte` renders `{title}` verbatim (line 128) — the `header` snippet that could override it is NOT passed by the connectivity modal (it passes only `title`, `titleClass`, `titleTag`, `beforeBody`,…
 
 ### CONN-07 — Second sidebar label variant 'Connectivity/Mic Check' is not rendered anywhere
+
+**MEASURED REFUSAL 2026-08-30 17:01 UTC.** The literal is genuinely absent and the row's own last sentence is the disposition: *"only relevant if the second shell is a surface we are meant to build."* It is not. The bundle carries TWO shells with different labels for the same target, and the one this room implements is the other — `RoomSidebar.svelte` matches its label, icon and span at bytes 2,470,954 / 2,534,049 / 2,572,801 exactly.
+
+The shell that says `Connectivity/Mic Check` is `app-closed-session-page`, which this room does not build at all: a closed room here is answered by `session/+page.server.ts` with the close message, which is a deliberate architectural difference recorded with `room_state.closed_message`. Adding one label out of a page we do not render would be a string with no surface. **Unblocked by** a decision to build that shell, at which point its whole sidebar comes with it and this label is one line of it.
 
 **low** · `missing-behaviour` · reference byte **2,576,810**
 
@@ -3255,6 +3337,14 @@ d(36,"li",26)(37,"a",27),T(38,"i",28),d(39,"span",29),v(40,"Connectivity/Mic Che
 
 ### dta-01 — Edit button does not flash the composer form (`animated flash`, 500 ms) in either pane
 
+**BUILT 2026-08-30 17:19 UTC, in both panes.** `#lib/flash-on-edit.ts`, worn by both forms as `{@attach flashOnEdit(flashNonce)}`.
+
+**The row's last sentence is the whole reason upstream spends an animation on this**, and it survived the build: the composer sits ABOVE a table that can be scrolled past it, so pressing Edit on row forty fills a form the presenter cannot see. Without the flash the button reads as broken — they press it again, and the second press overwrites the draft the first one made.
+
+An ATTACHMENT rather than an `$effect` or jQuery, which is what `CLAUDE.md` names as the Svelte 5 replacement for imperative DOM plumbing, and the official docs were read on it: *"Attachments are functions that run in an effect when an element is mounted to the DOM or when state read inside the function updates"*, and *"they can return a function that is called before the attachment re-runs"*. Both halves are load-bearing here.
+
+**A COUNTER and not a boolean**, and the control on it was seen red: with a boolean, Edit pressed twice inside 500 ms leaves the value already `true`, nothing re-runs, and the FIRST timer strips the class off the SECOND flash — the presenter presses Edit, sees nothing, and is back to the defect.
+
 **medium** · `missing-behaviour` · reference byte **1,988,722**
 
 ```
@@ -3266,6 +3356,10 @@ ii(".day-trade-alert-form").addClass("animated flash");const s=setTimeout(()=>{i
 > Verified: The Edit-button flash is genuinely absent from both panes. `requestEdit` in each pane sets the composer draft and does nothing else, and no flash exists anywhere else in the chain: no `use:` action on either form, no scrollIntoView/focus, no helper (`flashElement`/`addClass(`), no `*FLASH*` constant other than the unrelated SSE `RECONNECT…
 
 ### dta-02 — Image-preview lightbox has no `Download Image` button in either pane
+
+**BUILT 2026-08-30 17:19 UTC, in both panes.** `buttons: { download: … }` REPLACES bootbox's default OK, so Download Image is the dialog's only control and the header's close button is how it is dismissed without saving — upstream and here. `BootboxDialog`'s `footer` snippet is what expresses that; passing it suppresses the default OK. Saving closes the dialog too, which is the reference's own shape (its callback returns undefined, which bootbox reads as "close") and the right one: the presenter opened the picture to get a copy of it.
+
+**The row named the capability as already present and it was, in the wrong place.** `RoomModals.downloadImage` had exactly one caller, and it was never modal state — no field, no lifecycle, nothing rendered. It is `#lib/download-image.ts` now, because handing a pane the room's whole modal state so it can save a file is the coupling this repository keeps taking back out. **A method whose class it never touches is a function that has not been extracted yet.** Its two filename rules are the reference's and are not cosmetic: without them a presenter saving a screenshot gets `a3f9c1_chart_1024.png` instead of `chart.png`.
 
 **medium** · `missing-control` · reference byte **1,992,730**
 
@@ -3279,6 +3373,10 @@ showImagePreview(e,i=""){e&&bootbox.dialog({title:i,message:`…<img src="${e}" 
 
 ### dta-04 — Paste-to-upload confirm has no `Upload this image?` question in either pane
 
+**BUILT 2026-08-30 17:19 UTC, in both panes**, with the reference's inline `max-height: 50vh` that the row records as the secondary half. Without the heading this was an unlabelled OK/Cancel over a picture: the presenter pasted, a dialog appeared, and nothing on it said what OK does.
+
+**The chat composer's twin has carried the heading since it was built**, which is why the contract COUNTS the occurrences rather than checking for one — a `toContain` was already satisfied before either pane had it. `50vh` stays inline rather than folded into `.img-fluid`, which is 70vh and shared with the alert lightbox that wants the extra height.
+
 **medium** · `missing-behaviour` · reference byte **1,992,250**
 
 ```
@@ -3291,6 +3389,8 @@ onImagePaste(e,i){…bootbox.confirm({message:'<div class="text-center"><h4>Uplo
 
 ### dta-03 — Image-preview lightbox is not opened at `size:"large"`
 
+**BUILT 2026-08-30 17:19 UTC, in both panes** — `className="modal-lg"`, which is what this repository already uses for a bootbox `size:"large"` at three other call sites the row itself names. Built with dta-02 because they are one dialog.
+
 **low** · `missing-behaviour` · reference byte **1,992,730**
 
 ```
@@ -3302,6 +3402,10 @@ size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download I
 > Verified: I could not find the large-size image lightbox implemented anywhere for these two panes. The reference's showImagePreview opens bootbox with size:"large" (bootbox puts modal-lg on the .modal-dialog element).
 
 ### dta-05 — Linked-room log override (`linkedRoom${e}AlertsOther`) is deliberately not carried
+
+**DELIBERATE DIVERGENCE — verified by reading 2026-08-30 17:19 UTC; the row is its own disposition and the code already carries the reason.** `linkedRoom${e}AlertsOther` lets a room fetch ANOTHER room's alert log, with the room named by the BROWSER: `sendServerCommand(\`get${e}AlertsLog\`, { sessionID: s || globals.sessionID, days: i })`. Both endpoints here take the room from the session row instead and say so in place (`api/day-trade-alerts/+server.ts:20-31`, `api/swing-alerts/+server.ts:21-25`), the setting is excluded from the room config at `room-config-client.ts:452` and `:480`, and `trade-alerts.svelte.ts` sends no session parameter at all.
+
+**This is the 2026-08-07 privilege escalation's exact shape** — an authority decision asserted by the client — so carrying it would mean reintroducing the thing `CLAUDE.md` names as never to be reintroduced. The honest cost is stated rather than hidden: a room configured upstream to mirror another room's alert log shows its own here. Building it correctly would mean the mirror being resolved on the CONTROLLER from the room's own settings and never named on the wire, which is a real feature and not this row.
 
 **low** · `divergence` · reference byte **1,993,565**
 

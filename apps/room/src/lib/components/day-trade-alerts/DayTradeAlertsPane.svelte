@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { downloadImage } from '#lib/download-image.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import type { DayTradeAlertRow } from '#lib/types.js';
   import {
@@ -132,8 +133,15 @@
   */
   let visibleAlerts = $derived(limitDayTradeLogs(searchDayTradeLogs(alerts, search), limit ?? 0));
 
+  /*
+    `dta-01` — bumped on every Edit so the composer flashes. `#lib/flash-on-edit.ts` carries the
+    byte offsets and why a counter beats a boolean here.
+  */
+  let flashNonce = $state(0);
+
   function requestEdit(row: DayTradeAlertRow): void {
     draft = dayTradeAlertDraftFrom(row);
+    flashNonce += 1;
   }
 
   function requestDelete(dayTradeAlertID: number): void {
@@ -251,6 +259,7 @@
   <!-- `O(1, e.isP ? 1 : -1)` — the whole form, presenter-only. The server re-checks. -->
   {#if isPresenter}
     <DayTradeAlertForm
+      {flashNonce}
       bind:draft
       onCancel={requestCancel}
       onPasteImage={(file) => void pasteImage(file)}
@@ -444,10 +453,41 @@
       title is blank.
     -->
     {@const previewUrl = dialog.url}
-    <BootboxDialog mode="alert" message="" onclose={() => (dialog = null)}>
+    <!--
+      `dta-02` and `dta-03` — `size:"large"` and the ONE button this dialog has.
+
+      ```js
+      bootbox.dialog({ title: i, message: `…<img src="${e}" class="img-fluid" …/>…`,
+        size: "large",
+        buttons: { download: { label: '<i class="fa fa-download"></i> Download Image',
+                               className: "btn-primary btn-sm m-auto", callback: … } } })
+                                                                    // bundle byte 1,992,730
+      ```
+
+      `buttons:` REPLACES bootbox's default OK, so Download Image is the only control — the header's
+      close button is how the dialog is dismissed without saving, upstream and here. The `footer`
+      snippet is what lets `BootboxDialog` express that; passing it suppresses the default OK.
+
+      Saving closes it too. That is the reference's shape (its callback returns undefined, which
+      bootbox reads as "close"), and it is the right one: the presenter opened the picture to get a
+      copy of it, and a dialog still sitting there afterwards is one more click for nothing.
+    -->
+    <BootboxDialog mode="alert" message="" className="modal-lg" onclose={() => (dialog = null)}>
       <div class="text-center">
         <img src={previewUrl} class="img-fluid" alt={previewUrl} />
       </div>
+      {#snippet footer()}
+        <button
+          type="button"
+          class="btn btn-primary btn-sm m-auto"
+          onclick={() => {
+            downloadImage(previewUrl);
+            dialog = null;
+          }}
+        >
+          <i class="fa fa-download"></i> Download Image
+        </button>
+      {/snippet}
     </BootboxDialog>
   {:else if dialog !== null}
     <BootboxDialog

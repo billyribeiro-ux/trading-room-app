@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { flashOnEdit } from '#lib/flash-on-edit.js';
   import { pastedImageFrom } from '#lib/pasted-image.js';
   import type { SwingAlertDraft } from './draft';
 
@@ -13,6 +14,13 @@
    * to ask — but the SERVER re-checks every mutation, because a hidden form is not a check.
    */
   interface Props {
+    /**
+     * `dta-01` — bumped by the pane when Edit is pressed, so the composer flashes.
+     *
+     * A COUNTER and not a boolean: `#lib/flash-on-edit.ts` explains why, and it is the difference
+     * between a second press flashing and a second press doing nothing.
+     */
+    readonly flashNonce: number;
     /**
      * The model, owned by the pane and written here.
      *
@@ -41,7 +49,8 @@
     onPasteImage,
     onPreviewImage,
     onSubmit,
-    onCancel
+    onCancel,
+    flashNonce
   }: Props = $props();
 
   /**
@@ -67,6 +76,7 @@
 -->
 <form
   class="m-2 mx-auto swing-alert-form"
+  {@attach flashOnEdit(flashNonce)}
   onsubmit={(event) => {
     event.preventDefault();
     onSubmit();

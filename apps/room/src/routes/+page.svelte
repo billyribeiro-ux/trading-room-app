@@ -34,7 +34,11 @@
     import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
   import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
   import { applyRoomDefaults } from '#lib/room/room-defaults.js';
-  import { defaultChatStyleForTheme, defaultFollowChatStyle } from '#lib/chat-style.js';
+  import {
+    chatStyleAfterThemeSwitch,
+    defaultChatStyleForTheme,
+    defaultFollowChatStyle
+  } from '#lib/chat-style.js';
   import { shouldDisableSelection } from '#lib/room-key-gates.js';
   import AlertChatArea from '#lib/components/AlertChatArea.svelte';
   import PresentationArea from '#lib/components/PresentationArea.svelte';
@@ -530,10 +534,18 @@
     alertChatElement: () => alertChatElement,
     composerElement: () => composerElement,
     alertsScroller: () => alertsScroller,
-    setTheme: (next) => (theme = next),
+    /* USM-17. `chatStyleAfterThemeSwitch` holds the reasoning and the citation; saved wins. */
+    setTheme: (next) => {
+      theme = next;
+      globalChatStyle = chatStyleAfterThemeSwitch(next, savedChatStyle);
+    },
     setMainTab: (tab) => (mainTab = tab),
     setChatAlertsDetached: (next) => (chatAlertsDetached = next),
-    mergeGlobalChatStyle: (patch) => (globalChatStyle = { ...globalChatStyle, ...patch }),
+    /* Both: `savedChatStyle` is USM-17's record of what was actually stored. */
+    mergeGlobalChatStyle: (patch) => {
+      savedChatStyle = { ...savedChatStyle, ...patch };
+      globalChatStyle = { ...globalChatStyle, ...patch };
+    },
     setCurrentCaption: (caption) => (currentCaption = caption),
     pushCaptionHistory: (caption) => {
       captionHistory = [...captionHistory, caption].slice(-CAPTION_HISTORY_LIMIT);
@@ -568,6 +580,9 @@
     ...defaultChatStyleForTheme(theme),
     ...loadedChatStyle
   });
+  /* USM-17 — what the viewer has STORED, as distinct from what is on screen. See
+     `chatStyleAfterThemeSwitch` for why the two cannot be one field. */
+  let savedChatStyle = $state.raw<Partial<FollowChatStyle>>({ ...loadedChatStyle });
 
   /** The THREE reasons the composer is off are in `chatComposerAvailable`, with the transcription. */
   const selfMutedUntil = $derived(data.chatMutedTill ? new Date(data.chatMutedTill) : null);

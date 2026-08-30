@@ -17,6 +17,7 @@ import type { RoomMedia } from './media.svelte';
 import type { RoomMediaTransport } from './media-transport.svelte';
 import type { RoomPrefs } from './prefs.svelte';
 import type { PrivateChatMessage } from './private-chat.svelte';
+import { noteUpdateNotice } from './note-update-notice.js';
 import type { RoomToasts } from './toasts.svelte';
 
 /** What the stream reads off the loaded page data. Narrow on purpose: it consults, never owns. */
@@ -524,6 +525,17 @@ export class RoomEventStream<Entry> {
           */
           if (typeof command.screenId === 'string')
             this.#mediaTransport.selectScreenTabOfId(command.screenId);
+          return;
+        }
+        if (command?.cmd === 'updatedSessionNote') {
+          /* A note was saved by somebody else. `#lib/room/note-update-notice.ts` holds USM-11's
+             reasoning, the two byte offsets and the two refusals. */
+          noteUpdateNotice(command, {
+            viewerId: this.#session().user.id,
+            popupEnabled: this.#prefs.noteUpdatePopup,
+            refetch: () => void invalidateAll(),
+            toasts: this.#toasts
+          });
           return;
         }
         if (command?.cmd === 'focusOnSessionNote') {

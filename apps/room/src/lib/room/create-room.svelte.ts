@@ -153,6 +153,7 @@ import { RoomChat } from '#lib/room/chat.svelte.js';
 import { RoomChatSearch } from '#lib/room/chat-search.svelte.js';
 import { RoomMedia } from '#lib/room/media.svelte.js';
 
+import { preferenceSideEffects } from '#lib/room/preference-side-effects.js';
 import { RoomSplit, isRoomSplitDir, splitPairFromValue } from '#lib/room/split.svelte.js';
 
 import { resolveNoteSurfaceGates } from '#lib/components/notes/note-gates.js';
@@ -284,24 +285,22 @@ export function createRoom(deps: RoomDeps) {
       }).catch((cause) => console.error('savePreference', key, cause));
     },
     /*
-      The two branches of the write path that are NOT preferences, kept here with their reasoning.
-      A preferences class that re-seeded the room's layout would have stopped having a boundary.
+      The FOUR branches of the write path that are not preferences — `#lib/room/preference-side-effects.ts`
+      holds them and the reason each exists. They left this file when USM-12 and USM-13 added their
+      citations and the composition root went over its ceiling; the module is the better home on its
+      own terms, because this file is wiring and that one is a decision table.
+
+      `recording` is constructed BELOW this line, so both of its methods are passed as THUNKS. A
+      closure, never a read at construction — the same arrangement, and the same note, as the media
+      hooks further down.
     */
-    onSideEffect: (key, value) => {
-      if (key === 'chatStyle' && value && typeof value === 'object' && !Array.isArray(value)) {
-        deps.mergeGlobalChatStyle(value as Partial<FollowChatStyle>);
-      }
-      /*
-            Applies the sizes the server rendered with, alongside the new direction. Each arrangement has
-            its own pair of preference keys, so this brings back the geometry last chosen for THAT
-            arrangement rather than reinterpreting a width as a height. It said "never on a page load"
-            until 2026-08-28, when `applyRoomDefaults` began writing `roomSplitDir` from `onMount` for
-            a room that sets `alertsChatOnBottom` — once per viewer, latched, and the correct path.
-          */
-      if (key === 'roomSplitDir' && isRoomSplitDir(value)) {
-        split.setDirection(value, settingsSplitPair);
-      }
-    }
+    onSideEffect: preferenceSideEffects({
+      mergeGlobalChatStyle: (patch) => deps.mergeGlobalChatStyle(patch),
+      setSplitDirection: (direction) => split.setDirection(direction, settingsSplitPair),
+      hideRecordingPreview: () => recording.hideRecPreview(),
+      beginSpeechRecognition: () => recording.beginSpeechRecognition(),
+      endSpeechRecognition: () => recording.endSpeechRecognition()
+    })
   });
 
   /*
