@@ -58,9 +58,28 @@ describe('Alert/Chat captured stylesheet authority', () => {
     expect(messageCode.match(/<app-st-compactmessage>/g), 'the compact host').toHaveLength(1);
     expect(messageCode.match(/\{@render dateSeparator\(\)\}/g), 'one per host').toHaveLength(2);
     expect(messageCode.match(/<div class="separator">/g)).toHaveLength(1);
+    /*
+      Asserted as two facts rather than as one exact tag string.
+
+      This read `'<a>{item.evidenceSeparatorText ?? …}</a>'` — the bare anchor — and RMSG-05 broke it
+      by being right: const 6 is `[3,"ngStyle"]` in BOTH components' tables, and this room painted
+      the separator's anchor with nothing, so the fix adds `style={bodyStyle}`. An assertion that
+      pins a whole tag fails the next time any attribute the capture calls for is added, and the
+      obvious repair is to paste the new tag in — which is how a contract turns into a transcript of
+      whatever the file currently says.
+
+      What is worth pinning is the CONTENT expression, which is the one implementation this test
+      exists to keep single, and that the anchor takes the body style at all.
+    */
     expect(messageCode).toContain(
-      '<a>{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}</a>'
+      '{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}'
     );
+    const separatorAt = messageCode.indexOf('<div class="separator">');
+    expect(separatorAt, 'the separator moved').toBeGreaterThan(-1);
+    expect(
+      messageCode.slice(separatorAt, separatorAt + 260),
+      'RMSG-05 — the anchor takes `styleF` in both components'
+    ).toContain('style={bodyStyle}');
   });
 
   it('forbids later local overrides of the captured header and message selectors', () => {

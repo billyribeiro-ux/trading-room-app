@@ -406,30 +406,29 @@
             is what an unconfigured room gets - not a broken `<img>`.
           -->
         <!--
-          `H(14, APe, 5, 2, "li", 139)` with `O(14, isTipEnabled ? 14 : -1)`, immediately before the
-          Benzinga slot. Consts 139/140: `[1,"nav-item",3,"click","title"]` and
-          `[1,"d-flex","align-items-center","btn","btn-primary","btn-sm"]`.
+          ── SIDE-01 — NO TIP ITEM HERE. IT IS THE NAVBAR'S, AND IT WAS RENDERING A THIRD TIME ────
 
-          THE SAME BUTTON TWICE is the reference's own shape, and both sites read the one
-          `isTipEnabled` field rather than re-evaluating the three settings. Ours read `tip.visible`
-          for the same reason.
+          A `<li class="nav-item" title={tip.label}>` used to sit on this line, carrying a comment
+          that cited `H(14, APe, 5, 2, "li", 139)` and consts 139/140. Every one of those citations
+          is real and every one of them belongs to a DIFFERENT template: node 14 and consts 139/140
+          are `U4e`, the `app-room` NAVBAR, at bundle byte 2,485,267. This file transcribes `TPe`,
+          the sidebar, whose own node 14 is `T(14,"hr")` — read end to end at 2,470,562 through
+          2,472,257, it has no tip `<li>` at any slot.
 
-          The interactive element is the `<a>` and not the `<li>`. Upstream binds the click to the
-          `li`, which is not focusable and not reachable by keyboard; reproducing that would ship a
-          control a keyboard user cannot press. The classes and the nesting are unchanged.
+          The tip the sidebar DOES have is `aPe` (byte 2,466,601), the `<p><button>` above, gated
+          `O(13, isTipEnabled ? 13 : -1)`, and that one is correct and stays. So the reference
+          renders the tip twice in the room and this room was rendering it three times: here, in
+          that `<p>`, and — since RS-09 built the navbar's copy on 2026-08-30 — in `RoomNavbar` as
+          well. RS-09 measured this exact `<li>` and said so in as many words ("In the reference TPe
+          … there is no tip li in the sidebar at all"); what it did was add the missing navbar
+          render, and the stray one it had just measured stayed behind.
+
+          **The lesson is the one the audit's own preamble states, arriving from the other side.** A
+          row phrased as "X is missing over there" is closed by adding X, and the half that says
+          "and it is wrong over here" is the half that gets dropped — because the added control is
+          visible and the removed one is only a deletion nobody is looking for.
+          `sidebar-tip-single-render-contract.test.ts` is what makes it stay one, in both files.
         -->
-        {#if tip.visible}
-          <li class="nav-item" title={tip.label}>
-            <a
-              href={tip.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="d-flex align-items-center btn btn-primary btn-sm"
-            >
-              <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
-            </a>
-          </li>
-        {/if}
         {#if benzinga.visible}
           <li class="nav-item py-0">
             <a

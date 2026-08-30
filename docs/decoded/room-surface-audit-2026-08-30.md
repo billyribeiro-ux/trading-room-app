@@ -46,16 +46,26 @@ inside the document itself. The table describes the two-verifier pass **as it ra
 refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
 exactly as RM-25 belongs in the next paragraph and not in that table.
 
-**One row was ADDED after this document was committed** — RM-25, found while building RM-11 and
-RM-12 by decoding the compact component's whole consts table rather than the entries those rows
-named. It is not folded into the totals above, which describe the two-verifier pass and should keep
-describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes
-the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
-byte offsets make the second reading the tempting one.
+**Twenty-eight rows have been appended since this document was committed**, and none of them is
+folded into the totals above — those describe the two-verifier pass and should keep describing it.
+
+**Each such row says so at itself**, in one sentence, and that sentence is the whole mechanism:
+`room-surface-audit-counts.test.ts` counts it per surface to license the gap between a surface's
+`gaps` number and the rows filed under it, and counts it document-wide to license the gap between
+the survivor count and the row count. A row may sit outside the tables ONLY by declaring that it
+does, and it cannot escape both counts, because the same declaration is what admits it to either.
+
+This paragraph used to carry that sentence itself, while describing RM-25 — the first such row,
+found while building RM-11 and RM-12 by decoding the compact component's whole consts table rather
+than the entries those rows named. That made RM-25 count twice once it also carried its own marker,
+which is why this summary is now phrased in the plural: **a summary of markers must not be a
+marker.** The lesson RM-25 taught is still the cheaper half of the one UIM-03 teaches — **a reader
+who decodes the table finds rows a reader who looks up the cited const cannot** — and this
+document's per-row byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 251 closed · 251 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -744,6 +754,112 @@ d(0,"div",43)(1,"div",44)(2,"strong",45),v(3),u(),T(4,"div",46),u(),T(7,"div",47
 **Ours:** `U1e` (compact admin, 1,370,300) and `f_e` (compact member, 1,378,850) render `div43 > [ div44 > [strong45, div46], div47 ]`. Compact const 43 is `msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100` + `ngClass` (`v1e`, admin only) + `ngStyle`; const 76 is the same list with `ngStyle` alone (member); const 44 is `private-reply-message w-100` + the theme background; const 45 is `d-block username`; const 46 is the quoted body, the only node here carrying the mention/question colours; const 47 is the sender's own text, a direct child of the outer div with no class and no style. We rendered `<div class="ms-1 private-reply">` — compact const **24**, which is the answered TICK's const — with `private-reply-message` as a SIBLING of the name rather than the box that wraps it. So the quoted block had no background, the name had no `username` treatment, neither body carried a colour, and `w-100` was missing from the box that is meant to fill the row.
 
 **Also decoded in passing:** the binding ORDER says which style goes where, and they are not all the body's — div43 and strong45 both take `invertTxtColorToggler(invertTxtColor, "name")` (the NAME inversion, which is `usernameStyle` here and is what the card already puts on the same `d-block username` node), while only div46 takes `styleF`. div47 takes neither and inherits. That asymmetry is the reference's.
+
+*This row was ADDED after this document was committed — found on 2026-08-30 while building RM-11 and RM-12, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RMSG-01 — `text-primary` on the card username is ours, and it is bound by no reference template that can ever apply it
+
+**FIXED 2026-08-30 22:40 UTC.** `fge = t => ({"text-primary": t})` is defined at byte 1,328,577 and bound EXACTLY ONCE in the whole bundle — `ct(29, fge, e.msg.isA)` at 1,344,339, on card const 59, which is the MEMBER card's username. Both occurrences of the identifier were enumerated and the count is asserted from the pinned bundle at run time, not quoted.
+
+**And that single binding is structurally dead.** The card's branch gate is `O(3, e.msg.isA && "alert" != e.logType ? 3 : 4)` — index 3 is `Bge` (admin), 4 is `f1e` (member), and `"alert"` is never a logType, which RM-05 established by enumerating all four literals. So `f1e` renders precisely when `msg.isA` is FALSE, and `ct(29, fge, e.msg.isA)` is false on every row that can evaluate it. **This is RM-13's shape exactly** — a real class, applied by us and by no reference template — and it is removed for the same reason.
+
+**What it painted:** ours applied it on `kind === 'alert' && isAdminMessage`, which after RM-05 is a row that takes the ADMIN card, whose username is const 24 and carries no `ngClass` at all. So a presenter's name on an alert rendered Bootstrap blue wherever no inline `usernameStyle` outranked it. The `!item.evidenceKey` term settles the provenance: it EXCLUDED captured rows, so the class cannot have been read off a capture. `CARD_USERNAME_TEXT_PRIMARY_REFUSED` in `#lib/message-renderer-differences.js`; one negative control seen red.
+
+**low** · `invented-value` · reference byte **1,344,339**
+
+```
+m(),O(23,e.hideAvatar?-1:23),m(3),z("ngStyle",e.styleF),m(),z("ngClass",ct(29,fge,e.msg.isA))("ngStyle",e.invertTxtColorToggler(e.invertTxtColor,"name"))
+```
+
+**Ours:** RoomMessage.svelte rendered `class={['username mx-1', { 'text-primary': kind === 'alert' && isAdminMessage && !item.evidenceKey }]}`. `grep -rn text-primary src` shows the class is used elsewhere in this room only where the reference does use it — `ModalHost`'s edit-username control and its two restream links, each with the const quoted beside it — so this was the one site with no reference wearer.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RMSG-02 — The card's username ROW takes the body style on the member layout and on no other; ours gated it on the log type instead
+
+**FIXED 2026-08-30 22:40 UTC.** The two consts differ by exactly one binding section, which is the whole finding: const 23 (admin, `Bge` node 30) is `[1,"d-flex","align-items-center","justify-content-between","flex-nowrap"]` and const 58 (member, `f1e` node 26) is the same list plus `3,"ngStyle"`. `f1e`'s update block reaches node 26 with `m(3), z("ngStyle", e.styleF)` at byte 1,344,339 — the same `styleF` the body carries. Const 23 has no binding section at all, so the admin row cannot take a style whatever the update block selects.
+
+**Ours gated it on the LOG where the reference gates it on the LAYOUT, and the two disagreed in both directions.** `style={kind === 'alert' ? bodyStyle : undefined}` gave an admin's ALERT card a style the reference has no node for, and denied a member's CHAT card the one it does.
+
+**Captured rows move TOWARD the capture, not away from it.** The owner's coloured-alert capture quoted in `room-message-render.test.ts` lists exactly four styled elements — the kebab, the username, the timestamp and the body — and this wrapper is not among them, while an alert from a presenter is an admin row. `usernameRowStyle` in `#lib/message-renderer-differences.js`; one negative control seen red, failing on both layouts at once.
+
+**low** · `wrong-constant` · reference byte **1,360,639**
+
+```
+[1,"d-flex","align-items-center","justify-content-between","flex-nowrap",3,"ngStyle"]
+```
+
+**Ours:** RoomMessage.svelte's card branch renders one username row for both layouts and styled it from `kind`. The reference's admin template (`Bge` node 30, const 23 at byte 1,358,852) and member template (`f1e` node 26, const 58 at 1,360,639) are two nodes with two consts, and only the member's is bound.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RMSG-03 — The Q&A count span is padded on the card and bare in the compact row; one snippet rendered the card's form in both
+
+**FIXED 2026-08-30 22:40 UTC.** The `alert-qa` button is otherwise byte-identical across the two renderers — card const 70 and compact const 69 are the same eleven-entry array, the `me-1` span is `[1,"me-1"]` in both tables, and the trailing `✅` span is ` ✅` in both (`i1e` 1,339,199, `o_e` 1,377,073). Exactly one literal differs: `Ne(" (", e.msg.qa.length, ") ")` on the card against `Ne("(", e.msg.qa.length, ")")` in the compact row.
+
+**RM-02 built the compact button by reusing the card's snippet**, and its note said so — *"The button is the card's, verbatim, down to the literal spaces inside each span"* — which is right about every part of it except this one. Every compact alert row shipped two extra spaces beside a `me-1` margin that is already the gap. `alertQaCountText(count, compact)` in `#lib/message-renderer-differences.js`; `compact` is a snippet PARAMETER rather than a read of `displayMode`, because the two call sites already know which they are and the whole reason this is a snippet is that their ORDER differs.
+
+**low** · `wrong-constant` · reference byte **1,376,970**
+
+```
+function i_e(t,n){if(1&t&&(d(0,"span",70),v(1),u()),2&t){const e=g(4);m(),Ne("(",e.msg.qa.length,")")}}
+```
+
+**Ours:** the single `alertQaButton` snippet emitted `{' '}({item.questionCount}){' '}` for both hosts. Both literals are now read off the pinned bundle by the contract, and both rendered forms are asserted with the other as its control.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RMSG-04 — The compact Trial badge is `Trial`; the card's is ` Trial `, and its `New` sibling is unpadded in both
+
+**FIXED 2026-08-30 22:40 UTC.** `Jge` (card, byte 1,338,697) renders `v(1," Trial ")` and `c_e` (compact, 1,378,154) renders `v(1,"Trial")`, from the same const in both tables (`[1,"badge","bg-danger","trial-badge"]`, card 61 and compact 61), under the same gate, in the same position among the member-only marks. Only the literal differs, and this room rendered the card's in both.
+
+**Its sibling is what makes this a transcription slip rather than a house rule.** `New` is `v(1,"New")` in BOTH (`Zge` 1,338,756, `d_e` 1,378,211) and was already right — so a compact row showing a trial member drew one padded badge beside one unpadded one, from the same table, on the same line. The contract counts the `New` pair as well as reading both `Trial` literals, so a capture that pads either turns it red.
+
+`TRIAL_BADGE_TEXT` in `#lib/message-renderer-differences.js` — constants rather than markup whitespace, because Svelte normalises runs of whitespace around a text node and `" Trial "` typed into a template is not reliably `" Trial "`. That is RM-10's reason for writing its two bracket runs as expressions, made again.
+
+**low** · `wrong-constant` · reference byte **1,378,154**
+
+```
+function c_e(t,n){1&t&&(d(0,"span",61),v(1,"Trial"),u())}
+```
+
+**Ours:** RoomMessage.svelte's compact member row rendered `<span class="badge bg-danger trial-badge"> Trial </span>`, which is `Jge`. One negative control, mutating the compact constant to the card's, was seen red on four assertions.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RMSG-05 — The date separator's anchor takes `styleF` in BOTH components; this room painted it with nothing
+
+**BUILT 2026-08-30 22:40 UTC.** `_ge` (card, byte 1,328,773) and `S1e` (compact, 1,367,109) are the same six calls, const for const: `d(0,"div",3)(1,"a",6), v(2), Xe(3,"date")` with `m(), z("ngStyle", e.styleF), m(), Ze(Ct(3,2,e.msg.t,"fullDate"))`. Const 6 is `[3,"ngStyle"]` in both tables — an element declared for a binding and nothing else — and the bare `m()` selects node 1, the anchor, by the same `advance` arithmetic ACA-03 rests on.
+
+**Why it is worth a row.** This separator was the only node in either renderer that reads a message and paints none of its colours, so in a room whose alerts carry their own `fontColor` the date rule sat in the default text colour between rows that did not. Nothing announces that; it is a colour. Both renderers are asserted, plus the control that a message with no colours emits no style at all — which is what keeps this from becoming an unconditional `style` attribute.
+
+**low** · `missing-behaviour` · reference byte **1,328,773**
+
+```
+function _ge(t,n){if(1&t&&(d(0,"div",3)(1,"a",6),v(2),Xe(3,"date"),u()()),2&t){const e=g();m(),z("ngStyle",e.styleF),m(),Ze(Ct(3,2,e.msg.t,"fullDate"))}}
+```
+
+**Ours:** RoomMessage.svelte's `dateSeparator` snippet rendered a bare `<a>`. The snippet itself is right and RM-01 argued for it — one implementation, two hosts, because each component's `styles:[…]` block carries its own `.separator` rule — so this is one attribute on a node that was otherwise transcribed.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RMSG-06 — The compact MEMBER reaction repeater has no `clickedBy` gate; the other three have it, and matching would draw a pill claiming a reaction nobody made
+
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 22:40 UTC, not reproduced.** Four templates repeat the reaction loop. `Oge` (card admin, 1,333,312), `u1e` (card member, 1,341,960) and `V1e` (compact admin, 1,371,615) each wrap the pill in `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `m_e` (compact member, 1,379,950) opens `d(0,"span")(1,"span",51)` and renders it unconditionally.
+
+`addRemoveReaction` empties `clickedBy` rather than deleting the key, so a reaction whose last holder removes it draws upstream as `🎉 0` — on a compact member row and on no other row in the product. That is a defect of the kind RM-19 records for `copyMessage`'s write-back: reproducing it would ship a pill claiming a reaction nobody has made, on one layout of four. The gate is applied to all four here, which is what three of them already say, and the contract renders all four layouts so that "one of four differs" is a statement about four rather than about one.
+
+**Found by unifying the strip, which is the second half of this row.** The compact branch held a SECOND copy of the pill list, differing from `reactionStrip` by an inner gate on the log type — `g_e`'s own `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)` at 1,380,270. That gate is IMPLIED by the container's, upstream as well as here: `__e` renders under `O(36, (enableReactions && "chat" === logType || enableQAReactions && "alerts" === logType && isQAMsg) && checkMsgReactions(msg) ? 36 : -1)` (`b_e`, 1,380,680), every disjunct of which entails a disjunct of the inner one, and `menuAllows.reaction` is that same expression here. So the copy could go, and going is what surfaced that its `{#each}` and the card's gated differently.
+
+**low** · `divergence` · reference byte **1,379,950**
+
+```
+function m_e(t,n){if(1&t){const e=Y();d(0,"span")(1,"span",51),x("click",function(){const o=D(e).$implicit;return E(g(3).addRemoveReaction(o.key))}),v(2),u()()}if(2&t){const e=n.$implicit,i=g(3);m(),z("ngClass",ct(3,r6,e.value.clickedBy.includes(i.hashEmail))),m(),ns("",e.value.emoji," ",e.value.clickedBy.length," ")}}
+```
+
+**Ours:** one `reactionStrip` snippet with THREE call sites — the card's two wrappers (RM-22: `span.ms-1` admin, bare `div` member) and the compact host's own container. The gate is `{#if reaction.clickedBy.length > 0}` for all of them, and the contract asserts one `{#snippet reactionStrip()}`, three renders of it, and a single occurrence of `chat-reaction-added` in the file.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
 ## notes/NoteEditor.svelte
 
@@ -3650,7 +3766,122 @@ d(11,"li",12),x("click",function(){return D(s),E(o.toggleAlertsToolbarSearchOnly
 
 > Verified: I could not find the reference's binding shape anywhere in apps/room/src. In all three of our toolbars the click sits on the anchor inside a plain <li>, never on the <li>: AlertChatArea.svelte:484-491 (<li class="nav-item mx-1"> with the handler on <a title="Search" class="nav-link p-0" onclick={ontogglealertssearch}> at :488) and :492-50…
 
+### ACA-01 — The chat composer's Enter rules are not the reference's: ALT+Enter posts where it should insert a newline, the typing signal runs on for five seconds after a send, and the emoji panel stays open
+
+**BUILT 2026-08-30 22:40 UTC, and it corrects a claim this repository had written down backwards.** `onKey` is measured on BOTH compiled copies — `app-chat` at 1,439,821 and `app-extra-chat` at 2,386,131, identical but for the jQuery alias and the textarea id — and its partner `onKeydown(e){e.preventDefault()}` at 1,440,246, bound as `keydown.enter` on const 64/61, is the half that changes what the other half means: the browser's default is cancelled for every Enter, so nothing the browser does can insert a newline in this box. `onKey` then runs on keyup and decides. **Enter sends, ALT+Enter appends `"\n"`, SHIFT+Enter does nothing.** `#lib/chat-composer-key.js` holds the rule; `AlertChatArea.svelte` holds the wiring, because each of the three side effects has a different owner here.
+
+**Three things this room did not do, in descending order of what they cost.** (1) `ALT+Enter POSTED THE MESSAGE` — our gate was `Enter && !shiftKey`, so a member reaching for upstream's newline modifier published instead. (2) `this.showTyping && this.refreshTypingStatus(!0)` runs before the branch on every Enter, and ours only stopped on `blur`, so the sender kept showing as typing to everyone in the channel for up to five seconds after their message had already arrived — `TypingSignal`'s debounce was the only thing that would ever have cleared it. (3) `this.showEmojiChooser = !1` is on the SEND branch alone, and a newline does not close it; ours left the picker up across a send. The third is `menus.set('emoji', false)` rather than a local flag because the page owns which panel is open across every column at once.
+
+**The `\n` goes on the END of the value**, which is `i.val(i.val() + "\n")` transcribed rather than improved. Guessing a caret insertion would be inventing behaviour; ACA-02 covers the caret case.
+
+Contract: `chat-composer-key-contract.test.ts`, which reads both `onKey` bodies out of the pinned bundle at run time rather than quoting them. Three negative controls seen red.
+
+**high** · `missing-behaviour` · reference byte **1,439,821**
+
+```
+onKey(e){if(13==e.keyCode){e.preventDefault(),this.showTyping&&this.refreshTypingStatus(!0);const i=li("#textAreaTxt");e.shiftKey?(i.val(i.val()),this.autoExpand(e.target)):e.altKey?(i.val(i.val()+"\n"),this.autoExpand(e.target)):(this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target))}else this.showTyping&&(0===li("#textAreaTxt").val().trim().length?this.refreshTypingStatus(!0):this.updateLastTypedTime())}
+```
+
+**Ours:** AlertChatArea.svelte's composer textarea bound `onkeydown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); … void onsend()… } }}` — one branch, no ALT term, no typing frame and no panel close. `onstoppedtyping` reached only `onblur`. The `else` half of upstream's handler — an emptied box counting as a stop — IS already built and is not part of this row: `TypingSignal.typed()` returns through `stop()` on a blank value, with the reference's own `"" == i.val()` condition quoted at it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ACA-02 — SHIFT+Enter: upstream swallows the keystroke, this room inserts a newline, and the inline alert box already reproduces the swallow
+
+**OWNER DECISION.** The measurement is settled and the two boxes now disagree with each other on purpose, which is not a state to leave undocumented. Upstream's Shift branch in every composer that shares this rule is `i.val(i.val())` — a self-assignment after `preventDefault`, whose only observable effect is that the keystroke is eaten. `inline-alert-key.ts` reproduced it for the inline ALERT box in `acA-01` and argued for it: *"a presenter's muscle memory for this box is the reference's."* The chat composer is NOT following it, and `#lib/chat-composer-key.js` states why at the code: the alert box had no prior behaviour to take away, the chat composer has had Shift+Enter as its newline for as long as it has existed, and upstream's replacement — `i.val(i.val() + "\n")` on ALT — appends at the END of the value rather than at the caret, so a member editing the middle of a message would have the newline land somewhere else.
+
+**What the owner has to answer:** whether the two composers should agree, and in which direction. Matching upstream everywhere costs the chat composer its caret newline. Matching this room everywhere costs the inline alert box a divergence `acA-01` deliberately took. Doing neither — which is where it stands — costs one line of explanation per box and nothing else, and is the only option of the three that is reversible.
+
+**One-line correction that is not mine to make:** `src/lib/inline-alert-key.ts:33` says *"One column over, in the chat composer, **Shift+Enter is the newline**"* as a statement about the REFERENCE. It is true of this room and false of the bundle. That line should read "in the chat composer as this room ships it". The claim is annotated at the call site in `AlertChatArea.svelte` and asserted in `chat-composer-key-contract.test.ts`, which reads both `onKey` bodies rather than trusting either document.
+
+**medium** · `divergence` · reference byte **2,386,131**
+
+```
+e.shiftKey?(i.val(i.val()),this.autoExpand(e.target)):e.altKey?(i.val(i.val()+"\n"),this.autoExpand(e.target)):(this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target))
+```
+
+**Ours:** `chatComposerKeyAction` answers `'ignore'` for Shift+Enter and `chatComposerKeyPrevents` therefore answers `false`, so the browser inserts the newline at the caret. Shift is tested BEFORE Alt, which is upstream's own order, so Shift+Alt+Enter resolves to the Shift branch in both — the decision tree is transcribed and one leaf is changed.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ACA-03 — The presenter's Poll indicator classes are on the `<li>`; the reference binds them to the `<a>` inside it, and the non-presenter entry beside them already wears one there
+
+**BUILT 2026-08-30 22:40 UTC.** `Tt` is Angular's `classProp` and writes to whichever node the update block has SELECTED. `P2e`'s update block is `m(), Tt("poll-active-blink", …)("poll-active-indicator", …)` — an Ivy update block starts at index 0 and `m(n)` advances by `n`, so the bare `m()` moves from the `<li>` at 0 to the `<a>` at 1. **That arithmetic is not assumed:** `Bge` in `app-st-message` writes its first `z(…)` pair with no `m()` at all (node 0, the box) and its next after `m(4)` (node 4, `d(4,"a",10)`, the kebab), and the contract asserts both readings.
+
+**The const table is the second, independent half of the proof.** Const 11 is `[1,"nav-item","mx-2"]` — a class list with no `3,` binding section — so the `<li>` cannot change class at runtime whatever the update block selects.
+
+**Why it is visible rather than pedantic:** both rules paint the anchor's own box, and the NON-presenter poll entry a few nodes later already wears one of them statically on its anchor (const 27, `[1,"poll-active-blink",2,"cursor","pointer",3,"click"]`, which this room had right). So one control was drawing its indicator on the anchor for a viewer and on the anchor's parent for a presenter, differing by the `<li>`'s `mx-2` margin. `pollNavAnchorClasses` in `#lib/alert-chat-nav.js`. Two negative controls seen red.
+
+**low** · `wrong-markup` · reference byte **2,041,385**
+
+```
+d(0,"li",11)(1,"a",23),x("click",function(){return D(e),E(g().doPollUI())}),T(2,"i",24),v(3," Poll"),u()()… m(),Tt("poll-active-blink",e.pollIsActive&&!e.pollIsMinimized)("poll-active-indicator",e.pollIsMinimized)
+```
+
+**Ours:** AlertChatArea.svelte rendered `<li class={['nav-item mx-2', { 'poll-active-blink': …, 'poll-active-indicator': … }]}>` with a bare `<a onclick={onopenpoll}>` inside it. The two conditions were already the reference's, including the `&& !polls.minimized` term on the blink; only the element was wrong.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ACA-04 — Both compiled copies close the Webinar Mode block with a bare, class-less `<i>`; this room does not emit it
+
+**MEASURED REFUSAL 2026-08-30 22:40 UTC, recorded at the code.** `e0e` (byte 1,424,607) and `Z3e` (2,371,066) are the same six calls, and the last of them is `T(4,"i")` — passing **no const index at all**, not an empty one. The element therefore carries no class, no attribute, no text and no binding.
+
+**Nothing can style it.** There is no bare `i` type selector in `app.css`, none in `captured-runtime-components.css`, and none in the reference's own `styles.ee2a710065b60389.css` — asserted in the contract against all three sheets, with a positive control per sheet so a regex that matches nothing cannot pass quietly. It renders zero pixels and announces nothing to a screen reader. Emitting it would be markup with no consumer, which is the first defect `CLAUDE.md` names, and it is the same test `app-typing-indicator-dots` failed eight nodes below and `blinkingRec` passed.
+
+Recorded rather than left out silently, so the next byte-for-byte comparison of this block finds the reason instead of the hole. `WEBINAR_MODE_TRAILING_ICON_REFUSED` in `#lib/alert-chat-nav.js`; contract in `alert-chat-nav-contract.test.ts`. One negative control seen red — inserting the element turns the assertion on the block's tail red.
+
+**low** · `divergence` · reference byte **1,424,607**
+
+```
+function e0e(t,n){1&t&&(d(0,"div",24),v(1," Webinar Mode "),d(2,"span",56),T(3,"i",57),u(),T(4,"i"),u())}
+```
+
+**Ours:** AlertChatArea.svelte's webinar block ends at the tooltip `<span>`. The three nodes before it — the `px-1 webinarMode` div, the ` Webinar Mode ` text with both of its spaces, and the `ml-2` span carrying the const-56 tooltip verbatim — are all transcribed.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ACA-05 — The extra chat column's composer binds `paste` upstream; the refusal recorded here rests on a measurement of one copy that the other copy contradicts
+
+**BLOCKED — needs one file this session does not own.** `acA-02` built the chat paste handler and recorded, as its reason for giving the extra column none, that *"the reference binds paste on textarea const 64 (the main composer) and its handler reads `#textAreaTxt` by id, so a second column pasting through it would seed from the first column's box."* **Both halves are false of `app-extra-chat`.** Its composer const (61) is `["name","txt-area","id","textAreaTxtExtra","rows","1","spellcheck","true","placeholder","Type your message here..",1,"txt-area","form-control","border-0",3,"keyup","paste","keydown.enter","focus"]` — `paste` is in the binding section — `cMe` at byte 2,373,521 binds it, and that component's OWN `onImagePaste` at byte 2,392,023 reads `ui("#textAreaTxtExtra")`, not `#textAreaTxt`, behind the same `if(!this.canPostImages)return!1` guard. There is no shared box and no seeding across columns.
+
+**This is the shape the document's own preface warns about, in the other direction:** a claim framed as a fact about "the reference" that was read off one of the two compiled copies. The rule for this surface is that both are read before a divergence is claimed, and here that was not done.
+
+**What would unblock it, exactly.** `ExtraChatPane.svelte` needs an `onpasteimage: (file: File) => void` prop and an `onpaste` on its `#textAreaTxtExtra` textarea calling the same `pastedImageFrom(event.clipboardData?.items)` guarded by `canPostImages` that `AlertChatArea.svelte`'s `handleComposerPaste` already runs, fed from `+page.svelte` beside the main column's `onpasteimage={(file) => composer.beginImagePaste(file)}`. And `src/lib/chat-paste-image-contract.test.ts:346` asserts `expect(extraCode).not.toContain('onpaste')` with that false reason written above it at :343-345; that assertion has to be inverted and its comment replaced. Both files are owned by other agents this session.
+
+**medium** · `missing-behaviour` · reference byte **2,373,521**
+
+```
+function cMe(t,n){if(1&t){const e=Y();d(0,"div",25)(1,"div",59,3)(3,"div",60)(4,"textarea",61),x("keyup",function(o){return D(e),E(g().onKey(o))})("paste",function(o){return D(e),E(g().onImagePaste(o))})("keydown.enter",function(o){return D(e),E(g().onKeydown(o))})("focus",function(o){return D(e),E(g().onTextareaFocus(o,"textAreaTxtExtra"))}),u()()…
+```
+
+**Ours:** `grep -n paste src/lib/components/ExtraChatPane.svelte` returns nothing. A member with the second column open and focused cannot post a screenshot at all, and the reason recorded for that is a reading of the wrong component.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ACA-06 — The chat toolbar's extended section is missing all four of its controls, and `ChatSearchBar`'s own docblock names two of them wrongly
+
+**BLOCKED — every one of them lives in `ChatSearchBar.svelte`, owned by another agent this session.** `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
+
+* **Save chat messages** — `K_e` at 1,421,929, `span` const 38 (`id="addon-chat-save"`), click `It(18).downloadLog("chat")`. Inside the input group, beside the clear `×`. The ALERTS column's twin of this IS built.
+* **Archive Chat Messages** — `q_e` at 1,421,800, `div` const 41 (`id="addon-chat-archive"`), click `archiveOptions()`, gated `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` — the same two-term gate `acA-07` restored on the alerts side.
+* **Group Chat Control** — `Y_e` at 1,422,202, const 46 `[1,"dropdown","d-inline-block","m-1","group-chat-control"]`: a `btn-secondary dropdown-toggle btn-sm` button reading ` Group Chat Control `, over three `dropdown-item`s — `Regular Group Chat` / `Webinar Mode` / `Disable Group Chat` — calling `changeChatMode("g"|"p"|"d", event)` with a `fas fa-check-square me-1` tick whose `visible` class marks the current `sessData.chatMode`. Gated `O(4, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 4)`.
+* **Detach Chat** — `Q_e` at 1,422,956, const 53, `fa-window-restore` plus ` Detach Chat`, click `detachChat()`, gated `O(5, chatOnlyMode ? -1 : 5)`.
+
+**The two copies differ here, and that is a finding rather than an aside.** `app-extra-chat`'s extended section (`Q3e`, byte 2,369,619) carries Mod Only and Group Chat Control and **stops** — there is no Detach Chat. The const tables agree: `app-chat` carries three entries `app-extra-chat` does not (47 and 53, the two forms of the Detach button, and 54, its `fa-window-restore` icon), which is exactly the offset by which every const from 48 onward shifts between the two tables. So the control belongs to the main column alone.
+
+**A separate one-line correction, in the same file.** `ChatSearchBar.svelte`'s docblock says *"The save-chat and archive controls beside it (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e`) are separate features and are still not built."* `Y_e` and `Q_e` are the Group Chat Control dropdown and the Detach Chat button; the save and archive pair is `K_e`/`q_e` at node **9 of `J_e`**, in the other slot entirely. The same docblock cites `X_e` "at byte 1,423,265"; `function X_e` begins at **1,423,104**. Four names, one offset — the note should read "The Group Chat Control dropdown and the Detach Chat button (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e`, byte 1,423,104), and the save/archive pair (`K_e`/`q_e`, node 9 of `J_e`), are separate features and are still not built."
+
+**medium** · `missing-control` · reference byte **1,423,104**
+
+```
+function X_e(t,n){if(1&t){const e=Y();d(0,"div",43)(1,"input",44),Ve("ngModelChange",…),x("change",function(){return D(e),E(g(2).toggleModOnlyFilter())}),u(),d(2,"label",45),v(3," Mod Only "),u()(),H(4,Y_e,16,9,"div",46)(5,Q_e,3,0,"button",47)}if(2&t){const e=g(2);…m(3),O(4,!e.appService.globals.isPresenter&&!e.appService.globals.user.hasMic||e.appService.globals.isLimitedPresenter?-1:4),m(),O(5,e.appService.globals.chatOnlyMode?-1:5)}}
+```
+
+**Ours:** `ChatSearchBar.svelte`'s extended block renders the Mod Only checkbox and closes. `grep -rn "group-chat-control|Detach Chat|addon-chat-save|addon-chat-archive|changeChatMode|archiveOptions" src` over the whole app returns ZERO hits for every one of the six names — the alerts column's `#addon-chat-save` and `#addon-chat-messages-archive` are different ids on a different toolbar, and the alerts column's Detach button is `detachAlerts`, a different command.
+
 ---
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
 ## PresentationArea.svelte
 
@@ -4395,6 +4626,468 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
 
 ---
+
+## notes/NoteEditor.svelte — second reading, 2026-08-30
+
+3 rows. The eighteen above came from the two-verifier pass; these come from re-reading `app-note`
+end to end at verified boundaries and decoding its whole consts table by value, which is the reading
+`RM-25` records as the one that finds rows a reader who looks up a cited const cannot.
+
+### NE-01 — A block whose entire body is one HTML comment: three conditions evaluated to render nothing
+
+**FIXED 2026-08-30.** Deleted. `{#if giphyApiKey && openMenu === null && dialog === null}` wrapped a
+single HTML comment and nothing else, so three values were read on every render to choose between
+rendering nothing and rendering nothing.
+
+The comment inside it — *"Giphy is opened by the toolbar button through this captured picker
+surface"* — is TRUE, and it describes the block eighty lines above that actually mounts
+`GiphyPicker`. That is what made it survive: a correct sentence, in a gate of its own, reads to the
+next person as a surface that has not been built yet rather than as a leftover.
+
+Nothing else in this repository looks in this direction. `orphan-style-contract` finds a rule nobody
+wears and `orphan-component-contract` finds a component nobody mounts; a BRANCH with no body compiles,
+lints, type-checks and passes `svelte-check` in silence. `note-dead-control-contract.test.ts` now
+sweeps for the general form — any `{#if}` whose body is empty once comments are stripped — rather
+than pinning this one instance. Control seen red: re-adding the block failed both assertions, and the
+sweep named the block in its own message.
+
+**low** · `divergence` · reference byte **1,461,505**
+
+```
+function T0e(t,n){if(1&t){const e=Y();d(0,"div",4)(1,"button",5),x("click",function(){return D(e),E(g().setAsWelcomeTab(!1))})
+```
+
+**Ours:** `T0e` is `app-note`'s entire editing template and it has sixteen nodes, none of them empty.
+Ours had a seventeenth that rendered nothing at all. The offset is cited as the template the block
+claimed to belong to, because there is no reference counterpart to cite — that is the finding.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### NE-02 — The button bar drops every padded text node the capture carries
+
+**BUILT 2026-08-30.** Seven labels: ` Set as Welcome Mat `, ` Apply as Welcome Mat to all rooms `,
+` Bring Everyone here `, ` Edit Carousel `, ` Version History (n) `, ` Done ` and `S0e`'s ` Revert `.
+
+Svelte trims whitespace at the edges of an element's children, so a trailing space written as text is
+compiled away — only an expression survives. The measurement and the whole argument already live in
+`files-pane-contract.test.ts`'s `the padded text nodes` block, which pins the identical idiom on the
+Files pane and records the compiler check that decided it; nothing of that is restated here or in the
+component. What was new is only that the note surface had none of it while nine other components use
+`{' '}` in 42 places.
+
+The leading space needs nothing — it sits between the icon element and the text, where Svelte keeps
+it. `note-padded-labels-contract.test.ts` asserts the source AND renders the bar, because a
+source-only pin would have passed just as happily for `&#32;`, which that Files block measured and
+found does not survive. Control seen red on both halves at once.
+
+**low** · `wrong-constant` · reference byte **1,461,505**
+
+```
+v(3," Set as Welcome Mat "),u(),d(4,"button",5),x("click",…setAsWelcomeTab(!0)),T(5,"i",6),v(6," Apply as Welcome Mat to all rooms ")
+```
+
+**Ours:** Every label was written as markup text, so the compiler dropped its trailing space. No
+pixel depends on it — a space at the end of a line box collapses — but the DOM text node does, and
+that is what a byte-for-byte comparison of the two trees reads.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### NE-03 — The toolbar's four constant tables have no counterpart in the pinned bundle at all
+
+**MEASURED REFUSAL 2026-08-30.** The font list, the size list, the line-height list and the
+sixty-four-colour palette are NOT transcriptions and must not be cited as such. They are now
+`src/lib/note-palette.ts`, whose header records the search rather than the assumption.
+
+What was searched: `main.d1d09071be31f1ba.js` contains the string `summernote` 37 times and the
+library zero times — the reference's editor is a separate script the capture does not include. Its
+config at byte 1,468,553 names a toolbar layout and nothing else: no `fontNames`, no `fontSizes`, no
+palette. `F7C6CE` and `9CC6EF` return zero hits in the bundle, zero in
+`styles.ee2a710065b60389.css`, and zero in `css/complete-app-styles.css`.
+
+So there is nothing to match, and inventing a citation for these values would be worse than having
+none. They are summernote's own defaults, carried because our editor is not summernote and has no
+defaults of its own. The module says that where the values are, so the next reader arguing about a
+colour knows they are arguing about this room's editor rather than about a captured value.
+
+The extraction was forced by `source-size-contract` refusing `NoteEditor.svelte` at 1,700 lines, and
+the ceiling's rule — a slice leaves rather than the number rising — chose the right slice: ninety
+lines that know nothing about Tiptap, about the open menu, or about a note.
+
+**low** · `divergence` · reference byte **1,468,553**
+
+```
+placeholder:"Type your note here and press save",height:"100%",toolbar:[["style",["style"]],["view",["fullscreen","codeview"]],["misc",["und
+```
+
+**Ours:** `NoteEditor.svelte` carried the four tables inline with no note on where they came from, so
+every one of them looked like the transcriptions the rest of the file is full of.
+
+---
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## notes/CarouselDialog.svelte
+
+8 rows. The carousel modal, its image browser and its two confirmations were extracted out of
+`NoteEditor.svelte` on 2026-08-30; this is the first end-to-end reading of the component that
+resulted, against `M0e`, `x0e`, `D0e`, `E0e`, `k0e` and `O0e`.
+
+### CD-01 — The image browser's header icon is `fas fa-images`; const 62 is `fas fa-folder-open`
+
+**FIXED 2026-08-30.** `O0e`'s node 2 is `T(2,"i",62)` and const 62 is `[1,"fas","fa-folder-open"]` at
+byte 1,486,004 — the SAME icon as the ` Browse ` button that opens this modal, which is the point of
+it: the folder is what the control and the thing it opens have in common. `fa-images` is const 15 and
+belongs to the carousel modal's own title, one screen up in the same file.
+
+This is the shape the surface kept producing from the other side. `note-image-browser-contract.test.ts`
+had already pinned this modal's strings and its grid and every one of them was right; what nobody had
+read was the chrome the strings sit in. `O0e` is nine nodes long and every one names a const —
+decoding all nine took a minute and produced four corrections, of which this is the first. Control
+seen red.
+
+**low** · `wrong-constant` · reference byte **1,466,288**
+
+```
+d(0,"div",26)(1,"h4",72),T(2,"i",62),v(3," Select Image "),u(),d(4,"button",28)
+```
+
+**Ours:** `CarouselDialog.svelte` rendered `<i class="fas fa-images"></i> Select Image`, and its `h4`
+wore Bootstrap's `modal-title` where its sibling modal in the same file wears summernote's
+`note-modal-title` — a third spelling in a file that only ever needed one.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-02 — The browser's close button is `btn-close`; const 28 is Bootstrap 4's `close`, and it is the const the four sibling dialogs use
+
+**FIXED 2026-08-30.** Const 28 is `["type","button","aria-label","Close",1,"close",3,"click"]` at byte
+1,484,628, and it is the ONE close-button const in this component — the carousel modal and the file
+browser are both declared from it. Ours drew them as two different buttons: `close` on one and
+Bootstrap 5's `btn-close` on the other. Two spellings of one control in one file is one of them being
+wrong.
+
+**Its CHILD is deliberately not transcribed, and that is the interesting half.** `T(5,"span",29)` is
+a CHILDLESS `<span aria-hidden="true">` — `T` is elementStart-and-end with no children, where a `×`
+would compile to `d(5,"span",29),v(6,"×"),u()`. So upstream's close button paints nothing but its own
+padding; the glyph was lost somewhere above this build, and `.close` in the captured sheet carries no
+`::before` to put it back. Reproducing it would reproduce an invisible control, which is the one
+reason `CLAUDE.md` gives for not matching the reference. `note-icon-close` is what the four sibling
+note dialogs already draw and it is what is drawn here. Control seen red.
+
+**low** · `wrong-constant` · reference byte **1,484,628**
+
+```
+["type","button","aria-label","Close",1,"close",3,"click"],["aria-hidden","true"]
+```
+
+**Ours:** `class="btn-close"` with no child at all, so the browser's close was a Bootstrap 5 control
+in a summernote modal — styled by a different sheet from the four dialogs beside it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-03 — The browser's footer button is `btn btn-secondary`; const 41 is `btn btn-outline-dark`, the same const the carousel modal dismisses with
+
+**FIXED 2026-08-30.** Const 41 is `["type","button",1,"btn","btn-outline-dark",3,"click"]` at byte
+1,485,128, and `O0e` node 11 and `M0e` node 25 are both declared from it. Ours already had the
+carousel modal's ` Cancel ` right; the browser's was invented beside it.
+
+Worth stating plainly because it is the row's whole content: nothing here was missing and nothing was
+broken. Two buttons that the reference draws identically were drawn differently, in one file, forty
+lines apart — which is exactly the kind of divergence that survives every gate and every review, and
+exactly why the const table is decoded by value rather than described. Control seen red.
+
+**low** · `wrong-constant` · reference byte **1,466,484**
+
+```
+d(10,"div",40)(11,"button",41),x("click",function(){return E(D(e).$implicit.dismiss())}),v(12," Cancel ")
+```
+
+**Ours:** `class="btn btn-secondary"` on the browser's Cancel, against `btn btn-outline-dark` on the
+carousel modal's — the same act, two buttons.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-04 — The image-browser modal is not announced as a dialog and has no accessible name
+
+**BUILT 2026-08-30.** `role="dialog"` and `aria-label="Select Image"` on the browser's root, matching
+what the sibling carousel modal in the same file has always had.
+
+The reference gets both without writing either: `openFileBrowser` opens the template through
+`modalService.open(this.fileBrowserModal, {ariaLabelledBy:"file-browser-modal-title", size:"lg"})` at
+byte 1,477,226, and NgbModal puts `role="dialog"` and `aria-labelledby` on a wrapper it owns. Const 72
+is `["id","file-browser-modal-title",1,"modal-title"]` — the id that binding points at.
+
+**The id is deliberately not reproduced**, and this is a divergence with a reason rather than a
+shortcut. A literal document-unique id belongs to a component NgbModal mounts once at the document
+root. This one is re-created inside `{#if dialog === 'carousel'}` in an editor a room may hold more
+than one of, so a literal `file-browser-modal-title` is a duplicate id waiting for a second note to be
+edited. `aria-label` says the same thing and cannot collide. Control seen red.
+
+**medium** · `missing-behaviour` · reference byte **1,477,226**
+
+```
+this.fileBrowserModalRef=this.modalService.open(this.fileBrowserModal,{ariaLabelledBy:"file-browser-modal-title",size:"lg"})
+```
+
+**Ours:** The browser's root was a bare `<div class="note-modal open">` — no role, no name — while
+the carousel modal forty lines above it carried `role="dialog"` and `aria-label={title}`. Assistive
+technology met the browser as an unlabelled group of buttons.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-05 — `.note-modal-dialog`: a wrapper element with no rule anywhere and no counterpart in the reference
+
+**FIXED 2026-08-30.** Deleted, element and class together.
+
+Searched rather than assumed: `note-modal-dialog` occurs zero times in
+`main.d1d09071be31f1ba.js`, zero times in `styles.ee2a710065b60389.css`, and zero times in every sheet
+this app ships — `css/complete-app-styles.css`, `lib/styles/*.css` and `app.css`. `O0e` has no wrapper
+element either; the `.modal-dialog` NgbModal supplies lives outside the template, which is why a
+reader porting the template would never have seen one to copy.
+
+`CLAUDE.md` names this defect — *"no `.flipped` class with no CSS"* — and it is the direction
+`orphan-style-contract.test.ts` does NOT look: that gate finds a rule nobody wears, and this was a
+class no rule reaches. `note-dead-control-contract.test.ts` closes the other direction for this
+surface, and its control asserts the six `note-modal-*` classes that ARE styled are still worn, so a
+sweep that removed one of those looks different from this one. Control seen red.
+
+**low** · `divergence` · reference byte **1,466,225**
+
+```
+function O0e(t,n){if(1&t){const e=Y();d(0,"div",26)(1,"h4",72),T(2,"i",62),v(3," Select Image ")
+```
+
+**Ours:** `<div class="note-modal-dialog">` sat between `.note-modal` and `.note-modal-content` in the
+file browser and nowhere else, so the two modals in this one file nested differently for no reason
+either of them could state.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-06 — `.note-carousel-modal`: an invented class on the carousel modal's root, styling nothing
+
+**FIXED 2026-08-30.** Removed. Same search as CD-05 and the same three zero results, plus zero in our
+own sheets.
+
+Recorded as its own row rather than folded into CD-05 because the two failed differently: the wrapper
+was a whole ELEMENT that could be mistaken for structure, and this was a class on an element that has
+to exist anyway, wearing the shape of a captured hook on a component whose every other class is one.
+It is the harder of the two to see and the cheaper to add. Control seen red — re-adding it to the
+markup, not to a comment, and the assertion names the class.
+
+**low** · `divergence` · reference byte **1,464,344**
+
+```
+function M0e(t,n){if(1&t){const e=Y();d(0,"div",26)(1,"h4",27),T(2,"i",15),v(3),u(),d(4,"button",28)
+```
+
+**Ours:** `class="note-modal open note-carousel-modal"`. `M0e` opens on const 26, `modal-header`, and
+declares no class of its own for the modal root at all — the root is NgbModal's.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-07 — The carousel modal and its browser drop the capture's padded labels, and three of them stay dropped
+
+**HALF BUILT 2026-08-30.** Padded: ` Add slide `, ` Select Image `, both ` Cancel `s, the swung title
+(` Edit / Insert Image Carousel `) and the swung primary button (` Save Changes ` / ` Insert
+Carousel `). The rule and its measurement are `files-pane-contract.test.ts`'s and are not restated.
+
+**` Upload `, ` Browse ` and ` Change image ` are still unpadded, and the reason is not a
+measurement** — the capture pads all three, at bytes 1,462,593, 1,462,725 and 1,463,600. It is that
+three assertions pin their exact current spelling in two contract test files this change was not
+permitted to edit:
+
+- `note-image-browser-contract.test.ts:132` — `'><i class="fas fa-folder-open"></i> Browse</button'`
+- `note-image-browser-contract.test.ts:268` — `'><i class="fas fa-upload"></i> Upload</label'`
+- `note-carousel-slide-contract.test.ts:76` — `'><i class="fas fa-times"></i> Change image</button'`
+
+Each needs one edit — `Browse</button` becomes `Browse{' '}</button`, and so on — after which the
+three labels take the pad like the rest. `note-padded-labels-contract.test.ts` asserts the three ARE
+still unpadded, deliberately: written as a comment the exception would rot the moment somebody fixed
+it, and written as an assertion it expires by failing.
+
+**low** · `wrong-constant` · reference byte **1,462,593**
+
+```
+d(7,"label",59),T(8,"i",60),v(9," Upload "),u(),d(10,"button",61),x("click",…openFileBrowser(o)),T(11,"i",62),v(12," Browse ")
+```
+
+**Ours:** None of the component's labels carried the capture's spaces; nine other components in this
+room use the `{' '}` idiom in 42 places and the three note components used it in none.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### CD-08 — Both modals are opened `size:"lg"` in the reference and are 600px wide here
+
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30.** The reference opens BOTH of this component's
+modals large, and it says so twice: `size:"lg"` at byte 1,475,314 (`openCarouselModal`, and again in
+`editCarousel`) and at byte 1,477,226 (`openFileBrowser`). That is NgbModal's `.modal-lg`.
+
+This room's chrome is summernote's, not NgbModal's, and the captured sheet ships the corresponding
+width already: `.note-modal-content { width: 600px }` and `.note-modal-content-large { width: 900px }`,
+both in `css/complete-app-styles.css`. Our two modals wear the first. So the change is one class on
+each of two elements and the class is a captured one.
+
+**What the owner has to answer is whether that mapping is a transcription or an inference.**
+`size:"lg"` is NgbModal's vocabulary and `note-modal-content-large` is summernote's; nothing in either
+capture states that one means the other, and the width of a modal is a visual decision that cannot be
+verified from this checkout — there is no rendered capture of either dialog. It is left measured
+rather than guessed, because a ten-slide carousel editor at 600px is a real complaint and a modal
+that grew 300px because an agent inferred an equivalence is a different one.
+
+**low** · `divergence` · reference byte **1,475,314**
+
+```
+this.modalService.open(this.carouselModal,{ariaLabelledBy:"carousel-modal-title",size:"lg"}).result.then(()=>{},()=>{})
+```
+
+**Ours:** `CarouselDialog.svelte` renders `<div class="note-modal-content">` for both modals, which
+`css/complete-app-styles.css` sizes at 600px. `.note-modal-content-large` has no wearer anywhere in
+`apps/room/src`.
+
+---
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## notes/NotesPane.svelte
+
+4 rows, read against `zSe` (byte 1,930,173) — the notes pane inside `app-presentationarea` — and its
+two row templates `jSe` and `$Se`.
+
+### NP-01 — One tab panel is rendered where the reference renders one per note, so every inactive tab's `aria-controls` names an element that does not exist
+
+**BUILT 2026-08-30.** A panel per note, `show active` toggled, which is Bootstrap's tab-pane shape and
+the reference's: `zSe` repeats BOTH lists over the same array — `ht(1,jSe,9,11,"li",16,pc)` for the
+tabs and `ht(4,$Se,10,9,"div",72,pc)` for the panels at byte 1,930,259 — and const 72 is
+`["role","tabpanel",1,"tab-pane","fade",3,"ngClass","id"]`, with `show active` arriving through
+`ngClass`.
+
+**The sharp end is not the missing markup, it is that two green assertions described a broken
+relationship.** `notes-pane-render.test.ts` has asserted `aria-controls="60"` on the second tab and a
+single panel `id="59"` since it was written. Both were true. Together they say that every tab but the
+open one pointed at an id nowhere in the document — which is not a degraded experience but a broken
+one, because the control announces a relationship a screen reader then cannot follow. A test can pin
+two facts and never ask whether they agree; the new assertion sweeps every `aria-controls` in the
+rendered output and requires the id it names to exist, so a third note is covered without anyone
+remembering.
+
+The second cost was the thing a tab strip is for: `.note-container` is `overflow-y: auto`, so each
+panel is its own scroller, and unmounting it threw away where the reader was.
+
+**What is deliberately NOT repeated is the editor.** Upstream renders `app-note` in every panel and
+lets each decide whether it is editing (`H(0,T0e,16,3)` gated on `isEditing`); ours mounts
+`NoteEditor` only in the panel being edited, because ours is a Tiptap instance with a document, an
+undo stack and a three-second autosave timer, and `editingNoteId` is a single value — a second
+instance is unreachable and would cost all of that per note in the room. The read-only `.note-view`
+IS repeated, which is what upstream's `app-note` renders when it is not editing. Control seen red:
+restoring the single panel failed four assertions, one of them naming `aria-controls="60"`.
+
+**medium** · `missing-behaviour` · reference byte **1,930,259**
+
+```
+d(3,"div",121),ht(4,$Se,10,9,"div",72,pc),u()),2&t){const e=g();m(),pt(e.appService.globals.sessionNotes),m(3),pt(e.appService.globals.sessionNotes)
+```
+
+**Ours:** `div#notesTabsContent` held a single `{#if activeNote !== null}` panel with `tab-pane fade
+show active` written into the class list, while `ul#notesTabs` rendered one `<li>` per note and gave
+each anchor `aria-controls={note.id}`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### NP-02 — The tab click is bound to the `<a>`; const 31 carries it on the `<li>` and const 73 has no listener at all
+
+**BUILT 2026-08-30.** Moved to the `<li>`, which is what `jSe` does at byte 1,928,643:
+`d(0,"li",31),x("click",…onNotesTabChange(o._id))`. Const 31 is
+`["role","presentation",1,"nav-item",3,"click"]` at byte 1,996,498; const 73, the anchor, is
+`["data-bs-toggle","tab","role","tab","aria-selected","true",1,"nav-link",3,"ngClass","id"]` at byte
+1,999,647 and declares two bindings, neither of them a listener.
+
+Measured rather than assumed to matter: `.noteTabset .nav-link` carries `margin: 5px`, so every tab in
+this strip has a five-pixel ring that belongs to the `<li>` and to nothing else, and a press landing
+there did nothing. `acA-12` is the same finding on the two alert-toolbar toggles and was built the
+same way, which is why this is transcribed rather than argued about again.
+
+The anchor keeps `role="tab"` and its `aria-*`: it is what a screen reader reads as the tab, and
+moving the handler outwards does not move the role. **No `svelte-ignore` is needed and two were
+written before being measured** — `svelte-autofixer` answered `svelte-ignore comment is used, but not
+warned` for both, because `role="presentation"` takes the element out of the accessibility tree and
+neither `a11y_click_events_have_key_events` nor `a11y_no_noninteractive_element_interactions` fires.
+A suppression for a warning that does not fire is one that will later hide a warning that does.
+
+The rendered `<li>` is byte-identical either way — a handler is not an attribute — which is precisely
+why it needed a test. Control seen red.
+
+**low** · `divergence` · reference byte **1,928,643**
+
+```
+d(0,"li",31),x("click",function(){const o=D(e).$implicit;return E(g(2).onNotesTabChange(o._id))}),d(1,"a",73)
+```
+
+**Ours:** `onclick` sat on the `<a class="nav-link">` with an `event.preventDefault()` that had
+nothing to prevent — the anchor carries no `href` — inside a plain `<li role="presentation"
+class="nav-item">`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### NP-03 — The three `.noteOptions` buttons drop the capture's trailing space
+
+**BUILT 2026-08-30.** `Edit `, `Download ` and `Delete ` — `v(2,"Edit ")` at byte 1,929,396,
+`v(2,"Delete ")` at 1,929,566 and `v(8,"Download ")` at 1,929,833. These three carry a trailing space
+and NO leading one, which is the opposite of the editor's bar and is correct: consts 137/134/139 put
+`mr-2` on the icon, so the gap on the left is a margin and not a text node.
+
+Same rule as NE-02 and CD-07, same one place it is argued. `note-padded-labels-contract.test.ts`
+renders the pane and checks the rendered strings as well as the source. Control seen red on both
+halves.
+
+**low** · `wrong-constant` · reference byte **1,929,833**
+
+```
+d(6,"button",133),x("click",function(){const o=D(e).$implicit;return E(g(2).downloadNote(o))}),T(7,"i",134),v(8,"Download ")
+```
+
+**Ours:** All three labels were markup text followed by a newline, so the compiler dropped the space.
+The FilesPane trio next door — `Download{' '}`, `Delete{' '}`, `Play{' '}` — has kept it since that
+pane was built and is pinned by its own contract test.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### NP-04 — The read-only note body has no `app-note` host and no `height: 100%`, and neither is reproduced
+
+**MEASURED REFUSAL 2026-08-30.** The reference's `app-note` component ships two scoped rules of its
+own at byte 1,487,671 — `[_nghost-%COMP%]{display:block;height:100%}` and
+`.note-view[_ngcontent-%COMP%]{height:100%}` — and ours renders neither: the read-only branch is a
+bare `.note-view` with no `<app-note>` around it, and `.note-view` has no rule in any sheet this app
+ships.
+
+Not built, and the measurement is why. The rule sizes the note body to its container, and the
+container already bounds and scrolls it: `.note-container` is `height: calc(100% - 140px);
+overflow-y: auto` in `css/complete-app-styles.css`. Content taller than the container scrolls either
+way; content shorter than it leaves the container's own `--note-text-bg` painting the remainder either
+way. The one case the rules would change is an EMPTY note, where the reference's `.note-view` is
+full-height and ours is zero-height — inside a padded container that paints the same background in
+both. There is nothing to see.
+
+The host element is the same answer for a shorter reason: `app-note` has no rule anywhere in
+`apps/room/src` or in any sheet, so adding the custom element would add a wrapper nothing reads. It
+exists in the reference because Angular needed somewhere to hang a component; ours mounts the editor
+inside `<app-note>` where it does render one, and that is the only place it is load-bearing.
+
+Recorded rather than left silent because the pair is a real difference and the next reader diffing
+the two templates will find it in ten seconds and spend ten minutes deciding.
+
+**low** · `divergence` · reference byte **1,487,671**
+
+```
+[_nghost-%COMP%]{display:block;height:100%}.note-view[_ngcontent-%COMP%]{height:100%}
+```
+
+**Ours:** `NotesPane.svelte` renders `<div class="note-view" id="summernoteEdit-{id}">` directly
+inside `.note-container`, with no `<app-note>` ancestor and no rule for either class. `NoteEditor`
+renders `<app-note>` and styles it `display: block; min-height: 100%` in its own scoped block, which
+is the half of the pair that has a consumer.
+
+---
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
 ## The fifty-one refuted claims
 

@@ -237,7 +237,18 @@
    * the reference by there being one such modal on the page; here it is scoped by holding the
    * element, which does not depend on that staying true.
    */
-  let slidesList = $state<HTMLDivElement | null>(null);
+  /*
+    `bind:this`. This was an `Attachment` assigning `slidesList = node` with a teardown reading
+    `if (slidesList === node) slidesList = null` — a hand-rolled `bind:this`, both halves of it, of
+    exactly the shape `dom-reference-contract.svelte.test.ts` refuses and proves unnecessary by
+    driving the platform rather than by asserting.
+
+    It escaped that contract on its NAME alone: the check matches `capture*` and `hold*` and this
+    was `attachSlidesList`. The rule is the argument, not the prefix.
+
+    Read once after a `tick()`, never rendered from.
+  */
+  let slidesList: HTMLDivElement | null = $state.raw(null);
 
   async function addCarouselSlide(): Promise<void> {
     carouselSlides = [...carouselSlides, newCarouselSlide()];
@@ -273,9 +284,6 @@
    * an `<img src="h">` that will never load, and the box the presenter was typing into is gone. The
    * staging field is what lets the row stay an input until there is something worth previewing.
    *
-   * That is also the answer to why the confirm step is not "nothing left to do" here, which is what
-   * the audit row assumed while our field was bound straight through and the row had one state.
-   *
    * `pendingUrl` is TRIMMED on the way in and the untrimmed text stays in the box, which is
    * upstream's shape: the trim decides both the button's enabled state and the value stored.
    */
@@ -298,15 +306,11 @@
    *
    * The regex is transcribed character for character, `jfif` included. It is deliberately narrow:
    * anything it does not match falls through to the browser's own paste, which fills the box and
-   * leaves the presenter to press the check — so a URL with no extension is not rejected, it is
-   * merely not auto-confirmed. `preventDefault` fires ONLY on the matching branch, which is why the
-   * two are written in that order.
+   * leaves the presenter to press the check. `preventDefault` fires ONLY on the matching branch,
+   * which is why the two are written in that order.
    *
-   * ## The anchors are what make this safe to run on a paste
-   *
-   * `^https?://` and the `(\?.*)?$` tail mean a match is an absolute http(s) URL ending in an image
-   * extension or an extension plus a query string. No `javascript:` or `data:` payload can match it,
-   * and the value goes into an `<img src>` rather than anywhere that would execute it.
+   * The `^https?://` anchor and the `(\?.*)?$` tail are what make it safe to run on a paste: no
+   * `javascript:` or `data:` payload can match, and the value goes into an `<img src>`.
    */
   const CAROUSEL_IMAGE_URL = /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|jfif|svg)(\?.*)?$/i;
 
@@ -430,36 +434,21 @@
 </script>
 
 <!--
-  ── `{' '}` ON THE LABELS, AND THE THREE THAT DO NOT HAVE IT YET ─────────────────────────────────
+  The `{' '}` on the labels below is the capture's own padding — `v(23," Add slide ")`,
+  `v(26," Cancel ")`, `Ne(" ",…," ")` on the primary button, `v(3," Select Image ")` in `O0e`. Svelte
+  trims whitespace at an element's edges, so only an expression survives; the measurement and the
+  argument live in `files-pane-contract.test.ts`'s `the padded text nodes` block.
 
-  Every text node this component's templates emit is padded — `v(23," Add slide ")`,
-  `v(26," Cancel ")`, `Ne(" ",isEditingCarousel?"Save Changes":"Insert Carousel"," ")`,
-  `v(3," Select Image "), v(12," Cancel ")` in `O0e`, `v(9," Upload ")`, `v(12," Browse ")` and
-  `v(4," Change image ")`. Svelte trims whitespace at an element's edges, so only an expression
-  survives; the measurement and the argument live in `files-pane-contract.test.ts`'s `the padded
-  text nodes` block and are not repeated here.
-
-  **` Upload `, ` Browse ` and ` Change image ` are still unpadded**, and it is not an oversight or a
-  measurement: three assertions pin their exact current spelling, in two contract tests this change
-  was not permitted to touch —
-
-    note-image-browser-contract.test.ts:132  '><i class="fas fa-folder-open"></i> Browse</button'
-    note-image-browser-contract.test.ts:268 '><i class="fas fa-upload"></i> Upload</label'
-    note-carousel-slide-contract.test.ts:76  '><i class="fas fa-times"></i> Change image</button'
-
-  Each needs the same one-line edit — `Browse</button` becomes `Browse{' '}</button`, and so on —
-  and then the three labels here take the pad like every other. Recorded rather than left as an
-  inconsistency somebody later reads as a decision.
+  ` Upload `, ` Browse ` and ` Change image ` are still UNPADDED, and that is neither an oversight nor
+  a measurement: three assertions pin their exact current spelling in two contract tests this change
+  was not permitted to touch. `note-padded-labels-contract.test.ts` names all three, with the
+  one-line edit each needs.
 -->
-<!--
-  `note-carousel-modal` STOOD ON THIS ELEMENT AND STYLED NOTHING, removed 2026-08-30.
 
-  Searched rather than assumed: the string occurs zero times in `main.d1d09071be31f1ba.js`, zero
-  times in `styles.ee2a710065b60389.css`, and zero times in every sheet this app ships
-  (`css/complete-app-styles.css`, `lib/styles/*.css`, `app.css`). It was invented here, wearing the
-  shape of a captured hook — `CLAUDE.md`'s *"no `.flipped` class with no CSS"*, in the direction
-  `orphan-style-contract.test.ts` does not look: that gate finds a RULE nobody wears, and this was a
-  class no rule reaches.
+<!--
+  `note-carousel-modal` stood on this element and styled nothing — zero occurrences in the bundle, in
+  the reference stylesheet, and in every sheet this app ships. Removed with the file browser's
+  `.note-modal-dialog`; `note-dead-control-contract.test.ts` carries both searches.
 -->
 <div class="note-modal open" aria-hidden="false" role="dialog" aria-label={title}>
   <div class="note-modal-content">
@@ -716,46 +705,20 @@
 -->
 {#if fileBrowserTargetIndex !== null}
   <!--
-    ── FOUR THINGS THIS MODAL GOT WRONG, ALL FOUND BY DECODING `O0e` RATHER THAN ITS STRINGS ──────
+    FOUR THINGS THIS MODAL GOT WRONG, all found by decoding `O0e` (byte 1,466,225) node by node
+    rather than by its strings — which were the half that was already right.
 
-    The strings were right the first time and everything holding them was invented. `O0e` at byte
-    1,466,225 is nine nodes long and every one of them is a const:
+      1  a `.note-modal-dialog` wrapper with no rule in any sheet and no counterpart in `O0e`
+      2  a `fas fa-images` header icon where `T(2,"i",62)` is `fas fa-folder-open`
+      3  a `btn-close` where const 28 is Bootstrap 4's `close`, the spelling the four sibling
+         dialogs in this file and in `NoteEditor` already use
+      4  a `btn btn-secondary` footer where const 41 is `btn btn-outline-dark` — the SAME const the
+         carousel modal above uses, so one file drew its two dismissals as two different buttons
 
-      d(0,"div",26)(1,"h4",72),T(2,"i",62),v(3," Select Image "),u(),
-      d(4,"button",28),x("click",…dismiss()),T(5,"span",29),u()(),
-      d(6,"div",30),H(7,A0e,…)(8,P0e,…)(9,I0e,…),u(),
-      d(10,"div",40)(11,"button",41),x("click",…dismiss()),v(12," Cancel "),u()()
-
-    1. **`.note-modal-dialog` wrapped all of it and styled nothing.** Zero occurrences in
-       `main.d1d09071be31f1ba.js`, zero in `styles.ee2a710065b60389.css`, zero in every sheet this
-       app ships. `O0e` has no such element either — the wrapper NgbModal supplies is `.modal-dialog`
-       and it is outside the template. Deleted; the sibling carousel modal above never had one.
-
-    2. **The header icon was `fas fa-images`.** `T(2,"i",62)` and const 62 is
-       `[1,"fas","fa-folder-open"]` (byte 1,486,004) — the SAME icon as the ` Browse ` button that
-       opens this modal, which is the point of it: the folder is what the button and the thing it
-       opens have in common. `fa-images` is const 15 and belongs to the carousel modal's own title.
-
-    3. **The close button was `btn-close`.** Const 28 (byte 1,484,628) is
-       `["type","button","aria-label","Close",1,"close",3,"click"]` — Bootstrap 4's `close`, which is
-       what the carousel modal beside it and all three `NoteEditor` dialogs already use. Two spellings
-       of the same control in one file is one of them being wrong.
-
-       Its CHILD is not transcribed and that is deliberate: `T(5,"span",29)` is a CHILDLESS
-       `<span aria-hidden="true">`, so upstream's close button paints nothing but its own padding —
-       the `&times;` was lost somewhere upstream of the build. Reproducing it would reproduce an
-       invisible control. `note-icon-close` is what the four sibling dialogs here draw.
-
-    4. **The footer button was `btn btn-secondary`.** Const 41 is
-       `["type","button",1,"btn","btn-outline-dark",3,"click"]` (byte 1,485,128) — and it is the
-       same const the carousel modal's own ` Cancel ` uses, so the two dismissals in this file were
-       drawn as two different buttons.
-
-    `role="dialog"` and `aria-label` are the fifth, and they are ours rather than a transcription:
-    upstream gets both from `modalService.open(…, {ariaLabelledBy:"file-browser-modal-title"})` at
-    byte 1,477,226, pointing at const 72's id. An `aria-label` says the same thing without minting a
-    document-unique id for a component that can be mounted more than once, which is the form the
-    carousel modal above already uses.
+    `note-file-browser-chrome-contract.test.ts` carries the four measurements, the const values, and
+    why upstream's empty `<span aria-hidden="true">` close-button child is the one thing here that is
+    deliberately not transcribed. `role="dialog"` plus `aria-label` are ours and stand in for the
+    reference's `ariaLabelledBy:"file-browser-modal-title"` (byte 1,477,226); that test says why.
   -->
   <div class="note-modal open" aria-hidden="false" role="dialog" aria-label="Select Image">
     <div class="note-modal-content">

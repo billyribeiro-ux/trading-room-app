@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { callRemote, expectSchemaRefusal } from './server/remote-command-harness';
 import { db, ensureDatabase } from './server/db';
@@ -22,8 +23,23 @@ let member: App.Locals;
 beforeAll(() => {
   ensureDatabase();
 
-  const account = (role: 'staff' | 'participant', email: string) =>
-    db
+  /*
+    SELECT-THEN-INSERT, like every sibling that seeds an account — and this was a bare insert.
+
+    `users.email` is UNIQUE and the database file is SHARED across the suite, so a bare insert is
+    only safe while this file is the sole creator of these two rows AND runs once. It failed on
+    2026-08-31 with `UNIQUE constraint failed: users.email`, taking all four tests with it as a
+    setup error rather than an assertion — and it failed for a reason that had nothing to do with
+    this file: adding a test file elsewhere changed the worker scheduling.
+
+    Alone it passed, which is the tell. `message-action-contract` and
+    `notes-account-action-contract` both reuse an existing row and always have; this one assumed an
+    empty table. The assumption is the defect, not the schedule that exposed it.
+  */
+  const account = (role: 'staff' | 'participant', email: string) => {
+    const existing = db.select().from(users).where(eq(users.email, email)).get();
+    if (existing) return existing;
+    return db
       .insert(users)
       .values({
         displayName: email,
@@ -34,6 +50,7 @@ beforeAll(() => {
       })
       .returning()
       .get();
+  };
 
   presenter = {
     user: account('staff', 'harness-presenter@example.test'),

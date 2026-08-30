@@ -57,31 +57,31 @@ rest is smaller than this entry claimed, and its "belongs at the source reposito
 
 **Two blockers this entry inherited are gone, and neither was retired by doing the work.**
 
-*"Deliberately not done from this repository: `services/**` is a mirror"* — **false, and recorded as
+_"Deliberately not done from this repository: `services/**` is a mirror"_ — **false, and recorded as
 false.** `CLAUDE.md` states this repository is `services/**`'s authority, and
 `verify-backend-provenance.mjs:122-128` is the measurement behind it: it searched `scripts`, `ops`,
 every per-app scripts directory, `.github` and the root manifest, found **no sync in either
 direction**, and records the owner confirming on 2026-08-12 that the siblings are reference only.
 The same entry routed the work to root `TODO.md` item **P**, which no longer exists.
 
-*"every one of those assertions is a runtime check needing a provisioned cluster to verify"* — a
+_"every one of those assertions is a runtime check needing a provisioned cluster to verify"_ — a
 cluster was started here on 2026-08-31 (PostgreSQL 16.13, the version this entry names) and the
 whole chain was run against it. **What this entry asserted from reading is now measured:**
 
-| measured 2026-08-31 | result |
-| --- | --- |
-| `0001` → `0009` applied in order on a fresh database | **all nine OK**, each in a transaction |
-| `0009` re-run on the same database | clean; prints *"parity verified: 87 relation, 26 column, 22 policy facts mirrored to tradingroom_app"* |
-| table privileges, both roles | **87 each — exact parity** |
-| RLS policies targeting `tradingroom_app` | **22**, and **zero** name `ptr_clone_app` |
-| `tradingroom_app` + tenant A's GUC | sees tenant A's room and no other |
-| `tradingroom_app` + tenant B's GUC | sees tenant B's room and no other |
-| `tradingroom_app` with **no** tenant GUC | **0 rows — fails closed** |
-| `ptr_clone_app` + a valid tenant GUC | **0 rows** |
+| measured 2026-08-31                                  | result                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `0001` → `0009` applied in order on a fresh database | **all nine OK**, each in a transaction                                                                 |
+| `0009` re-run on the same database                   | clean; prints _"parity verified: 87 relation, 26 column, 22 policy facts mirrored to tradingroom_app"_ |
+| table privileges, both roles                         | **87 each — exact parity**                                                                             |
+| RLS policies targeting `tradingroom_app`             | **22**, and **zero** name `ptr_clone_app`                                                              |
+| `tradingroom_app` + tenant A's GUC                   | sees tenant A's room and no other                                                                      |
+| `tradingroom_app` + tenant B's GUC                   | sees tenant B's room and no other                                                                      |
+| `tradingroom_app` with **no** tenant GUC             | **0 rows — fails closed**                                                                              |
+| `ptr_clone_app` + a valid tenant GUC                 | **0 rows**                                                                                             |
 
-That last line is `0009`'s own security claim, in its own words — *"after this runs, `ptr_clone_app`
+That last line is `0009`'s own security claim, in its own words — _"after this runs, `ptr_clone_app`
 holds object privileges but is named by no policy, so under FORCE ROW LEVEL SECURITY it reads zero
-rows from every tenant table"* — and it is now a measurement rather than a reading. **The baseline
+rows from every tenant table"_ — and it is now a measurement rather than a reading. **The baseline
 role is already inert with respect to tenant data.** What retiring it still needs is revoking the 87
 object privileges it holds, which is a migration, not a question.
 

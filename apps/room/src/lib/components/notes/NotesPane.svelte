@@ -9,42 +9,16 @@
   import { safeNoteHtml } from './safe-html';
   import { welcomeMatPasswordRequired } from '../../../routes/welcome-mat.remote';
 
-  import { noteVersionRevertMessage } from './version-history';
-
-  type PromptState =
-    | { kind: 'new'; title: 'New Note name:'; value: '' }
-    | { kind: 'rename'; noteId: number; title: 'Change note name'; value: string }
-    /*
-      The all-rooms welcome mat's password — `note-editor-welcome-mat-all-rooms-password`.
-
-      The title is the reference's verbatim, at byte 1,474,217. It is a PROMPT and not a confirm
-      because upstream raises a different dialog for each: a password when
-      `allRoomsWelcomeMatPW` is configured and a plain confirmation when it is not. This room cannot
-      see that setting, so `welcomeMatPasswordRequired` asks the controller which one to raise.
-    */
-    | {
-        kind: 'welcome-password';
-        noteId: number;
-        title: 'Please enter the password to replace all the rooms Welcome Mats:';
-        value: '';
-      };
-
-  type ConfirmState =
-    | { kind: 'delete'; noteId: number; message: 'Are you sure you want to delete this note?' }
-    /*
-      The one confirmation whose text is not a fixed string: `revertToVersion` in the reference
-      interpolates the version's own date into it, so the message is built by
-      `noteVersionRevertMessage` from the same value the row displays.
-    */
-    | { kind: 'restore'; noteId: number; versionId: number; message: string }
-    | {
-        kind: 'welcome';
-        noteId: number;
-        allRooms: boolean;
-        message:
-          | 'Are you sure you want to apply this note as Welcome Mat'
-          | 'Are you sure you want to replace all the rooms Welcome Mats with this note?';
-      };
+  import {
+    type NoteConfirm,
+    type NotePrompt,
+    deleteConfirm,
+    newNotePrompt,
+    renamePrompt,
+    restoreConfirm,
+    welcomeConfirm,
+    welcomePasswordPrompt
+  } from '#lib/note-dialogs.js';
 
   interface Props {
     readonly canEdit: boolean;
@@ -111,8 +85,8 @@
   let editingNoteId = $state<number | null>(null);
   let openMenuNoteId = $state<number | null>(null);
   const dirtyNoteIds = new SvelteSet<number>();
-  let prompt = $state<PromptState | null>(null);
-  let confirm = $state<ConfirmState | null>(null);
+  let prompt = $state<NotePrompt | null>(null);
+  let confirm = $state<NoteConfirm | null>(null);
   let mutationError = $state<string | null>(null);
   let noteTabChromeMounted = $state(false);
   /*
@@ -141,9 +115,9 @@
       notes[0] ??
       null
   );
-  let effectivePrompt = $derived.by<PromptState | null>(() => {
+  let effectivePrompt = $derived.by<NotePrompt | null>(() => {
     if (prompt !== null) return prompt;
-    return newNoteOpen && canEdit ? { kind: 'new', title: 'New Note name:', value: '' } : null;
+    return newNoteOpen && canEdit ? newNotePrompt() : null;
   });
   /*
     Never show one note's history against another note's editor.
@@ -223,27 +197,19 @@
     showVersionHistory = false;
   }
 
+  /* The dialogs themselves — every captured sentence, with its offset — are `#lib/note-dialogs.ts`. */
   function requestRestore(noteId: number, version: NoteVersion): void {
-    confirm = {
-      kind: 'restore',
-      noteId,
-      versionId: version.id,
-      message: noteVersionRevertMessage(version.createdAt)
-    };
+    confirm = restoreConfirm(noteId, version);
   }
 
   function requestRename(note: RoomNote): void {
     openMenuNoteId = null;
-    prompt = { kind: 'rename', noteId: note.id, title: 'Change note name', value: note.name };
+    prompt = renamePrompt(note);
   }
 
   function requestDelete(noteId: number): void {
     openMenuNoteId = null;
-    confirm = {
-      kind: 'delete',
-      noteId,
-      message: 'Are you sure you want to delete this note?'
-    };
+    confirm = deleteConfirm(noteId);
   }
 
   /**
@@ -271,23 +237,11 @@
     openMenuNoteId = null;
 
     if (allRooms && (await welcomeMatPasswordRequired()).required) {
-      prompt = {
-        kind: 'welcome-password',
-        noteId,
-        title: 'Please enter the password to replace all the rooms Welcome Mats:',
-        value: ''
-      };
+      prompt = welcomePasswordPrompt(noteId);
       return;
     }
 
-    confirm = {
-      kind: 'welcome',
-      noteId,
-      allRooms,
-      message: allRooms
-        ? 'Are you sure you want to replace all the rooms Welcome Mats with this note?'
-        : 'Are you sure you want to apply this note as Welcome Mat'
-    };
+    confirm = welcomeConfirm(noteId, allRooms);
   }
 
   async function acceptPrompt(value = ''): Promise<void> {
@@ -380,14 +334,42 @@
   {#each notes as note (note.id)}
     {const tabId = $derived(String(note.id))}
     {const menuId = $derived(`${componentId}-note-menu-${note.id}`)}
-    <li role="presentation" class="nav-item">
+    <!--
+      THE CLICK IS ON THE `<li>`, WHICH IS WHERE THE CAPTURE PUTS IT — and it is not a preference.
+
+      Const 31 is `["role","presentation",1,"nav-item",3,"click"]` (byte 1,996,498) and const 73, the
+      anchor, is `["data-bs-toggle","tab","role","tab","aria-selected","true",1,"nav-link",3,
+      "ngClass","id"]` (byte 1,999,647) — no click on it at all. `jSe` binds
+      `onNotesTabChange(o._id)` on the `<li>` at byte 1,928,643.
+
+      It was on the anchor here, and the difference is measurable rather than notional:
+      `.noteTabset .nav-link` carries `margin: 5px`, so every tab in this strip has a five-pixel
+      ring that belongs to the `<li>` and to nothing else. A press landing there did nothing.
+      `acA-12` is the same finding on the two alert-toolbar toggles, and it was built the same way.
+
+      The anchor keeps `role="tab"` and its `aria-*`: it is what a screen reader reads as the tab,
+      and moving the handler outwards does not move the role.
+
+      NO `svelte-ignore` IS NEEDED HERE and two were written before being measured: `svelte-autofixer`
+      answered `svelte-ignore comment is used, but not warned` for both. `role="presentation"` is what
+      makes the difference — a presentational element raises neither
+      `a11y_click_events_have_key_events` nor `a11y_no_noninteractive_element_interactions`, because
+      it is not in the accessibility tree to begin with. A suppression for a warning that does not
+      fire is a suppression that will one day hide a warning that does.
+    -->
+    <li
+      role="presentation"
+      class="nav-item"
+      onclick={(event) => {
+        event.preventDefault();
+        selectNote(note.id);
+      }}
+    >
       <!--
         The captured application has no href on this Bootstrap tab anchor.
         Its nested title anchor is inserted after mount by NoteTabContent.
       -->
       <!-- svelte-ignore a11y_missing_attribute -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_interactive_supports_focus -->
       <a
         data-bs-toggle="tab"
         role="tab"
@@ -395,10 +377,6 @@
         class={['nav-link', { active: activeNote?.id === note.id }]}
         id={`${tabId}-tab`}
         aria-controls={tabId}
-        onclick={(event) => {
-          event.preventDefault();
-          selectNote(note.id);
-        }}
       >
         {#if noteTabChromeMounted}
           <NoteTabContent
@@ -423,29 +401,54 @@
 </ul>
 
 <div id="notesTabsContent" class="tab-content">
-  {#if activeNote !== null}
+  <!--
+    ── ONE PANEL PER NOTE, NOT ONE PANEL ────────────────────────────────────────────────────────
+
+    `zSe` (byte 1,930,200) repeats BOTH lists over the same array: `ht(1,jSe,…,"li",16,pc)` for the
+    tabs and `ht(4,$Se,10,9,"div",72,pc)` for the panels, at byte 1,930,259. Const 72 is
+    `["role","tabpanel",1,"tab-pane","fade",3,"ngClass","id"]` — `show active` arrives through
+    `ngClass`, which is Bootstrap's own tab-pane shape: every pane exists and one is shown.
+
+    This rendered the ACTIVE note's panel only, and the cost was not cosmetic. Every tab anchor
+    carries `aria-controls={note.id}` (the reference's `Et("aria-controls",e._id)` at byte
+    1,929,073), so with one panel in the document every tab but the open one pointed at an id that
+    does not exist. A dangling `aria-controls` is not a degraded experience, it is a broken one: the
+    control announces a relationship a screen reader then cannot follow.
+
+    It also cost the thing a tab strip is for. `.note-container` is `overflow-y: auto`, so each
+    panel is its own scroller; unmounting the pane threw away the scroll position, and switching
+    away from a long note and back returned the reader to the top of it.
+
+    **What is NOT repeated is the editor.** The reference mounts `app-note` in every panel and lets
+    each decide whether it is editing; ours mounts `NoteEditor` only in the panel being edited,
+    because ours is a Tiptap instance with a document, a history stack and a three-second autosave
+    timer, and `editingNoteId` is a single value — a second instance could never be reached and
+    would cost all of that per note in the room.
+  -->
+  {#each notes as note (note.id)}
+    {const isActive = $derived(activeNote?.id === note.id)}
     <div
       role="tabpanel"
-      class="tab-pane fade show active"
-      aria-labelledby={`${activeNote.id}-tab`}
-      id={String(activeNote.id)}
+      class={['tab-pane', 'fade', { show: isActive, active: isActive }]}
+      aria-labelledby={`${note.id}-tab`}
+      id={String(note.id)}
     >
       <div class="note-container">
-        {#if editingNoteId === activeNote.id && canEdit}
-          {#key `${activeNote.id}:${activeNote.updatedAt}`}
+        {#if editingNoteId === note.id && canEdit}
+          {#key `${note.id}:${note.updatedAt}`}
             <NoteEditor
-              contentHtml={activeNote.contentHtml ?? ''}
+              contentHtml={note.contentHtml ?? ''}
               {giphyApiKey}
-              onBringEveryone={() => onBringEveryone(activeNote.id)}
-              onDirtyChange={(dirty) => setDirty(activeNote.id, dirty)}
+              onBringEveryone={() => onBringEveryone(note.id)}
+              onDirtyChange={(dirty) => setDirty(note.id, dirty)}
               onDone={() => {
-                setDirty(activeNote.id, false);
+                setDirty(note.id, false);
                 editingNoteId = null;
                 showVersionHistory = false;
               }}
-              onRequestRestore={(version) => requestRestore(activeNote.id, version)}
-              onSave={(contentHtml) => onSave(activeNote.id, contentHtml)}
-              onSetWelcomeMat={(allRooms) => requestWelcome(activeNote.id, allRooms)}
+              onRequestRestore={(version) => requestRestore(note.id, version)}
+              onSave={(contentHtml) => onSave(note.id, contentHtml)}
+              onSetWelcomeMat={(allRooms) => requestWelcome(note.id, allRooms)}
               {onUploadImages}
               {sessionImages}
               onVersionHistoryOpenChange={(open) => (showVersionHistory = open)}
@@ -457,8 +460,8 @@
         {:else}
           <div
             class="note-view"
-            id={`summernoteEdit-${activeNote.id}`}
-            {@attach safeNoteHtml(activeNote.contentHtml ?? '')}
+            id={`summernoteEdit-${note.id}`}
+            {@attach safeNoteHtml(note.contentHtml ?? '')}
           ></div>
         {/if}
       </div>
@@ -470,30 +473,30 @@
               type="button"
               title="Edit Note"
               class="btn btn-sm noteEdit mr-3"
-              onclick={() => startEditing(activeNote.id)}
-              ><i class="fas fa-edit mr-2"></i>Edit
+              onclick={() => startEditing(note.id)}
+              ><i class="fas fa-edit mr-2"></i>Edit{' '}
             </button>
           {/if}
           <button
             type="button"
             title="Download Note"
             class="btn btn-sm noteDownload mr-3"
-            onclick={() => downloadNote(activeNote)}
-            ><i class="fas fa-download mr-2"></i>Download
+            onclick={() => downloadNote(note)}
+            ><i class="fas fa-download mr-2"></i>Download{' '}
           </button>
           {#if canEdit}
             <button
               type="button"
               title="Delete Note"
               class="btn btn-sm noteDelete"
-              onclick={() => requestDelete(activeNote.id)}
-              ><i class="fas fa-trash-alt mr-2"></i>Delete
+              onclick={() => requestDelete(note.id)}
+              ><i class="fas fa-trash-alt mr-2"></i>Delete{' '}
             </button>
           {/if}
         </div>
       </div>
     </div>
-  {/if}
+  {/each}
 </div>
 
 {#if effectivePrompt !== null}

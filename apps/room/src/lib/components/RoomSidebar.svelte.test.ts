@@ -363,34 +363,60 @@ describe('the roster row shape', () => {
   reason the sidebar's other tests give: what can regress is whether the markup comes out, and a
   `toContain` on the file proves only that somebody typed it.
 
-  Two sites is the assertion. The reference draws this button twice — once in the app-info block and
-  once beside Benzinga — and a change that lost one of them would leave every source assertion in
-  `tip-button-contract.test.ts` passing.
+  ONE SITE IN THIS COMPONENT, corrected 2026-08-31 — and the correction is the interesting part.
+
+  This said two: *"the reference draws this button twice — once in the app-info block and once
+  beside Benzinga"*, and asserted two rendered buttons. SIDE-01 measured that and it is wrong.
+  `TPe`, the sidebar, was read end to end from bundle byte 2,470,562 to 2,472,257 and has no tip
+  `<li>` at any slot; its own node 14 is `T(14,"hr")`. The `H(14, APe, 5, 2, "li", 139)` this
+  premise rested on belongs to `U4e`, the app-room NAVBAR, at 2,485,267.
+
+  So the reference draws it twice in the ROOM, one per component — and this repository briefly drew
+  it THREE times, because the navbar's copy was added without removing the sidebar `<li>` that the
+  same row had just measured as not existing upstream. This test was green throughout: two rendered
+  buttons is satisfied by two in the wrong places.
+
+  What replaces it is narrower and says more: the sidebar draws it ONCE, as `aPe`'s `<p><button>`
+  rather than an `<a>`, and `sidebar-tip-single-render-contract.test.ts` holds the same invariant
+  across both files so a copy landing in either fails something.
 */
 describe('the tip button', () => {
   const tip = { visible: true, label: 'Buy me a coffee', url: 'https://tip.test/me' };
 
-  it('draws at BOTH sites when the room configured one', () => {
+  it('draws it exactly once when the room configured one', () => {
     const root = render({ isPresenter: false, people: [], tip });
     const buttons = root.querySelectorAll('i.fas.fa-dollar-sign');
-    expect(buttons, 'the reference draws this button twice').toHaveLength(2);
+    expect(
+      buttons,
+      'the sidebar draws `aPe` and nothing else; the navbar draws the other'
+    ).toHaveLength(1);
     for (const node of root.querySelectorAll('span.ms-1')) {
       expect(node.textContent).toBe('Buy me a coffee');
     }
   });
 
-  it('draws at neither site when it did not', () => {
+  it('draws none when it did not', () => {
     const root = render({ isPresenter: false, people: [] });
     expect(root.querySelectorAll('i.fas.fa-dollar-sign')).toHaveLength(0);
   });
 
-  it('carries the destination and the label as a title on both', () => {
+  it('is a button that opens the destination, not a link', () => {
+    /*
+      `aPe` is `<p><button>`. The `<a class="btn btn-primary">` this looked for was the removed
+      `<li>`'s, so the assertion could only ever have passed while the extra render existed — it was
+      testing the defect. The destination is opened by the handler rather than carried in an `href`,
+      which is why there is no `rel` to assert: `window.open(tip.url, '_blank', 'noopener,noreferrer')`
+      passes the same two tokens as window features.
+    */
     const root = render({ isPresenter: false, people: [], tip });
-    const link = root.querySelector<HTMLAnchorElement>('a.btn.btn-primary');
-    expect(link?.getAttribute('href')).toBe('https://tip.test/me');
-    // `rel` on a `target="_blank"` link, which upstream's clickable `<li>` had no need of.
-    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
-    expect(root.querySelectorAll('[title="Buy me a coffee"]')).toHaveLength(2);
+    expect(
+      root.querySelector('a.btn.btn-primary'),
+      'the `<li><a>` form belongs to the navbar'
+    ).toBeNull();
+    const button = root.querySelector<HTMLButtonElement>('button.btn.btn-primary.btn-sm');
+    expect(button, 'the sidebar draws `aPe`’s button').not.toBeNull();
+    expect(button?.getAttribute('title')).toBe('Buy me a coffee');
+    expect(root.querySelectorAll('[title="Buy me a coffee"]')).toHaveLength(1);
   });
 });
 

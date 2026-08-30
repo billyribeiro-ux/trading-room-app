@@ -190,29 +190,28 @@ true for weeks while the register went on listing them as open.
 **3b was resolved by the file simply not existing.** The entry says a second Cargo lock sits at
 `services/media/Cargo.lock` in violation of the SSOT's "sole workspace lock". `find services -name
 Cargo.lock` returns exactly one path, `services/Cargo.lock`, and `git ls-files` agrees. Its stated
-blocker is worth reading as a lesson rather than as history: *"`services/**` is a mirror, so it must
-be resolved at the source and re-synced rather than deleted here."* **That premise is false and
+blocker is worth reading as a lesson rather than as history: _"`services/**` is a mirror, so it must
+be resolved at the source and re-synced rather than deleted here."_ **That premise is false and
 `CLAUDE.md` records it as false** — "the rule that used to sit on this line was **false and cost
 real time**", contradicted by `verify-backend-provenance.mjs`, which searched for a sync in either
 direction and found none. The entry was blocked on a rule that had already been retracted.
 
 **3c made three claims and all three are false today**, each measured rather than argued:
 
-| its claim | measured 2026-08-31 |
-| --- | --- |
-| "no `quality` script and no CI parity" | both apps declare `gate`, and `package-scripts-contract.test.ts` asserts *"room gate runs CI's steps, in CI's order"* and the same for the controller — parity is not merely present, it is enforced |
-| "the drift check in `services/SYNC-PROVENANCE.md` is manual, so it can rot" | `verify-backend-provenance.mjs` runs in `.github/workflows/backend-quality.yml:316` |
-| "no gate verifies any number in `docs/*.md`" | at least five do: `evidence-gap-register-counts`, `room-surface-audit-counts`, `todo-next-coverage-contract`, `setting-coverage-contract`, `feature-coverage-contract` — and `missing-command-census-contract`, which recomputes a triage table on every run and fails in either direction |
+| its claim                                                                   | measured 2026-08-31                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "no `quality` script and no CI parity"                                      | both apps declare `gate`, and `package-scripts-contract.test.ts` asserts _"room gate runs CI's steps, in CI's order"_ and the same for the controller — parity is not merely present, it is enforced                                                                                       |
+| "the drift check in `services/SYNC-PROVENANCE.md` is manual, so it can rot" | `verify-backend-provenance.mjs` runs in `.github/workflows/backend-quality.yml:316`                                                                                                                                                                                                        |
+| "no gate verifies any number in `docs/*.md`"                                | at least five do: `evidence-gap-register-counts`, `room-surface-audit-counts`, `todo-next-coverage-contract`, `setting-coverage-contract`, `feature-coverage-contract` — and `missing-command-census-contract`, which recomputes a triage table on every run and fails in either direction |
 
 The entry's own closing sentence asked for exactly what now exists. It stayed open because nobody
 re-read it after building the thing it asked for, which is the failure this archive exists to stop.
 
 **7 was already marked RESOLVED 2026-08-11** and had been sitting in the open register for twenty
 days. Verified before moving: its three cited tests exist in `page-load-contract.test.ts` and pass —
-*"returns an empty list to anyone who is not a presenter"*, *"gates on the membership predicate, not
-on the account role"*, and *"does not even run the query for a member"* — which are precisely the
+_"returns an empty list to anyone who is not a presenter"_, _"gates on the membership predicate, not
+on the account role"_, and _"does not even run the query for a member"_ — which are precisely the
 three claims it makes.
-
 
 ## 3b. `services/media/Cargo.lock` violates a named authority
 

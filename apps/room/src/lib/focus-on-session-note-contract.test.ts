@@ -124,9 +124,33 @@ describe('the wiring that made it a lie is gone', () => {
     expect(NOTES_PANE, 'the tab menu item').toContain(
       'onBringEveryone={() => onBringEveryone(note.id)}'
     );
-    expect(NOTES_PANE, 'the editor button').toContain(
-      'onBringEveryone={() => onBringEveryone(activeNote.id)}'
-    );
+    /*
+      THE EDITOR'S SUBJECT IS ITS OWN NOTE, not the active one — and the two are not the same value.
+
+      This asserted `onBringEveryone(activeNote.id)` and that was wrong twice over. `<NoteEditor>` is
+      mounted INSIDE `{#each notes as note}`, under `{#if editingNoteId === note.id}`, so the editor
+      that exists belongs to a specific note; `activeNote` is whichever TAB is selected. They agree
+      in the ordinary case and diverge exactly when an editor is mounted in a panel that is not the
+      shown one — at which point `activeNote.id` broadcasts a note the presenter is not editing.
+
+      It is also the unfaithful reading. The reference's editor-side sender is
+      `bringFocusToTab(){…sendServerAdminCommand("focusOnSessionNote",{id:this.tab._id})}` at byte
+      1,474,066 — `this.tab._id`, the tab the control belongs to. The parameterised form at 1,970,831
+      is the presentation area's, which is the other call site.
+
+      So both sites read `note.id`, and the assertion below is scoped to the editor's own markup
+      rather than to the string, which the menu item shares.
+    */
+    const editorAt = NOTES_PANE.indexOf('<NoteEditor');
+    expect(editorAt, 'the editor mount moved').toBeGreaterThan(-1);
+    expect(
+      NOTES_PANE.slice(editorAt, editorAt + 600),
+      'the editor button sends ITS OWN note, which inside the each is `note.id`'
+    ).toContain('onBringEveryone={() => onBringEveryone(note.id)}');
+    expect(
+      NOTES_PANE.split('onBringEveryone={() => onBringEveryone(note.id)}'),
+      'exactly two controls send, and no third'
+    ).toHaveLength(3);
     /*
       And the plain tab click stays LOCAL. It is the anchor's own handler in `NotesPane` — not a prop
       of `NoteTabContent`, which is rendered inside that anchor — so it calls `selectNote` directly

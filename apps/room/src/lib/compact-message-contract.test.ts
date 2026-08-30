@@ -158,8 +158,14 @@ describe('RM-02 — the compact ALERTS row', () => {
       compact branch is asserted to CALL it and the button itself is asserted once, on the file —
       which is what stops this from passing while the compact host renders nothing.
     */
-    expect(COMPACT).toContain('{@render alertQaButton()}');
-    expect(MESSAGE).toContain('{#snippet alertQaButton()}');
+    /*
+      Called with `true` — the snippet takes a `compact` parameter, added when the card's copy joined
+      it. Asserted with the argument rather than without, because `alertQaButton(` alone would also
+      match the card's call and this assertion is about the COMPACT host having one at all.
+    */
+    expect(COMPACT).toContain('{@render alertQaButton(true)}');
+    /* Parameterised on `compact` when the card's copy joined it — the two consts differ (69/70). */
+    expect(MESSAGE).toContain('{#snippet alertQaButton(compact: boolean)}');
     expect(MESSAGE).toContain('{#if !isQaMessage && hasQaOnAlerts}');
     expect(MESSAGE).toContain("'btn btn-sm btn-secondary me-1 alert-qa'");
     expect(MESSAGE).toContain("'btn-danger': Boolean(item.unreadQa)");
@@ -206,8 +212,38 @@ describe('RM-04 — the compact add-reaction pill', () => {
       `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)`. In compact mode a
       reaction could previously be added only through the kebab menu.
     */
-    expect(COMPACT).toContain("{#if kind === 'chat' || (kind === 'alert' && isQaMessage)}");
-    expect(COMPACT).toContain('<i class="far fa-smile"></i>');
+    /*
+      THE INNER GATE IS GONE, AND ITS REMOVAL WAS ARGUED RATHER THAN ASSUMED — so this asserts the
+      gate that carries the condition instead of the one that no longer exists.
+
+      This read `{#if kind === 'chat' || (kind === 'alert' && isQaMessage)}` wrapped around the pill
+      in the compact host. The pill moved into the shared `reactionStrip` snippet, and the wrapper
+      did not move with it because it is redundant: the CONTAINER's gate entails it. Upstream `__e`
+      renders under `O(36, (enableReactions && "chat" === logType || enableQAReactions && "alerts"
+      === logType && isQAMsg) && checkMsgReactions(msg) ? 36 : -1)` at byte 1,380,680, and every
+      disjunct of that entails a disjunct of the inner `O(3, …)` at 1,380,270. Here that same
+      expression is `menuAllows.reaction` (`message-behavior.ts`, `react:`), which already gates the
+      container — so the inner test could never be false where it was evaluated.
+
+      The reasoning is written at the code, which is where a reader meets the absence. What this
+      pins is that the entailing gate is still the one in force: if `menuAllows.reaction` is ever
+      loosened, the inner gate stops being implied and has to come back.
+    */
+    expect(COMPACT).toContain('{#if menuAllows.reaction && reactions.length > 0}');
+    expect(COMPACT, 'and the pill is drawn from the one shared strip').toContain(
+      '{@render reactionStrip()}'
+    );
+    /*
+      Asserted on the FILE, not on the compact slice: the pill lives in `reactionStrip`, which is
+      declared above both hosts and rendered by each. Looking for it inside `<app-st-compactmessage>`
+      was right while the compact host had its own copy, and that copy is what the shared snippet
+      replaced. The compact host's side of it — that it renders the strip at all — is asserted above.
+    */
+    expect(MESSAGE).toContain('<i class="far fa-smile"></i>');
+    expect(
+      MESSAGE.split('<i class="far fa-smile"></i>'),
+      'one add-reaction pill in the file, because there is one strip'
+    ).toHaveLength(2);
   });
 });
 

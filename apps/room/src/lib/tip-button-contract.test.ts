@@ -94,32 +94,79 @@ describe('the destination is checked, not trusted', () => {
 
 describe('both render sites', () => {
   const sidebar = readFileSync(new URL('./components/RoomSidebar.svelte', import.meta.url), 'utf8');
+  const navbar = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
   const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
   /*
-    TWO SITES, ONE ANSWER. The reference draws this button twice — slot 13 in the app-info block and
-    slot 14 beside Benzinga — and both read the single `isTipEnabled` field. Asserting the count is
-    what stops a later edit from adding a third site that re-evaluates the three settings itself.
+    TWO SITES, ONE ANSWER, AND THEY ARE IN TWO DIFFERENT FILES — corrected 2026-08-31.
+
+    ## What this asserted before, and why it was wrong
+
+    Both sites were asserted against `RoomSidebar.svelte`, on the reading that the reference draws
+    the button twice in the sidebar: slot 13 in the app-info block and slot 14 beside Benzinga.
+
+    SIDE-01 measured that and it does not hold. Node 14 and consts 139/140 belong to `U4e`, the
+    `app-room` NAVBAR, at bundle byte 2,485,267. The sidebar is `TPe`, read end to end from 2,470,562
+    to 2,472,257, and its own node 14 is `T(14,"hr")` — there is no tip `<li>` in it at any slot. The
+    one tip the sidebar has is `aPe` at byte 2,466,601, the `<p><button>` gated
+    `O(13, isTipEnabled ? 13 : -1)`.
+
+    So the reference renders it twice in the ROOM, once per file — and this repository was rendering
+    it THREE times, because RS-09 added the navbar's missing copy on 2026-08-30 without removing the
+    stray sidebar `<li>` it had measured in the same breath. This file's assertions were green
+    throughout, because counting both sites in one file is satisfied by two in the wrong places.
+
+    ## Why the count is per file now
+
+    A site count within one file cannot express "one here and one there", which is the property that
+    actually matters: a third render appears by a copy landing in EITHER file, and the old shape
+    could only see one of them. `sidebar-tip-single-render-contract.test.ts` pins the same invariant
+    from the other direction, so a copy added to either file fails something.
   */
   it('both read the resolved answer and never the settings', () => {
-    expect(sidebar.split('{#if tip.visible}')).toHaveLength(3);
+    expect(sidebar.split('{#if tip.visible}'), 'the sidebar draws it exactly once').toHaveLength(2);
+    expect(navbar.split('{#if tip.visible}'), 'and so does the navbar').toHaveLength(2);
     const code = sidebar.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     for (const setting of ['tipMeBtnEnabled', 'tipMeBtnUrl', 'tipMeBtnTxt']) {
       expect(code, `the sidebar must not re-read ${setting}`).not.toContain(setting);
     }
+    const navbarCode = navbar.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const setting of ['tipMeBtnEnabled', 'tipMeBtnUrl', 'tipMeBtnTxt']) {
+      expect(navbarCode, `the navbar must not re-read ${setting}`).not.toContain(setting);
+    }
   });
 
-  it('carries the captured classes at both sites', () => {
-    // Consts 34/35/36 and 139/140.
+  it('carries the captured classes, each at the site the capture puts it', () => {
+    /* `aPe` consts 34/35/36 in the sidebar; `U4e` consts 139/140 in the navbar. */
     expect(sidebar).toContain('class="btn btn-primary btn-sm"');
-    expect(sidebar).toContain('class="d-flex align-items-center btn btn-primary btn-sm"');
-    expect(sidebar.split('<i class="fas fa-dollar-sign"></i>')).toHaveLength(3);
-    expect(sidebar.split('<span class="ms-1">{tip.label}</span>')).toHaveLength(3);
+    expect(sidebar, 'the navbar’s anchor form does not belong here').not.toContain(
+      'class="d-flex align-items-center btn btn-primary btn-sm"'
+    );
+    expect(navbar).toContain('class="d-flex align-items-center btn btn-primary btn-sm"');
+
+    for (const [name, source] of [
+      ['sidebar', sidebar],
+      ['navbar', navbar]
+    ] as const) {
+      expect(source.split('<i class="fas fa-dollar-sign"></i>'), `${name} icon`).toHaveLength(2);
+      expect(source.split('<span class="ms-1">{tip.label}</span>'), `${name} label`).toHaveLength(
+        2
+      );
+    }
   });
 
   it('binds the label to the title attribute as well as the text', () => {
-    // `xn("title", tipMeBtnTxt)` at both sites — upstream's own doubling.
-    expect(sidebar.split('title={tip.label}')).toHaveLength(3);
+    /*
+      `xn("title", tipMeBtnTxt)` at both sites — upstream's own doubling.
+
+      Read from CODE rather than from the raw file: the sidebar carries a second `title={tip.label}`
+      inside the SIDE-01 comment, quoting the markup that was removed. Counting the raw text would
+      make that comment vote.
+    */
+    const code = (source: string) =>
+      source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code(sidebar).split('title={tip.label}')).toHaveLength(2);
+    expect(code(navbar).split('title={tip.label}')).toHaveLength(2);
   });
 
   it('is resolved on the page and handed down', () => {

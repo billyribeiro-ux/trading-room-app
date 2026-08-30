@@ -315,18 +315,42 @@ describe('the two-verifier pass states its own arithmetic', () => {
       surfaces.set(name![1].trim(), Number(found[1]));
     }
 
-    /* Walk the document, attributing each `### ` row to the `## ` heading above it. */
+    /*
+      Walk the document, attributing each `### ` row to the `## ` heading above it — and counting,
+      per surface, how many of those rows declare themselves as added AFTER the pass.
+
+      THE ALLOWANCE IS DERIVED NOW, and it used to be `surface === 'RoomMessage.svelte' ? 1 : 0`.
+      That was honest when RM-25 was the only such row: one named exception, written where a reader
+      would see it. It stopped scaling on 2026-08-31, when a second reading added twenty-seven rows
+      across five surfaces — and a hardcoded list would have had to grow by hand every time, which
+      is the shape that goes stale.
+
+      So the document declares it instead. A row added after the pass carries the same sentence
+      RM-25's prose carries, and this counts those sentences per heading. The constraint is
+      unchanged and is still exact: a row may sit outside the table ONLY by saying so at itself.
+      An unmarked row still has to be in the surface's `gaps` count, and a marked one still has to
+      be somewhere — the `survivors plus the ones added afterwards` assertion below counts the same
+      sentences document-wide, so a row cannot escape both.
+    */
     const filed = new Map<string, number>();
+    const addedAfter = new Map<string, number>();
     let heading = '';
+    let inRow = '';
     for (const line of lines) {
-      if (line.startsWith('## ')) heading = line.slice(3).trim();
-      else if (line.startsWith('### ')) filed.set(heading, (filed.get(heading) ?? 0) + 1);
+      if (line.startsWith('## ')) {
+        heading = line.slice(3).trim();
+        inRow = '';
+      } else if (line.startsWith('### ')) {
+        filed.set(heading, (filed.get(heading) ?? 0) + 1);
+        inRow = heading;
+      } else if (inRow && line.includes('row was ADDED after this document was committed')) {
+        addedAfter.set(inRow, (addedAfter.get(inRow) ?? 0) + 1);
+      }
     }
 
     const wrong: string[] = [];
     for (const [surface, gaps] of surfaces) {
-      /* RM-25 was added after the pass and is deliberately outside the table. */
-      const allowance = surface === 'RoomMessage.svelte' ? 1 : 0;
+      const allowance = addedAfter.get(surface) ?? 0;
       const actual = filed.get(surface) ?? 0;
       if (actual !== gaps + allowance) {
         wrong.push(`${surface}: the table says ${gaps}, ${actual} rows are filed under it`);
