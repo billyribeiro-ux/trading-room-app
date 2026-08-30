@@ -29,6 +29,8 @@ import { RoomScreens } from './screens.svelte';
 import { RoomChatMute } from './chat-mute';
 import { RoomChatSearch } from './chat-search.svelte';
 import { RoomKicks } from './kicks';
+import { RoomProfilePicture } from './profile-picture';
+import { RoomUserDetail } from './user-detail';
 import { RoomPrivateCommands } from './private-commands';
 import { RoomManagedUsers } from './managed-users.svelte';
 import { RoomSessionControl } from './session-control';
@@ -115,6 +117,15 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   privateCommands: RoomPrivateCommands,
   kicks: RoomKicks,
   managedUsers: RoomManagedUsers,
+  /*
+    Added 2026-08-30 with the offline user lookup, and again it was the completeness check below
+    that asked rather than anybody remembering. `RoomProfilePicture` arrived by extraction from
+    `RoomUserActions`, which was already listed — so the two methods it holds went from covered to
+    uncovered by a move that changed no behaviour at all. That is exactly the blind spot this map
+    exists for, and exactly how it was found.
+  */
+  profilePicture: RoomProfilePicture,
+  userDetail: RoomUserDetail,
   sessionControl: RoomSessionControl,
   userActions: RoomUserActions,
   gates: RoomGates,

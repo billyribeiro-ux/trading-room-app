@@ -466,6 +466,15 @@ export function ensureDatabase() {
   if (!userColumns.has('auth_source')) {
     sqlite.exec("ALTER TABLE users ADD COLUMN auth_source TEXT NOT NULL DEFAULT 'password'");
   }
+  /*
+    `last_login_at` — the user modal's Last Login row, 2026-08-29. Nullable with NO default, because
+    the honest value for an account that has never logged in since the column existed is "unknown",
+    and a default of `0` would render as 1 January 1970 for every pre-existing row. See `schema.ts`
+    for why this is a column rather than a query over `sessions`.
+  */
+  if (!userColumns.has('last_login_at')) {
+    sqlite.exec('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
+  }
 
   const alertColumns = new Set(
     (sqlite.pragma('table_info(alerts)') as Array<{ name: string }>).map((column) => column.name)
@@ -542,6 +551,24 @@ export function ensureDatabase() {
     }
     sqlite.exec(`CREATE INDEX IF NOT EXISTS ${table}_room_idx ON ${table}(room_short_code)`);
   }
+
+  /*
+    The user-detail scope check: "has this person ever spoken in THIS room?", which is what says a
+    presenter may read another account's address at all. Without it that is a full scan of
+    `messages` on every user modal opened for somebody who is not on the roster, growing with the
+    room's whole history — the cost `CLAUDE.md` asks about at 10,000 rows. The room leads because it
+    is the equality that eliminates the most, and the pair alone answers the query from the index
+    without touching a row.
+
+    AFTER the loop above, not in the `CREATE TABLE` block, and that is not tidiness. `messages`
+    predates `room_short_code`; the loop is what adds it to an existing database. The first draft
+    created this index in the opening `sqlite.exec` and every suite that touches the database failed
+    with `no such column: room_short_code` — an index cannot name a column that has not been added
+    yet, and the ordering here is the only thing that guarantees it has been.
+  */
+  sqlite.exec(
+    'CREATE INDEX IF NOT EXISTS messages_room_sender_idx ON messages(room_short_code, sender_id)'
+  );
 
   /*
     `alert_questions` gains the two columns the Q&A thread needs to be a real surface.

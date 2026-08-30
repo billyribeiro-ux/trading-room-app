@@ -60,6 +60,7 @@ import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
 import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';
 import { userNotesPort } from './user-notes-port';
+import { createRoomUserDetail } from './user-detail-port';
 
 import {
   deletePrivateChatLog as deletePrivateChatLogCommand,
@@ -897,6 +898,7 @@ export function createRoom(deps: RoomDeps) {
     dialogs,
     toasts,
     notesPort: userNotesPort,
+    userDetail: createRoomUserDetail(),
     commands: {
       presenter: presenterCommand,
       editUsername,

@@ -39,7 +39,7 @@ export class RoomModals {
     polls: RoomPolls;
     /** What a closing modal reaches for: the selection it was about, and the managed list. */
     messageActions: { clearSelected(): void; readonly selected: { id: number } | null };
-    userActions: { loadManaged(): void };
+    userActions: { loadManaged(): void; hydrateDetail(): void };
     /** The Q&A unread marker, cleared when the questions modal is opened. */
     unreadQaAlertIds: { clear(): void; delete(id: number): boolean };
     /**
@@ -82,7 +82,7 @@ export class RoomModals {
   readonly #polls: RoomPolls;
   readonly #messageActions: { clearSelected(): void; readonly selected: { id: number } | null };
   readonly #debugLog: { clearReceived(): void };
-  readonly #userActions: { loadManaged(): void };
+  readonly #userActions: { loadManaged(): void; hydrateDetail(): void };
   readonly #unreadQaAlertIds: { clear(): void; delete(id: number): boolean };
   readonly #setTheme: (next: Theme) => void;
 
@@ -133,6 +133,9 @@ export class RoomModals {
 
   open(name: Exclude<ModalName, null>) {
     if (name === 'muted' || name === 'followed' || name === 'user') this.#userActions.loadManaged();
+    // HERE because this is the one place the card is SHOWN, which the selection is not:
+    // `RoomUserActions.hydrateDetail` records what hanging it off the selection instead cost.
+    if (name === 'user') this.#userActions.hydrateDetail();
     this.#modal = name;
     this.#menus.closeForModal();
   }

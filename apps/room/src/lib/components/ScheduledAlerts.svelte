@@ -1,5 +1,6 @@
 <script lang="ts">
   import { REPEAT_MODES, type RepeatMode } from '#lib/scheduled-alert.js';
+  import { shortWhen } from '#lib/short-when.js';
   import {
     listScheduledAlerts,
     removeScheduledAlert,
@@ -127,8 +128,7 @@
   }
 
   /** `{{ sendOn | date:'short' }}` in the reference's own table. */
-  const shortDate = (epochMs: number) =>
-    new Date(epochMs).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  const shortDate = (epochMs: number) => shortWhen.format(new Date(epochMs));
 </script>
 
 <section class="scheduler">

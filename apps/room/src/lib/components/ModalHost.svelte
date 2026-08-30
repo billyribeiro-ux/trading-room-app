@@ -1,6 +1,7 @@
 <script lang="ts">
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
+  import { shortWhen } from '#lib/short-when.js';
   import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
@@ -2203,6 +2204,11 @@
       cleanupMicTest();
     };
   });
+
+  /** `e.user.loggedIn | date:'short'`, `$derived` because `targetUser` re-resolves on every access. */
+  const lastLogin = $derived(
+    targetUser.loggedIn ? shortWhen.format(new Date(targetUser.loggedIn)) : 'n/a'
+  );
 </script>
 
 <app-user-info-modal>
@@ -2342,7 +2348,7 @@
                     <tr>
                       <th scope="row">Last Login:</th>
                       <td>
-                        {targetUser.loggedIn ? String(targetUser.loggedIn) : 'n/a'}
+                        {lastLogin}
                         {#if targetUser.status === 'offline'}
                           <span class="badge badge-danger">Offline</span>
                         {/if}

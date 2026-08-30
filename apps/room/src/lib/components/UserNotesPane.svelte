@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { UserNoteView } from '#lib/server/user-notes.js';
+  import { shortWhen } from '#lib/short-when.js';
 
   /**
    * `#user-modal`'s Admin Notes tab, both halves of it.
@@ -44,16 +45,6 @@
   }
 
   const { canManage, notes, loading, error, onEnterPassword, onAdd, onRemove }: Props = $props();
-
-  /**
-   * `e.date | date:'short'` — Angular's `short` is `M/d/yy, h:mm a` in `en-US`.
-   *
-   * `Intl.DateTimeFormat` with `dateStyle: 'short'` and `timeStyle: 'short'` is the same shape from
-   * the platform, so no format string is carried here. Built once rather than per row: a formatter
-   * constructed inside the `{#each}` is one allocation and one locale-data lookup per note, which is
-   * the per-item cost this repository asks about before writing the loop rather than after.
-   */
-  const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' });
 </script>
 
 {#if !canManage}
@@ -100,7 +91,7 @@
             width="20"
             height="20"
           />
-          [{when.format(new Date(note.createdAt))}] {note.authorName}: {note.note}
+          [{shortWhen.format(new Date(note.createdAt))}] {note.authorName}: {note.note}
         </span>
         <button
           class="btn btn-sm btn-outline-light float-right"

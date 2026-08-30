@@ -24,7 +24,9 @@ import type { RoomDialogs } from './dialogs.svelte';
 import { RoomKicks } from './kicks';
 import { RoomAdminNotes, type NotesPort } from './admin-notes';
 import { RoomManagedUsers } from './managed-users.svelte';
+import { RoomProfilePicture } from './profile-picture';
 import { RoomSessionControl } from './session-control';
+import type { RoomUserDetail } from './user-detail';
 import type { RoomToasts } from './toasts.svelte';
 
 /** The load values every one of these actions reads, taken as a thunk. */
@@ -122,6 +124,10 @@ export class RoomUserActions<
   */
   readonly #managed: RoomManagedUsers;
   readonly #kicks: RoomKicks<User>;
+  /** The `userInfoDB` lookup's answers. Injected, because the wire lives in `create-room`. */
+  readonly #detail: RoomUserDetail;
+  /** Set and clear one member's avatar. Built here for `RoomKicks`' reason — see that class. */
+  readonly #profilePicture: RoomProfilePicture;
   #selectedUserId: number | null;
   #selectedMessageUser: ModalTargetUser | null;
 
@@ -131,6 +137,8 @@ export class RoomUserActions<
     commands: UserActionCommands;
     /** The Admin Notes wire — the door and the list behind it. See `NotesPort`. */
     notesPort: NotesPort;
+    /** Last Login and the address, for a target the roster cannot describe. See `RoomUserDetail`. */
+    userDetail: RoomUserDetail;
     session: () => UserActionSession<User>;
     isPresenter: () => boolean;
     /** `media.talking` — who has a microphone open, which is what "mute all" acts on. */
@@ -209,6 +217,12 @@ export class RoomUserActions<
       announceThenSend: (message, send) => this.#announceThenSend(message, send)
     });
 
+    this.#detail = options.userDetail;
+    this.#profilePicture = new RoomProfilePicture({
+      commands: options.commands,
+      alert: (message) => (options.dialogs.alert = message)
+    });
+
     this.#selectedUserId = $state<number | null>(null);
 
     this.#selectedMessageUser = $state<ModalTargetUser | null>(null);
@@ -256,6 +270,23 @@ export class RoomUserActions<
     this.#selectedMessageUser = next;
   }
 
+  /**
+   * Ask the server for the card's Last Login and address — called when the card is SHOWN.
+   *
+   * `RoomModals.open` calls this from the branch it already has for `'user'`, which is the one place
+   * every entry point converges: the roster row, the chat message, and the followed/muted lists all
+   * reach the card through `openModal('user')`.
+   *
+   * The first draft hung it off `set selectedMessageUser` instead and that was WRONG, not merely
+   * different. `message-actions.handle` selects the sender for EVERY action it dispatches — mention,
+   * reply, report, question, delete — so a presenter clicking "Mention" would have triggered a
+   * lookup of that member's email address. A request for data nobody asked to see, on a field this
+   * repository restricts to presenters on purpose.
+   */
+  hydrateDetail(): void {
+    this.#detail.hydrate(this.target.id);
+  }
+
   /** `edit-my-info` and the private-chat close both clear the message selection. */
   clearSelectedMessageUser(): void {
     this.#selectedMessageUser = null;
@@ -281,6 +312,11 @@ export class RoomUserActions<
    * records what that costs, why nothing reached it, and refuses a third.
    */
   get target(): ModalTargetUser {
+    return this.#detail.decorate(this.#resolveTarget());
+  }
+
+  /** Who is selected, before the server's additions. Split out only so `target` stays one line. */
+  #resolveTarget(): ModalTargetUser {
     if (this.#selectedMessageUser) return this.#selectedMessageUser;
     const user = this.#session().connectedUsers.find(
       (connectedUser) => connectedUser.id === this.#selectedUserId
@@ -827,68 +863,17 @@ export class RoomUserActions<
     );
   }
 
-  /**
-   * `adminUploadProfilePic` — a presenter sets one member's avatar.
-   *
-   * ## A CORRECTION: this DOES announce, and the first version was wrong to be silent
-   *
-   * The first version of this method carried a paragraph arguing that *"upstream raises no alert on
-   * success — the picture simply changes, which is its own confirmation"*. **That was reasoning
-   * carried over from `getDebugLog`, where it is true, and it was never checked here.** The
-   * reference is explicit, at bundle byte 2,086,100:
-   *
-   * ```js
-   * beforeSend: … bootbox.alert(`Uploading: ${e.name}... Please wait...`)
-   * success:     … bootbox.alert("Profile picture uploaded successfully for " + (user.nick||user.name))
-   * error:       … bootbox.alert("Upload Failed...")
-   * ```
-   *
-   * Three alerts, one per outcome, and the sentences are transcribed rather than composed. That is
-   * the opposite of the `EXACT_ALERTS` defect this repository has spent commits removing: those were
-   * alerts raised over NOTHING, and these are raised over a real round trip.
-   *
-   * The progress alert is dropped and that IS a divergence, recorded rather than hidden: upstream's
-   * is a bootbox that `bootbox.hideAll()` closes from the success and error callbacks, and this
-   * room's `alert` primitive is a single string the member dismisses. Showing "Uploading…" would
-   * require the presenter to dismiss it before they could read the result.
-   *
-   * The failure sentence is the SERVER's when there is one — "That is not an image", the size limit,
-   * or the member having left the room — falling back to upstream's `"Upload Failed..."` verbatim.
-   * A specific reason beats a transcribed one; the transcription is what happens when there is no
-   * specific reason to give.
-   *
-   * The modal stays OPEN. `savePermissions` closes it because saving is the end of that dialog; a
-   * presenter who has just set a picture may well set another.
-   */
+  /*
+    Forwarded rather than re-pointed at their new home, and that is the smaller change of the two.
+    `ModalHost` and `handle()`'s `upload-profile-picture` branch call these on this object; moving
+    the call sites would have put a second collaborator in the modal's props for a slice whose whole
+    behaviour is two commands. `RoomKicks` is exposed the same way, for the same reason.
+  */
   uploadProfilePicture(user: ModalTargetUser, file: File): void {
-    void this.#commands
-      .uploadProfilePicture({ targetUserId: user.id, file })
-      .then(() => {
-        // Verbatim, byte 2,086,100 — including that it names the member rather than the file.
-        this.#dialogs.alert = `Profile picture uploaded successfully for ${user.nick}`;
-      })
-      .catch((cause: unknown) => {
-        this.#dialogs.alert =
-          cause instanceof Error && cause.message ? cause.message : 'Upload Failed...';
-      });
+    this.#profilePicture.uploadProfilePicture(user, file);
   }
 
-  /**
-   * Clear a member's picture. The mirror of {@link uploadProfilePicture}, and deliberately so.
-   *
-   * Silent on success and loud on failure, for that method's reason: the avatar changing IS the
-   * confirmation, and the ways this can fail — the member has left the room — are ones a presenter
-   * cannot infer from a control that did nothing.
-   *
-   * NO CONFIRM DIALOG. The reference's button raises none, and the act is reversible by the upload
-   * beside it; asking twice for something undoable in one click is friction, not safety.
-   */
   removeProfilePicture(user: ModalTargetUser): void {
-    void this.#commands.removeProfilePicture(user.id).catch((cause: unknown) => {
-      this.#dialogs.alert =
-        cause instanceof Error && cause.message
-          ? cause.message
-          : 'That profile picture could not be removed.';
-    });
+    this.#profilePicture.removeProfilePicture(user);
   }
 }

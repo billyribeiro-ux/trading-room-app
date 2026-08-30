@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,180 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,186 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
 | 3 | `routes/+page.svelte` | 1,470 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,187 | no |
@@ -130,15 +130,15 @@ guessed.
 | 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 62 surfaces audited · 1,059 of 28,693 lines · 3.7%.**
+**2 of 62 surfaces audited · 1,059 of 28,687 lines · 3.7%.**
 
 | 56 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 57 | `routes/logout/+page.svelte` | 31 | no |
 | 58 | `routes/+layout.svelte` | 27 | no |
 | 59 | `lib/components/FollowChatStylePane.svelte` | 151 | no |
-| 60 | `lib/components/UserNotesPane.svelte` | 123 | no |
+| 60 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 61 | `lib/components/LogArchiveModals.svelte` | 147 | no |
-| 62 | `lib/components/ChatArchivePane.svelte` | 146 | no |
+| 62 | `lib/components/ChatArchivePane.svelte` | 143 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

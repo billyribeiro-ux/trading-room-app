@@ -34,6 +34,27 @@ export const users = sqliteTable('users', {
   authSource: text('auth_source', { enum: ['password', 'handoff'] })
     .notNull()
     .default('password'),
+  /**
+   * When this account last became a session — the reference's `userXref.lastLogin`.
+   *
+   * ## Why a column and not `MAX(sessions.created_at)`
+   *
+   * `sessions` cannot answer this. `createSessionFor` deletes every prior row for the account
+   * before inserting (one account, one active session), and `logout` deletes the row outright, so
+   * the table holds at most one row per person and nothing at all once they sign out. Deriving a
+   * last login from it would show a date only for people who are still signed in — which is the
+   * one case the Last Login row does not need, since their presence already says it.
+   *
+   * ## Why on `users` and not on a membership
+   *
+   * Signing in is an act of the ACCOUNT. The four per-room flags removed from this table above were
+   * removed because a column here can only answer the same way in every room; this one is SUPPOSED
+   * to, because there is one login whichever room it leads to.
+   *
+   * Null for every row that predates the column and for any account that has never logged in. The
+   * modal renders `n/a` for null, which is what the reference renders for a missing `lastLogin`.
+   */
+  lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
   /*
     The four per-room flags that used to live here are gone: `is_limited_presenter`,
     `has_admin_chat`, `is_free_trial` and `deny_archives_access`.

@@ -33,6 +33,193 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 00:20 UTC — The user card's Last Login cell had no producer at all, and Email had one that only worked from the roster
+
+**Runtime impact: YES.** A presenter opening a member's card now sees when that member last logged
+in, and their address whether the card was opened from the roster, a chat message, or the
+followed/muted lists. Last Login read `n/a` for everybody on every path before this. Members see
+exactly what they saw before: `n/a` for both.
+
+#### The gap, measured rather than inferred
+
+`ModalHost.svelte` has rendered both cells since it was written.
+
+| field | consumers | producers |
+| --- | --- | --- |
+| `targetUser.loggedIn` | 1 — the Last Login cell | **0** |
+| `targetUser.email` | 1 — the Email cell | 1 — `targetFor`, which reads a live ROSTER entry |
+
+`loggedIn` was an optional field on `ModalTargetUser` that nothing ever assigned. `email` filled for
+somebody standing in the room and read `n/a` the moment the same modal was opened from a chat
+message, because `message-actions` builds its target from what the message row carries — sender id,
+name, email hash, avatar, status.
+
+#### This is the reference's design, not a shortfall of it
+
+Every `getUserInfo` call site in the pinned v4 bundle passes a null `socketID` except the roster's,
+and a null `socketID` takes the DB branch:
+
+```js
+a ? (P("getUserInfo socketID was NOT null"), o.socketService.getUserInfo(s, r, a, l, c))
+  : (P("getUserInfoDB socketID was null"), o.getUserInfoDB(s, r))
+```
+
+byte 1,159,275. The callers:
+
+| caller | byte | branch |
+| --- | ---: | --- |
+| chat message — `doUserInfo(e, i)`, two arguments | 1,352,046 | DB |
+| followed-users modal — `getUserInfo(e, i, null, null)` | 2,356,520 | DB |
+| Random User | 2,516,476 | DB |
+| own settings — `getUserInfo(uid, id, null, serverID, !0)` | 2,255,130 | DB |
+| roster row — `doUserInfo(o.userXrefID, o._id, o.socketID, o.serverID)` | 2,032,939 | socket |
+
+So the offline lookup is how the reference fills this modal everywhere except the roster. **My own
+earlier note on this row was wrong on both counts** and is corrected here: it claimed
+`openManagedInfo` refuses where the reference falls back to a DB lookup. The reference's
+followed-users modal refuses on exactly the same condition, in the same words —
+``e && i ? (…getUserInfo(e, i, null, null)…) : bootbox.alert("User is not logged in.")`` at byte
+2,356,520. What our `openManagedInfo` was missing was not the refusal; it was the resolved path.
+
+#### What was built
+
+| piece | file |
+| --- | --- |
+| `users.last_login_at`, stamped inside the same transaction that issues the session | `db/schema.ts`, `server/auth.ts`, `drizzle/0011_user_last_login.sql` |
+| `readUserDetail(room, userId)` — room-scoped, two columns | `server/user-detail.ts` |
+| `userDetail` — one presenter-only query, no room argument | `routes/user-detail.remote.ts` |
+| `RoomUserDetail` — holds the answers for the page, asks once | `lib/room/user-detail.ts` |
+| the ask, where the card is shown | `RoomModals.open`'s existing `'user'` branch |
+
+**`sessions` cannot answer "when did they last log in".** `createSessionFor` deletes every prior row
+for the account before inserting, and `logout` deletes the row outright, so the table holds at most
+one row per person and nothing at all once they sign out. A last login derived from it would show a
+date only for people still signed in — the one case the cell does not need, since their presence
+already says it. Hence the column.
+
+**The room owns no membership table**, so "may this presenter ask about this account" is answered
+from what the room does own: the live roster, or a message authored in this room. Archived messages
+count — sweeping a log into the archive does not undo the fact that its author was here. The check
+runs BEFORE any account row is read, so a refusal cannot be used to test which user ids exist, and
+`messages_room_sender_idx` keeps it a `LIMIT 1` over an index rather than a scan that grows with the
+room's history.
+
+#### Two divergences from the reference, both stricter
+
+**It caches forever.** `serverInvokeUserInfoDB` memoises per uid in `userInfoDBCache` with no
+invalidation (byte 990,107). Not copied.
+
+**It decides visibility in the browser.** The whole block is gated on
+`O(17, e.user.hidePrivateInfo ? -1 : 17)` (byte 2,068,096) — a flag the server puts on the payload
+and the component obeys, so the address arrives either way. Here the query is presenter-only and a
+member gets no address to hide. That is the same correction `roster-privacy.test.ts` records for
+`locStr` and `email` on the roster frame: a render gate is a decoration over an authority decision
+nobody made.
+
+#### The first draft hung the lookup off the SELECTION, and that was wrong
+
+`message-actions.handle` selects the sender for **every** action it dispatches — mention, reply,
+report, question, delete. A lookup on the selection setter meant a presenter clicking "Mention"
+fetched that member's email address: a request for data nobody asked to see, on a field this
+repository restricts to presenters on purpose. It now hangs off `RoomModals.open('user')`, which is
+the one place all three entry points converge and the only one that means *the card is being shown*.
+
+#### The ratchet asked for an extraction and got a real one
+
+The wiring needed about sixteen lines in `user-actions.svelte.ts`, which sat exactly on its ceiling.
+`RoomProfilePicture` came out — sixty-four lines, two methods, one feature complete, transcriptions
+moved byte for byte. It passes the test the ratchet's own header demands, which is that an
+extraction is a real slice and not one invented to satisfy a number: nothing else in that class
+reads or writes anything those two methods touch.
+
+| ceiling | before | after |
+| --- | ---: | ---: |
+| `lib/room/user-actions.svelte.ts` | 895 | **880** |
+| `lib/components/ScheduledAlerts.svelte` | 274 | **272** |
+| `lib/room/modals.svelte.ts` | 260 | 263 |
+| `lib/room/create-room.svelte.ts` | 1,333 | 1,335 |
+
+**The two raises are flagged for the owner.** The standing rule is that a ceiling only goes down and
+a raise is a conversation, and these were made without them. `modals.svelte.ts` is one line of code
+plus the two explaining it — the alternative was deleting the comment to land on 261, and
+`CLAUDE.md` names that directly. `create-room.svelte.ts` is one import and one hand-off, which its
+own entry already describes as "the smallest form that growth takes". The room's total cap falls by
+thirteen.
+
+#### `shortWhen`, because there were three copies of one formatter
+
+`UserNotesPane`, `ChatArchivePane` and `ScheduledAlerts` each carried their own
+`dateStyle: 'short', timeStyle: 'short'`, and the Last Login cell was about to be a fourth. One
+definition now, in `#lib/short-when.ts`. `ScheduledAlerts` was building a formatter on **every
+call** — one locale-data lookup per scheduled alert per render — and now uses the shared one.
+
+#### Two defects found by the gates, both mine
+
+**The index named a column that did not exist yet.** `messages_room_sender_idx` was created in the
+opening `sqlite.exec` block; `messages` predates `room_short_code`, and the backfill loop further
+down is what adds it. Eighteen test files failed with `no such column: room_short_code`. Moved after
+the loop, with the ordering written down as the reason.
+
+**Backticks inside the SQL template literal.** The first version of that comment quoted `messages`
+and `CLAUDE.md` in backticks, inside a template literal, which ends the string. That file's own
+swing-alerts note says *"NO BACKTICKS ANYWHERE IN THIS COMMENT"* — I read it afterwards.
+
+And one the gates asked for correctly: `rune-module-extension-contract` rejected
+`user-detail.svelte.ts`, because a `SvelteMap` is an ordinary class and the extension marks runes.
+Renamed to `user-detail.ts`.
+
+#### A third defect, found by reading my own diff rather than by a gate
+
+The port was `export const roomUserDetail = new RoomUserDetail(...)` — a module-level instance. It
+holds ANSWERS, keyed by user id, and `create-room.svelte.ts` is imported by `+page.svelte`, which
+renders on the **server**. That is one cache shared by every request a worker handles:
+`CLAUDE.md`'s "no shared server-side module state", and on this particular data it is the
+multi-tenant failure this repository exists under — one room's presenter populating a map another
+room's render can read.
+
+Nothing populates it during SSR today, because no modal is open at first render and `hydrate` never
+runs. So it was a hole that was not yet a leak. Closed at the shape rather than argued away, because
+the argument depends on a fact about rendering that the next feature can change without anybody
+thinking about this file: the port is a factory now, called once per `createRoom`, and the contract
+test pins both halves.
+
+#### Negative controls — fourteen, and one found a hole
+
+| mutation | result |
+| --- | --- |
+| `decorate` always spreads instead of returning the same object | RED ×3 |
+| the asked-set is dropped, so every open re-asks | RED ×3 |
+| the placeholder guard removed | RED |
+| the scope check moved after the account read | RED |
+| the route takes a room from the caller | RED |
+| the select widens to the whole `users` row | RED |
+| `open('user')` stops asking | RED |
+| it asks for every modal, not just the card | RED |
+| the moved transcription altered | RED ×2 |
+| **the upload forwarder gutted to a no-op** | **GREEN — nothing failed** |
+| the same, after the fix | RED |
+| the remove forwarder gutted | RED |
+| the port goes back to a module-level instance | RED |
+| the root hands over the factory instead of calling it | RED |
+
+That green line is the finding. `profilePicturesSent` and `profilePicturesRemoved` were recorded by
+the test harness and asserted by **nothing**, so `uploadProfilePicture` could be replaced with a
+no-op and every test in the file stayed green — `profile-picture-contract.test.ts` reads the
+transcriptions out of the source and cannot see whether anything calls them. The hole predates the
+extraction; what the extraction added was a link that could break silently. Three behavioural tests
+close it.
+
+#### Verified
+
+- `pnpm run gate` in `apps/room`: 3,438 tests, `svelte-check` 0 errors, eslint, prettier, build.
+- The twelve controls above, each with the file restored and `diff`ed byte-identical afterwards.
+- Svelte MCP: docs read for `.svelte.ts` modules, `$state` and remote functions before writing;
+  `svelte-autofixer` clean apart from its `SvelteSet` suggestion, declined with the reason recorded
+  at the declaration in the shape `RoomFiles` established.
+
+Not verified: **nothing was opened in a browser.** The room's Playwright suite does not drive the
+user card, and a presenter reading a real member's Last Login has not been observed end to end.
+
 ### 2026-08-29 23:40 UTC — CI went red on a formatting step nothing local ran, so `gate` now derives its steps from CI
 
 **Runtime impact: NO.** Nothing ships differently. What changes is that "the full gate" is a command

@@ -295,6 +295,14 @@ const codeOf = (source: string) =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
+/*
+  READ FROM `lib/room/profile-picture.ts` since 2026-08-30, not `user-actions.svelte.ts`.
+
+  The two methods were extracted into their own slice when the user-detail lookup pushed that file
+  past its ceiling. Nothing about them changed in the move — the transcriptions below are asserted
+  against the same bytes — and `RoomUserActions` still exposes both, so every caller and every other
+  test is unaffected. The path is the whole diff.
+*/
 describe('the presenter is told what happened, in the reference own words', () => {
   it('announces success and failure, which the first version did NOT', () => {
     /*
@@ -302,7 +310,7 @@ describe('the presenter is told what happened, in the reference own words', () =
       upstream raises no alert on success. That reasoning was carried over from `getDebugLog`, where
       it is true, and was never checked here — the reference alerts three times, at byte 2,086,100.
     */
-    const actions = codeOf(readFileSync(`${ROOT}lib/room/user-actions.svelte.ts`, 'utf8'));
+    const actions = codeOf(readFileSync(`${ROOT}lib/room/profile-picture.ts`, 'utf8'));
     expect(actions).toContain('Profile picture uploaded successfully for');
     expect(actions).toContain("'Upload Failed...'");
   });
@@ -312,7 +320,7 @@ describe('the presenter is told what happened, in the reference own words', () =
       "That is not an image" or the size limit beats `"Upload Failed..."`. The transcription is the
       fallback for when there is no specific reason to give, not the first answer.
     */
-    const actions = codeOf(readFileSync(`${ROOT}lib/room/user-actions.svelte.ts`, 'utf8'));
+    const actions = codeOf(readFileSync(`${ROOT}lib/room/profile-picture.ts`, 'utf8'));
     expect(actions).toContain(
       "cause instanceof Error && cause.message ? cause.message : 'Upload Failed...'"
     );
