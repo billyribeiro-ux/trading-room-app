@@ -33,6 +33,61 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 23:15 UTC — A list that named its own tracker, and never opened it
+
+**Runtime impact: NO.** One assertion added to an existing contract. No `src` module changed.
+
+`setting-coverage-contract.test.ts` pins the settings the reference reads in its own browser and this
+room does not — twenty-one of them, measured from the bundle against a committed SHA-256 pin. Its
+docblock is explicit about what that list is for: *"Each entry is a QUESTION, and the answers are in
+`docs/decoded/missing-settings-triage.md` — that document, not this list, is the tracker."*
+
+**Every assertion in the file was about the list. Not one of them opened the tracker.** The document
+was named in prose, five times, and read by nothing.
+
+The way those two drift apart is not hypothetical. The list changes when the schema changes or the
+bundle pin moves, and the pinning assertion then fails with a diff. The obvious repair is to paste
+the new name into `REFERENCE_READS_AND_WE_DO_NOT` and go green — at which point a setting the
+reference reads and this room does not is pinned, counted, guarded against being wired by accident,
+and **answered by nobody**, looking exactly like the twenty that are answered.
+
+So the contract now reads the triage and requires each pinned setting to appear under one of its
+seven `## ` disposition sections. Those seven are read from the document's own headings rather than
+restated here, because the document declares them in a table under *"What the dispositions mean"*.
+It asserts an answer EXISTS, never that the answer is right: four of the seven dispositions mean *do
+not build this* — `NEVER`, `NOT A GAP`, `ENUMERATION ARTEFACT` and `BLOCKED` — so a test demanding
+work would be wrong about most of the document. What it refuses is silence.
+
+**Verified first, then relied on:** all twenty-one already appear under a disposition, so this
+codifies the current state rather than declaring a backlog. `enableDiscord` is the only genuinely
+unbuilt one and it needs an application registration that does not exist.
+
+**Both negative controls came back GREEN, and each one exposed a real defect in the assertion I had
+just written.** This is the whole argument for running them.
+
+1. Renaming `h264Enabled` to `h264EnabledXX` in the triage left it green — because the longer string
+   still CONTAINS the shorter one. A substring match answers a setting with any name that merely
+   starts the same way, and it would have answered `description` with the ordinary English word,
+   which appears throughout that document in prose disposing of nothing. Fixed by matching the
+   backticked form, which is how the document names every setting; measured first, so requiring it
+   loses nothing. Re-controlled: **RED**, naming `h264Enabled`.
+2. Renaming the heading `## DERIVED — …` to `## DERIVED-VALUES — …` left the vacuity floor green —
+   the same substring defect one level up, in the guard whose entire job is to notice that the test
+   is searching nothing. A guard that a rename can fool is not a guard. The heading must now be the
+   disposition word and end there: followed by the em-dash gloss most carry, or by the newline that
+   `## BLOCKED` ends on. Re-controlled: **RED** — *"the triage's disposition headings were renamed —
+   this test now searches nothing: expected 6 to be 7"*.
+
+Neither defect would have failed anything. Both would have made the new assertion quietly weaker
+than it reads, which is the failure mode a contract test exists to prevent in the code it guards.
+
+**Also measured, and it closes a plan item rather than opening one.** The standing plan carried a
+phase for *"the 202 unwired settings"*. The real figures today are **269 declared · 104 read · 165
+not**, and of those 165 the reference itself reads only **21** — seven of which are the credentials
+that must never cross. Every one of the 21 is dispositioned. There is no phase of work there.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,455 passed,
+1 skipped, gate-exit=0**.
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships

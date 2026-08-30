@@ -262,6 +262,104 @@ describe('room settings the reference reads and this room does not', () => {
     ]);
   });
 
+  it('and every one of them has an ANSWER in the document this list calls its tracker', () => {
+    /*
+      THE LIST NAMED ITS TRACKER AND NOTHING EVER OPENED IT. Closed 2026-08-30.
+
+      The docblock above says it in as many words — *"Each entry is a QUESTION, and the answers are
+      in `docs/decoded/missing-settings-triage.md` — that document, not this list, is the tracker."*
+      Every assertion in this file was about the LIST: that it names exactly the right settings, that
+      the credentials are still on it, that `TODO.md` does not restate its size. Not one of them
+      opened the tracker.
+
+      So the two could disagree silently, and the way they would is not hypothetical: the list
+      changes when the SCHEMA changes or the bundle pin moves, and the assertion above fails with a
+      diff. The obvious repair is to paste the new name into `REFERENCE_READS_AND_WE_DO_NOT` and go
+      green — at which point a setting the reference reads and this room does not is pinned,
+      counted, guarded against being wired by accident, and answered by nobody. It would look
+      exactly like the twenty that ARE answered.
+
+      A disposition is a `## ` section of that document, and the seven are the document's own —
+      it declares them in a table under *"What the dispositions mean"*, which is why they are read
+      from the headings rather than restated as a rule here.
+
+      This asserts an ANSWER EXISTS, never that it is right. Three of the seven dispositions mean
+      "do not build this" and one means "wiring it would be a regression", so a test that demanded
+      work would be wrong about four sevenths of the document. What it refuses is silence.
+    */
+    const triage = readFileSync(
+      new URL('../../../../docs/decoded/missing-settings-triage.md', import.meta.url),
+      'utf8'
+    );
+
+    /*
+      Split on `## ` and keep the sections whose heading opens with a disposition word. The headings
+      carry an em-dash and a gloss after the word — `## NEVER — credentials the reference ships…` —
+      so this matches the opening rather than the whole line.
+    */
+    const DISPOSITIONS = [
+      'NEVER',
+      'NOT A GAP',
+      'ENUMERATION ARTEFACT',
+      'WIRE',
+      'FEATURE',
+      'BLOCKED',
+      'DERIVED'
+    ];
+    /*
+      The heading must be the disposition word AND END THERE — followed by the em-dash gloss most of
+      them carry, or by the newline that `## BLOCKED` ends on, and by nothing else.
+
+      `startsWith(word)` was the first version, and its own negative control refused it for the same
+      reason the backtick rule exists above: renaming `## DERIVED — …` to `## DERIVED-VALUES — …`
+      left the floor GREEN, because the longer heading still starts with the shorter word. A test
+      whose vacuity guard can itself be fooled by a rename is not a guard.
+    */
+    const sections = triage
+      .split(/^## /m)
+      .slice(1)
+      .filter((section) =>
+        DISPOSITIONS.some(
+          (word) => section.startsWith(`${word} `) || section.startsWith(`${word}\n`)
+        )
+      );
+
+    /*
+      The vacuity floor, and this one is not decoration: every assertion below is a search over
+      these sections, so a renamed heading would silently answer nothing and pass. Seven headings,
+      seven dispositions.
+    */
+    expect(
+      sections.length,
+      'the triage’s disposition headings were renamed — this test now searches nothing'
+    ).toBe(DISPOSITIONS.length);
+
+    /*
+      MATCHED IN BACKTICKS, and that is not a stylistic preference — a plain `includes` was the first
+      version and its own negative control refused it.
+
+      Renaming `h264Enabled` to `h264EnabledXX` in the triage left the test GREEN, because the longer
+      string still CONTAINS the shorter one. A substring match answers a setting with any name that
+      merely starts the same way, and it also answers `description` with the ordinary English word,
+      which appears in this document dozens of times in prose that disposes of nothing.
+
+      The document names every setting the same way — in backticks — so that is what is searched for.
+      Measured before relying on it: all twenty-one appear as `` `name` `` inside a disposition
+      section, so nothing is lost by requiring it.
+    */
+    const answered = sections.join('\n');
+    const silent = REFERENCE_READS_AND_WE_DO_NOT.filter(
+      (name) => !answered.includes(`\`${name}\``)
+    );
+    expect(
+      silent,
+      'these settings are on the pinned list and appear under no disposition in ' +
+        '`docs/decoded/missing-settings-triage.md`. The list is the question; that document is ' +
+        'the tracker. Give each one a disposition there — including "do not build this", which is ' +
+        'four of the seven — rather than leaving it counted and unanswered.'
+    ).toEqual([]);
+  });
+
   it('keeps TODO.md pointing at this list rather than restating its size', () => {
     /*
       `TODO.md` carried this count twice and it was stale both times — "26 of the 170", then "26" when
