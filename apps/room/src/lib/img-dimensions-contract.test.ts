@@ -231,11 +231,13 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
       why: 'a screenshot pasted into the alert composer, bounded inline at `max-width: 100%; max-height: 50vh`.'
     }
   },
-  'lib/components/RoomMessage.svelte': {
+  'lib/components/MessageBody.svelte': {
     '{segment.url}': {
       count: 1,
-      why: 'an image posted into chat. The paired `img-container` rule in `app.css` reserves the exact settled box for the uploads whose intrinsic width IS known, and deliberately leaves the rest to shrink-to-fit rather than over-reserving.'
-    },
+      why: 'an image posted into chat. The paired `img-container` rule in `app.css` reserves the exact settled box for the uploads whose intrinsic width IS known, and deliberately leaves the rest to shrink-to-fit rather than over-reserving. Moved here with the segment renderer on 2026-08-30; the markup is unchanged.'
+    }
+  },
+  'lib/components/RoomMessage.svelte': {
     '{item.senderAvatarUrl}': {
       count: 2,
       why: 'the message avatar, which may be a custom picture of any shape. The captured `.avatar img` gives it `width: 100%; max-width: 50px; height: auto`; forcing a square here would letterbox every non-square avatar.'

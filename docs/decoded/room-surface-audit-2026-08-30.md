@@ -36,6 +36,13 @@ checked is whether the outcome is achieved another way — and it is, by three s
 that are stricter than the flag. **A gap stated as a missing NAME is the shape most likely to
 survive verification while being wrong**, and it is the shape to distrust in the entries above.
 
+**One row was ADDED after this document was committed** — RM-25, found while building RM-11 and
+RM-12 by decoding the compact component's whole consts table rather than the entries those rows
+named. It is not folded into the totals above, which describe the two-verifier pass and should keep
+describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes
+the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
+byte offsets make the second reading the tempting one.
+
 Also recorded per surface: how many reference behaviours were confirmed **present** here. A list of
 only gaps reads as though nothing works, and 965 behaviours were confirmed built.
 
@@ -470,6 +477,8 @@ function g_e(t,n){if(1&t){const e=Y();d(0,"span",52),x("click",function(){return
 
 ### RM-05 — Card admin/member branch: the reference compares against `"alert"` (singular), which is never a logType, so an ADMIN ALERT takes the reversed admin card
 
+**BUILT 2026-08-30 11:22 UTC — and the row's own caveat is RESOLVED rather than inherited.** The row called this "a candidate rather than a certainty" because the captured DOM might be the better authority and is absent from this checkout. It still is; the bundle settles it without the capture. Every `logType` literal in it was enumerated: **32 `alerts`, 23 `chat`, 3 `pc`, and exactly 2 `alert`** — and those two are these render gates and nothing else. A term that can never be false is not a term. The compact renderer's extra clause is `"pc" != o.logType` (byte 1,400,148), which IS live and never reaches this component because a private message renders through `CompactMessageRow`; and the box class states the same gate with no term at all, `ct(30, o6, e.msg.isA)` at 1,334,988 and `ct(27, o6, e.msg.isA)` at 1,343,627 where `o6 = t => ({"msg-box-adm": t})`. **A gate written twice, once with a dead condition and once without, is the reference telling you which one it meant.** So `reverseMessage` and `messageBoxClass` drop the `kind === 'chat'` term: an alert posted by a presenter now takes the reversed admin card. Captured rows are unaffected — `evidenceDirection` and `evidenceMessageBoxClass` still win outright, which `admin-direction-contract.test.ts` asserts alongside the enumeration, read from the pinned bundle at run time rather than quoted.
+
 **medium** · `divergence` · reference byte **1,361,597**
 
 ```
@@ -481,6 +490,8 @@ o.msg.isA&&"alert"!=o.logType?3:4
 > Verified: Not implemented anywhere in apps/room/src. The reference card gate is `o.msg.isA&&"alert"!=o.logType?3:4`; I enumerated every logType literal in the bundle and "alert" (singular) is never assigned — only "alerts", "chat" and (by comparison) "pc" — so the term is unconditionally true and the gate reduces to `msg.isA`.
 
 ### RM-06 — parseStock's preceding-character guard is not reproduced — a ticker glued to a non-space character is left uncoloured upstream
+
+**BUILT 2026-08-30 11:22 UTC.** The guard, in `#lib/message-body-segments.ts` — a ticker is coloured when it starts the body or when a LITERAL space precedes it, and `foo$AAPL`, `($AAPL` and a tab-indented `\t$AAPL` are plain text, as they are upstream. `atBodyStart` is threaded through the label and trade passes rather than measured, because upstream runs over ONE string those passes have already rewritten into markup: a ticker at offset 0 of a later piece sits immediately after a `>` there, which is not a space, so the two implementations agree character for character. **What is deliberately NOT reproduced** is `a = e.indexOf(r)` — the first occurrence of the matched text ANYWHERE in the body rather than this match's position, which makes upstream decide both of ` $AAPL foo $AAPL` from position 0 and, on the second pass, substitute inside the span the first pass produced. That is a defect whose only effect is nested markup; the positional RULE is transcribed and the aliasing is not, and the code says so where the next comparison will read it. `ticker-colour-contract.test.ts` renders all five cases.
 
 **medium** · `missing-behaviour` · reference byte **1,327,300**
 
@@ -508,6 +519,8 @@ e.msg.txt.includes("?")&&!e.hasCustomFollowedUserColors
 
 ### RM-08 — Compact menu labels differ from the card's and we render one label set for all three variants
 
+**BUILT 2026-08-30 11:22 UTC.** `MESSAGE_MENU_TEXT` in `message-behavior.ts`, keyed by renderer, and `MessageMenu.svelte` picks the row from its own `variant` so a call site cannot render the wrong words. **Every `\xa0\xa0`-prefixed label literal in the bundle was enumerated first** — four complete menus, the card at 1,329,046-1,330,950 and 1,336,386-1,338,290, the compact admin at 1,367,382-1,369,287, the compact member at 1,374,766-1,376,671 — which establishes the row's scope as exactly three rather than approximately three: nine entries are byte-identical across all four, trailing spaces included (`Mark Answered ` and `Private Chat ` carry one everywhere; `Edit` and `Copy` carry none anywhere). `MESSAGE_MENU_LABEL` is untouched and stays the capture-matching LOOKUP; the contract asserts the two agree on the card so they cannot drift.
+
 **low** · `wrong-constant` · reference byte **1,368,194**
 
 ```
@@ -519,6 +532,8 @@ e.msg.txt.includes("?")&&!e.hasCustomFollowedUserColors
 > Verified: I could not refute it. Reference side confirmed by direct read: the card family (app-st-message) uses "\xa0\xa0Show message to all" (no trailing space), "\xa0\xa0Alert Send Report " and "\xa0\xa0Reply" (no trailing space), while BOTH compact template branches (app-st-compactmessage) use "\xa0\xa0Show message to all ", "\xa0\xa0Show Send R…
 
 ### RM-10 — Compact ADMIN timestamp is " [h:mm a] " with surrounding spaces; ours emits the member form for both rows
+
+**BUILT 2026-08-30 11:22 UTC.** ` [` / `] ` on the admin row, `[` / `]` on the member's, written as EXPRESSIONS rather than as template whitespace — Svelte normalises runs of whitespace around a text node, so ` [` typed into the markup is not reliably ` [`, and a divergence of exactly one space is the kind nothing here would otherwise catch. `compact-mirror-contract.test.ts` renders both rows and matches the whole bracketed run anchored at both ends.
 
 **low** · `wrong-constant` · reference byte **1,374,160**
 
@@ -532,6 +547,8 @@ Ne(" [",Ct(29,27,e.msg.t,"h:mm a"),"] ")
 
 ### RM-11 — Compact inner row applies `flex-row-reverse` on presenterMsgsOnTheRight; ours applies `presenter-msg-right`
 
+**BUILT 2026-08-30 11:22 UTC — and it is FOUR nodes, not one.** Reading the row's own byte led to the other three, which bind different lambdas to different consts in the same admin template: const 8 `g1e` → `flex-row-reverse` (this row), const 23 `_1e` → `w-100` when there is a reply and the setting is off / `flex-fill` when it is on, const 25 `b1e` → `presenter-msg-right flex-fill` on the plain body, const 43 `v1e` → `presenter-msg-right` on the reply wrapper. The member template binds NONE of them (consts 55, 64, 75, 76 are plain class lists), which is why every one carries the `reverseMessage` term and why one rendered member row is the negative control for all four at once. `presenter-msg-right` on the inner row was the wrong class from the right component: it sets text-align and margin, so the row's children kept their source order and the setting did nothing a presenter could see.
+
 **low** · `wrong-constant` · reference byte **1,373,250**
 
 ```
@@ -543,6 +560,8 @@ z("ngClass",ct(30,g1e,e.appService.globals.sessData.presenterMsgsOnTheRight))
 > Verified: I tried to refute this and could not. Both halves of the claim check out against bytes I actually read.
 
 ### RM-12 — Compact ADMIN reaction container drops `presenter-reactions-right`
+
+**BUILT 2026-08-30 11:22 UTC.** `y1e` on const 26, admin only — the member container is const 65 and carries `ngStyle` alone. Without it a presenter's compact reactions stayed left while every other part of their row moved right.
 
 **low** · `missing-behaviour` · reference byte **1,371,980**
 
@@ -622,6 +641,8 @@ doUserInfo(e,i){this.appService.getUserInfo(e,i),this.appService.guiEventBus.emi
 
 ### RM-21 — Alerts-log ticker colour comes from localStorage `alertStyle` upstream; ours has no alert-side ticker style
 
+**BUILT 2026-08-30 11:22 UTC, with one gap recorded rather than papered over.** `tickerColorStyle` gives the ticker `parseStock`'s own precedence, which is not the body's: on ALERTS the followed-user style is not consulted at all and a room style IS, and on CHAT the room style applies whether or not the message carries a background of its own — `parseStock` never reads `msg.bkgColor`, while `effectiveStyle` drops to `undefined` for exactly that case because that gate belongs to the BOX. Every `$TICKER` in every alert had been rendering as a bare `stockColor` span. **The gap:** upstream `alertStyle` is separately persisted (`saveAlertStyle`, byte 2,242,440), its default is byte-identical to the chat one (`globals.alertStyle`, byte 980,310, the same five values as `globals.chatStyle` beside it), and this repository has no alert-style editor — so the alert branch reads `chatStyle`, which is upstream's behaviour for every account that has never opened that pane, and the one expression to change when it lands. A prop nothing feeds is what `unfed-props-contract` exists to catch.
+
 **low** · `missing-behaviour` · reference byte **1,327,851**
 
 ```
@@ -660,9 +681,19 @@ o.txt.replace("[{(",'<span class="tradeColor" id="id_'+o._id+'">')
 
 ---
 
-## notes/NoteEditor.svelte
+### RM-25 — Compact reply block wears the answered tick's two classes and nests `private-reply-message` the wrong way round
 
-18 verified gaps; 50 reference behaviours confirmed present.
+**BUILT 2026-08-30 11:22 UTC.** Found while building RM-11 and RM-12, by decoding the compact component's consts table (`consts:` at 1,395,760) rather than by looking for it — which is the argument for decoding the whole table instead of the entries a row names.
+
+**medium** · `wrong-markup` · reference byte **1,370,300**
+
+```
+d(0,"div",43)(1,"div",44)(2,"strong",45),v(3),u(),T(4,"div",46),u(),T(7,"div",47),u()
+```
+
+**Ours:** `U1e` (compact admin, 1,370,300) and `f_e` (compact member, 1,378,850) render `div43 > [ div44 > [strong45, div46], div47 ]`. Compact const 43 is `msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100` + `ngClass` (`v1e`, admin only) + `ngStyle`; const 76 is the same list with `ngStyle` alone (member); const 44 is `private-reply-message w-100` + the theme background; const 45 is `d-block username`; const 46 is the quoted body, the only node here carrying the mention/question colours; const 47 is the sender's own text, a direct child of the outer div with no class and no style. We rendered `<div class="ms-1 private-reply">` — compact const **24**, which is the answered TICK's const — with `private-reply-message` as a SIBLING of the name rather than the box that wraps it. So the quoted block had no background, the name had no `username` treatment, neither body carried a colour, and `w-100` was missing from the box that is meant to fill the row.
+
+**Also decoded in passing:** the binding ORDER says which style goes where, and they are not all the body's — div43 and strong45 both take `invertTxtColorToggler(invertTxtColor, "name")` (the NAME inversion, which is `usernameStyle` here and is what the card already puts on the same `d-block username` node), while only div46 takes `styleF`. div47 takes neither and inherits. That asymmetry is the reference's.
 
 ### note-editor-carousel-slide-upload — Per-slide image upload (Upload button, uploading spinner, POST to upload_server) is missing
 
@@ -934,6 +965,11 @@ onCarouselUrlPaste(e,i){const o=e.clipboardData?.getData("text")?.trim();o&&/^ht
 > Verified: I could not disprove this. The reference behaviour is confirmed present in the bundle, and no counterpart exists anywhere in apps/room/src.
 
 ---
+
+## notes/NoteEditor.svelte
+
+18 verified gaps; 50 reference behaviours confirmed present.
+
 
 ## ModalHost: session-control modal
 

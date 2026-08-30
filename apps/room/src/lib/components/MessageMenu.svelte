@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { calculateMessageMenuPosition } from '#lib/message-menu-position.js';
+  import { attachMenuPlacement } from '#lib/message-menu-position.js';
   import type { MessageAction } from '#lib/types.js';
-  import type { MessageMenuAllows } from '#lib/message-behavior.js';
+  import { MESSAGE_MENU_TEXT, type MessageMenuAllows } from '#lib/message-behavior.js';
 
   /**
    * The kebab menu on a message — the trigger, the dropdown, and the twelve entries.
@@ -86,6 +86,16 @@
   type MessageMenuVariant = keyof typeof TRIGGER_CLASS;
 
   /**
+   * RM-08 — the three entries whose TEXT differs between the two renderers. See
+   * {@link MESSAGE_MENU_TEXT}, which carries the enumeration and the byte offsets.
+   *
+   * Keyed off the variant rather than passed in, so the same `allows` object cannot be rendered
+   * with the wrong words by a call site that forgot a prop. The other nine labels stay literal
+   * markup below because they are literally identical in all four captured menus.
+   */
+  const text = $derived(MESSAGE_MENU_TEXT[variant === 'regular' ? 'regular' : 'compact']);
+
+  /**
    * `⠇ ` — U+2807, braille dots-123, and the trailing space is in the capture.
    *
    * Moved here with the markup rather than left as a prop: it is a literal of this menu and the two
@@ -93,64 +103,11 @@
    */
   const KEBAB_TEXT = '\u2807 ';
 
-  let menuTriggerElement: HTMLAnchorElement | null = null;
-  let menuElement: HTMLDivElement | null = null;
-
-  function hideMenuPosition() {
-    if (!menuElement) return;
-    menuElement.style.removeProperty('position');
-    menuElement.style.removeProperty('inset');
-    menuElement.style.removeProperty('margin');
-    menuElement.style.removeProperty('visibility');
-    menuElement.style.removeProperty('display');
-    menuElement.style.removeProperty('transform');
-    delete menuElement.dataset.popperPlacement;
-  }
-
-  function positionMenu() {
-    if (!menuOpen || !menuTriggerElement || !menuElement) return;
-
-    const triggerRect = menuTriggerElement.getBoundingClientRect();
-    const menuRect = menuElement.getBoundingClientRect();
-    const viewportWidth = document.documentElement.clientWidth;
-    const viewportHeight = document.documentElement.clientHeight;
-    const { left, top, placement } = calculateMessageMenuPosition(triggerRect, menuRect, {
-      width: viewportWidth,
-      height: viewportHeight,
-      devicePixelRatio: window.devicePixelRatio
-    });
-
-    menuElement.dataset.popperPlacement = placement;
-    menuElement.style.cssText =
-      `position: fixed; inset: 0px auto auto 0px; margin: 0px; visibility: visible; ` +
-      `display: block; transform: translate3d(${left}px, ${top}px, 0px);`;
-  }
-
-  $effect(() => {
-    if (!menuOpen) {
-      hideMenuPosition();
-      return;
-    }
-
-    if (menuElement) {
-      menuElement.style.cssText =
-        'position: fixed; inset: 0px auto auto 0px; visibility: hidden; display: block;';
-    }
-    const frame = window.requestAnimationFrame(positionMenu);
-    window.addEventListener('resize', positionMenu);
-    window.addEventListener('scroll', positionMenu, true);
-    const resizeObserver = new ResizeObserver(positionMenu);
-    if (menuTriggerElement) resizeObserver.observe(menuTriggerElement);
-    if (menuElement) resizeObserver.observe(menuElement);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', positionMenu);
-      window.removeEventListener('scroll', positionMenu, true);
-      resizeObserver.disconnect();
-      hideMenuPosition();
-    };
-  });
+  /**
+   * The trigger, because the menu is positioned against it. The MENU element is not bound here:
+   * `attachMenuPlacement` is given it directly, which is what an attachment is for.
+   */
+  let menuTriggerElement: HTMLAnchorElement | null = $state.raw(null);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -170,7 +127,10 @@
   }}>{KEBAB_TEXT}</a
 >
 <div
-  bind:this={menuElement}
+  {@attach attachMenuPlacement(
+    () => menuOpen,
+    () => menuTriggerElement
+  )}
   aria-labelledby="dropdownMenuLink"
   class={menuOpen
     ? 'dropdown-menu users-dropdown-options show'
@@ -214,7 +174,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_missing_attribute -->
     <a class="dropdown-item" onclick={() => onaction('show-all')}
-      ><i class="fas fa-envelope-open"></i>&nbsp;&nbsp;Show message to all</a
+      ><i class="fas fa-envelope-open"></i>&nbsp;&nbsp;{text.showAll}</a
     >
   {/if}
   {#if allows.report}
@@ -226,8 +186,8 @@
       data-bs-target="#alert-send-report-modal"
       class="dropdown-item"
       onclick={() => onaction('report')}
-      ><i class="fas fa-chart-pie"></i>&nbsp;&nbsp;Alert Send Report
-    </a>
+      ><i class="fas fa-chart-pie"></i>&nbsp;&nbsp;{text.report}</a
+    >
   {/if}
   {#if allows.reply}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -237,7 +197,7 @@
       data-bs-toggle="modal"
       data-bs-target="#replyModal"
       class="dropdown-item"
-      onclick={() => onaction('reply')}><i class="fas fa-comment"></i>&nbsp;&nbsp;Reply</a
+      onclick={() => onaction('reply')}><i class="fas fa-comment"></i>&nbsp;&nbsp;{text.reply}</a
     >
   {/if}
   {#if allows.answered}

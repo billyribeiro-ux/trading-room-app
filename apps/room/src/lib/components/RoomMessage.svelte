@@ -1,15 +1,11 @@
 <script lang="ts">
-  import { splitTradeOrders, tradeOrderId } from '#lib/copy-trades.js';
+  import { parseBodySegments, tickerColorStyle } from '#lib/message-body-segments.js';
+  import MessageBody from '#lib/components/MessageBody.svelte';
   import type { MessageAction, RoomMessageItem } from '#lib/types.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '#lib/emoji-data.js';
   import { isMentionOf } from '#lib/mention.js';
-  import {
-    ALERT_LABEL_BADGE_CLASS,
-    alertLabelBadgeStyle,
-    splitAlertLabels,
-    type AlertLabel
-  } from '#lib/alert-labels.js';
+  import type { AlertLabel } from '#lib/alert-labels.js';
   import { safeChatHtml } from './chat-safe-html';
   import { ngbTooltipWith } from '#lib/ngb-tooltip.js';
   import MessageMenu from '#lib/components/MessageMenu.svelte';
@@ -22,6 +18,7 @@
   import { messageMenuAllows, sourceMessageBehavior } from '#lib/message-behavior.js';
   import type { FollowChatStyle } from '#lib/types.js';
   import { type PresenterColors } from '#lib/presenter-colors.js';
+  import { resolveMessageStyles } from '#lib/message-styles.js';
   import { hideMessageAvatar, type ChatDisplayMode } from '#lib/chat-display-mode.js';
 
   type MessageKind = 'alert' | 'chat';
@@ -225,14 +222,41 @@
   const hideAvatar = $derived(
     hideMessageAvatar({ altChatRender, hideAvatars, kind, isQaMessage })
   );
+  /*
+    ── RM-05 — AN ADMIN'S ALERT TAKES THE ADMIN CARD, and the `kind === 'chat'` term was OURS ──────
+
+    Both renderers gate the admin/member split on a comparison against a log type that does not
+    exist:
+
+    ```js
+    O(3, o.msg.isA && "alert" != o.logType ? 3 : 4)                       // app-st-message,        1,361,608
+    O(3, o.msg.isA && "alert" != o.logType && "pc" != o.logType ? 3 : 4)  // app-st-compactmessage, 1,400,148
+    ```
+
+    `"alert"` is SINGULAR and the log types are `alerts`, `chat` and `pc`. That is not read off one
+    site and assumed: every `logType` literal in the bundle was enumerated — 32 `alerts`, 23 `chat`,
+    3 `pc`, and exactly 2 `alert`, which are these two comparisons and nothing else. So the term is
+    dead in both, and `"pc" != o.logType` — which IS live — never applies to this component, because
+    a private message renders through `CompactMessageRow`. Upstream's gate is therefore `msg.isA`,
+    in both renderers, for everything this file draws.
+
+    The box class says the same thing with no term at all: `ct(30, o6, e.msg.isA)` at byte 1,334,988
+    and `ct(27, o6, e.msg.isA)` at 1,343,627, where `o6 = t => ({"msg-box-adm": t})`. A gate written
+    twice, once with a dead condition and once without, is the reference telling you which one it
+    meant.
+
+    **WHAT CHANGES ON SCREEN:** an alert posted by a presenter now renders as the reversed admin
+    card — right-aligned, `msg-box-adm` — where it rendered as a member's forward card before. The
+    audit row flagged this as a candidate rather than a certainty because the captured DOM might
+    have been the better authority and could not be read in this checkout. It still cannot; the
+    enumeration above settles it from the bundle instead, and captured rows are unaffected either
+    way because `evidenceDirection` and `evidenceMessageBoxClass` still win outright.
+  */
   const reverseMessage = $derived(
-    item.evidenceDirection
-      ? item.evidenceDirection === 'reverse'
-      : kind === 'chat' && isAdminMessage
+    item.evidenceDirection ? item.evidenceDirection === 'reverse' : isAdminMessage
   );
   const messageBoxClass = $derived(
-    item.evidenceMessageBoxClass ??
-      `msg-box pb-1${kind === 'chat' && isAdminMessage ? ' msg-box-adm' : ''}`
+    item.evidenceMessageBoxClass ?? `msg-box pb-1${isAdminMessage ? ' msg-box-adm' : ''}`
   );
   const messageRowClass = $derived(
     `mr-1 d-flex ${reverseMessage ? 'flex-row-reverse' : 'flex-row'}`
@@ -240,94 +264,43 @@
   const avatarRowClass = $derived(
     `d-flex ${reverseMessage ? 'flex-row-reverse ' : ''}justify-content-center align-items-start flex-nowrap mt-1`
   );
-  /*
-    ── THE PRESENTER'S COLOURS OVERRIDE THE MESSAGE'S OWN, and that is the whole of the wiring ─────
-
-    The reference applies them by overwriting the same three assignments `msg.bkgColor` /
-    `msg.fontColor` made, in the same `ngOnInit`, four lines later (bundle byte 1,346,945). So they
-    are plugged in HERE, at the two values those assignments produce, rather than as a fourth branch
-    in `effectiveStyle` — which is what makes the full precedence fall out with no new condition:
-    `followedStyle` still wins below, `chatStyle` still loses to a message that has a background,
-    and the presenter's pair now IS that background.
-
-    `evidenceKey` excludes it for the same reason it excludes `effectiveStyle`: a captured row
-    renders the DOM that was captured, and a presenter whose hash happens to match a captured
-    sender's must not repaint the evidence.
-
-    `presenter-colors.ts` carries the four-row precedence table and the one measured divergence
-    (font size, which a message with its own background has never taken here either).
-  */
-  const senderPresenterStyle = $derived(item.evidenceKey ? undefined : presenterStyle);
-  const messageBackgroundColor = $derived(senderPresenterStyle?.bgColor ?? item.backgroundColor);
-  const messageFontColor = $derived(senderPresenterStyle?.color ?? item.fontColor);
-  const effectiveStyle = $derived(
-    item.evidenceKey
-      ? undefined
-      : (followedStyle ?? (kind === 'chat' && !messageBackgroundColor ? chatStyle : undefined))
+  /**
+   * Every inline style this row carries, resolved once by `#lib/message-styles.js`.
+   *
+   * The precedence — presenter pair, then the viewer's follow override, then the room style, and
+   * `evidenceKey` shutting all three off — was ninety lines of `$derived` here. It is one pure
+   * function now, for the reason `source-size-contract` forced the question and the reason upstream
+   * already has one: `invertTxtColorToggler(invertTxtColor, mode)` is a method, called by both
+   * renderers, and the four-row answer table in `presenter-colors.ts` had no function to point at.
+   */
+  const styles = $derived(
+    resolveMessageStyles({
+      kind,
+      presenterStyle,
+      followedStyle,
+      chatStyle,
+      backgroundColor: item.backgroundColor,
+      fontColor: item.fontColor,
+      evidenceKey: item.evidenceKey,
+      evidenceMessageBoxStyle: item.evidenceMessageBoxStyle,
+      evidenceBodyStyle: item.evidenceBodyStyle
+    })
   );
-  /*
-    THE BOX'S BACKGROUND, resolved once — and the reason it is one value is a defect it was hiding.
-
-    Two things are painted from it: the box itself, and the kebab's inversion below. They were two
-    separate expressions, and the second one read only `item.backgroundColor` — so whenever the box
-    took its background from `followedStyle` while the message ALSO carried one of its own, the
-    kebab inverted a colour that was not on screen anywhere. The comment beneath already said what
-    it should be (*"color: <box background>"*); the code did not, and nothing compared them.
-
-    Found on 2026-08-30 by the presenter-colour precedence test, which made the case common rather
-    than rare: a presenter's pair is set once and applies to every message they send, so "followed
-    user who is also a presenter with colours" is an ordinary state rather than a corner. Captured
-    rows are unaffected — they have no `effectiveStyle`, so this resolves to exactly what the old
-    expression did.
-  */
-  const resolvedBackgroundColor = $derived(effectiveStyle?.bgColor ?? messageBackgroundColor);
-  const messageBoxStyle = $derived.by(() => {
-    if (item.evidenceMessageBoxStyle !== undefined) {
-      return item.evidenceMessageBoxStyle ?? undefined;
-    }
-    return resolvedBackgroundColor
-      ? `background-color: ${resolvedBackgroundColor};`
-      : undefined;
-  });
-  // The only inline style the captured DOM ever puts on `.msgMenu` is this background inversion:
-  // app-room/complete.html has 13 kebab anchors carrying `color: <box background>; filter:
-  // invert(1);` and 5 carrying no style attribute at all - never a font size. The captured
-  // stylesheet pins `app-st-message .msgMenu` at 20px, so feeding the follow/global chat font
-  // size into that anchor shrank the kebab on newly posted messages while captured ones (which
-  // have no effectiveStyle) stayed at 20px.
-  const backgroundInversionStyle = $derived(
-    resolvedBackgroundColor
-      ? `color: ${resolvedBackgroundColor}; filter: invert(1);`
-      : undefined
+  const messageBoxStyle = $derived(styles.box);
+  const backgroundInversionStyle = $derived(styles.backgroundInversion);
+  const usernameStyle = $derived(styles.username);
+  const dateStyle = $derived(styles.date);
+  const bodyStyle = $derived(styles.body);
+  /**
+   * RM-21 — the ticker's colour, which is `parseStock`'s own and not the body's.
+   *
+   * `tickerColorStyle` lives beside the pass that emits the span. `evidenceKey` is applied HERE
+   * rather than inside it, because "this row is captured DOM, do not repaint it" is a fact about
+   * this component's evidence props and not about the reference's pipe.
+   */
+  const stockStyle = $derived(
+    item.evidenceKey ? undefined : tickerColorStyle({ kind, chatStyle, followedStyle })
   );
-  const invertedTextStyle = $derived(
-    effectiveStyle
-      ? `color: ${effectiveStyle.usernameColor}; font-size: ${effectiveStyle.fontSize}px;`
-      : backgroundInversionStyle
-  );
-  const usernameStyle = $derived.by(() => {
-    if (effectiveStyle) {
-      return `color: ${effectiveStyle.usernameColor}; font-size: ${effectiveStyle.fontSize + 1}px;`;
-    }
-    return invertedTextStyle;
-  });
-  const dateStyle = $derived.by(() => {
-    if (effectiveStyle) {
-      return `color: ${effectiveStyle.usernameColor}; font-size: ${effectiveStyle.fontSize - 2}px;`;
-    }
-    return invertedTextStyle;
-  });
-  const bodyStyle = $derived.by(() => {
-    if (item.evidenceBodyStyle !== undefined) return item.evidenceBodyStyle ?? undefined;
-    const color = effectiveStyle?.color ?? messageFontColor;
-    const fontSize = effectiveStyle?.fontSize;
-    return (
-      [color ? `color: ${color};` : '', fontSize ? `font-size: ${fontSize}px;` : '']
-        .filter(Boolean)
-        .join(' ') || undefined
-    );
-  });
-  const stockStyle = $derived(effectiveStyle ? `color: ${effectiveStyle.tickerColor};` : undefined);
   /*
     The shared rule, not a second copy. This was `item.body.includes('@' + currentUserName)` —
     case-sensitive, no trailing space and blind to `@all`, so `@Bob` never highlighted for bob,
@@ -381,164 +354,26 @@
       : []
   );
 
-  /**
-   * The URL pattern from the capture's `parseLinks` pipe, verbatim:
-   *
-   * ```js
-   * e.replace(/((http|https|ftp):\/\/[\w?=&.@\/-;#~%-]+(?![\w\s?&.@\/;#~%"=-]*>))/gi,
-   *           r => this.urlwrapImg(r, i, o, s))
-   * ```
-   *
-   * `\/-;` inside the class is a RANGE - `/` (0x2F) through `;` (0x3B) - so it also admits digits
-   * and `:`. Copied as written rather than "tidied", because narrowing it would stop matching URLs
-   * the real room links today.
-   */
-  /*
-    The name is the reason: this is the reference's own linkifier, reproduced character for
-    character. Its `\/` escapes inside the character classes are redundant to a regex engine, and
-    tidying them would make this no longer a transcription — including the `\/-;` run, which a
-    reader should notice is a RANGE from `/` to `;` rather than three literals. That is upstream's,
-    and it is reproduced rather than corrected.
-  */
-  // eslint-disable-next-line no-useless-escape
-  const CAPTURED_URL = /((http|https|ftp):\/\/[\w?=&.@\/-;#~%-]+(?![\w\s?&.@\/;#~%"=-]*>))/gi;
+
 
   /**
-   * Which muted gifs this viewer has clicked open, keyed by the segment's URL.
+   * The three body passes, from `#lib/message-body-segments.js`.
    *
-   * Upstream this is DOM state: `showChatGif(id)` looks the placeholder up with jQuery and toggles
-   * `d-none` on its next sibling (`deployed-index.html`). Held as component state here instead,
-   * because the captured function depends on `el.next()` being the image — a structural assumption
-   * that breaks the moment anything is inserted between them.
-   *
-   * Keyed by URL rather than by the `gif_${id}` the reference builds: that id is derived from the
-   * MESSAGE, so a message containing two gifs would give both the same id upstream. The id is still
-   * rendered for fidelity, but nothing here resolves anything through it.
+   * They were 200 lines of this component until `source-size-contract` refused the file, and the
+   * seam is the reference's own: upstream they are PIPES — `parseSymbols`, `parseLinks`,
+   * `parseStock` — pure transforms of one string that every body-rendering template shares. The
+   * context object is what they read besides the string.
    */
-  let revealedGifs = $state.raw<Record<string, boolean>>({});
-
-  /** `!i && -1 !== r.indexOf('.gif')` — the muting applies to gifs only, case-insensitively. */
-  function isMutedGif(url: string) {
-    return !chatGif && url.toLowerCase().includes('.gif');
-  }
-
-  /** `urlwrapImg` renders these inline instead of as an anchor. */
-  const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.jfif'];
-
-  type BodySegment = {
-    kind: 'text' | 'stock' | 'link' | 'image' | 'label' | 'trade';
-    text: string;
-    url?: string;
-    label?: AlertLabel;
-    /**
-     * `trade` only — the element id `doTradeCopy` looks up, `id_<messageId>` for the first order.
-     *
-     * The order's own text lives in `children`, not in `text`, because the reference leaves the
-     * span's CONTENT to the later pipes: a `$TICKER` inside an order is still coloured. So a trade
-     * segment wraps segments rather than carrying a string.
-     */
-    tradeId?: string;
-    children?: BodySegment[];
-  };
-
-  /**
-   * Splits a message body into tickers, links, inline images and plain text.
-   *
-   * Links were not parsed at all - a pasted URL rendered as dead text. The capture wraps each one
-   * as `<a href target="_blank" class="linkColor" onclick="event.stopPropagation()">`; the
-   * `stopPropagation` matters because the message row itself is clickable, so without it opening a
-   * link would also fire the row's own handler.
-   *
-   * Built as segments rather than an HTML string. The capture pipes through
-   * `bypassSecurityTrustHtml` and leans on DOMPurify to make that safe; emitting real elements
-   * means the message text can never be parsed as markup in the first place, and the rendered DOM
-   * is the same.
-   *
-   * ## Alert Labels, then tickers and links — and that ORDER is the capture's, not a preference
-   *
-   * `parseSymbols` (bundle byte 1,326,855) substitutes its labels into the string FIRST and only
-   * then hands the result to `parseStock`, so the `$` pass only ever sees text the label pass has
-   * already rewritten. Running them the other way round would let a ticker match inside a label.
-   *
-   * `"alerts" === i` in that transform is the whole reason `kind` is consulted here: the same pipe
-   * runs over the chat log and substitutes nothing there, so a `#DayTrade` typed in chat stays
-   * literal text. Passing the labels in unconditionally and filtering at the badge would have been
-   * the easy mistake.
-   */
-  function parseBodySegments(value: string): BodySegment[] {
-    /*
-      TRADE ORDERS FIRST, and the order of these passes is the capture's.
-
-      `filterChatMessages` rewrites `[{( … )}]` into a span BEFORE the message reaches the renderer,
-      so `parseSymbols` and `parseStock` run over the already-wrapped string and colour tickers
-      INSIDE an order. Splitting orders last would put a `$TICKER` and an order in competition for
-      the same characters.
-
-      `kind === 'alert'` is part of the reference's gate (`"alerts" === i`), not an optimisation: a
-      `[{( … )}]` typed into chat stays literal, exactly as a `#label` does.
-    */
-    const pieces =
-      copyTrades && kind === 'alert'
-        ? splitTradeOrders(value)
-        : [{ kind: 'text' as const, text: value }];
-
-    return pieces.flatMap<BodySegment>((piece, index) =>
-      piece.kind === 'trade'
-        ? [
-            {
-              kind: 'trade',
-              text: piece.text,
-              tradeId: tradeOrderId(item.id, index),
-              children: parseLabelsTickersAndLinks(piece.text)
-            }
-          ]
-        : parseLabelsTickersAndLinks(piece.text)
-    );
-  }
-
-  function parseLabelsTickersAndLinks(value: string): BodySegment[] {
-    const labelled =
-      kind === 'alert' && alertLabels.length > 0
-        ? splitAlertLabels(value, alertLabels)
-        : [{ kind: 'text' as const, text: value }];
-
-    return labelled.flatMap<BodySegment>((piece) =>
-      piece.kind === 'label'
-        ? [{ kind: 'label', text: piece.text, label: piece.label }]
-        : parseTickersAndLinks(piece.text)
-    );
-  }
-
-  function parseTickersAndLinks(value: string): BodySegment[] {
-    const segments: BodySegment[] = [];
-
-    for (const chunk of value.split(/(\s*\$[A-Za-z_?]+\b)/g).filter(Boolean)) {
-      if (/^\s*\$[A-Za-z_?]+\b$/.test(chunk)) {
-        segments.push({ kind: 'stock', text: chunk });
-        continue;
-      }
-
-      let cursor = 0;
-      for (const match of chunk.matchAll(CAPTURED_URL)) {
-        const at = match.index ?? 0;
-        if (at > cursor) segments.push({ kind: 'text', text: chunk.slice(cursor, at) });
-        const url = match[0];
-        const lower = url.toLowerCase();
-        segments.push({
-          kind: IMAGE_EXTENSIONS.some((extension) => lower.includes(extension)) ? 'image' : 'link',
-          text: url,
-          url
-        });
-        cursor = at + url.length;
-      }
-      if (cursor < chunk.length) segments.push({ kind: 'text', text: chunk.slice(cursor) });
-    }
-
-    return segments;
-  }
-
-  const stockSegments = $derived(parseBodySegments(item.body));
-  const replyStockSegments = $derived(item.replyToBody ? parseBodySegments(item.replyToBody) : []);
+  const segmentContext = $derived({
+    kind,
+    messageId: item.id,
+    alertLabels,
+    copyTrades
+  });
+  const stockSegments = $derived(parseBodySegments(item.body, segmentContext));
+  const replyStockSegments = $derived(
+    item.replyToBody ? parseBodySegments(item.replyToBody, segmentContext) : []
+  );
 
   /*
     The three formatters live in `#lib/message-formatters.js` and are built ONCE for the page.
@@ -586,98 +421,6 @@
     };
   }
 </script>
-
-{#snippet bodySegments(segments: BodySegment[])}
-  <!--
-    UNKEYED, deliberately, and that is a correction rather than an omission.
-
-    This was `(index)`, which Svelte's best-practices page names outright: *"The key MUST uniquely
-    identify the object. Do not use the index as a key."* The reason it is wrong here is subtler than
-    the reason it is usually wrong — an index key and no key at all produce IDENTICAL reuse, so this
-    was never a bug. It was a false signal: it reads as a guarantee of identity across updates, and
-    there is none to give.
-
-    A segment has no identity. `segments` is parsed from one message body and replaced wholesale
-    whenever that body changes; a segment never moves from one position to another while surviving.
-    Writing no key says exactly that, and the next person is not told a promise that cannot be kept.
-
-    ON THE DISABLE BELOW: `eslint-plugin-svelte`'s `require-each-key` wants a key on EVERY block, and
-    here it and the official docs genuinely disagree. The plugin is a heuristic that cannot express
-    "this list has no identity"; the docs' rule is the specific one and it forbids the only key
-    available. The docs win, and the reason is written down rather than the rule silently satisfied
-    with `(index)` again.
-
-    The justification is in THIS comment and not on the disable line, because an eslint justification
-    uses a double hyphen and a double hyphen inside an HTML comment is illegal — that exact mistake
-    shipped once here and was silently unrecognised.
-  -->
-  <!-- eslint-disable-next-line svelte/require-each-key -->
-  {#each segments as segment}
-    {#if segment.kind === 'trade'}<!--
-        `<span class="tradeColor" id="id_<messageId>">` — the element `doTradeCopy` looks up by id
-        and `copyTradeOnClick` compares against. `stopPropagation` is the reference's own: the
-        message row is itself clickable, so without it copying an order would also fire the row.
-
-        A BUTTON in a span's clothing. Upstream binds the click to the span and checks `tagName`
-        inside the handler; a span is not focusable and not reachable by keyboard, so this carries
-        the role and the key handler that make it a control. The class and the id are unchanged,
-        because both are what the captured stylesheet and the captured handler select on.
-
-        RM-24 — `title="Copy order"` was OURS and is gone. The reference's span is
-        `'<span class="tradeColor" id="id_' + o._id + '">'` (byte 1,414,920) and carries no title, so
-        a member hovering an order in the original sees nothing. A tooltip nobody wrote is a
-        behaviour nobody can check against the capture.
-
-        `aria-label` takes its place rather than nothing at all, and the two are not the same thing:
-        `title` shows a tooltip to everyone, `aria-label` names the control for a screen reader and
-        is invisible. This span is `role="button"` — ours, because the capture puts a click handler
-        on a bare span — and a button whose only content is the order text needs a name that says
-        what activating it does.
-      --><span
-        class="tradeColor"
-        id={segment.tradeId}
-        role="button"
-        tabindex="0"
-        aria-label="Copy this order"
-        onclick={(event) => {
-          event.stopPropagation();
-          runAction('copy-trade', { text: segment.text });
-        }}
-        onkeydown={(event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return;
-          event.preventDefault();
-          event.stopPropagation();
-          runAction('copy-trade', { text: segment.text });
-        }}>{@render bodySegments(segment.children ?? [])}</span
-      >{:else if segment.kind === 'label' && segment.label}<span
-        class={ALERT_LABEL_BADGE_CLASS}
-        style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
-      >{:else if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}
-        >{segment.text}</span
-      >{:else if segment.kind === 'link' && segment.url}<a
-        href={segment.url}
-        target="_blank"
-        rel="noreferrer"
-        class="linkColor"
-        onclick={(event) => event.stopPropagation()}>{segment.text}</a
-      >{:else if segment.kind === 'image' && segment.url}{#if isMutedGif(segment.url)}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events --><div
-        class="chat-gif-muted"
-        id="gif_{item.id}"
-        onclick={() =>
-          (revealedGifs = { ...revealedGifs, [segment.url!]: !revealedGifs[segment.url!] })}
-      >
-        {revealedGifs[segment.url] ? 'click to hide' : 'gif muted, click to show'}
-      </div>{/if}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events --><div
-        class={['img-container', { 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }]}
-        onclick={(event) => runAction('image', event)}
-      >
-        <!-- svelte-ignore a11y_missing_attribute -->
-        <img class="uploaded-img" src={segment.url} /><br
-          {...{ clear: 'both' } as Record<string, string>}
-        />
-      </div>{:else}{segment.text}{/if}
-  {/each}
-{/snippet}
 
 
 <!--
@@ -733,10 +476,28 @@
     -->
     <div class={reverseMessage ? 'msg-box msg-box-adm' : 'msg-box'} style={messageBoxStyle}>
       <div class={reverseMessage ? 'w-100 h-100 d-flex flex-row-reverse' : 'w-100 h-100 d-inline-block'}>
+        <!--
+          ── RM-11 — `presenterMsgsOnTheRight` PAINTS FOUR NODES HERE, and we had one of them wrong ─
+
+          The compact ADMIN template binds a different lambda at each of four nodes, and the member
+          template binds none of them — which is why every one of these carries `reverseMessage`:
+
+          | node | const | lambda | class |
+          | --- | --- | --- | --- |
+          | this row | 8 | `g1e` (1,366,633) | `flex-row-reverse` |
+          | the body wrapper | 23 | `_1e` (1,366,665) | `w-100` when there is a reply and the setting is OFF; `flex-fill` when it is on |
+          | the plain body | 25 | `b1e` (1,366,704) | `presenter-msg-right flex-fill` |
+          | the reactions strip | 26 | `y1e` (1,366,866) | `presenter-reactions-right` — RM-12 |
+
+          This node had `presenter-msg-right`, which is a REAL class from the same component and the
+          wrong one for this node: it sets `text-align`/`margin`, so the row's children kept their
+          source order and the setting did nothing a presenter could see. `flex-row-reverse` is the
+          one that mirrors them, and it is what `g1e` binds.
+        -->
         <div
           class={[
             'w-100 d-inline-flex align-items-center',
-            { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }
+            { 'flex-row-reverse': reverseMessage && presenterMessagesOnTheRight }
           ]}
         >
           {#if showMenu}
@@ -834,10 +595,24 @@
             </span>
           {:else}
             <!--
-              THE STAMP IS BRACKETED HERE and it is not in the regular renderer: ` [{h:mm a}] `
-              against the card's bare `hh:mm a`. Both are the capture's own — `Ct(29,27,e.msg.t,
-              "h:mm a")` wrapped in the literal brackets, versus `"hh:mm a"` unbracketed on the card
-              — so the two formats differ by a leading zero as well as by the brackets.
+              THE STAMP IS BRACKETED HERE and it is not in the regular renderer: `[h:mm a]` against
+              the card's bare `hh:mm a`. Both are the capture's own — `Ct(29,27,e.msg.t,"h:mm a")`
+              wrapped in the literal brackets, versus `"hh:mm a"` unbracketed on the card — so the
+              two formats differ by a leading zero as well as by the brackets.
+
+              RM-10 — AND THE TWO COMPACT ROWS DO NOT BRACKET IT THE SAME WAY. The admin row pads
+              it and the member row does not:
+
+              ```js
+              Ne(" [", Ct(29, 27, e.msg.t, "h:mm a"), "] ")   // z1e,  admin,  byte 1,374,160
+              Ne("[",  Ct(3,  6,  e.msg.t, "h:mm a"), "]")    // a_e,  member, byte 1,377,804
+              ```
+
+              Ours emitted the member form for both, so an admin's compact stamp sat flush against
+              the username on one side and the badges on the other. The two literals are written as
+              EXPRESSIONS rather than as template whitespace on purpose: Svelte normalises runs of
+              whitespace around a text node, so ` [` typed into the markup is not reliably ` [`,
+              and a divergence of exactly one space is the kind nothing here would ever catch.
             -->
             <span
               {...{ placement: 'top' } as Record<string, string>}
@@ -846,9 +621,9 @@
                 ? 'created-at ml-1 nowrap d-inline-block float-right align-baseline'
                 : 'created-at d-inline-block align-baseline'}
               style={dateStyle}
+            >{reverseMessage ? ' [' : '['}{item.evidenceTimestampText ??
+                compactTimeFormatter.format(item.createdAt)}{reverseMessage ? '] ' : ']'}</span
             >
-              [{item.evidenceTimestampText ?? compactTimeFormatter.format(item.createdAt)}]
-            </span>
           {/if}
           {#if visibleBadges.length > 0}
             <div
@@ -886,9 +661,22 @@
             </span>
           {/if}
           <div
-            class={reverseMessage
-              ? 'd-inline-flex msg-left preText ml-2 float-right align-baseline'
-              : 'd-inline-flex msg-left preText align-baseline'}
+            class={[
+              reverseMessage
+                ? 'd-inline-flex msg-left preText ml-2 float-right align-baseline'
+                : 'd-inline-flex msg-left preText align-baseline',
+              {
+                /*
+                  `_1e = (t, n) => ({ "w-100": t, "flex-fill": n })`, bound at byte 1,374,249 as
+                  `Kn(32, _1e, msg.repl && !presenterMsgsOnTheRight, presenterMsgsOnTheRight)`.
+                  The two terms are mutually exclusive by construction and are still written as the
+                  reference writes them, because the first also requires a REPLY: a plain message
+                  with the setting off gets neither.
+                */
+                'w-100': reverseMessage && Boolean(item.replyToBody) && !presenterMessagesOnTheRight,
+                'flex-fill': reverseMessage && presenterMessagesOnTheRight
+              }
+            ]}
           >
             <!--
               RM-14 — `function Age(t,n){1&t&&(d(0,"div",27),v(1,"\u2705"),u())}` at byte 1,331,360,
@@ -903,24 +691,92 @@
               <div class="ms-1 private-reply">✅</div>
             {/if}
             {#if item.replyToBody}
-              <div class="ms-1 private-reply">
-                <strong>{item.replyToName}</strong>
-                <div class="private-reply-message">{@render bodySegments(replyStockSegments)}</div>
-                <div>{@render bodySegments(stockSegments)}</div>
+              <!--
+                ── RM-25 — THE COMPACT REPLY BLOCK WAS THE ANSWERED TICK'S MARKUP ────────────────
+
+                This wore `ms-1 private-reply` — compact const 24, which is the TICK's const
+                (`h_e`/`L1e` render `<div class="ms-1 private-reply">✅</div>` and nothing else with
+                it). The compact reply block is a different shape entirely. `U1e` at byte 1,370,300,
+                admin, and `f_e` at 1,378,850, member:
+
+                ```js
+                d(0,"div",43)(1,"div",44)(2,"strong",45), v(3), u(),   // <div43><div44><strong45>
+                T(4,"div",46), u(),                                     //   <div46/> </div44>
+                T(7,"div",47), u()                                      //   <div47/> </div43>
+                ```
+
+                const 43 `msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100` (+ `v1e`, admin
+                only) · const 76 the same list with no ngClass (member) · const 44
+                `private-reply-message w-100` + the theme background · const 45 `d-block username` ·
+                const 46 the quoted body, which is the only node here that carries the mention and
+                question colours · const 47 the sender's OWN text, a direct child of the outer div
+                with no class and no style at all.
+
+                Ours nested them the other way round — `private-reply-message` as a SIBLING of the
+                name rather than the box that wraps it — so the quoted block had no background, the
+                name had no `username` treatment, and neither body carried a colour. `w-100` was
+                missing from the box, which is what makes it fill the row.
+
+                THE STYLES ARE NOT ALL THE BODY'S, and the binding order says which is which: div43
+                and strong45 both take `invertTxtColorToggler(invertTxtColor, "name")` — the NAME
+                inversion, which is `usernameStyle` here and is what the card already puts on this
+                same `d-block username` node — while only div46 takes `styleF`. div47 takes neither,
+                so the sender's own line inherits, and that is the reference's own asymmetry.
+              -->
+              <div
+                class={[
+                  'msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100',
+                  { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }
+                ]}
+                style={usernameStyle}
+              >
+                <div
+                  class={[
+                    'private-reply-message w-100',
+                    {
+                      'private-reply-bg-light': theme === 'light',
+                      'private-reply-bg-dark': theme === 'dark'
+                    }
+                  ]}
+                >
+                  <strong class="d-block username" style={usernameStyle}>
+                    {item.replyToName}
+                  </strong>
+                  <div class={bodyColorClasses.trim() || undefined} style={bodyStyle}>
+                    <MessageBody segments={replyStockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
+                  </div>
+                </div>
+                <div><MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} /></div>
               </div>
             {:else}
               <div
                 class={(reverseMessage
                   ? 'msg-left preText ml-2 d-inline-block float-right align-baseline'
-                  : 'msg-left preText d-inline-block align-baseline') + bodyColorClasses}
+                  : 'msg-left preText d-inline-block align-baseline') +
+                  bodyColorClasses +
+                  (reverseMessage && presenterMessagesOnTheRight
+                    ? ' presenter-msg-right flex-fill'
+                    : '')}
                 style={bodyStyle}
               >
-                {@render bodySegments(stockSegments)}
+                <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
               </div>
             {/if}
           </div>
           {#if menuAllows.reaction && reactions.length > 0}
-            <span class="reactions-container" style={bodyStyle}>
+            <!--
+              RM-12 — `$1e` (byte 1,371,909) binds `y1e = t => ({"presenter-reactions-right": t})`
+              to compact const 26 `[1,"reactions-container",3,"ngClass","ngStyle"]`; the member
+              container is const 65 and has ngStyle alone. Without it a presenter's compact
+              reactions stayed left while every other part of their row moved right.
+            -->
+            <span
+              class={[
+                'reactions-container',
+                { 'presenter-reactions-right': reverseMessage && presenterMessagesOnTheRight }
+              ]}
+              style={bodyStyle}
+            >
               {#each reactions as [reactionKey, reaction] (reactionKey)}
                 {#if reaction.clickedBy.length > 0}
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -1110,10 +966,10 @@
                       {item.replyToName}
                     </strong>
                     <div class={messageBodyClass} style={bodyStyle}>
-                      {@render bodySegments(replyStockSegments)}
+                      <MessageBody segments={replyStockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
                     </div>
                     <div class={messageBodyClass} style={bodyStyle}>
-                      {@render bodySegments(stockSegments)}
+                      <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
                     </div>
                   </div>
                 </div>
@@ -1167,7 +1023,7 @@
                     -->
                     <span {@attach safeChatHtml(item.bodyHtml)}></span>
                   {:else}
-                    {@render bodySegments(stockSegments)}
+                    <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
                     {#if kind === 'alert' && item.targetUrl}
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_static_element_interactions -->

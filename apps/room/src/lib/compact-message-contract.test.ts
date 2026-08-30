@@ -29,6 +29,8 @@ import { codeOf } from './source-comments.js';
 const read = (path: string) => codeOf(path, readFileSync(new URL(path, import.meta.url), 'utf8'));
 
 const MESSAGE = read('./components/RoomMessage.svelte');
+/* The six segment kinds became `MessageBody.svelte` when `source-size-contract` refused the file. */
+const BODY = read('./components/MessageBody.svelte');
 const ACTIONS = read('./room/message-actions.svelte.ts');
 const COMPACT_CSS = readFileSync(new URL('./styles/compact-message.css', import.meta.url), 'utf8');
 const CARD_CSS = readFileSync(
@@ -146,7 +148,7 @@ describe('RM-02 — the compact ALERTS row', () => {
     /* Angular's `short` is `M/d/yy, h:mm a`, which is what `alertDateFormatter` produces. */
     expect(COMPACT).toContain('alertDateFormatter.format(item.createdAt)');
     /* And the bracketed chat time survives, on the other branch. */
-    expect(COMPACT).toContain('compactTimeFormatter.format(item.createdAt)}]');
+    expect(COMPACT).toContain('compactTimeFormatter.format(item.createdAt)}');
   });
 
   it('offers the Ask-a-question button, with the unread marker', () => {
@@ -173,7 +175,7 @@ describe('RM-03 and RM-07 — the colours', () => {
       that says a message is addressed to you.
     */
     expect(MESSAGE).toContain('const bodyColorClasses = $derived(');
-    expect(COMPACT).toContain('+ bodyColorClasses');
+    expect(COMPACT).toContain('bodyColorClasses +');
   });
 
   it('does not gate questionColor on the chat log', () => {
@@ -226,8 +228,8 @@ describe('the three that were ours', () => {
       `aria-label` names the control for a screen reader and is invisible. The span is
       `role="button"` here because the capture puts a click handler on a bare span.
     */
-    expect(MESSAGE).not.toContain('title="Copy order"');
-    expect(MESSAGE).toContain('aria-label="Copy this order"');
+    expect(BODY).not.toContain('title="Copy order"');
+    expect(BODY).toContain('aria-label="Copy this order"');
   });
 
   it('RM-19 — the copy does not mutate the message, and says why', () => {

@@ -256,10 +256,15 @@ describe('the compact renderer', () => {
 
   it('brackets its timestamp, which the card does not', () => {
     /*
-      ` [{h:mm a}] ` against the card's bare `hh:mm a` — both the capture's own, and they differ by a
+      `[{h:mm a}]` against the card's bare `hh:mm a` — both the capture's own, and they differ by a
       leading zero as well as by the brackets. `compactTimeFormatter` is the second formatter.
+
+      The brackets are EXPRESSIONS since RM-10, because the admin row pads them and the member row
+      does not; `compact-mirror-contract.test.ts` renders both and asserts the exact runs.
     */
-    expect(code).toContain('compactTimeFormatter.format(item.createdAt)}]');
+    expect(code).toContain('compactTimeFormatter.format(item.createdAt)');
+    expect(code).toContain("reverseMessage ? ' [' : '['");
+    expect(code).toContain("reverseMessage ? '] ' : ']'");
   });
 
   it('keeps the trial, new and stars marks on the MEMBER row only', () => {

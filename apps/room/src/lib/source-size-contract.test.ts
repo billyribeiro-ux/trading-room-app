@@ -1361,6 +1361,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
+    file: 'lib/components/MessageBody.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      One parsed message body: the six segment kinds — trade order, alert label, ticker, link, inline
+      image and plain text — and the revealed-gif map that belongs to them. It was a `{#snippet}` on
+      `RoomMessage.svelte` with six call sites, and THAT file's entry named it as the next seam three
+      separate times before this took it.
+
+      It renders ITSELF for a trade order, because a trade segment wraps segments rather than
+      carrying a string: upstream's `<span class="tradeColor">` is inserted before the symbol and
+      link pipes run, so a `$TICKER` inside an order is still coloured.
+
+      What to check if this number climbs. Has it started PARSING? It must not — the three passes
+      are `message-body-segments.ts` and this is handed a finished list. And has it acquired a gate?
+      Its five props are a list, a colour, a preference, an id and a callback; a sixth that is an
+      entitlement is the signal that the wrong thing crossed.
+    */
+    max: 157,
+    why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
+  },
+  {
     file: 'lib/components/MessageMenu.svelte',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
@@ -1382,8 +1404,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `msgMenu dropright float-left align-baseline` are not variations on a theme — the compact pair
       mirrors and the regular one does neither — so composing them would have invented a pattern the
       reference does not have. Twenty-two lines buys three exact strings a call site cannot add to.
+
+      293 -> 252, 2026-08-30. RM-08 added the per-variant label table, this file refused the growth,
+      and the answer was the extraction the note above missed: 55 lines of `getBoundingClientRect`,
+      `ResizeObserver` and `style.cssText` moved to `attachMenuPlacement` in
+      `message-menu-position.ts`, beside the pure function they were already calling. It is a Svelte
+      5 `{@attach}` now, so the menu element no longer needs a `bind:this` to be handed to the code
+      that positions it.
+
+      The two questions above still stand and one of them is answered: the compact and regular
+      renderers now differ in the label table as well as the trigger class, and BOTH are pinned
+      lookups keyed by the same `variant`. A THIRD such divergence is the signal to stop sharing.
     */
-    max: 293,
+    max: 253,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
   },
   {
@@ -4489,7 +4522,59 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       kinds it switches on are one concern, they take a segment list and nothing else, and they are
       already a snippet.
     */
-    max: 1270,
+    /*
+      1270 -> 1213, 2026-08-30, and it is a DROP taken while adding six more audit rows. This entry
+      has named an extraction three times without taking one; the ratchet is what finally forced it,
+      and both seams turned out to be the reference's own rather than ours.
+
+      TWO MODULES LEFT, 245 lines between them:
+
+      `message-body-segments.ts` — `parseSymbols`, `parseLinks` and `parseStock`, which upstream are
+      PIPES. That is Angular's word for exactly what they are: pure transforms of one string that
+      every body-rendering template shares. Inline here, the only way to ask what `foo$AAPL` produces
+      was to render a whole message row with a dozen props and read the markup back; RM-06 needed
+      precisely that question asked eight ways. `tickerColorStyle` (RM-21) went with them, because
+      the colour a `stockColor` span carries is resolved by `parseStock` itself.
+
+      `message-styles.ts` — `invertTxtColorToggler` and the four-source precedence above it, which
+      upstream is ONE METHOD with a mode argument, called by both renderers. Ninety lines of
+      `$derived` here meant the four-row answer table in `presenter-colors.ts` had no function to
+      point at. Two of its returns had no consumer at all and did not survive the move.
+
+      The note above was right that a component per mode is the wrong seam and is still right. The
+      seam was never the markup — it was the three PIPES and the one style METHOD that the reference
+      had already factored out and we had not.
+
+      Six rows landed in the same commit: RM-06 the ticker's word-boundary guard, RM-08 the compact
+      menu's three divergent labels, RM-10 the padded admin stamp, RM-11 the four nodes
+      `presenterMsgsOnTheRight` paints, RM-12 the compact reaction strip, RM-21 the ticker's own
+      colour precedence, plus RM-25 — the compact reply block, which was wearing the answered tick's
+      two classes.
+
+      If this climbs again: the BODY SEGMENTS renderer is still the next seam, and it is now the only
+      large one left — six segment kinds, a segment list in, markup out, already a snippet.
+    */
+    /*
+      1214 -> 1123, 2026-08-30, in the same commit: RM-05 landed (+27, and every line of it is the
+      recorded reason for a behaviour CHANGE), and the seam the paragraph above had just named was
+      taken rather than deferred a fourth time.
+
+      `MessageBody.svelte` is the segment renderer — six kinds, five props, none of them a gate. The
+      revealed-gif map went with it and is now per BODY rather than per message, which is closer to
+      the reference than the shared map was: a gif quoted in a reply and the same gif in the line
+      below it are two placeholders upstream, not one.
+
+      RM-05 is what the extraction paid for. Both renderers gate the admin/member split on
+      `"alert" != o.logType` — SINGULAR, against log types that are `alerts`, `chat` and `pc`. That
+      is settled by enumeration rather than by reading one site: every `logType` literal in the
+      bundle is 32 `alerts`, 23 `chat`, 3 `pc` and exactly 2 `alert`, which are those two dead
+      comparisons. So upstream's gate is `msg.isA`, our `kind === 'chat'` term was invented, and an
+      admin's ALERT now takes the reversed admin card as it does upstream.
+
+      Nothing large is left to extract here. What remains is one message's props, its gates, its two
+      hosts and their two class lists — which is what this component IS.
+    */
+    max: 1124,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

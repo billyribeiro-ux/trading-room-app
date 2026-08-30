@@ -33,6 +33,111 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 11:22 UTC — Seven more `RoomMessage` rows, and the three extractions the ratchet finally forced
+
+**Runtime impact: YES.** A `$TICKER` glued to a non-space character is plain text again, as it is
+upstream. Every `$TICKER` in every ALERT is coloured, which none of them were. An alert posted by a
+presenter takes the reversed admin card. In compact mode a presenter's row actually mirrors when
+`presenterMsgsOnTheRight` is on — the row, the body, the reply wrapper and the reactions strip, four
+nodes of which we painted one and painted it with the wrong class. The compact kebab says
+`Show Send Report` where the card says `Alert Send Report`. And a quoted reply in compact mode has
+its background, its username treatment and its colours, none of which it had.
+
+**Rows closed: RM-05, RM-06, RM-08, RM-10, RM-11, RM-12, RM-21 — plus RM-25, which is new.**
+
+#### RM-05 — the row's own caveat, resolved from the bundle rather than inherited
+
+Both renderers gate the admin/member split on `"alert" != o.logType`. **`"alert"` is singular and no
+log type is ever `alert`.** The audit row flagged it as *"a candidate rather than a certainty… the
+captured DOM may be the better authority and I could not check it"*. It still cannot be checked here.
+The bundle settles it anyway, by enumeration rather than by reading one site: every `logType`
+literal in it is **32 `alerts`, 23 `chat`, 3 `pc`, and exactly 2 `alert`** — and those two are these
+render gates. The compact renderer's extra clause, `"pc" != o.logType`, IS live and never reaches
+this component. And the box class states the same gate with no term at all (`ct(30, o6, e.msg.isA)`).
+A gate written twice, once with a dead condition and once without, is the reference saying which one
+it meant. `admin-direction-contract.test.ts` re-runs that enumeration against the pinned bundle at
+test time, so a future capture that renames `alerts` turns it red.
+
+#### RM-06 — and one defect deliberately not reproduced
+
+`parseStock` refuses a match that is not at index 0 and not preceded by a LITERAL space, so
+`foo$AAPL`, `($AAPL` and a tab-indented `\t$AAPL` are plain upstream. What is **not** reproduced is
+`a = e.indexOf(r)` — the first occurrence of the matched text anywhere in the body rather than this
+match's position — which makes upstream decide both matches of ` $AAPL foo $AAPL` from position 0
+and, on the second pass, substitute inside the span the first pass produced. The positional rule is
+transcribed; the aliasing is a defect whose only effect is nested markup, and the code says so where
+the next comparison will read it.
+
+#### RM-21 — the ticker's precedence is not the body's, and one gap is recorded rather than papered over
+
+On ALERTS `parseStock` does not consult the followed-user style at all and does consult a room
+style; on CHAT the room style applies whether or not the message carries a background of its own,
+because `parseStock` never reads `msg.bkgColor` while `effectiveStyle` drops to `undefined` for
+exactly that case — correctly, since that gate belongs to the BOX. **The gap:** upstream `alertStyle`
+is separately persisted (`saveAlertStyle`, byte 2,242,440); its default is byte-identical to the chat
+one (byte 980,310, the same five values as `globals.chatStyle` beside it); and this repository has no
+alert-style editor, so the two cannot differ here. The alert branch reads `chatStyle`, which IS
+upstream's behaviour for every account that has never opened that pane, and it is named as the one
+expression to change when that pane lands. A prop nothing feeds is what `unfed-props-contract` exists
+to catch.
+
+#### RM-11 is four nodes, and RM-25 was found by decoding the table rather than the row
+
+Reading RM-11's byte led to three more bindings in the same admin template — const 8 `g1e` →
+`flex-row-reverse`, const 23 `_1e` → `w-100`/`flex-fill`, const 25 `b1e` →
+`presenter-msg-right flex-fill`, const 43 `v1e` → `presenter-msg-right` — with the member template
+binding none of them, which is why one rendered member row is the negative control for all four at
+once. `presenter-msg-right` on the inner row was a real class of the same component and the wrong
+one for that node: it sets text-align and margin, so nothing moved.
+
+Decoding the whole consts table then produced **RM-25**, which no row named: the compact reply block
+wore compact const **24** — `ms-1 private-reply`, the answered TICK's const — with
+`private-reply-message` as a sibling of the name rather than the box that wraps it. It is added to
+the audit with its provenance, and deliberately **not** folded into that document's verification
+totals, which describe the two-verifier pass and should keep describing it.
+
+#### Three extractions, because the size ratchet refused the file and it was right to
+
+`RoomMessage.svelte` had named an extraction in three separate `source-size-contract` entries without
+taking one. It went **1,270 → 1,123**, and all three seams turned out to be the reference's own
+rather than ours:
+
+* **`message-body-segments.ts`** — `parseSymbols`, `parseLinks`, `parseStock`. Upstream these are
+  PIPES: pure transforms of one string that every body-rendering template shares. Inline, the only
+  way to ask what `foo$AAPL` produces was to render a message row with a dozen props and read the
+  markup back — and RM-06 needed exactly that question asked eight ways.
+* **`message-styles.ts`** — `invertTxtColorToggler` and the four-source precedence above it, which
+  upstream is ONE METHOD with a mode argument called by both renderers. The four-row answer table in
+  `presenter-colors.ts` had had no function to point at; `message-styles.test.ts` now points at it
+  row by row. Two of the returns had no consumer at all and did not survive the move.
+* **`MessageBody.svelte`** — the six segment kinds, five props, none of them a gate. It renders
+  ITSELF for a trade order, which is Svelte 5's replacement for `<svelte:self>`. The revealed-gif map
+  went with it and is now per BODY rather than per message, which is *closer* to the reference than
+  the shared map was: a gif quoted in a reply and the same gif in the line below are two placeholders
+  upstream, not one.
+
+`MessageMenu.svelte` went **293 → 252** the same way: 55 lines of `getBoundingClientRect`,
+`ResizeObserver` and `style.cssText` became `attachMenuPlacement`, a Svelte 5 `{@attach}` living
+beside the pure geometry function it was already calling. The menu element no longer needs a
+`bind:this` to be handed to the code that positions it.
+
+#### What was run
+
+`pnpm run gate` in `apps/room`, green, with the exit code echoed into the log and read from there.
+237 test files, 3,914 passed, 1 skipped. **Eleven negative controls, each seen RED after the commit
+and reverted**: the ticker's positional guard removed and its alert branch given the follow style;
+the compact row's four presenter bindings broken one at a time; the admin stamp unpadded; the compact
+menu given the card's `Alert Send Report`; the reply wrapper put back on the tick's const; RM-05's
+`kind === 'chat'` term restored; and, in `message-styles`, the room style allowed to beat the
+presenter pair and `null` conflated with `undefined` on a captured style attribute.
+Nothing was opened in a browser and no capture root is present in this checkout, so every claim above
+is from the pinned v4 bundle, the test suite and `svelte-check` — not from a rendered page.
+
+**The Svelte MCP server is still disconnected for this session.** `list-sections`,
+`get-documentation` and `svelte-autofixer` could not be called on any of the four `.svelte` files
+touched here, which `CLAUDE.md` requires. `svelte-check` is green at 1,437 files and `eslint-plugin-
+svelte` is clean, but neither is that gate and this is the eleventh entry that has had to say so.
+
 ### 2026-08-30 11:20 UTC — The compact message row got its own stylesheet, its Q&A button and three of our inventions removed
 
 **Runtime impact: YES.** Compact rows are the size the reference makes them — 14px text, a 25px

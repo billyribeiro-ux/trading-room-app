@@ -17,6 +17,47 @@ export const MESSAGE_MENU_LABEL = {
 
 export type MessageMenuLabel = (typeof MESSAGE_MENU_LABEL)[keyof typeof MESSAGE_MENU_LABEL];
 
+/**
+ * ── RM-08 — THE COMPACT RENDERER'S MENU IS NOT THE CARD'S MENU, in exactly three entries ───────
+ *
+ * `MESSAGE_MENU_LABEL` above is a LOOKUP: it matches captured DOM entries to gates, and every
+ * captured kebab in this repository came from `app-st-message`. This table is the other thing —
+ * the text each entry RENDERS — and the two renderers disagree.
+ *
+ * Every `\xa0\xa0`-prefixed label literal in the bundle was enumerated to establish that (four
+ * complete menus: the card at bytes 1,329,046-1,330,950 and 1,336,386-1,338,290, the compact admin
+ * at 1,367,382-1,369,287 and the compact member at 1,374,766-1,376,671). Nine of the twelve are
+ * identical across all four, trailing spaces included — `Mark Answered ` and `Private Chat ` carry
+ * one everywhere, `Edit` and `Copy` carry none anywhere. Three differ, and they differ the same way
+ * in both compact menus:
+ *
+ * | entry | card | compact |
+ * | --- | --- | --- |
+ * | showAll | `Show message to all` | `Show message to all ` |
+ * | report | `Alert Send Report ` | `Show Send Report ` |
+ * | reply | `Reply` | `Reply ` |
+ *
+ * `Alert Send Report` against `Show Send Report` is the one a member can see, and it had been the
+ * card's word in both renderers since `app-st-compactmessage` was built.
+ *
+ * The trailing spaces are transcribed rather than trimmed for the same reason the `\u2807 ` kebab
+ * glyph keeps its own: these strings sit next to an `<i>` inside an anchor, the anchor's padding is
+ * what positions them, and a "tidied" label is a silent one-space layout change with no way back to
+ * the evidence. `message-behavior.test.ts` pins each against the byte offset above.
+ */
+export const MESSAGE_MENU_TEXT = {
+  regular: {
+    showAll: 'Show message to all',
+    report: 'Alert Send Report ',
+    reply: 'Reply'
+  },
+  compact: {
+    showAll: 'Show message to all ',
+    report: 'Show Send Report ',
+    reply: 'Reply '
+  }
+} as const;
+
 export interface SourceMessageBehaviorInput {
   kind: MessageKind;
   viewerIsPresenter: boolean;
