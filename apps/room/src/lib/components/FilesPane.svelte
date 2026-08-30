@@ -403,10 +403,8 @@
                                   Resolved ONCE per row. The two alert-sound buttons are complements
                                   of one another, so asking twice invites the two answers to drift.
                                 -->
-              {@const alertSoundButton = alertSoundButtonFor(
-                { isPresenter },
-                data.sessData ?? {},
-                item
+              {const alertSoundButton = $derived(
+                alertSoundButtonFor({ isPresenter }, data.sessData ?? {}, item)
               )}
               {#if isPresenter}
                 <td>

@@ -427,7 +427,7 @@
       title is the empty second argument — every swing call site passes only the url, so the title
       is blank.
     -->
-    {@const previewUrl = dialog.url}
+    {const previewUrl = $derived(dialog.url)}
     <!--
       `dta-02` and `dta-03` — `size:"large"` and the ONE button this dialog has.
 

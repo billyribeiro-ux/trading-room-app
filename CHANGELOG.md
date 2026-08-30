@@ -33,6 +33,54 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 18:40 UTC — `{@const}` is legacy, and the obvious replacement is a silent staleness bug
+
+**Runtime impact: NO** — twelve template tags migrated to the syntax the official documentation now
+prescribes, with the compiler output measured to confirm the migration preserves reactivity.
+
+Svelte's own `{@const ...}` page opens with *"`{@const x = y}` is legacy syntax — use
+`{const x = $derived(y)}` instead"*, and the declaration-tags page dates the replacement to Svelte
+**5.56**. This repository is on **5.56.10**, so the old form is legacy here today rather than at some
+future upgrade.
+
+#### The measurement, which is why this is not a `sed`
+
+`{const x = y}` reads like the drop-in replacement. It is not. Compiling one block three ways and
+looking for a `$.derived` call in the output:
+
+```
+{@const d = n * 2}            ->  derived: true
+{const d = n * 2}             ->  derived: FALSE
+{const d = $derived(n * 2)}   ->  derived: true
+```
+
+A bare declaration tag is evaluated when its block is created and never again. Twelve sites migrated
+to that form would each have gone stale the moment the state behind them changed — a class of defect
+no type check, lint rule or `svelte-check` run can see, and one that shows up only as a number that
+stops moving. `ChatTabStrip`'s new unread badge, built an hour earlier, is exactly such a site.
+
+So the migration is `{@const x = y}` → `{const x = $derived(y)}`, and
+`declaration-tag-contract.test.ts` **re-runs that three-way compilation as a test** rather than
+quoting it, because the compiler is the authority and it can change.
+
+#### What moved
+
+Twelve sites across eight components: `RoomOverlays` (3), `PresenterMuteRows` (2), `NotesPane` (2),
+and one each in `ChatTabStrip`, `FilesPane`, `ModalHost`, `DayTradeAlertsPane` and `SwingAlertsPane`.
+Three tests that pinned the old string follow the code. The contract also refuses a BARE `{const}`
+anywhere, with the message saying that a deliberately non-reactive one belongs in the file as a named
+exception with its reason — there is no such site today, and that is the conversation the assertion
+exists to force rather than a rule against ever having one.
+
+The comment-stripping matters here and is why `codeOf` is used: four `.svelte` files in this room
+quote compiled reference code containing `{const e=Y();`, and a raw scan reports every one of them.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0, **254 test files, 4,212 tests, 1 skipped**. `svelte-check`
+clean at 1,467 files. Two negative controls seen red: the legacy tag put back, and one site reduced
+to a bare `{const}`. Nothing was opened in a browser.
+
 ### 2026-08-30 18:15 UTC — The chat columns: what you have not read, who you are reading, and where the second column goes
 
 **Runtime impact: YES.** Every chat channel now carries an unread count on its tab, and a presenter

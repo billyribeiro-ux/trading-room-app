@@ -889,7 +889,7 @@ describe('the alert-sound row buttons', () => {
     expect(pane).toContain("{#if alertSoundButton === 'set'}");
     expect(pane).toContain("{:else if alertSoundButton === 'remove'}");
     // ...and the one answer both branches read is computed once per row.
-    expect(pane).toContain('{@const alertSoundButton = alertSoundButtonFor(');
+    expect(pane).toContain('{const alertSoundButton = $derived(alertSoundButtonFor(');
   });
 
   it('wires both buttons to the action that PERSISTS the choice', () => {

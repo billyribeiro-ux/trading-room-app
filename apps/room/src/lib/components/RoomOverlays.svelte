@@ -770,7 +770,7 @@
     dialog whose top half is a drop zone would invite a viewer to replace the thing they just pasted.
   -->
 {#if composer.pastedImage}
-  {@const chatPastePreviewUrl = composer.pastedImage.previewUrl}
+  {const chatPastePreviewUrl = $derived(composer.pastedImage.previewUrl)}
   <BootboxDialog
     mode="confirm"
     message=""
@@ -833,7 +833,7 @@
     so a stray paste cannot silently push bytes to the upload server.
   -->
 {#if swingAlerts.imagePaste}
-  {@const pastePreviewUrl = swingAlerts.imagePaste.previewUrl}
+  {const pastePreviewUrl = $derived(swingAlerts.imagePaste.previewUrl)}
   <BootboxDialog
     mode="confirm"
     message=""
@@ -887,7 +887,7 @@
     uploading, so a stray paste cannot silently push bytes to the upload server.
   -->
 {#if dayTradeAlerts.imagePaste}
-  {@const dayTradePastePreviewUrl = dayTradeAlerts.imagePaste.previewUrl}
+  {const dayTradePastePreviewUrl = $derived(dayTradeAlerts.imagePaste.previewUrl)}
   <BootboxDialog
     mode="confirm"
     message=""

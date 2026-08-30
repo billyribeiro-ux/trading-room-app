@@ -66,7 +66,7 @@
 {#if tabs.length > 0}
   <ul role="tablist" class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs">
     {#each tabs as tab (tab)}
-      {@const counts = unreadFor(unread, tab)}
+      {const counts = $derived(unreadFor(unread, tab))}
       <li class="nav-item">
         <!-- svelte-ignore a11y_interactive_supports_focus -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->

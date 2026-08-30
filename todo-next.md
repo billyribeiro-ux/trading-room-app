@@ -91,7 +91,7 @@ guessed.
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 625 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
-| 18 | `lib/components/FilesPane.svelte` | 556 | no |
+| 18 | `lib/components/FilesPane.svelte` | 554 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | no |
 | 20 | `lib/components/notes/NotesPane.svelte` | 521 | no |
 | 21 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 33,605 lines · 3.2%.**
+**2 of 71 surfaces audited · 1,072 of 33,603 lines · 3.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -7950,39 +7950,3 @@ remaining reference dumps (`account-page`, `mising`, `must-match`, `gap-dump`, t
 are **not** claimed as gaps until a surface in `apps/room/src` needs them — that is the standard this
 section applies, and applying it is what turned an open-ended pile into a bounded list.
 
-## §20 — The `{@const}` → declaration-tag migration, recorded rather than half-done
-
-Added 2026-08-30 18:15 UTC, while building `acA-06`.
-
-The Svelte MCP's own documentation for `{@const}` now opens with:
-
-> `{@const x = y}` is legacy syntax — use `{const x = $derived(y)}` instead
-
-and the declaration-tags page dates the replacement: *"Declaration tags are available since Svelte
-5.56."* This repository is on **5.56.10**, so the new form is available today.
-
-There are **twelve `{@const}` sites across eight components**:
-
-| file | sites |
-| --- | ---: |
-| `lib/components/RoomOverlays.svelte` | 3 |
-| `lib/components/PresenterMuteRows.svelte` | 2 |
-| `lib/components/notes/NotesPane.svelte` | 2 |
-| `lib/components/ChatTabStrip.svelte` | 1 |
-| `lib/components/FilesPane.svelte` | 1 |
-| `lib/components/ModalHost.svelte` | 1 |
-| `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 1 |
-| `lib/components/swing-alerts/SwingAlertsPane.svelte` | 1 |
-
-**The one added on 2026-08-30 was written in the legacy form on purpose.** Migrating a single site
-would leave two idioms in the tree for the same job, which is the condition under which the next
-reader picks the wrong one — so this is its own piece of work, taking all twelve at once.
-
-Two things it has to get right rather than sed through:
-
-- **`{const}` is not always the answer.** The docs pair it with `{let}` and with `$derived`: a value
-  that must be REACTIVE inside the block is `{const x = $derived(...)}`, and a plain `{const x = ...}`
-  is the non-reactive one. Each site has to be read for which it is.
-- **Three contract tests pin the literal `{@const` string** — `alert-chat-area-contract.test.ts:190`,
-  `files-pane-contract.test.ts:892`, and prose in `PresenterMuteRows.test.ts:22`. They follow the
-  code; they are not relaxed.

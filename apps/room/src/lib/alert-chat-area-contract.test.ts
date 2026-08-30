@@ -189,7 +189,7 @@ describe('acA-06 — the per-tab unread badge', () => {
 
   it('reads each tab ONCE per render', () => {
     // Five calls to `unreadFor` per tab per render is what a naive transcription produces.
-    expect(strip).toContain('{@const counts = unreadFor(unread, tab)}');
+    expect(strip).toContain('{const counts = $derived(unreadFor(unread, tab))}');
   });
 
   it('states the presenter gate once, at the COUNT and not again at the badge', () => {
