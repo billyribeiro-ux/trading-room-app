@@ -2,7 +2,14 @@ import { signedOutDestination } from '#lib/server/control-plane.js';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
-import { notes, sessions, userSettings, users, type User } from '#lib/server/db/schema.js';
+import {
+  noteVersions,
+  notes,
+  sessions,
+  userSettings,
+  users,
+  type User
+} from '#lib/server/db/schema.js';
 import { actions as logoutActions } from '../routes/logout/+page.server';
 import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
@@ -180,6 +187,83 @@ describe('the six session-note commands', () => {
     // Soft delete: the row stays, `deletedAt` is set. Version history has to survive a delete.
     const row = db.select().from(notes).where(eq(notes.id, created.id)).get();
     expect(row?.deletedAt).not.toBeNull();
+  });
+
+  /*
+    `restoreNoteVersion`'S HAPPY PATH, THROUGH THE COMMAND — the second of the two remainders
+    `apps/room/TODO.md` entry 9 named for itself, closed 2026-08-30.
+
+    That entry said it plainly: *"Its 403, 400 and 404 are covered; restoring an actual version is
+    exercised by `notes-repository.test.ts` beneath it, not through the action."* Both halves were
+    still true today — the negative paths are asserted above, and the only restore that ran was the
+    repository's own, one layer down.
+
+    ## Why the layer below is not cover for this layer
+
+    `notes-repository.test.ts` proves the RESTORE: that a version's html comes back and that the
+    restore appends a new version rather than rewinding the counter. What it cannot prove is
+    anything the command adds — that the room comes from the session rather than from an argument,
+    that the caller's id is what lands in `updatedById`, and that a null from the repository becomes
+    a 404 rather than a 500 or a success. Those three are the whole job of the wrapper, and a test
+    that stops at the repository is exactly the shape entry 9 was written to warn about.
+
+    The `updatedById` assertion is the one worth keeping: the restore is performed by a DIFFERENT
+    presenter than the one who wrote the version, so a wrapper that passed the version's author
+    through instead of the caller would still return the right html and still be wrong about who
+    did it.
+  */
+  it('restores a version through the command, with the caller as the author', async () => {
+    /*
+      TWO PRESENTERS, and the second one is load-bearing twice over.
+
+      `saveNote` COALESCES: a save by the same author inside `COALESCE_WINDOW_MS` updates the latest
+      version in place rather than appending one, which is the reference's own behaviour and is why
+      two saves by one person produce ONE version. The first draft of this test asserted two and its
+      own vacuity guard caught it — *"the two saves did not produce two versions: expected 1 to be
+      greater than or equal to 2"*. A different author on the second save is what makes two.
+
+      It is also what gives the authorship assertion below any force. Restoring a version you wrote
+      yourself would pass whether the command passed the CALLER through or the version's author, so
+      the restore is done by the presenter who did not write the version being restored.
+    */
+    const other = account('notes-restorer@example.test', 'staff');
+
+    const created = await newNote('Risk rules');
+    await as(presenter, () => saveSessionNote({ noteId: created.id, contentHtml: '<p>one</p>' }));
+    await as(other, () => saveSessionNote({ noteId: created.id, contentHtml: '<p>two</p>' }));
+
+    const versions = db
+      .select({ id: noteVersions.id, version: noteVersions.version })
+      .from(noteVersions)
+      .where(eq(noteVersions.noteId, created.id))
+      .all()
+      .toSorted((left, right) => left.version - right.version);
+    /* Without this the restore below could pick nothing and every assertion after it would pass. */
+    expect(versions.length, 'the two saves did not produce two versions').toBe(2);
+
+    const restored = await as(other, () =>
+      restoreNoteVersion({ noteId: created.id, versionId: versions[0].id })
+    );
+    expect(restored.contentHtml, 'the earlier version’s html is what comes back').toBe(
+      '<p>one</p>'
+    );
+
+    /*
+      A restore APPENDS. The reference keeps history as a log rather than a pointer, so rewinding
+      the counter would lose the version being restored FROM — which is precisely the state a
+      presenter needs to get back to when they restore by mistake.
+    */
+    const after = db
+      .select({ contentHtml: noteVersions.contentHtml, updatedById: noteVersions.updatedById })
+      .from(noteVersions)
+      .where(eq(noteVersions.noteId, created.id))
+      .all();
+    expect(after.length, 'the restore appended rather than rewound').toBe(3);
+    expect(after.at(-1)?.contentHtml).toBe('<p>one</p>');
+    expect(after.at(-1)?.updatedById, 'the CALLER restored it, not the version’s author').toBe(
+      other.id
+    );
+    expect(other.id, 'the two presenters must be different accounts').not.toBe(presenter.id);
   });
 
   /*

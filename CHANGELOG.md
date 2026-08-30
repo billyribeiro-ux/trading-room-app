@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 00:20 UTC — The room register's last two remainders, and a blocker that was never true
+
+**Runtime impact: NO.** Tests and a tracker. No `src` module changed — the three source files touched
+during the negative controls are byte-identical to `HEAD`.
+
+`apps/room/TODO.md` entry 9 is the room's own register of the day a `password_hash` reached the
+browser. It closed the leak and the coverage gap, and named **two remainders rather than quietly
+skipping them**. Both are closed now, and one of them should have been closed long ago.
+
+**Remainder 1 — the captured-item branches, and a blocker that was false when it was written.**
+
+Eighteen items of the forensic capture are served to the reference room with NEGATIVE ids. They live
+in a fixture, not in `messages` or `alerts`, so a delete becomes a row in `hidden_room_items` and an
+edit becomes a column of `captured_item_overrides`. Same authorisation rules as the real rows, none
+of the same code — the shape that goes wrong quietly, and where the "deleted alert comes back for
+everyone else" defect lived.
+
+The entry said they *"need the fixture wired up"*. **The fixture needed no wiring.** It is
+`server/captured-message-fixture.json`, a tracked 23 KB JSON file that `captured-room.ts` imports
+directly, and it resolves anywhere — 18 messages, 8 alerts and 10 chats, ids `-1`…`-8` and
+`-101`…`-110`. Nothing was blocking. Re-measuring is the entire content of the fix, and it is the
+lesson `missing-settings-triage.md` already records about `altChatRender`: **a blocker is a claim,
+and it goes stale like any other.**
+
+Four assertions now cover those branches, and the fourth is the one worth having:
+
+| assertion | what it refuses |
+| --- | --- |
+| a presenter's delete records a hide **keyed to this room** | a hide keyed on evidence alone blanks the item for every tenant at once |
+| a member the capture does not attribute to → 403 | the authorship rule, which lives in different code from the real-row one |
+| an edit lands in the overrides with the same room key | the cross-room overwrite the command's own conflict target records |
+| **the same id from a room that is not the capture's → 404** | **a cross-tenant write** |
+
+Every room is served the same fixture rows, so an unscoped negative id is one room's delete landing
+on evidence another room is being shown. **Control: removing `capturedRoomItem`'s room check makes
+that delete SUCCEED from room 9999** — `promise resolved "undefined" instead of rejecting`. The 404
+rather than 403 is deliberate and is asserted as such: from a room not rendering the capture that
+item does not exist, and 403 would confirm it exists somewhere, which is an oracle over another
+tenant's content.
+
+**Two defects in the test file itself, found on the way in.** Its `vi.mock` predated this morning's
+`deleteAlertPW` door and omitted `checkAlertDeletePasswordRemotely`, so the entire delete branch
+threw before reaching any assertion. And its `beforeEach` cleared three tables but not these two, so
+the first hide survived into the next test and made a refusal look like a write. A `beforeEach` that
+lists SOME of the tables a file writes is worse than one that lists none, because it reads as
+complete — that reasoning is now at the code.
+
+**Remainder 2 — `restoreNoteVersion`'s happy path, through the command rather than beneath it.**
+
+Its 403, 400 and 404 were covered; the actual restore was only exercised by the repository test one
+layer down. That layer proves the restore. What it cannot prove is anything the wrapper adds: that
+the room comes from the SESSION and never from an argument, that the caller's id lands in
+`updatedById`, and that a null becomes a 404 rather than a 500 or a success. Those three are the
+whole job of the wrapper.
+
+The restore is performed by a **different presenter** from the one who wrote the version, and that is
+load-bearing: restoring your own version would pass whether the command passed the caller through or
+the version's author. Controls: crediting a fixed user id → *"the CALLER restored it, not the
+version's author: expected 1 to be 3"*; reusing the latest version number instead of appending →
+red on the append assertion.
+
+`saveNote` **coalesces** a same-author save inside its window, so two saves by one person produce ONE
+version. The first draft of this test asserted two, and its own vacuity guard caught it — *"the two
+saves did not produce two versions: expected 1 to be greater than or equal to 2"*. A second author is
+what makes two, and it is the same second author the authorship assertion needs.
+
+**One reframing recorded rather than left to be re-derived.** Entry 9 is written throughout about
+"the 20 actions". They are not actions any more — all twenty became remote functions during
+2026-08-30 and `+page.server.ts` exports none, with a contract asserting the empty set. The coverage
+survived because each test was rewritten onto `callRemote` rather than re-pointed as text.
+
+**Verified:** the four affected suites — `message-action-contract` (33), `notes-account-action-contract`
+(21), `notes-repository`, and `naming-boundary` in both apps, which reads this document. Five negative
+controls, each mutation verified as landed, each seen RED, each restored by file copy rather than by
+git, because three sub-agents share this working tree. **Not run:** the full gate, for that same
+reason.
+
 ### 2026-08-30 23:45 UTC — Every remaining blocker re-measured against the bundle, and one citation was wrong
 
 **Runtime impact: NO.** `TODO.md` only.
