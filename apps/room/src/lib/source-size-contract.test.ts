@@ -1278,8 +1278,43 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       with the style object bound and three inline handlers lifted to callbacks - so the extraction
       cannot have changed what the panel renders, and the browser suite is the check that it did not.
     */
-    max: 152,
+    /*
+      152 -> 171, 2026-08-30, UIM-16. Nineteen lines for a ONE-WORD change — `class="fw-bold"` on the
+      preview's `<strong>`, const 120 of the user-info modal's table.
+
+      The comment is eighteen of the nineteen and it is not padding: `fw-bold` on a `<strong>` looks
+      like a tautology, and a future reader deleting it as redundant would be making the same
+      judgement the original author of the bare tag made. What it records is why the reference put a
+      utility class on an already-bold element — Bootstrap's `font-weight: 700 !important` beats the
+      browser's `bolder` and survives a stylesheet that flattens typography — and that this preview's
+      whole job is to show a presenter what the real thing will look like.
+
+      Nothing to extract: this file IS the extraction, and one attribute does not warrant a second.
+    */
+    max: 171,
     why: 'the follow-chat colour and size editor - five inputs, a live example, three callbacks'
+  },
+  {
+    file: 'lib/components/AlertSendReportModal.svelte',
+    /*
+      The Alert Sent Report modal, lifted out of `ModalHost.svelte` on 2026-08-30 when RPT-01
+      through RPT-08 were dispositioned.
+
+      **It is ninety percent argument and ten percent markup, and that ratio is the reason it is a
+      file.** Six of upstream's controls for this surface — the fetch, the per-status rows, the
+      search box, the status select, the flot pie and the token dialog — all rest on a list of
+      per-recipient DELIVERY RECORDS. This product has none: 24 tables and not one records a
+      delivery, `alerts.dispatch` is five booleans naming which channels were requested rather than
+      what happened, no mail transport exists in the room at all and the controller's has no alert
+      caller, and `getAlertReport` has no server half anywhere in `apps/`. That measurement is what
+      the file mostly contains.
+
+      It renders one sentence. Somebody will one day decide to build the six controls, and they will
+      stand exactly here when they do — which is the whole argument for the explanation living with
+      the surface rather than in the host that opens it.
+    */
+    max: 165,
+    why: 'the alert-report modal — one honest notice, and the measurement that decided against six controls'
   },
   {
     file: 'lib/components/LogArchiveModals.svelte',
@@ -1562,7 +1597,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       day trade and swing genuinely own separate dialogs. A reader who meets one of them must not
       have to find the other to learn why it says what it says.
     */
-    max: 1056,
+    /*
+      1,056 -> 1,081, 2026-08-30, for UIM-04 and SRCH-03 — twenty-five lines, and this is exactly the
+      raise this file is happy to grant, because the alternative was a raise somewhere worse.
+
+      Fourteen of them are the `canPrivateChat` call: `canShowRosterPrivateChat(context, target)`,
+      answered HERE from the session and from the same `userActions.target` the modal is already
+      being handed. The reference's `canPM` is a five-input expression with the TARGET as one of the
+      inputs (byte 2,073,550), and `#lib/roster-private-chat.ts` has been its transcription since the
+      roster needed it. Drilling those five settings into `ModalHost` instead would have added them
+      to a props list of ninety and put a second copy of the rule in a component — which is the shape
+      the reference itself gets wrong, asking the question twice and disagreeing with itself once.
+
+      One line is `room={data.room}`, which removes two INVENTED literals from `ModalHost` — a room
+      key and a room name that appear nowhere in the 2,891,205-byte bundle. The remaining ten are the
+      import's note saying why one function now has two callers.
+
+      This is the composition root doing its job: resolve the answer where both halves of the
+      question are in scope, and hand over a boolean. Nothing to extract.
+    */
+    max: 1081,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2765,7 +2819,54 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Today's record so far: three components out (`RestreamPane`, `SessionHistoryPane`,
       `ReactionPrefsPane`, 324 lines) against a ceiling risen 147.
     */
-    max: 6482,
+    /*
+      6,482 -> 6,868, 2026-08-30, for the nine UIM rows and the eleven RPT/SRCH rows of
+      `docs/decoded/room-surface-audit-2026-08-30.md`. **+365, and it is the largest raise this entry
+      has ever taken**, so it gets the longest argument.
+
+      ## What the 365 actually is
+
+      Almost none of it is behaviour. The whole functional change across nine audit rows is about
+      forty lines: three class strings, one gate widened from one term to three, one handler that now
+      also persists, one tab rewired to a door it already had, one `{#if}` around a footer button,
+      one `catch`, one `{const}`, and two literals replaced by props. Every other line is the WHY,
+      and this repository's standard says in as many words never to shorten those to look tidy.
+
+      Four of those WHYs are long because the row was WRONG in an instructive way and the correction
+      is the useful artefact:
+
+        * UIM-08 — the audit says `user.isP` "has no counterpart in apps/room/src". It has one, and
+          the mapping was already written down in `private-chat.svelte.ts`. Recording where, so the
+          next reader does not re-derive it.
+        * UIM-06 — the reference's Admin Notes TAB does call `manageAdminNotes()`, which a comment in
+          `admin-notes.ts` had asserted it does not. The decoded template is at the code now.
+        * UIM-13 — two comments cited a byte offset 2,123 bytes away from the function they
+          transcribed. The correction has to say what IS at the wrong address or it reads as churn.
+        * UIM-11/12 — two icon values that were making each other worse, which is one explanation and
+          not two.
+
+      ## What was extracted to pay for it, and why it is a real extraction
+
+      `AlertSendReportModal.svelte` — 164 lines — takes the whole Alert Sent Report surface out.
+      That is not a slice chosen to make a number: six of the eleven RPT rows are ONE measured
+      refusal (no table in this product records a per-recipient delivery, nothing sends an alert to
+      anyone, `getAlertReport` has no server half), and the argument for it is longer than the markup
+      it governs. An argument that long about one surface is a document. This entry's own rule for
+      that situation — written five paragraphs up, on the day the page's ceiling stopped moving — is
+      "moving an explanation to the code it explains is the extraction itself".
+
+      Without it this ceiling would be 6,969 rather than 6,868.
+
+      ## The connectivity modal is still the next extraction, and it is still not this commit's
+
+      Named above, ~250 lines, four CONN rows open against it. It stays named rather than done for
+      the same reason it was last time and one more: this commit already carries twenty audit rows,
+      two contract files, a component extraction and a SHIP-STOPPER fix (a `$state` initializer
+      reading a `$derived` declared two hundred lines below it, which made the room answer 500 on
+      every render — see `state-initializer-order-contract.test.ts`). Adding a move with live media
+      state to that is how one reviewable change becomes none.
+    */
+    max: 6869,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3105,7 +3206,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lines, and `RoomNotesAccess` owning the list cost that file 56. A file at its ceiling is a file
       where the next paragraph of wiring does not belong.
     */
-    max: 83,
+    /*
+      83 -> 111, 2026-08-30, UIM-06. Twenty-eight lines, ALL of them comment, and no code changed in
+      this file at all.
+
+      What they replace is a factual claim about the reference that was false: *"clicking a tab must
+      not raise a password prompt — upstream's tab does not"*. Upstream's tab does. `J2e` at bundle
+      byte 2,059,391 gives const 56 — the Admin Notes anchor, the only one of the three with a click
+      binding — the handler `manageAdminNotes()`. The claim had never been checked against the bytes,
+      and it is the reason the notes tab in this room switched panes and did nothing else.
+
+      The correction QUOTES the old sentence rather than deleting it, which is most of the twenty-
+      eight lines. A wrong claim silently removed is a wrong claim the next reader re-derives from
+      the same plausible reasoning — and the reasoning WAS plausible: a dialog nobody asked for is
+      worse than an empty panel. The original answered that differently (it prompts only when a
+      password is configured), and saying so is what stops this being reverted.
+
+      Nothing to extract: there is no code here to move, and moving a comment out of the class it
+      describes would be the opposite of what this ratchet asks for.
+    */
+    max: 111,
     why: 'the Admin Notes feature - the door, the list, and the rule that the grant loads'
   },
   {

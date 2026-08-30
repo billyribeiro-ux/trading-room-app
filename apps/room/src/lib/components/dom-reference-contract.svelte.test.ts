@@ -174,21 +174,37 @@ describe('every capture attachment has a reason bind:this cannot serve', () => {
     captureCategorySection: 'a factory writing one array slot per category'
   };
 
+  /*
+    EVERY COMPONENT READ ONCE AND PARSED ONCE, shared by the three assertions below.
+
+    This was `components.flatMap((file) => attachmentsIn(file, readFileSync(file, 'utf8')))` inside
+    the first `it`, and the identical loop again inside the second, and a third read of every file
+    in the third — so the Svelte compiler parsed the whole component tree three times for three
+    questions about the same syntax trees.
+
+    It stopped being merely wasteful on 2026-08-30: `ModalHost.svelte` grew by ~390 lines, each
+    parse of it got proportionally slower, and the first `it` crossed vitest's 5-second per-test
+    budget and FAILED — a green suite turned red by a file getting longer, with nothing wrong in it.
+    Raising the timeout would have been treating the symptom; the shape was the problem, and it is
+    the shape `CLAUDE.md` names third: work repeated per consumer instead of done once.
+
+    One parse. Same assertions, and the whole file now runs in roughly a third of the time.
+  */
+  const SOURCES = new Map(components.map((file) => [file, readFileSync(file, 'utf8')]));
+  const ATTACHMENTS = components.flatMap((file) => attachmentsIn(file, SOURCES.get(file)!));
+
   it('found attachments to inspect', () => {
-    const all = components.flatMap((file) => attachmentsIn(file, readFileSync(file, 'utf8')));
-    expect(all.length, 'no attachments were found at all').toBeGreaterThan(50);
+    expect(ATTACHMENTS.length, 'no attachments were found at all').toBeGreaterThan(50);
   });
 
   it('no capture-shaped attachment is an unsanctioned hand-rolled bind:this', () => {
     const offenders: string[] = [];
-    for (const file of components) {
-      for (const attachment of attachmentsIn(file, readFileSync(file, 'utf8'))) {
-        // The bare identifier or the factory head, e.g. `captureCategorySection(index)`.
-        const name = attachment.expr.match(/^([A-Za-z_$][\w$]*)/)?.[1];
-        if (!name || !CAPTURE_SHAPE.test(name)) continue;
-        if (SANCTIONED[name]) continue;
-        offenders.push(`${attachment.file}:${attachment.line} — {@attach ${name}}`);
-      }
+    for (const attachment of ATTACHMENTS) {
+      // The bare identifier or the factory head, e.g. `captureCategorySection(index)`.
+      const name = attachment.expr.match(/^([A-Za-z_$][\w$]*)/)?.[1];
+      if (!name || !CAPTURE_SHAPE.test(name)) continue;
+      if (SANCTIONED[name]) continue;
+      offenders.push(`${attachment.file}:${attachment.line} — {@attach ${name}}`);
     }
 
     expect(
@@ -206,7 +222,7 @@ describe('every capture attachment has a reason bind:this cannot serve', () => {
       draft got that wrong: `captureAlertsScroller` is a PROP that `holdAlertsScroller` CALLS, so it
       is never an attachment expression itself and was reported stale while being very much alive.
     */
-    const sources = components.map((file) => readFileSync(file, 'utf8')).join('\n');
+    const sources = [...SOURCES.values()].join('\n');
     const stale = Object.keys(SANCTIONED).filter((name) => !sources.includes(name));
     expect(stale, `${stale.join(', ')} is sanctioned but appears in no component`).toEqual([]);
   });

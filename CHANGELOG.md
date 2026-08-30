@@ -33,6 +33,109 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 20:45 UTC — Twenty-four audit rows on two ModalHost surfaces, and a ship-stopper that made the room answer 500
+
+**Runtime impact: YES**, and the largest part of it was not an audit row at all.
+
+#### THE SHIP-STOPPER, first, because it was live on the branch
+
+`ModalHost.svelte` seeded `activeConnectivityTab` with a `$state(…)` initializer that read
+`isPresenter` — a `$derived` declared **two hundred lines below it**. A `$state` initializer is
+evaluated eagerly at component init, so that read happened inside the binding's temporal dead zone
+and threw `ReferenceError: Cannot access 'isPresenter' before initialization`. Thrown during SSR it
+took the whole page: **the room answered 500 on every render**, not one broken modal.
+
+`untrack` was not a defence and reading it as one is the trap — it stops a read being registered as
+a dependency, it does not delay the read.
+
+Fixed by hoisting the declaration to immediately after the `$props()` destructure, where its only
+dependency (`currentUser`) already is. The alternative — seeding to the non-presenter default and
+correcting from a one-shot `$effect` — would have flashed the wrong tab for a frame, which is a
+declaration-order problem answered with a visible flicker.
+
+**`svelte-check`, eslint and the whole unit suite were GREEN on it.** They have to be: TypeScript
+models a Svelte `<script>` as a module body, and a unit test mounts a component whose initialisation
+has already succeeded. Only a browser saw it. Playwright, `apps/room`: **3 passed / 4 failed / 4 did
+not run** before, **11 passed / 0 failed** after.
+
+**This is the second instance of this exact class** — the `createRoom` one from 2026-08-28 answered
+500 for eleven days — so it becomes a gate rather than a fix.
+`src/lib/state-initializer-order-contract.test.ts` reads every `.svelte` file, finds every
+`$state(…)` initializer, and fails if one names a `const`/`let`/`function`/`class` declared later at
+the same script's top level. Its first draft produced three false positives (object keys, an arrow's
+own parameter, a `const` inside another function's body); all three exclusions and the lesson from
+each are written at the code, and the checker carries its own inline control both ways.
+
+#### The audit rows — `## ModalHost: user-info / moderation modal` and `## ModalHost: report / advanced-search modal`
+
+Twenty-four rows closed against `docs/decoded/room-surface-audit-2026-08-30.md`. Every reference
+offset was re-read with python from the pinned bundle (2,891,205 bytes, SHA-256
+`40796ca8…bab87524`, checked against `sha256sums.txt`), and every const was decoded by WALKING the
+component's `consts:[…]` table rather than by looking up the index a row cited. **Four rows cited an
+offset that lands inside a function rather than at its head** — `J2e`, `xMe`, `ZMe` and
+`openAlertSendReport` — and one row's own premise was wrong.
+
+BUILT: UIM-04 (Private Chat takes `canPM`; resolved in `RoomOverlays` from the existing
+`canShowRosterPrivateChat`, so one rule now has two callers where the reference has two copies),
+UIM-05 (follow-chat Reset persists, as `resetFollowChatStyle` does), UIM-06 (the Admin Notes tab
+raises the password door), UIM-08 (the stars gate takes all three terms), UIM-10 (the Trial/New
+badge class lists), UIM-11 and UIM-12 (two icons that were making each other worse), SRCH-02 (a
+failed search is no longer indistinguishable from an empty one).
+
+FIXED: UIM-13 (two comments cited byte 2,075,481 for `giveMicScreen`, which is at 2,077,604 —
+`resetFollowChatStyle` is what is actually there), RPT-02 (a hard-coded 500 ms spinner in front of a
+permanently empty list, ending on `No Reports.`; a presenter read that as "this alert reached
+nobody").
+
+HALF BUILT: UIM-16 (the `fw-bold` half; the gravatar half stays refuted), RPT-08 (the reference's
+refusal string, but inside the dialog rather than instead of it — the entry-point guard is one line
+in `message-actions.svelte.ts`), SRCH-03 (the multi-room divergence stays; the INVENTED
+`'mastering-the-trade'` key and label, which occur nowhere in the bundle, are `data.room` now).
+
+ALREADY BUILT: UIM-01, UIM-03, UIM-07. MEASURED REFUSAL: RPT-01, RPT-03, RPT-04, RPT-05, RPT-06,
+RPT-07. DELIBERATE DIVERGENCE: SRCH-05. BLOCKED: UIM-09.
+
+#### The report modal is a refusal, and the refusal is gated
+
+Six RPT rows rest on one thing: a per-recipient delivery record. This product has none. 24 tables
+across `services/api/migrations/**` and not one records a delivery; `alerts.dispatch` is five
+booleans naming which channels were REQUESTED; `apps/room/src/lib/server` has no mail transport at
+all and the controller's has no alert caller; `getAlertReport` has no server half anywhere in
+`apps/`. The modal now says what is missing instead of spinning and then lying.
+
+**`alert-report-modal-contract.test.ts` gates the PREMISE**, not the absence: it reads every
+migration and fails if a delivery record appears — by the columns one must hold, not by a table name
+somebody might not reuse. If that goes red the six rows are live again, which is the intended
+behaviour. A refusal whose premise has expired is worse than an unbuilt feature, because it looks
+decided.
+
+#### Sizes
+
+`AlertSendReportModal.svelte` extracted (164 lines) — not to make a number, but because that refusal
+is longer than the markup it governs and an argument that long about one surface is a document. Four
+ceilings raised with recorded arguments: `ModalHost.svelte` 6,482 → 6,848 (the largest raise that
+entry has taken; the argument is at the entry), `RoomOverlays.svelte` 1,056 → 1,081,
+`FollowChatStylePane.svelte` 152 → 171, `admin-notes.ts` 83 → 111 (twenty-eight lines, all comment,
+no code — the file had asserted the OPPOSITE of what the bundle says about the notes tab).
+
+#### Two documents were nearly damaged by a formatter, and that is worth recording
+
+`prettier --write` was run over `CHANGELOG.md`, `todo-next.md` and the audit register as a
+convenience before the gate. **None of the three is covered by any `format:check` in this
+repository** — both apps scope prettier to their own directory — so the run was not required, and it
+reflowed every markdown table in all three: a 7,004-line diff on this file alone, and eleven
+failures in `room-surface-audit-counts.test.ts`, which parses those tables. Reverted and the content
+edits re-applied by script, leaving insert-only diffs. The rule the near-miss earns: **run the
+formatter through the gate that owns the file, never over a path the gate does not cover.**
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0. Playwright 11/11 with
+`PLAYWRIGHT_CHROMIUM_PATH` pointed at the container's Chromium. Twenty-five negative controls run,
+each mutation verified as landed before the result was believed, each seen RED — including the one
+that came back GREEN first time and turned out to be a weak assertion rather than a redundant guard
+(SRCH-05 checked for symbols that occur seven times elsewhere; it reads the markup now).
+
 ### 2026-08-30 19:50 UTC — The emoji picker: 1,821 cells on a click, a duplicate id, and a popover that positioned itself over the wrong composer
 
 **Runtime impact: YES.** The picker opens without building every one of its 1,821 cells first. Two

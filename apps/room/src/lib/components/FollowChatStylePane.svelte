@@ -122,7 +122,26 @@
     style:font-size={`${style.fontSize}px`}
   >
     <div>
-      <div style:color={style.usernameColor}><strong>Username:</strong></div>
+      <!--
+        UIM-16 (second half) — `fw-bold` on this `<strong>`, which is not the tautology it looks
+        like.
+
+        Read at bundle byte 2,070,269: `d(36,"strong",120), v(37,"Username:")`, and const 120 —
+        walked out of the user-info modal's own consts table at 2,087,748 — is `[1,"fw-bold"]`.
+        A bare `<strong>` was here.
+
+        It matters because this preview is styled by the follow-chat colours around it and sits
+        inside a room stylesheet that resets typography: Bootstrap's `fw-bold` sets
+        `font-weight: 700 !important`, which is stronger than the browser's `bolder` default for
+        `<strong>` and survives any rule that flattens it. The reference put the utility class
+        there deliberately — every other `<strong>` in this component is bare — and the preview's
+        whole job is to show the presenter what a followed member's line will look like. A preview
+        that is a weight lighter than the real thing is a preview that lies quietly.
+
+        The first half of UIM-16 (a gravatar fallback for the header avatar) was REFUTED before
+        this was built and is not reproduced; see the audit row.
+      -->
+      <div style:color={style.usernameColor}><strong class="fw-bold">Username:</strong></div>
       This is the followed user message example with
       <span class="stockColor" style:color={style.tickerColor}>$TICKER</span>
       color!
