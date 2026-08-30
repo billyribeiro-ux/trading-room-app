@@ -323,6 +323,23 @@ export class RoomRecording {
    */
   showRecPreview() {
     if (!this.#media.recordedUrl) return;
+    /*
+      USM-12's second read. `recPreviewWindow` is the viewer's own "may this open a window at all",
+      and it had no reader anywhere in this room until 2026-08-30 — the checkbox that writes it was
+      missing from `updateSettingCheck`'s table, which has no fallback, so it persisted nothing.
+
+      Upstream reads the preference only to seed its own checkbox and to close on the way off
+      (`recPreviewWindowOnChange`, byte 2,250,601). Refusing to OPEN is a divergence and a
+      deliberate one: a preference whose only effect is closing something already open is one that
+      does nothing at all on the next session, which is the defect this row is about rather than a
+      shape to reproduce.
+    */
+    if (!this.#prefs.recPreviewWindow) {
+      this.#dialogs.alert =
+        'The recording preview window is switched off in your settings. Turn "Recording Preview" back on to use it.';
+      this.#menus.set('recording', false);
+      return;
+    }
     this.#recPreviewWindow?.close();
     this.#recPreviewWindow = window.open(
       this.#media.recordedUrl,

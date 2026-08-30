@@ -33,6 +33,94 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 16:00 UTC — Three settings that wrote a value nothing read, and a theme switch that left the colours behind
+
+**Runtime impact: YES.** The presenter's captions toggle starts and stops recognition the moment it
+is pressed instead of waiting for the microphone to be restarted. The Recording Preview checkbox
+persists, closes an open preview when switched off, and is presenter-only. Switching theme now moves
+the chat colours the viewer never chose.
+
+**USM-12, USM-13 and USM-17 built; USM-18 half built; USM-01 blocked.** Five more of the
+user-settings modal's seventeen rows — **nine of seventeen closed**.
+
+#### One shape, three times over
+
+Each of these writes a preference, and for each the preference had **no reader**. That is the defect
+class `CLAUDE.md` names first — *a control whose only effect is changing its own label* — and this
+one modal held three of them at once.
+
+**USM-12 is three defects in one checkbox**, and the first two are why the third was never noticed:
+`app-recording-preview-window` was absent from `updateSettingCheck`'s id→preference table, which has
+**no fallback by design**, so it persisted nothing; nothing anywhere read `recPreviewWindow`, so
+there was nothing for a stored value to restore even if it had been written; and it rendered for
+every viewer while the window it governs belongs to the presenter who is recording. All three closed,
+with one recorded divergence: `showRecPreview` also **refuses to open** when the preference is off,
+which upstream does not do. Upstream reads the value only to seed its own checkbox and to close on
+the way off — and a preference whose only effect is closing something already open does nothing at
+all on the next session, which is the defect being fixed rather than a shape to reproduce.
+
+**USM-13 is two lines, because the guards were already right.** The only callers of
+`beginSpeechRecognition` were the two mic-START paths, so turning captions on mid-session did nothing
+until the microphone was restarted and turning them off did not stop a recognition already running.
+The reference's `micProducer && !micMuted` guard is deliberately **not** repeated, and the contract
+asserts its absence: `beginSpeechRecognition` already refuses without a live session, the preference,
+the room entitlement or presenter authority, and it is the method both mic paths call. Two copies of
+one guard is how the copies come to disagree.
+
+**USM-17 turned out to be half already built.** The row names two behaviours; the presenter-colour
+half was there, because the settings modal's open-time effect reads `theme` and therefore re-runs on
+a switch — asserted rather than duplicated, since two effects keyed on one question are two answers
+to it. The chat-style half needed a **second field**, and that is the interesting part.
+`chatStyle = JSON.parse(localStorage.getItem("chatStyle")) || globals.chatStyle[e]` means **saved
+wins**: what the viewer stored survives the switch and only what they never chose follows the theme.
+`globalChatStyle` is already the two merged and cannot answer *which of these did they choose?* — so
+re-seeding from it would pin the opening theme's defaults for the life of the session. That is the
+V8 negative control on this change, and it was seen red.
+
+**USM-18's other half is refused, not missed.** The label carries its `on`/`off` span now. The
+`smallImagePreview && defaultImagePreview` conjunct is not reproduced because **neither preference
+has a consumer here**: the class the pair drives, `chat-uploaded-img-sm`, has no rule in any of the
+52 stylesheets, which `settings-preference-wiring-contract.test.ts` already proves. ANDing two values
+nothing reads would be scaffolding on scaffolding.
+
+**USM-01 is blocked** on a Discord application registration. `doDiscordAuth` is decoded (byte
+2,256,837) and the part that would **not** be reproduced is named: it puts the room's session token
+in the query string of a third-party OAuth start URL, which is the same shape as RS-12's Benzinga
+default and is already an owner decision for the same reason.
+
+#### The contract caught its own helper, on a change that was correct
+
+`gatesAround` asked `blockAt(source, '{#if isPresenter}')` for the enclosing block — and that gate
+occurs **seven times** in `ModalHost.svelte`. `blockAt` measured the FIRST one and the length was
+then compared against a different block's position, so a marker inside the fourth read as enclosed by
+nothing. The suite went red on a correct change, which is the good direction to fail in; the match
+position is passed explicitly now.
+
+#### Two extractions, so three of five ceilings did not move
+
+`source-size-contract` refused the change and got two modules out of it. **`preference-side-effects.ts`**
+took the four preference writes that are not preferences out of `createRoom` — which is a wiring
+file, while that is a decision table whose every row is a defect somebody fixed — and its ceiling is
+**not** raised. **`chatStyleAfterThemeSwitch`** took USM-17's reasoning into `chat-style.ts`, leaving
+the page a one-line call.
+
+Four ceilings are raised, each argued at the ceiling: `+page.svelte` 1,544 → 1,559 (a field and two
+callbacks, which is the composition root doing its job), `ModalHost.svelte` 6,335 → 6,356 (nineteen
+of the twenty lines are the citations, and this file already gave up 225 lines to two extractions
+earlier today against a ceiling that has not moved), `recording.ts` 406 → 423, `prefs.svelte.ts`
+685 → 709.
+
+**Verified:** `user-settings-effects-contract.test.ts` 12/12 (new), `user-settings-gates-contract.test.ts`
+9/9, `source-size-contract.test.ts` 507/507. **Ten negative controls run and seen red** — the mapping
+row removed, the presenter gate removed, `showRecPreview` no longer consulting the preference, the
+close side-effect removed, the `doSpeechReco` branch removed, the mic guard duplicated into it, the
+theme switch reverted to one statement, the re-seed taken from the merged style instead of the saved
+one, the preference default flipped, and the on/off span removed. Full `pnpm run gate` in `apps/room`:
+**248 files, 4,090 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into.
+Controller untouched. **Nothing was opened in a browser, and the Svelte MCP server has been
+disconnected for this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at
+1,455 files.
+
 ### 2026-08-30 15:36 UTC — A limited presenter had the whole Presenter Settings pane, and a caption toggle that captioned nothing
 
 **Runtime impact: YES.** A member handed mic and screen no longer gets the Presenter Settings tab —

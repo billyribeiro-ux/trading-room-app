@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**96 open · 128 closed · 224 rows.**
+**91 open · 133 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1404,6 +1404,10 @@ savePresenterStyle(){this.appService.sendServerAdminCommand("savePresenterColors
 
 ### USM-01 — Discord tab, pane and its three handlers are absent entirely
 
+**BLOCKED 2026-08-30 15:52 UTC — on a Discord application registration, which does not exist for this deployment.** The row's own reading is right and the settings enumeration reached the same verdict independently: `enableDiscord` is the last entry on `REFERENCE_READS_AND_WE_DO_NOT` in `setting-coverage-contract.test.ts`, recorded there as needing a registration nobody has made.
+
+What is decoded and would be built the day one exists: `doDiscordAuth()` opens `${apiROOT}/discord/v2/auth/start?token=${sesionToken}` in a new tab (byte 2,256,837), with `revokeDiscord` and `checkDiscordStatus` beside it. **The token in that query string is the part that would NOT be reproduced**: a room session token on a third-party OAuth start URL is the same shape as RS-12's Benzinga default, which is already an OWNER DECISION for the same reason. The correct form here is a server-minted, single-purpose state parameter. **Unblocked by:** a Discord application (client id and secret) plus the owner's answer on that. Recorded rather than deferred.
+
 **medium** · `missing-control` · reference byte **2,268,143**
 
 ```
@@ -1478,6 +1482,12 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 
 ### USM-12 — 'Recording Preview' checkbox persists nothing, has no disable side-effect, and is not gated on isPresenter
 
+**BUILT 2026-08-30 15:52 UTC. Three defects in one control, and the first two are why the third was never noticed.** `app-recording-preview-window` was absent from `updateSettingCheck`'s id→preference table, which has NO fallback by design, so the box persisted nothing; nothing anywhere read `recPreviewWindow`, so there was nothing for a stored value to restore even if it had been written; and it rendered for every viewer while the window it governs belongs to the presenter who is recording.
+
+All three closed. `RoomPrefs.recPreviewWindow` seeds from `loadedSettings.recPreviewWindow !== false` — default ON, read rather than chosen, from `recPreviewWindow:!0` at byte **979,890**. The mapping row exists, which in this file is the DECLARATION that a control has a consumer. `create-room`'s `onSideEffect` closes an open preview when the box goes off, which is the reference's own `guiEventBus.emit("closeRecPreviewWindow")` at byte 2,250,601. And `O(115, isPresenter ? 115 : -1)` at 2,285,015 is the gate.
+
+**One recorded divergence:** `showRecPreview` also REFUSES to open when the preference is off, which upstream does not do — it reads the value only to seed its checkbox and to close on the way off. A preference whose only effect is closing something already open does nothing at all on the next session, which is the defect this row is about rather than a shape to reproduce.
+
 **medium** · `defect` · reference byte **2,285,015**
 
 ```
@@ -1489,6 +1499,10 @@ O(115,o.appService.globals.isPresenter?115:-1)
 > Verified: I could not find it built anywhere in apps/room/src. All three limbs verified against our source and the reference bundle.
 
 ### USM-13 — Presenter CC toggle does not start or stop speech recognition immediately
+
+**BUILT 2026-08-30 15:52 UTC, and it is two lines because the guards were already right.** `speechRecoCCOnChange` at byte 2,246,212 persists and then acts; ours persisted `doSpeechReco` and stopped. The only callers of `beginSpeechRecognition` were the two mic-START paths, so turning captions on mid-session did nothing until the microphone was restarted, and turning them off did not stop a recognition already running — **a toggle that says `Enabled` and captions nobody.**
+
+The branch lives in `create-room`'s `onSideEffect`, the seam `prefs.save` already offers for exactly this. **The reference's `micProducer && !micMuted` guard is deliberately NOT repeated**, and the contract asserts its absence: `beginSpeechRecognition` already refuses without a live session, without the preference, without the room entitlement and without presenter authority, and it is the method both mic paths call. Two copies of one guard is how the copies come to disagree.
 
 **medium** · `missing-behaviour` · reference byte **2,246,212**
 
@@ -1515,6 +1529,12 @@ O(18,o.appService.globals.isPresenter&&!o.appService.globals.isLimitedPresenter?
 > Verified: Could not refute. Both gates on the user-settings modal's Presenter Settings tab and pane read `{#if isPresenter}` with no `!isLimitedPresenter` term, while the reference applies the pair to both.
 
 ### USM-17 — Switching theme does not reset the chat style or re-seed presenter colours
+
+**HALF BUILT 2026-08-30 15:52 UTC — the chat-style half was missing, the presenter-colour half was already here.** The row names two behaviours and the second turned out to be built: the settings modal's open-time effect reads `theme`, so switching theme while it is open re-seeds the presenter swatches, which is verbatim what `switchTheme` does at byte 2,254,236. The contract asserts that rather than adding a second seeder — two effects keyed on one question are two answers to it.
+
+The chat-style half is built now, and the shape of the reference's expression is the whole point: `chatStyle = JSON.parse(localStorage.getItem("chatStyle")) || globals.chatStyle[e]` means **saved wins, and only what the viewer never chose follows the theme**. Reproducing that needed a second field — `savedChatStyle` — because `globalChatStyle` is already the theme defaults with the stored values merged on top and cannot answer *which of these did they choose?* Re-seeding from it would pin the opening theme's defaults for the life of the session; that is the V8 control on this change, and it was seen red.
+
+The row's own note that our chat style living in server preferences rather than `localStorage` is a deliberate architectural divergence is correct and unaffected: the write path is `prefs.save` → `onSideEffect` → `mergeGlobalChatStyle`, which is the single place both fields are kept in step.
 
 **medium** · `missing-behaviour` · reference byte **2,253,925**
 
@@ -1543,6 +1563,10 @@ O(132,o.appService.globals.hasSpeechRecognition?132:-1)
 > Verified: Both closed-captions sections in our user-settings modal render with no entitlement condition, while the reference gates each on globals.hasSpeechRecognition. In ModalHost.svelte the #appSpeechRecoOverlay block (currently :3324-3344, +33 from the claim's line numbers because the working tree has uncommitted edits) has NO enclosing {#if} a…
 
 ### USM-18 — 'Smaller image preview' label has no on/off span and its checked term drops defaultImagePreview
+
+**HALF BUILT 2026-08-30 15:52 UTC, and the half NOT built is the row's own recorded reason.** The label carries `<span>on</span>` / `<span>off</span>` now — `v(218," Smaller image preview "), H(219,Cke,…)(220,Ske,…)` at byte 2,281,312, where both are bare `<span>`s. Every other checkbox in this modal already had the pair.
+
+The `defaultImagePreview` conjunct is refused, not overlooked. Upstream both the `checked` binding and the span gate are `smallImagePreview && defaultImagePreview`; here NEITHER preference has a consumer, because the class the pair drives — `chat-uploaded-img-sm` — has no rule in any of the 52 stylesheets. `settings-preference-wiring-contract.test.ts` proves that and keeps the id out of `updateSettingCheck`'s table; the new contract asserts it stays out. ANDing two values nothing reads would be scaffolding on scaffolding.
 
 **low** · `divergence` · reference byte **2,286,816**
 

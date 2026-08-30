@@ -91,6 +91,7 @@ export class RoomPrefs {
   #makeUsersFollowMyScreens;
   #alwaysScrollToBottom;
   #recordingStartSound;
+  #recPreviewWindow;
   #recordingStopSound;
   #enableRTE;
   #extraChatColumn;
@@ -248,6 +249,20 @@ export class RoomPrefs {
     this.#recordingStartSound = $state(loadedSettings.recordingStartSound !== false);
 
     this.#recordingStopSound = $state(loadedSettings.recordingStopSound !== false);
+
+    /**
+     * `preferences.recPreviewWindow` — USM-12, and it had no home at all before 2026-08-30.
+     *
+     * The checkbox that writes it (`#app-recording-preview-window`) rendered for every viewer,
+     * routed through `updateSettingCheck`, and was ABSENT from that function's id→preference table —
+     * which has no fallback, so it persisted nothing and was forgotten on reload. Three defects in
+     * one control: no persistence, no side effect, and no presenter gate.
+     *
+     * Default ON, read rather than chosen: the reference's defaults object carries
+     * `recPreviewWindow:!0` at byte 979,890, so an unset preference must not switch the preview off
+     * for somebody who never touched the box.
+     */
+    this.#recPreviewWindow = $state(loadedSettings.recPreviewWindow !== false);
 
     /**
      * `preferences.enableRTE` — the presenter's own half of the rich text editor gate.
@@ -501,6 +516,16 @@ export class RoomPrefs {
     return this.#alwaysScrollToBottom;
   }
 
+  /**
+   * USM-12. Read in TWO places, which is what makes it a preference rather than a stored click:
+   * `RoomRecording.showRecPreview` refuses when it is off, and `create-room`'s `onSideEffect` closes
+   * an open preview the moment it is switched off — the reference's own
+   * `guiEventBus.emit("closeRecPreviewWindow")` at byte 2,250,601.
+   */
+  get recPreviewWindow() {
+    return this.#recPreviewWindow;
+  }
+
   get recordingStartSound() {
     return this.#recordingStartSound;
   }
@@ -621,6 +646,7 @@ export class RoomPrefs {
       */
       if (key === 'recordingStartSound') this.#recordingStartSound = value;
       if (key === 'recordingStopSound') this.#recordingStopSound = value;
+      if (key === 'recPreviewWindow') this.#recPreviewWindow = value;
       if (key === 'pushToTalk') this.#pushToTalk = value;
       if (key === 'doSpeechReco') this.#doSpeechReco = value;
       if (key === 'alwaysScrollToBottom') this.#alwaysScrollToBottom = value;

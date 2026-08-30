@@ -1856,6 +1856,9 @@
       'longer-alert-popup': 'longerAlertPopup',
       'app-recording-start-sound': 'recordingStartSound',
       'app-recording-stop-sound': 'recordingStopSound',
+      /* USM-12. `recPreviewWindowOnChange` at byte 2,250,601 persists `recPreviewWindow`; the id
+         was absent from this table and the table has no fallback, so the box wrote nothing at all. */
+      'app-recording-preview-window': 'recPreviewWindow',
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
@@ -3432,21 +3435,39 @@
               ></label
             >
           </div>
-          <div class="ml-5">
-            <input
-              type="checkbox"
-              name="app-recording-preview-window"
-              value="Do not disturb"
-              id="app-recording-preview-window"
-              class="form-check-input"
-              {@attach setInputChecked(settingChecks['app-recording-preview-window'])}
-              onchange={updateSettingCheck}
-            />
-            <label for="app-recording-preview-window" class="form-check-label"
-              >Recording Preview
-              <span>{settingChecks['app-recording-preview-window'] ? 'on' : 'off'}</span></label
-            >
-          </div>
+          <!--
+            USM-12 — `O(115, isPresenter ? 115 : -1)`, byte 2,285,015. THREE defects in one control,
+            and the first two are why the third was never noticed:
+
+              1. `app-recording-preview-window` was absent from `updateSettingCheck`'s
+                 id→preference table, which has NO fallback, so the box persisted nothing and was
+                 forgotten on reload.
+              2. Nothing read `recPreviewWindow` anywhere in this room, so there was nothing for a
+                 stored value to restore even if it had been written.
+              3. It rendered for every viewer, while the preview window it governs belongs to the
+                 presenter who is recording.
+
+            All three are closed: the preference exists on `RoomPrefs`, `showRecPreview` refuses when
+            it is off, `create-room`'s `onSideEffect` closes an open preview when it is switched off
+            (the reference's own `closeRecPreviewWindow`), and this is the gate.
+          -->
+          {#if isPresenter}
+            <div class="ml-5">
+              <input
+                type="checkbox"
+                name="app-recording-preview-window"
+                value="Do not disturb"
+                id="app-recording-preview-window"
+                class="form-check-input"
+                {@attach setInputChecked(settingChecks['app-recording-preview-window'])}
+                onchange={updateSettingCheck}
+              />
+              <label for="app-recording-preview-window" class="form-check-label"
+                >Recording Preview
+                <span>{settingChecks['app-recording-preview-window'] ? 'on' : 'off'}</span></label
+              >
+            </div>
+          {/if}
         </div>
 
         <div class="p-2 text-mode-box">
@@ -3748,7 +3769,22 @@
               {@attach setInputChecked(settingChecks['small-image-preview'])}
               onchange={updateSettingCheck}
             />
-            <label for="small-image-preview" class="form-check-label">Smaller image preview</label>
+            <!--
+              USM-18 — `v(218," Smaller image preview "), H(219,Cke,…)(220,Ske,…)` at byte 2,281,312,
+              where `Cke` and `Ske` are `<span>on</span>` and `<span>off</span>`. Every other
+              checkbox in this modal carries that pair and this one did not.
+
+              The row's OTHER half is deliberately not reproduced. Upstream both the `checked`
+              binding and the span gate are `smallImagePreview && defaultImagePreview`; here neither
+              preference has a consumer, because the class the pair drives — `chat-uploaded-img-sm` —
+              has no rule in any of the 52 stylesheets. `settings-preference-wiring-contract.test.ts`
+              proves that and keeps the id out of `updateSettingCheck`'s table. Adding the conjunct
+              would be ANDing two values nothing reads.
+            -->
+            <label for="small-image-preview" class="form-check-label"
+              >Smaller image preview
+              <span>{settingChecks['small-image-preview'] ? 'on' : 'off'}</span></label
+            >
           </div>
         </div>
 

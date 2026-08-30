@@ -623,7 +623,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rendered by the PAGE and the modal by the overlays — two components, one permission, and no
       shared holder between them that is not the page itself.
     */
-    max: 1544,
+    /*
+      1,544 -> 1,559, 2026-08-30, for USM-17. Fourteen lines: `savedChatStyle`, the two-statement
+      `setTheme`, and the two-statement `mergeGlobalChatStyle` that keeps them in step.
+
+      WHY NOT AN EXTRACTION — and the answer is that one was made. The REASONING left, to
+      `chatStyleAfterThemeSwitch` in `#lib/chat-style.ts`, which is where the citation and the
+      "saved wins" rule now live; the page keeps a one-line call. What is left here cannot leave: it
+      is a page field and two page callbacks, which is the composition root doing its job. The same
+      commit also sent four preference side effects out of `create-room.svelte.ts`, whose ceiling is
+      NOT raised.
+    */
+    max: 1559,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -953,7 +964,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It goes DOWN if the preview window ever leaves for a module of its own, which is the next real
       extraction here. It does not go up again.
     */
-    max: 406,
+    /*
+      406 -> 423, 2026-08-30, for USM-12: `showRecPreview` refuses when `prefs.recPreviewWindow` is
+      off, with the eleven lines that say why that refusal is a deliberate divergence.
+
+      Upstream reads the preference only to seed its checkbox and to close on the way off. Refusing
+      to OPEN is ours, and the reason is the row itself: a preference whose only effect is closing
+      something already open does nothing at all on the next session, which is the defect being
+      fixed rather than a shape to reproduce.
+    */
+    max: 423,
     why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
@@ -2553,7 +2573,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       6,334 -> 6,335, 2026-08-30. One line: `onconfirm={onConfirm}` on `PostAlertModal`, so PAM-11's
       confirm reaches the scheduler pane through the callback `PollPanel` next door already uses.
     */
-    max: 6335,
+    /*
+      6,335 -> 6,356, 2026-08-30, for USM-12 and USM-18. Twenty lines, nineteen of them the reason:
+      three defects in one Recording Preview checkbox (persisting nothing, read by nothing, drawn
+      for everyone), and why USM-18's `defaultImagePreview` conjunct is refused rather than missed.
+
+      This file ALREADY paid for today's work twice over: `RestreamPane.svelte` and
+      `SessionHistoryPane.svelte` took 225 lines out of it earlier in the day, against a ceiling
+      that has not moved since. A third extraction to absorb twenty lines of citation would be
+      churn, and the rule this file states about itself is that prose is never trimmed to fit.
+    */
+    max: 6356,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3103,7 +3133,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       neighbours default true, because `!== false` would have flipped every existing member's panel
       on the first load after this shipped.
     */
-    max: 685,
+    /*
+      685 -> 709, 2026-08-30, for USM-12's `recPreviewWindow`: a field, a seed, a boolean case, a
+      getter, and the two docblocks that say what the preference is for and where it is read.
+
+      The seed's note carries the byte offset of the reference's own default (979,890) because the
+      polarity is the whole point — `!== false`, so an unset preference does not switch a presenter's
+      preview off for them.
+    */
+    max: 709,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -3710,6 +3748,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/preference-side-effects.ts',
+    /*
+      The four preference writes that are NOT preferences, extracted from `createRoom` on
+      2026-08-30 when USM-12 and USM-13 added the third and fourth.
+
+      `source-size-contract` is what moved them and the module is the better home on its own terms:
+      `create-room.svelte.ts` is a wiring file, and this is a decision table whose every row is a
+      defect somebody fixed with a reason worth keeping. Most of the file is those reasons.
+
+      Two of the four act on a class constructed AFTER the hook, so all five dependencies are
+      thunks — a closure, never a read at construction, which is also what makes this testable
+      without building a room.
+    */
+    max: 111,
+    why: 'the four preference writes that are not preferences, and why each one exists'
+  },
   {
     file: 'lib/room/restream-url.ts',
     /*
