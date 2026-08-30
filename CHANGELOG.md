@@ -33,6 +33,88 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 16:50 UTC — Being told somebody reacted to your message, without putting it on everyone's wire
+
+**Runtime impact: YES.** A reaction on your chat message, or on a question you asked, now raises a
+toast naming who reacted and with what — behind three preferences, each behind the room setting that
+turns its feature on. Nothing new goes on the wire.
+
+**USM-08, USM-09 and USM-10 built. The user-settings modal is thirteen of seventeen.**
+
+#### The reference's mechanism could not be copied, and that IS the design
+
+```js
+subscribe("updateChatMsgReaction", i => preferences.reactionsPopup &&
+  alertsService.info(`${i.n}: ${i.remove?"removed":""} ${i.emoji} on "${i.txt}"`,
+                     "Message Reaction", {enableHtml:!0}))            // byte 2,509,044
+```
+
+Both toasts render **`txt` — the reacted-to message body** — read off `reactionDetails` /
+`qaReactionDetails`, fields on an inbound frame. And the socket layer then filters that payload to
+the right recipient **in the browser** (`reactionDetails.msgUID === globals.user.userXrefID`, byte
+1,011,021).
+
+`message-mutation-frames.ts` already says why neither is available here, in its own words: *"this
+hub's SSE stream is per ROOM while chat is per CHANNEL, so a frame carrying a message body would put
+admin-channel text on every subscriber's wire."*
+
+So the frame stays a trigger. `invalidateAll()` re-reads the rows the server decided this member may
+see, and a reaction is noticed by **diffing two of those reads** — `reaction-arrivals.ts`, the same
+shape `RoomArrivals` uses for new messages and alerts, one level down: rows instead of a list,
+reactors instead of rows. Everything the toast renders was already in this browser's page data, and
+the audience filter runs on the server's own answer rather than on a payload. The reactor's name
+comes from the roster, because a reaction stores an md5 email hash and nothing else.
+
+#### Two asymmetries reproduced deliberately
+
+**Do Not Disturb is on the sound and not on the popup.** `doNotDisturbOn || (c && qaReactionSoundOn
+&& qaAlert.play())` at byte 1,408,850, with the popup on the following line *outside* that guard.
+The contract asserts the gap between the two gates contains no `doNotDisturbOn`, because reproducing
+half of an asymmetry is worse than reproducing neither half.
+
+**The two audiences differ.** Chat: the message's owner and nobody else. Q&A: everyone who has asked
+on that alert, plus every presenter, never the actor — which is the audience `deliverQaNotice`
+already uses for a new question, because it is the same audience.
+
+#### A control found a redundant field, and another found a blind assertion
+
+`ReactionArrivals` had a `#primed` flag copied from its sibling. Deleting it left every test green —
+because the guard that makes a NEW row silent already makes the FIRST PASS silent, so the flag never
+decided anything. `RoomArrivals` needs one because its question ("is this row new?") is
+indistinguishable from "have I run before?" on the first pass; this one asks whether a row's
+reactions *changed*, and a row with no previous entry has no answer either way. The flag is gone and
+the reasoning is recorded so nobody adds it back from the sibling.
+
+And "skips the reactor's own reaction" was satisfied by `toContain` while the chat branch's copy was
+deleted, because the Q&A branch has the same line. It counts both now. **Second time this session an
+assertion has been caught by counting rather than by review.**
+
+#### The coverage gate caught a name collision
+
+`const chatReactions = new ReactionArrivals()` turned the enumeration red: **`chatReactions` is a
+reference COMMAND name** on `feature-coverage-contract`'s absent list, and a local called that would
+have made the report claim this room implements a command it does not. The scanner is right to be
+literal — that is what caught it — and the fix is the local's name, not the list.
+
+#### Three extractions, so the two host files gave back most of what they took
+
+`reaction-notices.ts` (the two audiences), `reaction-arrivals.ts` (the diff) and
+`ReactionPrefsPane.svelte` (the two App-tab checkboxes). `ModalHost.svelte` has now sent 324 lines to
+three components today against a ceiling that has risen 107 in total. Three ceilings move, argued at
+each: `RoomOverlays.svelte` 965 → 1,011 (two trackers and two calls whose context objects are the
+caller's own decisions), `ModalHost.svelte` 6,390 → 6,442, `prefs.svelte.ts` 725 → 759.
+
+**Verified:** `reaction-notice-contract.test.ts` 18/18 (new), including eight behavioural tests of
+the diff itself — first pass silent, additions, removals, two reactors on one row, a row that is new,
+a change already reported, a row that left the list, and one person's two emoji. **Eleven negative
+controls run and seen red** — the owner filter dropped, each self-skip dropped separately, the Q&A
+audience widened, Do Not Disturb applied to the popup, the line's `removed` term dropped, the
+entitlement gates removed, the roster fallback removed, removals not reported, a new row's reactions
+announced, and the marker map grown instead of replaced. Full `pnpm run gate` in `apps/room`: **250
+files, 4,135 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into. Controller
+untouched. **Nothing was opened in a browser, and the Svelte MCP server has been disconnected for
+this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at 1,461 files.
+
 ### 2026-08-30 16:25 UTC — Saving a session note told nobody
 
 **Runtime impact: YES.** A presenter editing the room's session notes is now visible to everyone in

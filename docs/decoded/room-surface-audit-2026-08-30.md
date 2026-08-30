@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**90 open · 134 closed · 224 rows.**
+**87 open · 137 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1434,6 +1434,14 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 
 ### USM-08 — 'Reactions Response' popup checkbox missing (gated on sessData.enableReactions)
 
+**BUILT 2026-08-30 16:38 UTC.** `app-reactions-popup` behind `O(116, sessData.enableReactions ? 116 : -1)` (byte 2,285,066), with the reference's own line — `` `${n}: ${remove ? "removed" : ""} ${emoji} on "${txt}"` `` under the title `Message Reaction`, byte 2,509,044.
+
+**MY messages only, and never my own reaction.** Upstream's socket layer emits `updateChatMsgReaction` only when `reactionDetails.msgUID === globals.user.userXrefID` (byte 1,011,021); here that filter runs on the server's own rows.
+
+The mechanism is shared with USM-08/09/10 and is the interesting part: **the reference's cannot be copied.** Both of its toasts render `txt` — the reacted-to message BODY — read off `reactionDetails` / `qaReactionDetails`, fields on an inbound frame, and then filter to the right recipient IN THE BROWSER. `message-mutation-frames.ts` already says why this room's frames carry nothing: *"this hub's SSE stream is per ROOM while chat is per CHANNEL, so a frame carrying a message body would put admin-channel text on every subscriber's wire."*
+
+So the frame stays a trigger, `invalidateAll()` re-reads the rows the server decided this member may see, and a reaction is noticed by DIFFING two of those reads — `#lib/reaction-arrivals.ts`. Everything the toast renders was already in this browser's page data, and the audience filter runs on the server's own answer rather than on a payload. The reactor's NAME comes from the roster, because a reaction stores an email hash and nothing else.
+
 **medium** · `missing-control` · reference byte **2,269,041**
 
 ```
@@ -1446,6 +1454,10 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 
 ### USM-09 — 'Reactions QA Response' popup checkbox missing (gated on sessData.enableQAReactions)
 
+**BUILT 2026-08-30 16:38 UTC**, with USM-08 and USM-10 — one mechanism, three rows. `app-reactions-popup-qa` behind `O(117, sessData.enableQAReactions ? 117 : -1)` (byte 2,285,130), title `QA Reaction`.
+
+**The audience is the one the question notice beside it already uses**, and it is upstream's: everyone who has asked on that alert (`for (let _ of o.qa) _.uid === myId`), plus every presenter (the `globals.user.isPresenter && (…the same…)` copy), never the actor — byte 1,408,850.
+
 **medium** · `missing-control` · reference byte **2,269,235**
 
 ```
@@ -1457,6 +1469,10 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 > Verified: I could not refute it. Exhaustive search of apps/room/src for `app-reactions-popup-qa`, `app-reactions-popup`, `reactions-popup`, `reactionsPopup`, `reactionPopup`, `showReactions`, `popupQA`, `qaReaction`/`QAReaction` (case-insensitive), and the reference's neighbouring sibling ids `note-update-popup` and `app-positions-update` returns Z…
 
 ### USM-10 — 'QA Reactions Sound' checkbox missing from the Alert tab
+
+**BUILT 2026-08-30 16:38 UTC.** `app-reactions-sound-qa`, `v(3," QA Reactions Sound ")` at byte 2,232,964, on the Alert tab beside the QA sound it sat next to upstream.
+
+**Which gate is on which is the part worth recording.** `preferences.doNotDisturbOn || (c && preferences.qaReactionSoundOn && qaAlert.play())` at byte 1,408,850 suppresses the SOUND with Do Not Disturb; the popup on the following line is outside that guard and is not suppressed. Reproduced with the asymmetry intact, because it is the shape every other notification in this room already has — and the contract asserts the gap between the two gates contains no `doNotDisturbOn`, because reproducing half of an asymmetry is worse than reproducing neither half.
 
 **medium** · `missing-control` · reference byte **2,271,175**
 

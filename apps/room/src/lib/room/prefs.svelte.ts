@@ -93,6 +93,9 @@ export class RoomPrefs {
   #recordingStartSound;
   #recPreviewWindow;
   #noteUpdatePopup;
+  #reactionsPopup;
+  #reactionsPopupQA;
+  #qaReactionSoundOn;
   #recordingStopSound;
   #enableRTE;
   #extraChatColumn;
@@ -273,6 +276,19 @@ export class RoomPrefs {
      * popup is the visible half of a broadcast that did not exist.
      */
     this.#noteUpdatePopup = $state(loadedSettings.noteUpdatePopup !== false);
+
+    /**
+     * The three reaction notices — USM-08, USM-09 and USM-10. All default ON, from
+     * `reactionsPopup:!0` / `reactionsPopupQA:!0` (byte 979,890's object) and
+     * `qaReactionSoundOn:!0` (byte 979,369's).
+     *
+     * `#lib/reaction-arrivals.ts` is what makes them possible here: the reference reads a reaction
+     * off a field on the inbound frame, and that field carries the reacted-to message BODY, which
+     * this room's per-ROOM stream may not put on the wire.
+     */
+    this.#reactionsPopup = $state(loadedSettings.reactionsPopup !== false);
+    this.#reactionsPopupQA = $state(loadedSettings.reactionsPopupQA !== false);
+    this.#qaReactionSoundOn = $state(loadedSettings.qaReactionSoundOn !== false);
 
     /**
      * `preferences.enableRTE` — the presenter's own half of the rich text editor gate.
@@ -541,6 +557,21 @@ export class RoomPrefs {
     return this.#noteUpdatePopup;
   }
 
+  /** USM-08 — a reaction on one of MY chat messages raises a toast. */
+  get reactionsPopup() {
+    return this.#reactionsPopup;
+  }
+
+  /** USM-09 — a reaction on a question I asked, or on any question when I am a presenter. */
+  get reactionsPopupQA() {
+    return this.#reactionsPopupQA;
+  }
+
+  /** USM-10 — the same event, as a sound. Suppressed by Do Not Disturb; the popup is not. */
+  get qaReactionSoundOn() {
+    return this.#qaReactionSoundOn;
+  }
+
   get recordingStartSound() {
     return this.#recordingStartSound;
   }
@@ -663,6 +694,9 @@ export class RoomPrefs {
       if (key === 'recordingStopSound') this.#recordingStopSound = value;
       if (key === 'recPreviewWindow') this.#recPreviewWindow = value;
       if (key === 'noteUpdatePopup') this.#noteUpdatePopup = value;
+      if (key === 'reactionsPopup') this.#reactionsPopup = value;
+      if (key === 'reactionsPopupQA') this.#reactionsPopupQA = value;
+      if (key === 'qaReactionSoundOn') this.#qaReactionSoundOn = value;
       if (key === 'pushToTalk') this.#pushToTalk = value;
       if (key === 'doSpeechReco') this.#doSpeechReco = value;
       if (key === 'alwaysScrollToBottom') this.#alwaysScrollToBottom = value;

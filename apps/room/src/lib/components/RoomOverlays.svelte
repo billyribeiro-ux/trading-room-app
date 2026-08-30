@@ -10,6 +10,8 @@
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
+  import { ReactionArrivals } from '#lib/reaction-arrivals.js';
+  import { chatReactionNotice, questionReactionNotice } from '#lib/room/reaction-notices.js';
   import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
@@ -473,6 +475,23 @@
   // `qaAlert` is clearly.mp3, which is why it sounds different from an alert's `cash`.
   const qaArrivals = new RoomArrivals<(typeof data.alertQuestions)[number]>();
 
+  /*
+    USM-08 / USM-09 / USM-10 — a reaction on something of mine. `#lib/room/reaction-notices.ts`
+    holds the audiences, the two byte offsets and why Do Not Disturb is on the sound and not on the
+    popup; `#lib/reaction-arrivals.ts` holds why a reaction is noticed by diffing two page loads
+    rather than read off the frame.
+  */
+  /*
+    NAMED `…Arrivals` rather than `chatReactions`, and the coverage gate is why: `chatReactions` is
+    a REFERENCE COMMAND NAME on `feature-coverage-contract`'s absent list, and a local called that
+    would have made the enumeration report a command this room does not implement. The scanner is
+    right to be literal — that is what caught it — and the fix is the local's name, not the list.
+  */
+  const chatReactionArrivals = new ReactionArrivals();
+  const questionReactionArrivals = new ReactionArrivals();
+  const reactorName = (emailHash: string) =>
+    roster.users.find((user) => user.emailHash === emailHash)?.displayName ?? 'Someone';
+
   function deliverQaNotice(question: (typeof data.alertQuestions)[number]) {
     if (question.senderId === data.user.id) return;
 
@@ -508,6 +527,21 @@
       deliverQaNotice(question);
     }
 
+    /* USM-09 and USM-10 — the same audience the question notice above goes to. */
+    questionReactionNotice(
+      questionReactionArrivals.changes(questions),
+      {
+        questions,
+        viewerId: data.user.id,
+        viewerEmailHash: data.user.emailHash,
+        isPresenter,
+        doNotDisturbOn: prefs.doNotDisturbOn,
+        soundEnabled: prefs.qaReactionSoundOn,
+        popupEnabled: prefs.reactionsPopupQA
+      },
+      { nameOf: reactorName, toasts, playSound: () => playSoundEffect('qaAlert') }
+    );
+
     // DELIBERATE DEVIATION from the captured app, on an explicit product decision.
     //
     // Upstream the flash is purely an unread marker: the class binds to `msg.unreadQA` alone
@@ -539,6 +573,18 @@
     const incoming = arrived.some((message) => message.senderId !== data.user.id);
 
     if (incoming && !prefs.doNotDisturbOn && prefs.chatSoundOn) playSoundEffect('pling');
+
+    /* USM-08 — MY messages only, and never my own reaction. See `reaction-notices.ts`. */
+    chatReactionNotice(
+      chatReactionArrivals.changes(data.messages),
+      {
+        messages: data.messages,
+        viewerId: data.user.id,
+        viewerEmailHash: data.user.emailHash,
+        popupEnabled: prefs.reactionsPopup
+      },
+      { nameOf: reactorName, toasts }
+    );
   });
 </script>
 

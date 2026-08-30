@@ -1464,7 +1464,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       leaving the twenty lines of markup where they were and raising ModalHost instead, which is the
       trade this rule exists to force.
     */
-    max: 965,
+    /*
+      965 -> 1,011, 2026-08-30, for USM-08 / USM-09 / USM-10. Forty lines, and the shape of them is
+      the argument: two trackers, one roster lookup, and two CALLS with their context objects
+      spelled out. The reasoning — both byte offsets, both audiences, why Do Not Disturb is on the
+      sound and not on the popup — left with the behaviour, to `#lib/room/reaction-notices.ts`.
+
+      The context objects are what cost the lines and they are not padding: each field is a decision
+      the caller owns (who am I, am I a presenter, which of three preferences applies), and passing
+      the room instead would have made a notification module reach for the whole room.
+    */
+    max: 1011,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2598,7 +2608,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `SessionHistoryPane.svelte`, 225 lines — and its reasoning left with the behaviour here rather
       than sitting beside the markup. What is left is a checkbox.
     */
-    max: 6390,
+    /*
+      6,390 -> 6,442, 2026-08-30, for USM-08 / USM-09 / USM-10: the Alert tab's QA Reactions Sound
+      box with its fifteen-line citation, the three mapping rows, and the call to the pane that took
+      the other two boxes.
+
+      THREE extractions have now come out of this file today — `RestreamPane.svelte`,
+      `SessionHistoryPane.svelte` and `ReactionPrefsPane.svelte`, 324 lines between them — against a
+      ceiling that has risen 107 in total. The trade this file asks for is being made.
+    */
+    max: 6442,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3169,7 +3188,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       709 -> 725, 2026-08-30, for USM-11's `noteUpdatePopup`: field, seed, boolean case, getter and
       the note recording that the preference had no control, no consumer and no EVENT before today.
     */
-    max: 725,
+    /*
+      725 -> 759, 2026-08-30, for the three reaction preferences: three fields, three seeds sharing
+      one docblock, three boolean cases and three getters. The seed note carries the two default
+      objects' offsets because all three default ON, and an unset preference silencing a
+      notification is the polarity that would be wrong in the expensive direction.
+    */
+    max: 759,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -3776,6 +3801,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     initialises in declaration order, before the constructor has assigned the thunks it reads.
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
+  {
+    file: 'lib/room/reaction-notices.ts',
+    /*
+      USM-08 / USM-09 / USM-10's two notices, extracted from `RoomOverlays.svelte` in the commit
+      that wrote them.
+
+      Most of the file is the WHY, and it is why worth keeping: the reference reads a reaction off a
+      frame field carrying the reacted-to message BODY and then filters to the recipient IN THE
+      BROWSER. This room cannot do either — the stream is per ROOM — so both audiences are decided
+      over rows the server already chose to send this viewer.
+    */
+    max: 116,
+    why: 'who is told about a reaction, and the Do Not Disturb split the reference has'
+  },
+  {
+    file: 'lib/reaction-arrivals.ts',
+    /*
+      Which reactions are NEW since the last load — the diff those two notices run on.
+
+      Its header records a control's finding: it had a `#primed` flag copied from `RoomArrivals` and
+      the flag did nothing, because the guard that makes a NEW row silent already makes the FIRST
+      PASS silent. Deleting it left every test green, which is what a redundant field looks like.
+    */
+    max: 115,
+    why: 'the reaction diff between two page loads, and why it is not read off the wire'
+  },
   {
     file: 'lib/room/note-update-notice.ts',
     /*
@@ -4564,6 +4615,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 146,
     why: 'the dialog primitive this repository uses in place of bootbox'
+  },
+  {
+    file: 'lib/components/ReactionPrefsPane.svelte',
+    /*
+      The user-settings modal's two reaction-notice checkboxes, extracted 2026-08-30.
+
+      A real slice rather than a convenience: these two share one gate apiece, one consumer, and
+      nothing at all with the alert-sound boxes they sat beside. `setInputChecked` is copied rather
+      than shared — four lines whose only reason to exist is that `bind:checked` over a plain
+      `Record` loses every race with the DOM, and sharing it would mean a module for a closure.
+    */
+    max: 100,
+    why: 'the two reaction popups and the two room settings that decide whether they exist'
   },
   {
     file: 'lib/components/RestreamPane.svelte',

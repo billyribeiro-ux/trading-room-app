@@ -8,6 +8,7 @@
   import { shortWhen } from '#lib/short-when.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import SessionHistoryPane from './SessionHistoryPane.svelte';
+  import ReactionPrefsPane from './ReactionPrefsPane.svelte';
   import RestreamPane from './RestreamPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
@@ -950,6 +951,9 @@
     'app-recording-stop-sound': true,
     'app-recording-preview-window': true,
     'note-update-popup': true,
+    'app-reactions-popup': true,
+    'app-reactions-popup-qa': true,
+    'app-reactions-sound-qa': true,
     'pm-window-layout': false,
     'app-disable-video': true,
     'app-speech-reco-overlay': false,
@@ -1863,6 +1867,13 @@
       /* USM-11. `noteUpdatePopupOnChange` at byte 2,251,541 persists `noteUpdatePopup`; the
          consumer is the `updatedSessionNote` frame's handler in `events.svelte.ts`. */
       'note-update-popup': 'noteUpdatePopup',
+      /* USM-08 / USM-09 / USM-10. `reactionsPopupOnChange`, `reactionsPopupQAOnChange` and
+         `reactionsSoundQAOnChange` at bytes 2,250,601 / 2,250,812 / 2,251,363. Their consumer is
+         `RoomOverlays`, which notices a reaction by diffing two loads — see
+         `#lib/reaction-arrivals.ts` for why it cannot come off the wire. */
+      'app-reactions-popup': 'reactionsPopup',
+      'app-reactions-popup-qa': 'reactionsPopupQA',
+      'app-reactions-sound-qa': 'qaReactionSoundOn',
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
@@ -3507,6 +3518,17 @@
           including why this control is NOT gated on `sessData.beepOnUserJoin` the way upstream
           gates it at byte 2,285,196.
         -->
+        <!--
+          USM-08 and USM-09 — the two reaction popups, each behind the ROOM setting that turns its
+          feature on. `ReactionPrefsPane.svelte` holds them, both gate offsets, and why a room with
+          reactions switched off must not draw them at all.
+        -->
+        <ReactionPrefsPane
+          enableReactions={messageChrome.enableReactions}
+          enableQaReactions={messageChrome.enableQaReactions}
+          {settingChecks}
+          onchange={updateSettingCheck}
+        />
         <div class="p-2 text-mode-box">
           <div id="appNoteUpdatePopup" title="Note Update Popup" class="pb-2">
             <i class="fas fa-sticky-note"></i>
@@ -3685,6 +3707,36 @@
               >QA sound <span>{qaSoundOn ? 'on' : 'off'}</span></label
             >
           </div>
+          <!--
+            USM-10 — `app-reactions-sound-qa`, `v(3," QA Reactions Sound ")` at byte 2,232,964, sat
+            beside the QA sound above it and was missing.
+
+            Same event as USM-09's popup, and note which gate is on which: upstream suppresses this
+            SOUND with Do Not Disturb and does NOT suppress the popup —
+            `preferences.doNotDisturbOn || (c && preferences.qaReactionSoundOn && qaAlert.play())`
+            at byte 1,408,850, with the popup on the line after, outside that guard. Reproduced,
+            asymmetry included, because it is the shape every other notification here has.
+
+            Gated on `enableQAReactions` for the reason its two neighbours in the App tab are: a
+            room with Q&A reactions off has nothing for this to silence.
+          -->
+          {#if messageChrome.enableQaReactions}
+            <div class="ml-5">
+              <input
+                type="checkbox"
+                name="app-reactions-sound-qa"
+                value="Do not disturb"
+                id="app-reactions-sound-qa"
+                class="form-check-input"
+                {@attach setInputChecked(settingChecks['app-reactions-sound-qa'])}
+                onchange={updateSettingCheck}
+              />
+              <label for="app-reactions-sound-qa" class="form-check-label"
+                >QA Reactions Sound
+                <span>{settingChecks['app-reactions-sound-qa'] ? 'on' : 'off'}</span></label
+              >
+            </div>
+          {/if}
           <div class="ml-5">
             <input
               type="checkbox"
