@@ -6,6 +6,7 @@ import {
   searchRoster,
   sortRosterByNick
 } from '#lib/roster-gates.js';
+import { clampSimUserCount } from '#lib/sim-user-count.js';
 
 /*
   Who is in the room — the live roster, the four header controls that filter it, the badge count and
@@ -159,8 +160,27 @@ export class RoomRoster<Entry extends RosterMember> {
   /**
    * `globals.rosterCount + this.simUserCount` — the one number the navbar and the sidebar badge
    * both show.
+   *
+   * ## G14 — THE PADDING IS CLAMPED, and it was rendered verbatim
+   *
+   * ```js
+   * e && (this.simUserCount = Number(e),
+   *       this.simUserCount > 5e3 && (this.simUserCount = 5e3),
+   *       this.simUserCount <= 0  && (this.simUserCount = 0))
+   * ```
+   * (bundle byte 2,499,409.) `simUserCount` is an owner-typed number that pads the headcount, and
+   * neither end of it was bounded here: 50000 rendered as 50000 and -5 SUBTRACTED five from a real
+   * roster, so a room of twelve could publish "7". A number that lies downwards is worse than one
+   * that lies upwards, because nobody looks twice at it.
+   *
+   * `clampSimUserCount` carries the transcription, including that the reference's upper test is
+   * `>` and its lower is `<=` — which makes 0 assign 0 and changes nothing, and is kept because a
+   * transcription that tidies a redundant branch is no longer one. `Number(e)` is also upstream's,
+   * so a non-numeric setting arrives as `NaN`; that case is ours to answer and the module says how.
    */
-  #connectedCount = $derived((this.#count ?? this.#users.length) + this.#simUserCount());
+  #connectedCount = $derived(
+    (this.#count ?? this.#users.length) + clampSimUserCount(this.#simUserCount())
+  );
 
   /** Everyone in the room, live if the hub has spoken and the page load's seed if it has not. */
   get users(): readonly Entry[] {

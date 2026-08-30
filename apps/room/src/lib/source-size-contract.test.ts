@@ -1016,7 +1016,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `videoDeviceId` — and consolidating them into one `CaptureSettings` gave five back and made
       `create-room` shorter. What is left is the irreducible cost of one more value crossing.
     */
-    max: 1367,
+    /*
+      1,367 -> 1,429, 2026-08-30. G09 — the blocked-autoplay dialog, and sixty-two lines of which
+      about fifty are the mechanism.
+
+      Chrome refuses audible autoplay without a user gesture. This caught the rejection and wrote a
+      `console.warn`, so a member whose browser blocked it heard NOTHING for the whole session with
+      nothing on screen to act on. **The dialog's OK is the gesture** — that is the entire mechanism,
+      and it is why the retry has to be the dismissal callback rather than a timer.
+
+      One divergence is recorded at the code: upstream opens `bootbox.hideAll()` and re-raises per
+      failing producer, so a room with four open microphones shows the same sentence four times and
+      clears whatever else the member was reading. One dialog is raised here and its callback retries
+      every blocked element, because one gesture satisfies all of them.
+    */
+    max: 1429,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -1109,7 +1123,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Flagged for the owner, since a raise is meant to be a conversation. `ModalHost.svelte` falls
       191 lines in the same commit, so the room's total cap falls by far more than these six.
     */
-    max: 966,
+    /*
+      966 -> 992, 2026-08-30. G11's MEASURED REFUSAL, and all of it is prose.
+
+      `audioServerDisableMic` is raised by the AUDIO BRIDGE — the server deciding a microphone is
+      unusable after it opened locally — and this room has no audio bridge, the same absence
+      `media-transport.svelte.ts` records for `startTalking`/`stopTalking`. A subscriber would be a
+      handler nothing can call. The note also records that the OUTCOME is already reached by a better
+      route: upstream has one sentence for every microphone failure and this method branches on the
+      actual error, so a member is told what went wrong rather than a paragraph of things to try.
+    */
+    max: 992,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -1369,7 +1393,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       into chat instead of into that feature. Here the cost of getting it wrong is larger — an image
       meant for one person would land in the room.
     */
-    max: 920,
+    max: 947,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1707,7 +1731,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a new concern arriving. If the NEXT raise is also same-day, that is the signal to split the
       file rather than the number.
     */
-    max: 920,
+    /*
+      920 -> 947, 2026-08-30. G03 — the half of the connection overlay that was missing.
+
+      There are TWO elements on `notConnectedOverlay` and this file had one: const 10, the
+      three-second "Conected" flash. Const 9 — the overlay shown while the socket is DOWN — had no
+      counterpart, so a member whose chat connection dropped saw nothing at all and was then
+      congratulated for a recovery from a failure they were never told about. The half that was
+      built is the half nobody needs.
+    */
+    max: 947,
     why: "app-note's carousel: the modal, its three-state slide row, the file browser and two confirms"
   },
   {
@@ -2775,7 +2808,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reactively so it is `$state`, while `missedChatWhileHidden` is a latch nothing renders from and
       the timer handle is a plain `let`.
     */
-    max: 114,
+    /*
+      114 -> 142, 2026-08-30. G16's divergence, and all twenty-eight lines are the record.
+
+      Two reference behaviours are deliberately not reproduced — the 10 000 ms arming delay before
+      `visibilitychange` is even listened for, and `unloadRoster()` on hide — and the row that raised
+      it asked for exactly this: the SIBLING refusal (the 500 ms `alwaysShowRoster` timer) is
+      recorded in a contract and this one was not, which is how a deliberate divergence reads as an
+      oversight to the next comparison against the bundle.
+    */
+    max: 142,
     why: 'the freshness poll and the tab-visibility rules, executable at last'
   },
   {
@@ -2799,7 +2841,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       above an unrelated `$state` and describing nothing, and `events.svelte.ts` fell 903 -> 900 in
       the same commit that moved them here.
     */
-    max: 342,
+    /*
+      342 -> 362, 2026-08-30. G14 — the `simUserCount` clamp, and all twenty lines are the citation.
+
+      Neither bound was applied here, and the LOWER one is the half that matters: a negative setting
+      SUBTRACTED from a real roster, so a room of twelve could publish "7". The transcription itself
+      is `#lib/sim-user-count.ts`, which carries the three details that would each be a real change
+      if tidied — including that the reference never answers `NaN`, which is ours to answer.
+    */
+    max: 362,
     why: 'the live roster, its four header controls, the badge count and the random draw'
   },
   {

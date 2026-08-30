@@ -45,7 +45,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**143 open · 81 closed · 224 rows.**
+**135 open · 89 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1446,6 +1446,8 @@ z("checked",o.appService.globals.preferences.smallImagePreview&&o.appService.glo
 
 ### G01 — Archives → "Recording" menu item is inert: no `launchRecordings()`
 
+**BLOCKED 2026-08-30 12:55 UTC.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab — **a SERVER page**. There is no archive service here and no recordings or archive table in either database, which is the same blocker `presAreaTabs-recordings` carries and which `TODO.md` already records. Wiring the item would open a tab onto a 404 with a session token in the URL, which is worse than an inert item. What would unblock it: an archive service with a recordings endpoint. The item stays rendered, because it is the reference's own menu and the neighbouring Alert Logs / Chat Logs entries in the same dropdown do work.
+
 **high** · `missing-behaviour` · reference byte **2,467,840**
 
 ```
@@ -1458,6 +1460,8 @@ E(g(3).launchRecordings())}),T(1,"i",51),d(2,"span",22),v(3,"Recording")
 
 ### G02 — Presenter entry warning when the session is locked (bootbox "Session Locked" with a "Session Control" button)
 
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30 12:55 UTC, and the reason is an AUTHORITY difference rather than a missing dialog.** The warning is guarded `sessData.isLocked && globals.user.isPresenter`, which means upstream **a presenter enters a locked room** and is told it is locked to everyone else. In this room they cannot: `decideRoomEntry` (`apps/controller/src/lib/room-entry.ts:221`) refuses `isLocked === true` as its FIRST test, before identity is even established, so there is no presenter to warn. The dialog is not missing here — its precondition is. That is not a bug on its face: the setting's own help text in the control plane reads *"If session is locked, nobody will be able to log in..."*, and our door matches the words the owner is shown. But it does mean **an owner who locks a room locks themselves out of it**, and the reference clearly expects otherwise. Changing who may enter a locked room is an authority decision made on the server, which is exactly the class of change this repository does not make on inference. **The question for the owner: should a presenter be admitted to a locked room?** If yes, `decideRoomEntry` gains a presenter exemption and this dialog is then five lines — the confirm exists, `openSessionControl('lock-session')` exists, and `RoomConfirmation` would need the reference's two button labels.
+
 **medium** · `missing-control` · reference byte **2,500,222**
 
 ```
@@ -1469,6 +1473,8 @@ title:"Session Locked",message:"Session is locked, no users are allowed in the r
 > Verified: I could not refute this. The reference behaviour is real and our source has no counterpart under any name.
 
 ### G03 — Room-level `.notConnectedOverlay` "Reconnecting Chat..." (template node 7, gated on `socketConnected`)
+
+**BUILT 2026-08-30 12:55 UTC.** `iRe` on const 9, gated `O(7, socketConnected ? -1 : 7)`. **The half that was built was the half nobody needs:** a member whose chat connection dropped saw nothing at all, and then — once it came back — a three-second tick saying "Conected" for a failure they were never told about. Both elements exist now and they stay two elements: making one say both things would lose the three-second timing the flash has and the flash alone. `roomEvents.connected` starts FALSE so this shows during the first connect too, which is upstream's own behaviour — `globals.socketConnected` is never initialised, only assigned. The literal spaces in `" Reconnecting Chat... "` are written as an expression, because Svelte normalises whitespace at element boundaries.
 
 **medium** · `missing-control` · reference byte **2,496,906**
 
@@ -1552,6 +1558,8 @@ function d4e(t,n){if(1&t){const e=Y();d(0,"li")(1,"a",163),x("click",function(){
 
 ### G09 — Blocked audio autoplay is only logged, never surfaced — no "Your browser needs your OK" dialog
 
+**BUILT 2026-08-30 12:55 UTC.** Chrome refuses audible autoplay without a user gesture, and this caught the rejection and wrote a `console.warn` — so a member whose browser blocked it heard NOTHING for the whole session with nothing on screen to act on. **The dialog's OK is the gesture**, which is the entire mechanism and why the retry has to be the dismissal callback rather than a timer: `play()` called again without a gesture is refused again. `alertThen` is the only API here that carries a dismissal callback. **One divergence, recorded at the code:** upstream opens `bootbox.hideAll()` and re-raises per failing producer, so a room with four open microphones shows the same sentence four times and clears whatever else the member was reading; one dialog is raised here and its callback retries every blocked element, because one gesture satisfies all of them. `resizeScrollviewChatEnd` has no counterpart — it is a jQuery height recalculation for a scroller this room lays out with CSS.
+
 **medium** · `missing-behaviour` · reference byte **2,515,092**
 
 ```
@@ -1563,6 +1571,8 @@ bootbox.alert("Your browser needs your OK to play the room's audio",()=>{P("Auto
 > Verified: I could not refute this. Both reference sites are real and I read them: byte 2515120 (`attachAudioStream` -> `bootbox.hideAll(); bootbox.alert("Your browser needs your OK to play the room's audio", () => { o.play(), guiEventBus.emit("resizeScrollviewChatEnd") })`) and byte 1094188 (the mediasoup consumer's `h=(f=3,_=300)=>{c.play().then(.…
 
 ### G11 — `audioServerDisableMic` — no `micDisabled` state and no microphone-troubleshooting dialog
+
+**MEASURED REFUSAL — recorded at the code 2026-08-30 12:55 UTC.** The event is raised by the AUDIO BRIDGE — the server deciding a microphone is unusable after it was already opened locally — and this room has no audio bridge, the same absence `media-transport.svelte.ts` records for `startTalking`/`stopTalking`. A subscriber would be a handler nothing can call. **And the outcome it exists for is already reached by a better route:** upstream has ONE sentence for every microphone failure, while `#reportCaptureError` branches on the actual error — a denied permission gets browser-specific guidance from the Permissions API, and everything else gets `mediaCaptureErrorMessage`, which tells an insecure context from a missing device from a device in use elsewhere. `micDisabled` stays unmodelled and `gates.ts:393` already records that where it matters.
 
 **medium** · `missing-behaviour` · reference byte **2,503,109**
 
@@ -1604,6 +1614,8 @@ O(5,e.hideCount||!e.appService.globals.sessData.rosterCountVisibleToViewers&&!e.
 
 ### G14 — `simUserCount` is not clamped to [0, 5000]
 
+**BUILT 2026-08-30 12:55 UTC, and the LOWER bound is the half that mattered.** `connectedCount` is `rosterCount + simUserCount`, so a negative setting **SUBTRACTED from a real roster** — a room of twelve could publish "7". A number that lies downwards is the worse half: an inflated headcount is at least the kind of lie the setting exists to tell. `#lib/sim-user-count.ts` carries the transcription and the three details that would each be a real change if tidied — the upper test is `>` and the lower `<=` (so 0 assigns 0, a redundant branch that is kept), `Number(e)` is upstream's so a non-numeric setting arrives as `NaN`, and the `e &&` guard means an absent value keeps the previous one there while here it is read per render. `NaN` is the one case the reference does not answer and is answered as 0, because the alternative is a headcount rendered as "NaN" to every member.
+
 **low** · `missing-behaviour` · reference byte **2,499,409**
 
 ```
@@ -1616,6 +1628,8 @@ this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this.simUs
 
 ### G16 — `visibilitychange` is armed immediately, not after the reference's 10 000 ms delay, and it does not unload/reload the roster
 
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 12:55 UTC, which is what the row asked for.** The row's own closing observation is the point: the SIBLING refusal (the 500 ms `alwaysShowRoster` timer) is recorded in `always-show-roster-contract.test.ts` and this one was not, which is how a deliberate divergence reads as an oversight to the next comparison. Both halves are now in `refresh.svelte.ts`. The 10 000 ms delay protects a socket handshake still in flight; this room's equivalent is `invalidateAll()` and an idempotent five-second poll, neither of which a mid-load visibility flip can corrupt — and arming immediately means a member who tabs away in the first ten seconds is actually noticed. `unloadRoster()` saves a subscription upstream because the roster is a separate fetch; here it arrives with the page load, so unloading it would buy an empty sidebar for one frame on every return to the tab.
+
 **low** · `divergence` · reference byte **2,511,416**
 
 ```
@@ -1627,6 +1641,8 @@ appVisibilityChange(e){console.log("appVisibilityChange enabled: ",e),e?this.vis
 > Verified: The claim is COMPOUND and only ONE of its two limbs survives. It must be split before it is acted on.
 
 ### G17 — `videoOnlyMode` (the `r` query parameter) is missing from both ngClass maps and from the `hideChatAlerts` gate
+
+**MEASURED REFUSAL — already recorded, verified 2026-08-30 12:55 UTC.** The row says so itself: this is an ALREADY-DECLARED gap rather than an unnoticed one, listed only so the enumeration is answered in full. `gates.ts:250-261` carries the reason and it is the same one `files-gates.ts` records for `hideFiles`: `videoOnlyMode` is the `r` query parameter — recording-bot mode — and it is not on the wire here, so the term would read a value nothing supplies. `recordChat` is deliberately not on the wire either, because it appears ONLY inside that writer and would arrive with no reader. Nothing was added; the row is closed against the record that already existed.
 
 **low** · `divergence` · reference byte **2,465,818**
 

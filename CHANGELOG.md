@@ -33,6 +33,88 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 12:55 UTC — The room shell's last eight rows: two things a member is told when the room breaks, one number that could lie downwards, and four recorded refusals
+
+**Runtime impact: YES.** A member whose chat connection drops is told so — until now they saw nothing
+at all, and were then congratulated on a recovery from a failure nobody had mentioned. A member whose
+browser blocks the room's audio gets a dialog whose OK is the gesture that unblocks it, instead of a
+`console.warn` and a silent session. And a negative `simUserCount` can no longer subtract from a real
+roster.
+
+**`routes/+page.svelte`'s fifteen rows are now closed: G03, G09, G14 built; G02 an owner decision;
+G01 blocked; G11, G16 and G17 recorded refusals — with G04-G08, G12 and G13 in the entry above.**
+
+#### G03 — the half that was built was the half nobody needs
+
+There are TWO elements on `notConnectedOverlay`: const 9 is the overlay shown while the socket is
+down, and const 10 is the three-second "Conected" flash. This room had const 10. So a dropped chat
+connection was invisible, and the only thing a member ever saw was a tick for a failure they were
+never told about.
+
+They stay two elements. Making one say both things would lose the three-second timing that belongs
+to the flash and to nothing else.
+
+#### G09 — the dialog's OK *is* the mechanism
+
+Chrome refuses audible autoplay without a user gesture. This caught the rejection and logged it, so a
+member whose browser blocked it heard nothing for the entire session with nothing on screen to act
+on. The retry has to be the dismissal callback rather than a timer, because `play()` called again
+without a gesture is refused again — the OK is the gesture.
+
+One divergence, recorded at the code: upstream opens `bootbox.hideAll()` and re-raises per failing
+producer, so four open microphones show the same sentence four times and clear whatever else the
+member was reading. One dialog is raised here and its callback retries every blocked element, because
+one gesture satisfies all of them.
+
+#### G14 — the bound that mattered was the lower one
+
+`connectedCount` is `rosterCount + simUserCount`, and neither end was bounded. An inflated headcount
+is at least the kind of lie the setting exists to tell; a negative one **subtracted from a real
+roster**, so a room of twelve could publish "7". `#lib/sim-user-count.ts` carries the transcription
+and the three details that would each be a real change if tidied, including the one case the
+reference never answers — `Number("lots")` is `NaN`, compared twice, both false, and rendered.
+
+#### G02 is an AUTHORITY difference, not a missing dialog
+
+The reference warns a presenter that the room they just entered is locked to everyone else. **In this
+room they cannot enter it:** `decideRoomEntry` refuses `isLocked === true` as its first test, before
+identity is even established. The dialog is not missing here — its precondition is.
+
+That is not obviously wrong. The setting's own help text in the control plane reads *"If session is
+locked, nobody will be able to log in..."*, and our door matches the words the owner is shown. But it
+does mean **an owner who locks a room locks themselves out of it**, and the reference clearly expects
+otherwise. Who may enter a locked room is an authority decision made on the server, which is the
+class of change this repository does not make on inference — so it is written up as one question for
+the owner, with the five lines it would then take.
+
+#### Four refusals, each recorded where the next comparison will meet it
+
+**G11** — `audioServerDisableMic` is raised by an audio bridge this room does not have, and the
+outcome it exists for is already reached by a better route: upstream has one sentence for every
+microphone failure, while `#reportCaptureError` branches on the actual error. **G16** — the
+`visibilitychange` arming delay and the roster unload, both deliberate, and the row asked for exactly
+this: its sibling refusal was recorded in a contract and this one was not. **G17** — already declared
+at `gates.ts:250-261`; closed against the record that existed rather than restated. **G01** —
+`launchRecordings()` opens a SERVER page, and wiring it would open a tab onto a 404 carrying a
+session token in the URL, which is worse than an inert item.
+
+#### What was run
+
+`pnpm run gate` in `apps/room`, green, exit code echoed into the log and read from there. 241 test
+files, 3,976 passed, 1 skipped. Five ceilings raised with their reasons recorded — three for built
+rows, two for refusals, and a refusal costs its lines exactly once.
+
+**Seven negative controls, and one of them found TWO unfalsifiable assertions.** The clamp's boundary
+tests read "`> 5e3`, not `>=`" and "assigns 0 at exactly 0, as `<= 0` does", both asserted by value —
+and neither can fail: at exactly 5000, `>` returns the input and `>=` returns the constant, which is
+**the same number**, and at exactly 0, `<= 0` and `< 0` both produce 0. Changing either operator is
+invisible to every input. The operators are a transcription, so the source is what pins them now, and
+both mutations turn that assertion red. The other five — the clamp's lower bound removed, the
+reconnecting overlay's gate closed, the autoplay retry moved off the dismissal, and the
+one-dialog guard removed — were red first time.
+
+**The Svelte MCP server is still disconnected for this session.**
+
 ### 2026-08-30 12:36 UTC — Seven navbar rows, and a coverage report that had been counting its own comments
 
 **Runtime impact: YES.** A presenter can take the floor back from ONE speaker: every name in the

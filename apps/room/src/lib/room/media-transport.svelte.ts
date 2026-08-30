@@ -90,8 +90,19 @@ export interface TransportSession {
   **What the room is told.** Publishing a producer is this class's; announcing it is the event
   stream's. They meet at the wire and nowhere else.
 */
+/**
+ * `bootbox.alert("Your browser needs your OK to play the room's audio", …)` — byte 2,515,092.
+ *
+ * Verbatim, apostrophe included. Named rather than inlined so the contract asserts the captured
+ * sentence rather than a paraphrase of it, which is the same reason `MEDIA_NOT_CONNECTED_ALERT`
+ * next door is a constant.
+ */
+export const AUTOPLAY_BLOCKED_ALERT = "Your browser needs your OK to play the room's audio";
+
 export class RoomMediaTransport {
   readonly #dialogs: RoomDialogs;
+  #autoplayBlocked: Set<HTMLAudioElement>;
+  #autoplayPromptOpen: boolean;
   readonly #toasts: RoomToasts;
   readonly #media: RoomMedia;
   readonly #screens: RoomScreens;
@@ -275,6 +286,16 @@ export class RoomMediaTransport {
      * producer does not say so, nothing does".
      */
     this.#audioProducerOwners = new Map<string, { userID: number; name: string }>();
+
+    /**
+     * Audio elements whose `play()` the browser refused for want of a user gesture — G09.
+     *
+     * A plain `Set`, not a rune: nothing renders from it. It exists so the ONE dialog raised for the
+     * first refusal can retry every element that was blocked by the same missing gesture, rather
+     * than one dialog per producer as the reference does.
+     */
+    this.#autoplayBlocked = new Set<HTMLAudioElement>();
+    this.#autoplayPromptOpen = false;
 
     /**
      * Every remote peer's microphone, keyed by producer id.
@@ -1280,8 +1301,49 @@ export class RoomMediaTransport {
       node.volume = Math.min(1, Math.max(0, this.#roomVolume.volume / 100));
 
       if (stream) {
+        /*
+          ── G09 — A BLOCKED AUTOPLAY IS TOLD TO THE MEMBER, and it used to be told to the console ──
+
+          ```js
+          bootbox.hideAll(), P("audiobridge Autoplay FAILED. need user OK..."),
+          bootbox.alert("Your browser needs your OK to play the room's audio", () => {
+            P("Autoplay after UI, pressing play()..."), o.play(),
+            guiEventBus.emit("resizeScrollviewChatEnd") })
+          ```
+          (bundle byte 2,515,092.) Chrome refuses audible autoplay without a user gesture, so a
+          member whose browser blocks this hears NOTHING for the whole session and has nothing on
+          screen to act on. A `console.warn` is not a way to recover.
+
+          **The dialog's OK is the gesture.** That is the entire mechanism and it is why the retry
+          has to be the dismissal callback rather than a timer: `play()` called again without a
+          gesture is refused again.
+
+          RAISED ONCE, which is ours. Upstream opens `bootbox.hideAll()` — it re-raises per failing
+          producer and closes whatever was on screen to do it, so a room with four open microphones
+          shows the same sentence four times and clears anything else the member was reading. Here
+          the first refusal raises it and the callback retries EVERY blocked element, because they
+          were all blocked by the same missing gesture and one OK satisfies all of them.
+
+          `resizeScrollviewChatEnd` has no counterpart: it is a jQuery height recalculation for a
+          scroller this room lays out with CSS.
+        */
         node.play().catch((error: unknown) => {
           console.warn(`[media] remote audio ${producerId} could not play`, error);
+          this.#autoplayBlocked.add(node);
+          if (this.#autoplayPromptOpen) return;
+          this.#autoplayPromptOpen = true;
+          this.#dialogs.alertThen(AUTOPLAY_BLOCKED_ALERT, () => {
+            this.#autoplayPromptOpen = false;
+            for (const blocked of this.#autoplayBlocked) {
+              void blocked.play().catch(() => {
+                /*
+                  Silent, and deliberately: the member has just answered this question. A second
+                  dialog for the same refusal is a loop, and the failure is already on the console.
+                */
+              });
+            }
+            this.#autoplayBlocked.clear();
+          });
         });
       }
 

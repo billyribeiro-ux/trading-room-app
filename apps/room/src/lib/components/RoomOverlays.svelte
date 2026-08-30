@@ -534,6 +534,37 @@
 
 <!-- One hidden sink per remote microphone. The reasoning travelled with the markup. -->
 <RemoteAudioSinks {mediaTransport} />
+<!--
+  ── G03 — THE OVERLAY HAD ONLY ITS SUCCESS HALF ───────────────────────────────────────────────
+
+  There are TWO elements on this class and this room had one of them:
+
+  ```js
+  function iRe(t,n){ 1&t && (d(0,"div",9), T(1,"i",37), v(2," Reconnecting Chat... "), u()) }
+  O(7, o.appService.globals.socketConnected ? -1 : 7)          // byte 2,548,292
+   9  [1,"notConnectedOverlay","animated","fadeIn"]            // the failure overlay
+  10  ["id","connectedMsg",1,"notConnectedOverlay","animated","fadeIn"]   // the 3s success flash
+  37  [1,"fas","fa-cog","fa-spin"]
+  ```
+
+  So a member whose chat connection dropped saw nothing at all, and then — once it came back — a
+  three-second tick saying "Conected" for a failure they were never told about. The half that was
+  built is the half nobody needs.
+
+  `roomEvents.connected` is `socketConnected`'s counterpart and starts FALSE, so this is on screen
+  during the first connect too. That is upstream's own behaviour: `globals.socketConnected` is never
+  initialised, only assigned, so it is `undefined` until the socket opens. Gating on
+  `hasConnectedBefore` as well would read better and would be OURS, and the wording is the
+  reference's own — a room whose chat has not connected yet IS a room whose chat is connecting.
+
+  " Reconnecting Chat... " keeps its leading and trailing spaces, written as an expression because
+  Svelte normalises whitespace at element boundaries.
+-->
+{#if !roomEvents.connected}
+  <div class="notConnectedOverlay animated fadeIn">
+    <i class="fas fa-cog fa-spin"></i>{' Reconnecting Chat... '}
+  </div>
+{/if}
 <div
   id="connectedMsg"
   class="notConnectedOverlay animated fadeIn"
