@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { RoomDialogs } from './room/dialogs.svelte';
+import { RoomToasts } from './room/toasts.svelte';
+import { RoomUserActions } from './room/user-actions.svelte';
 import {
   MISSING_SCHEME_ALERT,
   TOAST_ONLY_ACTIONS,
@@ -136,16 +139,19 @@ describe('the actions that report success and send nothing', () => {
   button that reports success. Joined 2026-08-23.
 */
 describe('force-reload reaches the wire', () => {
-  it('dispatches to the command with the TARGET user, not the caller', async () => {
+  it('dispatches to the command with the TARGET user, not the caller', () => {
     /*
       The id matters more than the call. `forceReload(user.id)` where `user` is the modal's target —
       passing the presenter's own id would reload the presenter, which looks like a working button
       right up until somebody uses it.
-    */
-    const { RoomUserActions } = await import('./room/user-actions.svelte.js');
-    const { RoomDialogs } = await import('./room/dialogs.svelte.js');
-    const { RoomToasts } = await import('./room/toasts.svelte.js');
 
+      The three room classes are imported at MODULE scope, like every other test that builds them.
+      They were dynamic `await import()`s inside this body until 2026-08-30 — the only three in the
+      suite — and that put the cost of compiling a rune module and its whole graph INSIDE vitest's
+      per-test budget: 3,388ms of a 5,000ms default, measured. It timed out for real on a loaded
+      box. A static import pays the same cost during the file's import phase, which vitest measures
+      separately and does not time out, so nothing is hidden and nothing is slower.
+    */
     const reloaded: number[] = [];
     const dialogs = new RoomDialogs();
     /* The full row shape the class constrains its generic to, so the cast below hides nothing. */

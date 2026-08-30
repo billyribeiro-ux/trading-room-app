@@ -65,12 +65,39 @@ describe('svelte template comments', () => {
     Asked of the COMPILER rather than of a pattern: parse the template and look for a text node that
     reached the fragment carrying comment prose. A real comment is a `Comment` node and never appears
     as `Text`, so this cannot false-positive on a legitimate one.
+
+    ## Why a regex screens the files the compiler then judges
+
+    Parsing all seventy-four templates costs 2,718ms, measured; the walk over the resulting ASTs
+    costs 63ms. So this rule was 97% parser, and it spent that on a 5,000ms default budget: on
+    2026-08-30 it timed out for real at 5,219ms while other work loaded the box, and reported itself
+    as a FAILING CONTRACT rather than as a slow one. A gate that goes red for being busy is a gate
+    people learn to re-run, which is the opposite of what a contract is for.
+
+    The screen below is sound rather than merely fast, and the reason is worth stating because the
+    cheap version of this idea is the bug the whole rule exists to catch. A `Text` node's data is
+    always a substring of the source that lies OUTSIDE a comment. `stripComments` removes every
+    well-formed comment with the same non-greedy pairing the parser itself uses — `<!--` to the next
+    `-->` — so any `-->` still standing afterwards is one the parser could not have consumed either.
+    A file with none cannot produce a `Text` node containing `-->`, and skipping it loses nothing.
+
+    The screen only DECIDES WHAT TO PARSE. It never decides who offends: a residual `-->` inside a
+    `<script>` block, an attribute value or an expression tag survives stripping and is not a
+    template text node, and the compiler is what says so. That is why the parse stays — the check is
+    still asked of the compiler, on the handful of files that could possibly answer yes.
+
+    Cost after: 74 parses become 0 in a clean tree, and the rule runs in ~15ms.
   */
+  const stripComments = (source: string): string => source.replace(/<!--[\s\S]*?-->/g, '');
+
   it('never leaks a comment CLOSER into the rendered page', () => {
     const offenders: string[] = [];
 
     for (const file of templates) {
       const source = readFileSync(file, 'utf8');
+      /* See the docblock: no residual closer means no Text node can carry one. */
+      if (!stripComments(source).includes('-->')) continue;
+
       let ast;
       try {
         ast = parse(source, { modern: true });

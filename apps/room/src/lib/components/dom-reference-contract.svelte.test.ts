@@ -129,8 +129,18 @@ describe('what bind:this actually does, so the guard can be removed on evidence'
 */
 const CAPTURE_SHAPE = /^\s*(?:function\s+)?(capture|hold)[A-Z]\w*/;
 
-/** Every attachment expression, with the component it sits on. */
+/**
+ * Every attachment expression, with the component it sits on.
+ *
+ * The `@attach` screen is a COST decision, and it is equivalence-preserving rather than a
+ * heuristic: an `AttachTag` node can only come from an `{@attach ...}` tag, so a source with no
+ * `@attach` token anywhere cannot contribute one. Measured across all 74 components on 2026-08-30:
+ * 125 attachments found either way, byte-identical file/line/expression sets, with 35 files parsed
+ * instead of 74. Matching the bare token rather than `{@attach` keeps it indifferent to spacing.
+ */
 const attachmentsIn = (file: string, source: string) => {
+  if (!source.includes('@attach')) return [];
+
   const found: { line: number; expr: string }[] = [];
   const lineOf = (offset: number) => source.slice(0, offset).split('\n').length;
   const visit = (node: unknown): void => {
@@ -174,21 +184,32 @@ describe('every capture attachment has a reason bind:this cannot serve', () => {
     captureCategorySection: 'a factory writing one array slot per category'
   };
 
+  /*
+    Parsed ONCE, at describe scope, and read by both tests below.
+
+    They each enumerated the whole corpus independently, so every component was read and parsed
+    twice — 2,344ms per pass, measured. That put the first test at 3,349ms against vitest's 5,000ms
+    default, and a test whose body is 67% budget is a test that goes red for being busy: two others
+    in this suite did exactly that on 2026-08-30 while the box was loaded, and reported themselves
+    as failing contracts. Collection-time work is not charged to a test's timeout, so this both
+    halves the work and puts what remains where it cannot masquerade as a failure.
+  */
+  const ALL_ATTACHMENTS = components.flatMap((file) =>
+    attachmentsIn(file, readFileSync(file, 'utf8'))
+  );
+
   it('found attachments to inspect', () => {
-    const all = components.flatMap((file) => attachmentsIn(file, readFileSync(file, 'utf8')));
-    expect(all.length, 'no attachments were found at all').toBeGreaterThan(50);
+    expect(ALL_ATTACHMENTS.length, 'no attachments were found at all').toBeGreaterThan(50);
   });
 
   it('no capture-shaped attachment is an unsanctioned hand-rolled bind:this', () => {
     const offenders: string[] = [];
-    for (const file of components) {
-      for (const attachment of attachmentsIn(file, readFileSync(file, 'utf8'))) {
-        // The bare identifier or the factory head, e.g. `captureCategorySection(index)`.
-        const name = attachment.expr.match(/^([A-Za-z_$][\w$]*)/)?.[1];
-        if (!name || !CAPTURE_SHAPE.test(name)) continue;
-        if (SANCTIONED[name]) continue;
-        offenders.push(`${attachment.file}:${attachment.line} — {@attach ${name}}`);
-      }
+    for (const attachment of ALL_ATTACHMENTS) {
+      // The bare identifier or the factory head, e.g. `captureCategorySection(index)`.
+      const name = attachment.expr.match(/^([A-Za-z_$][\w$]*)/)?.[1];
+      if (!name || !CAPTURE_SHAPE.test(name)) continue;
+      if (SANCTIONED[name]) continue;
+      offenders.push(`${attachment.file}:${attachment.line} — {@attach ${name}}`);
     }
 
     expect(
