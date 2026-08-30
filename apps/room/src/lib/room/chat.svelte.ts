@@ -1,5 +1,6 @@
 import { appendMention } from '#lib/mention-insert.js';
-import { RoomChatSearch } from './chat-search.svelte.js';
+import { RoomChatSearch, type ChatColumn } from './chat-search.svelte.js';
+import { withArrival, withoutChannel, type ChatTabUnreadCounts } from './chat-tab-unread.js';
 import type { ChatTab } from '#lib/types.js';
 
 /*
@@ -93,6 +94,38 @@ export class RoomChat {
   #typists = $state.raw<readonly string[]>([]);
   #extraTypists = $state.raw<readonly string[]>([]);
 
+  /*
+    ── WHAT YOU HAVE NOT READ, per column ─────────────────────────────────────────────────────────
+
+    `acA-06`. Two maps for the same reason there are two typist lists: the columns show different
+    channels, and the reference keeps a separate `unreadMsgs` on `app-chat` and on `app-extra-chat`
+    (byte 1,429,032 and 2,375,500) rather than one shared map. A single map would clear the badge in
+    the column that is NOT showing the channel you just opened.
+
+    `$state.raw`, and the writers above are why: the map is replaced wholesale on every arrival, so a
+    deep proxy would be pure overhead on a path that runs once per message in the room.
+  */
+  #unread = $state.raw<ChatTabUnreadCounts>({});
+  #extraUnread = $state.raw<ChatTabUnreadCounts>({});
+
+  /*
+    `acA-04` — "Mod Only", the chat log's one filter, per column.
+
+    ```js
+    this.filterChatMsgs = { modOnly: !1, modOnlyExtra: !1 }                     // byte 981,131
+    ```
+
+    Two keys on ONE object upstream and two entries in one record here, for the reason every other
+    field on this class is doubled: the columns show different channels and a reader filters one of
+    them without filtering the other.
+
+    SESSION STATE, not a preference. The reference declares it on `globals` beside `mutedUsers` and
+    `showPositions`, never writes it to the settings store, and it comes back `false` on every
+    reload. Reproduced — `dead-preference-keys.ts` exists because a key nothing persists is worse
+    than no key at all.
+  */
+  #modOnly = $state({ main: false, extra: false });
+
   /** `amITyping` — so a burst sends ONE `typing`, not one per keystroke. Per composer. */
   #announced = { main: false, extra: false };
 
@@ -146,6 +179,74 @@ export class RoomChat {
   }
 
   /**
+   * Whether a column is showing moderator messages only.
+   *
+   * The PREDICATE is `RoomFeeds`', where every other visibility rule for the log already lives; this
+   * class holds the switch. Splitting it that way is the same division `chat-search.svelte.ts`
+   * makes — the box remembers what is typed, the feed owns the rows.
+   */
+  modOnly(column: ChatColumn): boolean {
+    return this.#modOnly[column];
+  }
+
+  /**
+   * The checkbox.
+   *
+   * Upstream's `change` handler re-requests page 0 of the log (`toggleModOnlyFilter()`, byte
+   * 1,446,494) because its filter runs over whatever the last `getChatLog` returned. This room's
+   * filter is a view over rows it already holds, so there is nothing to re-request: the same
+   * messages are re-rendered through one more predicate. **That is a divergence in the reader's
+   * favour** — upstream's refetch throws away the pages a reader had scrolled back to, and turning a
+   * filter on should not lose their place.
+   */
+  setModOnly(column: ChatColumn, next: boolean): void {
+    this.#modOnly[column] = next;
+  }
+
+  /** The MAIN column's unread counts, keyed by channel. */
+  get unread(): ChatTabUnreadCounts {
+    return this.#unread;
+  }
+
+  /** The same for the extra column. */
+  get extraUnread(): ChatTabUnreadCounts {
+    return this.#extraUnread;
+  }
+
+  /**
+   * One chat message arrived on the wire, in some channel.
+   *
+   * ```js
+   * subscribe("chatMsg", e => {
+   *   e.c == this.channel ? emit("alwaysScrollToBottom")
+   *                       : this.unreadMsgs[e.c] = this.unreadMsgs[e.c] ? this.unreadMsgs[e.c]+1 : 1,
+   *   e.isMention && (e.c !== this.channel && globals.isPresenter &&
+   *                   (this.unreadMentions[e.c] = …+1)), …                        // byte 1,430,918
+   * ```
+   *
+   * Term for term: the OPEN channel never counts — a message you are looking at is read — and a
+   * mention counts only when its channel is not the open one either.
+   *
+   * ## `countMentions` is a parameter and not a field, and that is the presenter gate
+   *
+   * Upstream states `globals.isPresenter` TWICE: once here, deciding whether to count, and again in
+   * the badge, deciding whether to draw. Both gates on one fact means the second can never differ
+   * from the first, so this room states it once — HERE, at the count — and `ChatTabStrip` draws the
+   * `(n)` whenever there is one. A strip that took `isPresenter` of its own would be a second
+   * authority on the same question, which is the shape this repository refuses everywhere else.
+   *
+   * The caller passes the role because the role is the page's, resolved on the SERVER from
+   * `data.user.role`; this class has never known it and must not start.
+   */
+  chatArrived(channel: string, options: { isMention: boolean; countMentions: boolean }): void {
+    const mention = options.isMention && options.countMentions;
+    if (channel !== this.#tab) this.#unread = withArrival(this.#unread, channel, mention);
+    if (channel !== this.#extraTab) {
+      this.#extraUnread = withArrival(this.#extraUnread, channel, mention);
+    }
+  }
+
+  /**
    * One `typing` frame off the wire — `typingUpdated` upstream.
    *
    * Routed by CHANNEL rather than by column, because that is what the frame carries and because the
@@ -183,6 +284,8 @@ export class RoomChat {
 
   set tab(next: ChatTab) {
     this.#tab = next;
+    // `switchChatChannel` clears the channel it opened. See `withoutChannel`.
+    this.#unread = withoutChannel(this.#unread, next);
     /*
       SWITCHING CHANNELS ENDS THE SEARCH. In the SETTER rather than in an effect, so it is a property
       of switching rather than a reaction that could run a frame late — or not at all, if a switch
@@ -197,6 +300,8 @@ export class RoomChat {
 
   set extraTab(next: ChatTab) {
     this.#extraTab = next;
+    // See `tab` above. `app-extra-chat` clears its own map and never the main column's.
+    this.#extraUnread = withoutChannel(this.#extraUnread, next);
     // See `tab` above: a search belongs to one channel.
     this.search.endedByChannelSwitch('extra');
   }

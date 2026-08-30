@@ -35,12 +35,15 @@
  * searchTermChanged(e) { e || this.clearSearchTerm() }  // byte 1,439,050
  * ```
  *
- * `showChatToolbarExtended` is NOT held. The extended bar carries the save-chat and archive
- * controls, which are separate features that are not built; a flag whose only reader would be markup
- * that does not exist is what `CLAUDE.md` refuses by name. So `toggle` below is
- * `toggleChatToolbarSearchOnly` with that assignment dropped — in the one state where it mattered
- * (bar open and extended), upstream collapses the bar to search-only, which is what this room's bar
- * already is.
+ * `showChatToolbarExtended` IS held now, and the sentence that used to stand here — "a flag whose
+ * only reader would be markup that does not exist is what `CLAUDE.md` refuses by name" — was correct
+ * on 2026-08-29 and stopped being correct on 2026-08-30, when `acA-04` built the first control the
+ * extended bar carries: the **Mod Only** checkbox. So both toggles are transcribed above, term for
+ * term, and both are implemented below.
+ *
+ * The rest of that bar is still not built — the save-chat and archive controls (`Y_e` and `Q_e`,
+ * nodes 4 and 5 of `X_e` at byte 1,423,265) are separate features — so the extended section renders
+ * the checkbox and nothing else. That is a gap in what the bar OFFERS, not a flag with no reader.
  *
  * ## One divergence, and it is in the reader's favour
  *
@@ -65,6 +68,8 @@ export class RoomChatSearch {
 
   #term = $state({ main: '', extra: '' });
   #open = $state({ main: false, extra: false });
+  /** `showChatToolbarExtended` — the bar is showing its controls and not only the search field. */
+  #extended = $state({ main: false, extra: false });
 
   constructor(options: { ended?: (column: ChatColumn) => void } = {}) {
     this.#ended = options.ended ?? (() => {});
@@ -93,10 +98,59 @@ export class RoomChatSearch {
     return this.#open[column];
   }
 
-  /** The magnifier. Closing ends the search — see the divergence in the docblock. */
+  /** Whether the bar is showing its controls as well as the search field. */
+  isExtended(column: ChatColumn): boolean {
+    return this.#extended[column];
+  }
+
+  /**
+   * The magnifier — `toggleChatToolbarSearchOnly`, byte 1,435,310.
+   *
+   * ```js
+   * this.showChatToolbar && this.showChatToolbarExtended || (this.showChatToolbar = !this.showChatToolbar);
+   * this.showChatToolbarExtended = !1;
+   * ```
+   *
+   * The `||` is doing the work and is easy to misread: when the bar is open AND extended, the left
+   * side is truthy and the assignment is SKIPPED — so the magnifier COLLAPSES an extended bar to
+   * search-only rather than closing it. Every other state flips it. The unconditional
+   * `showChatToolbarExtended = !1` is the second line.
+   *
+   * Closing ends the search — see the divergence in the docblock.
+   */
   toggle(column: ChatColumn): void {
+    const collapsing = this.#open[column] && this.#extended[column];
+    this.#extended[column] = false;
+    if (collapsing) return;
+
     const next = !this.#open[column];
     this.#open[column] = next;
+    if (!next) this.clear(column);
+  }
+
+  /**
+   * The gear — `toggleChatToolbar`, byte 1,435,047.
+   *
+   * ```js
+   * this.showChatToolbar && !this.showChatToolbarExtended
+   *   ? this.showChatToolbarExtended = !0
+   *   : (this.showChatToolbar = !this.showChatToolbar,
+   *      this.showChatToolbar && (this.showChatToolbarExtended = !0));
+   * ```
+   *
+   * An open search-only bar EXTENDS; anything else opens or closes, and an open one is always
+   * extended. Closing this way ends the search for the same reason the magnifier does — a term left
+   * standing behind a hidden bar is a filtered log with nothing on screen saying so.
+   */
+  toggleExtended(column: ChatColumn): void {
+    if (this.#open[column] && !this.#extended[column]) {
+      this.#extended[column] = true;
+      return;
+    }
+
+    const next = !this.#open[column];
+    this.#open[column] = next;
+    this.#extended[column] = next;
     if (!next) this.clear(column);
   }
 

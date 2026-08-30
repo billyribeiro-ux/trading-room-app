@@ -33,6 +33,135 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 18:15 UTC — The chat columns: what you have not read, who you are reading, and where the second column goes
+
+**Runtime impact: YES.** Every chat channel now carries an unread count on its tab, and a presenter
+also sees how many of those said their name. A "Mod Only" checkbox filters a chat column to the
+moderators' messages and your own. In a top/bottom room the second chat column lands below the chat
+pane instead of beside the presentation area. And a member handed mic and screen at runtime no longer
+gets an Archive Alerts button the reference withholds from them.
+
+Six rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `acA-04`, `acA-06`, `acA-07`,
+`acA-08`, `acA-11`, `acA-12` — which closes the `AlertChatArea` surface. **67 open · 157 closed ·
+224 rows.**
+
+#### `acA-07` — a comment that had been right about a gate the code got wrong
+
+One `&&`. The archive control was gated on `isPresenter` while the comment eight lines above it had
+said `isPresenter && !media.limitedPresenter` since the block was written. That is the failure
+`CLAUDE.md` names in as many words — *"every comment claiming X is bounded/constant/checked still
+matches the next line"* — and it had a real consequence, because `giveMicScreen` assigns
+`globals.user.isPresenter = globals.isLimitedPresenter = e.give`: somebody handed mic and screen was
+being offered a control upstream keeps from exactly those people. `O(2, isPresenter &&
+!isLimitedPresenter ? 2 : -1)`, byte 2,043,456.
+
+#### `acA-06` — the unread counters, and a gate stated once instead of twice
+
+`chat-tab-unread.ts` holds the arithmetic as three pure functions; `RoomChat` holds ONE MAP PER
+COLUMN, because the reference does (`app-chat` at byte 1,429,032, `app-extra-chat` at 2,375,500) and
+a shared map would clear the badge in the column that is *not* showing the channel you opened. The
+count is taken in `events.svelte.ts` from the SSE frame, which already carries the channel and a
+server-decided `isMention`, and it sits **above** the own-sender guard because upstream's
+subscription has no sender filter and the guard here is about a refetch — the case where the two
+differ is a message typed into the extra column arriving on a channel the main column is not showing.
+
+Upstream states `globals.isPresenter` twice: once deciding whether to count a mention, once deciding
+whether to draw it. It is stated once here, at the count, and `ChatTabStrip` carries no role of its
+own — `expect(strip).not.toContain('isPresenter')` is an assertion, because a strip that took the
+role would be a second authority on a question the server already answered.
+
+#### `acA-04` — Mod Only, and a toolbar that finally has something in it
+
+The switch is per column on `RoomChat` (`filterChatMsgs = {modOnly, modOnlyExtra}`, byte 981,131);
+the predicate is one `.filter` in `RoomFeeds`, transcribed from byte 1,414,769. Two survivors, not
+one — the moderators' messages AND your own — which reads like an oversight until you try it, because
+a filter that hid what you had just typed looks like the send having failed.
+
+`RoomChatSearch` now holds `showChatToolbarExtended`. Its docblock used to argue that it should not:
+*"a flag whose only reader would be markup that does not exist is what `CLAUDE.md` refuses by name."*
+That was correct on 2026-08-29 and stopped being correct when this checkbox was built, so the
+sentence is replaced rather than deleted. The chat gear opens that bar now instead of the settings
+modal, which is what `toggleChatToolbar()` binds upstream (byte 1,435,047); the modal keeps its
+routes from the sidebar and the alerts column.
+
+**One divergence:** the checkbox id carries the column. `"mod-only"` occurs four times in the bundle,
+twice per column, so a room with both bars open ships two elements with one id and the extra column's
+`<label for>` operates the main column's checkbox. That is a functional break, not a cosmetic one.
+
+#### `acA-08` — the second column has three homes upstream and had a fourth here
+
+The reference places it three ways and this room shipped one ungated top-level area in every case, so
+a top/bottom viewer got the second column beside the presentation pane. All three are built now over
+ONE `<ExtraChatPane>` call: the phone's plain area (`nRe`, byte 2,496,359, whose gate carries **no
+direction term** — measured, not assumed), `H4e`'s top-level area with the nested split, and `j4e`'s
+`chat-box` inside `AlertChatArea`'s own split (byte 2,490,857).
+
+The part that is not a transcription is the arithmetic. `as-split` treats `size` as a proportion and
+normalises across however many areas there are; flex-basis percentages do not, so binding `chatSize`
+to both inner chat areas verbatim would emit `alerts + chat + chat` and overflow the stack.
+`RoomSplit.#innerScale` does the division `as-split` does for free.
+
+`extra-chat-column-contract.test.ts`'s two old assertions — "gated exactly as K4e gates index 3" and
+"it is an area, not a pane nested inside the chat column" — were **true of two forms out of three**
+and neither could have caught this. They are rewritten against the three measured gates.
+
+#### `acA-11` and `acA-12` — the small ones, and why they are not cosmetic
+
+`acA-11` is both halves of one behaviour: the brand grows `&nbsp;Chat` when there are no channels
+(`j_e`, byte 1,420,732) and the strip suppresses its whole `<ul>` in the same case (byte 1,453,947).
+The verifier's note that this is unreachable while every room has two built-ins is correct and is why
+it stayed `low` — but the empty styled `nav-tabs` strip was already shipping, and
+`chatTabsWithBadges` makes the other half reachable.
+
+`acA-12` moves four toolbar clicks from the `<a>` to the `<li>`, which is what const 12 carries and
+const 13 does not. The contract also asserts the private-chat click is still on its ANCHOR, because
+it is bound there in both applications — a later consistency pass tidying all three to match would be
+undoing a measurement.
+
+#### What the gate found that the work did not
+
+Three things, and each was a real hole rather than a formality:
+
+- **Two mount harnesses were rendering `AlertChatArea` without `chatTabs`**, a required prop. Nothing
+  had noticed because the only reader was `<ChatTabStrip tabs={chatTabs}>` and `{#each undefined}`
+  renders nothing. `acA-11` put `chatTabs.length` in the brand, which is not so forgiving. Both
+  harnesses had been exercising a component in a state its own types forbid.
+- **`orphaned-comment-contract`** caught the constructor docblock in `split.svelte.ts` separated from
+  its constructor by the new field.
+- **`slice-anchor-contract`** caught four unasserted `indexOf`/`lastIndexOf` slice bounds in the new
+  tests, which is exactly the class of assertion-that-cannot-fail this repository has now found six
+  times.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — `format:check`, `lint`, `check`, `test`, `build` — exit 0, with the
+code echoed into a log and read from there. **253 test files, 4,206 tests, 1 skipped.** The run also
+prints, as every run here does, that 42 evidence-bound test files are excluded because 13 of the 14
+reference-capture roots are gitignored; this run does not cover them.
+
+**Seventeen negative controls, each seen RED**, and each mutation checked to have landed before the
+run — a `python` replace that silently matches nothing produces a green control and a false claim,
+which has happened here. The controls: the archive gate reduced to one term; the `&nbsp;Chat` label
+removed; the strip's presence gate forced true; a toolbar click moved back to its anchor; the unread
+count taking the open tab; the switch never clearing; the mention gate removed; the count moved below
+the own-sender guard; the Mod Only predicate removed; its own-messages term removed; the switch made
+shared; the id made constant; the extended section forced open; the side area ungated by direction;
+the inner slot removed; the renormalisation removed; and a second `<ExtraChatPane>` call site.
+
+Svelte MCP: `list-sections` and `get-documentation` for `{@const}`, `{#snippet}`, `{@render}` and the
+declaration tags; `svelte-autofixer` returned no issues for `ChatTabStrip` and `ChatSearchBar`, and
+for `RoomShell` returned only the two findings that predate this change (a suppressed
+`a11y_no_noninteractive_tabindex` on the gutter, and its two documented `$effect`s). It was **not**
+run on `AlertChatArea.svelte` or `routes/+page.svelte` — 73KB and 79KB — which stays recorded as
+outstanding rather than claimed.
+
+**Nothing was opened in a browser.** The room's Playwright job exists but was not run here.
+
+One thing found and deliberately not done: the official docs now call `{@const}` legacy in favour of
+the `{const x = ...}` declaration tags added in Svelte 5.56, which this repository is on. There are
+twelve `{@const}` sites across eight components. Migrating one of them would leave two idioms in the
+tree, so it is recorded as its own piece of work rather than half-done here.
+
 ### 2026-08-30 17:19 UTC — The trade-alert panes: an Edit that looked broken, and a picture you could not save
 
 **Runtime impact: YES.** Pressing Edit on a trade alert flashes the composer, so it no longer reads

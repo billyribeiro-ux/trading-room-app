@@ -1227,6 +1227,8 @@
           -->
           {#snippet chatAlertsPane()}
             <AlertChatArea
+              isLimitedPresenter={media.limitedPresenter}
+              extraChatArea={extraChatInnerArea}
               {broadcasts}
               {split}
               {alerts}
@@ -1357,20 +1359,34 @@
           {/snippet}
 
           <!--
-            `q4e` — the extra chat column, its own `as-split-area` holding `app-extra-chat`.
+            `acA-08` — the extra chat column has THREE forms upstream, not one, and this room shipped
+            a fourth that is none of them.
 
-            A third area, not a second pane inside the chat column: `K4e` renders three areas and
-            gates this one on `!hideChatAlerts && preferences.extraChatColumn`. Const 227 is the
-            only mobile area carrying an `order` binding, which `RoomSplit.extraChatAreaStyle`
-            records; the note there used to end "which this room does not model", and it does now.
+            ```js
+            // phone: nRe, byte 2,496,359 — const 227 ["minSize","0",1,"alert-chat-box",3,"size","order"]
+            O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)
+
+            // desktop ltr/rtl: H4e, const 207
+            //   ["minSize","0",1,"alert-chat-box","alert-chat-box-extra-column",3,"size","order"]
+            //   holding an <as-split> whose single area is const 211, `chat-box`
+            O(2, e.hideChatAlerts || !preferences.extraChatColumn ||
+                 "ltr" !== preferences.roomSplitDir && "rtl" !== preferences.roomSplitDir ? -1 : 2)
+
+            // desktop ttb/btt: j4e, byte 2,490,857 — a FOURTH area of the INNER stack, const 211
+            O(6, !preferences.extraChatColumn ||
+                 "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
+            ```
+
+            What shipped here was one ungated top-level area in every case, so a top/bottom room drew
+            the second column beside the presentation area instead of below the chat pane, and the
+            `alert-chat-box-extra-column` class hook — which the phone form correctly does NOT carry
+            — never existed at all.
+
+            The three forms share ONE `<ExtraChatPane>` call: it takes thirty props off this page's
+            state, and three transcriptions of that call is three places to forget a prop.
           -->
-          {#snippet extraChatPane()}
-            <as-split-area
-              minsize="0"
-              class="alert-chat-box as-split-area"
-              style={split.extraChatAreaStyle}
-            >
-              <ExtraChatPane
+          {#snippet extraChatColumn()}
+            <ExtraChatPane
                 bind:tab={chat.extraTab}
                 bind:composer={chat.extraComposer}
                 messages={feeds.visibleExtraChat}
@@ -1384,6 +1400,7 @@
                 {giphyApiKey}
                 chrome={messageChrome}
                 chatTabs={data.chatTabs}
+                unread={chat.extraUnread}
                 displayMode={displayModes.chat}
                 followedUsers={userActions.followedUsers}
                 presenterColors={data.presenterColors}
@@ -1409,12 +1426,77 @@
                 onsearchinput={(value) => chat.search.setTerm('extra', value)}
                 onsearchsubmit={() => searchChat('extra', chat.search.term('extra'))}
                 onsearchclear={() => chat.search.clear('extra')}
-                onsettings={() => modals.open('settings')}
+                searchExtended={chat.search.isExtended('extra')}
+                modOnly={chat.modOnly('extra')}
+                onmodonly={(next) => chat.setModOnly('extra', next)}
+                ontoggletoolbar={() => chat.search.toggleExtended('extra')}
                 onimageupload={() => composer.openImageUpload()}
                 onrte={() => composer.openExtraRTE()}
                 onselectgif={(url) => composer.selectGif('', url)}
-              />
+            />
+          {/snippet}
+
+          <!-- The phone's form: a plain `alert-chat-box` top-level area, const 227. -->
+          {#snippet extraChatPane()}
+            <as-split-area
+              minsize="0"
+              class="alert-chat-box as-split-area"
+              style={split.extraChatAreaStyle}
+            >
+              {@render extraChatColumn()}
             </as-split-area>
+          {/snippet}
+
+          <!--
+            `H4e` — the desktop left/right form. A top-level area carrying the extra-column class,
+            and inside it an `as-split` of its own whose single `chat-box` area holds the pane. The
+            nested split is the capture's and is kept: it is what makes the column line up with the
+            chat pane beside it rather than with the whole alert-chat stack.
+
+            `alert-chat-box-extra-column` HAS NO CSS RULE — measured: the only selectors carrying the
+            name in any of this room's stylesheets are `.alert-chat-box-extra-column-sm …`, a
+            different class, and the bundle reads it back nowhere. It ships anyway, because its twin
+            `alert-chat-regular` is in exactly the same position and `AlertChatArea.svelte:567`
+            already ships that one: the pair is what a stylesheet or a script would target, and
+            keeping one half of it is how the two stop being a pair.
+          -->
+          {#snippet extraChatSideArea()}
+            <as-split-area
+              minsize="0"
+              class="alert-chat-box alert-chat-box-extra-column as-split-area"
+              style={split.extraChatAreaStyle}
+            >
+              <as-split
+                minsize="0"
+                class={split.innerIsVertical
+                  ? 'as-percent as-vertical as-init'
+                  : 'as-percent as-horizontal as-init'}
+                style={split.innerIsVertical ? undefined : 'flex-direction: row;'}
+                dir="ltr"
+              >
+                <as-split-area minsize="0" class="chat-box as-split-area" style="flex: 0 0 100%;">
+                  {@render extraChatColumn()}
+                </as-split-area>
+              </as-split>
+            </as-split-area>
+          {/snippet}
+
+          <!--
+            `j4e` — the desktop top/bottom form, rendered INSIDE `AlertChatArea`'s own split. The
+            gate is here rather than there because the state it reads is this page's; the component
+            owns the place, not the decision. `split.extraChatIsInside` carries the three terms and
+            the renormalised size.
+          -->
+          {#snippet extraChatInnerArea()}
+            {#if split.extraChatIsInside && !gates.hideChatAlerts}
+              <as-split-area
+                minsize="0"
+                class="chat-box as-split-area"
+                style={split.innerExtraChatAreaStyle}
+              >
+                {@render extraChatColumn()}
+              </as-split-area>
+            {/if}
           {/snippet}
 
         <RoomShell
@@ -1431,6 +1513,7 @@
           {chatAlertsPane}
           {presentationPane}
           {extraChatPane}
+          {extraChatSideArea}
         />
       </div>
     </div>

@@ -228,18 +228,22 @@ describe('and nothing became unreachable', () => {
       function, called twice, keyed on the channel parameter.
     */
     expect(feedsModule).toContain(
-      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+      `chatMessagesFor(
+    tab: ChatTab,
+    searchResults: readonly Message[] | null,
+    column: 'main' | 'extra'
+  ) {`
     );
     expect(feedsModule).toContain(
       'mergeOlderChatMessages(this.#chatPages.older(tab), this.#session().messages)'
     );
     expect(feedsModule).toContain('get visibleChat() {');
     expect(feedsModule).toContain(
-      'return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);'
+      "return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults, 'main');"
     );
     expect(feedsModule).toContain('get visibleExtraChat() {');
     expect(feedsModule).toContain(
-      'return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);'
+      "return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults, 'extra');"
     );
   });
 
@@ -250,7 +254,11 @@ describe('and nothing became unreachable', () => {
       anything for the readers most likely to have it on.
     */
     const from = feedsModule.indexOf(
-      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+      `chatMessagesFor(
+    tab: ChatTab,
+    searchResults: readonly Message[] | null,
+    column: 'main' | 'extra'
+  ) {`
     );
     const derived = feedsModule.slice(from, feedsModule.indexOf('.filter(', from));
     expect(derived).toContain('trimChatLog(');

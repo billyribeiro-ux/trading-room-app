@@ -21,15 +21,17 @@ import { noteUpdateNotice } from './note-update-notice.js';
 import type { RoomToasts } from './toasts.svelte';
 
 /** What the stream reads off the loaded page data. Narrow on purpose: it consults, never owns. */
-/** The one method a typing frame needs. Narrow on purpose: this stream does not own the columns. */
-interface TypingSink {
+/** The two methods a chat frame needs. Narrow on purpose: this stream does not own the columns. */
+interface ChatSink {
   typingUpdated(chatChannel: string, names: readonly string[]): void;
+  /** `acA-06` — one arrival, counted against whichever column is not showing that channel. */
+  chatArrived(channel: string, options: { isMention: boolean; countMentions: boolean }): void;
 }
 
 /**
  * The screenshare overlay, seen as the one method this router uses.
  *
- * Structural rather than the class, for the reason `TypingSink` and `PrivateChatSink` are: the
+ * Structural rather than the class, for the reason `ChatSink` and `PrivateChatSink` are: the
  * router recognises a channel and hands the frame over. What an overlay IS — a canvas, an interval,
  * a producer-id map — is `#lib/room/screen-overlay.ts`'s business and no import of this file
  * should be able to reach it.
@@ -142,7 +144,7 @@ export class RoomEventStream<Entry> {
     roster: RosterSink<Entry>;
     privateChat: PrivateChatSink;
     /** See `#chat`. Optional so existing constructions are unchanged. */
-    chat?: TypingSink;
+    chat?: ChatSink;
     /** See `#screenOverlay`. Optional for the same reason `chat` is. */
     screenOverlay?: ScreenOverlaySink;
     userActions: FollowStyleSource;
@@ -245,7 +247,7 @@ export class RoomEventStream<Entry> {
    * the columns exist is a frame with nowhere to land, which is the correct outcome and not an
    * error — nobody is looking at a column that has not been made yet.
    */
-  readonly #chat: TypingSink | undefined;
+  readonly #chat: ChatSink | undefined;
   /**
    * The screenshare overlay, for arriving alerts and nothing else.
    *
@@ -809,6 +811,38 @@ export class RoomEventStream<Entry> {
         const alert = payload.data as { body?: string; senderName?: string } | undefined;
         if (typeof alert?.body === 'string') {
           this.#screenOverlay?.show({ text: alert.body, sender: alert.senderName ?? '' });
+        }
+      }
+
+      /*
+        `acA-06` — THE UNREAD COUNTERS, and they sit ABOVE the own-sender guard on purpose.
+
+        Upstream's subscription has no sender filter at all:
+
+        ```js
+        subscribe("chatMsg", e => { e.c == this.channel ? emit("alwaysScrollToBottom")
+          : this.unreadMsgs[e.c] = this.unreadMsgs[e.c] ? this.unreadMsgs[e.c]+1 : 1, … })
+        ```                                                                   // byte 1,430,918
+
+        and the guard below is about a REFETCH — "our own post already refetched" — not about what
+        this member may be counted as having read. The one case the two differ in is real: a message
+        typed into the EXTRA column's composer arrives on a channel the MAIN column may not be
+        showing, and upstream badges it there. Moving the count below the guard would silently drop
+        exactly that message, which is the kind of quiet divergence this repository writes rows
+        about, so the count is taken where the reference takes it.
+
+        `countMentions` is `isPresenter`, stated once — see `RoomChat.chatArrived`. `isMention` is
+        the SERVER's answer, decided per recipient in `publishChatToRoom` against the name each
+        listener joined with, because this hub's stream is per ROOM while chat is per CHANNEL and a
+        frame carrying a body would put admin chat on every subscriber's wire.
+      */
+      if (payload.channel === 'chat') {
+        const channel = (payload.data as { room?: string } | undefined)?.room;
+        if (typeof channel === 'string') {
+          this.#chat?.chatArrived(channel, {
+            isMention: payload.isMention === true,
+            countMentions: this.#isPresenter()
+          });
         }
       }
 

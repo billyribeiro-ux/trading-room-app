@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**73 open · 151 closed · 224 rows.**
+**67 open · 157 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -2879,6 +2879,26 @@ O(9,o.showPMBtn?9:-1)
 
 ### acA-04 — "Mod Only" chat filter checkbox has no counterpart anywhere in apps/room/src
 
+**BUILT 2026-08-30.** The switch is per column on `RoomChat` (`filterChatMsgs = {modOnly, modOnlyExtra}`,
+byte 981,131); the predicate is one `.filter` in `RoomFeeds.chatMessagesFor`, transcribed from byte
+1,414,769 — the moderators' messages AND your own survive it, which reads like an oversight until
+you try it, because a filter that hid what you had just typed looks like the send having failed. The
+checkbox is the capture's const table 43/44/45 (byte 1,450,283) in `ChatSearchBar`'s extended
+section, which this room had never rendered because nothing had ever been built to put in it —
+`RoomChatSearch` now holds `showChatToolbarExtended` and both of the reference's toggles, and the
+chat gear opens it rather than the settings modal, which is what `toggleChatToolbar()` binds
+upstream (byte 1,435,047).
+
+**Two divergences, both recorded at the code.** The id carries the column — `"mod-only"` occurs four
+times in the bundle, twice per column, so a room with both bars open ships two elements with one id
+and the extra column's `<label for>` operates the main column's checkbox. And the toggle does not
+re-request page 0 of the log the way upstream's does: this filter is a view over rows already held,
+so the refetch would only throw away the pages a reader had scrolled back to.
+
+Contracts: `alert-chat-area-contract.test.ts` (the markup, the two ids, the held flag),
+`chat.svelte.test.ts` (per-column switch), `feeds.svelte.test.ts` (the predicate, executed, including
+over search results). Five negative controls seen red.
+
 **medium** · `missing-control` · reference byte **1,423,104**
 
 ```
@@ -2890,6 +2910,21 @@ function X_e(t,n){if(1&t){const e=Y();d(0,"div",43)(1,"input",44),Ve("ngModelCha
 > Verified: I could not refute the claim. Reference verified by reading bytes: `function X_e` begins at exactly offset 1423104 in main.d1d09071be31f1ba.js and renders `input,44` two-way bound to `appService.globals.filterChatMsgs.modOnly` with a change handler `toggleModOnlyFilter()` and label text " Mod Only "; it belongs to component `app-chat` (se…
 
 ### acA-06 — Chat tab unread-count badge and presenter-only mention count are not rendered
+
+**BUILT 2026-08-30.** `chat-tab-unread.ts` holds the arithmetic; `RoomChat` holds one map per
+column, because the reference keeps a separate `unreadMsgs` on `app-chat` and on `app-extra-chat`
+(bytes 1,429,032 and 2,375,500) and a shared map would clear the badge in the column that is *not*
+showing the channel you opened. `events.svelte.ts` counts from the SSE frame — which already carries
+`room` and a server-decided `isMention` — above the own-sender guard, where the reference's
+subscription takes it. `ChatTabStrip` renders const 28 and the `text-danger` span inside it.
+
+**One deliberate simplification.** Upstream states `globals.isPresenter` twice, once deciding whether
+to count a mention and once deciding whether to draw it, so the second can never differ from the
+first. It is stated once here, at the count, and the strip carries no role of its own —
+`expect(strip).not.toContain('isPresenter')` is a contract assertion, because a strip that took the
+role would be a second authority on a question the server answered.
+
+Contracts: `alert-chat-area-contract.test.ts`, `chat.svelte.test.ts`. Four negative controls seen red.
 
 **medium** · `missing-control` · reference byte **1,420,987**
 
@@ -2903,6 +2938,18 @@ function $_e(t,n){if(1&t&&(d(0,"span",28),v(1),H(2,H_e,2,1,"span",29),u()),2&t){
 
 ### acA-07 — The alerts archive control drops the !isLimitedPresenter half of its gate — and the file's own comment states the full gate
 
+**FIXED 2026-08-30.** `{#if isPresenter && !isLimitedPresenter}` around
+`#addon-chat-messages-archive`, fed from `+page.svelte` as `media.limitedPresenter`. The component
+takes it as a prop and decides no role of its own.
+
+This is the shape `CLAUDE.md` names outright — *"every comment claiming X is bounded/constant/checked
+still matches the next line"* — and it did not: the comment eight lines above the gate had stated
+both terms since the block was written. Somebody handed mic and screen at runtime satisfies
+`isPresenter` (`giveMicScreen` assigns `globals.user.isPresenter = globals.isLimitedPresenter =
+e.give`), so the room was offering them a control the reference withholds. Contract:
+`alert-chat-area-contract.test.ts`, which walks the block rather than checking proximity. Control
+seen red.
+
 **medium** · `missing-control` · reference byte **2,043,456**
 
 ```
@@ -2914,6 +2961,25 @@ O(2,e.appService.globals.isPresenter&&!e.appService.globals.isLimitedPresenter?2
 > Verified: I could not refute it. The `!limitedPresenter` half of the gate is applied nowhere on the alerts-archive path, under any name.
 
 ### acA-08 — Extra chat column: wrong container class, no roomSplitDir gate, and the desktop ttb/btt placement inside the inner split is not modelled
+
+**BUILT 2026-08-30.** The reference has THREE forms and this room shipped a fourth that is none of
+them — one ungated top-level area in every case, so a top/bottom room drew the second column beside
+the presentation pane instead of below the chat one. All three are built now, over one shared
+`<ExtraChatPane>` call: the phone's plain `alert-chat-box` area (`nRe`, byte 2,496,359, whose gate
+carries **no direction term** — measured, not assumed), `H4e`'s top-level area with the
+`alert-chat-box-extra-column` class and the nested split, and `j4e`'s `chat-box` area inside
+`AlertChatArea`'s own split (byte 2,490,857).
+
+**The arithmetic is the part that is not a transcription.** `as-split` treats `size` as a proportion
+and normalises across however many areas there are; flex-basis percentages do not, so binding
+`chatSize` to both inner chat areas verbatim would emit `alerts + chat + chat` and overflow the
+stack. `RoomSplit.#innerScale` does the division `as-split` does for free.
+
+The class ships despite having no CSS rule in any of this room's stylesheets and no reader in the
+bundle, because its twin `alert-chat-regular` is in exactly the same position and this room already
+ships that one. Contract: `extra-chat-column-contract.test.ts`, whose old two assertions were
+rewritten — both were true of two forms out of three and neither could have caught this. Four
+negative controls seen red.
 
 **medium** · `divergence` · reference byte **2,490,857**
 
@@ -2927,6 +2993,18 @@ function j4e(t,n){if(1&t){const e=Y();d(0,"as-split-area",211)(1,"app-extra-chat
 
 ### acA-11 — The empty-tabs " Chat" brand label and the tab-strip <ul> presence gate are both absent
 
+**BUILT 2026-08-30.** Both halves, because neither reads right alone: the brand grows
+`{#if chatTabs.length === 0}<span>&nbsp;Chat</span>{/if}` (`j_e`, byte 1,420,732, gated at
+1,453,850) and `ChatTabStrip` wraps its whole `<ul>` in `{#if tabs.length > 0}` (byte 1,453,947).
+`&nbsp;` and not a space: it is `\xa0` in the capture and a plain space would be collapsed by the
+surrounding whitespace.
+
+The verifier's note — that the gap is unreachable while every room has two built-in channels — is
+correct and is why this stayed `low`. It stops being unreachable the moment a room configures its
+channels through `chatTabsWithBadges`, and the empty styled `nav-tabs` strip was already shipping.
+Contract: `alert-chat-area-contract.test.ts`, including a mount that asserts no `<ul>` for an empty
+list. Two controls seen red.
+
 **low** · `missing-control` · reference byte **1,420,732**
 
 ```
@@ -2938,6 +3016,15 @@ function j_e(t,n){1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}
 > Verified: Both controls are genuinely absent from our markup, but the gap is unreachable in practice and that must be stated with it. (1) The empty-tabs brand label: AlertChatArea.svelte:763-770 renders navbar-brand as `<i class="fas fa-comment">` plus the conditional DND badge only — no `&nbsp;Chat` span and no gate.
 
 ### acA-12 — Search and gear clicks are bound to the <a> in ours and to the <li> in the reference
+
+**BUILT 2026-08-30.** All four toolbar toggles — search and gear, in both columns — now hang on the
+`<li>`, which is what const 12 `[1,"nav-item","mx-1",3,"click"]` carries and const 13 does not (byte
+2,055,851). The `mx-1` margin was dead space on a control people press many times a session.
+
+**The private-chat button is left on its `<a>`, and that is the row's real content.** It is bound
+there in BOTH applications (`W_e`, byte 1,421,660), so the difference is specific to these two
+toggles; the contract asserts the PM click is on an anchor precisely so a later consistency pass does
+not undo a measurement. Control seen red.
 
 **low** · `divergence` · reference byte **2,055,851**
 

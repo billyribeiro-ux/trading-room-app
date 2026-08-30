@@ -62,7 +62,8 @@
     beginSplit,
     chatAlertsPane,
     presentationPane,
-    extraChatPane
+    extraChatPane,
+    extraChatSideArea
   }: {
     split: RoomSplit;
     /** The page's own handle on `#mainAreaSplit`; several page handlers measure it. */
@@ -79,7 +80,16 @@
     /** The three panes, built on the page and PLACED here. See the note above on why. */
     chatAlertsPane: Snippet;
     presentationPane: Snippet;
+    /** The extra chat column in the PHONE's form — a plain `alert-chat-box` area, const 227. */
     extraChatPane: Snippet;
+    /**
+     * The same column in the desktop LEFT/RIGHT form — `H4e`, const 207, which carries the
+     * `alert-chat-box-extra-column` class and a nested split the phone's form has not got.
+     *
+     * Two snippets rather than one with a branch inside it, because the branch is a placement
+     * decision and this component is what places things.
+     */
+    extraChatSideArea: Snippet;
   } = $props();
 
   /**
@@ -228,10 +238,30 @@
     {#if !hidePresentation}{@render presentationPane()}{/if}
     {@render mainGutter()}
     {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
+    <!--
+      `acA-08` — the phone's gate carries NO direction term, and that is measured rather than assumed:
+      `O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)` in `nRe`, byte 2,496,359. A
+      phone always places the column at the top level, whatever the arrangement preference says.
+    -->
     {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
   {:else}
     {#if !hideChatAlerts}{@render chatAlertsPane()}{/if}
-    {#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}{/if}
+    <!--
+      The desktop gate has one, and it decides between TWO homes:
+
+      ```js
+      O(2, e.hideChatAlerts || !preferences.extraChatColumn ||
+           "ltr" !== preferences.roomSplitDir && "rtl" !== preferences.roomSplitDir ? -1 : 2)
+      ```                                                                     // byte 2,493,526
+
+      Left/right rooms get the third top-level area below. Top/bottom rooms get it as a fourth area
+      of the INNER stack instead, which is `AlertChatArea`'s to render — see `extraChatInnerArea` on
+      the page. The two are mutually exclusive by construction: `split.extraChatIsInside` is the
+      negation of `roomIsHorizontal` with the same two other terms.
+    -->
+    {#if !hideChatAlerts && extraChatColumnVisible && split.roomIsHorizontal}
+      {@render extraChatSideArea()}
+    {/if}
     {#if !hidePresentation}{@render presentationPane()}{/if}
     {@render mainGutter()}
   {/if}

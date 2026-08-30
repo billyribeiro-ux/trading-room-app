@@ -258,7 +258,7 @@ export class RoomFeeds<
     pages this feature adds.
   */
   get visibleChat() {
-    return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);
+    return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults, 'main');
   }
 
   /**
@@ -284,7 +284,7 @@ export class RoomFeeds<
     so the two columns cannot drift: a second derived would be a second copy of six steps.
   */
   get visibleExtraChat() {
-    return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);
+    return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults, 'extra');
   }
 
   /**
@@ -402,7 +402,11 @@ export class RoomFeeds<
    * are about the LIVE log's length and the reader's scroll position, and neither has any meaning
    * for a result set the server bounded to one page.
    */
-  chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {
+  chatMessagesFor(
+    tab: ChatTab,
+    searchResults: readonly Message[] | null,
+    column: 'main' | 'extra'
+  ) {
     return (
       (
         searchResults ??
@@ -412,6 +416,30 @@ export class RoomFeeds<
         )
       )
         .filter((item) => item.room === tab && !this.#isHidden(item))
+        /*
+          `acA-04` — "MOD ONLY", the checkbox in the chat toolbar, transcribed:
+
+          ```js
+          const {modOnly: r} = globals.filterChatMsgs;
+          r && (e = e.filter(a => { if (a.uid === s.userXrefID || r && a.isA) return !0 }))
+          ```                                                                  // byte 1,414,769
+
+          Your own messages survive the filter alongside the moderators', which reads like an
+          oversight and is not: a filter that hid what you had just typed would look like the send
+          failing. The `r &&` inside the callback is upstream's, and redundant — the whole `filter`
+          only runs when `r` is true — so it is not restated here.
+
+          APPLIED TO SEARCH RESULTS TOO, which upstream cannot do: its toggle re-requests the log and
+          drops the search. A result set that contradicted the checkbox above it would be the same
+          class of defect `alertSearchFilter` exists to prevent — the filtered-out must not reappear
+          in a search.
+        */
+        .filter(
+          (item) =>
+            !this.#chat.modOnly(column) ||
+            item.senderId === this.#session().user.id ||
+            item.isAdmin === true
+        )
         /*
         WEBINAR MODE. Upstream applies this as messages ARRIVE, dropping them before they ever reach
         the log; applied here as a view filter instead, because this room re-reads its log from the

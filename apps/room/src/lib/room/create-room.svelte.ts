@@ -419,7 +419,15 @@ export function createRoom(deps: RoomDeps) {
   const settingsSplitPair = (key: string): SplitPair | null =>
     splitPairFromValue(prefs.loaded[key]);
 
-  const split = new RoomSplit(loadedRoomSplitDir, settingsSplitPair);
+  /*
+    `extraChatColumnEnabled` — `acA-08`. The geometry has to know whether there is a second chat
+    column, because in a `ttb`/`btt` room it is a FOURTH area of the inner stack and the three sizes
+    renormalise. A thunk over `prefs`, which is created twelve lines above; the collapse half of the
+    question is the split's own `chatCollapsed` and is not passed.
+  */
+  const split = new RoomSplit(loadedRoomSplitDir, settingsSplitPair, {
+    extraChatColumnEnabled: () => prefs.extraChatColumn
+  });
 
   /*
     The poll modal's four fields, in `#lib/room/polls.svelte.ts`.

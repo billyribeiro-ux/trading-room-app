@@ -212,12 +212,35 @@ export class RoomSplit {
   #beforeCollapse: number | null = null;
 
   /**
+   * `acA-08` — `preferences.extraChatColumn`, the viewer's second-column setting.
+   *
+   * A THUNK and not a copy: the viewer turns the column on from the settings modal mid-session, and
+   * a value read at construction would leave the layout believing the old answer forever. The same
+   * trap `RoomChat` records for `extraColumnEnabled`.
+   *
+   * The COLLAPSE half of "is it on screen" is not passed in, because it is `#chatCollapsed` — this
+   * class already owns it, and asking a caller for it would be asking them to restate what they read
+   * from here.
+   *
+   * This class needs the answer for one thing: in a `ttb`/`btt` room the extra column is a FOURTH
+   * area of the inner stack, so the three inner sizes have to be renormalised. Defaults to "no
+   * second column" so every existing construction — the tests included — is unchanged.
+   */
+  readonly #extraChatColumnEnabled: () => boolean = () => false;
+
+  /**
    * Seeded from the server-persisted sizes so the very first paint already has the user's pane
    * geometry. Leaving these null until `onMount` made SSR emit the default flex and hydration then
    * rewrite it, which is a layout shift the size of the whole room.
    */
-  constructor(direction: RoomSplitDir, read: SplitPairReader) {
+  constructor(
+    direction: RoomSplitDir,
+    read: SplitPairReader,
+    options: { extraChatColumnEnabled?: () => boolean } = {}
+  ) {
     this.#direction = direction;
+    if (options.extraChatColumnEnabled)
+      this.#extraChatColumnEnabled = options.extraChatColumnEnabled;
     const seeded = resolveSplitSizes(direction, read);
     this.#main = seeded.mainSplit;
     this.#chatAlerts = seeded.chatAlertsSplit;
@@ -326,15 +349,49 @@ export class RoomSplit {
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.presentationFlex
       : flexSize(1 - this.#resolvedMainSplit)
   );
+  /**
+   * `acA-08` — whether the extra chat column is a fourth area of the INNER stack.
+   *
+   * ```js
+   * H(6, j4e, 2, 1, "as-split-area", 211)                                    // byte 2,490,857
+   * O(6, !preferences.extraChatColumn ||
+   *      "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
+   * ```
+   *
+   * `roomIsHorizontal` and not `isHorizontal`: the gate upstream reads the PREFERENCE, and the phone
+   * has its own template (`nRe`, byte 2,496,359) whose extra-column gate carries no direction term
+   * at all — `O(3, !hideChatAlerts && preferences.extraChatColumn ? 3 : -1)`. So a phone always
+   * places it at the top level, whatever the arrangement says, and `!isMobileScreen` is what says so.
+   */
+  #extraChatIsInside = $derived(
+    this.#extraChatColumnEnabled() &&
+      !this.#chatCollapsed &&
+      !this.#roomIsHorizontal &&
+      !this.#isMobileScreen
+  );
+
+  /**
+   * What the inner sizes are multiplied by when there are THREE areas in the stack instead of two.
+   *
+   * The reference binds `size` to `chatSize` on the extra area — the SAME number the chat area gets
+   * (`z("size", e.chatSize)` in both `V4e` and `j4e`) — and `as-split` treats sizes as proportions,
+   * normalising them across however many areas there are. Flex-basis percentages do not normalise:
+   * emitting `alerts + chat + chat` verbatim would come to more than 100% of the stack and overflow
+   * it. So the proportions are reproduced and the arithmetic `as-split` does for free is done here.
+   *
+   * With `a` the alerts share, the three proportions are `a : (1-a) : (1-a)`, summing to `2-a`.
+   */
+  #innerScale = $derived(this.#extraChatIsInside ? 1 / (2 - this.#resolvedChatAlertsSplit) : 1);
+
   #alertsRow = $derived(
     this.#chatAlerts === null && this.#isHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.alertsFlex
-      : flexSize(this.#resolvedChatAlertsSplit)
+      : flexSize(this.#resolvedChatAlertsSplit * this.#innerScale)
   );
   #chatRow = $derived(
     this.#chatAlerts === null && this.#isHorizontal
       ? DIRECT_EVIDENCE_CONTRACT.populatedRoom.chatFlex
-      : flexSize(1 - this.#resolvedChatAlertsSplit)
+      : flexSize((1 - this.#resolvedChatAlertsSplit) * this.#innerScale)
   );
 
   /*
@@ -376,6 +433,12 @@ export class RoomSplit {
   );
   #alertsAreaStyle = $derived(`order: 0; flex: 0 0 ${this.#alertsRow};`);
   #chatAreaStyle = $derived(`order: 2; flex: 0 0 ${this.#chatRow};`);
+  /**
+   * The extra column when it sits INSIDE the inner stack — const 211, the same `chat-box` the main
+   * column uses, with the same size. `order: 2` as well: the gutter holds order 1, both chat areas
+   * hold 2, and DOM order decides between them, which is `j4e` being node 6 to the chat area's 4.
+   */
+  #innerExtraChatAreaStyle = $derived(`order: 2; flex: 0 0 ${this.#chatRow};`);
 
   /** The two `aria-valuenow` figures the gutters report to a screen reader. */
   #primaryPercent = $derived(this.#resolvedMainSplit * 100);
@@ -477,6 +540,15 @@ export class RoomSplit {
 
   get chatAreaStyle(): string {
     return this.#chatAreaStyle;
+  }
+
+  /** Whether the extra chat column belongs to the inner stack rather than the outer split. */
+  get extraChatIsInside(): boolean {
+    return this.#extraChatIsInside;
+  }
+
+  get innerExtraChatAreaStyle(): string {
+    return this.#innerExtraChatAreaStyle;
   }
 
   get primaryPercent(): number {

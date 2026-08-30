@@ -634,7 +634,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       commit also sent four preference side effects out of `create-room.svelte.ts`, whose ceiling is
       NOT raised.
     */
-    max: 1559,
+    /*
+      1559 -> 1642, 2026-08-30, for `acA-08` — the extra chat column's PLACEMENT, which the
+      reference decides three different ways and this room decided one.
+
+      The executable change is small: one shared `{#snippet extraChatColumn()}` holding the single
+      `<ExtraChatPane>` call, and two wrappers around it — `H4e`'s top-level area with its nested
+      split for a left/right room, and `j4e`'s `chat-box` area for a top/bottom one, which
+      `AlertChatArea` renders inside its own split. The lines are the THREE gates transcribed with
+      their byte offsets, because that is the whole finding: what shipped here was one ungated area
+      in every case, and a top/bottom room drew the second column beside the presentation pane.
+
+      An extraction was looked for and refused. The three forms differ only in their wrapper markup
+      and all three close over this page's state, so moving them into a component would mean passing
+      `split` plus the thirty props the pane already takes THROUGH that component to be handed
+      straight back — the shape this list already records refusing for the alert and presentation
+      panes. The snippet is the extraction.
+    */
+    max: 1642,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -779,7 +796,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       from the frame. The reasoning itself left, to `#lib/room/note-update-notice.ts`, which is the
       trade this file asks for; what remains is a dispatcher branch, which is what this file is.
     */
-    max: 983,
+    /*
+      983 -> 1017, 2026-08-30, for `acA-06`'s counting site — and 30 of the 34 lines are the reason
+      it sits ABOVE the own-sender guard rather than below it.
+
+      Upstream's `chatMsg` subscription has no sender filter (byte 1,430,918) and the guard here is
+      about a REFETCH. The case where the two differ is real: a message typed into the extra
+      column's composer arrives on a channel the main column may not be showing, and moving the
+      count below the guard drops exactly that one. A future reader tidying two adjacent
+      `payload.channel === 'chat'` blocks into one would move it, so the argument is at the code.
+    */
+    max: 1017,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1609,7 +1636,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one of them loses an attribute with nothing to notice. The dangling
       `aria-describedby="addon-search"` is the capture's own and now exists in exactly one place.
     */
-    max: 89,
+    /*
+      89 -> 142, 2026-08-30, for `acA-04` — the extended toolbar section, and the Mod Only checkbox
+      that is the first control this room has ever put in it.
+
+      The old entry ended "an empty toolbar section is a control whose only effect is its own
+      presence", which was true while nothing filled it. The lines are the const table (43/44/45 at
+      byte 1,450,283) and the one divergence: `"mod-only"` occurs FOUR times in the bundle, twice per
+      column, so a room with both bars open ships two elements with one id and the extra column's
+      `<label for>` operates the main column's checkbox. The id carries the column here, and the
+      paragraph saying why is what stops somebody "correcting" it back to the capture.
+    */
+    max: 142,
     why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
@@ -1628,7 +1666,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       draw. It must not: it renders the list it is handed, and that list is an entitlement resolved
       in `memberChatChannels`.
     */
-    max: 56,
+    /*
+      56 -> 105, 2026-08-30, for `acA-06` — the per-tab unread badge.
+
+      The old entry said: "If this number climbs, the thing to check is whether it has started
+      DECIDING which tabs to draw." It has not. It renders a count it is handed, from a map its
+      caller owns, and the assertion that it holds no role of its own is in
+      `alert-chat-area-contract.test.ts` (`expect(strip).not.toContain('isPresenter')`).
+
+      Nearly all of it is markup: the pill (const 28), the `(n)` inside it (const 29), the two gates,
+      and the note recording that `app-chat` and `app-extra-chat` differ by ONE leading space — which
+      is the reason this is still one component and not two.
+    */
+    max: 105,
     why: 'the chat channel strip - the captured markup, once, over a list the server decided'
   },
   {
@@ -2021,7 +2071,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       layout effects, and NOTHING else. The three panes arrive as snippets. If this number starts
       climbing, the thing to check is whether pane props have begun leaking through it.
     */
-    max: 239,
+    /*
+      239 -> 269, 2026-08-30, for `acA-08` — the extra chat column now has two desktop homes and this
+      file places one of them.
+
+      The lines are the two gates with their offsets, including the measured fact that the PHONE's
+      template carries no direction term at all (`nRe`, byte 2,496,359) while the desktop one does.
+      That asymmetry is what the file gets wrong if somebody unifies the two branches, and it is not
+      recoverable from either branch on its own.
+    */
+    max: 269,
     why: 'the split layout and its two effects; the panes arrive as snippets, not as props'
   },
   {
@@ -2793,8 +2852,38 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       not held because the controls it would gate are not built, and closing the bar ENDS the search
       where upstream leaves a hidden bar filtering the log with nothing on screen saying so.
     */
-    max: 124,
+    /*
+      124 -> 178, 2026-08-30, for `acA-04`.
+
+      This entry used to say the file's divergences included "`showChatToolbarExtended` is not held
+      because the controls it would gate are not built". That was correct on 2026-08-29 and stopped
+      being correct the moment Mod Only was built, so the flag is held and both toggles are
+      transcribed in full.
+
+      Both are worth their lines. `toggleChatToolbarSearchOnly`'s `||` is easy to misread — when the
+      bar is open AND extended the assignment is SKIPPED, so the magnifier COLLAPSES an extended bar
+      rather than closing it — and `toggleChatToolbar` re-extends an open search-only bar. Neither
+      reads as intentional without the transcription beside it.
+    */
+    max: 178,
     why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
+  },
+  {
+    file: 'lib/room/chat-tab-unread.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a module to this list.
+
+      `acA-06`'s arithmetic, extracted out of `RoomChat` rather than raising that file by a further
+      ninety. Three pure functions over a record of counts and the type they share: what a channel's
+      counts are when a message arrives, what they are when the channel is opened, and what an absent
+      key means.
+
+      It is a plain `.ts` on purpose. Nothing here needs a rune — the state lives on `RoomChat` — and
+      keeping the writers pure is what makes that field's `$state.raw` correct: every path returns a
+      NEW object, which is much easier to see in eighty lines than inside a class of four hundred.
+    */
+    max: 90,
+    why: 'the per-channel unread arithmetic; a plain .ts because the state lives on RoomChat'
   },
   {
     file: 'lib/room/chat.svelte.ts',
@@ -2818,7 +2907,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
       security-relevant half of the change; this entry carries its part.
     */
-    max: 283,
+    /*
+      283 -> 388, 2026-08-30, for `acA-06` and `acA-04` — the two things a chat column knows that it
+      did not: what you have not read in it, and whether you are filtering it.
+
+      THE EXTRACTION THIS LIST ASKS FOR WAS DONE FIRST. The unread arithmetic — the type, the
+      absent-is-zero lookup, the two writers — is `chat-tab-unread.ts`, its own module with its own
+      ceiling, because a pure function over a record does not need a rune and because the ONE writer
+      of a `$state.raw` field returning a new object every time is the property that makes the `raw`
+      correct rather than merely cheap. What is left here is the state and the rules that read the
+      two tabs: an arrival counts against whichever column is not showing that channel, and opening a
+      channel clears it.
+
+      `chatArrived`'s docblock is a third of the raise and it earns it: it records that upstream
+      states `globals.isPresenter` TWICE — once at the count and once at the badge — and that this
+      room states it once, at the count, so the strip cannot become a second authority on a role the
+      server decided.
+    */
+    max: 388,
     why: 'the two chat columns and the mention routing that reads three of their fields at once'
   },
   {
@@ -3079,7 +3185,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `split-legacy-migration.test.ts` — a migration that silently does nothing was previously
       indistinguishable from one that ran and found nothing to do.
     */
-    max: 782,
+    /*
+      782 -> 796, 2026-08-30, for `acA-08`'s arithmetic, which is fourteen lines because thirteen of
+      them are why it exists at all.
+
+      `as-split` treats `size` as a PROPORTION and normalises across however many areas there are;
+      flex-basis percentages do not. The reference binds `chatSize` to both inner chat areas, so
+      transcribing it verbatim would emit `alerts + chat + chat` and overflow the stack. `#innerScale`
+      does the division `as-split` does for free, and a reader who does not know that reads the
+      multiplication as noise and deletes it.
+    */
+    max: 796,
     why: "the room's two nested splits and twenty derived geometry values"
   },
   /*
@@ -3391,7 +3507,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `[]` are different — no search, versus a search that matched nothing. Collapsing those two
       would show a reader their whole log as the result of a search that found none of it.
     */
-    max: 463,
+    /*
+      463 -> 490, 2026-08-30, for `acA-04`'s predicate — one `.filter` and the transcription above it.
+
+      Two survivors, not one: the moderators' messages AND your own (`a.uid === s.userXrefID ||
+      r && a.isA`, byte 1,414,769). That reads like an oversight until you try it — a filter that hid
+      what you had just typed looks like the send having failed — which is why the line saying so is
+      here rather than in a commit message. The paragraph beside it records the divergence: this
+      applies to search results too, which upstream cannot do because its toggle re-requests the log.
+    */
+    max: 490,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
@@ -4482,7 +4607,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1382 -> 1390, 2026-08-30. `roomName` and `composerHasFocus` for G27 — the second asked of the
       DOM here so the panel class does not reach into it for a decision.
     */
-    max: 1390,
+    /*
+      1390 -> 1393, 2026-08-30. Three lines: the `extraChatColumnEnabled` thunk `RoomSplit` now takes
+      for `acA-08`, and the note that the COLLAPSE half of the question is the split's own and is
+      deliberately not passed.
+    */
+    max: 1393,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -4649,7 +4779,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The key RULE itself is not here: it was written inline, then extracted to
       `#lib/inline-alert-key.ts` so a test could execute it rather than copy it.
     */
-    max: 1394,
+    /*
+      1394 -> 1496, 2026-08-30, for four rows on this surface at once: `acA-04`, `acA-07`, `acA-11`
+      and `acA-12`, plus the place `acA-08`'s inner form is rendered.
+
+      The executable changes are small and the transcriptions are not, which is the ratio this file
+      is supposed to produce. `acA-07` is one `&&`: the archive control's gate had said
+      `isPresenter && !isLimitedPresenter` in this file's own comment since the block was written
+      while the code applied half of it — the exact shape `CLAUDE.md` names, "every comment claiming
+      X is checked still matches the next line". `acA-12` moves four clicks from the `<a>` to the
+      `<li>` and records that the private-chat button is bound on the `<a>` in BOTH applications, so
+      a later consistency pass does not undo a measurement. `acA-11` adds the `&nbsp;Chat` label and
+      says why it is `&nbsp;` and not a space.
+    */
+    max: 1496,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -4754,7 +4897,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       is RM-16's other half. `urlwrapImg` takes it as its fourth argument and the gif placeholder's
       id becomes `gifExtra_<id>` — this pane is the only place in the room that can supply it.
     */
-    max: 597,
+    /*
+      597 -> 626, 2026-08-30, for `acA-04`: this column's own `showChatToolbarExtended` and Mod Only
+      switch, plus the rename of `onsettings` to `ontoggletoolbar`.
+
+      The rename is most of it. The prop opened the settings modal, which is not what the reference's
+      chat gear does — `toggleChatToolbar()`, byte 1,435,047 — and a prop whose name says one thing
+      while its handler does another is how the next reader wires the wrong one.
+    */
+    max: 626,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

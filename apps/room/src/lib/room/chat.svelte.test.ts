@@ -3,6 +3,7 @@ import { flushSync } from 'svelte';
 import { describe, expect, it } from 'vitest';
 
 import { EXTRA_COMPOSER, RoomChat } from './chat.svelte';
+import { unreadFor } from './chat-tab-unread';
 
 /*
   The seventh room state class. The reactivity block at the bottom is the only gate that can see the
@@ -279,5 +280,114 @@ describe('the getters are REACTIVE, which no other gate can see', () => {
     stop();
 
     expect(seen, 'the extra channel is not reactive').toEqual(['off-topic', 'main']);
+  });
+});
+
+/**
+ * `acA-06` — the per-column unread counts.
+ *
+ * ```js
+ * subscribe("chatMsg", e => {
+ *   e.c == this.channel ? emit("alwaysScrollToBottom")
+ *                       : this.unreadMsgs[e.c] = this.unreadMsgs[e.c] ? this.unreadMsgs[e.c]+1 : 1,
+ *   e.isMention && (e.c !== this.channel && globals.isPresenter &&
+ *                   (this.unreadMentions[e.c] = this.unreadMentions[e.c]+1)), … })  // byte 1,430,918
+ *
+ * switchChatChannel(e) { … this.unreadMsgs[this.channel] = 0,
+ *                          this.unreadMentions[this.channel] = 0, … }               // byte 1,439,687
+ * ```
+ *
+ * The whole rule is "not the channel you are looking at", asked once per column — which is why the
+ * cases below are all about the two columns disagreeing.
+ */
+describe('the unread counters', () => {
+  const room = () => new RoomChat({ extraColumnEnabled: () => true });
+  const arrival = { isMention: false, countMentions: false };
+
+  it('counts nothing for the channel a column is already showing', () => {
+    const chat = room();
+    chat.chatArrived('main', arrival);
+    expect(unreadFor(chat.unread, 'main').messages).toBe(0);
+  });
+
+  it('counts for the OTHER column, which is showing a different channel', () => {
+    /*
+      The main column opens on `main` and the extra one on `off-topic`, so one arrival on `main` is
+      unread in exactly one of them. A single shared map could not express this, which is why the
+      reference keeps one per component.
+    */
+    const chat = room();
+    chat.chatArrived('main', arrival);
+    expect(unreadFor(chat.unread, 'main').messages).toBe(0);
+    expect(unreadFor(chat.extraUnread, 'main').messages).toBe(1);
+  });
+
+  it('accumulates, and keys by channel', () => {
+    const chat = room();
+    chat.chatArrived('off-topic', arrival);
+    chat.chatArrived('off-topic', arrival);
+    chat.chatArrived('vip', arrival);
+    expect(unreadFor(chat.unread, 'off-topic').messages).toBe(2);
+    expect(unreadFor(chat.unread, 'vip').messages).toBe(1);
+  });
+
+  it('counts a mention only when the viewer is a presenter', () => {
+    const member = room();
+    member.chatArrived('off-topic', { isMention: true, countMentions: false });
+    expect(unreadFor(member.unread, 'off-topic')).toEqual({ messages: 1, mentions: 0 });
+
+    const presenter = room();
+    presenter.chatArrived('off-topic', { isMention: true, countMentions: true });
+    expect(unreadFor(presenter.unread, 'off-topic')).toEqual({ messages: 1, mentions: 1 });
+  });
+
+  it('clears the channel a column switches TO, and only that column', () => {
+    const chat = room();
+    chat.chatArrived('off-topic', { isMention: true, countMentions: true });
+    expect(unreadFor(chat.unread, 'off-topic').messages).toBe(1);
+
+    chat.tab = 'off-topic';
+    expect(unreadFor(chat.unread, 'off-topic')).toEqual({ messages: 0, mentions: 0 });
+
+    // The extra column was already on off-topic, so it never counted it in the first place.
+    expect(unreadFor(chat.extraUnread, 'off-topic').messages).toBe(0);
+    // …and its own map is untouched by the main column's switch.
+    chat.chatArrived('main', arrival);
+    chat.tab = 'main';
+    expect(unreadFor(chat.extraUnread, 'main').messages).toBe(1);
+  });
+
+  it('drops the key rather than storing a zero, because absent already means zero', () => {
+    const chat = room();
+    chat.chatArrived('off-topic', arrival);
+    chat.tab = 'off-topic';
+    expect(Object.keys(chat.unread)).not.toContain('off-topic');
+  });
+
+  it('replaces the map instead of editing it, which is what makes the $state.raw correct', () => {
+    const chat = room();
+    const before = chat.unread;
+    chat.chatArrived('off-topic', arrival);
+    expect(chat.unread).not.toBe(before);
+    expect(before).toEqual({});
+  });
+});
+
+/**
+ * `acA-04` — "Mod Only", per column.
+ *
+ * `this.filterChatMsgs = { modOnly: !1, modOnlyExtra: !1 }` (byte 981,131). The switch is here; the
+ * predicate is `RoomFeeds`', where every other visibility rule for the log lives.
+ */
+describe('the Mod Only switch', () => {
+  it('starts off in both columns', () => {
+    const { chat } = roomWith(true);
+    expect([chat.modOnly('main'), chat.modOnly('extra')]).toEqual([false, false]);
+  });
+
+  it('is per column, because a reader filters one and not the other', () => {
+    const { chat } = roomWith(true);
+    chat.setModOnly('extra', true);
+    expect([chat.modOnly('main'), chat.modOnly('extra')]).toEqual([false, true]);
   });
 });

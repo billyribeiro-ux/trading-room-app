@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { ChatColumn } from '#lib/room/chat-search.svelte.js';
+
   /**
    * `chatToolbar` — the search bar under a chat column's header.
    *
@@ -26,11 +28,29 @@
    * `addon-chat-clear`. **The dangling reference is the capture's** and is reproduced rather than
    * quietly repaired, exactly as the alerts column's field reproduces the same one and records why.
    *
-   * ## Search only
+   * ## The extended section, and the one id that is deliberately not the capture's
    *
-   * Upstream's bar has an extended state carrying save-chat and archive controls. Those are separate
-   * features and are not built, so their container is not rendered: an empty toolbar section is a
-   * control whose only effect is its own presence.
+   * The bar has two states upstream — search-only, and extended with the controls under it. The
+   * extended section was not rendered here at all while none of its controls existed. `acA-04` built
+   * the first: **Mod Only**, `X_e` at byte 1,423,265, whose const table is
+   *
+   * ```js
+   * 43 ["placement","top","ngbTooltip","Show only Moderators messages",
+   *     1,"form-check","text-white","d-inline-block","m-1","mt-2"]
+   * 44 ["type","checkbox","id","mod-only",1,"form-check-input",3,"ngModelChange","change","ngModel"]
+   * 45 ["for","mod-only",1,"form-check-label"]                                     (byte 1,450,283)
+   * ```
+   *
+   * transcribed below with ONE change: the id carries the column. `"mod-only"` occurs four times in
+   * the bundle — twice for `app-chat` and twice for `app-extra-chat` (1,450,283 and 2,396,458) — so
+   * a room with both bars open ships two elements with one id, and the extra column's `<label for>`
+   * then operates the main column's checkbox. That is a functional break rather than a cosmetic one,
+   * and it is the reason this is a divergence rather than a faithful copy. The two halves stay in
+   * step because ONE expression builds both.
+   *
+   * The save-chat and archive controls beside it (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e`) are
+   * separate features and are still not built, so nothing stands in for them: an empty toolbar
+   * section is a control whose only effect is its own presence.
    */
   type Props = {
     /** What is typed. A value plus a handler, not a binding — see `oninput`. */
@@ -45,9 +65,23 @@
     onsubmit: () => void;
     /** The `×`. */
     onclear: () => void;
+    /**
+     * Which column this bar belongs to. Read for ONE thing — the checkbox's id — and taken as the
+     * column rather than as a raw id string so no call site can invent a third one.
+     */
+    column: ChatColumn;
+    /** `showChatToolbarExtended` for this column. The controls below the field appear with it. */
+    extended: boolean;
+    /** `filterChatMsgs.modOnly` / `.modOnlyExtra` for this column. */
+    modOnly: boolean;
+    /** The checkbox. A value plus a handler, for the reason `oninput` is one. */
+    onmodonly: (next: boolean) => void;
   };
 
-  let { term, oninput, onsubmit, onclear }: Props = $props();
+  let { term, oninput, onsubmit, onclear, column, extended, modOnly, onmodonly }: Props = $props();
+
+  /** `mod-only` in the main column, `mod-only-extra` in the extra one. See the docblock. */
+  const modOnlyId = $derived(column === 'extra' ? 'mod-only-extra' : 'mod-only');
 </script>
 
 <div class="shadow p-2 w-100 chatToolbar" style="margin-top: 0px;">
@@ -84,5 +118,24 @@
         </div>
       </div>
     </div>
+    <!--
+      `H(10, X_e, 6, 3)` inside `J_e`, gated `O(10, e.showChatToolbarExtended ? 10 : -1)` at byte
+      1,424,325 — the controls live under the field and appear only in the extended state.
+    -->
+    {#if extended}
+      <div
+        title="Show only Moderators messages"
+        class="form-check text-white d-inline-block m-1 mt-2"
+      >
+        <input
+          type="checkbox"
+          id={modOnlyId}
+          class="form-check-input"
+          checked={modOnly}
+          onchange={(event) => onmodonly(event.currentTarget.checked)}
+        />
+        <label for={modOnlyId} class="form-check-label"> Mod Only </label>
+      </div>
+    {/if}
   </form>
 </div>

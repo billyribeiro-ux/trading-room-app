@@ -159,6 +159,13 @@ const render = (over: {
     onimageupload: noop,
     onrte: noop,
     onselectgif: noop,
+    /*
+        `chatTabs` was omitted here until 2026-08-30 and nothing noticed, because the only thing that
+        read it was `<ChatTabStrip tabs={chatTabs}>` and `{#each undefined}` renders nothing. `acA-11`
+        put `chatTabs.length` in the brand, which is not so forgiving — so this harness had been
+        rendering a component in a state its own types forbid, and the gate is what said so.
+      */
+    chatTabs: ['main', 'off-topic'],
     onbeginsplit: noop
   });
 
