@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**67 open · 157 closed · 224 rows.**
+**59 open · 165 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -3147,6 +3147,17 @@ O(47,o.hideVideoPlayer&&!o.isP||o.isP?47:-1),m(),O(48,o.hasSwingTradeAlerts?48:-
 
 ### poll-01 — No sound is played when a poll arrives for answering
 
+**BUILT 2026-08-30.** `playSoundEffect('fileShare')` in the page's delivery effect, gated on
+`prefs.doNotDisturbOn` — the same gate every other arrival sound in this room uses, and upstream's
+own (`globals.preferences.doNotDisturbOn || soundEffects.fileShare.play()`, byte 2,507,038).
+
+The row's real finding is the one it states in passing: the key was declared, the file shipped, the
+sound was loaded on every page, and `grep -rn fileShare src` found **no caller anywhere**. The call
+sits inside the `'open'` branch rather than beside it — upstream's `gotPoll` never reaches the viewer
+who wrote the poll (`i.senderUID != globals.user.userXrefID`, byte 1,024,082) and `deliver` refuses
+that person plus two more, so a sound with no panel behind it would be a noise nothing explains.
+Contract: `poll-panel-contract.test.ts`, with a control seen red.
+
 **medium** · `missing-behaviour` · reference byte **2,507,038**
 
 ```
@@ -3158,6 +3169,26 @@ Service.appEventBus.subscribe("gotPoll",i=>{this.appService.globals.preferences.
 > Verified: I tried to find a poll-arrival sound under any name and could not. Our entire poll-arrival path is the effect at /home/user/trading-room-app/apps/room/src/routes/+page.svelte:623 — `if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';` — and the decision it delegates to, `RoomPolls.deliver` (/home/user/trading-room-app…
 
 ### poll-02 — A poll ending elsewhere does not close an open panel
+
+**BUILT 2026-08-30.** `RoomPolls.deliver` returns a verdict — `'open' | 'ended' | null` — and the
+page closes the poll modal on `'ended'`.
+
+**The row is really about state versus events, and that is why a boolean could not have carried it.**
+The reference has `case "pollDone": emit("pollDone")` (byte 1,024,082) and a subscription wired once
+for the component's life (2,106,987); this room has `data.activePoll` going null, which is true both
+of a room that has never had a poll and of a poll that ended a moment ago. The first must NOT close
+anything — a presenter builds a poll with `activePoll` null, so a verdict from the steady state would
+shut the setup panel on the pass that opened it — so the TRANSITION is what is detected, on a field
+of its own.
+
+That field is not `#deliveredId`, and the distinction is the one an obvious implementation gets
+wrong: `#deliveredId` is cleared for three reasons that are not "the poll ended" — you wrote it, you
+already answered it, this browser has shown it once — so the author of a poll, for whom `deliver`
+always returns `null`, would never be told their own poll had gone. Two of the six behavioural tests
+are exactly those two people, and the control that reads the transition off `#deliveredId` fails both.
+
+Behaviour: `room/polls.svelte.test.ts`. The page's half: `poll-panel-contract.test.ts`, which also
+pins the `modals.modal === 'poll'` guard, because `closeActive()` closes whatever is open.
 
 **medium** · `missing-behaviour` · reference byte **2,106,987**
 
@@ -3171,6 +3202,15 @@ pollChoicesTotals),this.calcPieData()}}),this.appService.appEventBus.subscribe("
 
 ### poll-03 — Pie-slice labels are placed on a container-relative ellipse, not at 0.8 of the pie radius
 
+**FIXED 2026-08-30.** The labels are placed in PIXELS at `PIE_LABEL_RADIUS` (0.8, the reference's
+`radius: .8` from `EB` at byte 2,104,707) times the pie's radius, from the measured centre of the
+chart box.
+
+The defect was two expressions in different units describing one circle: the pie was drawn on
+`min(w,h)/2 - 10` and the labels placed at 32% of the box in each axis, on a box that is `width:
+100%` by a fixed `height: 300px`. One `pieRadius()` answers both now, and the contract counts the
+expression so it stays one. Control seen red.
+
 **low** · `wrong-constant` · reference byte **2,104,707**
 
 ```
@@ -3182,6 +3222,15 @@ const EB={series:{pie:{show:!0,innerRadius:0,label:{show:!0,radius:.8,color:"#FA
 > Verified: Our label placement is genuinely container-percentage based and unrelated to the pie radius. PollPanel.svelte:446-454 computes `left = 50 + cos(angle)*32` and `top = 50 + sin(angle)*32` and emits them as `%` of #pollPieChart, whose box is declared `width: 100%; height: 300px` at PollPanel.svelte:736-739 — so the label ring is an ellipse (…
 
 ### poll-07 — Dragging does not snap (jQuery UI snap:true)
+
+**BUILT 2026-08-30.** Both axes go through `clampAndSnap` from `#lib/panel-drag.js`, which is where
+the private chat and the webcam holders already got their snap — this panel is the one floating panel
+in the room that rolls its own pointer handling, and it was the one without it.
+
+`SNAP_TOLERANCE` is jQuery UI's own 20px and is now read from one place rather than copied. The
+cross-element half of `snap: true` — snapping to every other snappable element — needs a registry
+this application does not have, and `panel-drag.ts` has recorded that gap since it was written, once,
+for all four panels rather than four times. Control seen red: one axis left unsnapped.
 
 **low** · `missing-behaviour` · reference byte **2,108,197**
 
@@ -3195,6 +3244,12 @@ initDrag(){$("#pollModalCompHolder").draggable({appendTo:"body",containment:".wr
 
 ### poll-08 — Choice input commits on keydown, reference on keyup
 
+**FIXED 2026-08-30.** `onkeyup`, which is what the const table binds (`"keyup.enter"`, byte
+2,113,811).
+
+Not a one-frame difference: holding Enter repeats `keydown`, so the input added a choice per repeat.
+Control seen red.
+
 **low** · `divergence` · reference byte **2,113,811**
 
 ```
@@ -3206,6 +3261,16 @@ initDrag(){$("#pollModalCompHolder").draggable({appendTo:"body",containment:".wr
 > Verified: Our PollPanel binds the choice-commit to keydown; the reference const table binds keyup.enter, and nothing in our tree supplies keyup timing for this control. Searched exhaustively: `grep -rn "keyup"` over apps/room/src returns only RoomSidebar.svelte:643 (onkeyup={onusersearchkey}) and ModalHost.svelte:5620 — nothing in PollPanel; `pollC…
 
 ### poll-09 — No localStorage "savedPolls" legacy migration
+
+**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The row argues its own disposition and the
+argument holds: saved polls are a server table here (`saved_polls`, `schema.ts:382`), written by
+`savePoll` / `deleteSavedPoll` and loaded with the page. The reference's `loadPollsFromStorage()` is a
+ONE-SHOT migration that promotes a legacy `localStorage` array to the server and then deletes the key
+— and there is no legacy `localStorage` array in this application to promote, because this
+application never wrote one.
+
+Building it would mean reading a key nothing has ever written, and the `deleteSavedPoll` shape
+differs besides: by row id here, by array index plus a full JSON resend there.
 
 **low** · `missing-behaviour` · reference byte **2,111,310**
 
@@ -3219,6 +3284,22 @@ Polls",{savedSessionPolls:JSON.stringify(e)}),this.savedPolls=e,this.appService.
 
 ### poll-10 — savePollResults() has a formatter but no Blob/saveAs download
 
+**MEASURED REFUSAL, recorded 2026-08-30.** There is no user-facing control in the reference to
+reproduce. The audit's own reader read all nine template functions (`ATe`/`PTe`/`RTe`/`ITe`/`OTe`/
+`NTe`/`LTe`/`BTe`/`UTe`, 2,101,231–2,104,700) and **none binds `savePollResults`**; const entry 48 is
+a click-less duplicate of entry 52, used only as the `ɵɵconditional` placeholder. So the reference
+ships the method and no way to reach it, and the row's own verdict was *"a divergence, not a missing
+user-facing control"*.
+
+`formatPollResultsDownload` stays. It is the transcription of the reference's payload — results text
+plus `"\n\nUser Responses:\n"` plus the archive rows — and deleting it would delete the evidence
+rather than the dead code. Its only importer is its test, which `dead-export-contract.test.ts`
+records as a real reader in as many words: *"a symbol only a test reads is still read, and excluding
+tests would have condemned every constant a contract test pins."*
+
+Inventing a download button the reference does not offer is the other direction, and it is not this
+document's job to decide it — that is an owner question, not a gap.
+
 **low** · `divergence` · reference byte **2,112,115**
 
 ```
@@ -3231,6 +3312,21 @@ var s="Poll Results ",r=new Blob([e],{type:"text/plain"});s+=(new Date).toDateSt
 1.
 
 ### poll-11 — Responses textarea has no trailing newline; redraw is rAF not a 100 ms timer
+
+**HALF BUILT 2026-08-30 — (a) fixed, (b) refused with the reason.**
+
+**(a) The trailing newline is real and is fixed.** The reference appends one row at a time and each
+row carries its own `"\n"` (byte 2,106,688), so the box always ends in one; `formatVisiblePollResponses`
+joined instead and lost the last character. The empty case stays the empty string rather than
+becoming a lone newline, which a bare `+ '\n'` would have made it. Control seen red.
+
+**(b) The 100 ms re-plot is refused, and the row itself supplies the reason.** `setTimeout(() =>
+this.calcPieData(), 100)` exists because flot must re-MEASURE its container after a display change.
+This room draws to a canvas, which keeps its bitmap across `display: none`, and its redraw is an
+`$effect` on `panelWidth`/`panelHeight`/`pieData` scheduling a `requestAnimationFrame`. A maximise
+changes a dimension and redraws one frame EARLIER than the reference; a restore-from-minimise changes
+neither and needs no redraw. Reproducing the timer would be adding a delay to work around a
+measurement this implementation does not have to make.
 
 **low** · `divergence` · reference byte **2,106,688**
 

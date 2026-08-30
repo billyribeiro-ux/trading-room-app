@@ -57,7 +57,12 @@
   import RoomSidebar from '#lib/components/RoomSidebar.svelte';
   import RoomShell from '#lib/components/RoomShell.svelte';
   import { DUMP_CONTRACT } from '#lib/dump-contract.js';
-  import { initializeSoundEffects, setSoundEffectsVolume, unloadSoundEffects } from '#lib/sound-effects.js';
+  import {
+    initializeSoundEffects,
+    playSoundEffect,
+    setSoundEffectsVolume,
+    unloadSoundEffects
+  } from '#lib/sound-effects.js';
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
 
@@ -664,7 +669,44 @@
   $effect(() => {
     // The decision is `RoomPolls.deliver` — who may see this poll, and whether this browser has
     // already shown it. It ASSIGNS inside an effect on purpose, and its docblock argues the latch.
-    if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';
+    const delivery = polls.deliver(data.activePoll, data.user.id);
+
+    if (delivery === 'open') {
+      modals.modal = 'poll';
+      /*
+        `poll-01` — THE POLL ARRIVAL SOUND, which this room had a file and a key for and no caller.
+
+        ```js
+        subscribe("gotPoll", i => { globals.preferences.doNotDisturbOn || soundEffects.fileShare.play(),
+          guiEventBus.emit("doPollModal", {mode:"answer", … }) })            // byte 2,507,038
+        ```
+
+        `fileShare` was declared in `#lib/sound-effects.ts` and mapped to a file that ships, and
+        `grep -rn fileShare src` found no caller anywhere — the sound was loaded on every page and
+        played by nothing.
+
+        Gated on `doNotDisturbOn`, which is the same gate every other arrival sound in this room
+        uses, and it is INSIDE the `'open'` branch rather than beside it: the reference's `gotPoll`
+        never reaches a viewer who wrote the poll (`i.senderUID != globals.user.userXrefID`, byte
+        1,024,082) and `deliver` refuses the same person plus two more. A sound for a poll no panel
+        opened for is a noise with nothing to explain it.
+      */
+      if (!prefs.doNotDisturbOn) playSoundEffect('fileShare');
+      return;
+    }
+
+    /*
+      `poll-02` — the poll ENDED, and somebody may be looking at a panel for it.
+
+      `subscribe("pollDone", () => this.hidePanel())` — byte 2,106,987, wired once for the component's
+      life rather than per mode, so it closes the panel for every viewer who has one open. Ours had
+      no counterpart at all: an answerer who had not yet voted kept a fully interactive panel for a
+      poll that no longer existed, and `sendAnswer` would then post against it.
+
+      Only when the poll modal is the one showing. `closeActive()` runs the close bookkeeping for
+      whatever is open, and a poll ending must not shut somebody's settings modal.
+    */
+    if (delivery === 'ended' && modals.modal === 'poll') modals.closeActive();
   });
 
   /*

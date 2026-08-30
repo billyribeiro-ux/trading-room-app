@@ -68,9 +68,15 @@ describe('decoded Poll behavior', () => {
   it('keeps visible responses and the downloaded sender reference format distinct', () => {
     const choices = ['Up', 'Down'];
     const totals = calculatePollTotals(choices.length, answers);
+    /*
+      `poll-11` — the TRAILING NEWLINE. The reference appends one row at a time and each row carries
+      its own `"\n"`, so the box always ends in one; this joined instead and lost the last character.
+    */
     expect(formatVisiblePollResponses(choices, answers)).toBe(
-      '1: [Billy]: Up\n2: [Welber]: Down\n3: [Guest]: Up'
+      '1: [Billy]: Up\n2: [Welber]: Down\n3: [Guest]: Up\n'
     );
+    // …and an empty log is still empty, not a lone newline.
+    expect(formatVisiblePollResponses(choices, [])).toBe('');
     expect(
       formatPollResultsDownload('Market direction?', choices, totals, answers.length, answers)
     ).toContain(

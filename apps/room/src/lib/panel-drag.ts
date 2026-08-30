@@ -105,7 +105,7 @@ function containerRect(node: HTMLElement, selector: string | undefined): DOMRect
 }
 
 /** Clamps a value, and snaps it to either bound when within {@link SNAP_TOLERANCE}. */
-function clampAndSnap(value: number, min: number, max: number, snap: boolean): number {
+export function clampAndSnap(value: number, min: number, max: number, snap: boolean): number {
   const clamped = Math.min(Math.max(value, min), max);
   if (!snap) return clamped;
   if (Math.abs(clamped - min) <= SNAP_TOLERANCE) return min;

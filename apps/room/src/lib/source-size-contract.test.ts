@@ -651,7 +651,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       straight back — the shape this list already records refusing for the alert and presentation
       panes. The snippet is the extraction.
     */
-    max: 1642,
+    /*
+      1642 -> 1684, 2026-08-30, for `poll-01` and `poll-02` — the poll arrival sound, and the poll
+      ENDING, which this room had no path for at all.
+
+      The executable change is a three-branch effect. What the lines carry is the two decisions that
+      are easy to get wrong from either side: the sound sits INSIDE the `'open'` branch, because
+      upstream's `gotPoll` never reaches the person who wrote the poll and a sound with no panel
+      behind it is a noise nothing explains; and the close is guarded on the poll modal being the one
+      showing, because `closeActive()` closes whatever is open and a poll ending must not shut
+      somebody's settings modal.
+    */
+    max: 1684,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -3057,7 +3068,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/polls.svelte.ts',
-    max: 119,
+    /*
+      119 -> 157, 2026-08-30, for `poll-02`, and the entry above says this file's argument lives in
+      its TEST because the ceiling would not take it. That was the right call for the LATCH and it is
+      the wrong call for this: the reason `#activeId` is a plain field while `#deliveredId` beside it
+      is `$state`, and the reason the transition cannot be read off `#deliveredId`, are both facts
+      about the two fields sitting three lines apart. A reader deleting one of them is looking at
+      this file, not at the test.
+
+      The rest is the verdict type. `'open' | 'ended' | null` replaces a boolean because "no poll" is
+      TWO situations — a room that has never had one, and a poll that just ended under somebody's
+      panel — and only the second may close anything.
+    */
+    max: 157,
     why: "the poll modal's four fields; the first of the room state classes"
   },
   {
@@ -4974,7 +4997,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/PollPanel.svelte',
-    max: 825,
+    /*
+      825 -> 896, 2026-08-30, for `poll-03`, `poll-07` and `poll-08`.
+
+      `poll-03` is the biggest of the three and the least visible: the pie was DRAWN on
+      `min(w,h)/2 - 10` and its labels PLACED at 32% of the container box in each axis. The box is
+      `width: 100%` by a fixed `300px`, so the labels traced an ellipse round a circle — outside the
+      pie left and right, inside it top and bottom. One `pieRadius()` now answers both, and the
+      contract counts the expression to make sure it stays one.
+
+      `poll-07` is four lines of code and fifteen of why: the snap goes through `panel-drag.ts`'s
+      `clampAndSnap` rather than being written out here, so this panel — the one floating panel in
+      the room that rolls its own pointer handling — shares the tolerance with the private chat and
+      the webcam holders instead of carrying a second copy of 20.
+    */
+    max: 896,
     why: 'the poll UI - author, vote and results in one captured component'
   },
   {

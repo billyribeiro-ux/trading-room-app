@@ -49,20 +49,20 @@ describe('the initial state is the reference’s', () => {
 describe('a poll arriving decides who sees it', () => {
   it('opens for a member who has not answered', () => {
     const polls = new RoomPolls();
-    expect(polls.deliver(poll(), VIEWER)).toBe(true);
+    expect(polls.deliver(poll(), VIEWER)).toBe('open');
     expect(polls.openMode, 'an arriving poll is answered, not built').toBe('auto');
     expect(polls.deliveredId).toBe(1);
   });
 
   it('does NOT open for the presenter who sent it', () => {
     const polls = new RoomPolls();
-    expect(polls.deliver(poll({ senderId: VIEWER }), VIEWER)).toBe(false);
+    expect(polls.deliver(poll({ senderId: VIEWER }), VIEWER)).toBeNull();
     expect(polls.deliveredId, 'nothing was delivered, so nothing is marked').toBeNull();
   });
 
   it('does NOT open for somebody who already answered', () => {
     const polls = new RoomPolls();
-    expect(polls.deliver(poll({ userAnswerChoice: 0 }), VIEWER)).toBe(false);
+    expect(polls.deliver(poll({ userAnswerChoice: 0 }), VIEWER)).toBeNull();
   });
 
   it('opens ONCE — the marker is what stops it reappearing', () => {
@@ -83,7 +83,7 @@ describe('a poll arriving decides who sees it', () => {
 
       **It reads what it writes, and it CONVERGES rather than looping.** `#deliveredId` is read
       inside `deliver` and assigned three lines later, so the effect tracks it: the write makes
-      `#deliveredId === poll.id` true, the effect runs once more, `deliver` returns false, and
+      `#deliveredId === poll.id` true, the effect runs once more, `deliver` returns `null`, and
       nothing is written. One extra pass, no cycle.
 
       The argument sits in the TEST and not in the docblock because `polls.svelte.ts` is at its
@@ -92,8 +92,8 @@ describe('a poll arriving decides who sees it', () => {
       file that would go red if somebody "simplified" the latch into a derivation.
     */
     const polls = new RoomPolls();
-    expect(polls.deliver(poll(), VIEWER)).toBe(true);
-    expect(polls.deliver(poll(), VIEWER), 'the same poll must not re-open').toBe(false);
+    expect(polls.deliver(poll(), VIEWER)).toBe('open');
+    expect(polls.deliver(poll(), VIEWER), 'the same poll must not re-open').toBeNull();
   });
 
   it('and a NEW poll opens again after the first one ended', () => {
@@ -101,7 +101,7 @@ describe('a poll arriving decides who sees it', () => {
     polls.deliver(poll({ id: 1 }), VIEWER);
     polls.deliver(null, VIEWER);
     expect(polls.deliveredId, 'the marker must clear or poll 2 never opens').toBeNull();
-    expect(polls.deliver(poll({ id: 2 }), VIEWER)).toBe(true);
+    expect(polls.deliver(poll({ id: 2 }), VIEWER)).toBe('open');
   });
 
   it('ending a poll un-minimises it, so the restore button cannot outlive it', () => {
@@ -226,5 +226,66 @@ describe('the getters are REACTIVE, which is the only thing the other gates cann
     stop();
 
     expect(seen, 'the restore token is not reactive').toEqual([0, 1]);
+  });
+});
+
+/**
+ * `poll-02` — A POLL ENDING ELSEWHERE HAS TO CLOSE THE PANEL, AND "no poll" ALONE CANNOT SAY SO.
+ *
+ * ```js
+ * case "pollDone": this.appEventBus.emit("pollDone")                        // byte 1,024,082
+ * this.appService.appEventBus.subscribe("pollDone", () => { this.hidePanel() })  // byte 2,106,987
+ * ```
+ *
+ * Wired once for the component's life — inside the `eventsWired` guard, outside any mode branch —
+ * so it closes the panel for every viewer who has one open, in any mode.
+ *
+ * This room has STATE where the reference has an EVENT, and the whole of the row is that the two are
+ * not interchangeable. `data.activePoll === null` is true of a room that has never had a poll and of
+ * a poll that ended a moment ago, and the second must close a panel while the first must not: a
+ * presenter builds a poll with `activePoll` null, so a verdict from the steady state would shut the
+ * setup panel on the same pass that opened it. The transition is what carries the information.
+ */
+describe('a poll ending', () => {
+  it('says so ONCE, on the transition', () => {
+    const polls = new RoomPolls();
+    polls.deliver(poll({ id: 1 }), VIEWER);
+    expect(polls.deliver(null, VIEWER)).toBe('ended');
+    expect(polls.deliver(null, VIEWER), 'the panel is already closed').toBeNull();
+  });
+
+  it('says nothing at all when there was never a poll', () => {
+    /*
+      The setup panel's whole existence depends on this. A presenter opens it to BUILD a poll, which
+      is exactly the state where `activePoll` is null and always has been.
+    */
+    const polls = new RoomPolls();
+    expect(polls.deliver(null, VIEWER)).toBeNull();
+    expect(polls.deliver(null, VIEWER)).toBeNull();
+  });
+
+  it('closes the panel of the presenter who WROTE it, whose poll was never delivered to them', () => {
+    /*
+      The reason the transition is tracked on its own field rather than on `#deliveredId`. That
+      marker is cleared for three reasons that are not "the poll ended" — you wrote it, you already
+      answered it, this browser has shown it once — so the author of a poll, for whom `deliver`
+      always returns `null`, would never be told their own poll had gone.
+    */
+    const polls = new RoomPolls();
+    expect(polls.deliver(poll({ id: 1, senderId: VIEWER }), VIEWER)).toBeNull();
+    expect(polls.deliver(null, VIEWER)).toBe('ended');
+  });
+
+  it('closes it for somebody who had already answered, who also never had it delivered', () => {
+    const polls = new RoomPolls();
+    expect(polls.deliver(poll({ id: 1, userAnswerChoice: 0 }), VIEWER)).toBeNull();
+    expect(polls.deliver(null, VIEWER)).toBe('ended');
+  });
+
+  it('does not report an ending when one poll replaces another', () => {
+    // Two polls back to back is not a close; the second opens over the first.
+    const polls = new RoomPolls();
+    polls.deliver(poll({ id: 1 }), VIEWER);
+    expect(polls.deliver(poll({ id: 2 }), VIEWER)).toBe('open');
   });
 });

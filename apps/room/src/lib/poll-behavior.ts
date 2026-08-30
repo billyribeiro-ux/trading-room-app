@@ -85,16 +85,37 @@ export function formatPollResults(
   return result;
 }
 
+/**
+ * The ON-SCREEN response rows — `#responsesTxt`, the short form without the xref.
+ *
+ * ```js
+ * $("#responsesTxt").append(this.total + ": [" + i.senderNick + "]: " + s + "\n")
+ * ```                                                                        // byte 2,106,688
+ *
+ * The reference APPENDS one row at a time and each row carries its own trailing newline, so the
+ * text always ends in one. `poll-11` — this joined instead, which is the same string minus that last
+ * character, and the difference shows the moment anything is appended after it or the box is
+ * selected and copied. A `map` + `join` cannot express "every row ends with a newline"; a trailing
+ * `+ '\n'` on a non-empty list can, and the empty case stays the empty string rather than a lone
+ * newline.
+ *
+ * NOT the archive form. `formatPollResponseArchive` below carries `- ${xref}`, which the reference
+ * accumulates into `textResponses` for the download and deliberately does not show. Two functions
+ * because they are two audiences.
+ */
 export function formatVisiblePollResponses(
   choices: readonly string[],
   answers: readonly PollAnswerRecord[]
 ) {
-  return answers
-    .map(
-      (answer, index) =>
-        `${index + 1}: [${answer.senderNick}]: ${choices[answer.choiceIndex] ?? ''}`
-    )
-    .join('\n');
+  if (answers.length === 0) return '';
+  return (
+    answers
+      .map(
+        (answer, index) =>
+          `${index + 1}: [${answer.senderNick}]: ${choices[answer.choiceIndex] ?? ''}`
+      )
+      .join('\n') + '\n'
+  );
 }
 
 export function formatPollResponseArchive(

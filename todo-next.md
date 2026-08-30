@@ -76,14 +76,14 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,481 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
-| 3 | `routes/+page.svelte` | 1,641 | no |
+| 3 | `routes/+page.svelte` | 1,683 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 988 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,055 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
-| 10 | `lib/components/PollPanel.svelte` | 824 | no |
+| 10 | `lib/components/PollPanel.svelte` | 895 | no |
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
 | 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 33,603 lines · 3.2%.**
+**2 of 71 surfaces audited · 1,072 of 33,716 lines · 3.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

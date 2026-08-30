@@ -33,6 +33,104 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 18:46 UTC — The poll panel: a sound with no caller, a panel that outlived its poll, and labels on the wrong curve
+
+**Runtime impact: YES.** A poll arriving now makes a sound (unless you are on do-not-disturb). A poll
+ending closes the panel of everyone still looking at it, instead of leaving an answerer with a live
+Vote button for a poll that no longer exists. Pie-slice labels sit on the pie instead of drifting
+outside it left and right. Dragging the panel snaps to the room edges like every other floating panel
+does. And holding Enter in the choice box adds one choice rather than one per key repeat.
+
+Eight rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `poll-01` through `poll-11` — which
+closes the `PollPanel` surface. **59 open · 165 closed · 224 rows.**
+
+#### `poll-01` — a sound this room loaded on every page and played from nowhere
+
+`fileShare` was declared in `#lib/sound-effects.ts`, mapped to a file that ships, and called by
+nothing: `grep -rn fileShare src` outside that module returned no hits at all. It plays now, gated on
+`doNotDisturbOn` the way the reference gates it, and INSIDE the branch that opens the panel — upstream
+never delivers `gotPoll` to the person who wrote the poll, and a sound with no panel behind it is a
+noise nothing explains.
+
+#### `poll-02` — state where the reference has an event, and why that is the whole row
+
+The reference broadcasts `pollDone` and every open panel hides. Here the signal is `data.activePoll`
+going null, which is **true of two different situations**: a room that has never had a poll, and a
+poll that ended a moment ago. Only the second may close anything — a presenter builds a poll while
+`activePoll` is null, so a verdict read off the steady state would shut the setup panel on the same
+pass that opened it. So `deliver` returns `'open' | 'ended' | null` and reports the TRANSITION.
+
+The transition is tracked on a field of its own rather than on `#deliveredId`, and that is the part
+an obvious implementation gets wrong. `#deliveredId` is cleared for three reasons that are not "the
+poll ended" — you wrote it, you already answered it, this browser has already shown it once — so the
+AUTHOR of a poll, for whom `deliver` always returns `null`, would never be told their own poll had
+gone. Two of the six new tests are exactly those two people, and the negative control that reads the
+transition off `#deliveredId` fails both.
+
+What it was leaving behind: an answerer who had not yet voted kept a fully interactive panel, and
+`sendAnswer` would then post against a poll the server had cleared.
+
+#### `poll-03` — two expressions, in different units, for one circle
+
+The pie was drawn on `min(w, h) / 2 - 10`. Its labels were placed at 32% of the container box in each
+axis — and the box is `width: 100%` by a fixed `height: 300px`, so 32% is about 173px sideways and
+96px down. The labels traced an ellipse around a circle: outside the pie left and right, inside it
+top and bottom. flot's `radius: .8` (byte 2,104,707) is a fraction of the PIE's radius, the same
+number in both axes.
+
+One `pieRadius()` answers both now, and the contract counts the expression so it stays one.
+
+#### `poll-07` — the one panel that rolled its own drag
+
+`panel-drag.ts` has implemented `snap: true`'s containment-edge half since it was written, and the
+private chat and the webcam holders both use it. The poll panel does its own pointer handling for its
+maximise and minimise states, and it was the panel without the snap. It now calls the same
+`clampAndSnap`, so the 20px tolerance is one number rather than two. The cross-element half of
+jQuery UI's `snap` needs a registry this app does not have — recorded once, in `panel-drag.ts`, for
+all four panels.
+
+#### `poll-08` and `poll-11(a)` — the two one-liners that are not cosmetic
+
+The choice input was bound to `keydown` where the reference binds `keyup.enter`. Holding Enter
+repeats `keydown`, so it added a choice per repeat. And `formatVisiblePollResponses` joined its rows
+where the reference appends them one at a time, each carrying its own newline — the same string minus
+its last character. The empty case stays the empty string rather than becoming a lone newline, which
+a bare `+ '\n'` would have made it.
+
+#### The three that were measured and refused
+
+- **`poll-09`** — the `localStorage` "savedPolls" migration is a ONE-SHOT promotion of legacy data to
+  the server. Saved polls are a server table here and always have been, so there is no legacy array
+  to promote: building it would mean reading a key nothing has ever written.
+- **`poll-10`** — the reference ships `savePollResults()` and **no way to reach it**. The audit's
+  reader read all nine template functions and none binds it; const entry 48 is a click-less duplicate
+  used as a conditional placeholder. `formatPollResultsDownload` stays as the transcription of the
+  payload — deleting it would delete the evidence, not the dead code, and `dead-export-contract`
+  records in as many words that a symbol only a test reads is still read.
+- **`poll-11(b)`** — the reference's `setTimeout(… calcPieData(), 100)` exists because flot must
+  re-measure its container after a display change. This draws to a canvas, which keeps its bitmap
+  across `display: none`. Reproducing the timer would be adding a delay to work around a measurement
+  this implementation does not have to make.
+
+#### What the gate found
+
+`state-raw-contract` caught `chartBox` declared as deep `$state` when it is only ever replaced. Two
+numbers behind a proxy read once per label per render — small, and exactly the shape that contract
+exists to stop accumulating.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **255 test files, 4,228 tests, 1
+skipped.** `svelte-check` clean at 1,469 files. **Seven negative controls, each seen red**, and each
+mutation checked to have landed: the do-not-disturb gate removed; the close ungated by which modal is
+open; the labels back on the ellipse; one drag axis left unsnapped; `keyup` back to `keydown`; the
+ending transition read off `#deliveredId`; and the trailing newline removed.
+
+Svelte MCP: `svelte-autofixer` on the changed region of `PollPanel.svelte` returns only its two
+standing suggestions — the `bind:this` on the canvas and the `requestAnimationFrame` inside the
+redraw effect — both of which are the documented design here. Three size ceilings raised with their
+arguments. **Nothing was opened in a browser.**
+
 ### 2026-08-30 18:40 UTC — `{@const}` is legacy, and the obvious replacement is a silent staleness bug
 
 **Runtime impact: NO** — twelve template tags migrated to the syntax the official documentation now
