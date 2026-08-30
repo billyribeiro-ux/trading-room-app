@@ -33,6 +33,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 23:45 UTC — Every remaining blocker re-measured against the bundle, and one citation was wrong
+
+**Runtime impact: NO.** `TODO.md` only.
+
+`TODO.md` is down to eight rows and every one of them claims to be blocked. A blocker is a claim like
+any other, and this repository has already been burned by one: `altChatRender` was filed BLOCKED on a
+measurement that turned out to be wrong, came back, and shipped the same evening —
+`missing-settings-triage.md` records that sequence as the argument for **re-measuring a blocker before
+building around it**. So each remaining row's evidence was read out of the bundle today rather than
+inherited.
+
+**Row AE was removed** — verified done, not taken on its own word. Its two claims were checked
+directly: `quality.yml` carries two browser jobs, `controller end-to-end` at line 227 and `room
+end-to-end` at line 387, each running `playwright install --with-deps chromium` then `pnpm run
+test:e2e`; and `RoomNavbar` — the last component in the repository with no render cover — now has
+`room-navbar-contract.test.ts`, 11 tests, both directions of the presenter gate plus the positive
+control that stops the absence assertions passing against a render that produced nothing.
+
+**Every byte citation in the eight rows was checked. Three of four land exactly; one was wrong.**
+
+| row | cited | what is actually there |
+| --- | --- | --- |
+| X | 1,023,704 | ✅ `setRecPreview":…this.globals.sessData.recPreviewLocation=i.url` |
+| AC | 1,014,265 | ✅ the emitter, `case"stopRecMsg":this.guiEventBus.emit("stopRecMsg",i)` |
+| AC | 2,501,954 | ❌ **a `sendSalesImageToChat` subscriber.** Wrong by 3,329 bytes |
+| SP | 2,170,505 | ✅ `getPlayerLink(){…invokeAdminCmd("streamStatus")…}` |
+
+The real `stopRecMsg` subscriber is at **2,505,283**. Corrected in place, and the row's count is
+corrected with it: the three occurrences are not three sites. Two of them — 1,014,265 and 1,014,300 —
+are the `case` label and the `emit` thirty-five bytes later, so there are TWO sites, an emitter and a
+subscriber.
+
+**The disposition did not change, and the corrected text is what confirms it.** The subscriber reads
+`-1 != i.data.indexOf("Stopped") ? error(i.data) : info(i.data)` — it renders server-generated text,
+which a client-side recorder cannot produce. Reading the right address made the refusal stronger than
+the wrong address had.
+
+**SP was verified on both sides.** The reference: `getPlayerLink()` calls
+`invokeAdminCmd("streamStatus")` and reads `i.rc.enablePlayer` and `i.rc.playerURL` — and `playerURL`
+occurs **exactly once in 2,891,205 bytes**, which is the measurement behind "the URL is unknowable
+here": it is a value that server sends and no captured byte defines. Ours: `streamingPlayerEnabled`
+now appears only in `ModalHost.svelte`'s comments recording the removal, a wiring contract, and
+`stream-player-blocked-contract.test.ts`. The write is genuinely gone.
+
+**The remaining eight, and what each is actually waiting on** — none is waiting on code:
+
+| row | blocked on |
+| --- | --- |
+| G, H | an owner decision: the Postgres host under sustained connections, and separating the media plane |
+| Q | a staging WooCommerce — boot, buy, cancel, prove the door closes |
+| R | a human at a screen picker (`getDisplayMedia` cannot be automated; headless returns a synthetic gradient), and a MediaMTX host for row 10 |
+| X, AC, AD | a MediaMTX host at `STREAM_SERVER_MTX` — 8889 WHIP/WHEP, 1935 RTMP, TLS |
+| SP | an authority decision: minting a media grant for an ANONYMOUS viewer of a multi-tenant fintech room |
+
+**Verified:** the bundle reads above, run against
+`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` (2,891,205 bytes). **Not run:** the full gate —
+three sub-agents have work in flight in this tree, and its output would attribute one agent's
+half-written file to another's change.
+
 ### 2026-08-30 23:15 UTC — A list that named its own tracker, and never opened it
 
 **Runtime impact: NO.** One assertion added to an existing contract. No `src` module changed.
