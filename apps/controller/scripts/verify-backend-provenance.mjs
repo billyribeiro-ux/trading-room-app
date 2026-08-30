@@ -97,6 +97,16 @@ const LOCALLY_AUTHORED = new Map([
   [
     'services/api/migrations/0009_provision_tradingroom_app.sql',
     '20b95d68bac75a698fa4e90502c2e54cc88d475d8b92bc4aada946a57700ce9c'
+  ],
+  [
+    // Authored here on 2026-08-31, and the pair to `migration_reappliability.rs` above: that test
+    // states the chain must apply to any number of databases on one cluster, and this migration is
+    // where that rule stops being about SQL and becomes about a cluster-global ROLE. It revokes
+    // per-database and drops only when it is the last database still granting — verified across
+    // three databases on a live PostgreSQL 16.13 cluster, including the refusal on one where 0009
+    // had not run. `CHANGELOG.md` carries the full evidence.
+    'services/api/migrations/0010_retire_ptr_clone_app.sql',
+    'a134bdcf67ae8662fb9c10a0c7a80581adf23ec0f59739e0363bde6ed4d3d36a'
   ]
 ]);
 

@@ -87,6 +87,17 @@ const ALLOWED_PREFIXES = Object.freeze([
   // role it points DATABASE_URL at is `tradingroom_app`.
   'services/.env.example',
   'services/api/migrations/0009_provision_tradingroom_app.sql',
+  /*
+    `0010` is the one migration whose SUBJECT is the reference name: it revokes everything
+    `ptr_clone_app` holds and drops the role when the last database in the cluster has stopped
+    granting to it. It cannot be written without naming it, and the day it can be deleted is the day
+    the name is gone from every live database — which is the outcome it exists to reach.
+
+    Added 2026-08-31 with the migration, and this list is the reason to notice it: an entry here
+    should read as a claim somebody has to defend, and this one's defence is that the entry deletes
+    itself once the rollout completes.
+  */
+  'services/api/migrations/0010_retire_ptr_clone_app.sql',
   'services/api/tests/',
   '.github/workflows/backend-quality.yml',
   'apps/controller/scripts/verify-backend.mjs',
@@ -135,11 +146,22 @@ describe('the reference name never leaks into live code', () => {
 
       If you are lowering this number, good. If you are raising it, say why in the CHANGELOG.
 
-      39 is MEASURED, not chosen: it is the list's size on 2026-08-15, the day the boundary was
-      drawn. The first value written here was a guess of 36 and this assertion caught it within
-      seconds, which is a small but exact demonstration of why the ceiling is pinned at all.
+      39 was MEASURED, not chosen: the list's size on 2026-08-15, the day the boundary was drawn. The
+      first value written here was a guess of 36 and this assertion caught it within seconds, which
+      is a small but exact demonstration of why the ceiling is pinned at all.
+
+      **39 -> 40 on 2026-08-31, and it is the one kind of growth this rule should admit.** The entry
+      is `services/api/migrations/0010_retire_ptr_clone_app.sql`, whose SUBJECT is the reference
+      name: it revokes everything `ptr_clone_app` holds and drops the role once the last database in
+      the cluster has stopped granting to it. It cannot be written without naming what it removes.
+
+      Every other entry on this list is a use that must be TOLERATED. This is the only one that is
+      working to shorten the list — it deletes itself, and takes the name out of every live database
+      with it, on the day the rollout completes. That is the argument, and the CHANGELOG carries the
+      evidence: three databases on a live PostgreSQL 16.13 cluster, including the refusal on one
+      where `0009` had not run.
     */
-    expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(39);
+    expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(40);
   });
 
   it('never permits an exception inside the running application code', () => {

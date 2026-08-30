@@ -82,8 +82,37 @@ whole chain was run against it. **What this entry asserted from reading is now m
 That last line is `0009`'s own security claim, in its own words — _"after this runs, `ptr_clone_app`
 holds object privileges but is named by no policy, so under FORCE ROW LEVEL SECURITY it reads zero
 rows from every tenant table"_ — and it is now a measurement rather than a reading. **The baseline
-role is already inert with respect to tenant data.** What retiring it still needs is revoking the 87
-object privileges it holds, which is a migration, not a question.
+role is already inert with respect to tenant data.**
+
+**And that migration is written and proven — `0010_retire_ptr_clone_app.sql`, 2026-08-31.** It
+revokes every ACL class the role holds in the database it runs on and drops the role once that is
+the last database in the cluster still granting to it. Measured across three databases on the same
+PostgreSQL 16.13 cluster:
+
+| database          | chain         | outcome                                                                                                       |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ptr_clone`       | `0001`→`0009` | revoked, **role dropped** — it was the only database granting                                                 |
+| `fresh_chain`     | `0001`→`0009` | revoked, **not** dropped, and said so: another database still granted. 0 grants remaining here                |
+| `interlock_probe` | `0001`→`0008` | **REFUSED**, and the role survived the refusal. `0009` applied, then `0010` dropped the role from the cluster |
+
+Three things that only a live cluster could have taught, each now written at the migration:
+
+- **`DROP ROLE` is cluster-global while privileges are per-database.** The first draft dropped
+  unconditionally and failed with _"72 objects in database interlock_probe"_ — which is the normal
+  mid-rollout state, because `0001` re-creates this role on every new database. Exactly one failure,
+  `dependent_objects_still_exist`, is tolerated and announced; anything else propagates.
+- **A LOGIN role always holds a DATABASE grant.** `CONNECT` lives in an ACL no table-level revoke
+  touches, and `DROP ROLE` refuses while it stands. The first live run failed on precisely that.
+- **The residual count has to read the catalogue.** Through `information_schema` it was both too
+  narrow (no database, schema or type ACL) and too wide (`column_privileges` reflects table grants
+  onto every column: it reported 922 where 26 column ACLs existed).
+
+After retirement `tradingroom_app` kept all 87 table grants and all 22 policies, tenant A saw only
+A's room, tenant B only B's, and an unset tenant saw zero rows.
+
+**What remains of this entry is the OWNER role and the database name** — `ptr_clone` →
+`tradingroom_owner` / `tradingroom`. That half is an operator step and always was: migrations
+authenticate as `ptr_clone`, and PostgreSQL answers `ERROR: session user cannot be renamed`.
 
 `services/api/migrations/0009_rename_runtime_roles.sql` renames `ptr_clone_app` →
 `tradingroom_app`, forward-only, guarded and idempotent. Proven against PostgreSQL 16.13 on all four
