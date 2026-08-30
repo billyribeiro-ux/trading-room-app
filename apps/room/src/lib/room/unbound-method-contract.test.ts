@@ -29,6 +29,7 @@ import { RoomScreens } from './screens.svelte';
 import { RoomChatMute } from './chat-mute';
 import { RoomChatSearch } from './chat-search.svelte';
 import { RoomKicks } from './kicks';
+import { RoomPeerHistory } from './peer-history.svelte';
 import { RoomProfilePicture } from './profile-picture';
 import { RoomUserDetail } from './user-detail';
 import { RoomPrivateCommands } from './private-commands';
@@ -124,6 +125,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
     uncovered by a move that changed no behaviour at all. That is exactly the blind spot this map
     exists for, and exactly how it was found.
   */
+  peerHistory: RoomPeerHistory,
   profilePicture: RoomProfilePicture,
   userDetail: RoomUserDetail,
   sessionControl: RoomSessionControl,

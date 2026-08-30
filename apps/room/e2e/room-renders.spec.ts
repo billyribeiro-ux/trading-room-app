@@ -408,3 +408,102 @@ test.describe('the dropdowns open, in a browser', () => {
     }
   });
 });
+
+/*
+  THE PRIVATE-CHAT LOG IS A SCROLL BOX, which for the life of this repository it was not.
+
+  `.pc-messages` is rendered by `PrivateChatPanel`, `private-chat.svelte.ts` scrolls it with
+  `scroller.scrollTop = scroller.scrollHeight`, and NO CSS RULE ANYWHERE GAVE IT A HEIGHT. Two rules
+  were missing and only one of them was the capture's:
+
+    * `.pc-messages{height:calc(100% - 50px);overflow:hidden auto}` — the reference's own, at bundle
+      byte 2,194,498, living in `app-privchatscroller`'s styles rather than `app-privchat`'s, which
+      is how it was missed when that component's styles were transcribed.
+    * `app-privchatscroller { display: block; height: 100% }` — OURS. A custom element is
+      `display: inline` until something says so, which `app.css` already knew for `app-roomscroller`
+      and had never said here.
+
+  Setting `scrollTop` on a box that does not scroll is a no-op, so a conversation longer than the
+  panel ran off the bottom with no way to reach it.
+
+  ## What this proves, and what it does NOT
+
+  A source assertion cannot see this at all: a rule can be present, correctly spelled, and never
+  reach an element. So this asks a real browser, after the real stylesheets have cascaded.
+
+  **Measured here:** both rules are parsed into live `CSSStyleDeclaration`s in the page's own
+  stylesheets. Before this change the capture's rule did not exist in this repository at all and the
+  `display` rule had never been written, so that is a real transition, and the negative control
+  confirms it — removing either turns this red.
+
+  **NOT measured here, stated rather than implied:** a laid-out box with a conversation in it.
+  `.pc-messages` and its scroller only enter the DOM once a peer is selected, and selecting a peer
+  needs a second member in the roster — two browser contexts and a live presence stream, which this
+  job has neither of. The branch below that measures `getBoundingClientRect` is therefore the one
+  that does NOT run today; it is kept because the day this job grows a second member it is the
+  stronger assertion and will start running on its own.
+*/
+test.describe('the private-chat log', () => {
+  test('carries both rules the browser needs to make it scroll', async ({ page }) => {
+    await page.route('**/*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return route.continue();
+      return route.abort();
+    });
+    await page.goto(handoffUrl(ROOM));
+    await page
+      .getByRole('button', { name: /log ?in|enter/i })
+      .first()
+      .click();
+    await page.waitForTimeout(1_000);
+    const entered = await page.goto(`/?room=${ROOM}`, { waitUntil: 'domcontentloaded' });
+    expect(entered?.status(), 'the room must answer 200 before anything below means anything').toBe(
+      200
+    );
+
+    /*
+      The panel is mounted and hidden rather than unmounted — `PrivateChatPanel.test.ts` pins that —
+      so the element exists to be measured without a second member in the room, which this job has
+      no way to produce. What cannot be measured that way is a THREAD, because `.pc-messages` only
+      renders once a peer is selected. So this asserts the two rules that were missing, on the
+      element that carries them, and says plainly which half it cannot reach.
+    */
+    const scroller = await page.evaluate(() => {
+      const element = document.querySelector('app-privchatscroller');
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return { display: style.display, height: element.getBoundingClientRect().height };
+    });
+
+    if (scroller === null) {
+      /*
+        No conversation open, so the scroller is not in the DOM. Measure the rule itself instead:
+        a stylesheet that CONTAINS the selector proves nothing, but one whose rule the browser has
+        parsed into a live `CSSStyleDeclaration` proves the cascade reached it.
+      */
+      const rules = await page.evaluate(() =>
+        [...document.styleSheets].flatMap((sheet) => {
+          try {
+            return [...sheet.cssRules].map((rule) => rule.cssText);
+          } catch {
+            return [];
+          }
+        })
+      );
+      expect(
+        rules.some((text) => /app-privchatscroller\s*\{[^}]*display:\s*block/.test(text)),
+        'the scroller must be a block, or `.pc-messages` has no height to be a percentage of'
+      ).toBe(true);
+      expect(
+        rules.some((text) => /\.pc-messages[^{]*\{[^}]*overflow:\s*hidden auto/.test(text)),
+        'and the log must overflow, or setting scrollTop is a no-op'
+      ).toBe(true);
+      return;
+    }
+
+    expect(scroller.display, 'a custom element is inline until something says otherwise').toBe(
+      'block'
+    );
+    expect(scroller.height, 'and an inline box has no height to give its child').toBeGreaterThan(0);
+  });
+});

@@ -546,7 +546,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       DOWN 3 on 2026-08-30. The Benzinga feature was six prop lines across two components; it is two
       now, and the flag that was missing from one of them cannot be dropped again.
     */
-    max: 1471,
+    /*
+      1,471 -> 1,473, 2026-08-30. Two props: `hasMore` and `loadingMore` reaching `PrivateChatPanel`
+      from the class that now owns them. The page is the only wiring point between the two, so this
+      is the same irreducible two lines the composition root pays whenever a value crosses.
+    */
+    max: 1473,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1430,7 +1435,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It holds no state of its own beyond the drag/resize attachment: the thread, the tabs, the
       search and the draft all belong to `RoomPrivateChat`.
     */
-    max: 396,
+    /*
+      RAISED 396 -> 402 on 2026-08-30, and the six lines buy a control that was making decisions it
+      had no basis for.
+
+      This panel used to decide whether more history existed (`log.length >= 50`) and which page to
+      ask for (`Math.floor(log.length / 50)`), against a `PAGE_SIZE` it declared itself. A short page
+      then named a page already fetched, so the same private messages were requested and prepended
+      twice, and the badge never disappeared. It renders `hasMore` / `loadingMore` now and asks with
+      no arguments — two props, a spinner branch the reference has, and their prose.
+
+      Flagged for the owner, as this session's other raises are. `private-chat.svelte.ts` beside it
+      absorbed a state machine and still came out a line SHORTER, because `RoomPeerHistory` left.
+    */
+    max: 402,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -2808,6 +2826,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       dispatches to a class that dispatches.
     */
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
+  },
+  {
+    file: 'lib/room/peer-history.svelte.ts',
+    /*
+      Extracted from `RoomPrivateChat` on 2026-08-30 and capped at what it landed at. It is the
+      user-info modal's "show private messages" — three fields, three getters and one loader — and it
+      had lived on the PANEL's class, which shares nothing with it but the word "private". If this
+      grows, the question is what a second thing this modal does could be.
+    */
+    max: 85,
+    why: 'one member’s whole private history, for a moderator; a modal, not the panel'
   },
   {
     file: 'lib/room/private-chat.svelte.ts',

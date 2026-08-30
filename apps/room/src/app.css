@@ -295,6 +295,33 @@ app-roomscroller {
 }
 
 /*
+  THE SAME RULE THE PRIVATE-CHAT SCROLLER NEVER GOT, and the omission is why its log could not
+  scroll at all.
+
+  A custom element is `display: inline` until something says otherwise — which is exactly why the
+  rule above this one exists for the main chat. `app-privchatscroller` is the identical shape and had
+  only `background-color` (a captured rule), so it was an inline box with no height, and the
+  `height: calc(100% - 50px)` the reference gives `.pc-messages` inside it resolved against `auto`.
+  A percentage height against an auto-height parent is `auto`, so `overflow: hidden auto` had nothing
+  to overflow: the box simply grew, and
+  `private-chat.svelte.ts`'s `scroller.scrollTop = scroller.scrollHeight` was setting scrollTop on a
+  box that does not scroll — a no-op, in a panel whose whole job is a conversation longer than itself.
+
+  `height: 100%` rather than the flex pair above, because the parent differs: `app-roomscroller` is a
+  flex ITEM in a column, while this is the only child of `.pc-logs`, which the capture gives
+  `flex: 1; height: 100%`. Filling it is what the child needs and nothing more.
+
+  This rule is OURS, not the capture's — Angular sizes a component host through its own view
+  encapsulation and never needed to say this — which is why it sits here beside its precedent rather
+  than in `captured-runtime-components.css`. The `.pc-messages` rule it makes work IS captured, and
+  is in that file.
+*/
+app-privchatscroller {
+  display: block;
+  height: 100%;
+}
+
+/*
   The alert and chat lists are pinned to the newest message. Doing that from script means the
   server-rendered list paints at scrollTop 0 and is then scrolled down after first paint - traced
   at 1512x900 as alerts 0 -> 723 and chat 0 -> 294, roughly 70-230ms after FCP. That is invisible

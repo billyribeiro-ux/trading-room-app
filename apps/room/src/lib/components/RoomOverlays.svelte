@@ -641,11 +641,9 @@
   privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
   onShowPrivateMessages={(user) => {
     modals.open('all-private');
-    void privateChat.showPeerHistory(user.id);
+    void privateChat.peerHistory.show(user.id);
   }}
   peerHistory={privateChat.peerHistory}
-  peerHistoryLoading={privateChat.peerHistoryLoading}
-  peerHistoryError={privateChat.peerHistoryError}
   mutedUsers={userActions.mutedUsers}
   followedUsers={userActions.followedUsers}
   targetMessage={messageActions.selected}

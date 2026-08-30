@@ -33,6 +33,103 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 01:30 UTC — The private-chat log could not scroll, and its Load More re-fetched pages it already had
+
+**Runtime impact: YES.** A private conversation longer than the panel is now reachable — it was not
+scrollable at all — and Load More asks for the next page rather than sometimes re-asking for the one
+it just received and showing those messages twice.
+
+#### Five defects in one surface, and they compound
+
+| # | defect | evidence |
+| --- | --- | --- |
+| 1 | `.pc-messages` had **no CSS rule anywhere** | `grep` over every `.css` in the repo: zero |
+| 2 | `app-privchatscroller` was an **inline element** | no `display` rule; `app.css` already sets one for `app-roomscroller` |
+| 3 | the page number was `Math.floor(log.length / 50)` | `PrivateChatPanel.svelte` |
+| 4 | `hasMoreData` was never modelled | badge gated on `log.length >= PAGE_SIZE` |
+| 5 | the prepend did not dedupe | bare spread |
+
+**1 and 2 together mean the log never scrolled.** The rule the reference gives it —
+`.pc-messages{height:calc(100% - 50px);overflow:hidden auto}` at bundle byte 2,194,498 — lives in
+`app-privchatscroller`'s own styles rather than `app-privchat`'s, which is how it was missed when
+that component's styles were transcribed. And a custom element is `display: inline` until something
+says otherwise, so even with the rule the `100%` would have resolved against an auto-height parent.
+`private-chat.svelte.ts` has always done `scroller.scrollTop = scroller.scrollHeight`; on a box that
+does not scroll that is a no-op.
+
+`app.css` already knew this. `app-roomscroller { min-height: 0; display: block; flex: 1 1 auto }`
+sits twenty lines above where the new rule went, for the main chat's scroller. The private-chat one
+was never given the same.
+
+**3 and 4 are one mistake: deriving state the server owns.** Hold 50 rows, ask for page 1, get 30
+back — `log.length` is 80 and `Math.floor(80 / 50)` is 1, the page just fetched. The next click
+re-requested it and prepended the same thirty private messages a second time. An empty response left
+`log.length` unchanged, so the badge stayed and every further click re-fetched nothing, forever. And
+below 50 rows the badge never appeared at all, however much history the server had.
+
+`PAGE_SIZE = 50` was invented. The reference has no client-side page size: `++this.currPage` counts
+REQUESTS on its scroller, and the server decides how many rows a page holds.
+
+#### The reference's state machine, transcribed whole (byte 2,191,427)
+
+```js
+constructor: hasMoreData = !0, currPage = 0, isLoadingMore = !1, loadMoreLastID = ""
+subscribe("getPCLog", e => { isLoadingMore = !1; 0 == e.length && (hasMoreData = !1, …) })
+subscribe("PCswitchChatToUser", () => { currPage = 0; hasMoreData = !0; isLoadingMore = !1; … })
+loadMore() { loadMoreLastID = "pcm-" + msgs[0]._id; emit("PCLoadMore", {page: ++currPage}); … }
+```
+
+Three of its four fields are now in `#lib/chat-paging.ts` beside the main feeds' scroll-trigger
+rules, so the two paging models sit where they can be compared.
+
+#### The fourth field was modelled, then REMOVED, and that is the honest half
+
+`loadMoreLastID` is a scroll restoration: the row at the top when Load More was pressed, scrolled
+back into view once older rows land so the reader's position does not jump. I modelled it — and then
+took it out, because **nothing could read it**: our rows render through `CompactMessageRow` with no
+`id` attribute, so the `getElementById("pcm-" + _id)` it turns on would find nothing. A field written
+and never read is what this repository refuses, and carrying it would have looked like the behaviour
+existed. `TODO.md` carries what building it needs, with these bytes.
+
+#### `RoomPeerHistory` came out, and it never belonged where it was
+
+The paging needed lines in a file on its ceiling. What left is the user-info modal's "show private
+messages" — three fields, three getters, one loader — which had lived on `RoomPrivateChat`, the
+floating PANEL, sharing nothing with it but the word "private". `private-chat.svelte.ts` ends the
+commit a line **shorter** than it started despite absorbing a state machine.
+
+Its three props on `ModalHost` became one, for the third time this session: three parallel
+parameters that are one idea, threaded through every hop between them.
+
+#### Verified in a browser, which for CSS is the only verification that counts
+
+A rule can be present, correctly spelled, and apply to nothing — that is exactly what happened here.
+So `e2e/room-renders.spec.ts` gained a spec, run against the container's preinstalled Chromium:
+**11 browser specs pass**, and removing the `display: block` rule turns the new one red.
+
+**What it does NOT prove, stated rather than implied:** a laid-out box with a conversation in it.
+`.pc-messages` enters the DOM only once a peer is selected, which needs a second member in the
+roster — two browser contexts and a live presence stream, which this job has neither of. The spec
+keeps the stronger `getBoundingClientRect` branch for the day that changes; today it takes the
+branch that measures the parsed rules.
+
+#### Two things the gate caught that nothing else did
+
+`svelte-check` was silent on an import left unused by the prop consolidation; **eslint** caught it,
+and eslint is a `gate` step that `pnpm test` does not run. That is the second time in two days this
+distinction has paid for itself.
+
+#### Negative controls — six, all red
+
+A short page ending the history; an ended history reopening; the counter derived from rows again;
+the prepend dropping its dedupe; the badge gated on `log.length` again; and the `display: block` rule
+removed (that one in the browser). Each with the file restored and `diff`ed byte-identical.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,474 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done. Playwright 11/11.
+
 ### 2026-08-30 00:50 UTC — The A/V pane's six controls all saved a preference; nothing read four of them, and two showed somebody else's hardware
 
 **Runtime impact: YES.** A presenter who picks a microphone is now recorded through it, with the

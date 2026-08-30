@@ -1,9 +1,9 @@
 <script lang="ts">
   import AvDevicePane from '#lib/components/AvDevicePane.svelte';
+  import type { RoomPeerHistory } from '#lib/room/peer-history.svelte.js';
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
-  import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
@@ -288,14 +288,13 @@
     privateMessageHistoryEnabled: boolean;
     /** Opens the all-user private-message modal for one peer. */
     onShowPrivateMessages: (user: ModalTargetUser) => void;
-    /** What that modal is showing, and why it is not. All three owned by `RoomPrivateChat`. */
-    peerHistory: {
-      readonly nick: string;
-      readonly messages: readonly PrivateChatMessage[];
-      readonly truncated: boolean;
-    } | null;
-    peerHistoryLoading: boolean;
-    peerHistoryError: string | null;
+    /**
+     * What that modal is showing, why it is not, and whether it is still asking.
+     *
+     * ONE collaborator rather than the three parallel props this used to be — see the getter it
+     * comes from. Three props that are one idea is the shape this session corrected twice.
+     */
+    peerHistory: RoomPeerHistory;
     currentUser: {
       id: number;
       email: string;
@@ -509,8 +508,6 @@
     privateMessageHistoryEnabled,
     onShowPrivateMessages,
     peerHistory,
-    peerHistoryLoading,
-    peerHistoryError,
     currentUser,
     mobilePin = 'N/A',
     mobileAppAvailable = false,
@@ -5124,7 +5121,7 @@
     {#snippet header()}
       <h5>
         All private messages:
-        {#if peerHistory?.nick}<strong>{peerHistory.nick}</strong>{/if}
+        {#if peerHistory.history?.nick}<strong>{peerHistory.history.nick}</strong>{/if}
       </h5>
     {/snippet}
     <!--
@@ -5133,28 +5130,28 @@
       was the spinner ALONE and nothing opened the modal: a permanent "Loading..." with no fetch
       behind it, which is why `enablePrivateMessageHistory` was mis-filed as a one-line WIRE.
     -->
-    {#if peerHistoryLoading}
+    {#if peerHistory.loading}
       <div class="text-center my-4">
         <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
       </div>
-    {:else if peerHistoryError}
+    {:else if peerHistory.error}
       <!--
         NOT in the capture: upstream has no failure branch here, because its fetch cannot refuse.
         Ours can — the server checks the role AND the room setting before it reads a row — and a
         refusal that rendered as "No logs." would tell a presenter the member has no private
         messages, which is a different and worse answer than "you may not read them".
       -->
-      <div class="mt-3 text-center text-warning">{peerHistoryError}</div>
+      <div class="mt-3 text-center text-warning">{peerHistory.error}</div>
     {:else}
       <div class="w-100">
         <div class="log-body">
-          {#if peerHistory && peerHistory.messages.length > 0}
+          {#if peerHistory.history && peerHistory.history.messages.length > 0}
             <div class="log-messages">
-              {#each peerHistory.messages as message (message._id)}
+              {#each peerHistory.history.messages as message (message._id)}
                 <CompactMessageRow {message} />
               {/each}
             </div>
-            {#if peerHistory.truncated}
+            {#if peerHistory.history.truncated}
               <!--
                 ALSO NOT in the capture, and for the same reason: the reference asks for everything
                 and gets everything. `loadPeerHistory` caps at `MAX_PEER_HISTORY` because this read

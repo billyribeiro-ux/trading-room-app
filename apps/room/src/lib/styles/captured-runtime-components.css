@@ -6665,6 +6665,34 @@ app-privchat .pmToolbar:not(:root) {
   color: var(--msgs-header-color);
 }
 
+/*
+  `.pc-messages` — THE PRIVATE-CHAT LOG'S SCROLL BOX, and it was missing entirely.
+
+  Verbatim from the bundle at byte 2,194,498:
+
+      styles:[".pc-messages[_ngcontent-%COMP%]{height:calc(100% - 50px);overflow:hidden auto}"]
+
+  Why it was missed rather than dropped: it belongs to `app-privchatscroller`, a SEPARATE component
+  from `app-privchat`, and only `app-privchat`'s styles were transcribed into the block above. So the
+  container had no height and no overflow — `private-chat.svelte.ts`'s
+  `scroller.scrollTop = scroller.scrollHeight` was setting scrollTop on a box that does not scroll,
+  which is a no-op, and a conversation longer than the panel simply ran off the bottom.
+
+  The 50px is the composer's default height. The reference also RESIZES this at runtime as the
+  textarea grows — `querySelector(".pc-messages").style.height = "calc(100% - " + h + " - 15px)"` at
+  byte 2,203,435, restored to `calc(100% - 50px)` when the textarea is emptied. NOT reproduced, and
+  the reason is that its trigger is not: our composer does not auto-expand, so there is no height to
+  follow. If it ever does, this rule is what that code has to keep in step with.
+
+  Written here rather than in `PrivateChatPanel.svelte`'s own `<style>` because this file is where
+  the rest of `app-privchat`'s captured rules live, and splitting one component's captured styles
+  across two places is how the next transcription misses the other half again.
+*/
+app-privchat .pc-messages:not(:root) {
+  height: calc(100% - 50px);
+  overflow: hidden auto;
+}
+
 /* Captured runtime section 30: as-split; scope 3013344202 */
 as-split:not(:root) {
   display: flex;

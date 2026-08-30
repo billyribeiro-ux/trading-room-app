@@ -111,7 +111,15 @@
     ondonotdisturb: () => void;
     ondownload: () => void;
     onswitchuser: (uid: number) => void;
-    onloadmore: (uid: number, page: number) => void;
+    /**
+     * The Load More badge. NO ARGUMENTS: the counter belongs to whoever makes the requests, and
+     * `#lib/chat-paging.ts` records what deriving it from `log.length` here cost.
+     */
+    onloadmore: () => void;
+    /** `hasMoreData && !searchTerm` — the server's answer, not a guess from how many rows are held. */
+    hasMore: boolean;
+    /** `isLoadingMore` — the badge becomes a spinner rather than staying clickable. */
+    loadingMore: boolean;
     onsend: () => void;
   }
 
@@ -134,6 +142,8 @@
     ondownload,
     onswitchuser,
     onloadmore,
+    hasMore,
+    loadingMore,
     onsend
   }: Props = $props();
 
@@ -144,9 +154,6 @@
     part of the extraction that removes a line rather than relocating one.
   */
   let toolbarOpen = $state(false);
-
-  /** The page size `getAllPCLogs` answers with; Load More asks for the next multiple of it. */
-  const PAGE_SIZE = 50;
 </script>
 
 <!--
@@ -343,18 +350,19 @@
             -->
             <app-privchatscroller class="privChatScroller">
               <div class="pc-messages">
-                {#if log.length >= PAGE_SIZE && !searching}
+                <!--
+                  `O(2, o.hasMoreData && !o.searchTerm ? 2 : -1)` then `O(3, o.isLoadingMore ? 3 : -1)`
+                  at bundle byte 2,194,498 — two exclusive branches, badge or spinner.
+                -->
+                {#if hasMore && !searching}
                   <div class="text-center">
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span
-                      class="badge badge-warning"
-                      onclick={() =>
-                        currentUserId !== null &&
-                        onloadmore(currentUserId, Math.floor(log.length / PAGE_SIZE))}
-                    >
-                      Load More</span
-                    >
+                    <span class="badge badge-warning" onclick={() => onloadmore()}>Load More</span>
+                  </div>
+                {:else if loadingMore}
+                  <div class="text-center">
+                    <span class="badge badge-warning"><i class="fas fa-spinner fa-spin"></i></span>
                   </div>
                 {/if}
                 {#each log as message (message._id)}

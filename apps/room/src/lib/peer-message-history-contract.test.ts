@@ -48,7 +48,17 @@ function bodyOf(source: string, declaration: string): string {
 
 const remote = read('../routes/private-chat.remote.ts');
 const store = read('./server/private-chat.ts');
-const room = read('./room/private-chat.svelte.ts');
+/*
+  READ FROM `room/peer-history.svelte.ts` since 2026-08-30.
+
+  This feature lived on `RoomPrivateChat` and never belonged there: that class is the floating PANEL
+  — its tabs, its draft, its paging — and this is a read-only modal opened from the user-info card,
+  sharing nothing with it but the word "private". It came out when the panel's paging fix needed
+  lines in a file on its ceiling. Nothing about the behaviour changed in the move, which is what the
+  assertions below still check; the names lost their `peerHistory` prefix because the class they are
+  on now says it.
+*/
+const room = read('./room/peer-history.svelte.ts');
 const modalHost = read('./components/ModalHost.svelte');
 const overlays = read('./components/RoomOverlays.svelte');
 
@@ -131,36 +141,41 @@ describe('the read itself', () => {
 
 describe('the room half', () => {
   it('clears before it loads, so no member is labelled with another member’s messages', () => {
-    const from = room.indexOf('async showPeerHistory');
-    expect(from, 'showPeerHistory has been renamed or removed').toBeGreaterThan(-1);
+    const from = room.indexOf('async show(');
+    expect(from, 'the loader has been renamed or removed').toBeGreaterThan(-1);
     const to = room.indexOf('\n  }', from);
-    expect(to, 'showPeerHistory is unterminated').toBeGreaterThan(from);
+    expect(to, 'the loader is unterminated').toBeGreaterThan(from);
     const body = room.slice(from, to);
 
     // The order IS the behaviour, so the positions are compared rather than the presence.
-    const cleared = body.indexOf('this.#peerHistory = null');
-    const loading = body.indexOf('this.#peerHistoryLoading = true');
-    const loaded = body.indexOf('await this.#commands.loadPeerHistory');
+    const cleared = body.indexOf('this.#history = null');
+    const loading = body.indexOf('this.#loading = true');
+    const loaded = body.indexOf('await this.#load(');
     expect(cleared).toBeGreaterThan(-1);
     expect(loading).toBeGreaterThan(cleared);
     expect(loaded).toBeGreaterThan(loading);
   });
 
   it('always stops spinning, even when the server refuses', () => {
-    const from = room.indexOf('async showPeerHistory');
+    const from = room.indexOf('async show(');
     const to = room.indexOf('\n  }', from);
     const body = room.slice(from, to);
     expect(body).toContain('} finally {');
-    expect(body).toContain('this.#peerHistoryLoading = false');
+    expect(body).toContain('this.#loading = false');
   });
 
   it('is a SECOND command rather than a flag on the thread read', () => {
     /*
       The narrow read and the wide one share a peer id and nothing else. A flag would have given
       them one code path, and only one of the two callers is allowed to take it.
+
+      Both DECLARATIONS stayed on `PrivateChatCommands` when the loader moved out to
+      `RoomPeerHistory`: that list is the panel's wire, and the new class is handed the one function
+      it needs rather than the whole object.
     */
-    expect(room).toContain('loadPeerHistory: (payload: {');
-    expect(room).toContain('loadLog: (payload: {');
+    const panel = read('./room/private-chat.svelte.ts');
+    expect(panel).toContain('loadPeerHistory: (payload: {');
+    expect(panel).toContain('loadLog: (payload: {');
   });
 });
 
@@ -183,14 +198,17 @@ describe('the wire, end to end', () => {
     expect(from, 'the handler has been renamed or removed').toBeGreaterThan(-1);
     const body = overlays.slice(from, from + 300);
     expect(body).toContain("modals.open('all-private')");
-    expect(body).toContain('privateChat.showPeerHistory(user.id)');
+    expect(body).toContain('privateChat.peerHistory.show(user.id)');
   });
 
   it('carries the answer to the modal', () => {
     for (const prop of [
-      'peerHistory={privateChat.peerHistory}',
-      'peerHistoryLoading={privateChat.peerHistoryLoading}',
-      'peerHistoryError={privateChat.peerHistoryError}'
+      /*
+        ONE prop since 2026-08-30, not three. Three parallel props that are one idea is the shape
+        this session corrected twice in a day — the capture settings were the other — and each hop
+        between the class and the modal was carrying all three.
+      */
+      'peerHistory={privateChat.peerHistory}'
     ]) {
       expect(overlays).toContain(prop);
     }
@@ -202,8 +220,8 @@ describe('the wire, end to end', () => {
     can) and a truncation notice (it asks for everything and gets everything; ours is bounded).
   */
   it('renders the log, the empty state, the refusal and the truncation notice', () => {
-    expect(modalHost).toContain('{#if peerHistoryLoading}');
-    expect(modalHost).toContain('{:else if peerHistoryError}');
+    expect(modalHost).toContain('{#if peerHistory.loading}');
+    expect(modalHost).toContain('{:else if peerHistory.error}');
     expect(modalHost).toContain('<CompactMessageRow {message} />');
     expect(modalHost).toContain('No logs.');
     expect(modalHost).toContain('older ones are not listed');

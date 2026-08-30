@@ -1455,7 +1455,9 @@
       ondonotdisturb={setDND}
       ondownload={() => privateChat.downloadLog()}
       onswitchuser={(uid) => void privateChat.switchToUser(uid)}
-      onloadmore={(uid, page) => void privateChat.loadLog(uid, page)}
+      onloadmore={() => void privateChat.loadMore()}
+      hasMore={privateChat.hasMore}
+      loadingMore={privateChat.loadingMore}
       onsend={() => void privateChat.send()}
     />
   </app-room>
