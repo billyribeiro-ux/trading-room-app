@@ -33,6 +33,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 22:50 UTC — `NEW-TODO.md` was scheduling five commands that were already built
+
+**Runtime impact: NO.** One tracker corrected and one new assertion. No `src` module changed.
+
+`NEW-TODO.md`'s suggested order ended with a paragraph pointing at the remaining work, in these
+words: *"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the archives pair (`archiveLogs` /
+`unarchiveLogs`) are the largest clusters left."*
+
+**All five are built.** `kicks.ts`, `chat-mute.ts` — whose docblock quotes the reference's own
+`subscribe("unmuteChat", …)` — and `chat-archive-port.ts`, which wires `archiveChatLog` and
+`unarchiveChatLogCommand`. Checked by reading the modules, not by trusting a second document.
+
+**And the document that WAS right had been right all along.** `missing-commands-triage.md` records
+the measured tally — **0 still NOT BUILT**, 14 built, 7 built under another name, 4 blocked with the
+blocker named — and `missing-command-census-contract.test.ts` recomputes it on every run and fails on
+a disagreement in either direction. It could not have drifted. The summary of it could, and did: the
+triage was carrying the truth while the file a reader reaches first went on scheduling the work.
+
+That is this repository's most-repeated failure — *two places recording one thing is how one of them
+goes stale* — and the stale one is always the summary. So the correction did two things rather than
+one:
+
+- The paragraph now POINTS at the triage and says why it must never restate its state.
+- **The numbers it does quote are now enforced.** `missing-command-census-contract.test.ts` gained an
+  assertion that recomputes the tally from the triage's own rows and requires `NEW-TODO.md` to carry
+  exactly those figures. Deliberately a check of the NUMBERS rather than the prose around them: a
+  test that pattern-matched sentences would fail on a rewording and pass on a wrong figure, which is
+  backwards. It carries a vacuity floor too — a `NEW-TODO` that stopped mentioning the triage at all
+  would otherwise satisfy every line of it.
+
+Writing that assertion was itself the point. The first draft of this correction quoted the tally in
+prose, which is precisely the duplication the correction was about; the fix was not to delete the
+numbers but to make them a restatement that cannot drift.
+
+**The five that genuinely remain are BLOCKED, not pending**, and the paragraph now says so.
+`getMyRepeater`, `resetAudioBridge`, `resetAllMediaServers`, `resetMediaServer` and
+`resetAudioBridgeOnServer` are the SaaS operator's toolkit; the owner answered the product question
+about them on 2026-08-15. What is missing is **reach** — ours work inside one room, the operator need
+is to invoke them for a tenant's room from a central console — and four of the five reset a media
+plane this deployment does not have, the same `STREAM_SERVER_MTX` host that blocks `TODO.md` rows AD,
+X and R. Five controls that reset servers which are not there is the dead scaffolding the standard
+forbids by name.
+
+**Negative controls — two, both directions of the new assertion:**
+
+| mutation | result |
+| --- | --- |
+| `NEW-TODO`'s "14 built" changed to "13 built" | RED, with the message naming which document to correct |
+| a triage row's status changed `BUILT` → `BLOCKED` | RED in **four** places, the new assertion among them — the triage's own guards fire alongside it |
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,454 passed,
+1 skipped, gate-exit=0**.
+
 ### 2026-08-30 22:30 UTC — Two implementations of signing out, one of which could not be invoked
 
 **Runtime impact: NO.** The path a browser takes is unchanged; the one it could not take is gone.

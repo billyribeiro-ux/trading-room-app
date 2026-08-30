@@ -324,4 +324,46 @@ describe('the triage document tells the truth about what is built', () => {
       `| *Confirmed missing*, **BLOCKED** — cannot be built here, blocker named | ${tally('BLOCKED')} |`
     );
   });
+
+  it('and NEW-TODO.md, which restates that tally, is checked against it too', () => {
+    /*
+      THE SUMMARY OF THE SUMMARY, added 2026-08-30 — and it is here because it had already gone
+      wrong once by the time it was written.
+
+      Everything above keeps the triage honest about itself. Nothing kept the file a reader reaches
+      FIRST honest about the triage. `NEW-TODO.md`'s suggested order said, in these words,
+      *"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the archives pair (`archiveLogs` /
+      `unarchiveLogs`) are the largest clusters left."* All five were built — `kicks.ts`,
+      `chat-mute.ts` and `chat-archive-port.ts` — and the triage had recorded every one of them,
+      recomputed on every run, while the summary went on scheduling the work.
+
+      That is the same failure this file exists for, one level up, and it has the same fix. The
+      correction put the real numbers into `NEW-TODO.md`; this makes them a restatement that CANNOT
+      drift, rather than a second snapshot that will. A number worth writing twice is a number worth
+      checking twice.
+
+      Deliberately a check of the NUMBERS and not of the prose around them. A test that pattern-
+      matched sentences would fail on a rewording and pass on a wrong figure, which is backwards.
+    */
+    const plan = readFileSync(
+      fileURLToPath(new URL('../../../../NEW-TODO.md', import.meta.url)),
+      'utf8'
+    );
+    const tally = (status: string) => table.filter((row) => row.status === status).length;
+    const renamed = table.filter((row) => row.status.startsWith('BUILT AS ')).length;
+
+    /* The vacuity floor: a file that stopped mentioning the triage would pass every line below. */
+    expect(plan, 'NEW-TODO no longer points at the triage at all').toContain(
+      'docs/decoded/missing-commands-triage.md'
+    );
+
+    expect(
+      plan,
+      'NEW-TODO restates the triage tally and the two now disagree — the triage is recomputed on ' +
+        'every run, so it is NEW-TODO that is stale. Correct it there, never the other way.'
+    ).toContain(
+      `own measured tally is **${tally('NOT BUILT')} still NOT BUILT** — ${tally('BUILT')} built, ` +
+        `${renamed} built under another name, ${tally('BLOCKED')} blocked`
+    );
+  });
 });
