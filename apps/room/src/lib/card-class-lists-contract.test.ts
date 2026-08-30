@@ -179,9 +179,43 @@ describe('RM-22 — the two reaction containers', () => {
     expect(html).toContain('chat-reaction');
   });
 
-  it('renders ONE strip implementation for both, which is what the snippet is for', () => {
-    expect(MESSAGE).toContain('{#snippet reactionStrip()}');
-    expect(MESSAGE.match(/\{@render reactionStrip\(\)\}/g)).toHaveLength(2);
+  it('renders ONE strip implementation for every container, which is what the snippet is for', () => {
+    /*
+      The count was 2 and is 3, and neither number is the property.
+
+      Two was right while the card had one reaction container. RM-22 measured that it has TWO — the
+      reference splits on `reverseMessage` into a `<span class="ms-1">` and a `<div>` — so the card
+      renders the strip twice and the compact host once. A test that pins the number fails the next
+      time a container is added for a measured reason, and the repair is to bump the number, which
+      teaches nobody anything.
+
+      What this file is actually protecting is that there is ONE implementation however many places
+      draw it, so that is what is asserted: exactly one `{#snippet}` definition, at least one render
+      per host, and — the half a count cannot express — the strip's own markup appearing nowhere
+      outside it. A second hand-written strip is the failure; a third CALL is not.
+    */
+    expect(MESSAGE.match(/\{#snippet reactionStrip\(\)\}/g), 'one definition').toHaveLength(1);
+
+    const renders = MESSAGE.match(/\{@render reactionStrip\(\)\}/g) ?? [];
+    expect(
+      renders.length,
+      'both hosts draw it, and the card draws it once per container'
+    ).toBeGreaterThanOrEqual(2);
+
+    /*
+      The pill itself, which only the snippet may emit. Bound and asserted rather than inlined:
+      `slice-anchor-contract` refuses the inline form, and a -1 here would slice one character and
+      pass.
+    */
+    const at = MESSAGE.indexOf('{#snippet reactionStrip()}');
+    expect(at, 'the snippet moved').toBeGreaterThan(-1);
+    const end = MESSAGE.indexOf('{/snippet}', at);
+    expect(end, 'the snippet is unterminated').toBeGreaterThan(at);
+    const outside = MESSAGE.slice(0, at) + MESSAGE.slice(end);
+    expect(
+      outside,
+      'a second reaction pill is written outside the snippet — that is two implementations'
+    ).not.toContain("class={['badge chat-reaction'");
   });
 });
 

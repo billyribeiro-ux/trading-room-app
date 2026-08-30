@@ -238,20 +238,13 @@
    * element, which does not depend on that staying true.
    */
   /*
-    `bind:this`, and the attachment it replaced is worth recording because it was wrong on the
-    repository's own evidence.
+    `bind:this`. This was an `Attachment` assigning `slidesList = node` with a teardown reading
+    `if (slidesList === node) slidesList = null` — a hand-rolled `bind:this`, both halves of it, of
+    exactly the shape `dom-reference-contract.svelte.test.ts` refuses and proves unnecessary by
+    driving the platform rather than by asserting.
 
-    It was an `Attachment` that assigned `slidesList = node` and returned a teardown reading
-    `if (slidesList === node) slidesList = null`. That is a hand-rolled `bind:this` — both halves of
-    it — and `dom-reference-contract.svelte.test.ts` exists to refuse exactly this shape. It does
-    not refuse it by assertion but by PROOF: three tests there drive the platform and show that
-    `bind:this` points at the element once mounted, that it survives a swap with the new element
-    winning rather than being left undefined, and that it clears to `null` when the element really
-    goes away. The teardown was reimplementing a guarantee that was already tested.
-
-    It escaped that contract only on its NAME. The check matches `capture*` and `hold*`, and this
-    was `attachSlidesList` — so the rule caught the pattern everywhere it was named as such and
-    missed it here. The rule is the argument, not the prefix.
+    It escaped that contract on its NAME alone: the check matches `capture*` and `hold*` and this
+    was `attachSlidesList`. The rule is the argument, not the prefix.
 
     Read once after a `tick()`, never rendered from.
   */

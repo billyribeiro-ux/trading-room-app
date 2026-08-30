@@ -40,8 +40,7 @@
 </script>
 
 <p>
-  You can store polls you use often here. Just type the poll on the create poll tab and press
-  "save"
+  You can store polls you use often here. Just type the poll on the create poll tab and press "save"
 </p>
 <ul class="list-group">
   {#each savedPolls as poll (poll.id)}

@@ -1722,7 +1722,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       docblock carries that argument, and `session-control-audience-contract.test.ts` is what makes
       it binding.
     */
-    max: 75,
+    /*
+      75 -> 90, 2026-08-31. NAV-02's argument arrived from `RoomNavbar.svelte`, where it was
+      restating a subject this file owns; the navbar fell by more than this rose.
+    */
+    max: 90,
     why: 'the viewer-side SoundCloud stop; slot 23 of the navbar template'
   },
   {
@@ -5988,7 +5992,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       which ABSORBED the same feature's other 79 lines and still lands at 6,280 against an unchanged
       ceiling of 6,335. **The pair is eighty-five lines smaller than doing neither.**
     */
-    max: 1172,
+    /*
+      1,172 -> 1,169, 2026-08-31, and DOWN after a fix that first pushed it UP.
+
+      NAV-02's explanation was written here — seventeen lines on a control mounted in the wrong
+      block — and it belongs to `SoundCloudViewerStop.svelte`, which is the thing being explained.
+      Moved there, with four lines left pointing at it. Where a mount is part of a component's
+      correctness, the component is where a reader meets that, not the file that happens to host it.
+    */
+    max: 1169,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

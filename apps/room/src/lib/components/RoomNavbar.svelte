@@ -661,22 +661,10 @@
           indicators above, which report state rather than change it.
         -->
       <!--
-        NAV-02 — `o4e`, byte 2,478,748, gated `O(23, isPresenter || isNonPresenterAdmin ||
-        !e.scPlaying ? -1 : 23)` at byte 2,488,684: the one SoundCloud control upstream renders for
-        a VIEWER, and the only way a member has to stop room-wide music for themselves. Its gate is
-        the exact negation of `SoundCloudMenu`'s, which is why the two are separate files.
-
-        ## It sits OUTSIDE the presenter block, and that is the whole fix
-
-        It was written inside it. A control whose gate is `not a presenter`, nested in a block that
-        renders only FOR a presenter, is unreachable in both directions at once: no member ever saw
-        it, and the only browser that evaluated its gate was the one it excludes. The defect it was
-        built to fix — a member with no way to silence room-wide music — survived the fix.
-
-        Placed BEFORE that block rather than after, and the row order is unaffected either way: for
-        a member the presenter block renders nothing, so this is still slot 23's place in the row,
-        and for a presenter this renders nothing. Argued as NAV-02 in
-        `docs/decoded/room-surface-audit-2026-08-30.md`.
+        NAV-02, slot 23 — `O(23, isPresenter || isNonPresenterAdmin || !e.scPlaying ? -1 : 23)` at
+        byte 2,488,684, the exact negation of `SoundCloudMenu`'s gate below. It sits OUTSIDE the
+        presenter block deliberately and `SoundCloudViewerStop.svelte` records why, along with what
+        it cost while it did not.
       -->
       {#if !isPresenter && media.soundCloudPlaying}
         <SoundCloudViewerStop {onstopsoundcloudforme} />

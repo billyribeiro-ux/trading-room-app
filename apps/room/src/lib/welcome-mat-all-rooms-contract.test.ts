@@ -44,6 +44,18 @@ import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harn
 const read = (path: string) => codeOf(path, readFileSync(new URL(path, import.meta.url), 'utf8'));
 
 const PANE = read('./components/notes/NotesPane.svelte');
+/*
+  THE THREE CAPTURED STRINGS MOVED, 2026-08-31 — to `note-dialogs.ts`, where the two Welcome Mat
+  confirmations and the password prompt are declared as literal TYPES as well as values, so a
+  mistyped one is a compile error rather than a silent divergence from the capture.
+
+  `NotesPane.svelte` still owns the DECISION — which dialog to raise, and the `welcomeMatPasswordRequired`
+  call that decides it — and that is what is still asserted against it below. What it no longer owns
+  is the wording. Splitting the two assertions is the point: a test that read only the pane would go
+  green on a pane that raised the right dialog with invented copy, and one that read only the module
+  would go green on correct copy nothing raises.
+*/
+const DIALOGS = read('./note-dialogs.ts');
 const AREA = read('./components/PresentationArea.svelte');
 /*
   `+page.server.ts` no longer holds the write — `setWelcomeMatNoteTab` left for
@@ -89,17 +101,20 @@ describe('the credential never reaches the room', () => {
 
 describe('which dialog is raised', () => {
   it('asks the controller, because the room cannot see the setting', () => {
+    /* The DECISION stays in the pane: which dialog, and the call to the controller that decides. */
     expect(PANE).toContain('if (allRooms && (await welcomeMatPasswordRequired()).required) {');
-    expect(PANE).toContain(
+    /* The WORDING is the module's, verbatim. */
+    expect(DIALOGS).toContain(
       "title: 'Please enter the password to replace all the rooms Welcome Mats:'"
     );
   });
 
   it('keeps both confirmations, verbatim', () => {
-    expect(PANE).toContain(
+    expect(DIALOGS).toContain(
       "'Are you sure you want to replace all the rooms Welcome Mats with this note?'"
     );
-    expect(PANE).toContain("'Are you sure you want to apply this note as Welcome Mat'");
+    /* No full stop, and the all-rooms twin has one — upstream's own inconsistency, kept. */
+    expect(DIALOGS).toContain("'Are you sure you want to apply this note as Welcome Mat'");
   });
 
   it('does NOT ask for the per-room variant', () => {

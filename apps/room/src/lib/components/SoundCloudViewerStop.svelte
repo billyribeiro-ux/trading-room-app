@@ -1,16 +1,16 @@
 <script lang="ts">
-/**
- * `o4e`, bundle byte 2,478,748 — the ONE SoundCloud control upstream renders for a viewer.
- *
- * Its sibling is `SoundCloudMenu.svelte` (the presenter's dropdown, `i4e`), whose docblock records
- * why the two are separate components and how their gates relate. This half exists because of
- * NAV-02, and its whole argument is below.
- */
-let {
-  onstopsoundcloudforme
-}: {
-  onstopsoundcloudforme: () => void;
-} = $props();
+  /**
+   * `o4e`, bundle byte 2,478,748 — the ONE SoundCloud control upstream renders for a viewer.
+   *
+   * Its sibling is `SoundCloudMenu.svelte` (the presenter's dropdown, `i4e`), whose docblock records
+   * why the two are separate components and how their gates relate. This half exists because of
+   * NAV-02, and its whole argument is below.
+   */
+  let {
+    onstopsoundcloudforme
+  }: {
+    onstopsoundcloudforme: () => void;
+  } = $props();
 </script>
 
 <!--
@@ -31,6 +31,21 @@ let {
   that stops room-wide music for one listener was one a listener never saw. A member who did
   not want the presenter's soundtrack had the master volume slider, which also silences the
   presenter. Argued in full as NAV-02 in `docs/decoded/room-surface-audit-2026-08-30.md`.
+
+  ## WHERE IT IS MOUNTED IS PART OF THIS COMPONENT'S CORRECTNESS
+
+  It was first written INSIDE `RoomNavbar`'s `{#if isPresenter}` block. A control whose own gate is
+  `not a presenter`, nested in a block that renders only FOR a presenter, is unreachable in both
+  directions at once: no member ever saw it, and the only browser that evaluated its gate was the
+  one it excludes. The defect it was built to fix — a member with no way to silence room-wide music
+  — survived the fix, and every source assertion about this component was green throughout, because
+  the component was correct and its mount was not.
+
+  It is mounted BEFORE that block rather than after, and the row order is identical either way: for
+  a member the presenter block renders nothing, so this is still slot 23's place in the row; for a
+  presenter this renders nothing. `navbar-viewer-controls-contract.test.ts` asserts both directions
+  by rendering, which is the only instrument that can tell a mounted-but-unreachable control from a
+  missing one.
 
   The `<li>` carries the title and the `<a>` carries the click, which is what consts 97 and 176
   say rather than a choice. The duplicate `id` on const 176 is upstream's own; only the second

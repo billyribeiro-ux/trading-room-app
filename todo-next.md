@@ -79,7 +79,7 @@ guessed.
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,258 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,171 | no |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,168 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,080 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | no |
@@ -123,21 +123,21 @@ guessed.
 | 47 | `lib/components/MobileRestorePane.svelte` | 130 | no |
 | 48 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
 | 49 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 50 | `lib/components/SoundCloudMenu.svelte` | 120 | no |
+| 50 | `lib/components/SoundCloudMenu.svelte` | 114 | no |
 | 51 | `lib/components/CloseSessionPane.svelte` | 104 | no |
 | 52 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 53 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 54 | `lib/components/CompactMessageRow.svelte` | 77 | no |
-| 55 | `lib/components/PositionsContainer.svelte` | 74 | no |
-| 56 | `lib/components/SoundCloudViewerStop.svelte` | 74 | no |
+| 54 | `lib/components/SoundCloudViewerStop.svelte` | 89 | no |
+| 55 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 56 | `lib/components/PositionsContainer.svelte` | 74 | no |
 | 57 | `lib/components/ModeratorMessage.svelte` | 73 | no |
 | 58 | `lib/components/ToastHost.svelte` | 64 | no |
 | 59 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 | 60 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 61 | `lib/components/PollSavedList.svelte` | 60 | no |
+| 61 | `lib/components/PollSavedList.svelte` | 59 | no |
 | 62 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 75 surfaces audited · 1,072 of 35,137 lines · 3.1%.**
+**2 of 75 surfaces audited · 1,072 of 35,142 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

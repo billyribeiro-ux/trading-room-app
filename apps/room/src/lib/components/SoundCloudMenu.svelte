@@ -64,10 +64,7 @@
     data-bs-toggle="dropdown"
     aria-haspopup="true"
     aria-expanded={menuOpen}
-    class={[
-      'nav-link dropdown-toggle d-flex align-items-center',
-      { 'text-white': playing }
-    ]}
+    class={['nav-link dropdown-toggle d-flex align-items-center', { 'text-white': playing }]}
     onclick={ontoggle}
   >
     <i class="fab fa-2x fa-soundcloud"></i>
@@ -94,10 +91,7 @@
   <ul
     aria-labelledby="soundcloudDropdown"
     data-bs-popper={menuOpen ? 'static' : undefined}
-    class={[
-      'dropdown-menu dropdown-menu-end soundcloud-options',
-      { show: menuOpen }
-    ]}
+    class={['dropdown-menu dropdown-menu-end soundcloud-options', { show: menuOpen }]}
     style={menuOpen ? 'display: block;' : undefined}
   >
     <!-- svelte-ignore a11y_click_events_have_key_events -->
