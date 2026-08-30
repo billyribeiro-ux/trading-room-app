@@ -4,6 +4,7 @@
   import type { SvelteSet } from 'svelte/reactivity';
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
+  import { captureSettingsFrom } from '#lib/capture-settings.js';
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
@@ -628,6 +629,7 @@
   userNotes={userActions.userNotes}
   onSavePermissions={(user, granted) => userActions.savePermissions(user, granted)}
   streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
+  capture={captureSettingsFrom(prefs.loaded)}
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}

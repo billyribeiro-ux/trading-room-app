@@ -59,6 +59,7 @@ import { RoomPolls } from '#lib/room/polls.svelte.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
 import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';
+import { captureSettingsFrom } from '#lib/capture-settings.js';
 import { userNotesPort } from './user-notes-port';
 import { createRoomUserDetail } from './user-detail-port';
 
@@ -700,8 +701,7 @@ export function createRoom(deps: RoomDeps) {
     overlay: screenOverlay,
     session: () => data,
     closeScreenMenu: () => menus.set('screen', false),
-    videoDeviceId: () =>
-      typeof prefs.loaded.videoDeviceID === 'string' ? prefs.loaded.videoDeviceID : undefined,
+    capture: () => captureSettingsFrom(prefs.loaded),
     roomVolume,
     beginSpeech: () => recording.beginSpeechRecognition(),
     endSpeech: () => recording.endSpeechRecognition(),

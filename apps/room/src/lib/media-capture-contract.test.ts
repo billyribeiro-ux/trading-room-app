@@ -76,9 +76,12 @@ describe('media capture activation contract', () => {
       /async toggleWebcam\(\)[\s\S]*?navigator\.mediaDevices\.getUserMedia\(/
     );
     expect(TRANSPORT).toMatch(
-      // `selectedVideoDeviceId` is the injected `#videoDeviceId()` thunk since the 2026-08-26
-      // split; the CONSTRAINT it feeds is what this asserts and that is unchanged.
-      /async toggleWebcam\(\)[\s\S]*?deviceId: \{ ideal: this\.#videoDeviceId\(\) \}/
+      // `selectedVideoDeviceId` was the injected `#videoDeviceId()` thunk from the 2026-08-26 split
+      // until 2026-08-30, when the four AUDIO settings needed the same journey and one
+      // `CaptureSettings` replaced two parallel channels. The CONSTRAINT it feeds is what this
+      // asserts and that is unchanged — `ideal` for the camera, and `#lib/capture-settings.ts`
+      // records why the microphone beside it uses `exact`.
+      /async toggleWebcam\(\)[\s\S]*?deviceId: \{ ideal: this\.#capture\(\)\.videoDeviceId \|\| undefined \}/
     );
   });
 });

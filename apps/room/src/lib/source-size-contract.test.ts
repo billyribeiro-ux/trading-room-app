@@ -924,7 +924,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 1365,
+    /*
+      1,365 -> 1,367, 2026-08-30. Two lines: this class is the hop between the composition root and
+      the local capture, so a value the capture needs is declared and passed here. The first draft
+      cost SEVEN — it threaded the four audio settings as a second parameter beside the existing
+      `videoDeviceId` — and consolidating them into one `CaptureSettings` gave five back and made
+      `create-room` shorter. What is left is the irreducible cost of one more value crossing.
+    */
+    max: 1367,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -1005,7 +1012,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 960,
+    /*
+      RAISED 960 -> 966 on 2026-08-30, for the microphone constraint that was never applied.
+
+      `#enableMicrophone` asked for `{ audio: true }`, so the A/V pane's device select and its three
+      processing checkboxes were four controls that wrote a preference and changed nothing — the
+      exact twin of the `videoDeviceID` defect fixed here on 2026-08-26, left behind because both
+      halves still captured something. Six lines: the import, the injected settings, and the four
+      that build and pass the constraint.
+
+      Flagged for the owner, since a raise is meant to be a conversation. `ModalHost.svelte` falls
+      191 lines in the same commit, so the room's total cap falls by far more than these six.
+    */
+    max: 966,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -1232,7 +1251,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this number is ever asked to pass 848, the answer is an extraction from this file and not
       another paragraph here.
     */
-    max: 848,
+    /*
+      848 -> 850, 2026-08-30. One import and one prop: the A/V pane's saved settings, read from
+      `prefs.loaded` here exactly as `streamingType` beside it is. One prop rather than five,
+      for the reason `#lib/capture-settings.ts` records.
+    */
+    max: 850,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1645,6 +1669,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'app-webcam-holder - the card strip, three props, and the two transcriptions behind it'
   },
   {
+    file: 'lib/components/AvDevicePane.svelte',
+    /*
+      Extracted from `ModalHost.svelte` on 2026-08-30 and capped at what it landed at. Most of it is
+      `loadDevices` and the account of the six controls that used to write preferences nothing read.
+      If this climbs, the question is what a seventh thing about choosing a microphone could be.
+    */
+    max: 266,
+    why: 'which microphone and camera this browser captures with, and the three processing flags'
+  },
+  {
     file: 'lib/components/ModalHost.svelte',
     /*
       Moved for the first time, and DOWN, by the chat-mode conversion. The two radios each built the
@@ -1871,7 +1905,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The second was chosen by measuring free identifiers across candidate slices rather than by
       taking the first one that looked separable — it had five, and four of them were handlers.
     */
-    max: 6189,
+    /*
+      LOWERED 6,189 -> 5,999 on 2026-08-30. The A/V device pane left, and the ratchet asked for it by
+      name: `AvDevicePane.svelte` is 266 lines of markup, six controls and one `loadDevices` that
+      nothing else in this file touched. It came out because the fix it carries needed lines here,
+      and that is the trade this entry exists to force.
+    */
+    max: 5999,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's

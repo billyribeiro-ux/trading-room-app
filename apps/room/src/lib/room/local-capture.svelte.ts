@@ -9,6 +9,7 @@ import {
   mediaCaptureErrorMessage,
   permissionForCapture
 } from '#lib/media-capture-error.js';
+import { audioCaptureConstraints, type CaptureSettings } from '#lib/capture-settings.js';
 import type { AutoRecordTrigger } from '#lib/auto-record.js';
 import type { MediaSession } from '#lib/media/session.js';
 import type { SignallingClient } from '#lib/media/signalling.js';
@@ -145,7 +146,8 @@ export class RoomLocalCapture {
   readonly #autoRecord: (trigger: AutoRecordTrigger) => void;
   readonly #checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
   readonly #closeScreenMenu: () => void;
-  readonly #videoDeviceId: () => string | undefined;
+  /** Every device and processing flag the A/V pane saves. See `#lib/capture-settings.ts`. */
+  readonly #capture: () => CaptureSettings;
   readonly #mediaSession: () => MediaSession | null;
   readonly #mediaSignalling: () => SignallingClient | null;
   readonly #tabs: ScreenTabPort;
@@ -180,7 +182,7 @@ export class RoomLocalCapture {
     autoRecord: (trigger: AutoRecordTrigger) => void;
     checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
     closeScreenMenu: () => void;
-    videoDeviceId: () => string | undefined;
+    capture: () => CaptureSettings;
     mediaSession: () => MediaSession | null;
     mediaSignalling: () => SignallingClient | null;
     tabs: ScreenTabPort;
@@ -198,7 +200,7 @@ export class RoomLocalCapture {
     this.#autoRecord = options.autoRecord;
     this.#checkPermissionState = options.checkPermissionState;
     this.#closeScreenMenu = options.closeScreenMenu;
-    this.#videoDeviceId = options.videoDeviceId;
+    this.#capture = options.capture;
     this.#mediaSession = options.mediaSession;
     this.#mediaSignalling = options.mediaSignalling;
     this.#tabs = options.tabs;
@@ -337,7 +339,11 @@ export class RoomLocalCapture {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new DOMException('Microphone access is not supported', 'NotSupportedError');
       }
-      this.#microphoneStream ??= await navigator.mediaDevices.getUserMedia({ audio: true });
+      // `{ audio: true }` until 2026-08-30, so the A/V pane's microphone select and its three
+      // processing checkboxes wrote preferences and changed nothing. `audioCaptureConstraints`
+      // carries the reference's rule, and why `retryCount` is what decides it.
+      const audio = audioCaptureConstraints(this.#capture(), retryCount);
+      this.#microphoneStream ??= await navigator.mediaDevices.getUserMedia({ audio });
       setStreamEnabled(this.#microphoneStream, true);
       this.#media.micMuted = false;
 
@@ -505,7 +511,7 @@ export class RoomLocalCapture {
         capture does not make, so it stays out until it is asked for - see `docs/streaming-choices.md`.
       */
       this.#webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { ideal: this.#videoDeviceId() } }
+        video: { deviceId: { ideal: this.#capture().videoDeviceId || undefined } }
       });
       this.#media.camMuted = false;
       // `webcamingUsers.push(r)` then `guiEventBus.emit("newWebcamPresenter", r)`.
@@ -630,7 +636,7 @@ export class RoomLocalCapture {
               // 640x480. Every member watching an OBS / XSPLIT / virtual-cam share was receiving a
               // ninth of the pixels the original sends. The selected camera was ignored too.
               video: {
-                deviceId: { ideal: this.#videoDeviceId() },
+                deviceId: { ideal: this.#capture().videoDeviceId || undefined },
                 width: { ideal: 1920 },
                 height: { ideal: 1080 }
               }

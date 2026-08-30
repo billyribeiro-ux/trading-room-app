@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AvDevicePane from '#lib/components/AvDevicePane.svelte';
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
@@ -17,6 +18,7 @@
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { onMount, untrack } from 'svelte';
+  import type { CaptureSettings } from '#lib/capture-settings.js';
   import type {
     AlertTab,
     ActivePoll,
@@ -265,6 +267,14 @@
      * populated.
      */
     streamingType: string;
+    /**
+     * Every device and processing flag the A/V pane saves, as saved. See `#lib/capture-settings.ts`.
+     *
+     * ONE prop rather than five, and the same value the capture itself reads. It seeds this pane's
+     * controls so a reopened modal shows what is actually in force — they were `$state(false)` and
+     * two fabricated device ids until 2026-08-30, and neither told the truth.
+     */
+    capture: CaptureSettings;
     onManagedUserRemoval: (list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) => void;
     onManagedUserInfo: (user: ManagedChatUser) => void;
     /**
@@ -493,6 +503,7 @@
     userNotes,
     onSavePermissions,
     streamingType,
+    capture,
     onManagedUserRemoval,
     onManagedUserInfo,
     privateMessageHistoryEnabled,
@@ -725,29 +736,6 @@
     could show "Group Chat" in a room whose chat was disabled.
   */
   const groupChatMode = $derived(chatMode);
-  let echoCancellation = $state(false);
-  let noiseSuppression = $state(false);
-  let autoGainControl = $state(false);
-  let audioDevices = $state.raw([
-    {
-      deviceId: '953f11aeca98147407fe5afe290dc18b384306c979179ce7a96ec4b92148ab5b',
-      label: 'Studio Display Microphone (05ac:1118)'
-    }
-  ]);
-  let videoDevices = $state.raw([
-    {
-      deviceId: '2da3a3313185023c68e57b8bd07c010fe3975db1a2962584c0b6b493aa5c708a',
-      label: 'Studio Display Camera (15bc:0000)'
-    }
-  ]);
-  let currentAudioDevice = $state(
-    '953f11aeca98147407fe5afe290dc18b384306c979179ce7a96ec4b92148ab5b'
-  );
-  let currentVideoDevice = $state(
-    '2da3a3313185023c68e57b8bd07c010fe3975db1a2962584c0b6b493aa5c708a'
-  );
-  let devicesLoading = $state(false);
-  let devicesLoadError = $state('');
   const fileUploadInputId = 'fupload';
   let streamPlayerEnabled = $state(false);
   /*
@@ -1910,88 +1898,6 @@
     if (untrack(() => ingest !== null || ingestLoading || ingestError !== '')) return;
     void getNewToken();
   });
-
-  async function loadDevices() {
-    if (!navigator.mediaDevices?.enumerateDevices) {
-      devicesLoadError =
-        'Your browser does not support device enumeration. Please use a modern browser.';
-      return;
-    }
-
-    devicesLoading = true;
-    devicesLoadError = '';
-    const streams: MediaStream[] = [];
-    try {
-      try {
-        streams.push(await navigator.mediaDevices.getUserMedia({ audio: true }));
-      } catch {
-        // The compiled client continues and enumerates devices without labels.
-      }
-      try {
-        streams.push(await navigator.mediaDevices.getUserMedia({ video: true }));
-      } catch {
-        // The compiled client continues and enumerates devices without labels.
-      }
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const isDuplicateDefault = (device: MediaDeviceInfo) => {
-        const label = device.label;
-        if (device.deviceId === 'default' || device.deviceId === 'communications') return true;
-        if (!label.toLowerCase().startsWith('default - ')) return false;
-        const physicalLabel = label.slice(10);
-        return devices.some(
-          (candidate) =>
-            candidate.kind === device.kind &&
-            candidate.label === physicalLabel &&
-            candidate.deviceId !== device.deviceId
-        );
-      };
-      const toOption = (device: MediaDeviceInfo) => ({
-        deviceId: device.deviceId,
-        label:
-          device.label ||
-          `${device.kind} (${device.deviceId ? `${device.deviceId.slice(0, 8)}...` : 'unknown'})`
-      });
-
-      const nextAudio = devices
-        .filter((device) => device.kind === 'audioinput' && !isDuplicateDefault(device))
-        .map(toOption);
-      const nextVideo = devices
-        .filter((device) => device.kind === 'videoinput' && !isDuplicateDefault(device))
-        .map(toOption);
-      if (nextAudio.length) {
-        audioDevices = nextAudio;
-        if (!nextAudio.some((device) => device.deviceId === currentAudioDevice)) {
-          currentAudioDevice = nextAudio[0].deviceId;
-        }
-      }
-      if (nextVideo.length) {
-        videoDevices = nextVideo;
-        if (!nextVideo.some((device) => device.deviceId === currentVideoDevice)) {
-          currentVideoDevice = nextVideo[0].deviceId;
-        }
-      }
-      if (!nextAudio.length && !nextVideo.length) {
-        devicesLoadError =
-          'No audio or video devices detected. Please ensure devices are connected and permissions are granted.';
-      }
-    } catch (error) {
-      const deviceError = error as DOMException;
-      devicesLoadError =
-        deviceError.name === 'NotFoundError'
-          ? 'No audio or video devices found. Please connect a microphone and/or camera.'
-          : deviceError.name === 'NotAllowedError'
-            ? 'Permission denied. Please allow access to your microphone and camera in your browser settings.'
-            : deviceError.name === 'SecurityError'
-              ? 'Security error. Please ensure the page is loaded over HTTPS.'
-              : `Error loading devices: ${deviceError.message || 'Unknown error'}`;
-    } finally {
-      for (const stream of streams) {
-        for (const track of stream.getTracks()) track.stop();
-      }
-      devicesLoading = false;
-    }
-  }
 
   onMount(() => {
     try {
@@ -4456,102 +4362,7 @@
           }
         ]}
       >
-        <div class="d-flex justify-content-end align-items-center mt-2 mb-3">
-          <button
-            type="button"
-            title="Refresh device list"
-            class="btn btn-sm btn-outline-primary"
-            onclick={() => void loadDevices()}
-          >
-            <i class="fas fa-sync-alt"></i> Refresh Devices
-          </button>
-        </div>
-        {#if devicesLoading}
-          <div class="text-center my-3">
-            <i class="fas fa-spinner fa-spin"></i> Loading devices...
-          </div>
-        {/if}
-        {#if devicesLoadError}
-          <div class="alert alert-danger">{devicesLoadError}</div>
-        {/if}
-        <div class="mt-2">
-          <div class="form-group">
-            <label for="audio-deviceList">Audio device (input):</label>
-            <select
-              id="audio-deviceList"
-              aria-label="Audio device (input)"
-              class="form-select"
-              bind:value={currentAudioDevice}
-              onchange={() => onPreferenceChange('audioDeviceID', currentAudioDevice)}
-            >
-              {#each audioDevices as device (device.deviceId)}
-                <option value={device.deviceId}>{device.label}</option>
-              {/each}
-            </select>
-            <small class="text-white mt-1 d-block">
-              <i class="fas fa-check-circle text-success"></i>
-              Selected: {audioDevices.find((device) => device.deviceId === currentAudioDevice)
-                ?.label ?? 'Unknown Device'}
-            </small>
-          </div>
-          <div class="form-group">
-            <label for="video-deviceList">Video device (input):</label>
-            <select
-              id="video-deviceList"
-              aria-label="Video device (input)"
-              class="form-select"
-              bind:value={currentVideoDevice}
-              onchange={() => onPreferenceChange('videoDeviceID', currentVideoDevice)}
-            >
-              {#each videoDevices as device (device.deviceId)}
-                <option value={device.deviceId}>{device.label}</option>
-              {/each}
-            </select>
-            <small class="text-white mt-1 d-block">
-              <i class="fas fa-check-circle text-success"></i>
-              Selected: {videoDevices.find((device) => device.deviceId === currentVideoDevice)
-                ?.label ?? 'Unknown Device'}
-            </small>
-          </div>
-        </div>
-        <div class="mt-4">
-          <div class="ml-4">
-            <input
-              type="checkbox"
-              name="echo-cancellation"
-              value="Echo Cancellation"
-              id="echo-cancellation"
-              class="form-check-input"
-              bind:checked={echoCancellation}
-              onchange={() => onPreferenceChange('echoCancellation', echoCancellation)}
-            />
-            <label for="echo-cancellation" class="form-check-label"> Echo Cancellation </label>
-          </div>
-          <div class="ml-4">
-            <input
-              type="checkbox"
-              name="noise-suppression"
-              value="Noise Suppression"
-              id="noise-suppression"
-              class="form-check-input"
-              bind:checked={noiseSuppression}
-              onchange={() => onPreferenceChange('noiseSuppression', noiseSuppression)}
-            />
-            <label for="noise-suppression" class="form-check-label"> Noise Suppression </label>
-          </div>
-          <div class="ml-4">
-            <input
-              type="checkbox"
-              name="auto-gain-control"
-              value="Auto Gain Control"
-              id="auto-gain-control"
-              class="form-check-input"
-              bind:checked={autoGainControl}
-              onchange={() => onPreferenceChange('autoGainControl', autoGainControl)}
-            />
-            <label for="auto-gain-control" class="form-check-label"> Auto Gain </label>
-          </div>
-        </div>
+        <AvDevicePane {capture} {onPreferenceChange} />
       </div>
       <div
         id="streaming-selection"

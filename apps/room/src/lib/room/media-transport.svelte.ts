@@ -1,5 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
+import type { CaptureSettings } from '#lib/capture-settings.js';
+
 import type { ScreenTab } from '#lib/components/ScreenTabs.svelte';
 import { type MediaPermissionKind } from '#lib/media-capture-error.js';
 import { MediaSession } from '#lib/media/session.js';
@@ -101,7 +103,8 @@ export class RoomMediaTransport {
   readonly #showScreensTab: () => void;
   readonly #checkPermissionState: (kind: MediaPermissionKind, userAgent: string) => Promise<string>;
   readonly #closeScreenMenu: () => void;
-  readonly #videoDeviceId: () => string | undefined;
+  /** Every device and processing flag the A/V pane saves, passed through to the capture. */
+  readonly #capture: () => CaptureSettings;
   /*
     RE-ADDED in slice 26, having been removed in slice 4 as a collaborator with no reader.
 
@@ -161,7 +164,7 @@ export class RoomMediaTransport {
     /** `menus.set('screen', false)` — the menu belongs to `RoomMenus`. */
     closeScreenMenu: () => void;
     /** The saved camera, from the preferences this class does not otherwise read. */
-    videoDeviceId: () => string | undefined;
+    capture: () => CaptureSettings;
     /** Read only to request the grant; the SERVER decides what the grant may do. */
     isPresenter: () => boolean;
     /**
@@ -186,7 +189,7 @@ export class RoomMediaTransport {
     this.#showScreensTab = options.showScreensTab;
     this.#checkPermissionState = options.checkPermissionState;
     this.#closeScreenMenu = options.closeScreenMenu;
-    this.#videoDeviceId = options.videoDeviceId;
+    this.#capture = options.capture;
     this.#isPresenter = options.isPresenter;
     this.#onCaption = options.onCaption;
 
@@ -368,7 +371,7 @@ export class RoomMediaTransport {
       autoRecord: options.autoRecord,
       checkPermissionState: (kind, agent) => this.#checkPermissionState(kind, agent),
       closeScreenMenu: () => this.#closeScreenMenu(),
-      videoDeviceId: () => this.#videoDeviceId(),
+      capture: () => this.#capture(),
       mediaSession: () => this.#mediaSession,
       mediaSignalling: () => this.#mediaSignalling,
       tabs: {
@@ -934,9 +937,8 @@ export class RoomMediaTransport {
    * another one rather than reject the whole call.
    */
   get selectedVideoDeviceId() {
-    return typeof this.#videoDeviceId() === 'string' && this.#videoDeviceId()
-      ? this.#videoDeviceId()
-      : undefined;
+    /* `captureSettingsFrom` has already type-guarded it; `''` is "never chosen" and drops the term. */
+    return this.#capture().videoDeviceId || undefined;
   }
 
   /**

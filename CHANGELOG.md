@@ -33,6 +33,121 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 00:50 UTC — The A/V pane's six controls all saved a preference; nothing read four of them, and two showed somebody else's hardware
+
+**Runtime impact: YES.** A presenter who picks a microphone is now recorded through it, with the
+echo-cancellation, noise-suppression and auto-gain settings they chose. All six controls also show
+what is actually in force when the pane is reopened, instead of two invented devices and three
+unticked boxes.
+
+#### The defect, measured by grepping every writer and looking for a reader
+
+| preference | written by | read by, before this |
+| --- | --- | --- |
+| `audioDeviceID` | the microphone select | **nothing** |
+| `echoCancellation` | its checkbox | **nothing** |
+| `noiseSuppression` | its checkbox | **nothing** |
+| `autoGainControl` | its checkbox | **nothing** |
+| `videoDeviceID` | the camera select | `RoomLocalCapture`, since 2026-08-26 |
+
+`RoomLocalCapture.#enableMicrophone` asked for `{ audio: true }`. So a presenter who chose a headset
+and switched noise suppression on was captured through whatever the browser considered default,
+unprocessed, in every session — four controls whose only effect was changing their own labels.
+
+**It is the exact twin of a defect fixed here five days earlier.** `media-capture-contract.test.ts`
+records it in those words: *"the AV settings modal was saving `videoDeviceID` and nothing ever read
+it back"*. The camera was wired that day; the microphone was not, and nothing noticed because both
+halves still compiled and both still captured something.
+
+#### And three of the six did not even restore themselves
+
+The checkboxes were `$state(false)`, so a saved setting showed as off after every reload. The two
+device selects were seeded with **invented entries**: `Studio Display Microphone (05ac:1118)` and
+`Studio Display Camera (15bc:0000)`, with 64-character device ids. Those ids appear nowhere in the
+reference bundle and nowhere else in this repository — somebody's real hardware, hardcoded, shown to
+every viewer as their own and pre-selected in both dropdowns. That is the invented-value shape the
+root standard refuses by name, and it was shipping.
+
+#### The reference, at bundle byte 1,082,931
+
+```js
+c = i.globals.audioDeviceID && 0 == r
+  ? { audio: { deviceId: { exact: i.globals.audioDeviceID },
+               autoGainControl: …, noiseSuppression: …, echoCancellation: … } }
+  : { audio: { autoGainControl: …, noiseSuppression: …, echoCancellation: … } }
+```
+
+Two decisions, both transcribed rather than improved on. **`exact`, not `ideal`** — the camera beside
+it uses `ideal`, and the difference is the reference's: being recorded through the wrong microphone
+is not a degraded success. **`0 == r`** — the device constraint applies on the first attempt only, so
+a retry drops it and keeps the processing flags. That is what makes `exact` safe, and either half
+alone is a defect: `exact` without the retry is a lockout, the retry without `exact` is the silent
+substitution `exact` exists to prevent.
+
+#### One value through every hop, and the first draft is why that matters
+
+The first version threaded the four audio settings down a **second** channel beside the existing
+`videoDeviceId` thunk. Five files grew for it and the ratchet failed all five, 44 lines over in
+total. Consolidating them into one `CaptureSettings` — the devices and processing the pane
+configures, which is one idea — cut that to 23 and made `create-room.svelte.ts` **shorter than
+before**. The ratchet was right, and it was right about the design rather than about the size.
+
+#### The pane came out of `ModalHost`, which the ratchet also asked for
+
+`AvDevicePane.svelte`: six controls, one `loadDevices`, 265 lines that nothing else in that file
+touched. `ModalHost.svelte` falls **6,189 → 5,999**, its largest single reduction, and the ratchet
+named the number itself.
+
+| ceiling | before | after |
+| --- | --- | --- |
+| `lib/components/ModalHost.svelte` | 6,189 | **5,999** |
+| `lib/room/create-room.svelte.ts` | 1,335 | **1,335** (unchanged; the consolidation gave a line back) |
+| `lib/room/local-capture.svelte.ts` | 960 | 966 |
+| `lib/room/media-transport.svelte.ts` | 1,365 | 1,367 |
+| `lib/components/RoomOverlays.svelte` | 848 | 850 |
+
+The three raises are flagged for the owner, as the last commit's were. They are the irreducible cost
+of one more value crossing three hops; ModalHost's 190-line drop is in the same commit.
+
+#### The lists now start EMPTY, and that is a divergence taken deliberately
+
+The reference enumerates in `ngAfterViewInit` (byte 2,159,387), which prompts a presenter for their
+camera and microphone because they opened a settings pane. `loadDevices` calls `getUserMedia` for
+the reason the reference does — an unpermitted `enumerateDevices` returns devices with empty labels
+— and `media-capture-contract.test.ts` deliberately keeps every capture behind an explicit click. So
+the pane opens saying it has not looked yet. The "Selected:" line says so too: it used to read
+`Unknown Device` for anything not in the list, which would now be every open before Refresh, about a
+device that is very likely connected and working.
+
+#### Two defects found by the gates, both real
+
+**A cast hid a runtime break.** `media-transport.svelte.test.ts` builds its subject through
+`as unknown as ConstructorParameters<…>`, so `svelte-check` said nothing when the class gained a
+required option — the harness kept compiling and handed the class `undefined`. Every webcam path
+then threw, and the only thing that noticed was one reactivity test going from `[null, 'cam']` to
+`[null]`. Fixed, and the cost of the cast is now written beside it.
+
+**The test failed on its own explanation.** `capture-settings-contract.test.ts` forbids the invented
+device literals — and `AvDevicePane`'s docblock quotes them, because it records what was removed.
+The comment-versus-code trap the root standard names, met again; comments are stripped before the
+assertion now, with the same helper `profile-picture-contract.test.ts` carries.
+
+#### Negative controls — seven, all red
+
+`exact` → `ideal`; the retry no longer dropping the device; the processing flags riding only with a
+chosen device (three assertions); the type guard dropped; the capture back to `{ audio: true }` (two
+assertions); a control back to `$state(false)`; the invented device id restored (two assertions).
+Each with the file restored and `diff`ed byte-identical afterwards.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly rather than through a pipe — 3,460 tests,
+`svelte-check` 0 errors, prettier clean, build done. `svelte-autofixer` clean on `AvDevicePane`.
+
+Not verified: **no browser was opened.** The constraint this builds is passed to `getUserMedia`, and
+nothing here has watched a real microphone be selected. That is the one thing a unit test cannot do
+and it is the gap this entry leaves open.
+
 ### 2026-08-30 00:35 UTC — Eighteen room surfaces read against the pinned bundle; 223 gaps survived adversarial verification, 51 did not
 
 **Runtime impact: NO.** This is evidence, not code. `docs/decoded/room-surface-audit-2026-08-30.md`.
