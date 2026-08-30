@@ -1,6 +1,6 @@
 # The room surfaces, audited against the pinned v4 bundle — 2026-08-30
 
-**222 verified gaps across 18 surfaces.** Every entry names a byte offset in
+**223 verified gaps across 18 surfaces.** Every entry names a byte offset in
 `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, what this room does instead, and
 the file and line where it does it.
 
@@ -17,8 +17,8 @@ it.
 | surfaces read | 18 |
 | reference components not found in the bundle | 0 |
 | differences claimed | 274 |
-| **survived verification** | **222** |
-| refuted | 52 |
+| **survived verification** | **223** |
+| refuted | 51 |
 | false-claim rate | 19% |
 
 **The 19% false-claim rate is the number to keep.** Nearly one claimed gap in five was wrong —
@@ -36,6 +36,16 @@ checked is whether the outcome is achieved another way — and it is, by three s
 that are stricter than the flag. **A gap stated as a missing NAME is the shape most likely to
 survive verification while being wrong**, and it is the shape to distrust in the entries above.
 
+**It is deliberately NOT folded into the table above, and it was, for a while.** That table read
+222 survived / 52 refuted until 2026-08-30 14:20 UTC, and every other count in this document
+disagreed with it: the prose two paragraphs up says "51 were refuted" and breaks that down as
+thirty-two plus nineteen; the refuted section is headed "The fifty-one refuted claims" and lists
+exactly fifty-one; the surfaces table sums to 223; `274 - 51 = 223`. One number had been moved and
+five had not, which is the whole failure mode this document was written to describe, occurring
+inside the document itself. The table describes the two-verifier pass **as it ran**, so UIM-03 —
+refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
+exactly as RM-25 belongs in the next paragraph and not in that table.
+
 **One row was ADDED after this document was committed** — RM-25, found while building RM-11 and
 RM-12 by decoding the compact component's whole consts table rather than the entries those rows
 named. It is not folded into the totals above, which describe the two-verifier pass and should keep
@@ -45,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**114 open · 110 closed · 224 rows.**
+**107 open · 117 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1025,6 +1035,8 @@ function DDe(t,n){if(1&t){const e=Y();d(0,"div",119)(1,"div",120)(2,"button",121
 
 ### SC-02 — A/V pane opens on two FABRICATED device entries and never enumerates on open — loadDevices() runs only from the Refresh button
 
+**ALREADY BUILT — verified by reading 2026-08-30 14:13 UTC, not rebuilt; the second half is a DELIBERATE DIVERGENCE.** The fabricated entries are gone and `AvDevicePane.svelte`'s header names them: `Studio Display Microphone (05ac:1118)` and `Studio Display Camera (15bc:0000)`, with 64-character device ids that appear nowhere in the reference bundle and nowhere else in this repository — **somebody's real hardware, hardcoded, shown to every viewer as their own and pre-selected in both dropdowns**. Both selects seed from the saved settings now. The row's second half — enumerating in `ngAfterViewInit` — is refused with its reason at the same place: `loadDevices` calls `getUserMedia` (an unpermitted `enumerateDevices` returns devices with empty labels) and `media-capture-contract.test.ts` keeps every capture behind an explicit click, so opening a settings pane must not prompt a presenter for their camera and microphone. The pane says it has not looked yet, and Refresh is what looks — which is also why SC-10's "Please connect…" fallback matters more here than upstream.
+
 **high** · `defect` · reference byte **2,159,387**
 
 ```
@@ -1036,6 +1048,8 @@ ngAfterViewInit(){var e=this;this.appService.globals.isPresenter&&!this.appServi
 > Verified: Could not refute. All three parts of the claim verified.
 
 ### SC-03 — The chosen audio input device is inert — `audioDeviceID` is written by the select and read by nothing; mic capture calls getUserMedia({audio:true})
+
+**ALREADY BUILT — verified by reading 2026-08-30 14:13 UTC, not rebuilt.** `#lib/capture-settings.ts` carries the reference's constraint rule verbatim (byte 2,160,736's siblings) and `local-capture.svelte.ts:370` builds the microphone's `getUserMedia` from it. Its own header records what this was: *"`{ audio: true }` until 2026-08-30, so the A/V pane's microphone select and its three processing checkboxes wrote preferences and changed nothing."* `retryCount` is what decides between the exact-device constraint and the fallback, which is upstream's own shape.
 
 **high** · `defect` · reference byte **2,160,736**
 
@@ -1114,6 +1128,8 @@ function cDe(t,n){if(1&t){const e=Y();T(0,"hr"),d(1,"button",90),x("click",funct
 
 ### SC-09 — A/V error alert has no icon and no "Retry" button — the retry control is missing entirely
 
+**BUILT 2026-08-30 14:13 UTC, and it is the one of the four that mattered.** Every error this pane can raise is TRANSIENT — a denied permission the member can grant, a device they can plug in, a page they can reload over HTTPS — and the only way out was the Refresh button at the TOP of the pane, above a red block that ends the reading. Somebody who had just fixed the problem the message describes had nothing beside the message to press. The icon (const 92), the button (const 93 `btn btn-sm btn-outline-secondary ml-2`), its `fa-redo` and the literal ` Retry ` are all the reference's, and Retry calls the SAME `loadDevices` Refresh does — a retry that took a different path would be two ways to answer one question.
+
 **medium** · `missing-control` · reference byte **2,141,127**
 
 ```
@@ -1126,6 +1142,8 @@ function uDe(t,n){if(1&t){const e=Y();d(0,"div",50),T(1,"i",92),v(2),d(3,"button
 
 ### SC-10 — No "Please connect audio/video devices." fallbacks — the empty select renders instead
 
+**BUILT 2026-08-30 14:13 UTC.** `O(99, audioDevicesList?.length > 0 ? 99 : devicesLoading || devicesLoadError ? -1 : 100)` — a three-way gate whose middle arm is "the block above has already said something". The fallback replaces the WHOLE group (label, select and the "Selected:" line) rather than sitting beside it. **This matters more here than upstream:** SC-02's recorded divergence means this pane deliberately opens with both lists empty, so an empty dropdown that opens onto nothing was the first thing a member saw every single time, with no statement of why. Both crossed-out icons are the reference's and they are not the same one — `fa-microphone-slash` and `fa-video-slash`.
+
 **medium** · `missing-behaviour` · reference byte **2,142,196**
 
 ```
@@ -1137,6 +1155,8 @@ function mDe(t,n){1&t&&(d(0,"div",100),T(1,"i",101),v(2," Please connect audio d
 > Verified: I could not refute this. The session-control modal's av-device-selection tab renders both <select>s unconditionally with no empty-list guard.
 
 ### SC-11 — The three audio-constraint checkboxes are seeded to `false` rather than from the saved preferences, so they always open unchecked
+
+**ALREADY BUILT — verified by reading 2026-08-30 14:13 UTC, not rebuilt.** All three seed from `capture` in `AvDevicePane.svelte:61-63`, with `untrack` because they are seeds and then locally owned — the user must be able to tick a box without the preference having round-tripped. The table in that file's header lists this row's three controls beside the two device selects as one fix; the pane was extracted for it.
 
 **medium** · `defect` · reference byte **2,155,032**
 
@@ -1186,6 +1206,8 @@ function LDe(t,n){if(1&t){const e=Y();d(0,"form",131,0),x("ngSubmit",function(){
 
 ### SC-15 — Refresh Devices button has neither the `disabled` binding nor the spinner/sync icon swap
 
+**BUILT 2026-08-30 14:13 UTC.** `z("disabled", e.devicesLoading)` and `z("ngClass", e.devicesLoading ? "fa-spinner fa-spin" : "fa-sync-alt")` at byte 2,154,613. The button was always live and its icon never moved, so pressing Refresh twice fired a second `getUserMedia` while the first was still resolving — and the pane looked identical throughout, which is exactly why anybody would press it twice.
+
 **low** · `missing-behaviour` · reference byte **2,154,613**
 
 ```
@@ -1197,6 +1219,8 @@ z("disabled",e.devicesLoading),m(),z("ngClass",e.devicesLoading?"fa-spinner fa-s
 > Verified: I could not refute this. The button exists but genuinely carries neither binding, and no module, action or wrapper supplies them.
 
 ### SC-16 — Loading-devices indicator uses the wrong container class
+
+**BUILT 2026-08-30 14:13 UTC.** Const 49 is `[1,"alert","alert-info"]` and this read `text-center my-3`. Not cosmetic: its twin below — const 50 `alert alert-danger` — already WAS a panel, so a loading state rendering as bare centred text beside an error rendering as a bordered block reads as two different KINDS of message, when they are the two outcomes of one button.
 
 **low** · `wrong-constant` · reference byte **2,178,854**
 

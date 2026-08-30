@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 68 surfaces audited · 1,072 of 32,428 lines · 3.4%.**
+**2 of 68 surfaces audited · 1,072 of 32,505 lines · 3.4%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -155,7 +155,7 @@ guessed.
 | 64 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 65 | `lib/components/LogArchiveModals.svelte` | 147 | no |
 | 66 | `lib/components/ChatArchivePane.svelte` | 143 | no |
-| 67 | `lib/components/AvDevicePane.svelte` | 265 | no |
+| 67 | `lib/components/AvDevicePane.svelte` | 342 | no |
 | 68 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 ## The honest scoping statement
 

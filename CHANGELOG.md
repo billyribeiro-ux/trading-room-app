@@ -33,6 +33,132 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 14:20 UTC — The A/V pane's error with no way out, and an audit that had lost count of itself
+
+**Runtime impact: YES** for the A/V device pane; **NO** for the audit document and its contract.
+
+Two unrelated pieces of work, recorded together because they landed in one commit.
+
+#### The A/V device pane — SC-09, SC-10, SC-15, SC-16 built
+
+`AvDevicePane.svelte`, the Devices tab of the session-control modal. Four rows of the seventeen the
+`ModalHost: session-control modal` slice carries, and **SC-09 is the one that mattered**.
+
+Every error this pane can raise is transient — a denied permission the member can grant, a device
+they can plug in, a page they can reload over HTTPS. The only way to act on any of them was the
+Refresh button at the *top* of the pane, above a red block that ends the reading. Somebody who had
+just done the thing the message told them to do had nothing beside the message to press. The
+reference puts Retry inside the alert (byte 2,141,127: const 92 `fas fa-exclamation-triangle`,
+const 93 `btn btn-sm btn-outline-secondary ml-2`, const 94 `fa-redo`, the literal ` Retry `), and it
+calls the same `loadDevices` Refresh does — a retry that took a different path would be two ways to
+ask one question.
+
+**SC-10** replaces an empty dropdown with a sentence. `O(99, audioDevicesList?.length > 0 ? 99 :
+devicesLoading || devicesLoadError ? -1 : 100)` at byte 2,142,196 is a three-way gate whose middle
+arm means *the block above has already said something*, and whose last arm replaces the **whole**
+group — label, select and the "Selected:" line — with `Please connect audio devices.` This matters
+more here than upstream: SC-02's recorded divergence means this pane deliberately opens with both
+lists empty, so an empty select that opens onto nothing was the first thing a member saw every
+single time, with no statement of why. The two crossed-out icons are the reference's and they are
+not the same one — `fa-microphone-slash` and `fa-video-slash`.
+
+**SC-15**: `disabled={devicesLoading}` and the icon swapping to `fa-spinner fa-spin`
+(`z("disabled", e.devicesLoading)` at byte 2,154,613). Refresh was always live and its icon never
+moved, so pressing it twice fired a second `getUserMedia` while the first was still resolving — and
+the pane looked identical throughout, which is precisely why anybody would press it twice.
+
+**SC-16**: the loading block was `text-center my-3`; const 49 is `[1,"alert","alert-info"]`. Not
+cosmetic — its twin, the error at const 50 `alert alert-danger`, already *was* a bordered block, so
+the two outcomes of one button were rendering as two different kinds of message.
+
+**SC-02, SC-03 and SC-11 were verified ALREADY BUILT and not rebuilt.** This pane was extracted from
+`ModalHost.svelte` earlier today for exactly SC-02's defect: two invented device entries — `Studio
+Display Microphone (05ac:1118)` and `Studio Display Camera (15bc:0000)`, with 64-character device ids
+that appear nowhere in the reference bundle and nowhere else in this repository — hardcoded, shown to
+every viewer as their own hardware, and pre-selected in both dropdowns. SC-11's three processing
+checkboxes seed from `capture` with `untrack`, and `capture-settings.ts` carries the reference's
+constraint rule.
+
+`AvDevicePane.svelte`'s size ceiling rises 266 → 343 with its reason recorded at the ceiling.
+`apps/room/src/lib/av-device-pane-contract.test.ts` is new: 7 tests.
+
+#### The audit document had lost count of itself — and it is the document that warns about this
+
+`docs/decoded/room-surface-audit-2026-08-30.md` opened with a table reading **274 claimed / 222
+survived / 52 refuted**. Six other statements of the same numbers, in the same document, all said
+something else:
+
+| where | says |
+| --- | --- |
+| the opening sentence | 222 verified gaps |
+| the prose under the table | "51 were refuted — thirty-two already built, nineteen dead" |
+| the refuted section's heading | "The fifty-one refuted claims" |
+| the rows listed under it | 51 |
+| the per-surface table, summed | 223 |
+| `274 − 51` | 223 |
+
+**The table was the wrong one, and the reason it was wrong is instructive.** UIM-03 was refuted
+*after* the document was committed, by a third reading. Somebody folded that into the summary table —
+222/52 — and into nothing else. But the table's own stated purpose is to describe the two-verifier
+pass **as it ran**, which is why RM-25, added afterwards by the same kind of later reading, was
+correctly kept out of it. So UIM-03 belongs in the paragraph that explains it, exactly as RM-25 does,
+and the table goes back to 223/51.
+
+This is the failure mode the document exists to describe, occurring inside the document. Correcting
+the number once would leave the next person to find it again, so `room-surface-audit-counts.test.ts`
+grew a second block that makes eight statements check each other. **Not one of its assertions holds a
+total**: each compares one part of the document to another part, so the numbers may all move together
+and it stays green, while any one of them moving alone fails.
+
+- `claimed = survived + refuted`
+- the opening sentence's survivor count and surface count = the table's
+- the refuted section's heading, **spelled out in words**, = the table's refuted count
+- the claims actually listed under that heading = the same
+- the per-surface `gaps` column, summed, = survived — *the assertion that would have caught this on
+  its own, because it is the only total that is derived rather than written*
+- the `kind` breakdown, summed, = survived; the `severity` breakdown, summed, = survived
+- the per-surface `of which high` column, summed, = the severity table's `high`
+- the per-surface `confirmed present` column, summed, = the one place the prose states that total
+- `### ` rows in the document = survived + the rows whose later addition is recorded in prose
+
+`todo-next.md` needed no correction: it had been quoting 223 and 51 all along, from the surfaces
+table. It was the summary that drifted, not the cross-reference.
+
+#### And SC-09's own first assertion could not fail — caught by its control, not by review
+
+This is the **fifth** time in this repository a negative control has found the test rather than the
+code, and the **fourth** of those was a slice bounded by something that does not mean what the prose
+above it says.
+
+SC-09's whole point is that Retry sits *inside* the error alert. The assertion sliced 700 characters
+forward from `{#if devicesLoadError}` and checked the button appeared in the window. So the control —
+move Retry out of the alert — **stayed green**: a button one line past `</div>` is still inside 700
+characters. The test read as a requirement about nesting and measured proximity.
+
+It walks `<div>` depth to the matching close now, exactly as `card-class-lists-contract` was made to
+after RM-22 taught the same lesson: **when nesting is what differs, nesting is what gets measured.**
+Four controls on this row now, all seen red — Retry moved out (fails two), the icon moved out, the
+alert rendered outside the error branch, and the message's surrounding spaces removed.
+
+**`slice-anchor-contract.test.ts` caught my own first draft of it**, which is the ratchet earning
+its keep. Two of the new assertions sliced the per-surface table with an inlined
+`AUDIT.slice(start, AUDIT.indexOf('\n\n', start))`. `indexOf` answers **-1** when it fails and -1 is
+a valid `slice` argument, so a slice bound that way silently becomes "to the last character" rather
+than throwing — the exact shape that has produced a green-but-meaningless assertion three times in
+this repository. The ratchet counts those and only lets the number go down; my draft pushed it 142 →
+144 and the gate went red. Both anchors are bound to locals and asserted now, and the two tests share
+one parser instead of repeating it.
+
+**Verified:** `room-surface-audit-counts.test.ts` 18/18, with **ten negative controls run and seen
+red** — the exact historical drift (`refuted 51 → 52`) fails three assertions; the headline, the
+spelled-out heading, a deleted refuted claim, a surface's gaps, a surface's high count, a surface's
+present count, the kind table, the severity table and the removal of the RM-25 record each fail one.
+`av-device-pane-contract.test.ts` 8/8, with four controls of its own seen red. Full `pnpm run gate` in `apps/room`: **244 files, 4,029
+passed, 1 skipped, `gate-exit=0`**, read from the log the exit code was echoed into rather than from
+the harness. **Nothing was opened in a browser, and the Svelte MCP server has been
+disconnected for this entire session** — the docs were read from the pinned copies in this checkout
+instead, and `svelte-autofixer` was not run.
+
 ### 2026-08-30 13:54 UTC — The post-alert modal's thirteen rows: a button that discarded the schedule you had just typed
 
 **Runtime impact: YES.** A presenter who opens Send Later can no longer press the green **Post

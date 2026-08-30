@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest';
  *
  * ## Why this exists, and it is the same lesson `todo-next-coverage-contract` was written for
  *
- * That document is the tracker for 224 rows across seventeen surfaces, and "how many are left" was
+ * That document is the tracker for 224 rows across eighteen surfaces, and "how many are left" was
  * being answered by grepping it. On 2026-08-30 that answer came out **three different ways in ten
  * minutes** — 158, then 218, then 151 — not because the document changed but because each pattern
- * recognised a different subset of the seven ways a closed row says it is closed. Every one of those
+ * recognised a different subset of the eight ways a closed row says it is closed. Every one of those
  * numbers was quoted as progress before the next one refuted it.
  *
  * A number nothing checks is a number that drifts, and this one was drifting inside a single
@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
  *
  * ## The vocabulary, and why "closed" is more than "built"
  *
- * A row can be finished in seven ways and only three of them are code. The other four are the
+ * A row can be finished in eight ways and only three of them are code. The other five are the
  * expensive ones to lose, because a row that was investigated and deliberately not built looks
  * exactly like a row nobody has read yet — which is how work gets done twice.
  */
@@ -111,5 +111,192 @@ describe('the header states the totals it can be checked against', () => {
 
   it('and the two sum to the whole document', () => {
     expect(Number(stated![3])).toBe(rows.length);
+  });
+});
+
+/**
+ * ## The verification table, checked against the five other places the same numbers appear
+ *
+ * The block above counts ROWS. This one counts the two-verifier PASS that produced them, and it was
+ * added on 2026-08-30 because that pass's totals had drifted inside the document itself.
+ *
+ * `274 claimed / 222 survived / 52 refuted` is what the table read. Every other statement of the
+ * same numbers disagreed: the prose said "51 were refuted" and broke it down as thirty-two plus
+ * nineteen; the refuted section was headed "The fifty-one refuted claims" and listed fifty-one; the
+ * per-surface table summed to 223; and `274 - 51` is 223. One number had been moved — when UIM-03
+ * was refuted after the document was committed — and five had not.
+ *
+ * That is precisely the failure the document was written to warn about, happening to the document.
+ * So the fix is not to correct the number once; it is to make those statements check each other,
+ * which is what this does. **Every assertion below compares one part of the document to another
+ * part of it** — none of them hardcodes a total — so the numbers may all change together and the
+ * test still holds, while any one of them moving alone fails.
+ */
+describe('the two-verifier pass states its own arithmetic', () => {
+  const cell = (label: string) => {
+    const found = new RegExp(
+      `^\\| \\*{0,2}${label}\\*{0,2} \\| \\*{0,2}(\\d+)\\*{0,2} \\|$`,
+      'm'
+    ).exec(AUDIT);
+    expect(found, `the summary table has no "${label}" row`).not.toBeNull();
+    return Number(found![1]);
+  };
+
+  const claimed = () => cell('differences claimed');
+  const survived = () => cell('survived verification');
+  const refuted = () => cell('refuted');
+
+  it('adds up: claimed = survived + refuted', () => {
+    expect(survived() + refuted()).toBe(claimed());
+  });
+
+  it('states the same survivor count in the headline as in the table', () => {
+    const headline = /\*\*(\d+) verified gaps across (\d+) surfaces\.\*\*/.exec(AUDIT);
+    expect(headline, 'the opening sentence is missing or reworded').not.toBeNull();
+    expect(Number(headline![1])).toBe(survived());
+    expect(Number(headline![2])).toBe(cell('surfaces read'));
+  });
+
+  /**
+   * The refuted heading spells its number out, which is why it was the one nobody updated. A word
+   * is not harder to check than a digit — it is only harder to grep, and that is the argument for
+   * checking it here rather than hoping.
+   */
+  const UNITS = [
+    'zero',
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+    'twelve',
+    'thirteen',
+    'fourteen',
+    'fifteen',
+    'sixteen',
+    'seventeen',
+    'eighteen',
+    'nineteen'
+  ];
+  const TENS = [
+    '',
+    '',
+    'twenty',
+    'thirty',
+    'forty',
+    'fifty',
+    'sixty',
+    'seventy',
+    'eighty',
+    'ninety'
+  ];
+  const spell = (value: number) =>
+    value < 20
+      ? UNITS[value]
+      : value % 10 === 0
+        ? TENS[Math.floor(value / 10)]
+        : `${TENS[Math.floor(value / 10)]}-${UNITS[value % 10]}`;
+
+  const REFUTED_HEADING = /^## The ([a-z-]+) refuted claims$/m;
+
+  it('states the same refuted count in the refuted section s own heading', () => {
+    const heading = REFUTED_HEADING.exec(AUDIT);
+    expect(heading, 'the refuted section heading is missing or reworded').not.toBeNull();
+    expect(refuted(), 'the speller below only covers 0-99').toBeLessThan(100);
+    expect(heading![1]).toBe(spell(refuted()));
+  });
+
+  it('lists exactly that many refuted claims under it', () => {
+    const heading = REFUTED_HEADING.exec(AUDIT);
+    const section = AUDIT.slice(heading!.index);
+    /* Table BODY rows only — the header row and the `| --- |` rule are not claims. */
+    const listed = section
+      .split('\n')
+      .filter(
+        (line) => line.startsWith('| ') && !line.startsWith('| --- ') && !line.startsWith('| # |')
+      );
+    expect(listed).toHaveLength(refuted());
+  });
+
+  /**
+   * The per-surface table, parsed once — and its two anchors bound to locals rather than inlined,
+   * because `indexOf` answers -1 when it fails and -1 is a valid `slice` argument. A slice bound by
+   * an inlined `indexOf` silently becomes "from the end" or "to the last character" instead of
+   * throwing, which is the shape `slice-anchor-contract.test.ts` ratchets down, and the shape that
+   * has produced a green-but-meaningless assertion three times in this repository.
+   */
+  const surfaceRows = () => {
+    const start = AUDIT.indexOf('| surface | gaps | of which high |');
+    expect(start, 'the per-surface table is missing or its header was reworded').toBeGreaterThan(
+      -1
+    );
+    const end = AUDIT.indexOf('\n\n', start);
+    expect(end, 'the per-surface table runs to the end of the document').toBeGreaterThan(start);
+    const cells = AUDIT.slice(start, end)
+      .split('\n')
+      .map((line) => /^\| [^|]+ \| (\d+) \| (\d+) \| (\d+) \|$/.exec(line))
+      .filter((found): found is RegExpExecArray => found !== null);
+    expect(cells.length, 'no surface rows parsed — the column shape changed').toBe(
+      cell('surfaces read')
+    );
+    return cells;
+  };
+
+  const columnTotal = (column: 1 | 2 | 3) =>
+    surfaceRows().reduce((sum, found) => sum + Number(found[column]), 0);
+
+  it('sums the per-surface table to the survivor count', () => {
+    /*
+      This is the assertion that would have caught the drift on its own: the per-surface table is
+      the only statement of the total that is DERIVED rather than written, so it cannot be edited
+      into agreement without editing a surface.
+    */
+    expect(columnTotal(1)).toBe(survived());
+  });
+
+  /**
+   * Four more derived agreements, all of which held while the summary table did not — which is the
+   * argument for pinning them rather than trusting that the one wrong number was the only one.
+   */
+  it('sums the kind and severity breakdowns to the survivor count too', () => {
+    const kinds = (AUDIT.match(/^\| `[a-z-]+` \| (\d+) \|/gm) ?? []).reduce(
+      (sum, line) => sum + Number(/(\d+)/.exec(line)![1]),
+      0
+    );
+    expect(kinds, 'the `kind` column').toBe(survived());
+
+    const severities = ['high', 'medium', 'low'].reduce((sum, name) => {
+      const found = new RegExp(`\\| ${name} \\| (\\d+) \\|`).exec(AUDIT);
+      expect(found, `the severity table has no "${name}" row`).not.toBeNull();
+      return sum + Number(found![1]);
+    }, 0);
+    expect(severities, 'the `severity` column').toBe(survived());
+  });
+
+  it('agrees with itself on how many of the gaps are high, and how many behaviours were present', () => {
+    /* The `of which high` column against the severity breakdown above it. */
+    const high = /\| high \| (\d+) \|/.exec(AUDIT);
+    expect(high, 'the severity table has no "high" row').not.toBeNull();
+    expect(columnTotal(2)).toBe(Number(high![1]));
+
+    /* The `confirmed present` column against the one place the prose states that total. */
+    expect(AUDIT).toContain(`${columnTotal(3)} behaviours were confirmed built`);
+  });
+
+  it('and the rows in the document are the survivors plus the ones added afterwards', () => {
+    /*
+      RM-25 was found while building, after the pass ran, and is deliberately outside the table. So
+      the document holds MORE rows than the pass produced, and the difference is not slack — it is
+      exactly the rows whose addition is recorded in the prose above. Any other gap between the two
+      is a row that appeared without a record.
+    */
+    const added = (AUDIT.match(/row was ADDED after this document was committed/g) ?? []).length;
+    expect(rows.length).toBe(survived() + added);
   });
 });

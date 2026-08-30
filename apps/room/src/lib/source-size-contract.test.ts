@@ -2177,7 +2177,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `loadDevices` and the account of the six controls that used to write preferences nothing read.
       If this climbs, the question is what a seventh thing about choosing a microphone could be.
     */
-    max: 266,
+    /*
+      266 -> 343, 2026-08-30. SC-09, SC-10, SC-15 and SC-16 — the pane's four states, three of which
+      had no shape of their own.
+
+      SC-09 is the one that mattered. Every error this pane can raise is TRANSIENT — a denied
+      permission the member can grant, a device they can plug in, a page they can reload over HTTPS
+      — and the only way out was the Refresh button at the TOP of the pane, above a red block that
+      ends the reading. The reference puts Retry inside the alert, which is where somebody who has
+      just read it is looking.
+
+      SC-10 replaces the WHOLE select group with "Please connect audio devices." rather than adding
+      a message beside it, and that matters here more than upstream: this pane deliberately opens
+      with both lists empty, so an empty dropdown was the first thing a member saw every time.
+
+      SC-15 disables Refresh while it is working (pressing it twice fired a second `getUserMedia`
+      while the first was still resolving, and the pane looked identical throughout), and SC-16
+      gives the loading state the same `alert` shape its error twin already had.
+    */
+    max: 343,
     why: 'which microphone and camera this browser captures with, and the three processing flags'
   },
   {
