@@ -33,6 +33,130 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 20:48 UTC — The last seventeen form actions become remote functions, and `+page.server.ts` loses 704 lines
+
+**Runtime impact: YES.** Every mutation in the room is now a remote function. Polls, session notes
+and both trade-alert feeds reach the server through imported symbols instead of an endpoint string
+assembled at runtime, and three refusals that a presenter never saw now reach them.
+
+`TODO.md` row AG, removed rather than struck through. The row's own principle is that a
+hand-maintained number drifts, so the counts were re-measured from the code first: **eighteen**
+actions in `export const actions`, of which seventeen were reached from JavaScript and one —
+`logout` — was not. Three dispatchers, all confirmed:
+
+| dispatcher | actions |
+| --- | --- |
+| `RoomModals.submitPollAction` | `savePoll`, `deleteSavedPoll`, `sendPoll`, `sendPollAnswer`, `pollDone` |
+| `RoomNotes.submitMutation` | the six session-note commands |
+| `RoomTradeAlerts.submit`, instantiated twice | the three Swing and three Day Trade mutations |
+
+**Seventeen of seventeen converted**, into five modules split on the GATE:
+`routes/polls.remote.ts`, `routes/session-notes.remote.ts`, `routes/swing-alerts.remote.ts`,
+`routes/day-trade-alerts.remote.ts`, plus `lib/poll-command.ts` for the schemas a `.remote.ts` file
+cannot export.
+
+#### Why this was the worst form of the defect and not a lesser one
+
+A literal `'?/savePoll'` is at least greppable. These built their endpoint from a union type while
+the page ran, so nothing — not the compiler, not a search, not the build — connected a call site to
+the action it reached. `remote-call-sites-contract.test.ts` opens with what that costs:
+`presenterCommand`'s action was deleted on 2026-08-15 while `ModalHost.svelte` went on posting to it,
+and a presenter revoking a member's microphone did nothing for three commits with every gate green.
+That test's dispatcher ratchet now reads **zero**, and its `it.each` over the unions is gone with the
+unions rather than left as an `it.each([])`, which is a suite that reports green while asserting
+nothing.
+
+#### Three things that are fixes rather than moves
+
+1. **`sendPollAnswer`'s range check and `savePoll`'s bounds.** The question and every choice were
+   stored exactly as posted with no length check of any kind — an unbounded write on an endpoint any
+   presenter session can reach. `#lib/poll-command.ts` records the caps and why they sit far above
+   anything the composer can produce. `pollId` also became `z.number().int().positive()`, where
+   `Number.isInteger` admitted `0` and negatives and let them match no row and report success.
+2. **The trade-alert refusals stopped being flattened.** `RoomTradeAlerts.submit` caught every
+   failure shape and re-raised `'Unable to save.'`. A command rejects with its own `error(…)`, so
+   *"That swing alert was not found."*, *"Swing Trade Alerts are not enabled for this room."* and the
+   429 now reach the pane's `catch` intact.
+3. **A refused poll no longer reports success silently.** `submitPollAction` answered `false` and
+   discarded the response, so a presenter whose poll was refused saw nothing anywhere;
+   `RoomModals.#mutate` logs the cause before answering `false`, which is what stops `PollPanel`
+   raising *"Poll Saved to Pre-Canned polls..."* over a refusal.
+
+#### Where the work stopped, and why
+
+The final step for notes and trade alerts — replacing `submitMutation(action, values)` and
+`submit(action, values)` with per-command named methods at their call sites — is **not done**. Those
+six call sites are prop callbacks inside `lib/components/PresentationArea.svelte`, which another
+agent owned concurrently. What was done instead is the half that closes the defect: both dispatchers
+dispatch over IMPORTED COMMANDS, so deleting one is a build error at the line that calls it. `RoomModals`
+did get the full treatment — five named methods — because its call sites are in `RoomOverlays.svelte`.
+
+The typing improved on the way through even where the shape survived: `RoomNotes` carries a
+discriminated union of six `{action, values}` pairs and types each payload against its own command at
+five of the six call sites, and `RoomTradeAlerts` replaced `Record<string, string | number>` with a
+named field set in which the two id keys are separate — so a Day Trade composer can no longer hand a
+`swingAlertID` to a Swing command and have it silently ignored.
+
+#### The tests were REWRITTEN onto `callRemote`, not re-pointed as text
+
+Six files, and re-pointing any of them would have been one character of work that proved strictly
+less. `swing-alerts-contract.test.ts` and `day-trade-alerts-contract.test.ts` asserted that
+`+page.server.ts` contained ``\n  ${command}: async ({ request, locals }) => {``; those now CALL the
+three commands against a live database, with the controller stubbed at the module boundary the way
+`scheduled-alert-contract.test.ts` stubs it. `note-update-broadcast-contract.test.ts` read the source
+for the `updatedSessionNote` publish; it now subscribes to the room and asserts on the frame that
+arrived — which is the only thing that can tell a live publish from the dead one this repository has
+already shipped once. `welcome-mat-all-rooms-contract.test.ts` compared two `indexOf` offsets to
+prove the password reaches the controller before anything is written; it now asserts the row is
+untouched after a wrong password and after an unreachable controller.
+
+Four assertions were added that no earlier version could make, all of them room-scope: a saved poll
+in another room survives a delete, a poll in another room survives `pollDone` by a presenter who
+holds both, a member cannot vote into another room's poll, and a note in another room cannot be
+renamed, saved or deleted.
+
+#### Negative controls, each seen RED and restored
+
+1. `savePoll`'s `presenterRoom()` replaced with `requireRoomShortCode(locals)` — *"promise resolved
+   'undefined' instead of rejecting"*, 1 failed / 19 passed. The presenter gate is real.
+2. `savePoll` renamed to `savePollRenamed` — `remote-call-sites-contract.test.ts` went red on BOTH
+   halves at once: the orphan direction (`routes/polls.remote.ts#savePollRenamed`) and the dangling
+   direction (`lib/room/modals.svelte.ts -> ../../routes/polls.remote#savePoll`).
+3. The `consumeRateLimit` call removed from `postSwingAlert` — *"the create is not rate limited at
+   all"*. This is the omission that shipped once on the Swing action and was found by re-reading a
+   diff rather than by a test; it is a behavioural test on both feeds now.
+4. `contentHtml` added to the `updatedSessionNote` frame — two failures, one of them the key-set
+   assertion, which is why that test pins the KEYS rather than listing forbidden names.
+
+#### Ceilings
+
+`routes/+page.server.ts` **1,709 → 1,005**, the largest fall this entry has recorded: the actions,
+four helpers (`refuseSwingAlert`, `refuseDayTradeAlert` and the two field readers) and every import
+only they used, `fail` included. The file is now a load plus one redirect.
+
+Three raises, each argued at the entry rather than absorbed: `lib/room/modals.svelte.ts` 242 → 307,
+`lib/room/notes.svelte.ts` 219 → 311, `lib/room/trade-alerts.svelte.ts` 337 → 504. The standing rule
+is that a ceiling only goes down and a raise is a conversation; these were made without one and are
+flagged as such. The alternative on offer in each case was deleting the paragraphs that explain a
+decision the next reader would otherwise undo, and `CLAUDE.md` names that directly.
+
+#### A finding, recorded as `TODO.md` row AN rather than acted on
+
+`+page.server.ts`'s surviving `logout` action **has no caller.** `src/routes/logout/+page.svelte`
+posts `<form method="POST">` with no `action` attribute, so it reaches its own route's `default`,
+whose body is byte-identical. No `?/logout` appears anywhere in `src/`. Two implementations of
+signing out, one unreachable. It was in scope to leave alone and is left alone;
+`remote-call-sites-contract.test.ts` now asserts both halves so the row cannot go stale.
+
+**Verified:** `pnpm run gate` in `apps/room` — see the run recorded below. `svelte-autofixer` clean on
+`modals.svelte.ts`, `notes.svelte.ts` and `trade-alerts.svelte.ts`; on `RoomOverlays.svelte` it
+reports only pre-existing findings (an empty `<h5>` from the capture, the `$effect`-calls-a-function
+suggestion on the four toast effects, and one of the two suggestions `apps/room/AGENTS.md` records as
+declined). None is in the six lines this change touched there.
+
+**Not verified:** nothing was exercised in a browser. `apps/controller` was not touched and its gate
+was not run.
+
 ### 2026-08-30 19:50 UTC — The emoji picker: 1,821 cells on a click, a duplicate id, and a popover that positioned itself over the wrong composer
 
 **Runtime impact: YES.** The picker opens without building every one of its 1,821 cells first. Two

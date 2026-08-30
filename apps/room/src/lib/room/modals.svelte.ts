@@ -1,5 +1,12 @@
 import { invalidateAll } from '$app/navigation';
 
+import {
+  deleteSavedPoll,
+  pollDone,
+  savePoll,
+  sendPoll,
+  sendPollAnswer
+} from '../../routes/polls.remote';
 import { saveTheme } from '../../routes/user-settings.remote';
 import type { AlertTab, ModalName, SessionControlTab, SettingsTab, Theme } from '#lib/types.js';
 
@@ -174,17 +181,75 @@ export class RoomModals {
     this.#modal = null;
   }
 
-  async submitPollAction(
-    action: 'savePoll' | 'deleteSavedPoll' | 'sendPoll' | 'sendPollAnswer' | 'pollDone',
-    values: Record<string, string | number> = {}
-  ) {
-    const body = new FormData();
-    for (const [key, value] of Object.entries(values)) body.set(key, String(value));
-
-    const response = await fetch(`?/${action}`, { method: 'POST', body });
-    if (!response.ok) return false;
+  /**
+   * THE FIVE POLL MUTATIONS, one method each, and the failure policy they share.
+   *
+   * ## What this replaced
+   *
+   * One `submitPollAction(action, values)` that built its endpoint at runtime —
+   * ``fetch(`?/${action}`)`` over a five-member union, with a hand-built `FormData` body. Nothing
+   * connected either end: the endpoint was a string assembled while the page ran, the values were
+   * `Record<string, string | number>` stringified on the way out and re-parsed on the way in, and a
+   * refusal arrived as `response.ok === false`. `remote-call-sites-contract.test.ts` opens with what
+   * that costs — `presenterCommand` was deleted while its call site kept posting to it for three
+   * commits, compiling the whole way.
+   *
+   * Each method below names an imported symbol. Delete one of the commands in `polls.remote.ts` and
+   * this file stops compiling, which is the property the union could never have.
+   *
+   * ## Why they still return `boolean`, and why that is not a swallowed error
+   *
+   * `PollPanel` reads the answer — `if (await onsave(…)) onalert(POLL_SAVED_ALERT)` — so a refusal
+   * must be FALSE rather than a rejection, or the panel raises *"Poll Saved to Pre-Canned
+   * polls..."* over a poll that was refused and then loses the rejection to an unhandled promise.
+   * That contract predates the conversion and is kept.
+   *
+   * What changed is that the cause is no longer thrown away. `submitPollAction` answered `false` and
+   * discarded the response; {@link #mutate} logs the rejection before answering `false`, for the
+   * reason {@link setTheme} gives one line further down — a `void`-ed rejection is a swallowed
+   * error, and this repository does not write `.catch(() => {})`.
+   */
+  async #mutate(name: string, run: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await run();
+    } catch (cause) {
+      // Surfaced, not swallowed: `false` tells the panel not to claim success, the log says why.
+      console.error(`[poll] ${name}`, cause);
+      return false;
+    }
+    /*
+      The poll lists, the active poll and its tally are all built by the page LOAD, not by a remote
+      query — so nothing refreshes them on its own and `invalidateAll()` is what the presenter sees.
+      Kept from `submitPollAction`, and deliberately AFTER the mutation resolved: refetching over a
+      refusal would redraw the same state and read as success.
+    */
     await invalidateAll();
     return true;
+  }
+
+  /** *"Save Poll"* — add this draft to the room's Pre-Canned list. */
+  savePoll(question: string, choices: readonly string[]): Promise<boolean> {
+    return this.#mutate('savePoll', () => savePoll({ question, choices: [...choices] }));
+  }
+
+  /** Remove one Pre-Canned entry. Any presenter of the room may remove any of them. */
+  deleteSavedPoll(pollId: number): Promise<boolean> {
+    return this.#mutate('deleteSavedPoll', () => deleteSavedPoll({ pollId }));
+  }
+
+  /** *"Send Poll"* — close whatever this room had open and open this one. */
+  sendPoll(question: string, choices: readonly string[]): Promise<boolean> {
+    return this.#mutate('sendPoll', () => sendPoll({ question, choices: [...choices] }));
+  }
+
+  /** A member's vote. The INDEX is the vote, which is why the panel keys its list by index. */
+  sendPollAnswer(choiceIndex: number): Promise<boolean> {
+    return this.#mutate('sendPollAnswer', () => sendPollAnswer({ choiceIndex }));
+  }
+
+  /** *"End Poll"* — close the poll this presenter opened. */
+  pollDone(): Promise<boolean> {
+    return this.#mutate('pollDone', () => pollDone());
   }
 
   openSessionControl(tab: SessionControlTab = 'reset-session') {
