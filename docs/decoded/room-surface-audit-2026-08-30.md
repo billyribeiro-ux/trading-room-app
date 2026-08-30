@@ -815,6 +815,8 @@ onCarouselUrlPaste(e,i){const o=e.clipboardData?.getData("text")?.trim();o&&/^ht
 
 ### SC-01 — Session History pane is a hardcoded empty state; its "Load History" button has no handler and there is no Refresh button, no list, and no data source
 
+**BUILT 2026-08-30 04:30 UTC.** Both of upstream's branches (`EDe` and `DDe`), decoded with `app-session-control-modal`'s own consts table — the empty state with `Load History`, the loaded state with `Refresh` and one `<a class="list-group-item …">` per entry carrying `eventName`, `created` through `date:'medium'` and `eventValue`. Behind it: a `session_history` table, `recordSessionEvent`, and `getSessionHistory` as a presenter-gated `query` that takes no argument, so no caller can name another room. **WHICH events is a decision and says so:** the reference's server is not in the capture, so this room records the acts it already has a presenter-gated room-scoped command for — chat-mode change, soft and hard reset, session opened, close message saved/cleared — the same test `room_state` applies. The read is capped at 100 newest where the reference has no cap. `session-history-contract.test.ts` executes every writer, both refusal directions and the room scoping.
+
 **high** · `missing-behaviour` · reference byte **2,146,310**
 
 ```

@@ -270,6 +270,15 @@ export function ensureDatabase() {
       closed_message TEXT,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS session_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      event_name TEXT NOT NULL,
+      event_value TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS session_history_room_created_idx
+      ON session_history(room_short_code, created_at);
     CREATE TABLE IF NOT EXISTS presenter_colors (
       room_short_code TEXT NOT NULL,
       sender_email_hash TEXT NOT NULL,

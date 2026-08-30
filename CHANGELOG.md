@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 04:30 UTC — The Session History pane, whose button had no handler at all
+
+**Runtime impact: YES.** The presenter's Session History tab lists what has happened to the room and
+refreshes on demand. Five presenter commands now write a history row. Before this the pane said
+`No session history.` whatever had happened, and its button did nothing.
+
+#### `SC-01`, and it was the emptiest kind of empty
+
+```svelte
+<div class="p-4 text-center">No session history.</div>
+<div class="p-4 text-center">
+  <button class="btn btn-primary"><i class="fas fa fa-sync"></i> Load History </button>
+</div>
+```
+
+Rendered unconditionally, with **no `onclick` at all** — not a handler that did nothing; no handler.
+No table, no query, and nothing anywhere in the room recording an event.
+
+#### What is evidence, and the one decision
+
+**Evidence** — the wire and the row shape. `fetchSessionHistory()` at byte 1,145,917 calls
+`invokeServerCommand("getSessionHistory", {})` and assigns `rc.data`; `TDe` at byte 2,146,069
+renders `eventName`, `created` through Angular's `date:'medium'`, and `eventValue`. Both branches
+and every class string are decoded from `app-session-control-modal`'s own consts table (119 =
+`list-group text-dark`, 123 = the list-group item, 124/125 the two inner ones).
+
+**Decision** — *which* events. The reference's server is not in the capture, so what it logs cannot
+be read out of anything held here; this is the position `room_state.closed_message` was in and it
+takes the same answer. This room records the acts it already has a presenter-gated, room-scoped
+command for, which is the `room_state` test — a fact somebody arriving later has to be able to find:
+
+| event | value |
+| --- | --- |
+| Chat mode changed | *Chat is now Webinar Mode.* — the NAME, because `g` says nothing |
+| Session reset | soft and hard told apart in the value |
+| Session opened | — |
+| Close message saved | saved or **cleared**, without copying the text |
+
+That last one is deliberate: an empty message is how a presenter clears it, so the value says which
+of the two happened — and the message itself is up to 2000 characters of presenter-authored text
+that the pane would render inline.
+
+#### Three rules the recording follows
+
+**It is written LAST**, after the act has been persisted and broadcast, so a history row can only
+ever describe something that actually happened — and the contract proves the other direction by
+driving three refused commands and asserting the log stays empty.
+
+**It is not in the caller's transaction.** A history row that could roll back a chat-mode change
+would make the log's own failure a room outage.
+
+**The READ is capped, at 100, newest first.** The reference has no cap — `pt(globals.sessionHistory)`
+renders whatever its server sent. Presenter acts accumulate for the life of a room, and the cap drops
+the oldest because the pane is for "what just happened".
+
+#### Two divergences, both toward telling the presenter the truth
+
+The reference has **no failure path**: `i && i.data && (globals.sessionHistory = i.data)` leaves the
+pane untouched when the call fails, so a Refresh on a broken connection is indistinguishable from a
+Refresh with nothing to show. This one says so.
+
+And `getSessionHistory` is **presenter-gated on the server**. The pane is inside a presenter-only
+modal, and a hidden control has never been an authorization check here — the history names what
+presenters have done to the room and when.
+
+#### One thing kept rather than corrected
+
+The row is an `<a>` with no `href`, which is the capture's own element, and the a11y warning is
+suppressed with the three reasons written beside it: a `<div>` changes the DOM these class strings
+are diffed against for no behavioural gain, an `href` invents a link that goes nowhere, and a
+`<button>` announces an action that does not exist.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors and 0 warnings, 3,643 tests passing (1 skipped), build done. Seventeen of
+those are this feature's and every writer is EXECUTED against a live SQLite database, including the
+room scoping (a presenter acting in room B leaves room A's log empty) and the refusal direction.
+
+**Six negative controls, each run and each seen RED**, on the committed tree and reverted after: the
+cap dropping the NEWEST instead of the oldest (four tests); the read no longer room-scoped (two); the
+query no longer presenter-gated (three); `openSession` no longer recording; the close message's TEXT
+copied into the log; and one of the two buttons losing its handler.
+
+**Not verified:** nothing was opened in a browser. The pane's markup and its no-fetch-on-open rule
+are read from source with their bounds asserted.
+
 ### 2026-08-30 04:18 UTC — The Alert Labels picker: a consumer that shipped without its producer
 
 **Runtime impact: YES.** A room with Alert Labels configured now shows a checkbox per label in the

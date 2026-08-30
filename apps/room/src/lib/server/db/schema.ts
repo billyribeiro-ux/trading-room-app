@@ -1187,6 +1187,49 @@ export const roomState = sqliteTable('room_state', {
 });
 
 /**
+ * `getSessionHistory` — the presenter-visible log of what has happened to this room.
+ *
+ * ## What the reference does, and what is unknowable from it
+ *
+ * `fetchSessionHistory()` at byte 1,145,917 is three lines:
+ *
+ * ```js
+ * const i = yield this.invokeServerCommand("getSessionHistory", {});
+ * i && i.data && (this.globals.sessionHistory = i.data)
+ * ```
+ *
+ * and its renderer (`TDe`, byte 2,146,069) reads exactly three fields per entry: `eventName`,
+ * `created` and `eventValue`. So the SHAPE is evidence and the CONTENT is not — which events its
+ * server records, and what it puts in `eventValue` for each, live in a server that is not in the
+ * capture.
+ *
+ * This is the same position `room_state.closed_message` was in, and it takes the same answer: the
+ * room chooses, and says so. `session-history.ts` names the events it records and why each one is a
+ * session event rather than a message. Recorded as a decision, not a match.
+ *
+ * ## Bounded on the READ, not on the write
+ *
+ * A presenter act is rare — a chat-mode change, a reset, a close — so this table grows slowly and
+ * nothing prunes it. The unbounded read is what would hurt, and `readSessionHistory` caps it; the
+ * index below is `(room, created_at)` so that cap is an index range scan rather than a sort of the
+ * whole table. The question `CLAUDE.md` asks at 10,000 rows, answered before the code was written.
+ */
+export const sessionHistory = sqliteTable(
+  'session_history',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    roomShortCode: text('room_short_code').notNull(),
+    /** The reference's `eventName` — the headline of the row. */
+    eventName: text('event_name').notNull(),
+    /** The reference's `eventValue` — the sentence beneath it. May be empty; never null. */
+    eventValue: text('event_value').notNull(),
+    /** The reference's `created`, rendered through Angular's `date:'medium'`. */
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [index('session_history_room_created_idx').on(table.roomShortCode, table.createdAt)]
+);
+
+/**
  * `savePresenterColors` — one presenter's two message colours, for one room.
  *
  * ## A table rather than a column on `room_state`
@@ -1217,6 +1260,7 @@ export const roomState = sqliteTable('room_state', {
  * are one state: a row exists and both colours are valid, or there is no row. Both columns are
  * therefore `notNull()`, and a half-set entry is unrepresentable rather than merely unhandled.
  */
+
 export const presenterColors = sqliteTable(
   'presenter_colors',
   {

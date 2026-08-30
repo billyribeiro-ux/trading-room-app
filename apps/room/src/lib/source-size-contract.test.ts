@@ -2084,7 +2084,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       6218 -> 6229, 2026-08-30. `alertLabels` taken and handed to `PostAlertModal`. The picker itself
       is in that component; what is here is the prop and why the parse happens on the page.
     */
-    max: 6229,
+    /*
+      6229 -> 6334, 2026-08-30. The Session History pane — `SC-01`, and it was the emptiest kind of
+      empty: `No session history.` rendered unconditionally above a `Load History` button with **no
+      `onclick` at all**. Not a handler that did nothing; no handler.
+
+      Both of upstream's branches now (`EDe` and `DDe`), decoded with `app-session-control-modal`'s
+      own consts table, plus the three pieces of state, the loader, and a failure path the reference
+      does not have — its `i && i.data && (globals.sessionHistory = i.data)` leaves the pane
+      untouched when the call fails, so a Refresh on a broken connection looks like a Refresh with
+      nothing to show.
+
+      Roughly forty of these lines are prose, and two paragraphs of it are load-bearing: why the
+      `<a>` keeps no `href` (all three alternatives are worse, and the element is inert upstream
+      too), and why nothing fetches on open (the `Load History` button only makes sense if the pane
+      starts empty).
+
+      If this climbs again the session-control modal is still the extraction — it is now seven panes
+      in one file, and this one owns three `$state` locals and a function that nothing else reads.
+    */
+    max: 6334,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
