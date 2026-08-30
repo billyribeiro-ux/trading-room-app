@@ -39,12 +39,29 @@
     chatGif = false,
     /** `id_<messageId>` on a trade span and `gif_<messageId>` on a placeholder are both the msg's. */
     messageId,
+    /**
+     * RM-16 — true when this body is rendered in the EXTRA chat column.
+     *
+     * `urlwrapImg`'s fourth argument, and its only effect is the placeholder's id:
+     *
+     * ```js
+     * const c = s ? `gifExtra_${o}` : `gif_${o}`     // bundle byte 1,326,195
+     * ```
+     *
+     * The id is derived from the MESSAGE, so with the extra column on, the same message rendered in
+     * both panes produced TWO elements with the same DOM id — which is invalid, and which
+     * `document.getElementById` resolves to whichever came first. Nothing here resolves anything
+     * through the id (the reveal is keyed by URL, see above), so the duplicate was inert; it is
+     * still a duplicate, and the reference already carries the fix.
+     */
+    extraChatMsg = false,
     onaction
   }: {
     segments: BodySegment[];
     stockStyle?: string;
     chatGif?: boolean;
     messageId: number;
+    extraChatMsg?: boolean;
     onaction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
   } = $props();
 
@@ -138,7 +155,7 @@
     >{:else if segment.kind === 'image' && segment.url}{#if isMutedGif(segment.url)}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="chat-gif-muted"
-        id="gif_{messageId}"
+        id={extraChatMsg ? `gifExtra_${messageId}` : `gif_${messageId}`}
         onclick={() =>
           (revealedGifs = { ...revealedGifs, [segment.url!]: !revealedGifs[segment.url!] })}
       >

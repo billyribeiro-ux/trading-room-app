@@ -633,7 +633,7 @@
   {onDisplayModeChange}
   onQaAction={(action, item, payload) =>
     messageActions.handle('alert', action, item, payload, false, 'qa')}
-  onMentionUser={(name) => messageActions.mention(name)}
+  onMentionUser={(name) => messageActions.mentionFromUserModal(name)}
   onPrivateChat={(user) => {
     userActions.selectedMessageUser = user;
     privateChat.show();

@@ -1379,7 +1379,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Its five props are a list, a colour, a preference, an id and a callback; a sixth that is an
       entitlement is the signal that the wrong thing crossed.
     */
-    max: 157,
+    /*
+      157 -> 174, 2026-08-30, in the same day: RM-16, and all of it is the citation.
+
+      `urlwrapImg`'s fourth argument switches the gif placeholder's id to `gifExtra_<id>`
+      (byte 1,326,195), because with the extra chat column on, the same message rendered in both
+      panes produced two elements carrying one DOM id. Nothing here resolves anything through that
+      id — the reveal is keyed by URL — so the duplicate was inert, and it was still a duplicate.
+    */
+    max: 174,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
@@ -3011,7 +3019,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       matching the reference would mean reproducing a defect, and the next person comparing the two
       needs to find the reason rather than assume the line was missed.
     */
-    max: 656,
+    /*
+      656 -> 706, 2026-08-30. RM-20 — `doUserInfoExtra`, and fifty lines of which forty-two are why.
+
+      `doUserInfo` emits a SECOND event whose only subscriber is the user modal, which stores it so
+      that its own @Mention button can route to the extra column the same three-term way the
+      message's kebab does. Both halves of that chain are quoted at the code, because the emit is at
+      byte 1,352,030 and the subscriber is seven hundred kilobytes away at 2,074,524 — a reader who
+      finds one and not the other will conclude the event goes nowhere, which is what a `grep` for
+      `doUserInfoExtra` in our own source did conclude.
+
+      The divergence is recorded there too: upstream emits ONLY when the extra column is involved, so
+      a card opened from the main log with main focus emits nothing and the modal keeps the last
+      extra-column answer. This records it on every open, which agrees in every case except that one.
+    */
+    max: 706,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -4260,7 +4282,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       prop, one import, one lookup at the call site. This column renders the same rows, so a map
       handed to one and not the other would paint the same message two ways in one room.
     */
-    max: 596,
+    /*
+      596 -> 597, 2026-08-30. One line: `extraChatMsg={true}` on the row this column renders, which
+      is RM-16's other half. `urlwrapImg` takes it as its fourth argument and the gif placeholder's
+      id becomes `gifExtra_<id>` — this pane is the only place in the room that can supply it.
+    */
+    max: 597,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -4574,7 +4601,40 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Nothing large is left to extract here. What remains is one message's props, its gates, its two
       hosts and their two class lists — which is what this component IS.
     */
-    max: 1124,
+    /*
+      1,124 -> 1,260, 2026-08-30, and this is a RAISE against a number set four hours earlier in the
+      same day's work. It is recorded as one rather than worked around.
+
+      **The day's net is still DOWN: this entry opened today at 1,270.** Fourteen audit rows closed
+      between those two numbers, three modules and a component came out, and the file is eleven lines
+      smaller than it started. That is the number that matters for a ratchet, and it is why this is a
+      raise rather than a failure of the rule.
+
+      WHAT THE 135 LINES ARE. RM-16, RM-20 and RM-22 — and RM-22 is four separate class-list findings
+      on the card (the badges wrapper, `justify-content-end` on the admin body row, the reply block's
+      whole shape, and two reaction containers that are different ELEMENTS with different classes).
+      Every one of them is a difference nothing on screen announces, so the transcription of the
+      const table that proves it is the deliverable, not decoration. Roughly 120 of the 135 lines are
+      those four citations.
+
+      ONE DUPLICATION WENT WHILE THEY LANDED: the Ask-a-question button was written out twice,
+      character for character, exactly as the reference has it twice (compact const 69, card const
+      70, the same eleven-entry array). It is a parameterless `{#snippet}` now — parameterless
+      because every value it reads is this component's, which is the test of whether a snippet is the
+      right tool rather than a component.
+
+      **THE NEXT SEAM, and the condition that makes it right.** It is the one this entry has argued
+      AGAINST twice: `CardMessage.svelte` and `CompactMessage.svelte`, which is the split the
+      reference itself draws (`app-st-message` and `app-st-compactmessage` are two components with
+      two stylesheets). The objection has always been the two dozen values the branches read off this
+      file. That objection is now most of the way to answered: `resolveMessageStyles` returns the
+      five styles as one object, `messageMenuAllows` returns the twelve gates as one, and
+      `room-message-chrome.ts` already carries the sixteen that come IN. When the remaining loose
+      derivations — `reverseMessage`, the two segment lists, `visibleBadges`, the two formatters'
+      call sites — are folded into one resolved view type, the split costs three props and stops
+      being a trade. **Do that before this number is raised again.**
+    */
+    max: 1260,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

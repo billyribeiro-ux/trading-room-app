@@ -125,6 +125,15 @@
      * to a question the surface has already asked.
      */
     displayMode?: ChatDisplayMode;
+    /**
+     * RM-16 — `extraChatMsg`, true for every row the EXTRA chat column renders.
+     *
+     * Upstream it is read in two places and this component is one of them: it switches the gif
+     * placeholder's id to `gifExtra_<id>` so the same message in both panes does not produce two
+     * elements with one DOM id. The OTHER place is the mention router, which is
+     * `MessageActions.handle`'s `fromExtraColumn` here and already wired.
+     */
+    extraChatMsg?: boolean;
     ontoggle: (id: number) => void;
     onaction: (
       action: MessageAction,
@@ -172,6 +181,7 @@
     copyTrades = false,
     disableStarYears = false,
     displayMode = 'r',
+    extraChatMsg = false,
     ontoggle,
     onaction
   }: Props = $props();
@@ -424,6 +434,112 @@
 
 
 <!--
+  The Ask-a-question button, which BOTH hosts render and which was written out twice.
+
+  The two blocks were character-for-character identical and the reference's two are too — compact
+  const 69 and card const 70 are the same eleven-entry array:
+
+  ```
+  ["title","Ask a question",1,"btn","btn-sm","btn-secondary","me-1","alert-qa",3,"click","ngClass","ngStyle"]
+  ```
+
+  Only the source ORDER differs, and that difference is upstream's: the compact alerts row (`r_e`,
+  1,377,512) puts the stamp before the button and the card puts the button before the stamp. A
+  snippet keeps the order at the call sites, where it belongs, and the button in one place.
+
+  Every value it reads is this component's, so it takes no parameters — which is the test of whether
+  a snippet is the right tool rather than a component: nothing here would cross a props boundary.
+-->
+{#snippet alertQaButton()}
+  {#if !isQaMessage && hasQaOnAlerts}
+    <button
+      title="Ask a question"
+      class={[
+        'btn btn-sm btn-secondary me-1 alert-qa',
+        {
+          'btn-danger': Boolean(item.unreadQa),
+          animated: Boolean(item.unreadQa),
+          flash: Boolean(item.unreadQa)
+        }
+      ]}
+      style={bodyStyle}
+      onclick={() => runAction('question')}
+    >
+      <!--
+        The captured button keeps a literal space inside each span - `> (1) <` and `> ✅<` - and that
+        space is what separates the checkmark from the icon. Svelte trims whitespace at element
+        boundaries, so it has to be written as an expression to survive into the rendered output.
+      -->
+      {#if item.questionCount}
+        <span class="me-1">{' '}({item.questionCount}){' '}</span>
+      {/if}
+      <i class="fas fa-question-circle"></i>
+      {#if item.questionAnswered}<span>{' '}✅</span>{/if}
+    </button>
+  {/if}
+{/snippet}
+
+<!--
+  The reactions strip — the pills and the add pill — as ONE implementation with two call sites.
+
+  RM-22: the card's two containers are a `span.ms-1` (admin, const 29) and a bare `div` (member,
+  const 6), which is a difference in the WRAPPER and not in what it wraps. A snippet is how that
+  stays one list; the compact host has its own container for the same reason and renders the same
+  contents inline, because its two containers differ from each other in nothing but a class.
+-->
+{#snippet reactionStrip()}
+              {#each reactions as [reactionKey, reaction] (reactionKey)}
+                {#if reaction.clickedBy.length > 0}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <span
+                    class={['badge chat-reaction', { 'chat-reaction-added': reaction.clickedBy.includes(currentUserEmailHash) }]}
+                    onclick={() =>
+                      runAction('reaction', {
+                        key: reactionKey,
+                        emoji: reaction.emoji
+                      })}
+                  >
+                    {reaction.emoji}
+                    {reaction.clickedBy.length}
+                  </span>
+                {/if}
+              {/each}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <!--
+                RM-13 — `chat-reaction-hover` was OURS on this pill, and it made the control
+                unreachable on a touch device.
+
+                The class is REAL and captured — `.msg-box:hover .chat-reaction-hover{display:
+                inline-block}` with `.chat-reaction-hover{display:none}` at byte 1,366,420 — but
+                **no reference template applies it**. A rule with no wearer upstream is a rule
+                upstream does not use, and reading one as an instruction is how a stylesheet
+                becomes a spec.
+
+                What it cost: the pill sat at `display: none` until the enclosing `.msg-box` was
+                hovered. There is no hover on a phone, so adding a reaction was impossible there —
+                the reference's pill is always visible, which is why it needs no such rule.
+
+                The captured rule STAYS in `captured-runtime-components.css`. That file is
+                evidence, not our stylesheet, and deleting a captured rule because we stopped
+                wearing it would edit the record.
+              -->
+              <span
+                class="badge chat-reaction"
+                aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
+                  ? `message-reaction-popover-${kind}-${item.id}`
+                  : undefined}
+                onclick={() => {
+                  reactionPickerOpen = !reactionPickerOpen;
+                  reactionPickerTrigger = reactionPickerOpen ? 'pill' : null;
+                }}
+              >
+                <i class="far fa-smile"></i>
+              </span>
+{/snippet}
+
+<!--
   ONE separator, rendered by whichever host is on screen.
 
   The reference has it in BOTH components — each `styles:[…]` block carries its own `.separator`
@@ -571,27 +687,7 @@
               <span class="created-at mr-2" style={dateStyle}
                 >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
               >
-              {#if !isQaMessage && hasQaOnAlerts}
-                <button
-                  title="Ask a question"
-                  class={[
-                    'btn btn-sm btn-secondary me-1 alert-qa',
-                    {
-                      'btn-danger': Boolean(item.unreadQa),
-                      animated: Boolean(item.unreadQa),
-                      flash: Boolean(item.unreadQa)
-                    }
-                  ]}
-                  style={bodyStyle}
-                  onclick={() => runAction('question')}
-                >
-                  {#if item.questionCount}
-                    <span class="me-1">{' '}({item.questionCount}){' '}</span>
-                  {/if}
-                  <i class="fas fa-question-circle"></i>
-                  {#if item.questionAnswered}<span>{' '}✅</span>{/if}
-                </button>
-              {/if}
+              {@render alertQaButton()}
             </span>
           {:else}
             <!--
@@ -743,10 +839,10 @@
                     {item.replyToName}
                   </strong>
                   <div class={bodyColorClasses.trim() || undefined} style={bodyStyle}>
-                    <MessageBody segments={replyStockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
+                    <MessageBody segments={replyStockSegments} {stockStyle} {chatGif} messageId={item.id} {extraChatMsg} onaction={runAction} />
                   </div>
                 </div>
-                <div><MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} /></div>
+                <div><MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} {extraChatMsg} onaction={runAction} /></div>
               </div>
             {:else}
               <div
@@ -759,7 +855,7 @@
                     : '')}
                 style={bodyStyle}
               >
-                <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
+                <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} {extraChatMsg} onaction={runAction} />
               </div>
             {/if}
           </div>
@@ -769,8 +865,14 @@
               to compact const 26 `[1,"reactions-container",3,"ngClass","ngStyle"]`; the member
               container is const 65 and has ngStyle alone. Without it a presenter's compact
               reactions stayed left while every other part of their row moved right.
+
+              A `<div>`, because both compact containers are: `$1e` opens `d(0,"div",26)` and `__e`
+              (1,380,430) opens `d(0,"div",65)`. It was a `<span>` here, and the two are not
+              interchangeable — an inline box does not take the `margin-left: 20px` the captured
+              `.reactions-container` rule gives it the way a block one does, and the reactions strip
+              is a row of its own beneath the message rather than a continuation of it.
             -->
-            <span
+            <div
               class={[
                 'reactions-container',
                 { 'presenter-reactions-right': reverseMessage && presenterMessagesOnTheRight }
@@ -823,7 +925,7 @@
                   <i class="far fa-smile"></i>
                 </span>
               {/if}
-            </span>
+            </div>
           {/if}
         </div>
       </div>
@@ -890,17 +992,44 @@
                 >
                   {item.senderName}
                 </strong>
-                {#each visibleBadges as badge, badgeIndex (`${item.id}-${badgeIndex}`)}
-                  {#if badge.imageUrl}
-                    <img class="user-badge-img" src={badge.imageUrl} alt={badge.imageUrl} />
-                  {:else}
-                    <span
-                      class="badge px-1 mx-1 user-badge"
-                      style="background-color: {badge.backgroundColor}; color: {badge.color};"
-                      >{badge.text}</span
-                    >
-                  {/if}
-                {/each}
+                <!--
+                  RM-22 — THE BADGES HAVE A WRAPPER, and it is the wrapper that bounds them.
+
+                  `H(33, Mge, 2, 5, "div", 25)` on the admin card and its member twin on const 60:
+
+                  ```
+                  25  [1,"d-inline-block","flex-shrink-1",2,"overflow","hidden",3,"innerHTML","ngStyle"]
+                  60  [1,"d-inline-block","flex-shrink-1",2,"overflow","hidden",3,"innerHTML"]
+                  ```
+
+                  We rendered the badges as direct siblings of the username inside a `flex-nowrap`
+                  row, so a member with several badges pushed the timestamp and the kebab out of the
+                  row instead of having their badges clipped. `flex-shrink-1` plus
+                  `overflow: hidden` is what makes the badge strip the part that gives.
+
+                  The two consts differ only by `ngStyle`, which is `styleF` on the admin (`Mge`
+                  binds `("innerHTML", …)("ngStyle", e.styleF)`) and absent on the member — so the
+                  style is gated on the layout, exactly as the const table has it. The CONTENT is
+                  still real elements rather than the reference's `innerHTML` of a prebuilt string;
+                  that divergence is older than this row and is the safer half.
+                -->
+                <div
+                  class="d-inline-block flex-shrink-1"
+                  style:overflow="hidden"
+                  style={reverseMessage ? bodyStyle : undefined}
+                >
+                  {#each visibleBadges as badge, badgeIndex (`${item.id}-${badgeIndex}`)}
+                    {#if badge.imageUrl}
+                      <img class="user-badge-img" src={badge.imageUrl} alt={badge.imageUrl} />
+                    {:else}
+                      <span
+                        class="badge px-1 mx-1 user-badge"
+                        style="background-color: {badge.backgroundColor}; color: {badge.color};"
+                        >{badge.text}</span
+                      >
+                    {/if}
+                  {/each}
+                </div>
                 {#if viewerIsPresenter && item.isTrial}
                   <span class="badge bg-danger trial-badge"> Trial </span>
                 {/if}
@@ -919,26 +1048,7 @@
               </div>
               {#if kind === 'alert'}
                 <div>
-                  {#if !isQaMessage && hasQaOnAlerts}
-                    <button
-                      title="Ask a question"
-                      class={['btn btn-sm btn-secondary me-1 alert-qa', { 'btn-danger': Boolean(item.unreadQa), animated: Boolean(item.unreadQa), flash: Boolean(item.unreadQa) }]}
-                      style={bodyStyle}
-                      onclick={() => runAction('question')}
-                    >
-                      <!--
-                        The captured button keeps a literal space inside each span - `> (1) <` and
-                        `> ✅<` - and that space is what separates the checkmark from the icon.
-                        Svelte trims whitespace at element boundaries, so it has to be written as an
-                        expression to survive into the rendered output.
-                      -->
-                      {#if item.questionCount}
-                        <span class="me-1">{' '}({item.questionCount}){' '}</span>
-                      {/if}
-                      <i class="fas fa-question-circle"></i>
-                      {#if item.questionAnswered}<span>{' '}✅</span>{/if}
-                    </button>
-                  {/if}
+                  {@render alertQaButton()}
                   <span class="created-at mr-2" style={dateStyle}
                     >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
                   >
@@ -953,24 +1063,72 @@
                 </span>
               {/if}
             </div>
-            <div class="d-flex">
+            <!--
+              RM-22 — `justify-content-end` on the ADMIN body row, `dge` at byte 1,335,936.
+
+              Card const 26 is `[1,"d-flex",3,"ngClass"]` and const 65 — the member's node 36 — is a
+              plain `[1,"d-flex"]`, so the binding exists on one layout only. Without it a
+              presenter's card body stayed left-packed while the rest of their row moved right.
+            -->
+            <div
+              class={[
+                'd-flex',
+                { 'justify-content-end': reverseMessage && presenterMessagesOnTheRight }
+              ]}
+            >
               {#if item.answered && kind !== 'alert'}
                 <div>✅</div>
               {/if}
               {#if item.replyToName && item.replyToBody}
-                <div class="ms-1 private-reply">
+                <!--
+                  RM-22 — THE CARD'S REPLY BLOCK IS THE SAME SHAPE AS THE COMPACT ONE, and ours was
+                  the same wrong shape. `Rge` at byte 1,331,967 (admin) and `c1e` at 1,340,691
+                  (member):
+
+                  ```js
+                  d(0,"div",46)(1,"div",47)(2,"strong",48), v(3), u(),  //  div46 > div47 > strong48
+                  T(4,"div",49), u(),                                    //    div49 </div47>
+                  T(7,"div",50), u()                                     //    div50 </div46>
+                  ```
+
+                  ```
+                  46  msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100  + ngClass hge + ngStyle
+                  73  the same list, ngStyle only                              (member, `c1e`)
+                  47  private-reply-message w-100                              + the theme background
+                  48  d-block username                                         + ngStyle
+                  49  the QUOTED body - the only node here carrying the colours
+                  50  the sender's OWN line, no class and no style at all
+                  ```
+
+                  Ours wore `ms-1 private-reply` - card const **27**, which is the answered TICK's -
+                  put the sender's own line INSIDE `private-reply-message`, and gave both bodies
+                  `messageBodyClass`, which lacks the `pe-3 w-100` that makes the block fill the row.
+
+                  The STYLES are not all the body's, and the binding order says which is which: div46
+                  and strong48 both take `invertTxtColorToggler(invertTxtColor, "name")` - the name
+                  inversion, which is `usernameStyle` - while only div49 takes `styleF`. div50 takes
+                  neither and inherits. `hge` is `presenter-msg-right` and, like everything else in
+                  this family, is bound on the admin layout alone.
+                -->
+                <div
+                  class={[
+                    'msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100',
+                    { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }
+                  ]}
+                  style={usernameStyle}
+                >
                   <div
                     class={['private-reply-message w-100', { 'private-reply-bg-light': theme === 'light', 'private-reply-bg-dark': theme === 'dark' }]}
                   >
                     <strong class="d-block username" style={usernameStyle}>
                       {item.replyToName}
                     </strong>
-                    <div class={messageBodyClass} style={bodyStyle}>
-                      <MessageBody segments={replyStockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
+                    <div class={bodyColorClasses.trim() || undefined} style={bodyStyle}>
+                      <MessageBody segments={replyStockSegments} {stockStyle} {chatGif} messageId={item.id} {extraChatMsg} onaction={runAction} />
                     </div>
-                    <div class={messageBodyClass} style={bodyStyle}>
-                      <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
-                    </div>
+                  </div>
+                  <div>
+                    <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} {extraChatMsg} onaction={runAction} />
                   </div>
                 </div>
               {:else}
@@ -1023,7 +1181,7 @@
                     -->
                     <span {@attach safeChatHtml(item.bodyHtml)}></span>
                   {:else}
-                    <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} onaction={runAction} />
+                    <MessageBody segments={stockSegments} {stockStyle} {chatGif} messageId={item.id} {extraChatMsg} onaction={runAction} />
                     {#if kind === 'alert' && item.targetUrl}
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1048,57 +1206,35 @@
               {/if}
             </div>
             {#if menuAllows.reaction && reactions.length > 0}
-              <span class={{ 'presenter-reactions-right': presenterMessagesOnTheRight }} style={bodyStyle}>
-                {#each reactions as [reactionKey, reaction] (reactionKey)}
-                  {#if reaction.clickedBy.length > 0}
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span
-                      class={['badge chat-reaction', { 'chat-reaction-added': reaction.clickedBy.includes(currentUserEmailHash) }]}
-                      onclick={() =>
-                        runAction('reaction', {
-                          key: reactionKey,
-                          emoji: reaction.emoji
-                        })}
-                    >
-                      {reaction.emoji}
-                      {reaction.clickedBy.length}
-                    </span>
-                  {/if}
-                {/each}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <!--
-                  RM-13 — `chat-reaction-hover` was OURS on this pill, and it made the control
-                  unreachable on a touch device.
+              <!--
+                RM-22 — THE CARD'S TWO REACTION CONTAINERS ARE DIFFERENT ELEMENTS WITH DIFFERENT
+                CLASSES, and ours was one element with neither.
 
-                  The class is REAL and captured — `.msg-box:hover .chat-reaction-hover{display:
-                  inline-block}` with `.chat-reaction-hover{display:none}` at byte 1,366,420 — but
-                  **no reference template applies it**. A rule with no wearer upstream is a rule
-                  upstream does not use, and reading one as an instruction is how a stylesheet
-                  becomes a spec.
+                ```js
+                function Lge(t,n){ … d(0,"span",29) … z("ngClass", ct(6, pge, presenterMsgsOnTheRight))("ngStyle", e.styleF) … }   // admin,  1,333,606
+                function p1e(t,n){ … d(0,"div",6)   … z("ngStyle", e.styleF) … }                                                    // member, 1,342,254
+                ```
 
-                  What it cost: the pill sat at `display: none` until the enclosing `.msg-box` was
-                  hovered. There is no hover on a phone, so adding a reaction was impossible there —
-                  the reference's pill is always visible, which is why it needs no such rule.
-
-                  The captured rule STAYS in `captured-runtime-components.css`. That file is
-                  evidence, not our stylesheet, and deleting a captured rule because we stopped
-                  wearing it would edit the record.
-                -->
+                Card const 29 is `[1,"ms-1",3,"ngClass","ngStyle"]` and const 6 is `[3,"ngStyle"]`.
+                So the admin strip is an inline `span` with a `ms-1` gap and the right-align binding;
+                the member's is a `div` with no class at all. Ours emitted a `span` with neither base
+                class and applied `presenter-reactions-right` on BOTH layouts — so a member's card
+                right-aligned its reactions whenever the room had the setting on, which is a thing
+                the reference has no node for.
+              -->
+              {#if reverseMessage}
                 <span
-                  class="badge chat-reaction"
-                  aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
-                    ? `message-reaction-popover-${kind}-${item.id}`
-                    : undefined}
-                  onclick={() => {
-                    reactionPickerOpen = !reactionPickerOpen;
-                    reactionPickerTrigger = reactionPickerOpen ? 'pill' : null;
-                  }}
+                  class={[
+                    'ms-1',
+                    { 'presenter-reactions-right': presenterMessagesOnTheRight }
+                  ]}
+                  style={bodyStyle}
                 >
-                  <i class="far fa-smile"></i>
+                  {@render reactionStrip()}
                 </span>
-              </span>
+              {:else}
+                <div style={bodyStyle}>{@render reactionStrip()}</div>
+              {/if}
             {/if}
           </div>
         </div>

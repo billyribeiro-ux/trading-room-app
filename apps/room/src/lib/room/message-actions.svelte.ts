@@ -96,6 +96,15 @@ export class RoomMessageActions {
   readonly #focusComposer: () => void;
   readonly #onChanged: () => Promise<void>;
 
+  /**
+   * Whether the user modal currently on screen was opened from the EXTRA chat column.
+   *
+   * Upstream this lives ON the modal component, set by the `doUserInfoExtra` subscriber. It is here
+   * because the modal in this room is a rendering of state the room owns, and a component field
+   * that survives the modal closing is the shape that goes stale. See {@link mentionFromUserModal}.
+   */
+  #userInfoFromExtraColumn = false;
+
   #selectedMessage: MessageActionItem | null;
 
   constructor(options: {
@@ -326,6 +335,45 @@ export class RoomMessageActions {
   }
 
   /**
+   * ── RM-20 — THE USER MODAL'S @Mention BUTTON REMEMBERS WHICH COLUMN OPENED IT ─────────────────
+   *
+   * `doUserInfo` on a message emits a SECOND event beside `doUserInfo` (byte 1,352,030):
+   *
+   * ```js
+   * doUserInfo(e, i) {
+   *   this.appService.getUserInfo(e, i), this.appService.guiEventBus.emit("doUserInfo", e),
+   *   this.appService.globals.preferences.extraChatColumn &&
+   *     (this.extraChatMsg || "textAreaTxtExtra" === this.appService.globals.chatInputFocus) &&
+   *     this.appService.guiEventBus.emit("doUserInfoExtra", this.extraChatMsg)
+   * }
+   * ```
+   *
+   * and the ONLY subscriber is the user modal, which stores it (byte 2,074,524):
+   *
+   * ```js
+   * this.appService.guiEventBus.subscribe("doUserInfoExtra", e => { this.extraChatMsg = e })
+   * ```
+   *
+   * so that its own `doMention` (byte 2,077,087) can route the same three-term way the message's
+   * kebab does. Without it, opening a member's card from the extra column and pressing @Mention
+   * inserts into the composer you are not looking at.
+   *
+   * ## ONE DIVERGENCE, and it removes a staleness rather than adding one
+   *
+   * Upstream only EMITS when `extraChatColumn && (extraChatMsg || focus === 'textAreaTxtExtra')`, so
+   * opening a card from the main log while the main composer has focus emits nothing and the modal
+   * keeps whatever the last extra-column open left behind. The flag is then true for a card that was
+   * not opened from that column. This records it on every open, which gives the same answer in every
+   * case except that one — and in that one it gives the right answer instead of the last one.
+   *
+   * `mentionTargetIsExtra` is still what decides, so the `focus === EXTRA_COMPOSER` half is not
+   * duplicated here; this supplies only the half the modal cannot know.
+   */
+  mentionFromUserModal(name: string) {
+    this.mention(name, this.#chat.mentionTargetIsExtra(this.#userInfoFromExtraColumn));
+  }
+
+  /**
    * @param surface Which list the row was clicked in.
    *
    * `'log'` is the alerts or chat column; `'qa'` is `AlertQaModal`'s thread, where the row
@@ -376,7 +424,11 @@ export class RoomMessageActions {
         : {})
     });
 
-    if (action === 'user') this.#openModal('user');
+    if (action === 'user') {
+      /* RM-20 — `doUserInfoExtra`, recorded for the modal's own @Mention button. */
+      this.#userInfoFromExtraColumn = fromExtraColumn;
+      this.#openModal('user');
+    }
     if (action === 'mention') {
       this.mention(item.senderName, this.#chat.mentionTargetIsExtra(fromExtraColumn));
     }

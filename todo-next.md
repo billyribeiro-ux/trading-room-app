@@ -78,7 +78,7 @@ guessed.
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
 | 3 | `routes/+page.svelte` | 1,504 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
-| 5 | `lib/components/RoomMessage.svelte` | 1,123 | no |
+| 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 988 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 915 | no |
@@ -89,7 +89,7 @@ guessed.
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/PostAlertModal.svelte` | 608 | no |
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 595 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 596 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
 | 18 | `lib/components/FilesPane.svelte` | 556 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
@@ -113,7 +113,7 @@ guessed.
 | 37 | `lib/components/GiphyPicker.svelte` | 215 | no |
 | 38 | `lib/components/RichTextEditor.svelte` | 191 | no |
 | 39 | `lib/components/Modal.svelte` | 157 | no |
-| 40 | `lib/components/MessageBody.svelte` | 156 | no |
+| 40 | `lib/components/MessageBody.svelte` | 173 | no |
 | 41 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
 | 42 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
 | 43 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -133,7 +133,7 @@ guessed.
 | 57 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 58 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 67 surfaces audited · 1,072 of 31,618 lines · 3.4%.**
+**2 of 67 surfaces audited · 1,072 of 31,772 lines · 3.4%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

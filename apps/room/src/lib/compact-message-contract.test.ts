@@ -152,10 +152,20 @@ describe('RM-02 — the compact ALERTS row', () => {
   });
 
   it('offers the Ask-a-question button, with the unread marker', () => {
-    expect(COMPACT).toContain('{#if !isQaMessage && hasQaOnAlerts}');
-    expect(COMPACT).toContain("'btn btn-sm btn-secondary me-1 alert-qa'");
-    expect(COMPACT).toContain("'btn-danger': Boolean(item.unreadQa)");
-    expect(COMPACT).toContain("runAction('question')");
+    /*
+      ONE SNIPPET since 2026-08-30, rendered by both hosts. The two blocks were character-for-
+      character identical, and so are the reference's two consts (compact 69, card 70). So the
+      compact branch is asserted to CALL it and the button itself is asserted once, on the file —
+      which is what stops this from passing while the compact host renders nothing.
+    */
+    expect(COMPACT).toContain('{@render alertQaButton()}');
+    expect(MESSAGE).toContain('{#snippet alertQaButton()}');
+    expect(MESSAGE).toContain('{#if !isQaMessage && hasQaOnAlerts}');
+    expect(MESSAGE).toContain("'btn btn-sm btn-secondary me-1 alert-qa'");
+    expect(MESSAGE).toContain("'btn-danger': Boolean(item.unreadQa)");
+    expect(MESSAGE).toContain("runAction('question')");
+    /* And exactly one of it, which is the whole point of the extraction. */
+    expect(MESSAGE.match(/alert-qa/g)).toHaveLength(1);
   });
 
   it('and the button has a rule to be styled by', () => {

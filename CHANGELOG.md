@@ -33,6 +33,98 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 11:56 UTC — The last three `RoomMessage` rows: the extra column's gif id, the user modal's @Mention, and four card class lists
+
+**Runtime impact: YES.** A member with several badges no longer pushes the timestamp and the kebab
+out of the message row — the badges clip, which is what the reference's wrapper is for. A presenter's
+card body packs to the end when `presenterMsgsOnTheRight` is on, and a MEMBER's card stops
+right-aligning its reactions, which it did for a node the reference does not have. A quoted reply on
+the card has the shape it is supposed to have, with the sender's own words outside the quoted box
+instead of on its background. Opening a member's card from the extra chat column and pressing
+@Mention now writes into the composer you are looking at. And with the extra column on, the same
+message in both panes no longer produces two elements carrying one DOM id.
+
+**Rows closed: RM-16, RM-20, RM-22 — `RoomMessage.svelte`'s surface is now complete at 22 of 22.**
+
+#### RM-20 — a chain of three sites, seven hundred kilobytes apart
+
+`grep -rn doUserInfoExtra src` returned zero here and the audit row read that as "the emit is not
+routed". It is worse than that and better: the emit is at 1,352,313, its ONLY subscriber is at
+2,074,524 — on the USER MODAL, which just stores the flag — and the thing that reads it is that
+modal's own `doMention` at 2,077,087. Find any one of those and the feature looks pointless. All
+three together are a real one: open a member's card from the extra column, press @Mention, and the
+mention lands where you are typing.
+
+**One divergence, and it removes a staleness rather than adding one.** Upstream emits only when the
+extra column is involved, so a card opened from the main log with the main composer focused emits
+nothing and the modal keeps whatever the last extra-column open left behind. Ours records it on every
+open — the same answer in every case except that one, where it gives the right answer instead of the
+last one.
+
+#### RM-22 — four findings, and every one needed a member control
+
+The card consts were decoded rather than looked up, and the pattern that fell out is the same one
+RM-11 showed on the compact host: **the reference binds these on ONE layout.**
+
+* the badges wrapper — const 25 (admin, with `ngStyle`) / const 60 (member, without),
+  `d-inline-block flex-shrink-1` + `overflow: hidden`;
+* `justify-content-end` on the admin body row (const 26, `dge`) against the member's plain const 65;
+* the reply block — `div46 > [ div47 > [strong48, div49], div50 ]`, where ours wore card const **27**,
+  which is the answered TICK's, and put the sender's own line inside the quoted box;
+* the two reaction containers, which are different ELEMENTS: a `span.ms-1` with the right-align
+  binding (const 29) and a bare `div` (const 6). Ours was one `span` with neither base class,
+  right-aligning on both layouts.
+
+So the fourth one was actively wrong for members, not merely missing for presenters. Each assertion
+in `card-class-lists-contract.test.ts` has its member control for exactly that reason.
+
+#### The size ratchet was raised, and the raise is recorded as one
+
+`RoomMessage.svelte` went **1,124 → 1,260** — a raise against a ceiling set four hours earlier in the
+same day's work. **The day's net is still down: it opened at 1,270**, fourteen audit rows closed
+between those numbers, and three modules plus a component came out. About 120 of the 135 lines are
+the const-table citations for four findings that nothing on screen announces; the transcription is
+the deliverable there, not decoration.
+
+One duplication went while they landed: the Ask-a-question button was written out twice, character
+for character, exactly as the reference has it twice (compact const 69, card const 70, the same
+eleven-entry array). It is a parameterless `{#snippet}` now — parameterless because every value it
+reads is this component's, which is the test of whether a snippet is the right tool rather than a
+component.
+
+**The next seam is named with the condition that makes it right.** It is the one the size entry has
+argued against twice: `CardMessage.svelte` and `CompactMessage.svelte`, the split the reference
+itself draws. The objection was always the two dozen values the branches read off this file, and that
+objection is now most of the way answered — `resolveMessageStyles` returns the five styles as one
+object, `messageMenuAllows` the twelve gates as one, and `room-message-chrome.ts` already carries the
+sixteen coming in. Fold the remaining loose derivations into one resolved view type and the split
+costs three props. That is to be done **before this ceiling is raised again**.
+
+#### What was run, and one thing observed rather than fixed
+
+`pnpm run gate` in `apps/room`, green, exit code echoed into the log and read from there. 238 test
+files, 3,932 passed, 1 skipped. **Six negative controls, and one of them found the TEST**: the
+assertion that the sender's own line sits outside the quoted reply box sliced from the box's class to
+the quoted text and checked the slice did not contain the sender's words — which it never can, in
+either arrangement, because the own line comes after the quoted one in document order. It could not
+fail. It measures nesting depth now, and the same mutation turns it red. That is the third time in
+this repository a control has found the test rather than the code, and the reason every one of them
+is run.
+
+**An intermittent worth recording:** twice during this work a full parallel run reported a failure in
+a DIFFERENT database-backed file each time (`remote-command-harness.test.ts`, then
+`trade-alerts-mirror-delete.test.ts`), and each passed in isolation and on the next full run — three
+consecutive clean full runs after the second. The mechanism is available in `vitest.setup.ts`: the
+SQLite file is keyed by process id, not per test file, because `isolate: false` means several files
+share one worker and one already-imported db module, so two files in the same worker share a
+database with no per-file reset. That is a plausible cause and it is **not** a diagnosis — it was not
+reproduced deliberately, and nothing here was changed for it. Recorded so the next person who sees a
+lone red database file has somewhere to start rather than a shrug.
+
+**The Svelte MCP server is still disconnected for this session**, so `svelte-autofixer` could not be
+run on the four `.svelte` files touched here. `svelte-check` is green at 1,438 files and
+`eslint-plugin-svelte` is clean; neither is that gate.
+
 ### 2026-08-30 11:22 UTC — Seven more `RoomMessage` rows, and the three extractions the ratchet finally forced
 
 **Runtime impact: YES.** A `$TICKER` glued to a non-space character is plain text again, as it is

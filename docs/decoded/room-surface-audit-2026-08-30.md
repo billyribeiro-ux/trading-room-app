@@ -603,6 +603,8 @@ z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ng
 
 ### RM-16 — gif placeholder id ignores the extra-chat-column variant
 
+**BUILT 2026-08-30 11:56 UTC.** `extraChatMsg` is `urlwrapImg`'s fourth argument and its only effect is the id — `const c = s ? \`gifExtra_${o}\` : \`gif_${o}\`` at byte 1,326,195. The prop is fed by `ExtraChatPane`, which is the only surface in the room that can know it, and consumed by `MessageBody.svelte`. The row's own note stands and is kept at the code: nothing here resolves anything THROUGH the id — the reveal is keyed by URL because the reference's id is derived from the message, so a message with two gifs gives both the same id upstream — so the duplicate was inert. It was still two elements with one DOM id whenever the extra column was on, and the reference already carries the fix.
+
 **low** · `divergence` · reference byte **1,326,195**
 
 ```
@@ -629,6 +631,8 @@ copyMessage(){this.msg.txt=sf(this.msg.txt).result,console.log("copyMessage: ",t
 
 ### RM-20 — doUserInfo's extra-chat-column companion event is not routed
 
+**BUILT 2026-08-30 11:56 UTC.** The chain is three sites seven hundred kilobytes apart, and reading one without the others is why a `grep` for `doUserInfoExtra` concluded the event went nowhere: the emit at 1,352,313, the ONLY subscriber at 2,074,524 (`subscribe("doUserInfoExtra", e => { this.extraChatMsg = e })`, on the user modal), and that modal's own `doMention` at 2,077,087, which reads the stored flag as the first term of the same three-term router the message's kebab uses. So the feature is: open a member's card from the extra column, press @Mention, and the mention lands in the composer you are looking at. `MessageActions` records it on the `user` action and `mentionFromUserModal` supplies it to `mentionTargetIsExtra`, which still owns the `focus === 'textAreaTxtExtra'` half. **One divergence, and it removes a staleness rather than adding one:** upstream emits ONLY when the extra column is involved, so a card opened from the main log with main focus emits nothing and the modal keeps the last extra-column answer; ours records it on every open, which agrees in every case except that one. `message-actions.svelte.test.ts` asserts all four cases through the two composer buffers.
+
 **low** · `missing-behaviour` · reference byte **1,352,030**
 
 ```
@@ -654,6 +658,8 @@ if("alerts"===i){const l=window.localStorage.getItem("alertStyle")
 > Verified: No alert-side ticker style source exists in apps/room/src. RoomMessage.svelte:216-220 gates the room style on `kind === 'chat'` (`followedStyle ??
 
 ### RM-22 — Card admin body row's `justify-content-end` and the badge/reply wrapper class lists
+
+**BUILT 2026-08-30 11:56 UTC — FOUR findings, and each one has a member control.** Every admin/member pair below is a place where the reference binds on ONE layout, so applying it to both is its own defect: (1) the **badges wrapper**, const 25 admin / const 60 member `d-inline-block flex-shrink-1` with `overflow: hidden` — we rendered badges as direct siblings of the username inside a `flex-nowrap` row, so a member with several badges pushed the timestamp and the kebab out instead of having their badges clipped; the two consts differ by `ngStyle` alone, which `Mge` binds to `styleF`, so the style is gated on the layout exactly as the table has it. (2) **`justify-content-end`**, `dge` at 1,335,936 on const 26, against the member's plain const 65. (3) The **reply block**, which was the same wrong shape as the compact one (RM-25): `Rge` at 1,331,967 and `c1e` at 1,340,691 render `div46 > [ div47 > [strong48, div49], div50 ]`, and ours wore card const **27** — the answered TICK's `ms-1 private-reply` — with the sender's own line INSIDE `private-reply-message` and both bodies on `messageBodyClass`, which lacks the `pe-3 w-100` that fills the row. (4) The **two reaction containers**, which are different ELEMENTS: `Lge` opens `d(0,"span",29)` = `[1,"ms-1",3,"ngClass","ngStyle"]` and `p1e` opens `d(0,"div",6)` = `[3,"ngStyle"]`; ours emitted one `span` with neither base class and applied `presenter-reactions-right` on BOTH layouts, so a member's card right-aligned its reactions whenever the room had the setting on — a thing the reference has no node for. The strip's CONTENTS are one `{#snippet}` with two call sites, because only the wrapper differs. The badge content stays real elements rather than the reference's `innerHTML` of a prebuilt string; that divergence is older than this row and is the safer half.
 
 **low** · `wrong-constant` · reference byte **1,328,315**
 
