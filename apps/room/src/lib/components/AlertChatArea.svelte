@@ -514,9 +514,7 @@
    * module; the effect here is that `'ignore'` reaches the browser untouched and the newline lands
    * at the caret.
    */
-  function handleComposerKey(
-    event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }
-  ): void {
+  function handleComposerKey(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }): void {
     const action = chatComposerKeyAction(event);
     if (action === 'ignore') return;
     if (chatComposerKeyPrevents(action)) event.preventDefault();

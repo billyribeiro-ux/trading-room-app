@@ -422,7 +422,7 @@ the end. Enumerate, do not estimate.
 ### Two remainders — both CLOSED 2026-08-30, and one of them had a blocker that was never true
 
 1. **The captured-item branches inside `messageAction` (`id < 0`)** — covered, in
-   `message-action-contract.test.ts`. This entry said they *"need the fixture wired up"*. The
+   `message-action-contract.test.ts`. This entry said they _"need the fixture wired up"_. The
    fixture needed no wiring: it is `server/captured-message-fixture.json`, a tracked JSON file that
    `captured-room.ts` imports directly and which resolves anywhere. The blocker was inherited rather
    than measured, and re-measuring it is the whole of what closed it — the same lesson
@@ -433,8 +433,7 @@ the end. Enumerate, do not estimate.
    with the same room key, and — the one worth having — **the same negative id from a room that is
    not the capture's is refused 404**. Every room is served the same fixture rows, so an unscoped
    negative id is a cross-tenant write: one room's delete landing on evidence another room is being
-   shown. Control: removing `capturedRoomItem`'s room check makes that delete SUCCEED from room
-   9999. 404 rather than 403 is deliberate — from a room not rendering the capture the item does not
+   shown. Control: removing `capturedRoomItem`'s room check makes that delete SUCCEED from room 9999. 404 rather than 403 is deliberate — from a room not rendering the capture the item does not
    exist, and 403 would confirm it exists somewhere, which is an oracle over another tenant.
 
    Two things were found on the way in. The file's `vi.mock` predated the `deleteAlertPW` door and
