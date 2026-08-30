@@ -566,7 +566,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       on `AlertChatArea`. The chat composer had no `paste` binding at all — `acA-02` — while all
       three ALERT composers have had one since they were built.
     */
-    max: 1478,
+    /*
+      1478 -> 1479, 2026-08-30. One line: `alertLabels={gates.alertLabels}` to `RoomOverlays`, so the
+      post-alert composer's label picker reads the SAME parsed table the alerts column renders badges
+      from. Two parses of one setting is how a picker offers a label the renderer does not know.
+    */
+    max: 1479,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1311,7 +1316,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `BootboxDialog` and not `ImageUploadDialog`: the file is already chosen, and a dialog whose top
       half is a drop zone invites replacing the thing that was just pasted.
     */
-    max: 896,
+    /*
+      896 -> 906, 2026-08-30. `alertLabels` forwarded to `ModalHost` for the composer's picker
+      (`PAM-01`), with the note recording that this is the second consumer of one parse rather than a
+      second parse.
+    */
+    max: 906,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2070,7 +2080,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `copy-trade` even though nothing can currently emit anything else — it fails closed against a
       later change that draws more controls.
     */
-    max: 6218,
+    /*
+      6218 -> 6229, 2026-08-30. `alertLabels` taken and handed to `PostAlertModal`. The picker itself
+      is in that component; what is here is the prop and why the parse happens on the page.
+    */
+    max: 6229,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2737,7 +2751,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `cancelImagePaste`, `confirmImagePaste` and their two fields — which is already the shape
       `RoomTradeAlerts` uses for the same feature.
     */
-    max: 687,
+    /*
+      687 -> 689, 2026-08-30. `submission.labelPrefix` threaded into the two UPLOAD composers.
+
+      Two lines, and they are the half of `PAM-01` that is easy to miss: these compose their body
+      AFTER the modal has closed, so a picker whose state only reached the draft would prefix a typed
+      alert and silently drop the labels from every alert carrying an image.
+    */
+    max: 689,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -3835,7 +3856,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       layout — the fields inline in the composer and a second modal beside it — which would have put
       roughly two hundred lines into the file that was already one line from its ceiling.
     */
-    max: 522,
+    /*
+      522 -> 609, 2026-08-30. The Alert Labels picker — `PAM-01`, and the producer for a consumer
+      that had already shipped: the room parsed the setting and rendered the badges, so a configured
+      label worked only if the presenter typed `#DayTrade` by hand.
+
+      Most of the addition is the decode. `zTe` at byte 2,119,145 with its consts read out of
+      `app-post-alert-modal`'s own table, the `O(62, …length > 0 ? 62 : -1)` gate at 2,138,428 that
+      puts it between Non-trade and Linked Room Alerts, and two properties that read as mistakes and
+      are the shipped markup: the id is INDEX-based and the label text ends in a question mark.
+
+      One deliberate divergence, argued at the code: the selection lives in a `SvelteSet` here rather
+      than as `checked` on the room's shared parsed table, which is where the reference keeps it.
+    */
+    max: 609,
     why: 'the alert composer and its per-open resets'
   },
   {

@@ -617,7 +617,8 @@ export class RoomComposer {
           submission.composition.bodyBeforeUploads,
           uploadedUrls,
           submission.legalDisclosure,
-          submission.legalDisclosureText
+          submission.legalDisclosureText,
+          submission.labelPrefix
         );
         targetUrl = uploadedUrls[0] ?? null;
       } catch (error) {
@@ -648,7 +649,8 @@ export class RoomComposer {
         submission.alertText,
         uploadedUrl,
         submission.legalDisclosure,
-        submission.legalDisclosureText
+        submission.legalDisclosureText,
+        submission.labelPrefix
       );
       if (submission.postOnX) this.#postOnX(body);
       return this.#persistAlert(

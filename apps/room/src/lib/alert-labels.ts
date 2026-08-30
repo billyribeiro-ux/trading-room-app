@@ -101,6 +101,52 @@ export function alertLabelBadgeStyle(label: AlertLabel): string {
 /** The badge's classes, byte 1,326,855. */
 export const ALERT_LABEL_BADGE_CLASS = 'my-1 me-1 badge';
 
+/**
+ * `processAlertLabels(e)` — the prefix the composer's label picker puts in front of an alert.
+ *
+ * Byte 2,131,232, verbatim:
+ *
+ * ```js
+ * processAlertLabels(e) {
+ *   let i = "";
+ *   const o = globals.alertLabels.filter(s => s.checked);
+ *   if (o.length > 0)
+ *     for (let s = 0; s < o.length; s++)
+ *       i += " #" + o[s].hash + (s === o.length - 1 ? "\n" : " ");
+ *   return i && i.length > 0 && (e.txt = i + e.txt,
+ *     globals.alertLabels.forEach(s => s.checked = !1)), e
+ * }
+ * ```
+ *
+ * Four properties of that string, each of which a "tidier" version would get wrong:
+ *
+ * 1. **Every entry is PREFIXED with a space**, including the first — so the alert body begins with
+ *    ` #DayTrade` and not `#DayTrade`. That leading space survives into the stored body.
+ * 2. **The separator is a space and the terminator is a newline**, so two labels produce
+ *    `" #A #B\n"` — not `" #A\n #B\n"` and not `" #A #B"`.
+ * 3. **It is PREPENDED**, after the legal disclosure has already been appended. All four call sites
+ *    do the disclosure first (`e.txt += " \n " + legalDisclosureTxt`) and then this, so a body ends
+ *    up as `labels + text + disclosure`.
+ * 4. **Nothing happens when nothing is checked** — no leading newline, no empty prefix. The `if`
+ *    guards the write as well as the loop.
+ *
+ * The UNCHECKING half of that method is deliberately not here: it mutates the room's shared label
+ * table, and this room keeps the picker's selection in the composer that owns it. `PostAlertModal`
+ * clears its own boxes, which is the same observable behaviour without a module reaching into
+ * another one's state.
+ *
+ * @param labels ONLY the checked ones. The filter is the caller's, because the caller is what holds
+ *   the selection — passing the whole table plus a predicate would put the picker's state in here.
+ */
+export function alertLabelPrefix(labels: readonly AlertLabel[]): string {
+  if (labels.length === 0) return '';
+  let prefix = '';
+  for (let index = 0; index < labels.length; index += 1) {
+    prefix += ` #${labels[index].hash}${index === labels.length - 1 ? '\n' : ' '}`;
+  }
+  return prefix;
+}
+
 /** A body split into literal text and the label badges found in it. */
 export type AlertLabelPiece =
   { kind: 'text'; text: string } | { kind: 'label'; text: string; label: AlertLabel };

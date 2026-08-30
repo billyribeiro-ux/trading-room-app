@@ -1,5 +1,7 @@
 <script lang="ts">
   import { pastedImageFrom } from '#lib/pasted-image.js';
+  import { SvelteSet } from 'svelte/reactivity';
+  import { alertLabelPrefix, type AlertLabel } from '#lib/alert-labels.js';
   import { onDestroy } from 'svelte';
   import type { AlertTab } from '#lib/types.js';
   import {
@@ -37,6 +39,18 @@
      * setting and decide for itself. Defaults `false`, which is the fail-closed direction.
      */
     schedulerAvailable?: boolean;
+    /**
+     * The room's configured Alert Labels — the picker, byte 2,119,145.
+     *
+     * `O(62, globals.alertLabels && globals.alertLabels.length > 0 ? 62 : -1)` is the whole gate: a
+     * room with no labels draws nothing, which is why this defaults to an empty list rather than
+     * being required.
+     *
+     * Parsed by the page (`gates.alertLabels`) rather than here, for the reason every other room
+     * setting reaches this component already resolved — and because `parseAlertLabels` runs
+     * `JSON.parse`, which a component that re-ran it per open would run per open.
+     */
+    alertLabels?: readonly AlertLabel[];
   }
 
   let {
@@ -48,7 +62,8 @@
     onpost,
     onpastepost,
     stickyNonTradeAlert = false,
-    schedulerAvailable = false
+    schedulerAvailable = false,
+    alertLabels = []
   }: Props = $props();
 
   let alertText = $state('');
@@ -66,6 +81,31 @@
      to open — including the first. Seeding the declaration too would capture the prop's initial
      value, which is what `state_referenced_locally` warns about, and would buy nothing: the modal
      is never read before it opens. */
+  /*
+    ── THE LABEL PICKER'S SELECTION ────────────────────────────────────────────────────────────────
+
+    The reference stamps `checked = false` onto every entry of `globals.alertLabels` when it parses
+    the setting, and `processAlertLabels` flips them all back to false after a send. That makes the
+    room's shared label table hold this composer's UI state, which is why `alert-labels.ts` carries
+    the field and a note saying it is not a render input.
+
+    Here the selection stays in the composer that owns it: a `Set` of hashes, so nothing reaches into
+    the parsed table and a second consumer of `alertLabels` cannot be affected by what is ticked in
+    this modal. Same observable behaviour, one fewer shared mutable.
+
+    `SvelteSet` and not a plain `Set`: it is read in the template per checkbox and written by each
+    one, so it has to be reactive. It is an ORDINARY class — `rune-module-extension-contract` records
+    that using it is not what makes a module `.svelte.ts`.
+  */
+  const checkedLabels = new SvelteSet<string>();
+  /*
+    The prefix, built from the labels in the ROOM's order rather than in click order. Upstream's
+    `filter(s => s.checked)` preserves the table's order and a `Set` preserves insertion order, so
+    filtering the table is what reproduces it — ticking B then A must still send ` #A #B\n`.
+  */
+  const labelPrefix = $derived(
+    alertLabelPrefix(alertLabels.filter((label) => checkedLabels.has(label.hash)))
+  );
   let nonTradeAlert = $state(false);
   let legalDisclosure = $state(false);
   let legalDisclosureText = $state(POST_ALERT_LEGAL_DISCLOSURE);
@@ -79,6 +119,13 @@
   }
 
   function clearInputFields() {
+    /*
+      `processAlertLabels` unchecks every label after a send, and `doCloseModal` and
+      `clearInputFields` upstream do the same — so a label ticked for one alert is never carried into
+      the next. Clearing here covers all three, because `beginOpenState` calls this on every open and
+      both send paths call it when Keep Open is on.
+    */
+    checkedLabels.clear();
     releasePreviews();
     files = [];
     alertText = '';
@@ -168,7 +215,8 @@
       dontPush,
       nonTradeAlert,
       legalDisclosure,
-      legalDisclosureText
+      legalDisclosureText,
+      labelPrefix
     });
 
     posting = false;
@@ -186,7 +234,8 @@
       imageAlertText,
       legalDisclosure,
       legalDisclosureText,
-      fileCount: files.length
+      fileCount: files.length,
+      labelPrefix
     });
 
     if (composition.status === 'noop') return;
@@ -205,7 +254,8 @@
       dontPush,
       nonTradeAlert,
       legalDisclosure,
-      legalDisclosureText
+      legalDisclosureText,
+      labelPrefix
     });
     posting = false;
 
@@ -454,6 +504,43 @@
           />
           <label for="alert-non-trade-label">Non-trade alert? (Different Sound)</label>
         </div>
+        <!--
+          `H(62, GTe, 2, 0)` behind `O(62, globals.alertLabels && globals.alertLabels.length > 0 ?
+          62 : -1)` — the Alert Labels picker, byte 2,119,145 with its gate at 2,138,428. It sits
+          between the Non-trade checkbox (slot 61) and Linked Room Alerts (63), which is where it is
+          drawn here.
+
+          `zTe`, the per-label row, decoded with its consts (35 = `[1,"form-check"]`,
+          52 = the checkbox, 53 = `[3,"for"]`):
+
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="alert-trade-label-{i}" [(ngModel)]="e.checked">
+              <label [for]="'alert-trade-label-' + i">{{e.name}}?</label>
+            </div>
+
+          THE ID IS INDEX-BASED and the label text ends in a QUESTION MARK — `Ne("", e.name, "?")` —
+          both of which look like mistakes and are the shipped markup. The `?` matches the four
+          checkboxes around it, every one of which asks a question.
+
+          Keyed by HASH rather than by index, because the id is the only thing the index is for: a
+          keyed `{#each}` on a stable identity is what stops Svelte reusing a checkbox for a
+          different label if the room's table is ever re-ordered, and `$index` still supplies the id.
+        -->
+        {#each alertLabels as label, index (label.hash)}
+          <div class="form-check">
+            <input
+              type="checkbox"
+              id="alert-trade-label-{index}"
+              class="form-check-input"
+              checked={checkedLabels.has(label.hash)}
+              onchange={(event) => {
+                if (event.currentTarget.checked) checkedLabels.add(label.hash);
+                else checkedLabels.delete(label.hash);
+              }}
+            />
+            <label for="alert-trade-label-{index}">{label.name}?</label>
+          </div>
+        {/each}
         <div class="form-check">
           <input
             type="checkbox"

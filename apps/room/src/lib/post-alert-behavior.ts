@@ -12,6 +12,19 @@ export interface PostAlertDraft {
   legalDisclosure: boolean;
   legalDisclosureText: string;
   fileCount: number;
+  /**
+   * The composer's checked alert labels, already reduced to their prefix by `alertLabelPrefix`.
+   *
+   * A STRING and not the labels, because the ordering rule this file has to honour is about a
+   * string: the reference appends the legal disclosure and then PREPENDS the labels, at all four of
+   * its send sites. Passing the table instead would put the transcription of `processAlertLabels` in
+   * two places, and this file is where the disclosure/labels ORDER lives, not where the prefix is
+   * built.
+   *
+   * Optional and defaulting to none, because three of the four composers here predate it and every
+   * one of their tests constructs a draft by hand.
+   */
+  labelPrefix?: string;
 }
 
 export type PostAlertComposition =
@@ -43,6 +56,16 @@ export interface PostAlertSubmission {
   nonTradeAlert: boolean;
   legalDisclosure: boolean;
   legalDisclosureText: string;
+  /**
+   * The composer's checked Alert Labels, already reduced to their prefix.
+   *
+   * On the SUBMISSION and not only on the draft, because the upload paths compose their body AFTER
+   * the modal has closed: `composeUploadedAlert` and `composePastedImageAlert` run in
+   * `RoomComposer`, once the files are on the CDN, and the picker's state has to survive that trip.
+   * Optional for the same reason it is optional on the draft — every existing test builds one of
+   * these by hand.
+   */
+  labelPrefix?: string;
 }
 
 export interface PastedImageSubmission {
@@ -54,6 +77,16 @@ export interface PastedImageSubmission {
   nonTradeAlert: boolean;
   legalDisclosure: boolean;
   legalDisclosureText: string;
+  /**
+   * The composer's checked Alert Labels, already reduced to their prefix.
+   *
+   * On the SUBMISSION and not only on the draft, because the upload paths compose their body AFTER
+   * the modal has closed: `composeUploadedAlert` and `composePastedImageAlert` run in
+   * `RoomComposer`, once the files are on the CDN, and the picker's state has to survive that trip.
+   * Optional for the same reason it is optional on the draft — every existing test builds one of
+   * these by hand.
+   */
+  labelPrefix?: string;
 }
 
 function appendLegalDisclosure(
@@ -62,6 +95,30 @@ function appendLegalDisclosure(
   legalDisclosureText: string
 ) {
   return legalDisclosure ? `${body} \n ${legalDisclosureText}` : body;
+}
+
+/**
+ * The label prefix, in front of a body the disclosure has already been appended to.
+ *
+ * ## The ORDER is the reference's and it is not obvious
+ *
+ * All four of its send sites do the same two things in the same sequence:
+ *
+ * ```js
+ * this.legalDisclosure && (e.txt += " \n " + this.legalDisclosureTxt),
+ * globals.alertLabels.length > 0 && (e = this.processAlertLabels(e)),   // prepends
+ * this.postOnX && this.postOnXAlert(e.txt),
+ * sendServerCommand("alertMsg", e)
+ * ```
+ *
+ * So a body with both ends up `labels + text + disclosure`, and the tweet `postOnX` composes carries
+ * the labels too. Applying them the other way round would put the hashes after the disclosure, where
+ * the badge renderer would still find them and a reader would not expect them.
+ *
+ * `alertLabelPrefix` is what builds the string; this is only where it lands.
+ */
+function prependAlertLabels(body: string, labelPrefix: string | undefined) {
+  return labelPrefix ? `${labelPrefix}${body}` : body;
 }
 
 /**
@@ -102,7 +159,10 @@ export function composePostAlert(draft: PostAlertDraft): PostAlertComposition {
   return {
     status: 'post',
     kind: draft.tab,
-    body: appendLegalDisclosure(body, draft.legalDisclosure, draft.legalDisclosureText)
+    body: prependAlertLabels(
+      appendLegalDisclosure(body, draft.legalDisclosure, draft.legalDisclosureText),
+      draft.labelPrefix
+    )
   };
 }
 
@@ -110,21 +170,29 @@ export function composeUploadedAlert(
   bodyBeforeUploads: string,
   uploadedUrls: readonly string[],
   legalDisclosure: boolean,
-  legalDisclosureText: string
+  legalDisclosureText: string,
+  labelPrefix?: string
 ) {
   let body = bodyBeforeUploads;
   for (const url of uploadedUrls) body += ` ${url}`;
-  return appendLegalDisclosure(body, legalDisclosure, legalDisclosureText);
+  return prependAlertLabels(
+    appendLegalDisclosure(body, legalDisclosure, legalDisclosureText),
+    labelPrefix
+  );
 }
 
 export function composePastedImageAlert(
   alertText: string,
   uploadedUrl: string,
   legalDisclosure: boolean,
-  legalDisclosureText: string
+  legalDisclosureText: string,
+  labelPrefix?: string
 ) {
   const body = alertText ? `${alertText}\n${uploadedUrl}` : uploadedUrl;
-  return appendLegalDisclosure(body, legalDisclosure, legalDisclosureText);
+  return prependAlertLabels(
+    appendLegalDisclosure(body, legalDisclosure, legalDisclosureText),
+    labelPrefix
+  );
 }
 
 export function postOnXIntent(body: string) {

@@ -1403,6 +1403,7 @@
       {messageActions}
       {messageChrome}
       presenterColors={data.presenterColors}
+      alertLabels={gates.alertLabels}
       alertsDisplayMode={displayModes.alerts}
       chatLogDisplayMode={displayModes.chat}
       onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}

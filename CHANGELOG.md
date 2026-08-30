@@ -33,6 +33,84 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 04:18 UTC — The Alert Labels picker: a consumer that shipped without its producer
+
+**Runtime impact: YES.** A room with Alert Labels configured now shows a checkbox per label in the
+post-alert composer, and ticking one prefixes the alert with its hash — so the badge renderer that
+has been live for weeks finally has something that produces its input.
+
+#### `PAM-01`
+
+The room PARSED the setting (`gates.alertLabels`) and RENDERED the badges (`RoomMessage` →
+`splitAlertLabels`). A configured label worked — as long as the presenter typed `#DayTrade` by hand
+into the alert body. The picker that puts it there did not exist, and neither did the prefixing.
+
+#### Decoded, not recalled
+
+The picker is `zTe` at byte 2,119,145, with its consts read out of `app-post-alert-modal`'s own
+table (35 = `[1,"form-check"]`, 52 = the checkbox, 53 = `[3,"for"]`), mounted behind
+`O(62, globals.alertLabels && globals.alertLabels.length > 0 ? 62 : -1)` at byte 2,138,428 — slot
+62, between Non-trade (61) and Linked Room Alerts (63), which is where it is drawn.
+
+Two properties of that markup read as mistakes and are the shipped output: the id is **index**-based
+(`alert-trade-label-{i}`) and the label text ends in a **question mark** (`Ne("", e.name, "?")`),
+which matches the four checkboxes around it — every one of them asks a question.
+
+#### THE DOUBLE SPACE, and my first test was wrong about it
+
+```js
+i += " #" + o[s].hash + (s === o.length - 1 ? "\n" : " ")     // byte 2,131,232
+```
+
+Every entry BEGINS with a space and every entry but the last ENDS with one, so two labels produce
+`" #A  #B\n"` — two spaces between. I asserted `" #A #B\n"`, the test failed, and **the code was
+right**: a "tidier" implementation joining on a single space would be a silent divergence in the
+stored body of every multi-label alert. The corrected assertion carries that reasoning.
+
+#### The ORDER, which is the same at all four of the reference's send sites
+
+```js
+this.legalDisclosure && (e.txt += " \n " + this.legalDisclosureTxt),
+globals.alertLabels.length > 0 && (e = this.processAlertLabels(e)),   // prepends
+this.postOnX && this.postOnXAlert(e.txt),
+sendServerCommand("alertMsg", e)
+```
+
+Disclosure appended, then labels prepended, so a body reads `labels + text + disclosure` and the
+tweet `postOnX` composes carries the labels too.
+
+#### Three composition sites, not two
+
+`labelPrefix` reaches the draft AND both submissions. The upload paths — `composeUploadedAlert` and
+`composePastedImageAlert` — run in `RoomComposer` after the files are on the CDN and the modal has
+closed, so a prefix that only reached the draft would work for a typed alert and silently drop the
+labels from every alert carrying an image. That is the pair the reference prefixes at bytes
+2,126,849 and 2,127,305. The contract counts all three, and it was written expecting two.
+
+#### One divergence, argued at the code
+
+The reference keeps the selection as `checked` on `globals.alertLabels` — the room's shared parsed
+table holding one modal's UI state — and flips them all back after a send. Here it is a `SvelteSet`
+of hashes owned by the composer: same observable behaviour, one fewer shared mutable, and a second
+consumer of `alertLabels` cannot be affected by what is ticked in this modal. The prefix is still
+built by filtering the TABLE, not by iterating the set, because upstream's `filter` preserves the
+room's order — ticking B then A still sends ` #A  #B`.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,622 tests passing (1 skipped), build done. The prefix rule and all three
+composition sites are EXECUTED; the markup, the gate-by-empty-array and the clearing are read from
+source with their bounds asserted.
+
+**Six negative controls, each run and each seen RED**, on the committed tree and reverted after: the
+per-entry leading space dropped (four tests); the terminating newline dropped (four); the labels
+APPENDED instead of prepended (three); the boxes no longer cleared; the draft no longer receiving the
+prefix; and the question mark "tidied" off the label text.
+
+**Not verified:** nothing was opened in a browser, so no checkbox was clicked. `direct-evidence-contract.ts`
+still lists `alertLabels` as a hidden capability branch — no DOM capture we hold ever rendered this
+picker — so the markup is decoded from the bundle's own const table rather than diffed against a
+captured page, which is a weaker form of evidence and is named as such.
+
 ### 2026-08-30 04:05 UTC — Alert search results were escaped plain text, and a fixture that assumed an empty database
 
 **Runtime impact: YES.** The advanced alert search draws real message rows — sender, timestamp, day

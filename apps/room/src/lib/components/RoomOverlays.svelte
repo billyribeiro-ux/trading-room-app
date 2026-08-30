@@ -13,6 +13,7 @@
   import type { ChatMode } from '#lib/chat-mode.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { PresenterColorMap } from '#lib/presenter-colors.js';
+  import type { AlertLabel } from '#lib/alert-labels.js';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
@@ -110,6 +111,7 @@
     isPresenter,
     messageChrome,
     presenterColors,
+    alertLabels,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -174,6 +176,13 @@
     messageChrome: RoomMessageChrome;
     /** The room's presenter colour map, forwarded whole to `ModalHost` — see `presenter-colors.ts`. */
     presenterColors: PresenterColorMap;
+    /**
+     * The room's parsed Alert Labels, forwarded to `ModalHost` for the composer's picker (`PAM-01`).
+     *
+     * The PAGE parses them (`gates.alertLabels`) and the alerts column already receives the same
+     * array, so this is the second consumer of one parse rather than a second parse.
+     */
+    alertLabels: readonly AlertLabel[];
     /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
     alertsDisplayMode: ChatDisplayMode;
     chatLogDisplayMode: ChatDisplayMode;
@@ -618,6 +627,7 @@
   alertQuestions={data.alertQuestions}
   {messageChrome}
   {presenterColors}
+  {alertLabels}
   {alertsDisplayMode}
   {chatLogDisplayMode}
   {onDisplayModeChange}

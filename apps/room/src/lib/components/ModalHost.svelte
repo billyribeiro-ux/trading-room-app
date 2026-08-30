@@ -38,6 +38,7 @@
     Theme,
     TradeCopyPayload
   } from '#lib/types.js';
+  import type { AlertLabel } from '#lib/alert-labels.js';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import { sameCalendarDay } from '#lib/message-formatters.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
@@ -110,6 +111,14 @@
     stickyNonTradeAlert?: boolean;
     /** `sessData.hasAlertScheduler`, forwarded to the composer — see `PostAlertModal`'s own prop. */
     schedulerAvailable?: boolean;
+    /**
+     * The room's configured Alert Labels, forwarded to the composer's picker (`PAM-01`).
+     *
+     * Parsed ONCE on the page (`gates.alertLabels`) — `parseAlertLabels` runs `JSON.parse`, and the
+     * alerts log already needs the same table to render the badges. Two parses of one setting is how
+     * a picker offers a label the renderer does not know.
+     */
+    alertLabels?: readonly AlertLabel[];
     theme: Theme;
     roomSplitDir: 'ltr' | 'ttb' | 'rtl' | 'btt';
     sessionControlInitialTab:
@@ -474,6 +483,7 @@
     alertTab,
     stickyNonTradeAlert = false,
     schedulerAvailable = false,
+    alertLabels = [],
     theme,
     roomSplitDir,
     sessionControlInitialTab,
@@ -4280,6 +4290,7 @@
     onpastepost={onPastePostAlert}
     {stickyNonTradeAlert}
     {schedulerAvailable}
+    {alertLabels}
   />
 </app-post-alert-modal>
 <app-poll-modal id="pollModalCompHolder" class="pollModalHolder" bind:this={pollPanelHost}>

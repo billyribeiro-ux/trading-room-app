@@ -1434,6 +1434,8 @@ nPe=(t,n)=>({"push-wrapper":t,"mt-0":n}),qB=t=>({"btn-dark":
 
 ### UIM-02 — Admin Notes tab renders only the password gate — the notes list, per-note delete and Add Note (mTe/fTe) have no counterpart
 
+**BUILT 2026-08-30, before this row was written down.** `UserNotesPane.svelte` renders both halves of upstream's `O(104, allowToManageNotes ? 105 : 104)` — the scrolling list (`mTe`), the per-note row with its 20px `smallAvatarImg` and delete button (`fTe`), and Add Note — against `user_notes`, which is keyed by room AND subject, with `RoomUserNotes` holding the three calls and `userNotesPort` carrying them. The row's own quote of `ModalHost.svelte:203-208` is the stale part: that docblock was rewritten on 2026-08-29 when the schema change landed, and now records that both states exist. Marked 2026-08-30 04:10 UTC after reading the component.
+
 **high** · `missing-control` · reference byte **2,065,327**
 
 ```
@@ -1624,6 +1626,8 @@ o.user.pic||"https://secure.gravatar.com/avatar/"+o.user.emailHash+"?d=mm&s=80",
 14 verified gaps; 61 reference behaviours confirmed present.
 
 ### PAM-01 — alertLabels picker: the per-label checkbox @for and processAlertLabels() hash-prefixing are absent, while the badge renderer that consumes the hashes is built
+
+**BUILT 2026-08-30 04:18 UTC.** Both halves. The picker is `zTe` decoded with `app-post-alert-modal`'s own consts table (35 = `[1,"form-check"]`, 52 = the checkbox, 53 = `[3,"for"]`), drawn behind its gate `O(62, alertLabels && alertLabels.length > 0 ? 62 : -1)` between Non-trade and Linked Room Alerts, with the reference's index-based `alert-trade-label-{i}` id and the question mark after the name. The prefixing is `alertLabelPrefix` in `alert-labels.ts`, a transcription of `processAlertLabels` including the DOUBLE space between labels that each entry's own leading and trailing space produces — my first test asserted a single space and was wrong. It reaches all three places a body is composed, because the two upload paths compose after the modal has closed. **One divergence:** the selection lives in the composer's own `SvelteSet` rather than as `checked` on the room's shared parsed table, which is where the reference keeps it — same observable behaviour, one fewer shared mutable. `alert-label-picker-contract.test.ts`.
 
 **high** · `missing-control` · reference byte **2,119,525**
 
