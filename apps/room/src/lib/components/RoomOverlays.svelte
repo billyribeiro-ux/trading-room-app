@@ -828,6 +828,10 @@
     mode="confirm"
     message={dialogs.confirmation.message}
     className={dialogs.confirmation.className}
+    confirmLabel={dialogs.confirmation.confirmLabel ?? 'OK'}
+    confirmClassName={dialogs.confirmation.confirmClassName ?? 'btn-primary'}
+    cancelLabel={dialogs.confirmation.cancelLabel ?? 'Cancel'}
+    cancelClassName={dialogs.confirmation.cancelClassName ?? 'btn-secondary btn-default'}
     onclose={() => {
       const dismissed = dialogs.confirmation?.ondismiss;
       dialogs.confirmation = null;

@@ -353,6 +353,17 @@
   function getRandomUser() {
     dialogs.confirmation = {
       message: 'Only select from Trials?',
+      /*
+        RS-07 — the buttons are the ANSWER to the question, and they said OK and Cancel.
+        `buttons: {confirm:{label:"Yes",className:"btn-success"}, cancel:{label:"No",className:
+        "btn-danger"}}` at byte 2,516,822. "Cancel" reads as abandon-the-whole-thing where it
+        actually means draw from everybody — a different action rather than none, which is exactly
+        what `ondismiss` below does.
+      */
+      confirmLabel: 'Yes',
+      confirmClassName: 'btn-success',
+      cancelLabel: 'No',
+      cancelClassName: 'btn-danger',
       onconfirm: () => {
         dialogs.confirmation = null;
         roster.draw(true);
@@ -1100,6 +1111,7 @@
           onrequestreload={requestReload}
           onshowrecpreview={() => recording.showRecPreview()}
           onhiderecpreview={() => recording.hideRecPreview()}
+          tip={tipButtonFor(data.sessData)}
           alwaysShowRoster={data.sessData?.alwaysShowRoster === true}
           rosterCountVisible={gates.rosterCountVisible}
           streamingTabAvailable={data.sessData?.useMediaMTX === true}
@@ -1152,6 +1164,7 @@
           {chatAlertsDetached}
           rosterVisible={gates.rosterVisible}
           rosterCountVisible={gates.rosterCountVisible}
+          badgesFor={(emailHash) => feeds.badgesFor(emailHash)}
           archivesAvailable={gates.archivesAvailable}
           {rowVisible}
           {rosterRowClass}

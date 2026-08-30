@@ -117,6 +117,20 @@ function html(over: Record<string, unknown> = {}): string {
       onrequestreload: noop,
       onshowrecpreview: noop,
       onhiderecpreview: noop,
+      /*
+        The eight that arrived with the 2026-08-30 navbar rows, at the plainest room's values. This
+        file is the SSR half of the navbar's cover and the mount half is
+        `RoomNavbar.svelte.test.ts`; the two harnesses stay in step because both feed every prop.
+      */
+      tip: { visible: false, label: '', url: '' },
+      alwaysShowRoster: false,
+      rosterCountVisible: true,
+      streamingTabAvailable: false,
+      localScreens: [],
+      onmutetalkinguser: noop,
+      onopenstreamingtab: noop,
+      onreopenpreview: noop,
+      onstoplocalscreen: noop,
       ...over
     } as never
   }).body;

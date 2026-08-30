@@ -138,6 +138,8 @@ const render = (over: Record<string, unknown> = {}) => {
         plainest room there is — no MediaMTX tab, no local screens, the count visible, the sidebar
         setting off — and every test that wants one of them says so in its own `over`.
       */
+      /* RS-09 — hidden by default: a room that has not configured a tip is the ordinary room. */
+      tip: { visible: false, label: '', url: '' },
       alwaysShowRoster: false,
       rosterCountVisible: true,
       streamingTabAvailable: false,
@@ -487,5 +489,48 @@ describe('G05, G06 and G07 — the three new screenshare entries', () => {
       ?.click();
     flushSync();
     expect(stopped).toEqual(['p2']);
+  });
+});
+
+describe('RS-09 — the tip button is rendered TWICE upstream and we had one', () => {
+  /*
+    `APe` at byte 2,472,922 is the NAVBAR's copy — `d(0,"li",139)` with the click on the item and
+    `d(1,"a",140)` inside it — gated `O(14, isTipEnabled ? 14 : -1)` immediately before Benzinga.
+    `aPe` (2,466,601) is the sidebar's, and this room had that one. `tip-button.ts` was written
+    expecting both: its docblock says "the two call sites read `tip.visible`" while only one existed.
+  */
+  const tip = { visible: true, label: 'Buy me a coffee', url: 'https://example.test/tip' };
+
+  it('renders it with the reference s class list and its doubled label', () => {
+    const { root } = render({ tip });
+    const item = root.querySelector<HTMLElement>('li.nav-item[title="Buy me a coffee"]');
+    expect(item, 'the navbar tip item is missing').not.toBeNull();
+    /* `title` AND the text, which is upstream's doubling on both copies. */
+    expect(item?.textContent?.trim()).toBe('Buy me a coffee');
+    expect(item?.querySelector('a')?.className).toBe(
+      'd-flex align-items-center btn btn-primary btn-sm'
+    );
+    expect(item?.querySelector('i.fa-dollar-sign')).not.toBeNull();
+  });
+
+  it('renders nothing when the room has not configured one, which is the control', () => {
+    /* `tipButtonFor` resolves the three-way gate; an unconfigured room reaches `visible: false`. */
+    const { root } = render();
+    expect(root.querySelector('li.nav-item[title="Buy me a coffee"]')).toBeNull();
+    expect(root.querySelector('i.fa-dollar-sign')).toBeNull();
+  });
+
+  it('sits immediately before Benzinga, which is the reference s order', () => {
+    /* `O(14, isTipEnabled ? 14 : -1), m(), O(15, sessData.hasBenzingaNews ? 15 : -1)`. */
+    const { root } = render({
+      tip,
+      benzinga: { visible: true, url: 'https://example.test/bz', logoUrl: '/bz.png' }
+    });
+    const items = [...root.querySelectorAll('ul.navbar-nav > li')];
+    const tipAt = items.findIndex((li) => li.getAttribute('title') === 'Buy me a coffee');
+    const benzingaAt = items.findIndex((li) => li.classList.contains('benzinga-li'));
+    expect(tipAt, 'the tip item must render').toBeGreaterThan(-1);
+    expect(benzingaAt, 'and Benzinga beside it').toBeGreaterThan(-1);
+    expect(tipAt).toBeLessThan(benzingaAt);
   });
 });

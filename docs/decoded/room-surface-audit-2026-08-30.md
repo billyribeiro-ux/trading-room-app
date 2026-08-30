@@ -45,7 +45,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**135 open · 89 closed · 224 rows.**
+**123 open · 101 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -2183,6 +2183,8 @@ this.appService.appEventBus.subscribe("getAlertsAdvancedSearchSuccess",i=>{conso
 
 ### RS-01 — Roster row: the presenter-only "Trial" badge is not rendered, though the data to render it is already on the wire
 
+**BUILT 2026-08-30 13:32 UTC.** `O(7, isPresenter && e.isFT ? 7 : -1)` on const 9. `isFT` was already on the wire and already read by two other gates, so the chip was the one thing missing — and it is the one distinction the roster is actually used to make: a presenter scanning the list could not tell a trial from a paying member.
+
 **medium** · `missing-behaviour` · reference byte **2,034,640**
 
 ```
@@ -2194,6 +2196,8 @@ O(1,i.showUserAvatar(e.isP)?1:-1),m(4),Ze(e.nick),m(),O(6,e.data.badges?6:-1),m(
 > Verified: I could not refute it. The reference roster row really does render a presenter-only "Trial" badge, and our only roster row render does not.
 
 ### RS-02 — Roster row: the badges div is rendered ALWAYS and EMPTY — the reference gates it on e.data.badges and fills it via parseBadges
+
+**BUILT 2026-08-30 13:32 UTC.** Const 8's class list was here with no content and no gate — a wrapper nobody fills, which is the defect this repository names by that description. `badgesFor` is `RoomFeeds`'s and is the **same** resolution the message rows use, including its dark-variant fallback and its skip for a badge deleted from the account; passing it in rather than re-deriving is what stops the rail and the log disagreeing about who wears what. Upstream reaches the same place through `parseBadges`, which builds an HTML string; real elements here for the reason `MessageBody` records.
 
 **medium** · `missing-behaviour` · reference byte **2,034,694**
 
@@ -2207,6 +2211,8 @@ O(6,e.data.badges?6:-1),m(),O(7,i.appService.globals.isPresenter&&e.isFT?7:-1),m
 
 ### RS-05 — Roster avatar has no hideAvatars gate — a room that hides avatars still shows them in the roster
 
+**BUILT 2026-08-30 13:32 UTC, and it is the one of the five that was a leak.** `showUserAvatar(e) { return !sessData.hideAvatars || !!e }` at byte 2,036,617 — **the roster's avatar gate is not the message log's**: a presenter's picture shows even in a room that hides avatars, because a member has to be able to tell who is running the room. This rail rendered every avatar unconditionally, so a room with avatars turned off still published every member's picture in the list of everybody present.
+
 **medium** · `missing-control` · reference byte **2,036,617**
 
 ```
@@ -2218,6 +2224,8 @@ showUserAvatar(e){return!this.appService.globals.sessData.hideAvatars||!!e}
 > Verified: The roster avatar is rendered with no hideAvatars gate anywhere in our source. RoomSidebar.svelte:681-686 emits `<img class="rosterImg mr-3" alt={user.displayName} src={user.avatarUrl} ...>` with the only enclosing branch being `{#if !rowIsFull(user)} ...
 
 ### RS-06 — Archives ▸ "Recording" renders with no handler at all
+
+**BLOCKED 2026-08-30 13:32 UTC — the same blocker as G01, and the same item.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab, which is a SERVER page. There is no archive service here and no recordings or archive table in either database. Wiring it would open a tab onto a 404 carrying a session token in the URL, which is worse than an inert item.
 
 **medium** · `missing-behaviour` · reference byte **2,467,757**
 
@@ -2231,6 +2239,8 @@ function gPe(t,n){if(1&t){const e=Y();d(0,"a",50),x("click",function(){return D(
 
 ### RS-07 — "Only select from Trials?" is a Yes/No question answered by OK/Cancel buttons
 
+**BUILT 2026-08-30 13:32 UTC.** `buttons: {confirm: {label:"Yes", className:"btn-success"}, cancel: {label:"No", className:"btn-danger"}}` at byte 2,516,822. **"Cancel" was not merely unhelpful, it was wrong:** the No branch is not a cancellation — `ondismiss` runs `roster.draw(false)`, which draws from everybody — so a member pressing Cancel to back out got a random user anyway. `RoomConfirmation` gained four OPTIONAL fields defaulting to OK/Cancel, because that is what `bootbox.confirm(message, callback)` renders and what every other call site in this room passes.
+
 **medium** · `wrong-constant` · reference byte **2,516,822**
 
 ```
@@ -2242,6 +2252,8 @@ getRandomUser(){const e=this;bootbox.confirm({message:"Only select from Trials?"
 > Verified: The message text and dismiss semantics are built, but the reference's button labels/classes are genuinely absent. `getRandomUser()` (routes/+page.svelte:353-364) sets `dialogs.confirmation = {message:'Only select from Trials?', onconfirm, ondismiss}`; the `RoomConfirmation` interface (lib/room/dialogs.svelte.ts:33-43) has only `message`/`…
 
 ### RS-09 — The second tip-me control lives in our SIDEBAR; the reference renders it in the navbar and our navbar has none
+
+**BUILT 2026-08-30 13:32 UTC, and the row's framing is one step off in a useful way: the reference renders the tip TWICE.** `aPe` (byte 2,466,601) is the sidebar's `<p>` and this room had it; `APe` (byte 2,472,922) is the navbar's `<li>`, const 139 `[1,"nav-item",3,"click","title"]` wrapping const 140 `d-flex align-items-center btn btn-primary btn-sm`, gated `O(14, isTipEnabled ? 14 : -1)` immediately before Benzinga. **`tip-button.ts` was already written expecting both** — its own docblock says *"the two call sites read `tip.visible`"* while only one existed. The `<li>` carries the click where the sidebar's `<button>` does, which is const 139's own shape.
 
 **medium** · `divergence` · reference byte **2,485,267**
 
@@ -2255,6 +2267,8 @@ APe,5,2,"li",89)(15,PPe,3,2,"li",90)(16,NPe,10,1,"li",91)
 
 ### RS-03 — Roster row: the stars / years indicator (stars-container) is absent, and its CSS ships with no producer
 
+**BLOCKED 2026-08-30 13:32 UTC.** `O(9, disableStarYears || e.isP || !e.data.years ? -1 : 9)` needs `e.data.years`, and **that value has no supply anywhere in this repository** — the same absence the MESSAGE-side star already carries, recorded twice at `gates.ts:110` and `room-config-client.ts:82` (*"its `item.membershipYears` supply does not exist yet"*). The message-side markup exists and is gated on a value that is always undefined; adding the roster's copy would be a second node that can never render. The CSS shipping with no producer is explained by the same fact. What would unblock it: a membership age on the roster row, which is a controller-side decision about what `years` means (account age? membership age? per room?) rather than a transcription.
+
 **low** · `missing-behaviour` · reference byte **2,034,694**
 
 ```
@@ -2266,6 +2280,8 @@ O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPrese
 > Verified: The roster star/years indicator is genuinely absent from our roster row, and the near-miss refutation is a component conflation. Reference: the gate at bundle byte 2,034,694 is confirmed verbatim, its slot-9 body `F2e` at byte 2,033,362 renders `span const 11 > i const 20 > span const 21` with `Ze(e.data.years)`, and the const table at by…
 
 ### RS-04 — Roster row: the "New" badge is absent
+
+**BLOCKED 2026-08-30 13:32 UTC, on the same absence as RS-03.** `O(8, isNewIndicatorOn && isPresenter && e.isNew ? 8 : -1)` needs `e.isNew`, and `isNew` is declared on the message type (`types.ts:85`, `:336`) and populated by nothing, anywhere. The gate's other two terms exist; the row flag does not. Same unblocking condition: a server-side definition of what makes a member new.
 
 **low** · `missing-behaviour` · reference byte **2,034,694**
 
@@ -2279,6 +2295,8 @@ O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPrese
 
 ### RS-08 — simUserCount is added to the headcount unclamped — the reference clamps it to 0…5000
 
+**BUILT 2026-08-30 13:32 UTC — the same clamp as G14, in the one place that computes the number.** `RoomRoster.#connectedCount` is what both the navbar and this badge read, so `clampSimUserCount` there fixes both surfaces at once. The lower bound is the half that mattered: a negative setting **subtracted from a real roster**. See `#lib/sim-user-count.ts` for the transcription and the three details that would each be a real change if tidied.
+
 **low** · `missing-control` · reference byte **2,499,381**
 
 ```
@@ -2290,6 +2308,8 @@ this.simUserCount=Number(e),this.simUserCount>5e3&&(this.simUserCount=5e3),this.
 > Verified: I could not refute this. The reference clamp is real and I read the bytes: at offset 2499381 (ngOnInit of the desktop room component) the bundle reads `const e=this.appService.globals.sessData.simUserCount` (offset 2498511) and then `e&&(this.simUserCount=Number(e),this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this…
 
 ### RS-10 — Mobile App Info and the tip <p> are in the opposite order to the reference
+
+**BUILT 2026-08-30 13:32 UTC.** `H(12, rPe, …)(13, aPe, …)` at byte 2,470,612. Both are `<p>` buttons in the same block, so the one a member's eye lands on first is whichever the room happens to have configured; the reference puts the thing the ROOM offers before the thing the PRESENTER asks for.
 
 **low** · `divergence` · reference byte **2,470,612**
 
@@ -2303,6 +2323,8 @@ H(12,rPe,2,1,"p")(13,aPe,5,2,"p"),T(14,"hr"
 
 ### RS-11 — The connection lines have a different element shape and the opposite order
 
+**BUILT 2026-08-30 13:32 UTC — four nodes in two shapes, and we had two nodes in one.** `H(15,lPe,3,0,"p")(16,cPe,3,0,"p"), d(17,"p"), H(18,dPe,3,0,"span")(19,uPe,3,0,"span")`: the two FAILURE lines are a `<p>` each because they are sentences, and the two SUCCESS marks share one `<p>` as `<span>`s because they are labels. We had one `<p>` per service with both states inside it, so **on a healthy connection the room drew two stacked lines where the reference draws one**, and CHAT came second where the reference puts it first. The literals are transcribed with their own non-uniform spacing — `" Reconnecting Chat..."` has a leading space and no trailing one, `" Reconnecting Media... "` has both — written as expressions because Svelte normalises whitespace at element boundaries.
+
 **low** · `divergence` · reference byte **2,470,790**
 
 ```
@@ -2314,6 +2336,8 @@ H(12,rPe,2,1,"p")(13,aPe,5,2,"p"),T(14,"hr"
 > Verified: I could not refute it; the divergence is real on all three counts, and there is no second implementation anywhere in apps/room/src. (a) ORDER: the reference emits the Chat slot first in BOTH states — H(15,lPe)="Reconnecting Chat...", H(16,cPe)="Reconnecting Media...
 
 ### RS-12 — Benzinga: the default URL is not reproduced, so the item hides unless altBenzingaLinkURL is set
+
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30 13:32 UTC, and the reason is a CREDENTIAL rather than a preference.** The default is `https://ptrv3.protradingroom.com/public/bz/index.html?sessID=${sessionID}&id=${sessData.uuid}&tok=${sesionToken}` — a page on the reference vendor's own host, **carrying this room's session token in the query string**. Reproducing it would send every room's session token to a third party on every load of the sidebar item, for every room that has not set `altBenzingaLinkURL`. That is not a transcription decision. Two things follow and both are the owner's: whether this deployment should point at that host at all, and — if some Benzinga page is wanted — what identifier it may be given, because a session token in a URL is a session token in referrer headers, proxy logs and browser history. Until then the item renders only when the room supplies its own URL, which is `altBenzingaLinkURL`'s own branch and is safe by construction. The sibling gap (`benzinga-logo.png` is absent from this repository) is already recorded in `RoomNavbar.svelte`.
 
 **low** · `divergence` · reference byte **2,499,501**
 

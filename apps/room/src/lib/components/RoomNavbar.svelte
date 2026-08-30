@@ -1,5 +1,6 @@
 <script lang="ts">
   import ScreenShareMenu from '#lib/components/ScreenShareMenu.svelte';
+  import type { TipButton } from '#lib/tip-button.js';
   import type { RoomMedia, TalkingUser } from '#lib/room/media.svelte.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomRoster, RosterMember } from '#lib/room/roster.svelte.js';
@@ -165,6 +166,8 @@
     onshowrecpreview: () => void;
     onhiderecpreview: () => void;
 
+    /** RS-09 — the tip control, already resolved. `tip-button.ts` holds the three-way gate. */
+    tip: TipButton;
     /**
      * G12 — `toggleSideBarUsersCount` is `alwaysShowRoster && (…)`: the SETTING gates the whole
      * statement, so in a room without it clicking the counter does nothing at all.
@@ -257,6 +260,7 @@
     onrequestreload,
     onshowrecpreview,
     onhiderecpreview,
+    tip,
     alwaysShowRoster,
     rosterCountVisible,
     streamingTabAvailable,
@@ -408,6 +412,42 @@
         supplies a logo and is absent otherwise. A room in that state still gets the sidebar item,
         so the feature is reachable either way. Restore the second copy by adding the asset.
       -->
+      <!--
+        ── RS-09 — THE TIP BUTTON IS RENDERED TWICE UPSTREAM, and we had one of them ──────────────
+
+        ```js
+        function APe(t,n){ … d(0,"li",139), x("click", () => doTipToUser()),
+                             d(1,"a",140), T(2,"i",35), d(3,"span",36), v(4) …
+                           xn("title", sessData.tipMeBtnTxt), Ze(sessData.tipMeBtnTxt) }
+        O(14, e.isTipEnabled ? 14 : -1)          // byte 2,487,938, immediately before Benzinga
+        139 [1,"nav-item",3,"click","title"]
+        140 [1,"d-flex","align-items-center","btn","btn-primary","btn-sm"]
+        ```
+
+        `aPe` (byte 2,466,601) is the SIDEBAR's copy and this room has it; this is the navbar's, and
+        `tip-button.ts` was written expecting both — its own docblock says *"the two call sites read
+        `tip.visible`"* while only one existed. The label is bound to the `title` AND to the text,
+        which is upstream's doubling on both copies.
+
+        The `<li>` carries the click here where the sidebar's `<button>` does, so the whole item is
+        the target rather than the button inside it. That is const 139's `3,"click"` and not a
+        choice; `role`/`tabindex`/`onkeydown` are ours, for the reason every other captured
+        click-on-a-non-control in this file carries them.
+      -->
+      {#if tip.visible}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <li
+          class="nav-item"
+          title={tip.label}
+          onclick={() => window.open(tip.url, '_blank', 'noopener,noreferrer')}
+        >
+          <!-- svelte-ignore a11y_missing_attribute -->
+          <a class="d-flex align-items-center btn btn-primary btn-sm">
+            <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
+          </a>
+        </li>
+      {/if}
       {#if benzinga.visible && benzinga.logoUrl}
         <li class="nav-item animated fadeIn benzinga-li">
           <a

@@ -247,6 +247,12 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
       why: 'a user badge supplied by room configuration. `.user-badge-img` bounds it at `max-height: 20px` with `width: auto`, so badges of different aspects sit on one line.'
     }
   },
+  'lib/components/RoomSidebar.svelte': {
+    '{badge.imageUrl}': {
+      count: 1,
+      why: 'the SAME badge element on a roster row — RS-02, which rendered the wrapper and never filled it. Bounded by the same `.user-badge-img` rule as the message-log twin above, and unsizeable for the same reason: the image is room configuration of unknown aspect.'
+    }
+  },
   'lib/components/RoomOverlays.svelte': {
     '{chatPastePreviewUrl}': {
       count: 1,

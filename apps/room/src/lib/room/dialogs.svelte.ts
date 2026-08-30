@@ -40,6 +40,29 @@ export interface RoomConfirmation {
    */
   ondismiss?: () => void;
   className?: string;
+  /**
+   * ── RS-07 — `bootbox.confirm({buttons:{confirm:{label,className},cancel:{…}}})` ───────────────
+   *
+   * `bootbox.confirm(message, callback)` renders OK/Cancel, and this room rendered OK/Cancel for
+   * every confirmation it has. But `getRandomUser` asks **"Only select from Trials?"** — a yes/no
+   * question — and answers it with buttons that say OK and Cancel. Reading them as an answer takes
+   * a beat every single time, and "Cancel" reads as *abandon the whole thing* when it actually
+   * means *draw from everybody*, which is a different action rather than none.
+   *
+   * ```js
+   * bootbox.confirm({ message: "Only select from Trials?",
+   *   buttons: { confirm: {label:"Yes", className:"btn-success"},
+   *              cancel:  {label:"No",  className:"btn-danger"} }, callback(i){…} })
+   * ```
+   * (byte 2,516,822.)
+   *
+   * OPTIONAL, and the defaults are the reference's own: a `bootbox.confirm` with no `buttons` block
+   * renders OK and Cancel, which is what every other call site here passes and must keep getting.
+   */
+  confirmLabel?: string;
+  confirmClassName?: string;
+  cancelLabel?: string;
+  cancelClassName?: string;
 }
 
 /** `bootbox.prompt({title, value, callback})`. */

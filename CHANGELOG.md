@@ -33,6 +33,75 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 13:32 UTC — The sidebar's twelve rows: an avatar setting that leaked, a wrapper nobody filled, and a Cancel button that did not cancel
+
+**Runtime impact: YES.** A room that hides avatars no longer publishes every member's picture in the
+roster — only the presenters', which is the reference's own exception. A presenter can tell a trial
+from a paying member at a glance. Roster rows wear the badges their account was given. The tip button
+is in the navbar as well as the sidebar, which is where the reference puts it and where
+`tip-button.ts` had been expecting a second call site all along. And "Only select from Trials?" is
+answered by **Yes** and **No** instead of OK and Cancel.
+
+**`RoomSidebar.svelte`'s twelve rows are closed: RS-01, RS-02, RS-05, RS-07, RS-09, RS-10, RS-11
+built; RS-08 built with G14; RS-03, RS-04 and RS-06 blocked; RS-12 an owner decision.**
+
+#### RS-05 was a leak, and the other four roster rows were not
+
+`showUserAvatar(e) { return !sessData.hideAvatars || !!e }` — **the roster's avatar gate is not the
+message log's.** A presenter's picture shows even in a room that hides avatars, because a member has
+to be able to tell who is running the room. This rail had no gate at all, so a room with avatars
+turned off still published every member's picture in the list of everybody present. One setting,
+honoured in the log and not in the roster.
+
+#### RS-07 — "Cancel" was not merely unhelpful, it was wrong
+
+The No branch of "Only select from Trials?" is not a cancellation: `ondismiss` runs
+`roster.draw(false)`, which draws from **everybody**. A member pressing Cancel to back out got a
+random user anyway. `RoomConfirmation` gained four optional button fields, defaulted to OK/Cancel
+because that is what `bootbox.confirm(message, callback)` renders and what forty other call sites
+here pass.
+
+#### RS-11 — four nodes in two shapes, and we had two nodes in one
+
+The two failure lines are a `<p>` each because they are sentences; the two success marks share one
+`<p>` as `<span>`s because they are labels. We had one `<p>` per service with both states inside it,
+so on a healthy connection the room drew two stacked lines where the reference draws one — and CHAT
+came second where the reference puts it first.
+
+#### RS-12 is a CREDENTIAL question, not a preference
+
+The reference's default Benzinga URL is a page on its own vendor's host **carrying this room's
+session token in the query string**. Reproducing it would send every room's session token to a third
+party on every load of that sidebar item, for every room that has not set `altBenzingaLinkURL` — and
+a session token in a URL is a session token in referrer headers, proxy logs and browser history. Two
+things follow and both are the owner's: whether this deployment should point at that host at all,
+and what identifier such a page may be given. Until then the item renders only when the room supplies
+its own URL, which is safe by construction.
+
+#### RS-03 and RS-04 are blocked on data that exists nowhere
+
+The stars indicator needs `e.data.years` and the New badge needs `e.isNew`. Both are declared on the
+message type and populated by **nothing, anywhere** — an absence this repository already records
+twice for the message-side star. Adding the roster's copies would be two more nodes that can never
+render. What would unblock them is a controller-side definition of what "years" and "new" mean, which
+is a decision rather than a transcription.
+
+#### What was run
+
+`pnpm run gate` in `apps/room`, green, exit code echoed into the log and read from there. 242 test
+files, 3,996 passed, 1 skipped. Six ceilings raised with their reasons recorded.
+
+**Eight negative controls, each seen RED after the commit and reverted:** the roster avatar ungated,
+and separately its presenter exception dropped (two different failures — the second is what makes the
+gate the roster's rather than the log's); the Trial chip shown to members; the badges wrapper restored
+to its empty self; the two success marks reordered; Mobile App Info swapped back behind the tip; the
+navbar tip removed; and the random-user confirm's label put back to OK.
+
+**The Svelte MCP server is still disconnected for this session.**
+
+**123 audit rows remain open; 101 are closed.** Four surfaces are now complete: `RoomMessage.svelte`,
+`routes/+page.svelte`, `PrivateChatPanel.svelte` and `RoomSidebar.svelte`.
+
 ### 2026-08-30 12:55 UTC — The room shell's last eight rows: two things a member is told when the room breaks, one number that could lie downwards, and four recorded refusals
 
 **Runtime impact: YES.** A member whose chat connection drops is told so — until now they saw nothing

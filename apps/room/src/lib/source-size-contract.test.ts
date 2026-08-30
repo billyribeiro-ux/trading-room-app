@@ -605,7 +605,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       immediately on the server — which is the exact shape of the defect that answered 500 on every
       room load for eleven days, and which `svelte-check` is silent about.
     */
-    max: 1529,
+    /*
+      1,529 -> 1,541, 2026-08-30. Twelve lines: RS-07's four button labels and their citation, and
+      `badgesFor` handed to the sidebar. The labels are the answer to a yes/no question that this
+      room was answering with OK and Cancel — "Cancel" reading as abandon-the-whole-thing where it
+      actually means draw from everybody, which is a different action rather than none. One more line
+      for RS-09's `tip={tipButtonFor(data.sessData)}` on the navbar, which is the same resolver the
+      sidebar already reads.
+    */
+    max: 1542,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1393,7 +1401,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       into chat instead of into that feature. Here the cost of getting it wrong is larger — an image
       meant for one person would land in the room.
     */
-    max: 947,
+    /*
+      947 -> 951, 2026-08-30. Four lines: the confirmation's four optional button labels passed
+      through to `BootboxDialog`, each defaulted to what a `bootbox.confirm` with no `buttons` block
+      renders — which is what every other call site in this room passes and must keep getting.
+    */
+    max: 951,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1886,7 +1899,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `benzingaVisible`, `tip` — and if this number climbs the thing to check is whether one of them
       has started being computed here instead.
     */
-    max: 775,
+    /*
+      775 -> 845, 2026-08-30. RS-01, RS-02 and RS-05 — three roster-row gaps, and the third is the
+      one that mattered.
+
+      RS-05: `showUserAvatar(e) { return !sessData.hideAvatars || !!e }` — the roster's avatar gate
+      is NOT the message log's, and this rail had none, so a room with avatars turned off still
+      published every member's picture here. RS-02: the badges div was rendered ALWAYS and EMPTY —
+      const 8's class list with no content and no gate, a wrapper nobody fills. RS-01: the Trial
+      chip had no node at all, so a presenter scanning the roster could not tell a trial from a
+      paying member, which is the one distinction that list is used to make.
+
+      `badgesFor` is `RoomFeeds`'s and is the SAME resolution the message rows use, passed in rather
+      than re-derived — which is what stops the rail and the log disagreeing about who wears what.
+    */
+    /*
+      845 -> 873 in the same commit: RS-10 and RS-11, two markup shapes and their citations.
+
+      RS-11 is the one worth the lines. The reference draws FOUR nodes in two shapes — the two
+      failure sentences are a `<p>` each, and the two success marks share one `<p>` as `<span>`s —
+      and we had one `<p>` per service with both states inside it. So on a healthy connection the
+      room drew two stacked lines where the reference draws one, and CHAT came second where the
+      reference puts it first. RS-10 swaps Mobile App Info ahead of the tip button, which is the
+      reference's own order: the thing the ROOM offers before the thing the PRESENTER asks for.
+    */
+    max: 873,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
@@ -2924,7 +2961,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the stale-callback trap that makes a plain assignment clear the field. That last one is
       negative-controlled: delete the line and an ordinary "Message Saved" reloads the room.
     */
-    max: 174,
+    /*
+      174 -> 197, 2026-08-30. RS-07 — four optional fields on `RoomConfirmation` and the citation for
+      why a confirm needs button labels at all.
+
+      They are OPTIONAL and default to OK/Cancel, because that is what `bootbox.confirm(message,
+      callback)` renders and what every existing call site here relies on. A required field would
+      have meant touching every one of them to say what they already said.
+
+      The seam question above still has the same answer: this is one primitive, and the labels
+      belong to the confirmation they label.
+    */
+    max: 197,
     why: 'the three bootbox dialogs, which STACK and therefore stay three fields; the alert carries a dismissal'
   },
   {
@@ -4343,7 +4391,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/BootboxDialog.svelte',
-    max: 132,
+    /*
+      132 -> 146, 2026-08-30. RS-07's other half: the four labels rendered, with the defaults that
+      keep every existing caller identical. The two buttons were hardcoded `OK` and `Cancel`.
+    */
+    max: 146,
     why: 'the dialog primitive this repository uses in place of bootbox'
   },
   {
@@ -4788,6 +4840,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       gates, whose every prop is an INPUT rather than a value it reaches back through the navbar to
       read. That is the test `RoomMessage.svelte`'s entry records for the split it refused.
 
+      1,097 -> 1,137, 2026-08-30. RS-09 — the tip button, which the reference renders TWICE and this
+      room had once. `APe` at byte 2,472,922 is the navbar's `<li>`; `aPe` is the sidebar's `<p>`,
+      and `tip-button.ts` was written expecting both — its docblock says "the two call sites read
+      `tip.visible`" while only one existed. It sits immediately before Benzinga, which is
+      `O(14, isTipEnabled ? 14 : -1)` followed by `O(15, hasBenzingaNews ? 15 : -1)`.
+
       1,063 -> 1,097 in the same commit: G08's MEASURED REFUSAL, thirty-four lines and every one of
       them the reason. The reference switches the talking indicator between `talking.gif` and
       `notalking.png` on `mediaService.presenterTalking`, and that flag is written by two
@@ -4799,7 +4857,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       A refusal costs lines exactly once and saves the next reader a re-derivation, which is the
       trade this file exists to make. It is not licence for the next one.
     */
-    max: 1097,
+    max: 1137,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

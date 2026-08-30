@@ -76,15 +76,15 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
-| 3 | `routes/+page.svelte` | 1,528 | no |
+| 3 | `routes/+page.svelte` | 1,541 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,096 | no |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,136 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 988 | no |
-| 8 | `lib/components/RoomOverlays.svelte` | 946 | no |
+| 8 | `lib/components/RoomOverlays.svelte` | 950 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 824 | no |
-| 11 | `lib/components/RoomSidebar.svelte` | 774 | no |
+| 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
 | 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/PostAlertModal.svelte` | 608 | no |
@@ -118,7 +118,7 @@ guessed.
 | 42 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
 | 43 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
 | 44 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
-| 45 | `lib/components/BootboxDialog.svelte` | 131 | no |
+| 45 | `lib/components/BootboxDialog.svelte` | 145 | no |
 | 46 | `lib/components/MobileRestorePane.svelte` | 130 | no |
 | 47 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
 | 48 | `lib/components/WebcamStrip.svelte` | 124 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 68 surfaces audited · 1,072 of 32,125 lines · 3.4%.**
+**2 of 68 surfaces audited · 1,072 of 32,294 lines · 3.4%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
