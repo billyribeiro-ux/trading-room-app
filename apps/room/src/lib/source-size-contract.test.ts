@@ -1531,6 +1531,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       bundled with a feature.
     */
     /*
+      1560 -> 1700, 2026-08-30. `note-editor-image-popover` — and a CORRECTION to the two entries
+      below, which have named the toolbar as this file's obvious extraction since 2026-08-28.
+
+      **That was wrong, and the carousel extraction is what showed it.** `CarouselDialog` came out
+      cleanly because it touches no editor state: it is handed the values a carousel is made of and
+      hands them back once. The toolbar is the opposite — it is *nothing but* editor access. Every
+      one of its buttons calls `command((instance) => instance.chain()…)`, so extracting it produces
+      a component with roughly twenty callback props whose only purpose is to reach back into the
+      parent. That is worse code written to satisfy a number, which is the one thing this ratchet
+      must not cause.
+
+      The seams that ARE real here, in order: the version-history panel (its own list, its revert,
+      its four CSS rules, no editor beyond one command), and the link/image/video dialogs (three
+      modals with three fields between them). Neither is bundled with a feature, for the same reason
+      the carousel was not until the gate forced it.
+
+      This addition is 130 lines and about 90 of them are the reason: what the capture evidences here
+      is the four GROUP NAMES and nothing else — summernote is not in the bundle, so its popover's
+      markup, geometry and icons are unknown, and `imageAttributes` is deliberately not built rather
+      than invented. `note-image.ts` carries the attribute decisions.
+    */
+    /*
       1502 -> 1560, 2026-08-30. `note-editor-gif-insert-confirm`, and the `hint` this surface passes.
 
       Fifty-eight lines, forty of them the docblock on `insertGif`. The handler inserted on the
@@ -1552,8 +1574,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rule agrees with it. The note also records what is NOT that message — a missing editor is a bug
       in this component, not a mistake by the presenter.
     */
-    max: 1560,
-    why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
+    max: 1700,
+    why: 'the note editor and its transcribed toolbar; the version panel and the three dialogs are the seams'
   },
   {
     file: 'lib/components/notes/CarouselDialog.svelte',

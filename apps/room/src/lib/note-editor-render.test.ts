@@ -8,7 +8,6 @@ describe('NoteEditor evidence contract', () => {
       props: {
         contentHtml: '',
         giphyApiKey: 'test-key',
-        noteId: 59,
         onBringEveryone: () => undefined,
         onDirtyChange: () => undefined,
         onDone: () => undefined,

@@ -36,7 +36,6 @@ const editor = (simplifiedEditor: boolean) =>
     props: {
       contentHtml: '',
       giphyApiKey: '',
-      noteId: 1,
       onBringEveryone: () => undefined,
       onDirtyChange: () => undefined,
       onDone: () => undefined,

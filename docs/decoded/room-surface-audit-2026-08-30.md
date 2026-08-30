@@ -650,6 +650,12 @@ sendGif(e,i){this.sendingGif||(this.modalService.dismissAll(),this.sendingGif=!0
 
 ### note-editor-image-popover — The image popover (imageAttributes / resize / float / removeMedia) has no counterpart
 
+**BUILT 2026-08-30 07:25 UTC — three of the four groups.** `resizeFull`/`resizeHalf`/`resizeQuarter`/`resizeNone`, `floatLeft`/`floatRight`/`floatNone` and `removeMedia`, by the names the capture gives, on a strip that appears while an image is selected. Behind them, `note-image.ts` extends `@tiptap/extension-image` with a `width` attribute and a `float` style. **`resizeNone` and `floatNone` clear rather than set** — which is what the names say, and what makes them undo rather than merely change.
+
+**What is evidenced here is the GROUP LIST and nothing else, and the build says so.** Summernote is not in this bundle, so its popover's markup, geometry and icons are unknown; this is a strip above the editor rather than a floating popover, because inventing a popover's geometry to match a capture nobody has is how a component acquires decisions nothing can check. **`imageAttributes` is deliberately NOT built** — a third-party plugin whose dialog is unevidenced twice over, in this bundle and in the reference's own source. It is the one group of four that stays open, and it needs either a capture of that plugin or an owner decision about what the dialog should hold.
+
+**Two divergences with reasons.** The width is an ATTRIBUTE where summernote writes a style, because `safe-html.ts`'s `img` style allow-list admits `width: 100%` and nothing else — `50%` and `25%` would have been stripped on the way back in and the control would have changed nothing. And that allow-list was WIDENED to admit `float: left|right|none`, which is a deliberate change to a deny-by-default control: three enumerated keywords, no URL, no `url()`, no expression, and narrower than the property's real grammar because the extra values are ones this editor cannot produce. `note-image-popover-contract.test.ts` executes the pattern against both the three legal values and five refused ones.
+
 **medium** · `missing-control` · reference byte **1,469,073**
 
 ```
@@ -801,6 +807,10 @@ d(12,"span",88),x("click",function(){return D(e),E(g().searchGiphy())}),T(13,"i"
 
 ### note-editor-height-and-mount — Editor height and the mount element differ from the single .note-view element
 
+**HALF BUILT 2026-08-30 07:25 UTC, and the half this row named.** *"the hidden div is the part worth deleting"* — deleted. `<div id="summernoteEdit-{noteId}" class="note-view" hidden>` was a mount point for a library this app does not use: summernote initialises ON `.note-view` and replaces it, so upstream has one element that is both the rendered note and the editor, while Tiptap mounts into `.note-editor-host` and the read-only note is `NotesPane`'s own element. Hidden, read by nothing, written by nothing. It also put a DUPLICATE id in the document — `NotesPane` renders the same one for the same note, so `getElementById` could return either and which depended on render order.
+
+**The height stays ours and that is the decision.** `height: "100%"` against our `editorHeight` with a drag-resize bar: the reference's editor fills a pane it does not share, ours sits in a column beside the note list and a presenter sizing it is a capability the reference does not have. Recorded as a kept divergence rather than left as an open row.
+
 **low** · `divergence` · reference byte **1,468,553**
 
 ```
@@ -812,6 +822,10 @@ placeholder:"Type your note here and press save",height:"100%",toolbar:[["style"
 > Verified: I could not refute either half. (1) HEIGHT: the reference config is height:"100%" and the component's own styles are [_nghost]{display:block;height:100%} / .note-view{height:100%}, i.e.
 
 ### note-editor-iframe-whitelist — protradingroom.com is not in our iframe host allow-list
+
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30 07:25 UTC.** This row says it itself: *"Worth a decision, not a fix by default."* Adding a host to a deny-by-default sanitizer in a multi-tenant fintech application is not a transcription, and three measured facts argue against doing it unasked. The reference's own `codeviewFilter` and `codeviewIframeFilter` are BOTH false at the same offset, so that whitelist is inert there and its contents evidence an intention rather than a behaviour. Our sanitizer is a control the reference does not have at all, so this is not a gap against it. And `.protradingroom.com` with a leading dot is a SUBDOMAIN wildcard — admitting it would admit every subdomain of a domain this deployment may not even serve from.
+
+**What unblocks it:** the owner saying whether notes may embed first-party iframes, and from which exact host. If yes, the entry belongs beside the existing four in `SAFE_IFRAME_HOSTS` with the room's own configured host rather than a literal, so a second deployment does not inherit the first one's domain.
 
 **low** · `divergence` · reference byte **1,469,265**
 

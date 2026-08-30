@@ -38,7 +38,6 @@ function editor(props: {
     props: {
       contentHtml: '',
       giphyApiKey: '',
-      noteId: 59,
       onBringEveryone: () => undefined,
       onDirtyChange: () => undefined,
       onDone: () => undefined,

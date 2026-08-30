@@ -33,6 +33,93 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 07:25 UTC — The image popover, a hidden element deleted, and two rows closed as decisions
+
+**Runtime impact: YES.** An image in a note can be resized to 100/50/25/auto, floated left or right,
+and removed. Before this there was no UI for any of it — only a raw text delete.
+
+**`note-editor-image-popover`, three groups of four.** Reference byte 1,469,073 configures
+`imageAttributes`, `resizeFull`/`resizeHalf`/`resizeQuarter`/`resizeNone`,
+`floatLeft`/`floatRight`/`floatNone` and `removeMedia`. Three of the four are built, by those names,
+on a strip that appears while an image is selected. `resizeNone` and `floatNone` **clear** rather
+than set — which is what the names say, and what makes them undo rather than merely change.
+
+**WHAT IS EVIDENCED IS THE GROUP LIST AND NOTHING ELSE, and the build says so at the markup.**
+Summernote is not in this bundle, so its popover's markup, geometry and icons are unknown. This is a
+strip above the editor rather than a floating popover over the image, because inventing a popover's
+geometry to look like a capture nobody has is how a component acquires decisions nothing can check.
+**`imageAttributes` is deliberately not built** — a third-party plugin whose dialog is unevidenced
+twice over, in this bundle and in the reference's own source. Building a src/alt/title dialog would
+be inventing a surface and then transcribing nothing.
+
+**A DENY-BY-DEFAULT SANITIZER WAS WIDENED, and that gets its own paragraph.** `safe-html.ts`'s `img`
+style allow-list now admits `float: left|right|none`. The argument, written at the rule: `float` is a
+layout keyword with three legal values; the pattern admits exactly those and cannot carry a URL, a
+`url()`, an expression or a custom property — the shapes a style allow-list exists to refuse. It is
+narrower than the property's real grammar on purpose, because CSS's `inline-start`, `inline-end` and
+the global keywords are values this editor cannot produce, and an allow-list matching the
+specification rather than the writer has stopped saying anything. The contract executes the pattern
+against the three legal values and five refused ones rather than asserting the text of it.
+
+The width is an **attribute** where summernote writes a style, and that is the same rule seen from
+the other side: the `img` style allow-list admits `width: 100%` and nothing else, so `50%` and `25%`
+written as styles would have been stripped on the way back in and the control would have changed
+nothing. The extension parses back everything it renders, because the editor serializes on save and
+re-parses on open — an attribute that renders but does not parse survives exactly until the note is
+reopened, which is a control that appears to work all session and loses its effect overnight.
+
+**`note-editor-height-and-mount` — the half this row named as worth doing.**
+*"the hidden div is the part worth deleting"*, and it is deleted.
+`<div id="summernoteEdit-{noteId}" class="note-view" hidden>` was a mount point for a library this
+app does not use: summernote initialises ON `.note-view` and replaces it, so upstream has one element
+that is both the rendered note and the editor, while Tiptap mounts into `.note-editor-host` and the
+read-only note is `NotesPane`'s own. Hidden, read by nothing, written by nothing — `CLAUDE.md`'s
+"nothing exists without a consumer" in its purest form. It also put a DUPLICATE id in the document,
+since `NotesPane` renders the same one for the same note, so `getElementById` could return either and
+which one depended on render order. **And the prop went with it.** eslint caught `noteId` unused on the first gate run after the
+deletion, because that div had been its only reader — leaving the prop exactly what the div had been:
+a value handed in that nothing consumes. Deleted from the component, from `NotesPane`'s call site and
+from the three test fixtures that constructed it. `NotesPane` already passes `activeNote.id` into
+every callback that needs it, so the editor never had to know its own id.
+
+The height stays ours and is recorded as a kept divergence: the
+reference's editor fills a pane it does not share, ours sits in a column beside the note list, and a
+presenter sizing it is a capability the reference does not have.
+
+**`note-editor-iframe-whitelist` is closed as an OWNER DECISION, not built.** The row says so itself
+— *"worth a decision, not a fix by default"* — and three measured facts argue against doing it
+unasked. The reference's own `codeviewFilter` and `codeviewIframeFilter` are both false at the same
+offset, so that whitelist is inert there and evidences an intention rather than a behaviour. Our
+sanitizer is a control the reference does not have at all, so this is not a gap against it. And
+`.protradingroom.com` with a leading dot is a subdomain wildcard, which would admit every subdomain
+of a domain this deployment may not even serve from. What unblocks it is one sentence from the owner,
+and the entry then belongs beside the existing four keyed on the room's own configured host rather
+than on a literal.
+
+**A CORRECTION TO TWO OF MY OWN SIZE-CONTRACT ENTRIES.** Both have named the toolbar as this file's
+obvious extraction since 2026-08-28, and the carousel extraction earlier today showed that was wrong.
+`CarouselDialog` came out cleanly because it touches no editor state — it is handed values and hands
+them back. The toolbar is the opposite: it is *nothing but* editor access, every button calling
+`command((instance) => instance.chain()…)`, so extracting it produces a component with roughly twenty
+callback props whose only purpose is to reach back into the parent. That is worse code written to
+satisfy a number, which is the one thing a size ratchet must not cause. The real seams are named
+instead — the version-history panel, and the three link/image/video dialogs — and the ceiling is
+raised to 1,695 with that argument at the entry rather than the file being mangled to avoid it.
+
+**Negative controls, all ten seen RED after the commit, all first time.** Giving `resizeNone` a
+width of `auto`; giving `floatNone` the string `none`; renaming one captured command; dropping
+`...this.parent?.()` so `src`/`alt`/`title` would be replaced; deleting the float's `parseHTML` so it
+would render but not survive a reopen; widening the sanitizer's float pattern to `/^.*$/`; turning
+`imageSelected` into a `$state` written by an `$effect`; removing `aria-pressed`; putting the hidden
+mount div back; and replacing the popover's CSS rule with one that gives it no spacing.
+
+**Verified.** `note-image-popover-contract.test.ts` 13 new assertions, including the sanitizer
+pattern executed against eight inputs; whole `src/lib` suite 3,753 passed, 1 skipped. `svelte-check`
+0 errors, 0 warnings. Full `pnpm run gate` before the push, `gate-exit` echoed into the log and read
+from there. **Nothing was opened in a browser** — so the strip's appearance is unverified and only
+its behaviour is; that is stated rather than implied. The **Svelte MCP has been unavailable for this
+entire session**.
+
 ### 2026-08-30 06:52 UTC — The note surface's three Giphy gaps, two of which were one word
 
 **Runtime impact: YES.** The Giphy popover has a search button as well as a clear button; a GIF

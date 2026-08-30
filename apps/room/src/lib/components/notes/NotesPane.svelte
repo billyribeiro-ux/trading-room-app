@@ -363,7 +363,6 @@
         {#if editingNoteId === activeNote.id && canEdit}
           {#key `${activeNote.id}:${activeNote.updatedAt}`}
             <NoteEditor
-              noteId={activeNote.id}
               contentHtml={activeNote.contentHtml ?? ''}
               {giphyApiKey}
               onBringEveryone={() => onBringEveryone(activeNote.id)}

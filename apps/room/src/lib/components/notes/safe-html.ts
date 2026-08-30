@@ -104,6 +104,22 @@ const TAG_STYLE_RULES: Readonly<Record<string, Readonly<Record<string, RegExp>>>
   },
   img: {
     display: /^block$/,
+    /*
+      ADMITTED 2026-08-30, for `note-editor-image-popover`'s `floatLeft` / `floatRight` /
+      `floatNone` group (reference byte 1,469,073). This allow-list is deny-by-default and widening
+      it is a decision, so here is the argument.
+
+      `float` is a layout keyword with three legal values and no others; the pattern below admits
+      exactly those. It cannot carry a URL, a `url()`, an expression, a custom property or anything
+      that resolves at parse time — the three attack shapes a style allow-list exists to refuse. It
+      moves an image inside the note's own text flow and can reach nothing outside it.
+
+      Narrower than the property's real grammar on purpose: CSS also defines `inline-start`,
+      `inline-end` and the global keywords, and none of them is a thing this editor can produce.
+      An allow-list matching the specification rather than the writer is an allow-list that has
+      stopped saying anything.
+    */
+    float: /^(?:left|right|none)$/,
     height: /^100%$/,
     'object-fit': /^contain$/,
     width: /^100%$/

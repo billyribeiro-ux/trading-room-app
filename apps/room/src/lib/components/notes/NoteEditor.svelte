@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Editor } from '@tiptap/core';
-  import Image from '@tiptap/extension-image';
   import Link from '@tiptap/extension-link';
   import { TableKit } from '@tiptap/extension-table';
   import TextAlign from '@tiptap/extension-text-align';
@@ -27,6 +26,7 @@
     numericRange,
     type CarouselSlide
   } from './carousel';
+  import { IMAGE_FLOATS, IMAGE_WIDTHS, NoteImage } from './note-image';
   import { safeNoteHtml } from './safe-html';
   import { noteVersionDate, noteVersionPreview } from './version-history';
 
@@ -38,7 +38,6 @@
   interface Props {
     readonly contentHtml: string;
     readonly giphyApiKey: string;
-    readonly noteId: number;
     readonly onBringEveryone: () => void;
     readonly onDirtyChange: (dirty: boolean) => void;
     readonly onDone: () => void;
@@ -81,7 +80,6 @@
   let {
     contentHtml,
     giphyApiKey,
-    noteId,
     onBringEveryone,
     onDirtyChange,
     onDone,
@@ -257,7 +255,7 @@
         }),
         TextStyleKit,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
-        Image.configure({ allowBase64: false }),
+        NoteImage.configure({ allowBase64: false }),
         Youtube.configure({
           controls: true,
           nocookie: true,
@@ -317,6 +315,58 @@
     void revision;
     return editor !== null && hasCarousel(editor.state.doc);
   });
+
+  /**
+   * The image the caret is on, and the three things the popover can do to it.
+   *
+   * `void revision` for the same reason `carouselInNote` does it: `revision` is bumped by
+   * `onSelectionUpdate`, so reading it is what makes this recompute when the caret moves. A
+   * `$derived` and not an `$effect` — the value is derived from editor state and nothing else, and
+   * an effect assigning it would re-run per keystroke to produce the same answer.
+   *
+   * `isActive('image')` rather than inspecting the node ourselves: it is what the editor already
+   * uses for every other toolbar button here, and it answers for a node selection and a caret
+   * inside an inline image alike.
+   */
+  let imageSelected = $derived.by(() => {
+    void revision;
+    return editor !== null && editor.isActive('image');
+  });
+
+  let imageWidth = $derived.by(() => {
+    void revision;
+    const value: unknown = editor?.getAttributes('image').width;
+    return typeof value === 'string' ? value : null;
+  });
+
+  let imageFloat = $derived.by(() => {
+    void revision;
+    const value: unknown = editor?.getAttributes('image').float;
+    return typeof value === 'string' ? value : null;
+  });
+
+  /*
+    `updateAttributes` and not a replacement node: the image keeps its `src`, `alt` and everything
+    else, and a `null` clears the attribute rather than writing the string "null". That is what makes
+    `resizeNone` and `floatNone` the ABSENCE of a value, which is what the capture's names say.
+  */
+  function setImageWidth(width: string | null): void {
+    command((instance) => instance.chain().focus().updateAttributes('image', { width }).run());
+  }
+
+  function setImageFloat(float: string | null): void {
+    command((instance) => instance.chain().focus().updateAttributes('image', { float }).run());
+  }
+
+  /**
+   * `removeMedia` — delete the selected image.
+   *
+   * `deleteSelection` rather than a node-specific delete, because `isActive('image')` is already the
+   * condition for showing this control and the selection IS the image when it is true.
+   */
+  function removeImage(): void {
+    command((instance) => instance.chain().focus().deleteSelection().run());
+  }
 
   /** The modal is editing an existing carousel rather than placing a new one. */
   let isEditingCarousel = $derived(editingCarouselPos !== null);
@@ -731,7 +781,85 @@
     </div>
   {/if}
 
-  <div id={`summernoteEdit-${noteId}`} class="note-view" hidden></div>
+  <!--
+    ── A HIDDEN ELEMENT NOTHING READ, DELETED 2026-08-30 ────────────────────────────────────────
+
+    `<div id="summernoteEdit-{noteId}" class="note-view" hidden></div>` stood here. It was the
+    reference's mount point: summernote initialises ON the `.note-view` element and then REPLACES it
+    with its own frame, so upstream has ONE element that is both the rendered note and the editor.
+
+    Ours does not work that way. Tiptap mounts into `.note-editor-host` below, and the read-only
+    rendered note is `NotesPane.svelte`'s own `.note-view#summernoteEdit-{id}` in the non-editing
+    branch. So this element was a mount point for a library this app does not use, hidden, holding
+    nothing, read by nothing, written by nothing — `CLAUDE.md`'s "nothing exists without a consumer"
+    in its purest form, and `note-editor-height-and-mount` said so.
+
+    A duplicate `id` in the document was the second cost: `NotesPane` renders the same id for the
+    same note, so `document.getElementById('summernoteEdit-3')` could return either, and which one
+    depended on render order. Nothing looked it up here, but the reference's own code does exactly
+    that lookup and a port of any of it would have found the empty one.
+
+    **THE `noteId` PROP WENT WITH IT, because that div was its only reader.** eslint said so on the
+    first gate run after the deletion, and the prop was then exactly what the div had been: a value
+    handed in that nothing consumes. `NotesPane` already passes `activeNote.id` into every callback
+    it needs it in — `onSave`, `onDelete`, `onRestoreVersion` — so the editor never had to know its
+    own id, and the version endpoint this component reads is reached through `onLoadVersions`.
+  -->
+  <!--
+    ── THE IMAGE POPOVER'S THREE BUILT GROUPS — `note-editor-image-popover` ─────────────────────
+
+    ```js
+    popover: { image: [                                          // reference byte 1,469,073
+      ["custom", ["imageAttributes"]],
+      ["image",  ["resizeFull","resizeHalf","resizeQuarter","resizeNone"]],
+      ["float",  ["floatLeft","floatRight","floatNone"]],
+      ["remove", ["removeMedia"]]
+    ]}
+    ```
+
+    Once an image was in a note there was no way to resize it, float it or remove it — only a raw
+    text delete.
+
+    **WHAT IS EVIDENCED IS THE GROUP LIST, AND NOTHING ELSE.** Summernote is not in the bundle, so
+    its popover's markup, its position and its icons are unknown, and none of them is guessed here.
+    This is a strip above the editor rather than a floating popover over the image, and it is one
+    because inventing a popover's geometry to look like a capture nobody has is how a component
+    acquires decisions nothing can check.
+
+    **`imageAttributes` IS DELIBERATELY NOT BUILT.** It is a third-party summernote plugin whose
+    dialog is unevidenced twice over — not in this bundle, and not in the reference's own source.
+    Building a src/alt/title dialog here would be inventing a surface and then transcribing nothing.
+    Recorded at the audit row as the one group of four that stays open.
+
+    `note-image.ts` carries what the two attributes are and why the width is an attribute where
+    summernote writes a style.
+  -->
+  {#if imageSelected}
+    <div class="note-image-popover btn-group btn-group-sm" role="group" aria-label="Image">
+      {#each IMAGE_WIDTHS as option (option.command)}
+        <button
+          type="button"
+          class={['btn btn-outline-secondary', { active: imageWidth === option.width }]}
+          aria-pressed={imageWidth === option.width}
+          onclick={() => setImageWidth(option.width)}>{option.label}</button
+        >
+      {/each}
+      {#each IMAGE_FLOATS as option (option.command)}
+        <button
+          type="button"
+          class={['btn btn-outline-secondary', { active: imageFloat === option.float }]}
+          aria-pressed={imageFloat === option.float}
+          onclick={() => setImageFloat(option.float)}>{option.label}</button
+        >
+      {/each}
+      <button
+        type="button"
+        class="btn btn-outline-danger"
+        aria-label="Remove this image"
+        onclick={removeImage}><i class="fas fa-trash"></i></button
+      >
+    </div>
+  {/if}
   <div
     class={['note-editor note-frame', { fullscreen, codeview: codeView }]}
     style:height={fullscreen ? '100vh' : `${editorHeight}px`}
@@ -1499,6 +1627,15 @@
     border: 0;
     background: transparent;
     text-align: left;
+  }
+
+  /*
+    The image popover's own spacing. It is a real rule and not a hook: `btn-group btn-group-sm` gives
+    the strip its shape, and this is the gap that keeps it off the editor frame it sits above. A
+    class carrying no declarations would be the `.flipped`-with-no-CSS defect `CLAUDE.md` names.
+  */
+  .note-image-popover {
+    margin-bottom: 6px;
   }
 
   .note-modal.open {
