@@ -28,9 +28,9 @@ the current image; the protected workflow must reproduce every current claim.
 
 The protected workflow provisions one explicitly named
 `api-release-builder` through commit-pinned
-`docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5`
-(`v4.1.0`), Buildx `v0.34.1`, and BuildKit
-`moby/buildkit:v0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec`.
+`docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e`
+(`v4.3.0`), Buildx `v0.36.1`, and BuildKit
+`moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8`.
 The evidence script rejects any other reported Buildx or BuildKit version,
 retains the selected builder inspection, passes `--builder
 api-release-builder` to both builds, and requires both metadata files to report
@@ -41,13 +41,13 @@ ID.
 The builder and final base are immutable:
 
 - builder:
-  `rust:1.97.1-alpine3.24@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900`;
+  `rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce`;
 - runtime:
-  `gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6`;
+  `gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7`;
 - platform: `linux/amd64`; and
 - runtime user: numeric uid/gid `65532:65532`.
 
-The Dockerfile explicitly selects the builder's installed Rust `1.97.1`
+The Dockerfile explicitly selects the builder's installed Rust `1.98.0`
 toolchain. Developer-only rustfmt, Clippy, and rust-analyzer component requests
 cannot cause release-build downloads. `cargo-auditable 0.7.5` embeds the locked
 runtime crate graph in both ELFs; the crates.io package SHA-256 is
@@ -69,7 +69,7 @@ hashes:
 | `/usr/lib/rcrt1.o`                                         | `musl-dev 1.2.6-r2`                            | `5e93abc3f181bdb1b177e8725dbad7c08ddf2dc5d94d47d593a34a7a4cba1df5` |
 | `/usr/lib/crti.o`                                          | `musl-dev 1.2.6-r2`                            | `a0af2446e5bce05119163883c5d522c3c44e3a9d1aa5014f468c1feb8dc2cb54` |
 | `/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/crtbeginS.o` | `libgcc-static 15.2.0-r5`                      | `21cc007ae9682cad220f2bd0c0475e483f6ef12204f65e99c464f6caf7eb0766` |
-| `/rust-native/libunwind.a`                                 | Rust `1.97.1` toolchain path and isolated copy | `eb16569e611a5d6cdda2e7604fd6402a3ad810817dd8d63ed50baa2ce8070aaa` |
+| `/rust-native/libunwind.a`                                 | Rust `1.98.0` toolchain path and isolated copy | `eb16569e611a5d6cdda2e7604fd6402a3ad810817dd8d63ed50baa2ce8070aaa` |
 | `/usr/lib/libc.a`                                          | `musl-dev 1.2.6-r2`                            | `ff0d5e7ac47afd296bb8bad4a67d4b0efbc763298a9fe6a4b1ee3e9d0fc6ec68` |
 | `/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/crtendS.o`   | `libgcc-static 15.2.0-r5`                      | `55b3c5c22ed779fb9a3ffb3cf9e878eceb9c97cfc6e7f58c0273bacae7ccd54e` |
 | `/usr/lib/crtn.o`                                          | `musl-dev 1.2.6-r2`                            | `596ea32e1d1782df9f25f8326013832ca5fe391e26f84382c6731c2a37263260` |
@@ -150,8 +150,8 @@ selected Linux x86-64 archive:
 
 | Tool  | Version | Official checksum-manifest SHA-256                                 | Linux x86-64 archive SHA-256                                       |
 | ----- | ------: | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| Syft  |  1.44.0 | `fa24ce6cafe6edbdba166414ce79de8142fbc217f8167e418dfb09e5aedfbf4e` | `0e91737aee2b5baf1d255b959630194a302335d848ff97bb07921eb6205b5f5a` |
-| Grype | 0.112.0 | `6294bee2e41b4af0c6f603b049b836b8dab25e39dac12343c7b69dfa9e7f1399` | `acb14a030010fe9bdb9594b4ae108d9d14ef2f926d936aa0916dc62c89c058ea` |
+| Syft  |  1.51.1 | `105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75` | `8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3` |
+| Grype | 0.118.0 | `7a0cfafb6082951a68f89199c3a45f84b0ed8670491e509529ab5f8ee4977a2b` | `1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2` |
 
 The script downloads each official manifest over verified HTTPS, verifies the
 complete manifest bytes, requires exactly one matching archive entry, verifies
