@@ -2389,6 +2389,8 @@ handleEmojiLeave(){!this.showPreview||!this.previewRef||(this.animationFrameRequ
 
 ### acA-01 — The inline ALERT ENTRY textarea is not rendered — only the checkbox that is supposed to control it
 
+**BUILT 2026-08-30 04:44 UTC.** The field, its two handlers and both halves of the toggle. The markup is `H2e` decoded with `app-alerts`' own consts (20 = `[1,"w-100","inline-alert-entry-field"]`, 52 = `["id","textAreaAlertHolder",1,"p-1"]`, 53 = the textarea), meeting the captured CSS that was already bridged and waiting for it. **The key rules are NOT the chat composer's** and are pinned in `lib/inline-alert-key.ts`: Enter posts, ALT+Enter is the newline, and SHIFT+Enter does nothing at all — `i.val(i.val())` after `preventDefault` is a no-op. A whitespace box clears without sending, because the clear is outside the guard. The paste routes to the ALERT path through the same pending-paste state and the same confirmation the chat composer uses, which is upstream's own shape — its subscriber is the post-alert modal. The row's second finding is closed too: `showAlertsEntry` is seeded and persisted, where ours was ephemeral. **One divergence:** upstream's subscriber calls the modal's `postAlert()`, so the inline box silently inherits whatever five checkboxes that modal was last left holding; this room posts a plain alert. `inline-alert-entry-contract.test.ts`.
+
 **high** · `missing-control` · reference byte **2,044,139**
 
 ```

@@ -46,6 +46,11 @@
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
   import { pastedImageFrom } from '#lib/pasted-image.js';
+  import {
+    inlineAlertKeyAction,
+    inlineAlertKeyPrevents,
+    inlineAlertPosts
+  } from '#lib/inline-alert-key.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
@@ -251,6 +256,31 @@
      * and this component would have to be handed three more things to do the job in place.
      */
     onpasteimage: (file: File) => void;
+    /**
+     * The inline alert box posted its text — upstream's `emit("inlineAlertEntry", value)`.
+     *
+     * A callback rather than the post itself, for the reason every other action here is one: the
+     * alert path, its refusals and its dialogs belong to `RoomComposer`.
+     */
+    oninlinealert: (body: string) => void;
+    /** The inline alert box pasted an image — `emit("inlineAlertEntryImage", {event, alertTxt})`. */
+    oninlinealertimage: (file: File, alertText: string) => void;
+    /**
+     * `toggleInlineAlertEntry()` — byte 2,047,433, and it does TWO things:
+     *
+     * ```js
+     * toggleInlineAlertEntry() {
+     *   this.appService.localstorage.setObject("showAlertsEntry", {showAlertsEntry: this.showAlertsEntry}),
+     *   this.appService.guiEventBus.emit("scrollAlertLogToBottom")
+     * }
+     * ```
+     *
+     * It PERSISTS the flag — ours was ephemeral `$state`, so the box closed itself on every reload —
+     * and it pulls the log back to the newest alert, because opening the field shortens the
+     * scroller. A `bind:checked` could do neither, which is why this is a callback and the checkbox
+     * is one-way now.
+     */
+    oninlineentrytoggle: (open: boolean) => void;
     onexpandcomposer: (element: HTMLTextAreaElement | undefined) => void;
     /** One keystroke in the main composer — `updateLastTypedTime()`. */
     ontyped: (value: string) => void;
@@ -319,6 +349,9 @@
     onprivatechat,
     showPmButton,
     onpasteimage,
+    oninlinealert,
+    oninlinealertimage,
+    oninlineentrytoggle,
     onexpandcomposer,
     ontyped,
     onstoppedtyping,
@@ -359,6 +392,83 @@
     if (!canPostImages) return;
     const image = pastedImageFrom(event.clipboardData?.items);
     if (image) onpasteimage(image);
+  }
+
+  /**
+   * The inline alert box's own draft. Local, because nothing outside this element reads it.
+   *
+   * Upstream keeps it in the DOM and reads it back with `$("#textAreaAlertTxt").val()`; a bound
+   * value is the same thing without a selector that can stop matching.
+   */
+  let inlineAlertText = $state('');
+
+  /**
+   * `onKey(e)` — byte 2,047,478, and its three branches are NOT the chat composer's.
+   *
+   * ```js
+   * onKey(e) {
+   *   if (13 == e.keyCode) {
+   *     e.preventDefault();
+   *     const i = $("#textAreaAlertTxt");
+   *     if (e.shiftKey) i.val(i.val());
+   *     else {
+   *       if (!e.altKey) return i.val().trim() && emit("inlineAlertEntry", i.val()),
+   *                             i.val(""), i.height("23px"), !1;
+   *       i.val(i.val() + "\n")
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * **Enter posts. ALT+Enter inserts a newline. SHIFT+Enter does NOTHING** — `i.val(i.val())` is a
+   * no-op after `preventDefault`, so the newline is swallowed. That last one reads as a bug and is
+   * the shipped behaviour, and it is the opposite of the chat composer one column over, where
+   * Shift+Enter is the newline. Reproduced rather than harmonised: a presenter's muscle memory for
+   * this box is the reference's, and "fixing" it would post an alert where they expected a line
+   * break.
+   *
+   * The RAW text is sent, not the trimmed one — `emit("inlineAlertEntry", i.val())` after testing
+   * `i.val().trim()`. So leading whitespace survives into the alert, exactly as it does through the
+   * modal, whose own composer "deliberately does not trim inputs".
+   */
+  function onInlineAlertKey(event: KeyboardEvent): void {
+    const action = inlineAlertKeyAction(event);
+    if (inlineAlertKeyPrevents(action)) event.preventDefault();
+    if (action === 'newline') {
+      inlineAlertText += '\n';
+      return;
+    }
+    if (action !== 'post') return;
+    const body = inlineAlertText;
+    /* Cleared unconditionally, posted only when there is something to post — see the module. */
+    inlineAlertText = '';
+    if (inlineAlertPosts(body)) oninlinealert(body);
+  }
+
+  /**
+   * `onImagePaste(e)` — byte 2,047,700.
+   *
+   * ```js
+   * onImagePaste(e) {
+   *   const i = $("#textAreaAlertTxt"), o = i.val();
+   *   emit("inlineAlertEntryImage", { event: e, alertTxt: o });
+   *   i.val(""), i.height("23px")
+   * }
+   * ```
+   *
+   * The box is cleared BEFORE the confirmation opens, which is upstream's order and is why the
+   * pending text travels with the event rather than being read back later. The subscriber is the
+   * post-alert MODAL (byte 2,125,263), so a pasted image here becomes an alert and not a chat
+   * message — `RoomComposer` carries that split.
+   *
+   * `pastedImageFrom` is the shared rule; the reference's own handler for this box is the same loop.
+   */
+  function onInlineAlertPaste(event: ClipboardEvent): void {
+    const image = pastedImageFrom(event.clipboardData?.items);
+    if (!image) return;
+    const text = inlineAlertText;
+    inlineAlertText = '';
+    oninlinealertimage(image, text);
   }
 
   function holdAlertsScroller(node: HTMLElement) {
@@ -580,7 +690,8 @@
                           value="Show inline alert entry"
                           id="inline-alert-entry"
                           class="form-check-input"
-                          bind:checked={alerts.inlineEntry}
+                          checked={alerts.inlineEntry}
+                          onchange={(event) => oninlineentrytoggle(event.currentTarget.checked)}
                         /><label for="inline-alert-entry" class="form-check-label">
                           Show inline alert entry
                         </label>
@@ -787,6 +898,47 @@
               {/each}
             </div>
           </app-roomscroller>
+
+          <!--
+            ── THE INLINE ALERT ENTRY, whose checkbox has always been drawn ─────────────────────────
+
+            `O(20, o.showAlertsEntry ? 20 : -1)` at byte 2,056,748, template `H2e` at 2,044,139, with
+            the three consts decoded from `app-alerts`' own table:
+
+              20  [1,"w-100","inline-alert-entry-field"]
+              52  ["id","textAreaAlertHolder",1,"p-1"]
+              53  ["name","txt-area-alert","id","textAreaAlertTxt","rows","1","spellcheck","true",
+                   "placeholder","Type your alert here..",1,"txt-area-alert","form-control",
+                   "border-0",3,"keyup","paste"]
+
+            The checkbox that toggles it has been in the toolbar since this pane was built and
+            `alerts.inlineEntry` has held its value; NOTHING rendered the field (`acA-01`). The
+            captured CSS for all three selectors is already bridged in
+            `styles/captured-runtime-components.css`, so this is markup arriving to meet a stylesheet
+            that was waiting for it.
+
+            PRESENTER-ONLY here, and that is ours rather than upstream's: the checkbox is already
+            inside `{#if isPresenter}` in the toolbar, so the field could only ever be opened by a
+            presenter — but `inlineEntry` is client state, and a gate that depends on a checkbox
+            being unreachable is not a gate. Posting an alert is presenter-only on the server either
+            way (`post-alert.remote.ts`).
+          -->
+          {#if isPresenter && alerts.inlineEntry}
+            <div class="w-100 inline-alert-entry-field">
+              <div id="textAreaAlertHolder" class="p-1">
+                <textarea
+                  name="txt-area-alert"
+                  id="textAreaAlertTxt"
+                  rows="1"
+                  spellcheck="true"
+                  placeholder="Type your alert here.."
+                  class="txt-area-alert form-control border-0"
+                  bind:value={inlineAlertText}
+                  onkeydown={onInlineAlertKey}
+                  onpaste={onInlineAlertPaste}></textarea>
+              </div>
+            </div>
+          {/if}
         </div>
       </app-alerts>
     </as-split-area>

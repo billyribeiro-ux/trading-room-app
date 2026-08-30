@@ -59,6 +59,22 @@ export class RoomAlerts {
   */
   #toolbarOpen = $state(false);
   #toolbarExtended = $state(false);
+  /**
+   * `showAlertsEntry` — whether the inline alert box is drawn under the alerts log.
+   *
+   * SEEDED from the stored preference and PERSISTED on every toggle, which it was not: it was
+   * ephemeral `$state`, so a presenter who opened the box got it closed again on the next reload.
+   * Upstream reads it back in `ngOnInit` (`localstorage.getObject("showAlertsEntry")`, byte
+   * 2,044,987) and writes it in `toggleInlineAlertEntry` (byte 2,047,433).
+   *
+   * ## The store is this room's, and it is a superset
+   *
+   * Upstream writes localStorage ONLY. `savePreference` here writes the settings blob and mirrors to
+   * localStorage, so the box also follows a presenter to another device. That is a divergence in the
+   * direction of the room's own convention — `alertsMode`, right beside it, is a real
+   * `setPreference` upstream too — and a second persistence mechanism for one boolean would be the
+   * thing worth avoiding.
+   */
   #inlineEntry = $state(false);
   #search = $state('');
 
@@ -100,10 +116,13 @@ export class RoomAlerts {
     alertFilterFor: AlertFilterFor;
     showAlertsFrom: boolean;
     archivedAt: number | null;
+    /** `showAlertsEntry`, read back on load — see the field. Absent means closed, as upstream's is. */
+    inlineEntry?: boolean;
   }) {
     this.#filterFor = seed.alertFilterFor;
     this.#showFrom = seed.showAlertsFrom;
     this.#archivedAt = seed.archivedAt;
+    this.#inlineEntry = seed.inlineEntry === true;
   }
 
   /**

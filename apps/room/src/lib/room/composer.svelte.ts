@@ -4,6 +4,7 @@ import {
   type PastedImageSubmission,
   type PostAlertSubmission,
   composePastedImageAlert,
+  composePostAlert,
   composeUploadedAlert,
   postOnXIntent
 } from '#lib/post-alert-behavior.js';
@@ -143,7 +144,17 @@ export class RoomComposer {
       `$state.raw`: it is replaced wholesale or cleared, never mutated, so a deep proxy over a `File`
       and a string would be overhead on every read — the same call `#rteEditTarget` below makes.
     */
-    this.#pastedImage = $state.raw<{ file: File; previewUrl: string } | null>(null);
+    this.#pastedImage = $state.raw<{
+      file: File;
+      previewUrl: string;
+      /*
+        WHICH log the confirmed image is posted to. One pending paste and one dialog for both, which
+        is the reference's own shape: `inlineAlertEntryImage` routes into the POST-ALERT MODAL's
+        `onImagePaste`, so upstream has exactly one paste confirmation and the alerts column borrows
+        it (byte 2,125,263). Two states here would be two dialogs and two ways to leak a preview URL.
+      */
+      target: 'chat' | 'alert';
+    } | null>(null);
     /*
       The message that will travel with it, seeded from the composer and then OWNED by the dialog.
 
@@ -275,15 +286,21 @@ export class RoomComposer {
    * not given — and it is not the real one either way: `composer-image.remote.ts` re-checks on the
    * server, which is where it counts.
    */
-  beginImagePaste(file: File): void {
+  beginImagePaste(file: File, target: 'chat' | 'alert' = 'chat'): void {
     /*
       A second paste while a confirmation is open replaces the first, and the first's object URL is
       revoked on the way — otherwise every discarded paste pins its image bytes for the life of the
       tab.
     */
     this.cancelImagePaste();
-    this.#pastedImage = { file, previewUrl: URL.createObjectURL(file) };
-    this.#pastedImageMessage = this.#chat.composer.trim();
+    this.#pastedImage = { file, previewUrl: URL.createObjectURL(file), target };
+    /*
+      The ALERT box seeds nothing: `onImagePaste` in the alerts column reads its OWN textarea and
+      hands the text over as `alertTxt` (byte 2,047,700), and the caller clears that box before this
+      runs — so the seed comes in through {@link pastedImageMessage} from there, not from the CHAT
+      composer, which is a different box entirely.
+    */
+    this.#pastedImageMessage = target === 'chat' ? this.#chat.composer.trim() : '';
   }
 
   /** Discard the pending paste, releasing its preview. Safe to call when there is none. */
@@ -313,8 +330,94 @@ export class RoomComposer {
     this.#pastedImage = null;
     this.#pastedImageMessage = '';
     URL.revokeObjectURL(pending.previewUrl);
+    if (pending.target === 'alert') {
+      /*
+        `subscribe("inlineAlertEntryImage", i => { selectedTab = "text"; alertTxt = …; onImagePaste(i.event) })`
+        at byte 2,125,263 — the pasted alert goes through the post-alert path, not the chat one.
+
+        The five flags are the composer's defaults rather than whatever the alert modal was last left
+        holding, which is the divergence `alerts.svelte.ts` argues for the text half: upstream calls
+        the MODAL's own method, so a presenter who ticked "Don't push" an hour ago silently gets it
+        again from a box in a different column.
+      */
+      await this.postPastedImage({
+        file: pending.file,
+        alertText: message,
+        keepOpen: false,
+        postOnX: false,
+        dontPush: false,
+        nonTradeAlert: false,
+        legalDisclosure: false,
+        legalDisclosureText: ''
+      });
+      return;
+    }
     if (message) this.#chat.clear('textAreaTxt');
     await this.uploadImages([pending.file], message);
+  }
+
+  /**
+   * The inline alert box sent its text — `subscribe("inlineAlertEntry", i => …)` at byte 2,125,143:
+   *
+   * ```js
+   * this.selectedTab = "text", this.alertTxt = i, this.postAlert()
+   * ```
+   *
+   * so it drives the post-alert modal's own TEXT tab. Here it composes the same way the modal's text
+   * tab does — `composePostAlert` with the tab pinned to `'text'` — and goes down `postAlert`, which
+   * is the one path that owns the refusal and the toast.
+   *
+   * ## The five flags are DEFAULTS, and that is a deliberate divergence
+   *
+   * Upstream calls the modal's method, so the inline box inherits whatever that modal was last left
+   * holding: a presenter who ticked "Don't send to push" an hour ago silently gets it again from a
+   * box in a different column, and nothing on screen says so. This room posts a plain alert. The
+   * modal is where those five decisions are made and where they are visible.
+   *
+   * `nonTradeAlert` is the one that could reasonably have gone the other way — `styckyNonTradeAlert`
+   * is a room setting whose whole purpose is a composer that starts ticked — and it is left `false`
+   * because the setting names the MODAL's checkbox and this box has none to start.
+   */
+  async postInlineAlert(body: string): Promise<boolean> {
+    const composition = composePostAlert({
+      tab: 'text',
+      alertText: body,
+      alertUrl: '',
+      linkAlertText: '',
+      imageAlertText: '',
+      legalDisclosure: false,
+      legalDisclosureText: '',
+      fileCount: 0
+    });
+    /* `noop` is an empty body, which the caller already refuses; `error` is the URL-scheme message,
+       unreachable from a text alert. Neither can post, and neither is worth a dialog here. */
+    if (composition.status !== 'post') return false;
+
+    return this.postAlert({
+      composition,
+      files: [],
+      keepOpen: false,
+      postOnX: false,
+      dontPush: false,
+      nonTradeAlert: false,
+      legalDisclosure: false,
+      legalDisclosureText: ''
+    });
+  }
+
+  /**
+   * The inline alert box pasted an image — `subscribe("inlineAlertEntryImage", …)`, byte 2,125,263.
+   *
+   * The same pending-paste state and the same confirmation the CHAT composer uses, because upstream
+   * has exactly one of each: its handler routes into the post-alert modal's `onImagePaste`. What
+   * differs is where the confirmed image goes, which is what `target` carries.
+   *
+   * @param alertText what was in the alert box when the paste happened. The box is cleared by the
+   *   caller first — upstream's own order — so this is the only copy.
+   */
+  beginAlertImagePaste(file: File, alertText: string): void {
+    this.beginImagePaste(file, 'alert');
+    this.#pastedImageMessage = alertText.trim();
   }
 
   get rteDraft(): string {

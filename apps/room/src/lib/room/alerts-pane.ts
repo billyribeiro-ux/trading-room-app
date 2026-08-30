@@ -241,6 +241,34 @@ export class RoomAlertsPane<Row extends ExportableRow> {
   }
 
   /**
+   * `toggleInlineAlertEntry()` — byte 2,047,433, and it does exactly two things:
+   *
+   * ```js
+   * toggleInlineAlertEntry() {
+   *   this.appService.localstorage.setObject("showAlertsEntry", {showAlertsEntry: this.showAlertsEntry}),
+   *   this.appService.guiEventBus.emit("scrollAlertLogToBottom")
+   * }
+   * ```
+   *
+   * Both were missing. The flag was ephemeral `$state`, so a presenter who opened the box got it
+   * closed again on the next reload; and nothing pulled the log back, so opening the field — which
+   * shortens the scroller — left the newest alert off screen.
+   *
+   * HERE rather than in `RoomAlerts` for the same reason {@link toggleToolbar} is: the scroller is
+   * this file's element. The two methods are the same shape because upstream's two are.
+   *
+   * `prefs.save` where upstream writes localStorage only — see `alerts.svelte.ts`, which records
+   * that this room's store is a superset and why a second persistence mechanism for one boolean is
+   * the thing worth avoiding.
+   */
+  toggleInlineEntry(open: boolean) {
+    this.#alerts.inlineEntry = open;
+    this.#prefs.save('showAlertsEntry', open);
+    const scroller = this.#alertsScroller();
+    if (scroller) this.#forceAlertsToBottom(scroller);
+  }
+
+  /**
    * `toggleAlertsToolbar()` - the gear (`app-alerts.compiled.js:134-140`):
    *
    * ```js

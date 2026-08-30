@@ -76,8 +76,8 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
-| 3 | `routes/+page.svelte` | 1,478 | no |
-| 4 | `lib/components/AlertChatArea.svelte` | 1,241 | no |
+| 3 | `routes/+page.svelte` | 1,482 | no |
+| 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,077 | no |
 | 6 | `lib/components/PresentationArea.svelte` | 974 | no |
 | 7 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 64 surfaces audited · 1,072 of 29,587 lines · 3.6%.**
+**2 of 64 surfaces audited · 1,072 of 29,743 lines · 3.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

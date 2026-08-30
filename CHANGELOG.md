@@ -33,6 +33,101 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 04:44 UTC — The inline alert entry: a checkbox that controlled nothing, and a stylesheet with no markup
+
+**Runtime impact: YES.** A presenter can post an alert from the alerts column without opening the
+modal, paste a screenshot into it, and the box stays open across reloads.
+
+#### `acA-01`
+
+"Show inline alert entry" has been drawn in the alerts toolbar since that pane was built, bound to
+`alerts.inlineEntry`, and `RoomAlerts` has held the flag. **Nothing rendered the field.** The
+captured CSS for all three of its selectors — `#textAreaAlertHolder`, `.txt-area-alert`,
+`.inline-alert-entry-field` — was already bridged in `styles/captured-runtime-components.css`, so a
+stylesheet sat waiting for markup that did not exist.
+
+The markup is `H2e` at byte 2,044,139 behind `O(20, o.showAlertsEntry ? 20 : -1)` at 2,056,748,
+decoded with `app-alerts`' own consts table.
+
+#### THE KEY RULES ARE NOT THE CHAT COMPOSER'S
+
+```js
+onKey(e) {                                                    // byte 2,047,478
+  if (13 == e.keyCode) {
+    e.preventDefault();
+    const i = $("#textAreaAlertTxt");
+    if (e.shiftKey) i.val(i.val());                           // ← a NO-OP
+    else {
+      if (!e.altKey) return i.val().trim() && emit("inlineAlertEntry", i.val()),
+                            i.val(""), i.height("23px"), !1;
+      i.val(i.val() + "\n")                                   // ← ALT+Enter
+    }
+  }
+}
+```
+
+| keys | outcome |
+| --- | --- |
+| Enter | POST, and empty the box |
+| Alt + Enter | insert a newline |
+| **Shift + Enter** | **nothing** — the default is prevented and the value reassigned to itself |
+
+One column over, in chat, Shift+Enter *is* the newline. Reproduced rather than harmonised: "fixing"
+it would post an alert where a presenter expected a line break.
+
+And two behaviours in one line that are easy to collapse into one: `i.val().trim() && emit(...)` is
+inside the guard, `i.val("")` is outside it — so a box holding nothing but spaces **empties without
+sending**. The RAW value travels, not the trimmed one; the trim is only the test.
+
+**The rule is a module.** It was written inline in the component first, then transcribed into the
+test so it could be executed — which is the copy this repository refuses. `#lib/inline-alert-key.ts`
+is the extraction; the component calls it and the contract drives the shipped code.
+
+#### The paste goes to the ALERT path, through ONE confirmation
+
+`onImagePaste` here emits `inlineAlertEntryImage`, and its subscriber is the **post-alert modal**
+(byte 2,125,263) — so upstream has exactly one paste confirmation and the alerts column borrows it.
+Reproduced: the same pending-paste state and the same dialog the chat composer already had, with a
+`target` deciding whether the confirmed image becomes a chat message or an alert. Two states here
+would have been two dialogs and two ways to leak a preview URL.
+
+The box is cleared **before** the confirmation opens, which is upstream's order and is why the
+pending text travels with the event rather than being read back later.
+
+#### The row's second finding, closed too
+
+`showAlertsEntry` is persisted upstream (`localstorage.setObject`, byte 2,047,433) and read back in
+`ngOnInit` (byte 2,044,987). Ours was ephemeral `$state`, so a presenter who opened the box got it
+closed again on the next reload. `RoomAlertsPane.toggleInlineEntry` is `toggleToolbar`'s twin now,
+because upstream's two are twins: both write the flag and pull the alerts log back, since both
+change the scroller's height.
+
+The store is this room's rather than localStorage-only, which is a superset and is recorded as one —
+a second persistence mechanism for one boolean is the thing worth avoiding.
+
+#### One divergence, argued at the code
+
+Upstream's subscriber is `selectedTab = "text", alertTxt = i, this.postAlert()` — the MODAL's own
+method — so the inline box inherits whatever that modal was last left holding. A presenter who
+ticked "Don't send to push" an hour ago silently gets it again from a box in a different column,
+with nothing on screen saying so. This room posts a plain alert; the modal is where those five
+decisions are made and where they are visible.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,664 tests passing (1 skipped), build done. The key rule and the
+whitespace case are EXECUTED against the real module; `toggleInlineEntry` is executed against a real
+`RoomAlerts` and `RoomAlertsPane` with the scroller and the preference store stubbed, so both halves
+of the toggle are proven rather than read.
+
+**Seven negative controls, each run and each seen RED**, on the committed tree and reverted after:
+Shift+Enter made a newline — the obvious "fix", and the one this whole module exists to refuse (two
+tests); only the post branch preventing the default; a whitespace box no longer clearing; the field
+no longer rendered; the toggle no longer persisting; the toggle no longer pulling the log back; and a
+pasted alert image falling through to the chat path.
+
+**Not verified:** nothing was opened in a browser, so no key was actually pressed and no alert was
+posted end to end.
+
 ### 2026-08-30 04:30 UTC — The Session History pane, whose button had no handler at all
 
 **Runtime impact: YES.** The presenter's Session History tab lists what has happened to the room and

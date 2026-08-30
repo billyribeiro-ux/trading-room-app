@@ -448,7 +448,8 @@ export function createRoom(deps: RoomDeps) {
     alertFilterFor: RoomAlerts.readFilterFor(prefs.loaded.alertFilterFor),
     showAlertsFrom: prefs.loaded.showAlertsFrom === true,
     archivedAt:
-      typeof prefs.loaded.alertsArchivedAt === 'number' ? prefs.loaded.alertsArchivedAt : null
+      typeof prefs.loaded.alertsArchivedAt === 'number' ? prefs.loaded.alertsArchivedAt : null,
+    inlineEntry: prefs.loaded.showAlertsEntry === true
   });
 
   /*

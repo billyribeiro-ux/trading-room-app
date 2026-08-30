@@ -1222,6 +1222,10 @@
               onprivatechat={() => privateChat.show()}
               showPmButton={gates.showPmButton}
               onpasteimage={(file) => composer.beginImagePaste(file)}
+              oninlinealert={(body) => void composer.postInlineAlert(body)}
+              oninlinealertimage={(file, alertText) =>
+                composer.beginAlertImagePaste(file, alertText)}
+              oninlineentrytoggle={(open) => alertsPane.toggleInlineEntry(open)}
               onexpandcomposer={autoExpandComposer}
               ontyped={(value) => typing.main.typed(value)}
               onstoppedtyping={() => typing.main.stop()}

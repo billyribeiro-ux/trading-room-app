@@ -571,7 +571,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       post-alert composer's label picker reads the SAME parsed table the alerts column renders badges
       from. Two parses of one setting is how a picker offers a label the renderer does not know.
     */
-    max: 1479,
+    /*
+      1479 -> 1483, 2026-08-30. Four lines wiring the inline alert entry (`acA-01`) to the three
+      things it needs: the text post, the image paste, and the toggle that persists and re-scrolls.
+    */
+    max: 1483,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -754,7 +758,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       pure decision with the whole account on it, and what remains here is the two values it needs.
       Extracting a getter that reads two private fields would mean handing both out.
     */
-    max: 304,
+    /*
+      304 -> 332, 2026-08-30. `toggleInlineEntry`, which is `toggleToolbar`'s twin because upstream's
+      two are twins: both write a flag and pull the alerts log back, because both change the
+      scroller's height. HERE and not in `RoomAlerts` for the reason that one gives — the scroller is
+      this file's element.
+    */
+    max: 332,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -2201,7 +2211,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `senderName`. A parameter wider than the body needs makes a predicate unusable on any row that
       omits a field it never looks at — and the alternative was a second copy of the rule.
     */
-    max: 320,
+    /*
+      320 -> 339, 2026-08-30. `#inlineEntry` is seeded and persisted rather than ephemeral: a
+      presenter who opened the inline alert box got it closed again on the next reload. The addition
+      is mostly the note recording that upstream persists to localStorage only and this room uses the
+      same store every other room preference uses.
+    */
+    max: 339,
     why: "the alerts pane's toolbar, viewer filter, archive cut-off and search term"
   },
   {
@@ -2777,7 +2793,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       AFTER the modal has closed, so a picker whose state only reached the draft would prefix a typed
       alert and silently drop the labels from every alert carrying an image.
     */
-    max: 689,
+    /*
+      689 -> 792, 2026-08-30. The inline alert entry's two send paths.
+
+      `postInlineAlert` composes through the same `composePostAlert` the modal's text tab uses and
+      goes down `postAlert`, the one path that owns the refusal and the toast; `beginAlertImagePaste`
+      reuses the pending-paste state the chat composer already had, with a `target` deciding where
+      the confirmed image goes — which is upstream's own shape, since its handler routes into the
+      post-alert modal's `onImagePaste` and there is exactly one confirmation for both.
+
+      A third of the addition is the recorded divergence: upstream's subscriber calls the MODAL's
+      method, so the inline box silently inherits whatever five checkboxes that modal was last left
+      holding.
+    */
+    max: 792,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -3608,7 +3637,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       capability that costs this file fewer than two lines: one import, one hand-off. The same
       commit lowers `user-actions.svelte.ts` by fifteen and `ScheduledAlerts.svelte` by two.
     */
-    max: 1335,
+    /*
+      1335 -> 1336, 2026-08-30. One line: `inlineEntry: prefs.loaded.showAlertsEntry === true`, so
+      the inline alert box is seeded from the stored preference instead of starting closed every
+      time.
+    */
+    max: 1336,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -3764,7 +3798,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       of the reference's last. What stayed here is the one thing that cannot: `canPostImages` is a
       page gate, so the refusal has nowhere else to live.
     */
-    max: 1242,
+    /*
+      1242 -> 1394, 2026-08-30. The inline alert entry — `acA-01`, a checkbox that controlled nothing.
+
+      The field itself is fifteen lines of markup, decoded with `app-alerts`' own consts (20, 52, 53)
+      and meeting a stylesheet that was already bridged and waiting for it. The rest is the two
+      handlers and the reason they are not the chat composer's: **Enter posts, ALT+Enter is the
+      newline, and SHIFT+Enter does nothing at all** — the exact opposite of the box one column over.
+
+      The key RULE itself is not here: it was written inline, then extracted to
+      `#lib/inline-alert-key.ts` so a test could execute it rather than copy it.
+    */
+    max: 1394,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
