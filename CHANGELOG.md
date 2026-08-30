@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:52 UTC — The anti-leak watermark was missing from the surface it is named for
+
+**Runtime impact: YES.** In a room with `overlayUserIdOnScreenshare` on, a member now sees their own
+`userXrefID` burned over a presenter's SCREENSHARE, not only over an MTX/OBS stream.
+
+#### `SV-SP-01`
+
+The overlay exists so a leaked recording names the account that made it. This room drew it on
+`StreamingView` — the stream player — and **nowhere else**. `ScreenPane`, where a screenshare
+renders, had neither the prop nor the gate. So a room that turned the setting on watermarked a
+restreamed feed and left the screenshare clean.
+
+The reference draws the same span on both. `app-screenshare-view`'s const 9 is
+`[1,"overlay-userID-container"]`, rendered by `Q0e` at byte 1,494,134, mounted behind
+`O(10, !isPresenter && sessData.overlayUserIdOnScreenshare ? 10 : -1)` at byte 1,502,175.
+
+#### One rule, because the missing copy IS the defect
+
+`StreamingView` spelled the gate out inline. That is precisely how a rule with two consumers ends up
+with one implementation, so the expression moved to `#lib/user-id-watermark.ts` and
+`PresentationArea` resolves it once for both videos. `StreamingView` lost three props
+(`isPresenter`, `overlayUserIdOnScreenshare`, `userXrefID`) and gained one, and the contract asserts
+that the gate expression no longer appears in either component.
+
+The module answers the whole question — *what does this viewer see burned over this picture* — so a
+caller cannot hold half of it. It returns `null` rather than `''` for "nothing", including for an
+empty `userXrefID`: an empty span carrying the captured class is an invisible element a later CSS
+change could make visible, and a blank watermark would report the setting as working.
+
+#### Where the span sits, and both reasons are load-bearing
+
+Inside `#video-screen-container-{id}`, not beside it. The captured rule is
+`.video-screen-container { position: relative }`, which is what the overlay's own
+`position: relative; bottom: 50%` is measured against — and that container is what
+`toggleFullscreen` fullscreens, so the watermark goes fullscreen WITH the picture instead of being
+clipped away, which is exactly the state a recording would be made in.
+
+The contract asserts that **structurally** — walking the `<div>` depth from the container's opening
+tag — rather than by line order, because a `<span>` that merely appears after the opening tag could
+still be a sibling.
+
+#### What is NOT being claimed
+
+That anything is prevented. This is a `<span>` over a `<video>` in the viewer's own browser and
+anyone who opens developer tools can remove it. What it does is make a casual screen recording carry
+the recorder's account id. That is the whole claim, it is written at the module, and it is repeated
+here because "anti-leak" in a fintech room invites a stronger reading than this shape can support.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,598 tests passing (1 skipped), build done.
+
+**Five negative controls, each run and each seen RED**, on the committed tree and reverted after: the
+presenter exemption removed; the empty-id case returning `''`; the screenshare pane's span deleted
+(two tests); the span MOVED outside the fullscreened container, which is the control that proves the
+structural nesting assertion is doing work rather than matching on position; and one of the two
+videos left unfed.
+
+**Not verified:** nothing was opened in a browser, so the overlay's position over a live screenshare
+is asserted from the captured CSS rule and the nesting, not seen.
+
 ### 2026-08-30 03:43 UTC — A screenshot pasted into chat now goes somewhere, and one copy of that rule had already drifted
 
 **Runtime impact: YES.** Pasting an image into the chat composer opens a confirmation with a preview

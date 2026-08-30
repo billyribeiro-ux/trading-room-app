@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { userIdWatermark as resolveUserIdWatermark } from '#lib/user-id-watermark.js';
   /*
     `app-webcam-holder` + `app-presentationarea` — the fifth and last of the plan's template
     regions, and the biggest: the webcam strip, the main tab bar and every one of its seven panes.
@@ -331,6 +332,22 @@
     setAutoplayAttribute
   }: Props = $props();
 
+  /**
+   * The anti-leak watermark this viewer sees, resolved ONCE for both videos.
+   *
+   * `StreamingView` has carried this overlay since it was built and `ScreenPane` never had it, so a
+   * room with `overlayUserIdOnScreenshare` on was watermarking the restreamed feed and not the
+   * SCREENSHARE the setting is named for (`SV-SP-01`). Two components render a video this setting
+   * covers; the rule lives in `#lib/user-id-watermark.ts` and each of them receives the answer.
+   */
+  const userIdWatermark = $derived(
+    resolveUserIdWatermark({
+      viewerIsPresenter: isPresenter,
+      overlayUserIdOnScreenshare: data.sessData?.overlayUserIdOnScreenshare === true,
+      userXrefID: data.user.userXrefID
+    })
+  );
+
   /*
     `globals.showPositions`, local. See the citation at the container's call site for why a flag with
     three readers in one column is not a room-level store.
@@ -616,6 +633,7 @@
                   pan={screens.pans.get(screen.id) ?? NEUTRAL_PAN}
                   detached={screens.detachedScreenId !== null}
                   saveData={mediaTransport.saveData}
+                  {userIdWatermark}
                   onpan={(x, y) => screens.pans.set(screen.id, { x, y })}
                   ontogglezoom={() => screens.toggleZoomControls()}
                   onzoomin={() => screens.zoomIn()}
@@ -704,9 +722,7 @@
                       muser={mtxStream}
                       {streamServerMTX}
                       {mtxToken}
-                      {isPresenter}
-                      overlayUserIdOnScreenshare={data.sessData.overlayUserIdOnScreenshare === true}
-                      userXrefID={data.user.userXrefID}
+                      {userIdWatermark}
                       audioVolume={volume / 100}
                       {doNotDisturbOn}
                       {bufferSizeLevel}

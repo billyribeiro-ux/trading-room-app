@@ -79,7 +79,7 @@ guessed.
 | 3 | `routes/+page.svelte` | 1,477 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,241 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,060 | no |
-| 6 | `lib/components/PresentationArea.svelte` | 958 | no |
+| 6 | `lib/components/PresentationArea.svelte` | 974 | no |
 | 7 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
 | 8 | `lib/components/PollPanel.svelte` | 824 | no |
 | 9 | `lib/components/RoomOverlays.svelte` | 895 | no |
@@ -87,13 +87,13 @@ guessed.
 | 11 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 12 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 13 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
-| 14 | `lib/components/StreamingView.svelte` | 597 | no |
+| 14 | `lib/components/StreamingView.svelte` | 604 | no |
 | 15 | `lib/components/FilesPane.svelte` | 556 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 595 | no |
 | 17 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
 | 18 | `lib/components/PostAlertModal.svelte` | 521 | no |
 | 19 | `lib/components/notes/NotesPane.svelte` | 446 | no |
-| 20 | `lib/components/ScreenPane.svelte` | 440 | no |
+| 20 | `lib/components/ScreenPane.svelte` | 470 | no |
 | 21 | `lib/components/VideoPlayer.svelte` | 413 | no |
 | 22 | `lib/components/PrivateChatPanel.svelte` | 401 | no |
 | 23 | `lib/components/MainTabStrip.svelte` | 371 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 64 surfaces audited · 1,072 of 29,214 lines · 3.7%.**
+**2 of 64 surfaces audited · 1,072 of 29,267 lines · 3.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

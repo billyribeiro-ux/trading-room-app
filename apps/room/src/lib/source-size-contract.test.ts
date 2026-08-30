@@ -1680,7 +1680,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       958 -> 959, 2026-08-29: one line, `{menus}` forwarded to `StreamingView` so its buffer-size
       dropdown can open at all. See `bootstrap-dropdown-contract.test.ts`.
     */
-    max: 959,
+    /*
+      959 -> 975, 2026-08-30. The anti-leak watermark resolved ONCE, for both videos.
+
+      `StreamingView` has carried the overlay since it was built and `ScreenPane` never had it, so a
+      room with `overlayUserIdOnScreenshare` on watermarked the restreamed feed and left the
+      SCREENSHARE — the surface the setting is named for — clean (`SV-SP-01`). The rule is
+      `#lib/user-id-watermark.ts`; what is here is one `$derived` and the paragraph saying why the
+      answer is computed at this level rather than at each of the two components.
+    */
+    max: 975,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -3992,7 +4001,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ScreenPane.svelte',
-    max: 441,
+    /*
+      441 -> 471, 2026-08-30. The watermark span, its prop, and thirty lines of why.
+
+      Two of those paragraphs are load-bearing rather than decorative: the span sits INSIDE
+      `#video-screen-container-{id}` because the captured `.video-screen-container { position:
+      relative }` is what its `bottom: 50%` is measured against, and because that container is what
+      `toggleFullscreen` fullscreens — a watermark outside it is clipped away in exactly the state a
+      recording would be made in. The contract asserts that by NESTING rather than by line order.
+    */
+    max: 471,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -4082,7 +4100,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
       nineteenth dropdown arrives without a way to open it.
     */
-    max: 598,
+    /*
+      598 -> 605, 2026-08-30, and the file gained seven lines while losing a prop.
+
+      `overlayUserIdOnScreenshare` + `userXrefID` + `isPresenter` became one `userIdWatermark`,
+      because the gate they spelled out here was the gate `ScreenPane` did not have. What grew is the
+      note recording that: a rule with two consumers and one implementation is how the second
+      consumer ends up uncovered.
+    */
+    max: 605,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {

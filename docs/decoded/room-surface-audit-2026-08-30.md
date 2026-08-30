@@ -2099,6 +2099,8 @@ this.benzingaUrl=this.sanitizer.bypassSecurityTrustUrl(`https://ptrv3.protrading
 
 ### SV-SP-01 — ScreenPane renders no user-ID watermark overlay; the anti-leak overlay exists only on StreamingView
 
+**BUILT 2026-08-30 03:52 UTC.** `ScreenPane.svelte` draws the same `overlay-userID-container` span, inside `#video-screen-container-{id}` so it fullscreens with the picture rather than being clipped away. The gate — `!isPresenter && overlayUserIdOnScreenshare`, plus the empty-id case — moved to `lib/user-id-watermark.ts` and `PresentationArea` resolves it once for both videos; `StreamingView` lost three props and gained one, because the expression spelled out there was exactly the one `ScreenPane` did not have. `user-id-watermark-contract.test.ts` asserts the nesting structurally rather than by line order. Stated at the module and worth repeating: this is a deterrent, not a control — a span over a video in the viewer's own browser can be removed by anyone with developer tools.
+
 **high** · `missing-control` · reference byte **1,494,134**
 
 ```
