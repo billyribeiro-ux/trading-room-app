@@ -1,9 +1,11 @@
-import { command } from '$app/server';
+import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
-import { presenterRoom } from '#lib/server/auth.js';
+import { presenterRoom, requireUser } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { roomState } from '#lib/server/db/schema.js';
+import { error } from '@sveltejs/kit';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
+import { writeRoomSetting } from '#lib/server/room-config-client.js';
 import { recordSessionEvent } from '#lib/server/session-history.js';
 
 /*
@@ -252,6 +254,87 @@ export const saveCloseMessage = command(
       room,
       'Close message saved',
       message ? 'The room now has a close message.' : 'The close message was cleared.'
+    );
+  }
+);
+
+/**
+ * `setRestreamURL` — the room's restream destination, written where it is actually read.
+ *
+ * ```js
+ * startRestream(e = !1) {
+ *   if (e) return this.appService.invokeAdminCmd("setRestreamURL", { restreamToURL: "" }),
+ *              void (this.restreamLink = "");
+ *   this.restreamLink.startsWith("rtmp://") && !this.restreamLink.includes(" ")
+ *     ? this.appService.invokeAdminCmd("setRestreamURL", { restreamToURL: this.restreamLink })
+ *     : …                                                              // bundle byte 2,174,659
+ * }
+ * ```
+ *
+ * ## SC-13 — a control whose only effect was on the person pressing it
+ *
+ * `saveRestreamLink()` called `onPreferenceChange('restreamToURL', restreamLink)`, and
+ * `clearRestreamLink()` the same with `''`. Those were the only two occurrences of the name in
+ * `apps/room/src`. `prefs.save` stores a PER-VIEWER preference, so a presenter who set a restream
+ * destination changed one row of their own settings and the room republished to nowhere — with a
+ * pane that then showed the value back to them, which is the specific reason nobody would notice.
+ *
+ * `restreamToURL` is a ROOM setting and lives on the controller
+ * (`room-settings-schema.ts`, section `settings`). So this is a `writeRoomSetting`, the same seam
+ * `overwriteCashRegisterSound` uses and for the same reason the sibling docblock gives: a durable
+ * per-room value broadcast over the event channel would change every browser's belief and persist
+ * nothing, so the first reload would put the old destination back.
+ *
+ * ## The validation is the reference's, and it is here as well as in the pane
+ *
+ * `startsWith('rtmp://') && !includes(' ')`. The pane checks it to raise the reference's own alert
+ * without a round trip; this checks it again because a remote command is reachable without the
+ * pane, and a hidden button is not a check. Same argument as the presenter gate, which is likewise
+ * applied here AND re-applied by `internal/room-setting` on the controller.
+ *
+ * `''` clears, exactly as upstream's `startRestream(true)` sends — not the URL being removed, and
+ * not an absent field.
+ *
+ * ## Why this value never reaches a participant
+ *
+ * It is on `ROOM_PRESENTER_SETTINGS`, not `ROOM_VISIBLE_SETTINGS`, so it crosses only to a member
+ * the controller has already decided is a presenter. The reference reads it from
+ * `globals.sessData.restreamToURL`, which every viewer receives; that divergence is deliberate and
+ * argued at the allow-list, because an rtmp destination usually carries its own stream key inline.
+ */
+export const setRestreamUrl = command(
+  z.strictObject({
+    /*
+      Bounded at 2048 to match what `internal/room-setting` will accept — a longer value would be
+      refused there with a 400 the presenter cannot act on, so it is refused here where the pane can
+      say something. Not trimmed: the reference's own validator rejects any string containing a
+      space, so trimming would silently accept an input it is about to declare invalid.
+    */
+    url: z.string().max(2048)
+  }),
+  async ({ url }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    const { locals } = getRequestEvent();
+
+    // `''` is the documented clear. Everything else must look like an rtmp destination.
+    if (url !== '' && !(url.startsWith('rtmp://') && !url.includes(' '))) {
+      error(400, 'That is not a valid restream URL.');
+    }
+
+    try {
+      await writeRoomSetting(room, requireUser(locals).email, 'restreamToURL', url);
+    } catch (cause) {
+      // Loud, for the reason the alert-sound write gives: a pane that clears its own textarea while
+      // the room's destination did not move is the defect this path exists to avoid.
+      console.error('[setRestreamUrl] the controller refused the write', cause);
+      error(502, 'Could not change the restream URL right now.');
+    }
+
+    recordSessionEvent(
+      room,
+      'Restream URL saved',
+      url ? 'The room now has a restream destination.' : 'The restream destination was cleared.'
     );
   }
 );

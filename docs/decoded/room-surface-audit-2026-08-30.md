@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**107 open · 117 closed · 224 rows.**
+**105 open · 119 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1170,7 +1170,7 @@ preferences.echoCancellation),m(4),z("checked",e.appService.globals.preferences.
 
 ### SC-12 — Restream textarea is never seeded from the room's stored restream URL
 
-**medium** · `missing-behaviour` · reference byte **2,160,049**
+**BUILT 2026-08-30 14:50 UTC, together with SC-13 — they are one defect with two halves.** `restreamLink` was `$state('')` with no prop and no read of the room config; it is `$state(untrack(() => restreamUrl ?? ''))` now, fed from `data.sessData?.restreamToURL` in `RoomOverlays.svelte`. `untrack` for the reason `streamingProtocol` two lines above it gives: this is a SEED and then locally owned, so the presenter can type without the write having round-tripped, and the `invalidateAll()` after a successful save cannot overwrite what is being typed. **Reading it required a setting that did not cross the boundary at all** — see SC-13 for the third allow-list that was built to carry it, and why it is not on the list every member receives.
 
 ```
 e.restreamLink=e.appService.globals.sessData.restreamToURL?e.appService.globals.sessData.restreamToURL:"",e.streamKey=e.appService.globals.mtxToken,e.streamingLink=`http://${e.appService.globals.streamServerMTX}:8889/room__${e.appService.gl
@@ -1182,7 +1182,13 @@ e.restreamLink=e.appService.globals.sessData.restreamToURL?e.appService.globals.
 
 ### SC-13 — Set/Clear Restream URL write a per-user preference `restreamToURL` that nothing reads, instead of the room-level `setRestreamURL` command
 
-**medium** · `defect` · reference byte **2,174,659**
+**BUILT 2026-08-30 14:50 UTC, and it is the largest row of this slice — a boundary, not a handler.** The audit's reading was exact: `onPreferenceChange('restreamToURL', …)` is `prefs.save`, this VIEWER's settings row, and those two calls were the only occurrences of the name in `apps/room/src`. A presenter typed a destination, pressed Set, and the room republished nowhere — **while the pane went on displaying the value, which is the specific reason it could survive being looked at**. `setRestreamUrl` in `session-commands.remote.ts` writes through `internal/room-setting` now, the same seam `overwriteCashRegisterSound` uses and for the reason that endpoint's docblock gives: a durable per-room value broadcast over the event channel would change every browser's belief and persist nothing.
+
+**What was NOT obvious, and is the divergence recorded rather than matched:** `restreamToURL` is a ROOM setting on the controller, and the room's config boundary had exactly two allow-lists — read by every member, and written. Adding it to the first would have put the value in the SSR payload of **every viewer's page load**, because `+page.server.ts` returns `sessData` from a load and SvelteKit serialises a load's return. The reference does exactly that (`globals.sessData.restreamToURL`). It must not be copied: the Manage page keeps `restreamToURLKey` as a separate field, so on paper the destination and the key are separate values — but YouTube hands out `rtmp://a.rtmp.youtube.com/live2/<STREAM-KEY>` and Twitch `rtmp://<ingest>/app/live_<KEY>` as ONE string, and the reference's own validator (`startsWith('rtmp://') && !includes(' ')`) accepts precisely that. Anybody holding it can publish to the presenter's channel.
+
+So a THIRD allow-list, `ROOM_PRESENTER_SETTINGS`, projected by `internal/room-config/[code]` only for a member it has already computed `isP` for — merged into `settings` so the room reads one object, and `{}` for anybody else, which makes a participant's payload byte-identical to what it was before the list existed. Safe to be per-member because that endpoint is already called with `?email=` and the room's client caches per `shortCode\u0000email` in a per-request `WeakMap`. `isRoomWritableSetting` was widened to accept presenter-visible, and that is a restatement rather than a relaxation: its rule was never "on the general read list" but "readable by the party that can write it", and the endpoint refuses every caller who is not an owner or true presenter.
+
+The validation is the reference's and is applied twice — in the pane to raise its own alert without a round trip, and again on the server, because a remote command is reachable without the pane and a hidden button is not a check.
 
 ```
 startRestream(e=!1){if(e)return this.appService.invokeAdminCmd("setRestreamURL",{restreamToURL:""}),void(this.restreamLink="");this.restreamLink.startsWith("rtmp://")&&!this.restreamLink.includes(" ")?this.appService.invokeAdminCmd("setRest

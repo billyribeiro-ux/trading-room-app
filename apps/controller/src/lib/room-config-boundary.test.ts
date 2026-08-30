@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  ROOM_PRESENTER_SETTINGS,
   ROOM_VISIBLE_SETTINGS,
   ROOM_WRITABLE_SETTINGS,
   isRoomWritableSetting,
   resolveRoomConfig,
+  roomPresenterConfig,
   roomVisibleConfig
 } from './room-config';
+import { scriptListNames } from './script-list-names';
 import { ROOM_SETTINGS } from './room-settings-schema';
 
 /**
@@ -125,9 +128,8 @@ describe('the allow-list itself', () => {
       sent but marked dead, is a control whose UI lies about it.
     */
     const generator = readFileSync(new URL('../../scripts/extract-manage-schema.mjs', import.meta.url), 'utf8');
-    const block = generator.match(/const ROOM_CONSUMED = \[([^\]]*)\]/);
-    expect(block, 'scripts/extract-manage-schema.mjs must declare ROOM_CONSUMED').not.toBeNull();
-    const declared = [...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+    const declared = scriptListNames(generator, 'ROOM_CONSUMED');
+    expect(declared, 'scripts/extract-manage-schema.mjs must declare ROOM_CONSUMED').not.toBeNull();
     expect(declared).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });
 
@@ -597,16 +599,25 @@ describe('the allow-list itself', () => {
 
 describe('what the room may WRITE back', () => {
   /*
-    A second allow-list, and strictly narrower than the read one.
+    A second allow-list, and strictly narrower than the read ones.
 
     Reading a setting exposes it; writing one lets the room change what its owner configured on the
-    Manage page. Exactly one setting needs it: `overwriteCashRegisterSound` is chosen from inside
-    the room, on the Files pane, which is where the reference puts the control
-    (`app-presentationarea.full.js:3084-3086`).
+    Manage page. TWO settings need it, and both for the same reason — the reference puts the control
+    inside the ROOM and the value is durable per-room state, so a broadcast would change every
+    browser's belief and persist nothing:
+
+      overwriteCashRegisterSound   the Files pane's two `set-alert-sound-btn` buttons
+                                   (`app-presentationarea.full.js:3084-3086`)
+      restreamToURL                `startRestream` → `setRestreamURL` (bundle byte 2,174,659)
+
+    `restreamToURL` joined on 2026-08-30 with SC-13, and it is the one that made this list stop
+    being a subset of `ROOM_VISIBLE_SETTINGS` — see the assertion below, which is the invariant
+    restated rather than relaxed.
   */
   it('permits exactly the settings on the write list', () => {
-    expect([...ROOM_WRITABLE_SETTINGS]).toEqual(['overwriteCashRegisterSound']);
+    expect([...ROOM_WRITABLE_SETTINGS]).toEqual(['overwriteCashRegisterSound', 'restreamToURL']);
     expect(isRoomWritableSetting('overwriteCashRegisterSound')).toBe(true);
+    expect(isRoomWritableSetting('restreamToURL')).toBe(true);
   });
 
   it('refuses a setting the room may READ but not write', () => {
@@ -625,9 +636,22 @@ describe('what the room may WRITE back', () => {
     expect(isRoomWritableSetting('constructor')).toBe(false);
   });
 
-  it('is a subset of the read list, so the room can see the result of its own write', () => {
+  it('is readable by the party that can write it, so the UI can show the result', () => {
+    /*
+      This read "is a subset of the read list" until 2026-08-30, and the change is a restatement
+      rather than a relaxation. The rule was never about the general list — it is that a setting the
+      room may write but never read is one whose UI cannot show the result of the write. A
+      presenter-only setting satisfies that for the presenter, who is the only party the endpoint
+      lets write at all.
+
+      The alternative was putting `restreamToURL` on the list every member receives in order to let
+      one presenter edit it, which is a strictly worse trade and is the one the third list refuses.
+    */
     for (const name of ROOM_WRITABLE_SETTINGS) {
-      expect(ROOM_VISIBLE_SETTINGS as readonly string[]).toContain(name);
+      const readable =
+        (ROOM_VISIBLE_SETTINGS as readonly string[]).includes(name) ||
+        (ROOM_PRESENTER_SETTINGS as readonly string[]).includes(name);
+      expect(readable, `${name} is writable but readable by nobody`).toBe(true);
     }
   });
 
@@ -662,5 +686,119 @@ describe('what the room may WRITE back', () => {
     expect(endpoint).toContain("error(403, 'Not a member of this room.')");
     // The same suspended-account refusal the config read makes; a suspended room stops writing too.
     expect(endpoint).toContain('account.status !== ACCOUNT_ACTIVE');
+  });
+});
+
+/**
+ * THE THIRD ALLOW-LIST — what crosses to a presenter and to nobody else.
+ *
+ * Added 2026-08-30 with SC-12/SC-13. `ROOM_VISIBLE_SETTINGS` is delivered to every member: the
+ * room returns it as `sessData` from a page load, and SvelteKit serialises a load's return into the
+ * SSR payload, so a name on that list is a name in the HTML of every viewer's page. `restreamToURL`
+ * must not be one of those — an rtmp destination usually carries its own stream key inline, and the
+ * reference's own validator (`startsWith("rtmp://") && !includes(" ")`) accepts exactly that string.
+ *
+ * The reference reads it from `globals.sessData.restreamToURL`, i.e. it ships it to everyone. This
+ * list is that divergence, and these are the assertions that make it a refusal rather than a note.
+ */
+describe('what crosses to a PRESENTER and to nobody else', () => {
+  /* A room with a destination that carries its key inline, which is the realistic shape. */
+  const RESTREAMING_ROOM = {
+    ...(CONFIGURED_ROOM as unknown as Record<string, unknown>),
+    restreamToURL: 'rtmp://a.rtmp.youtube.com/live2/abcd-efgh-ijkl-mnop-qrst'
+  } as never;
+
+  it('gives a presenter the value', () => {
+    expect(roomPresenterConfig(RESTREAMING_ROOM, true)).toEqual({
+      restreamToURL: 'rtmp://a.rtmp.youtube.com/live2/abcd-efgh-ijkl-mnop-qrst'
+    });
+  });
+
+  it('gives a non-presenter NOTHING — not an empty string, not the key', () => {
+    /*
+      `{}` rather than `{restreamToURL: ''}`: an empty string is a VALUE this pane would render and
+      then offer to save over the real one. Absent is the only honest answer for somebody who may
+      not see it.
+    */
+    expect(roomPresenterConfig(RESTREAMING_ROOM, false)).toEqual({});
+  });
+
+  it('keeps it off the list every member receives', () => {
+    /* The assertion the whole split exists for. */
+    expect(ROOM_VISIBLE_SETTINGS as readonly string[]).not.toContain('restreamToURL');
+    expect(Object.keys(roomVisibleConfig(RESTREAMING_ROOM).values)).not.toContain('restreamToURL');
+  });
+
+  it('shares no name with the list every member receives', () => {
+    /*
+      Not a tidiness rule. `internal/room-config` merges the presenter projection OVER the visible
+      one, so a name on both would be delivered to everybody through the first list while reading in
+      this file as presenter-only — the boundary would be documented one way and behave another.
+    */
+    const both = (ROOM_PRESENTER_SETTINGS as readonly string[]).filter((name) =>
+      (ROOM_VISIBLE_SETTINGS as readonly string[]).includes(name)
+    );
+    expect(both, `${both.join(', ')} is on BOTH allow-lists`).toEqual([]);
+  });
+
+  it('holds none of the credentials a configured room holds', () => {
+    /*
+      Presenter-only is not a licence. The seven this room's boundary refuses outright stay refused
+      for a presenter too — a presenter's browser is still a browser, and `restreamToURLKey` in
+      particular sits one letter away from the entry that IS on this list.
+    */
+    const projected = roomPresenterConfig(RESTREAMING_ROOM, true);
+    for (const name of ['restreamToURLKey', 'obsStreamKey', 'ssoJWTSecret', 'webinarPW', 'secTok']) {
+      expect(projected, `${name} must not cross, presenter or not`).not.toHaveProperty(name);
+    }
+    /* And the positive control: something IS projected, so the loop above is not vacuous. */
+    expect(Object.keys(projected).length).toBeGreaterThan(0);
+  });
+
+  it('omits an unset value rather than serialising a null', () => {
+    expect(roomPresenterConfig({} as never, true)).toEqual({});
+  });
+
+  it('matches the generator s fourth list, which is what marks it wired', () => {
+    /*
+      The same invariant `ROOM_CONSUMED` carries against `ROOM_VISIBLE_SETTINGS`, one list along.
+      `extract-manage-schema.mjs` cannot import this module — it has to run before the file it
+      generates exists — so `ROOM_PRESENTER_CONSUMED` is a deliberate copy and this is what keeps it
+      honest. A name marked wired but never projected is a Manage-page row claiming a consumer it
+      does not have.
+    */
+    const generator = readFileSync(new URL('../../scripts/extract-manage-schema.mjs', import.meta.url), 'utf8');
+    const declared = scriptListNames(generator, 'ROOM_PRESENTER_CONSUMED');
+    expect(declared, 'the generator must declare ROOM_PRESENTER_CONSUMED').not.toBeNull();
+    expect(declared).toEqual([...ROOM_PRESENTER_SETTINGS].sort());
+  });
+
+  it('is marked wired in the generated schema, like everything with a consumer', () => {
+    const wired = new Set(ROOM_SETTINGS.filter((d) => d.wired).map((d) => d.name));
+    for (const name of ROOM_PRESENTER_SETTINGS) {
+      expect(wired.has(name), `${name} crosses to a presenter but is marked unwired`).toBe(true);
+    }
+  });
+
+  it('lets the room write it, and the writable check knows why', () => {
+    /*
+      `isRoomWritableSetting` used to require the GENERAL read list, so this would have been refused.
+      It accepts presenter-visible now — the endpoint that consults it already refuses any caller who
+      is not an owner or true presenter, so the party that can write is the party this list projects
+      to. The alternative was shipping the value to every viewer in order to let one presenter edit
+      it, which is the trade the split refuses.
+    */
+    expect(isRoomWritableSetting('restreamToURL')).toBe(true);
+    expect(ROOM_WRITABLE_SETTINGS as readonly string[]).toContain('restreamToURL');
+  });
+
+  it('still refuses a name that is on NEITHER read list', () => {
+    /*
+      The negative control on the widening above: making `isRoomWritableSetting` accept the presenter
+      list must not have turned it into "on the writable list is enough". `hideFiles` is readable and
+      not writable; `restreamToURLKey` is neither.
+    */
+    expect(isRoomWritableSetting('hideFiles')).toBe(false);
+    expect(isRoomWritableSetting('restreamToURLKey')).toBe(false);
   });
 });

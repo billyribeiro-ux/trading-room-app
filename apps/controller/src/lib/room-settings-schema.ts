@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 103 of 269 are wired today.
+// nothing in the room reads it yet. 104 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -270,7 +270,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "obsBroadcastRoom", section: "settings", type: "checkbox", label: "Broadcast using OBS?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "obsStreamKey", section: "settings", type: "text", label: "OBS Stream Key", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "obsStreamSatusWebHookURL", section: "settings", type: "text", label: "OBS Stream Satus WebHook URL", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "restreamToURL", section: "settings", type: "text", label: "Restream URL", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "restreamToURL", section: "settings", type: "text", label: "Restream URL", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "restreamToURLKey", section: "settings", type: "text", label: "Restream Key", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "x264_encArgs", section: "settings", type: "text", label: "Custom Rec Params", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "twillioApiSID", section: "settings", type: "text", label: "Twillio SID", help: null, helpShape: null, helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

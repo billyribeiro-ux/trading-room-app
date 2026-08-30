@@ -1,6 +1,7 @@
 <script lang="ts">
   import RoomBranding from '#lib/components/RoomBranding.svelte';
   import { saveCloseMessageThen } from '#lib/room/close-message.js';
+  import { saveRestreamUrlThen } from '#lib/room/restream-url.js';
   import type { SvelteSet } from 'svelte/reactivity';
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
@@ -636,6 +637,8 @@
   onAlertTab={(tab) => (modals.alertTab = tab)}
   onTheme={(next) => modals.setTheme(next)}
   onPreferenceChange={(key, value) => prefs.save(key, value)}
+  restreamUrl={data.sessData?.restreamToURL}
+  onSaveRestreamUrl={(url) => void saveRestreamUrlThen(url, { dialogs })}
   saveData={mediaTransport.saveData}
   onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}
   onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}

@@ -1406,7 +1406,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       through to `BootboxDialog`, each defaulted to what a `bootbox.confirm` with no `buttons` block
       renders — which is what every other call site in this room passes and must keep getting.
     */
-    max: 951,
+    /*
+      951 -> 954, 2026-08-30, for SC-12 and SC-13. THREE lines: the `restream-url` import, the
+      `restreamUrl={data.sessData?.restreamToURL}` seed, and the one-line handler.
+
+      HERE for the reason this entry already gives four times over — this component holds `data`, so
+      reading the setting costs the page nothing. And the raise is the smaller half of the change:
+      `RestreamPane.svelte` took the pane out of `ModalHost.svelte` in the same commit, whose ceiling
+      is NOT raised — 6,335 holds and the file lands at 6,323. The pair is fifty lines lighter than
+      leaving the twenty lines of markup where they were and raising ModalHost instead, which is the
+      trade this rule exists to force.
+    */
+    max: 954,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -3679,6 +3690,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
   {
+    file: 'lib/room/restream-url.ts',
+    /*
+      SC-13's one act, 2026-08-30, and deliberately the same shape as `close-message.ts` below it: a
+      remote command, an alert on refusal, and an `invalidateAll()` so the page data and the pane
+      cannot disagree afterwards. It is small because the decisions are elsewhere — the validation is
+      in the pane and re-applied on the server, and the authority is `presenterRoom()`.
+    */
+    max: 46,
+    why: 'writes the room restream URL, and says so loudly when the controller refuses'
+  },
+  {
     file: 'lib/room/close-message.ts',
     /*
       THE TWO CLOSE-SESSION BUTTONS' one shared act, 2026-08-27.
@@ -4419,6 +4441,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 146,
     why: 'the dialog primitive this repository uses in place of bootbox'
+  },
+  {
+    file: 'lib/components/RestreamPane.svelte',
+    /*
+      The session-control modal's Restream tab, extracted 2026-08-30 with SC-12 and SC-13.
+
+      It was twenty lines of `ModalHost.svelte` and this contract is what made it a component:
+      ModalHost is capped, ceilings only go DOWN, and the rule's own words are "extract a slice
+      rather than raising this number". The slice is real — this pane owns one value, seeds it from
+      one place and writes it to one place, and its three tab neighbours share none of that.
+
+      Most of the file is the WHY. Both defects it fixes were invisible on screen: a textarea that
+      opened empty on a room with a destination already set, and two buttons that wrote the room's
+      restream URL as the pressing viewer's own preference, which nothing read.
+    */
+    max: 106,
+    why: 'the Restream tab - one seeded value, the rtmp validation, and the room-level write'
   },
   {
     file: 'lib/components/CloseSessionPane.svelte',

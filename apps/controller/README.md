@@ -164,10 +164,10 @@ found in the tooling along the way and what each would have caused.
 - Data model for accounts, rooms, settings, membership, badges, admin users, API keys
 - Password auth with per-account room scoping
 
-**103 of 269 settings are wired**, measured 2026-08-29 and checked on every run by
+**104 of 269 settings are wired**, measured 2026-08-30 and checked on every run by
 `scripts/verify-room-settings-schema.mjs`. The exact names are explicit input to
 `scripts/extract-manage-schema.mjs`, each backed by a real consumer. The other
-166 entries remain `wired: false`: the controller can store them, but the room does
+165 entries remain `wired: false`: the controller can store them, but the room does
 not yet consume them. The flag changes only with a real consumer and its test.
 
 > **Superseded 2026-08-29.** This paragraph read _"33 of 269 settings are wired … the other 257

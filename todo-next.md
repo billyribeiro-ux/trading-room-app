@@ -74,14 +74,14 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,334 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,322 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
 | 3 | `routes/+page.svelte` | 1,541 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,136 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 988 | no |
-| 8 | `lib/components/RoomOverlays.svelte` | 950 | no |
+| 8 | `lib/components/RoomOverlays.svelte` | 953 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 824 | no |
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 68 surfaces audited · 1,072 of 32,505 lines · 3.4%.**
+**2 of 69 surfaces audited · 1,072 of 32,601 lines · 3.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -157,6 +157,7 @@ guessed.
 | 66 | `lib/components/ChatArchivePane.svelte` | 143 | no |
 | 67 | `lib/components/AvDevicePane.svelte` | 342 | no |
 | 68 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
+| 69 | `lib/components/RestreamPane.svelte` | 105 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

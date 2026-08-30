@@ -29,9 +29,19 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
   Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
-  through `internal/room-config/[code]`, and six by the WordPress SSO door at `(public)/sso/[code]`.
-  `allowUsersToChangeUsername` is on the first two lists, and so now are `showPasswordField`,
-  `usernameInstructions` and `hasRequiredPhoneInLogin`, so the union is 103.
+  through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
+  WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
+  lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
+  so the union is 104.
+
+  103 -> 104 on 2026-08-30: restreamToURL, and it is the first entry that does NOT cross to every
+  member. It rides a FOURTH generator list, ROOM_PRESENTER_CONSUMED, mirroring the third allow-list
+  in src/lib/room-config.ts: an rtmp destination usually carries its own stream key inline, so it is
+  projected only to a member internal/room-config has already decided is the owner or a true
+  presenter. The reference reads it from globals.sessData.restreamToURL, which every viewer
+  receives; the divergence is deliberate. It came from the room-surface audit rather than the
+  settings enumeration - SC-12, the textarea that never seeded, and SC-13, the write that went to a
+  per-viewer preference nothing read.
 
   89 -> 90 on 2026-08-28: hasAlertScheduler. The last buildable row of the settings enumeration, and
   the third blocker in a day that named the wrong obstacle: the scheduler does not need the Rust
@@ -377,7 +387,24 @@ const EXPECTED_WIRED_SETTINGS = [
   'enableQAReactions',
   'enableEditMessage',
   'enableEditAlerts',
-  'recordingReminder'
+  'recordingReminder',
+  /*
+    Added 2026-08-30 with SC-12 and SC-13 of the room-surface audit, and it is the FIRST wired
+    setting that does not cross to every member.
+
+    `restreamToURL` goes over ROOM_PRESENTER_SETTINGS — a third allow-list on `room-config.ts`,
+    projected by the `internal/room-config` endpoint only for a member it has already decided is
+    the owner or a true presenter. An rtmp destination usually carries its own stream key inline
+    (rtmp://a.rtmp.youtube.com/live2/<KEY>) and the reference's own validator accepts exactly that
+    string, so putting it on the list every viewer receives would have published it in the SSR
+    payload of every page load. The reference does read it from `globals.sessData.restreamToURL`;
+    the divergence is deliberate and argued where the list is defined.
+
+    Also the SECOND setting the room WRITES back. Its pane's Set/Clear buttons called
+    `onPreferenceChange('restreamToURL', ...)` — this viewer's own preference row — and nothing
+    anywhere read it, so the room restreamed nowhere while the pane showed the value back.
+  */
+  'restreamToURL'
 ].sort();
 
 const fail = (message) => {

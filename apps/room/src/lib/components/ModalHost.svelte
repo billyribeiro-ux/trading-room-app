@@ -7,6 +7,7 @@
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
+  import RestreamPane from './RestreamPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
   import { ALERT_SEARCH_LIMIT } from '#lib/alert-search-limit.js';
@@ -158,6 +159,23 @@
     onAlertTab: (tab: AlertTab) => void;
     onTheme: (theme: Theme) => void;
     onPreferenceChange: (key: string, value: unknown) => void;
+    /**
+     * `sessData.restreamToURL` — the room's current restream destination, for SEEDING the textarea.
+     *
+     * `undefined` for a participant, because the controller projects this one only to a presenter;
+     * see `RoomSessionSettings.restreamToURL` for the argument. The pane it feeds is presenter-only
+     * anyway, so the two agree, and the seed is `''` either way.
+     */
+    restreamUrl?: string;
+    /**
+     * `setRestreamURL` — SC-13's write, at the level the value actually lives at.
+     *
+     * Separate from `onPreferenceChange` on purpose, and that separation IS the fix: this pane wrote
+     * the room's restream destination as a per-viewer preference for as long as it existed, and the
+     * two paths being one function is what let that look right. A caller that must name a different
+     * function cannot make the same mistake by passing a different string.
+     */
+    onSaveRestreamUrl: (url: string) => void;
     onDoNotDisturbChange: (enabled: boolean) => void;
     onSaveDataChange: (enabled: boolean) => void;
     onPlayYoutube: (url: string) => void;
@@ -507,6 +525,8 @@
     onAlertTab,
     onTheme,
     onPreferenceChange,
+    restreamUrl,
+    onSaveRestreamUrl,
     onDoNotDisturbChange,
     onSaveDataChange,
     onPlayYoutube,
@@ -827,7 +847,6 @@
     `streamingType` prop.
   */
   let streamingProtocol = $state(untrack(() => streamingType));
-  let restreamLink = $state('');
   /*
     OBS / XSplit ingest.
 
@@ -1938,19 +1957,6 @@
         onPreferenceChange('pmLogsOnRight', !previous);
       }
     );
-  }
-
-  function saveRestreamLink() {
-    if (restreamLink.startsWith('rtmp://') && !restreamLink.includes(' ')) {
-      onPreferenceChange('restreamToURL', restreamLink);
-      return;
-    }
-    onUserAction('invalid-restream-link', targetUser);
-  }
-
-  function clearRestreamLink() {
-    restreamLink = '';
-    onPreferenceChange('restreamToURL', '');
   }
 
   /**
@@ -4871,30 +4877,12 @@
               </div>
             {/if}
           </div>
-          <div
-            id="restream"
-            role="tabpanel"
-            aria-labelledby="restream-tab"
-            class={[
-              'tab-pane fade',
-              {
-                show: streamingControlTab === 'restream',
-                active: streamingControlTab === 'restream'
-              }
-            ]}
-          >
-            <textarea
-              id="restream-link"
-              class="form-control border border-danger"
-              style="height: 100px;"
-              bind:value={restreamLink}></textarea>
-            <button class="btn btn-outline-info btn-sm m-1" onclick={saveRestreamLink}>
-              <i class="fas fa-save"></i> Set Restream URL
-            </button>
-            <button class="btn btn-outline-warning btn-sm m-1" onclick={clearRestreamLink}>
-              <i class="fas fa-save"></i> Clear Restream URL
-            </button>
-          </div>
+          <RestreamPane
+            active={streamingControlTab === 'restream'}
+            {restreamUrl}
+            {onSaveRestreamUrl}
+            oninvalid={() => onUserAction('invalid-restream-link', targetUser)}
+          />
         </div>
       </div>
       <div

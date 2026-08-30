@@ -4,7 +4,7 @@ import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, badges, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { parseBadgeIds, readPermissions, readSettings } from '#lib/server/rooms.js';
-import { resolveRoomConfig, roomVisibleConfig } from '#lib/room-config.js';
+import { resolveRoomConfig, roomPresenterConfig, roomVisibleConfig } from '#lib/room-config.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { createHash } from 'node:crypto';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
@@ -118,6 +118,18 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     .where(eq(roomUsers.roomId, room.id));
 
   const membership = email ? roomMembers.find((row) => row.user.email.trim().toLowerCase() === email) : undefined;
+
+  /*
+    PRESENTER AUTHORITY, computed ONCE.
+
+    It is read in two places below — `member.isP`, and the presenter-only settings projection — and
+    a second computation is a second thing that can disagree. The owner counts; see the note on
+    `isP` further down for why `shouldRemoveAsNonPresenter` and `applyManyOpcode` both say so.
+
+    A caller that names no member has no membership row and is therefore not a presenter. That is
+    the deny-by-default arm and it is what a guest gets.
+  */
+  const isPresenter = membership ? membership.roomUser.role === 0 || isRoomPresenter(membership.roomUser) : false;
 
   /*
     BADGES — the two halves the room needs, and neither is the whole table.
@@ -257,7 +269,18 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
       rides along because a policy setting the owner is enforcing must not render in the room as a
       toggle the user can flip and watch snap back.
     */
-    settings: resolved.values,
+    /*
+      The presenter-only names are merged in HERE rather than sent as a separate field, because the
+      room reads all of this as one `sessData` object and a second object would mean every consumer
+      choosing which to look in. `roomPresenterConfig` answers `{}` for anyone who is not a
+      presenter, so for a participant this spread adds nothing and the payload is byte-identical to
+      what it was before the list existed.
+
+      The order matters and is not arbitrary: the presenter projection goes SECOND so that a name on
+      both lists resolves to the same `resolveRoomConfig` value either way — but no name should be
+      on both, and `room-config-boundary.test.ts` fails if one ever is.
+    */
+    settings: { ...resolved.values, ...roomPresenterConfig(roomSettings, isPresenter) },
     locked: resolved.locked,
     /*
       The member, translated once here so the room never has to know the numeric model.
@@ -284,7 +307,7 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
             answered `isP: false` for the account that owns it would drop its owner in as a
             participant.
           */
-          isP: membership.roomUser.role === 0 || isRoomPresenter(membership.roomUser),
+          isP: isPresenter,
           /*
             Role 1 WITH `nonPresenter` — the reference's "Admin". A distinct global in the room
             (`globals.isNonPresenterAdmin`, initialised alongside `isPresenter`), and distinct from

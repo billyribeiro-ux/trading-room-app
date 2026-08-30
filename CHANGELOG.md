@@ -33,6 +33,123 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 14:50 UTC — The restream URL a presenter set on themselves, and the third allow-list it needed
+
+**Runtime impact: YES.** A presenter's Restream pane now opens showing the destination the room is
+actually configured with, and Set / Clear change the ROOM's setting instead of that one presenter's
+stored preferences. Nothing about a participant's page changed — the value does not reach one.
+
+**SC-12 and SC-13 of the session-control slice, and they are one defect with two halves.**
+
+#### What the two buttons did
+
+`saveRestreamLink()` called `onPreferenceChange('restreamToURL', restreamLink)` and
+`clearRestreamLink()` the same with `''`. That call is `prefs.save` — **this viewer's own settings
+row**. Those two lines were the only occurrences of the name in `apps/room/src`; nothing in the room
+and nothing in `services/**` read it. So a presenter typed an rtmp destination, pressed Set, and the
+room republished nowhere.
+
+And the textarea was `$state('')` with no prop and no read of the room config, so it opened empty on
+a room that already had a destination — meaning Set pressed on an untouched pane would have cleared
+it, if the write had gone anywhere at all.
+
+**The pane displaying the value back is what let this survive.** A control whose only effect is on
+the person pressing it looks exactly like one that works. It is the same shape as `mute-chat-
+indefinitely` and the twelve "Command send OK." liars, and it is why `EXACT_ALERTS` and
+`INERT_ACTIONS` exist — this one was not on either list, because nobody had looked at where the
+write went.
+
+#### The part that was not a handler
+
+`restreamToURL` is a ROOM setting and lives on the controller. The room's config boundary had two
+allow-lists: what may be READ by the room, and the strictly narrower set it may WRITE. Putting this
+on the read list would have shipped it to **every viewer**, because `+page.server.ts` returns
+`sessData` from a page load and SvelteKit serialises a load's return into the SSR payload.
+
+The reference does exactly that — `e.appService.globals.sessData.restreamToURL` at bundle byte
+2,160,049. It is not copied, and the reason is specific rather than cautious: the Manage page keeps
+`restreamToURLKey` as a separate field, so on paper the destination and the key are separate values
+and only the second is a secret. The platforms this points at do not split them. YouTube hands out
+`rtmp://a.rtmp.youtube.com/live2/<STREAM-KEY>` and Twitch `rtmp://<ingest>/app/live_<KEY>` as one
+string, and the reference's own validator — `startsWith("rtmp://") && !includes(" ")` — accepts
+precisely that. Anybody holding the string can publish to the presenter's channel.
+
+So a **third allow-list**: `ROOM_PRESENTER_SETTINGS`, projected by `internal/room-config/[code]`
+only for a member it has already computed `isP` for, and merged into `settings` so the room still
+reads one object. `roomPresenterConfig(room, false)` answers `{}`, which makes a participant's
+payload byte-identical to what it was before the list existed. It is safe to be per-member because
+that endpoint is already called with `?email=` and the room's client caches per
+`shortCode\u0000email` inside a per-request `WeakMap` — a module-level cache would have served one
+member's projection to the next.
+
+`isRoomWritableSetting` was widened to accept presenter-visible names, and the test that encoded the
+old rule was rewritten rather than deleted. That is a restatement, not a relaxation: the rule was
+never "on the general read list", it was **readable by the party that can write it** — and the
+endpoint refuses every caller who is not an owner or true presenter of the room, so the party that
+can write is exactly the party this list projects to. The alternative was shipping the value to
+every viewer in order to let one presenter edit it.
+
+`isP` is now computed once in that endpoint and read twice, rather than twice: the projection and
+`member.isP` cannot disagree.
+
+#### Three things this turned up that no row was looking for
+
+**1. Three list parsers were reading prose as code, and had been for months.**
+`room-config-boundary.test.ts` and `sso-boundary.test.ts` parse the two build scripts with
+`[...block.matchAll(/'([^']+)'/g)]` over the raw array body — and every entry in those arrays carries
+a long explanatory comment. It worked only because no comment in either script had ever contained an
+apostrophe. Adding one whose comment says *"the reference's own validator"* and *"this VIEWER's
+settings row"* made the pattern match the span BETWEEN the two apostrophes as a name and lose the
+real entry, and all three tests went red on a change that was correct. A test that fails on prose is
+a test that will one day pass on prose. `script-list-names.ts` strips comments first now, so those
+arrays may be commented like every other list here.
+
+**2. A `]` inside a docblock silently truncated an array parse.** The same regex is
+`\[([^\]]*)\]`, so a comment mentioning `internal/room-config/[code]` ends the block at the wrong
+bracket and everything after it disappears from the parse. Found because the verifier script itself
+passed while the test reading it failed — the two disagreeing is the only signal, which is an
+argument for having both.
+
+**3. `ROOM_CONSUMED` had to stay meaning exactly one thing.** The generator's list is asserted equal
+to `ROOM_VISIBLE_SETTINGS` name for name. Folding a presenter-only setting in would have made the
+two disagree, and the honest fix is a fourth list — `ROOM_PRESENTER_CONSUMED` — rather than a looser
+assertion. It is pinned against `ROOM_PRESENTER_SETTINGS` the same way.
+
+#### The count moved, in six documents
+
+`restreamToURL` is the 104th wired setting, and the first that does not cross to every member. It did
+not come from the settings enumeration — it came from the surface audit, and the setting turned out
+to be the thing both halves of the row were missing. `verify-room-settings-schema.mjs` refused every
+run until `README.md`, `OUTSTANDING.md`, `ARCHITECTURE.md`, `admin-surface.md`, `v5.md` and `TODO.md`
+all moved, including the roster of names in the fourth. That check was added on 2026-08-29 predicting
+exactly this; it is the first time it has fired.
+
+#### The pane became a component, because the ceiling said so rather than because it looked nicer
+
+`source-size-contract.test.ts` refused the change: `ModalHost.svelte` is capped, ceilings there only
+go DOWN, and the rule's own words are *"extract a slice rather than raising this number"*. So
+`RestreamPane.svelte` took the tab out — 105 lines, most of them the WHY — and ModalHost lands at
+**6,322 against an unchanged ceiling of 6,335**. `RoomOverlays.svelte` is raised 951 → 954 for three
+lines of wiring, argued at the ceiling as this file requires, and the pair is fifty lines lighter
+than leaving the markup where it was.
+
+`slice-anchor-contract` fired again on the first draft of the new test — two more slices bound by an
+inlined `indexOf`, which answers -1 on failure and is a valid `slice` argument. Both anchors go
+through asserted helpers now. That ratchet has now caught two of my drafts in one session.
+
+**Verified:** `restream-url-contract.test.ts` 11/11 (new), `room-config-boundary.test.ts` 30/30,
+`sso-boundary.test.ts`, `setting-coverage-contract.test.ts` 6/6, `room-surface-audit-counts.test.ts`
+15/15, `source-size-contract.test.ts` 499/499, `verify-room-settings-schema.mjs` green.
+**Thirteen negative controls run and seen red** —
+five on the controller (the setting added to the general read list, the presenter flag ignored, the
+writable check reverted, `restreamToURLKey` joining the presenter list, the generator's fourth list
+drifting) and eight on the room (the seed reverted, the seed made reactive, the preference write
+restored, the pane's validation dropped, the server's validation dropped, the presenter gate dropped,
+the failure swallowed, the `sessData` feed removed). Both full gates before the push, exit codes read
+from the logs they were echoed into: **room 245 files / 4,049 passed / 1 skipped**, **controller 98
+files / 1,048 passed / 21 skipped**, both `gate-exit=0`. **Nothing was opened in a browser, and the Svelte MCP server has been disconnected
+for this entire session**, so `svelte-autofixer` was not run; `svelte-check` is clean at 1,448 files.
+
 ### 2026-08-30 14:20 UTC — The A/V pane's error with no way out, and an audit that had lost count of itself
 
 **Runtime impact: YES** for the A/V device pane; **NO** for the audit document and its contract.

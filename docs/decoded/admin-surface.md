@@ -881,16 +881,17 @@ for reference behaviour.
 
 ### E.5 — The honest gap that is not a diff: `wired`
 
-Our schema carries a `wired` flag meaning "something actually consumes this value". **103 of 269 are
-wired. 166 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
+Our schema carries a `wired` flag meaning "something actually consumes this value". **104 of 269 are
+wired. 165 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
 
 **This section said "58 wired, 211 not" until 2026-08-29**, and listed those 58 by name. The count
 had nearly doubled underneath it. Both the number and the roster below are now regenerated from
 `scripts/verify-room-settings-schema.mjs`'s `EXPECTED_WIRED_SETTINGS`, which the schema itself is
 checked against on every run — and that verifier now fails if this paragraph disagrees with it, so a
-104th wired setting cannot land without this text moving.
+105th wired setting cannot land without this text moving. It worked: `restreamToURL` was the 104th,
+on 2026-08-30, and this paragraph moved because the verifier refused the commit until it did.
 
-Wired (103), alphabetically:
+Wired (104), alphabetically:
 
 `alertLabels`, `alertSoundOff`, `alertsChatOnBottom`, `alertsOverlayOnScreenshare`,
 `allowUsersToChangeUsername`, `allowedMemberships`, `allowedPerms`, `allowedProducts`,
@@ -910,16 +911,17 @@ Wired (103), alphabetically:
 `loginErrorMsg`, `loginErrorURL`, `modAlertFilterList`, `modMessage`, `name`, `nickFilter`,
 `onlyPresentersVisibleToViewers`, `overlayUserIdOnScreenshare`, `overwriteCashRegisterSound`,
 `positionsIframe`, `positionsIframeUrl`, `presenterMsgsOnTheRight`, `ptrMobileAppEnabled`,
-`recordingReminder`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
+`recordingReminder`, `restreamToURL`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
 `showArchivesToSpecificPresenters`, `showArchivesToUsers`, `showBadgesToPresentersOnly`,
 `showOnlyUsernames`, `showPasswordField`, `simUserCount`, `simplifiedEditor`, `ssoJWTSecret`,
 `styckyNonTradeAlert`, `tawkPresenterSupport`, `tipMeBtnEnabled`, `tipMeBtnTxt`, `tipMeBtnUrl`,
 `tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
 `userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
 
-The 166 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
-`saveRecsToVimeo` and the four Vimeo fields), every streaming field (`obsBroadcastRoom`,
-`obsStreamKey`, `restreamToURL`, `restreamToURLKey`, `hasYTStreaming`), every SMS field
+The 165 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+`saveRecsToVimeo` and the four Vimeo fields), most of the streaming fields (`obsBroadcastRoom`,
+`obsStreamKey`, `restreamToURLKey`, `hasYTStreaming` — `restreamToURL` beside them was wired on
+2026-08-30 and is the one exception), every SMS field
 (`twillioApiSID`, `twillioApiToken`, `twilioPhone`, `protextingSecretTok`, `protextingGroupIDs`),
 most of the channels group (`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`,
 `extraRegChannels`, `altGenChannelName`, `altOffTopicChannelName`), the profanity filter
