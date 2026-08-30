@@ -1,6 +1,6 @@
 # The room surfaces, audited against the pinned v4 bundle — 2026-08-30
 
-**222 verified gaps across 18 surfaces.** Every entry names a byte offset in
+**223 verified gaps across 18 surfaces.** Every entry names a byte offset in
 `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, what this room does instead, and
 the file and line where it does it.
 
@@ -17,8 +17,8 @@ it.
 | surfaces read | 18 |
 | reference components not found in the bundle | 0 |
 | differences claimed | 274 |
-| **survived verification** | **222** |
-| refuted | 52 |
+| **survived verification** | **223** |
+| refuted | 51 |
 | false-claim rate | 19% |
 
 **The 19% false-claim rate is the number to keep.** Nearly one claimed gap in five was wrong —
@@ -35,6 +35,51 @@ does not exist anywhere in our source"*, which is TRUE, and the verifiers checke
 checked is whether the outcome is achieved another way — and it is, by three server-side refusals
 that are stricter than the flag. **A gap stated as a missing NAME is the shape most likely to
 survive verification while being wrong**, and it is the shape to distrust in the entries above.
+
+**It is deliberately NOT folded into the table above, and it was, for a while.** That table read
+222 survived / 52 refuted until 2026-08-30 14:20 UTC, and every other count in this document
+disagreed with it: the prose two paragraphs up says "51 were refuted" and breaks that down as
+thirty-two plus nineteen; the refuted section is headed "The fifty-one refuted claims" and lists
+exactly fifty-one; the surfaces table sums to 223; `274 - 51 = 223`. One number had been moved and
+five had not, which is the whole failure mode this document was written to describe, occurring
+inside the document itself. The table describes the two-verifier pass **as it ran**, so UIM-03 —
+refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
+exactly as RM-25 belongs in the next paragraph and not in that table.
+
+**One row was ADDED after this document was committed** — RM-25, found while building RM-11 and
+RM-12 by decoding the compact component's whole consts table rather than the entries those rows
+named. It is not folded into the totals above, which describe the two-verifier pass and should keep
+describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes
+the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
+byte offsets make the second reading the tempting one.
+
+## Where the work stands
+
+**96 open · 128 closed · 224 rows.**
+
+Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
+parses this document and fails if either is wrong. It exists because the answer to "how many are
+left" came out **three different ways in ten minutes** on 2026-08-30 — 158, then 218, then 151 — not
+because the document changed, but because each grep recognised a different subset of the ways a
+closed row says it is closed. Every one of those numbers had been quoted as progress.
+
+A row is finished in one of eight ways and only three of them are code. **The other five are the
+expensive ones to lose**, because a row that was read, measured and deliberately not built looks
+exactly like a row nobody has opened yet:
+
+| disposition | what it means |
+| --- | --- |
+| `BUILT` | built here, against the cited reference bytes |
+| `HALF BUILT` | built, where the row named a larger scope than the part that was right to build |
+| `FIXED` | a defect of OURS removed, rather than a reference behaviour added |
+| `ALREADY BUILT` | present under a name the audit's reader did not search for |
+| `MEASURED REFUSAL` | read, measured, deliberately not built — with the measurement at the code |
+| `DELIBERATE DIVERGENCE` | matching the reference here would reproduce a defect |
+| `OWNER DECISION` | not ours to decide; what the owner has to answer is named |
+| `BLOCKED` | cannot be finished from this checkout; what would unblock it is named |
+
+The disposition is the first line under the row's heading, in bold. A row with no disposition line
+carries its `**severity** · category · reference byte` line there instead, and is open.
 
 Also recorded per surface: how many reference behaviours were confirmed **present** here. A list of
 only gaps reads as though nothing works, and 965 behaviours were confirmed built.
@@ -470,6 +515,8 @@ function g_e(t,n){if(1&t){const e=Y();d(0,"span",52),x("click",function(){return
 
 ### RM-05 — Card admin/member branch: the reference compares against `"alert"` (singular), which is never a logType, so an ADMIN ALERT takes the reversed admin card
 
+**BUILT 2026-08-30 11:22 UTC — and the row's own caveat is RESOLVED rather than inherited.** The row called this "a candidate rather than a certainty" because the captured DOM might be the better authority and is absent from this checkout. It still is; the bundle settles it without the capture. Every `logType` literal in it was enumerated: **32 `alerts`, 23 `chat`, 3 `pc`, and exactly 2 `alert`** — and those two are these render gates and nothing else. A term that can never be false is not a term. The compact renderer's extra clause is `"pc" != o.logType` (byte 1,400,148), which IS live and never reaches this component because a private message renders through `CompactMessageRow`; and the box class states the same gate with no term at all, `ct(30, o6, e.msg.isA)` at 1,334,988 and `ct(27, o6, e.msg.isA)` at 1,343,627 where `o6 = t => ({"msg-box-adm": t})`. **A gate written twice, once with a dead condition and once without, is the reference telling you which one it meant.** So `reverseMessage` and `messageBoxClass` drop the `kind === 'chat'` term: an alert posted by a presenter now takes the reversed admin card. Captured rows are unaffected — `evidenceDirection` and `evidenceMessageBoxClass` still win outright, which `admin-direction-contract.test.ts` asserts alongside the enumeration, read from the pinned bundle at run time rather than quoted.
+
 **medium** · `divergence` · reference byte **1,361,597**
 
 ```
@@ -481,6 +528,8 @@ o.msg.isA&&"alert"!=o.logType?3:4
 > Verified: Not implemented anywhere in apps/room/src. The reference card gate is `o.msg.isA&&"alert"!=o.logType?3:4`; I enumerated every logType literal in the bundle and "alert" (singular) is never assigned — only "alerts", "chat" and (by comparison) "pc" — so the term is unconditionally true and the gate reduces to `msg.isA`.
 
 ### RM-06 — parseStock's preceding-character guard is not reproduced — a ticker glued to a non-space character is left uncoloured upstream
+
+**BUILT 2026-08-30 11:22 UTC.** The guard, in `#lib/message-body-segments.ts` — a ticker is coloured when it starts the body or when a LITERAL space precedes it, and `foo$AAPL`, `($AAPL` and a tab-indented `\t$AAPL` are plain text, as they are upstream. `atBodyStart` is threaded through the label and trade passes rather than measured, because upstream runs over ONE string those passes have already rewritten into markup: a ticker at offset 0 of a later piece sits immediately after a `>` there, which is not a space, so the two implementations agree character for character. **What is deliberately NOT reproduced** is `a = e.indexOf(r)` — the first occurrence of the matched text ANYWHERE in the body rather than this match's position, which makes upstream decide both of ` $AAPL foo $AAPL` from position 0 and, on the second pass, substitute inside the span the first pass produced. That is a defect whose only effect is nested markup; the positional RULE is transcribed and the aliasing is not, and the code says so where the next comparison will read it. `ticker-colour-contract.test.ts` renders all five cases.
 
 **medium** · `missing-behaviour` · reference byte **1,327,300**
 
@@ -508,6 +557,8 @@ e.msg.txt.includes("?")&&!e.hasCustomFollowedUserColors
 
 ### RM-08 — Compact menu labels differ from the card's and we render one label set for all three variants
 
+**BUILT 2026-08-30 11:22 UTC.** `MESSAGE_MENU_TEXT` in `message-behavior.ts`, keyed by renderer, and `MessageMenu.svelte` picks the row from its own `variant` so a call site cannot render the wrong words. **Every `\xa0\xa0`-prefixed label literal in the bundle was enumerated first** — four complete menus, the card at 1,329,046-1,330,950 and 1,336,386-1,338,290, the compact admin at 1,367,382-1,369,287, the compact member at 1,374,766-1,376,671 — which establishes the row's scope as exactly three rather than approximately three: nine entries are byte-identical across all four, trailing spaces included (`Mark Answered ` and `Private Chat ` carry one everywhere; `Edit` and `Copy` carry none anywhere). `MESSAGE_MENU_LABEL` is untouched and stays the capture-matching LOOKUP; the contract asserts the two agree on the card so they cannot drift.
+
 **low** · `wrong-constant` · reference byte **1,368,194**
 
 ```
@@ -519,6 +570,8 @@ e.msg.txt.includes("?")&&!e.hasCustomFollowedUserColors
 > Verified: I could not refute it. Reference side confirmed by direct read: the card family (app-st-message) uses "\xa0\xa0Show message to all" (no trailing space), "\xa0\xa0Alert Send Report " and "\xa0\xa0Reply" (no trailing space), while BOTH compact template branches (app-st-compactmessage) use "\xa0\xa0Show message to all ", "\xa0\xa0Show Send R…
 
 ### RM-10 — Compact ADMIN timestamp is " [h:mm a] " with surrounding spaces; ours emits the member form for both rows
+
+**BUILT 2026-08-30 11:22 UTC.** ` [` / `] ` on the admin row, `[` / `]` on the member's, written as EXPRESSIONS rather than as template whitespace — Svelte normalises runs of whitespace around a text node, so ` [` typed into the markup is not reliably ` [`, and a divergence of exactly one space is the kind nothing here would otherwise catch. `compact-mirror-contract.test.ts` renders both rows and matches the whole bracketed run anchored at both ends.
 
 **low** · `wrong-constant` · reference byte **1,374,160**
 
@@ -532,6 +585,8 @@ Ne(" [",Ct(29,27,e.msg.t,"h:mm a"),"] ")
 
 ### RM-11 — Compact inner row applies `flex-row-reverse` on presenterMsgsOnTheRight; ours applies `presenter-msg-right`
 
+**BUILT 2026-08-30 11:22 UTC — and it is FOUR nodes, not one.** Reading the row's own byte led to the other three, which bind different lambdas to different consts in the same admin template: const 8 `g1e` → `flex-row-reverse` (this row), const 23 `_1e` → `w-100` when there is a reply and the setting is off / `flex-fill` when it is on, const 25 `b1e` → `presenter-msg-right flex-fill` on the plain body, const 43 `v1e` → `presenter-msg-right` on the reply wrapper. The member template binds NONE of them (consts 55, 64, 75, 76 are plain class lists), which is why every one carries the `reverseMessage` term and why one rendered member row is the negative control for all four at once. `presenter-msg-right` on the inner row was the wrong class from the right component: it sets text-align and margin, so the row's children kept their source order and the setting did nothing a presenter could see.
+
 **low** · `wrong-constant` · reference byte **1,373,250**
 
 ```
@@ -543,6 +598,8 @@ z("ngClass",ct(30,g1e,e.appService.globals.sessData.presenterMsgsOnTheRight))
 > Verified: I tried to refute this and could not. Both halves of the claim check out against bytes I actually read.
 
 ### RM-12 — Compact ADMIN reaction container drops `presenter-reactions-right`
+
+**BUILT 2026-08-30 11:22 UTC.** `y1e` on const 26, admin only — the member container is const 65 and carries `ngStyle` alone. Without it a presenter's compact reactions stayed left while every other part of their row moved right.
 
 **low** · `missing-behaviour` · reference byte **1,371,980**
 
@@ -584,6 +641,8 @@ z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ng
 
 ### RM-16 — gif placeholder id ignores the extra-chat-column variant
 
+**BUILT 2026-08-30 11:56 UTC.** `extraChatMsg` is `urlwrapImg`'s fourth argument and its only effect is the id — `const c = s ? \`gifExtra_${o}\` : \`gif_${o}\`` at byte 1,326,195. The prop is fed by `ExtraChatPane`, which is the only surface in the room that can know it, and consumed by `MessageBody.svelte`. The row's own note stands and is kept at the code: nothing here resolves anything THROUGH the id — the reveal is keyed by URL because the reference's id is derived from the message, so a message with two gifs gives both the same id upstream — so the duplicate was inert. It was still two elements with one DOM id whenever the extra column was on, and the reference already carries the fix.
+
 **low** · `divergence` · reference byte **1,326,195**
 
 ```
@@ -610,6 +669,8 @@ copyMessage(){this.msg.txt=sf(this.msg.txt).result,console.log("copyMessage: ",t
 
 ### RM-20 — doUserInfo's extra-chat-column companion event is not routed
 
+**BUILT 2026-08-30 11:56 UTC.** The chain is three sites seven hundred kilobytes apart, and reading one without the others is why a `grep` for `doUserInfoExtra` concluded the event went nowhere: the emit at 1,352,313, the ONLY subscriber at 2,074,524 (`subscribe("doUserInfoExtra", e => { this.extraChatMsg = e })`, on the user modal), and that modal's own `doMention` at 2,077,087, which reads the stored flag as the first term of the same three-term router the message's kebab uses. So the feature is: open a member's card from the extra column, press @Mention, and the mention lands in the composer you are looking at. `MessageActions` records it on the `user` action and `mentionFromUserModal` supplies it to `mentionTargetIsExtra`, which still owns the `focus === 'textAreaTxtExtra'` half. **One divergence, and it removes a staleness rather than adding one:** upstream emits ONLY when the extra column is involved, so a card opened from the main log with main focus emits nothing and the modal keeps the last extra-column answer; ours records it on every open, which agrees in every case except that one. `message-actions.svelte.test.ts` asserts all four cases through the two composer buffers.
+
 **low** · `missing-behaviour` · reference byte **1,352,030**
 
 ```
@@ -622,6 +683,8 @@ doUserInfo(e,i){this.appService.getUserInfo(e,i),this.appService.guiEventBus.emi
 
 ### RM-21 — Alerts-log ticker colour comes from localStorage `alertStyle` upstream; ours has no alert-side ticker style
 
+**BUILT 2026-08-30 11:22 UTC, with one gap recorded rather than papered over.** `tickerColorStyle` gives the ticker `parseStock`'s own precedence, which is not the body's: on ALERTS the followed-user style is not consulted at all and a room style IS, and on CHAT the room style applies whether or not the message carries a background of its own — `parseStock` never reads `msg.bkgColor`, while `effectiveStyle` drops to `undefined` for exactly that case because that gate belongs to the BOX. Every `$TICKER` in every alert had been rendering as a bare `stockColor` span. **The gap:** upstream `alertStyle` is separately persisted (`saveAlertStyle`, byte 2,242,440), its default is byte-identical to the chat one (`globals.alertStyle`, byte 980,310, the same five values as `globals.chatStyle` beside it), and this repository has no alert-style editor — so the alert branch reads `chatStyle`, which is upstream's behaviour for every account that has never opened that pane, and the one expression to change when it lands. A prop nothing feeds is what `unfed-props-contract` exists to catch.
+
 **low** · `missing-behaviour` · reference byte **1,327,851**
 
 ```
@@ -633,6 +696,8 @@ if("alerts"===i){const l=window.localStorage.getItem("alertStyle")
 > Verified: No alert-side ticker style source exists in apps/room/src. RoomMessage.svelte:216-220 gates the room style on `kind === 'chat'` (`followedStyle ??
 
 ### RM-22 — Card admin body row's `justify-content-end` and the badge/reply wrapper class lists
+
+**BUILT 2026-08-30 11:56 UTC — FOUR findings, and each one has a member control.** Every admin/member pair below is a place where the reference binds on ONE layout, so applying it to both is its own defect: (1) the **badges wrapper**, const 25 admin / const 60 member `d-inline-block flex-shrink-1` with `overflow: hidden` — we rendered badges as direct siblings of the username inside a `flex-nowrap` row, so a member with several badges pushed the timestamp and the kebab out instead of having their badges clipped; the two consts differ by `ngStyle` alone, which `Mge` binds to `styleF`, so the style is gated on the layout exactly as the table has it. (2) **`justify-content-end`**, `dge` at 1,335,936 on const 26, against the member's plain const 65. (3) The **reply block**, which was the same wrong shape as the compact one (RM-25): `Rge` at 1,331,967 and `c1e` at 1,340,691 render `div46 > [ div47 > [strong48, div49], div50 ]`, and ours wore card const **27** — the answered TICK's `ms-1 private-reply` — with the sender's own line INSIDE `private-reply-message` and both bodies on `messageBodyClass`, which lacks the `pe-3 w-100` that fills the row. (4) The **two reaction containers**, which are different ELEMENTS: `Lge` opens `d(0,"span",29)` = `[1,"ms-1",3,"ngClass","ngStyle"]` and `p1e` opens `d(0,"div",6)` = `[3,"ngStyle"]`; ours emitted one `span` with neither base class and applied `presenter-reactions-right` on BOTH layouts, so a member's card right-aligned its reactions whenever the room had the setting on — a thing the reference has no node for. The strip's CONTENTS are one `{#snippet}` with two call sites, because only the wrapper differs. The badge content stays real elements rather than the reference's `innerHTML` of a prebuilt string; that divergence is older than this row and is the safer half.
 
 **low** · `wrong-constant` · reference byte **1,328,315**
 
@@ -660,9 +725,31 @@ o.txt.replace("[{(",'<span class="tradeColor" id="id_'+o._id+'">')
 
 ---
 
+### RM-25 — Compact reply block wears the answered tick's two classes and nests `private-reply-message` the wrong way round
+
+**BUILT 2026-08-30 11:22 UTC.** Found while building RM-11 and RM-12, by decoding the compact component's consts table (`consts:` at 1,395,760) rather than by looking for it — which is the argument for decoding the whole table instead of the entries a row names.
+
+**medium** · `wrong-markup` · reference byte **1,370,300**
+
+```
+d(0,"div",43)(1,"div",44)(2,"strong",45),v(3),u(),T(4,"div",46),u(),T(7,"div",47),u()
+```
+
+**Ours:** `U1e` (compact admin, 1,370,300) and `f_e` (compact member, 1,378,850) render `div43 > [ div44 > [strong45, div46], div47 ]`. Compact const 43 is `msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100` + `ngClass` (`v1e`, admin only) + `ngStyle`; const 76 is the same list with `ngStyle` alone (member); const 44 is `private-reply-message w-100` + the theme background; const 45 is `d-block username`; const 46 is the quoted body, the only node here carrying the mention/question colours; const 47 is the sender's own text, a direct child of the outer div with no class and no style. We rendered `<div class="ms-1 private-reply">` — compact const **24**, which is the answered TICK's const — with `private-reply-message` as a SIBLING of the name rather than the box that wraps it. So the quoted block had no background, the name had no `username` treatment, neither body carried a colour, and `w-100` was missing from the box that is meant to fill the row.
+
+**Also decoded in passing:** the binding ORDER says which style goes where, and they are not all the body's — div43 and strong45 both take `invertTxtColorToggler(invertTxtColor, "name")` (the NAME inversion, which is `usernameStyle` here and is what the card already puts on the same `d-block username` node), while only div46 takes `styleF`. div47 takes neither and inherits. That asymmetry is the reference's.
+
 ## notes/NoteEditor.svelte
 
 18 verified gaps; 50 reference behaviours confirmed present.
+
+> **These eighteen rows sat under `## RoomMessage.svelte` until 2026-08-30**, with this heading
+> below them as an empty stub claiming eighteen gaps and listing none. Nothing was lost — every
+> row was here and every one is closed — but the two sections said the opposite of the truth to
+> anybody reading either: the NoteEditor section looked unstarted and the RoomMessage section
+> looked twice its size. `room-surface-audit-counts.test.ts` now checks each surface heading
+> against the `gaps` column of the table above, so a row filed under the wrong heading fails
+> rather than being found by hand.
 
 ### note-editor-carousel-slide-upload — Per-slide image upload (Upload button, uploading spinner, POST to upload_server) is missing
 
@@ -955,6 +1042,8 @@ function DDe(t,n){if(1&t){const e=Y();d(0,"div",119)(1,"div",120)(2,"button",121
 
 ### SC-02 — A/V pane opens on two FABRICATED device entries and never enumerates on open — loadDevices() runs only from the Refresh button
 
+**ALREADY BUILT — verified by reading 2026-08-30 14:13 UTC, not rebuilt; the second half is a DELIBERATE DIVERGENCE.** The fabricated entries are gone and `AvDevicePane.svelte`'s header names them: `Studio Display Microphone (05ac:1118)` and `Studio Display Camera (15bc:0000)`, with 64-character device ids that appear nowhere in the reference bundle and nowhere else in this repository — **somebody's real hardware, hardcoded, shown to every viewer as their own and pre-selected in both dropdowns**. Both selects seed from the saved settings now. The row's second half — enumerating in `ngAfterViewInit` — is refused with its reason at the same place: `loadDevices` calls `getUserMedia` (an unpermitted `enumerateDevices` returns devices with empty labels) and `media-capture-contract.test.ts` keeps every capture behind an explicit click, so opening a settings pane must not prompt a presenter for their camera and microphone. The pane says it has not looked yet, and Refresh is what looks — which is also why SC-10's "Please connect…" fallback matters more here than upstream.
+
 **high** · `defect` · reference byte **2,159,387**
 
 ```
@@ -966,6 +1055,8 @@ ngAfterViewInit(){var e=this;this.appService.globals.isPresenter&&!this.appServi
 > Verified: Could not refute. All three parts of the claim verified.
 
 ### SC-03 — The chosen audio input device is inert — `audioDeviceID` is written by the select and read by nothing; mic capture calls getUserMedia({audio:true})
+
+**ALREADY BUILT — verified by reading 2026-08-30 14:13 UTC, not rebuilt.** `#lib/capture-settings.ts` carries the reference's constraint rule verbatim (byte 2,160,736's siblings) and `local-capture.svelte.ts:370` builds the microphone's `getUserMedia` from it. Its own header records what this was: *"`{ audio: true }` until 2026-08-30, so the A/V pane's microphone select and its three processing checkboxes wrote preferences and changed nothing."* `retryCount` is what decides between the exact-device constraint and the fallback, which is upstream's own shape.
 
 **high** · `defect` · reference byte **2,160,736**
 
@@ -1008,6 +1099,10 @@ function yDe(t,n){if(1&t){const e=Y();d(0,"div")(1,"div",105)(2,"label",106),v(3
 
 ### SC-06 — Stream player state is never seeded from the server (`streamStatus` / getPlayerLink), so the readout always says false on open
 
+**BLOCKED 2026-08-30 15:28 UTC, on the same absent server as SC-04 and SC-05 — it is their seeding half.** The row's own evidence is the argument: `getPlayerLink()` awaits `invokeAdminCmd("streamStatus")` and reads `rc.enablePlayer` and `rc.playerURL` off the answer. Both values come FROM a server that is not in the capture, and the client composes neither. There is nothing here to seed from.
+
+**What the pane says now is not the defect this row describes, and the difference matters.** `streamPlayerEnabled` no longer exists: SC-04's close removed the dead per-user preference and the state it fed, and the readout is a literal `false` in red beside two `disabled` buttons and an `alert alert-info` saying *"The stream player is not available in this deployment: it needs a public playback page, and there is no server here that issues one."* So `false` is the TRUE state of this deployment rather than a stale default — a seeded value would be seeding a lie. **Unblocked by:** the same two things SC-04 names — a decision on anonymous playback authorization, and a MediaMTX host.
+
 **medium** · `missing-behaviour` · reference byte **2,170,505**
 
 ```
@@ -1019,6 +1114,26 @@ getPlayerLink(){var e=this;return I(function*(){let i=yield e.appService.invokeA
 > Verified: I could not refute this. In our source the Stream Player readout is fed by exactly one variable, `streamPlayerEnabled`, declared as a literal `$state(false)` and written only by the two buttons in the same pane; nothing in the repository reads any server-side player status.
 
 ### SC-07 — "Swap Primary and Backup Media Servers" button absent, with its password gate and confirm
+
+**BLOCKED 2026-08-30 15:28 UTC on a backup media cluster, and its password gate is a DELIBERATE DIVERGENCE that would not be reproduced even if the cluster existed.** Decoded at byte 2,173,860:
+
+```js
+switchToBackup() {
+  this.appService.globals.sessData.deleteAlertPW
+    ? bootbox.prompt({ title: "Please enter the password for this action:", …
+        callback: e => { e && (e.trim() === this.appService.globals.sessData.deleteAlertPW
+          ? bootbox.confirm("Are you sure you want to switch to the backup cluster? …",
+              o => { o && (this.appService.invokeAdminCmd("swapBackupClusterID", {}), …) })
+          : bootbox.alert("Wrong password!")) } })
+    : bootbox.confirm("Are you sure you want to switch to the backup cluster? …", …)
+}
+```
+
+Two independent blockers, and they are not the same kind of thing.
+
+**The credential.** The gate compares the typed password **in the browser** against `sessData.deleteAlertPW` — one of the seven credentials this room's boundary refuses outright, and the exact shape of the 2026-08-07 privilege escalation: a member who can read `sessData` reads the password and answers their own prompt. This is the third control found doing it (`allRoomsWelcomeMatPW` on the welcome mat, and `needPasswordForUserNotes`), and the correct shape is the one those two settled on: **the credential stays on the controller and the QUESTION travels**. That half is designable today and is not what blocks the row.
+
+**The cluster.** `swapBackupClusterID` swaps the room onto `backupClusterID`, a media-server identity this deployment does not have — there is one media plane here and no second cluster to fail over to, so the command has nothing to name. `backupClusterID` and `primaryClusterID` are unwired controller settings, and their manage-page note already records that they stay unwired for this reason. **Unblocked by:** a second MediaMTX cluster, at which point the password gate is built as a server-side check on the controller and never as a string comparison in a browser.
 
 **medium** · `missing-control` · reference byte **2,140,720**
 
@@ -1032,6 +1147,31 @@ function lDe(t,n){if(1&t){const e=Y();d(0,"button",89),x("click",function(){retu
 
 ### SC-08 — "Admin Dashboard Login" button (and its preceding <hr>) absent
 
+**OWNER DECISION 2026-08-30 15:28 UTC. The shape is not in doubt and the credential is not the obstacle — the question is whether a room may hand somebody a signed-in controller session.** Decoded end to end, at bytes 2,175,167 and 1,153,962:
+
+```js
+adminLogin() { bootbox.confirm("Are you sure you want to login to the Admin Dashboard?",
+                 e => { e && this.appService.doAdminLogin() }) }
+
+doAdminLogin() { this.httpClient
+  .post(`${globals.apiROOT}/sessions/v2/loginToAdminFromRoom`, { sessID, token })
+  .subscribe({ next: i => i?.success && i.loginURL
+      ? window.open(i.loginURL.startsWith("https://") ? i.loginURL : "https://" + i.loginURL, "_blank")
+      : bootbox.alert(i?.msg || "There was an error logging in, …"),
+    error: i => bootbox.alert(i?.error?.msg || "Not authorized or there was a server error.") }) }
+```
+
+**`modAdminLoginList` never reaches the browser here or upstream.** The client posts its session id and token and the SERVER answers `{success, loginURL}` or refuses; the list is consulted where it lives. That is this repository's own doctrine — *every authority decision is made on the server from data the server owns* — so the row is **not** blocked on the credential boundary the way SC-07's password gate is, and the audit's note that `modAdminLoginList` is unwired is true but not the obstacle.
+
+What it is blocked on is one question the owner has to answer, because `CLAUDE.md` forbids inventing an authority decision: **may a presenter inside a room be handed an authenticated session for the controller, and for which account?** The controller here is not a read-only dashboard — it manages billing, room creation and every credential on this list. Minting a session for it from a room handoff is new authentication surface, not a link.
+
+Two answers are costed and either is buildable in a day:
+
+* **Yes, mint one.** `internal/room-admin-login/[code]` on the controller, on the read capability, checking the named member against the room's `modAdminLoginList` and its owner, and returning a one-shot login URL with a short TTL. The room's half is a presenter-gated remote function and the confirm above.
+* **No, just point at it.** The same endpoint answers a boolean and the room opens the controller's ordinary login page. No session is minted and nothing is authenticated by the room; the member signs in themselves. Diverges from the reference, which auto-logs-in, and the divergence would be recorded.
+
+**Not built either way until that is answered**, and the button is deliberately absent rather than present-and-inert: an "Admin Dashboard Login" that opens a login form somebody cannot pass is worse than no button.
+
 **medium** · `missing-control` · reference byte **2,140,887**
 
 ```
@@ -1043,6 +1183,8 @@ function cDe(t,n){if(1&t){const e=Y();T(0,"hr"),d(1,"button",90),x("click",funct
 > Verified: I could not find any counterpart in apps/room/src, and I searched hard for one. Searches run over apps/room/src (and, excluding the pinned bundle, the whole repo): `adminLogin`, `doAdminLogin`, `admin_login`, `admin-login`, `adminDashboard`, `admin dashboard`, `admin panel`, `adminPanel`, `admin-panel`, `admin area`, `control panel`, `das…
 
 ### SC-09 — A/V error alert has no icon and no "Retry" button — the retry control is missing entirely
+
+**BUILT 2026-08-30 14:13 UTC, and it is the one of the four that mattered.** Every error this pane can raise is TRANSIENT — a denied permission the member can grant, a device they can plug in, a page they can reload over HTTPS — and the only way out was the Refresh button at the TOP of the pane, above a red block that ends the reading. Somebody who had just fixed the problem the message describes had nothing beside the message to press. The icon (const 92), the button (const 93 `btn btn-sm btn-outline-secondary ml-2`), its `fa-redo` and the literal ` Retry ` are all the reference's, and Retry calls the SAME `loadDevices` Refresh does — a retry that took a different path would be two ways to answer one question.
 
 **medium** · `missing-control` · reference byte **2,141,127**
 
@@ -1056,6 +1198,8 @@ function uDe(t,n){if(1&t){const e=Y();d(0,"div",50),T(1,"i",92),v(2),d(3,"button
 
 ### SC-10 — No "Please connect audio/video devices." fallbacks — the empty select renders instead
 
+**BUILT 2026-08-30 14:13 UTC.** `O(99, audioDevicesList?.length > 0 ? 99 : devicesLoading || devicesLoadError ? -1 : 100)` — a three-way gate whose middle arm is "the block above has already said something". The fallback replaces the WHOLE group (label, select and the "Selected:" line) rather than sitting beside it. **This matters more here than upstream:** SC-02's recorded divergence means this pane deliberately opens with both lists empty, so an empty dropdown that opens onto nothing was the first thing a member saw every single time, with no statement of why. Both crossed-out icons are the reference's and they are not the same one — `fa-microphone-slash` and `fa-video-slash`.
+
 **medium** · `missing-behaviour` · reference byte **2,142,196**
 
 ```
@@ -1067,6 +1211,8 @@ function mDe(t,n){1&t&&(d(0,"div",100),T(1,"i",101),v(2," Please connect audio d
 > Verified: I could not refute this. The session-control modal's av-device-selection tab renders both <select>s unconditionally with no empty-list guard.
 
 ### SC-11 — The three audio-constraint checkboxes are seeded to `false` rather than from the saved preferences, so they always open unchecked
+
+**ALREADY BUILT — verified by reading 2026-08-30 14:13 UTC, not rebuilt.** All three seed from `capture` in `AvDevicePane.svelte:61-63`, with `untrack` because they are seeds and then locally owned — the user must be able to tick a box without the preference having round-tripped. The table in that file's header lists this row's three controls beside the two device selects as one fix; the pane was extracted for it.
 
 **medium** · `defect` · reference byte **2,155,032**
 
@@ -1080,7 +1226,7 @@ preferences.echoCancellation),m(4),z("checked",e.appService.globals.preferences.
 
 ### SC-12 — Restream textarea is never seeded from the room's stored restream URL
 
-**medium** · `missing-behaviour` · reference byte **2,160,049**
+**BUILT 2026-08-30 14:50 UTC, together with SC-13 — they are one defect with two halves.** `restreamLink` was `$state('')` with no prop and no read of the room config; it is `$state(untrack(() => restreamUrl ?? ''))` now, fed from `data.sessData?.restreamToURL` in `RoomOverlays.svelte`. `untrack` for the reason `streamingProtocol` two lines above it gives: this is a SEED and then locally owned, so the presenter can type without the write having round-tripped, and the `invalidateAll()` after a successful save cannot overwrite what is being typed. **Reading it required a setting that did not cross the boundary at all** — see SC-13 for the third allow-list that was built to carry it, and why it is not on the list every member receives.
 
 ```
 e.restreamLink=e.appService.globals.sessData.restreamToURL?e.appService.globals.sessData.restreamToURL:"",e.streamKey=e.appService.globals.mtxToken,e.streamingLink=`http://${e.appService.globals.streamServerMTX}:8889/room__${e.appService.gl
@@ -1092,7 +1238,13 @@ e.restreamLink=e.appService.globals.sessData.restreamToURL?e.appService.globals.
 
 ### SC-13 — Set/Clear Restream URL write a per-user preference `restreamToURL` that nothing reads, instead of the room-level `setRestreamURL` command
 
-**medium** · `defect` · reference byte **2,174,659**
+**BUILT 2026-08-30 14:50 UTC, and it is the largest row of this slice — a boundary, not a handler.** The audit's reading was exact: `onPreferenceChange('restreamToURL', …)` is `prefs.save`, this VIEWER's settings row, and those two calls were the only occurrences of the name in `apps/room/src`. A presenter typed a destination, pressed Set, and the room republished nowhere — **while the pane went on displaying the value, which is the specific reason it could survive being looked at**. `setRestreamUrl` in `session-commands.remote.ts` writes through `internal/room-setting` now, the same seam `overwriteCashRegisterSound` uses and for the reason that endpoint's docblock gives: a durable per-room value broadcast over the event channel would change every browser's belief and persist nothing.
+
+**What was NOT obvious, and is the divergence recorded rather than matched:** `restreamToURL` is a ROOM setting on the controller, and the room's config boundary had exactly two allow-lists — read by every member, and written. Adding it to the first would have put the value in the SSR payload of **every viewer's page load**, because `+page.server.ts` returns `sessData` from a load and SvelteKit serialises a load's return. The reference does exactly that (`globals.sessData.restreamToURL`). It must not be copied: the Manage page keeps `restreamToURLKey` as a separate field, so on paper the destination and the key are separate values — but YouTube hands out `rtmp://a.rtmp.youtube.com/live2/<STREAM-KEY>` and Twitch `rtmp://<ingest>/app/live_<KEY>` as ONE string, and the reference's own validator (`startsWith('rtmp://') && !includes(' ')`) accepts precisely that. Anybody holding it can publish to the presenter's channel.
+
+So a THIRD allow-list, `ROOM_PRESENTER_SETTINGS`, projected by `internal/room-config/[code]` only for a member it has already computed `isP` for — merged into `settings` so the room reads one object, and `{}` for anybody else, which makes a participant's payload byte-identical to what it was before the list existed. Safe to be per-member because that endpoint is already called with `?email=` and the room's client caches per `shortCode\u0000email` in a per-request `WeakMap`. `isRoomWritableSetting` was widened to accept presenter-visible, and that is a restatement rather than a relaxation: its rule was never "on the general read list" but "readable by the party that can write it", and the endpoint refuses every caller who is not an owner or true presenter.
+
+The validation is the reference's and is applied twice — in the pane to raise its own alert without a round trip, and again on the server, because a remote command is reachable without the pane and a hidden button is not a check.
 
 ```
 startRestream(e=!1){if(e)return this.appService.invokeAdminCmd("setRestreamURL",{restreamToURL:""}),void(this.restreamLink="");this.restreamLink.startsWith("rtmp://")&&!this.restreamLink.includes(" ")?this.appService.invokeAdminCmd("setRest
@@ -1103,6 +1255,20 @@ startRestream(e=!1){if(e)return this.appService.invokeAdminCmd("setRestreamURL",
 > Verified: I could not find a room-level write path anywhere in our source. `saveRestreamLink()` / `clearRestreamLink()` call `onPreferenceChange('restreamToURL', ...)`, which is bound at RoomOverlays.svelte:581 to `prefs.save(key, value)`; `prefs.save` (prefs.svelte.ts:532) mirrors into the decoded snapshot, offers the key to `#hooks.onSideEffect`…
 
 ### SC-14 — Non-presenter (hasMic) body — the ngForm device-change flow — is not built, and there is no other working device picker for a non-presenter
+
+**BUILT 2026-08-30 15:16 UTC, with SC-17 — they are one change, and the verifier's correction is what made it small.** The verifier was right that the picker itself already exists (`AvDevicePane`); what was missing was the ARM that renders it for a member and the navbar item that reaches it. Both halves are decoded rather than assumed:
+
+```js
+O(9, !isPresenter && user.hasMic ? 9 : -1)                              // the body,   byte 2,184,295
+O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)     // the navbar, byte 2,489,576
+function f4e(t,n){ d(0,"li",192), x("click", () => doSessionControl()), … v(4,"Session Control") … }
+```
+
+Slot 29 is the navbar's **Session Control** item, and it is the ONE entry in that presenter block whose gate is wider than `isPresenter`. So upstream a member holding the mic permission gets the item, and the modal answers them with the device picker alone. Here they could produce audio — `joinsMediaAsProducer(isPresenter || hasCam || hasMic || hasScreen)` has been honoured since the permissions work — and had no way to choose which microphone it came from.
+
+`!isLimitedPresenter` is the reference's own term and is not redundant: `giveMicScreen` assigns `globals.user.isPresenter = globals.isLimitedPresenter = globals.isPresenter = e.give`, so somebody handed mic and screen at runtime satisfies `isPresenter`, and upstream deliberately withholds room administration from them. `hasMic` is the durable membership permission, one of the five `permissions_json` keys.
+
+**Two divergences recorded at the code, and the second is forced by one of ours.** (1) It applies on CHANGE rather than on submit: `submitNewDevices(form)` writes the same two preference keys the presenter's selects write, only later, and keeping the submit button would mean one modal in which the identical control behaves two ways depending on who opened it. (2) It HAS a Refresh button, which `LDe` does not — SC-02's divergence means this room does not enumerate on open, so without Refresh a member would read "Please connect audio devices." forever with no way to answer it.
 
 **medium** · `missing-control` · reference byte **2,156,909**
 
@@ -1116,6 +1282,8 @@ function LDe(t,n){if(1&t){const e=Y();d(0,"form",131,0),x("ngSubmit",function(){
 
 ### SC-15 — Refresh Devices button has neither the `disabled` binding nor the spinner/sync icon swap
 
+**BUILT 2026-08-30 14:13 UTC.** `z("disabled", e.devicesLoading)` and `z("ngClass", e.devicesLoading ? "fa-spinner fa-spin" : "fa-sync-alt")` at byte 2,154,613. The button was always live and its icon never moved, so pressing Refresh twice fired a second `getUserMedia` while the first was still resolving — and the pane looked identical throughout, which is exactly why anybody would press it twice.
+
 **low** · `missing-behaviour` · reference byte **2,154,613**
 
 ```
@@ -1128,6 +1296,8 @@ z("disabled",e.devicesLoading),m(),z("ngClass",e.devicesLoading?"fa-spinner fa-s
 
 ### SC-16 — Loading-devices indicator uses the wrong container class
 
+**BUILT 2026-08-30 14:13 UTC.** Const 49 is `[1,"alert","alert-info"]` and this read `text-center my-3`. Not cosmetic: its twin below — const 50 `alert alert-danger` — already WAS a panel, so a loading state rendering as bare centred text beside an error rendering as a bordered block reads as two different KINDS of message, when they are the two outcomes of one button.
+
 **low** · `wrong-constant` · reference byte **2,178,854**
 
 ```
@@ -1139,6 +1309,12 @@ z("disabled",e.devicesLoading),m(),z("ngClass",e.devicesLoading?"fa-spinner fa-s
 > Verified: I could not refute it. Reference: at offset 2141078 the bundle reads `function dDe(t,n){1&t&&(d(0,"div",49),T(1,"i",91),v(2," Loading devices...
 
 ### SC-17 — Body is not gated on isPresenter inside the component — the presenter body is the only body and renders for whoever opens the modal
+
+**BUILT 2026-08-30 15:16 UTC, and building it WITH SC-14 is the point rather than a convenience.** The row files this `low` because nothing was exposed in practice: both entry points sat inside `RoomNavbar`'s `{#if isPresenter}`, and every button in the body is server-authorised, so it was defence-in-depth. **SC-14 is precisely the navbar edit that row named** — *"one navbar edit away from rendering Hard Reset and Lock Session to a member"* — so the two were done in one change, gate first.
+
+`{#if isPresenter}` now opens before the tab strip and closes after the last panel, with `{:else if hasMic}` beside it and `Done` outside both, which is the reference's own shape (`O(8, …)` / `O(9, …)` and the footer outside).
+
+**Its contract found itself twice, and both are recorded in that file's header.** The first draft asserted containment by POSITION — every marker's index greater than the gate's — which is true of everything after the gate's opening whatever it encloses; a control that moved the `{/if}` up to close straight after the tab strip left it green with Hard Reset and Lock Session outside. **Third time in this repository a control has found the test rather than the code, and all three were the same mistake**: nesting asserted as order. The second: switching to a depth walk was still not enough, because every tab id also appears in the `{#each}` array that draws the tab STRIP — the assertion now uses each panel's own `id="…"`, which only the panels carry.
 
 **low** · `divergence` · reference byte **2,184,295**
 
@@ -1186,6 +1362,8 @@ H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(
 
 ### USM-04 — Group Chat Control block is not gated on isPresenter && !isLimitedPresenter
 
+**ALREADY BUILT — verified by reading 2026-08-30 15:36 UTC, not rebuilt.** `ModalHost.svelte` carries `{#if isPresenter && !isLimitedPresenter}` around the whole `#groupChatControl` box, with `O(290, …)` at byte 2,288,249 cited at the gate and the reason for the second term written beside it: `giveMicScreen` makes a member a presenter at runtime, and disabling the room's chat is not part of what that grant hands over. `user-settings-gates-contract.test.ts` pins it now, because a row found already built is a row nothing was watching.
+
 **high** · `missing-control` · reference byte **2,288,249**
 
 ```
@@ -1197,6 +1375,8 @@ O(290,o.appService.globals.isPresenter&&!o.appService.globals.isLimitedPresenter
 > Verified: I could not find the gate anywhere in apps/room/src. The `#groupChatControl` block sits inside the `user-chat-settings` tab pane (opened at ModalHost.svelte:3453, `settingsTab === 'chat'`, whose nav-item at 2927 is NOT inside the `{#if isPresenter}` that wraps the presenter tab at 2942) with no surrounding `{#if}`: scanning lines 3454-371…
 
 ### USM-05 — Presenter-only action buttons (Remove preview windows / Mute all non-admins / Get my token) are rendered for everyone
+
+**ALREADY BUILT — verified by reading 2026-08-30 15:36 UTC, not rebuilt.** The three sit inside `{#if isPresenter}` and **"Edit my Info and Avatar" is deliberately outside it**, which is the half of this row that is easy to over-fix: `O(135, …)` holds exactly three buttons and the const immediately after it is unconditional. Wrapping all four passes any "are they gated" check and takes a control away from every member, so the contract added today asserts the fourth is NOT gated as well.
 
 **high** · `missing-control` · reference byte **2,285,714**
 
@@ -1322,6 +1502,8 @@ speechRecoCCOnChange(){this.appService.globals.preferences.speechRecoCC=!this.ap
 
 ### USM-14 — Presenter Settings tab and pane gated on isPresenter alone, missing !isLimitedPresenter
 
+**BUILT 2026-08-30 15:36 UTC.** Both gates now read `isPresenter && !isLimitedPresenter` — `O(18, …)` at byte 2,283,408 for the tab header and `O(292, …)` at 2,288,469 for the pane, which the reference gates separately and so does this. A limited presenter was getting the whole Presenter Settings pane: the CC toggle, the presenter colours, the recording preview. The row's own observation is what made it small — the prop existed and the same narrowing was already applied twice in this file, so this was the one place the pair had been dropped rather than a missing capability.
+
 **medium** · `divergence` · reference byte **2,283,408**
 
 ```
@@ -1345,6 +1527,10 @@ switchTheme(e){if(this.alertStyle=JSON.parse(window.localStorage.getItem("alertS
 > Verified: I tried hard to find a theme-triggered re-seed and there is none. The full write path is closed and does only one thing: ModalHost.svelte:3054/3066 `onchange={() => onTheme('light'|'dark')}` -> RoomOverlays.svelte:580 `onTheme={(next) => modals.setTheme(next)}` -> modals.svelte.ts:192-195, whose entire body is `this.#setTheme(nextTheme)`…
 
 ### USM-15 — Closed-captions sections are not gated on hasSpeechRecognition
+
+**BUILT 2026-08-30 15:36 UTC, and the row's own reading of the severity is right — this is not a privilege hole, it is a control that could not work.** `O(132, globals.hasSpeechRecognition ? 132 : -1)` at byte 2,285,653, applied to both `#appSpeechRecoOverlay` and `#presenterSpeechRecognition`. The room already refuses at runtime (`RoomRecording.beginSpeechRecognition`, pinned by `speech-reco-entitlement.test.ts`), so what the ungated blocks drew was a checkbox somebody could tick, that then said `Enabled`, and that captioned nothing — **a control whose only effect is changing its own label**, which `CLAUDE.md` names outright.
+
+The value is `RoomGates.speechRecognitionAvailable` passed from the page rather than re-derived in the component, and that is the load-bearing part: `!== true` (absent means NOT disabled) is that getter's rule and it is the same getter the runtime refusal reads. One reading of the setting, two consumers — re-deriving it in a component is how the drawn control and the running feature come to disagree.
 
 **low** · `divergence` · reference byte **2,285,653**
 
@@ -1376,6 +1562,8 @@ z("checked",o.appService.globals.preferences.smallImagePreview&&o.appService.glo
 
 ### G01 — Archives → "Recording" menu item is inert: no `launchRecordings()`
 
+**BLOCKED 2026-08-30 12:55 UTC.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab — **a SERVER page**. There is no archive service here and no recordings or archive table in either database, which is the same blocker `presAreaTabs-recordings` carries and which `TODO.md` already records. Wiring the item would open a tab onto a 404 with a session token in the URL, which is worse than an inert item. What would unblock it: an archive service with a recordings endpoint. The item stays rendered, because it is the reference's own menu and the neighbouring Alert Logs / Chat Logs entries in the same dropdown do work.
+
 **high** · `missing-behaviour` · reference byte **2,467,840**
 
 ```
@@ -1387,6 +1575,8 @@ E(g(3).launchRecordings())}),T(1,"i",51),d(2,"span",22),v(3,"Recording")
 > Verified: Could not refute. The Archives dropdown's "Recording" item in our source is rendered with no handler and no href at apps/room/src/lib/components/RoomSidebar.svelte:439-442, inside the correct `{#if isPresenter || !session?.hideRecs}` gate (:438) — while its three siblings in the same dropdown all carry onclick (Alert Logs :452, Chat Logs…
 
 ### G02 — Presenter entry warning when the session is locked (bootbox "Session Locked" with a "Session Control" button)
+
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30 12:55 UTC, and the reason is an AUTHORITY difference rather than a missing dialog.** The warning is guarded `sessData.isLocked && globals.user.isPresenter`, which means upstream **a presenter enters a locked room** and is told it is locked to everyone else. In this room they cannot: `decideRoomEntry` (`apps/controller/src/lib/room-entry.ts:221`) refuses `isLocked === true` as its FIRST test, before identity is even established, so there is no presenter to warn. The dialog is not missing here — its precondition is. That is not a bug on its face: the setting's own help text in the control plane reads *"If session is locked, nobody will be able to log in..."*, and our door matches the words the owner is shown. But it does mean **an owner who locks a room locks themselves out of it**, and the reference clearly expects otherwise. Changing who may enter a locked room is an authority decision made on the server, which is exactly the class of change this repository does not make on inference. **The question for the owner: should a presenter be admitted to a locked room?** If yes, `decideRoomEntry` gains a presenter exemption and this dialog is then five lines — the confirm exists, `openSessionControl('lock-session')` exists, and `RoomConfirmation` would need the reference's two button labels.
 
 **medium** · `missing-control` · reference byte **2,500,222**
 
@@ -1400,6 +1590,8 @@ title:"Session Locked",message:"Session is locked, no users are allowed in the r
 
 ### G03 — Room-level `.notConnectedOverlay` "Reconnecting Chat..." (template node 7, gated on `socketConnected`)
 
+**BUILT 2026-08-30 12:55 UTC.** `iRe` on const 9, gated `O(7, socketConnected ? -1 : 7)`. **The half that was built was the half nobody needs:** a member whose chat connection dropped saw nothing at all, and then — once it came back — a three-second tick saying "Conected" for a failure they were never told about. Both elements exist now and they stay two elements: making one say both things would lose the three-second timing the flash has and the flash alone. `roomEvents.connected` starts FALSE so this shows during the first connect too, which is upstream's own behaviour — `globals.socketConnected` is never initialised, only assigned. The literal spaces in `" Reconnecting Chat... "` are written as an expression, because Svelte normalises whitespace at element boundaries.
+
 **medium** · `missing-control` · reference byte **2,496,906**
 
 ```
@@ -1411,6 +1603,8 @@ function iRe(t,n){1&t&&(d(0,"div",9),T(1,"i",37),v(2," Reconnecting Chat... "),u
 > Verified: The reference has TWO distinct "Reconnecting Chat..." nodes and our source implements only one of them. The sidebar node (reference `lPe`, a `<p>` with `fa-cog fa-spin`, paired with `cPe`/`dPe`/`uPe`) IS built at RoomSidebar.svelte:270-281, driven by `roomEventsConnected` — so the driving state and the label text both exist.
 
 ### G04 — Talking-user names in the navbar are not clickable — `muteTalkingUserDialog(e)` absent
+
+**BUILT 2026-08-30 12:36 UTC.** `muteTalkingUserDialog` in `RoomUserActions`, raised by each speaker name (const 147 `[3,"click"]`, byte 2,473,449). **A PROMPT with a typed word rather than a confirm, and that is upstream's choice for the right reason:** this mutes a microphone for everyone in the room, and an accidental click on one name in a list of names is exactly the mistake a confirm dialog does not prevent. `i && "yes" == i.toLowerCase()` is transcribed including the fact that it is not trimmed. The command mapping is not restated — `sendServerCommand('muteTalkingUser')` has no counterpart here and `remotePresCommand`/`mutemic` is the same act addressed to one peer, which is written out once on `muteAllNonAdmins` and pointed at from here. `role`/`tabindex`/`onkeydown` are OURS: the capture binds a click to a bare span.
 
 **medium** · `missing-control` · reference byte **2,473,449**
 
@@ -1424,6 +1618,8 @@ E(g(3).muteTalkingUserDialog(o))})
 
 ### G05 — Screenshare menu: " OBS / RTMP / Stream / Restream " item + `openStreamingTab()` (gated on `sessData.useMediaMTX`)
 
+**BUILT 2026-08-30 12:36 UTC.** `a4e` at byte 2,479,514 with its leading divider inside the gate, its `title`, and the `badge text-bg-danger ms-1` **New** span (const 188). Upstream's handler is three chained jQuery `.tab('show')` calls; all three targets already exist here as STATE — `openSessionControl('streaming-selection')`, and `streamingControlTab` already defaults to `'obs-streaming'` — so the page opens the modal on the right tab and no component reaches into another's DOM.
+
 **medium** · `missing-control` · reference byte **2,479,514**
 
 ```
@@ -1435,6 +1631,8 @@ E(g(3).openStreamingTab())}),d(2,"a",158),v(3," OBS / RTMP / Stream / Restream "
 > Verified: I tried hard to find this built under another name and could not. Our screenshare dropdown (`apps/room/src/lib/components/RoomNavbar.svelte:594-607`) contains exactly two entry items — `title="(Regular Bandwidth) ** RECOMMENDED"` → `onpromptforscreenname('screen')` (:594-600) and `title="OBS"` → `onpromptforscreenname('camera')` (:604-607…
 
 ### G06 — Screenshare menu: " Reopen Screenshare Preview" item → `reopenPreviewWindow()`
+
+**BUILT 2026-08-30 12:36 UTC — and it is the way back from a one-way door.** The row's own closing note is the important half: `previewWindowsVisible` was written `false` by Hide Preview Windows and **nothing ever wrote it true**, so a presenter who hid the preview cards could not get them back without reloading the room. `c4e` at byte 2,479,924 is gated on the same `isScreenSharing` the Stop-All entry above it carries, and its divider comes AFTER the item, which is why it is written separately rather than folded into that pair.
 
 **medium** · `missing-control` · reference byte **2,479,924**
 
@@ -1448,6 +1646,8 @@ E(g(3).reopenPreviewWindow())}),v(2," Reopen Screenshare Preview")
 
 ### G07 — Screenshare menu: per-screen "Stop Sharing {screenName}" repeater (d4e over `screenProducers`)
 
+**BUILT 2026-08-30 12:36 UTC.** One entry per screen this browser is sharing, `d4e` at byte 2,480,060. Upstream repeats over `mediaSoupService.screenProducers`, a LOCAL producer map that cannot contain anybody else's share; the nearest thing here is the screen TAB list, which contains everyone's — so the page filters on `ownerId === null`, which `RoomScreens` documents as "one of this browser's own". Without that filter the menu would offer a presenter the chance to stop a screen they are not sharing. `stopLocalScreen(producerId)` already existed, because the browser's own "Stop sharing" bar calls it.
+
 **medium** · `missing-control` · reference byte **2,480,060**
 
 ```
@@ -1459,6 +1659,8 @@ function d4e(t,n){if(1&t){const e=Y();d(0,"li")(1,"a",163),x("click",function(){
 > Verified: The navbar screenshare menu genuinely has no per-producer repeater: RoomNavbar.svelte's dropdown ends at the all-screens item gated on media.screenSharing, its only {#each} in the file is over media.talking (line 285), and its props carry no screen list. Grep found zero hits for stopSharingProducer/screenProducers-as-state and no per-scre…
 
 ### G08 — Talking indicator never shows the idle image: `#nolevelsImg` / notalking.png branch absent
+
+**MEASURED REFUSAL — recorded at the code 2026-08-30 12:36 UTC, deliberately NOT built.** `presenterTalking` is written by exactly two subscribers (byte 1,117,020) and the only thing that emits them is the SERVER socket relaying `case "presenterTalking"` at byte 1,014,971. It is a live audio-activity signal computed somewhere this room does not have, and it is NOT the list beside it: "talking" in `talkingUsers` means A MICROPHONE IS OPEN, which `media-transport.svelte.ts` records at length — and there is no level detection anywhere in the reference either, its single `createAnalyser` being the AV-settings mic test. Building the branch means an image that can never show or one that always shows; neither is the reference. **This also settles the row's strongest argument:** `notalking.png` ships here with no consumer because the MARKUP was transcribed from a capture whose driving signal did not cross with it. The asset stays. What would unblock it: our own server computing and pushing an activity signal, after which this is one `{#if}` and const 148.
 
 **medium** · `missing-behaviour` · reference byte **2,542,272**
 
@@ -1472,6 +1674,8 @@ function d4e(t,n){if(1&t){const e=Y();d(0,"li")(1,"a",163),x("click",function(){
 
 ### G09 — Blocked audio autoplay is only logged, never surfaced — no "Your browser needs your OK" dialog
 
+**BUILT 2026-08-30 12:55 UTC.** Chrome refuses audible autoplay without a user gesture, and this caught the rejection and wrote a `console.warn` — so a member whose browser blocked it heard NOTHING for the whole session with nothing on screen to act on. **The dialog's OK is the gesture**, which is the entire mechanism and why the retry has to be the dismissal callback rather than a timer: `play()` called again without a gesture is refused again. `alertThen` is the only API here that carries a dismissal callback. **One divergence, recorded at the code:** upstream opens `bootbox.hideAll()` and re-raises per failing producer, so a room with four open microphones shows the same sentence four times and clears whatever else the member was reading; one dialog is raised here and its callback retries every blocked element, because one gesture satisfies all of them. `resizeScrollviewChatEnd` has no counterpart — it is a jQuery height recalculation for a scroller this room lays out with CSS.
+
 **medium** · `missing-behaviour` · reference byte **2,515,092**
 
 ```
@@ -1483,6 +1687,8 @@ bootbox.alert("Your browser needs your OK to play the room's audio",()=>{P("Auto
 > Verified: I could not refute this. Both reference sites are real and I read them: byte 2515120 (`attachAudioStream` -> `bootbox.hideAll(); bootbox.alert("Your browser needs your OK to play the room's audio", () => { o.play(), guiEventBus.emit("resizeScrollviewChatEnd") })`) and byte 1094188 (the mediasoup consumer's `h=(f=3,_=300)=>{c.play().then(.…
 
 ### G11 — `audioServerDisableMic` — no `micDisabled` state and no microphone-troubleshooting dialog
+
+**MEASURED REFUSAL — recorded at the code 2026-08-30 12:55 UTC.** The event is raised by the AUDIO BRIDGE — the server deciding a microphone is unusable after it was already opened locally — and this room has no audio bridge, the same absence `media-transport.svelte.ts` records for `startTalking`/`stopTalking`. A subscriber would be a handler nothing can call. **And the outcome it exists for is already reached by a better route:** upstream has ONE sentence for every microphone failure, while `#reportCaptureError` branches on the actual error — a denied permission gets browser-specific guidance from the Permissions API, and everything else gets `mediaCaptureErrorMessage`, which tells an insecure context from a missing device from a device in use elsewhere. `micDisabled` stays unmodelled and `gates.ts:393` already records that where it matters.
 
 **medium** · `missing-behaviour` · reference byte **2,503,109**
 
@@ -1496,6 +1702,8 @@ this.appService.appEventBus.subscribe("audioServerDisableMic",()=>{this.micDisab
 
 ### G12 — Navbar users counter has neither of its two handlers: click → `toggleSideBarUsersCount()`, dblclick → `hideCount` toggle
 
+**BUILT 2026-08-30 12:36 UTC.** Both, and the row is right that the enumeration mislabels them: CLICK opens the sidebar and DBLCLICK hides the number. `toggleSideBarUsersCount` is `alwaysShowRoster && (…)`, so the setting gates the whole statement and the control is inert in a room that did not ask for it — upstream's own behaviour, and the hamburger beside it does the same job unconditionally. Its `loadRoster()` half has no counterpart and was already refused with its reason in `always-show-roster-contract.test.ts`. `hideCount` stays component state because that is what it is upstream: nothing persists it, and a reload showing the count again is right for a gesture meant to peek past a number rather than configure the room.
+
 **medium** · `missing-control` · reference byte **2,484,941**
 
 ```
@@ -1507,6 +1715,8 @@ x("click",function(){return D(e),E(g().toggleSideBarUsersCount())})("dblclick",f
 > Verified: Both handlers are genuinely absent from our source, and so is the visibility field the dblclick toggles. WHAT I READ IN OUR SOURCE.
 
 ### G13 — Navbar roster count is shown to everyone — the `hideCount || (!rosterCountVisibleToViewers && !isPresenter)` gate is not applied
+
+**BUILT 2026-08-30 12:36 UTC.** The page resolves it through the same `rosterCountVisibleTo()` the SIDEBAR badge uses, so the two cannot answer differently — which was the defect: an owner setting honoured in one of the two places that publish the number is not honoured. `hideCount` is combined here rather than folded into that helper, because it is this component's state and not a room setting.
 
 **medium** · `missing-control` · reference byte **2,487,511**
 
@@ -1520,6 +1730,8 @@ O(5,e.hideCount||!e.appService.globals.sessData.rosterCountVisibleToViewers&&!e.
 
 ### G14 — `simUserCount` is not clamped to [0, 5000]
 
+**BUILT 2026-08-30 12:55 UTC, and the LOWER bound is the half that mattered.** `connectedCount` is `rosterCount + simUserCount`, so a negative setting **SUBTRACTED from a real roster** — a room of twelve could publish "7". A number that lies downwards is the worse half: an inflated headcount is at least the kind of lie the setting exists to tell. `#lib/sim-user-count.ts` carries the transcription and the three details that would each be a real change if tidied — the upper test is `>` and the lower `<=` (so 0 assigns 0, a redundant branch that is kept), `Number(e)` is upstream's so a non-numeric setting arrives as `NaN`, and the `e &&` guard means an absent value keeps the previous one there while here it is read per render. `NaN` is the one case the reference does not answer and is answered as 0, because the alternative is a headcount rendered as "NaN" to every member.
+
 **low** · `missing-behaviour` · reference byte **2,499,409**
 
 ```
@@ -1532,6 +1744,8 @@ this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this.simUs
 
 ### G16 — `visibilitychange` is armed immediately, not after the reference's 10 000 ms delay, and it does not unload/reload the roster
 
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 12:55 UTC, which is what the row asked for.** The row's own closing observation is the point: the SIBLING refusal (the 500 ms `alwaysShowRoster` timer) is recorded in `always-show-roster-contract.test.ts` and this one was not, which is how a deliberate divergence reads as an oversight to the next comparison. Both halves are now in `refresh.svelte.ts`. The 10 000 ms delay protects a socket handshake still in flight; this room's equivalent is `invalidateAll()` and an idempotent five-second poll, neither of which a mid-load visibility flip can corrupt — and arming immediately means a member who tabs away in the first ten seconds is actually noticed. `unloadRoster()` saves a subscription upstream because the roster is a separate fetch; here it arrives with the page load, so unloading it would buy an empty sidebar for one frame on every return to the tab.
+
 **low** · `divergence` · reference byte **2,511,416**
 
 ```
@@ -1543,6 +1757,8 @@ appVisibilityChange(e){console.log("appVisibilityChange enabled: ",e),e?this.vis
 > Verified: The claim is COMPOUND and only ONE of its two limbs survives. It must be split before it is acted on.
 
 ### G17 — `videoOnlyMode` (the `r` query parameter) is missing from both ngClass maps and from the `hideChatAlerts` gate
+
+**MEASURED REFUSAL — already recorded, verified 2026-08-30 12:55 UTC.** The row says so itself: this is an ALREADY-DECLARED gap rather than an unnoticed one, listed only so the enumeration is answered in full. `gates.ts:250-261` carries the reason and it is the same one `files-gates.ts` records for `hideFiles`: `videoOnlyMode` is the `r` query parameter — recording-bot mode — and it is not on the wire here, so the term would read a value nothing supplies. `recordChat` is deliberately not on the wire either, because it appears ONLY inside that writer and would arrive with no reader. Nothing was added; the row is closed against the record that already existed.
 
 **low** · `divergence` · reference byte **2,465,818**
 
@@ -1769,6 +1985,8 @@ function GTe(t,n){1&t&&ht(0,zTe,4,6,"div",35,Yx),2&t&&pt(g().appService.globals.
 
 ### PAM-02 — sendText checkbox "Text this out?" (gated on sessData.twillioApiSID) is absent
 
+**BLOCKED 2026-08-30 13:54 UTC, and the GATE is the more interesting half.** Upstream renders the checkbox when `sessData.twillioApiSID` is truthy — that is, it decides whether to show a control by looking at **a credential**, and `twillioApiSID` is one of the seven this room's boundary refuses outright (`room-config-boundary.test.ts`). Reproducing the gate is not an option and the correct shape is not in doubt: a server-derived boolean saying *this room can send text messages*, with the credential staying on the controller. What is actually blocked is the thing behind it — **there is no SMS downstream in this deployment**, so the checkbox would set a flag that `schema.ts:259-266` already refuses at the boundary with its reason recorded. What would unblock it: a Twilio integration on the controller and the derived boolean beside it.
+
 **medium** · `missing-control` · reference byte **2,118,228**
 
 ```
@@ -1781,6 +1999,8 @@ function VTe(t,n){if(1&t){const e=Y();d(0,"div",35)(1,"input",46),Ve("ngModelCha
 
 ### PAM-03 — dontCrossPost checkbox "Don't cross post to linked alert rooms" (gated on sessData.linkedRoomAlerts) is absent
 
+**BLOCKED 2026-08-30 13:54 UTC.** The checkbox suppresses a fan-out that does not exist: `linkedRoomAlerts` — posting one alert into several linked rooms — has no implementation here, which `schema.ts:259-266` already names (*"the cross-post fan-out `linkedRoomAlerts` is itself blocked on"*). A control that turns OFF a behaviour the room does not have is the clearest possible example of a control with no consumer. What would unblock it: the fan-out.
+
 **medium** · `missing-control` · reference byte **2,119,618**
 
 ```
@@ -1792,6 +2012,8 @@ function WTe(t,n){if(1&t){const e=Y();d(0,"div",35)(1,"input",54),Ve("ngModelCha
 > Verified: I could not refute this. Searched apps/room/src exhaustively for dontCrossPost, dont-cross, crossPost/cross_post/crosspost/cross-post/"Cross Post", the id alert-dont-cross-post-label, alert-cross, linkedRoomAlerts/linkedRoom*/linkedAlert/otherRooms/toLinked, and behavioural synonyms (fanout, fan-out, syndicate, relayAlert, mirrorAlert, pr…
 
 ### PAM-04 — The two inline-entry event-bus subscriptions (inlineAlertEntry / inlineAlertEntryImage) have no counterpart, and the toggle that feeds them has no consumer
+
+**ALREADY BUILT — verified by reading 2026-08-30 13:54 UTC, not rebuilt.** Both subscriptions have counterparts and both are cited to the same bytes the row names: `composer.svelte.ts:360` is `inlineAlertEntry` (byte 2,125,143) and `:409` is `inlineAlertEntryImage` (byte 2,125,263), and `AlertChatArea.svelte:260-266,415-454` is the emitter — the inline box's Enter handler and its paste handler, with the reference's own `emit(…)` quoted at each. The row also records one DELIBERATE DIVERGENCE that is already written down at `composer.svelte.ts:370`: upstream's subscription calls the modal's `postAlert()` and so inherits whatever that modal was last left holding, so a presenter who ticked "Don't send to push" an hour ago silently gets it again from a box in a different column. This room posts a plain alert; the modal is where those decisions are made and where they are visible.
 
 **medium** · `missing-behaviour` · reference byte **2,125,143**
 
@@ -1853,6 +2075,8 @@ d(2,"form")(3,"div",21)(4,"label",59),v(5,"NOTE: All times should be on "),d(6,"
 
 ### PAM-10 — sendLaterAsEmail / sendLaterAsNick inputs and their "Send as email:" / "Send as Name:" labels are absent (deliberate security refusal)
 
+**MEASURED REFUSAL — confirmed and now reaching a second place, 2026-08-30 13:54 UTC.** The row names it correctly. Two form fields that let a presenter post an alert under **someone else's name and email address** are an identity claim asserted by the client, which is the 2026-08-07 privilege escalation in a different costume; the sender is derived on the server from the session and the two fields are refused at the boundary (`schema.ts:259-266`). What changed today is that the refusal now shapes a SENTENCE as well as a payload: PAM-11's confirm ends at the date, where upstream's ends *"send as: <nick> (<email>) ?"* — quoting values that cannot vary here would imply a choice the presenter does not have.
+
 **low** · `missing-control` · reference byte **2,124,312**
 
 ```
@@ -1864,6 +2088,8 @@ this.sendLaterAsEmail=this.appService.globals.user.email,this.sendLaterAsNick=th
 > Verified: Could not refute. The reference genuinely renders both controls — I re-read the bundle and found the compiled template at byte offset 2121637 (NOT 2124312 as the record states; I did not verify that offset and it should be corrected or dropped): label "Send as email:" bound to s.sendLaterAsEmail and label "Send as Name:" bound to s.sendLa…
 
 ### PAM-11 — postAlertLater's confirm and success dialogs are absent
+
+**BUILT 2026-08-30 13:54 UTC, minus the identity clause.** Scheduling happened on one click. **The DATE is the reason for the question:** a `datetime-local` with a typo in it — a month, a year, an AM for a PM — schedules an alert to the entire room at a time nobody meant, and the only way to notice was to open the manage table afterwards and read it back. The confirm quotes the date in prose, which is where a wrong one is visible, and `Alert scheduled OK.` follows verbatim. `onalert` and `onconfirm` are passed in rather than owned: two components raising bootboxes from different places is how one replaces the other mid-read, which `dialogs.svelte.ts` records at length. The `send as:` clause is dropped for PAM-10's reason.
 
 **low** · `missing-behaviour` · reference byte **2,130,310**
 
@@ -1877,6 +2103,8 @@ bootbox.confirm("Send this alert on: "+o.toString()+". send as: "+this.sendLater
 
 ### PAM-12 — onImagePaste selects the LAST image clipboard item in the reference (no break); ours selects the first
 
+**ALREADY BUILT — verified by reading 2026-08-30 13:54 UTC, not rebuilt.** `pastedImageFrom` in `#lib/pasted-image.ts` keeps the LAST image item and its docblock says why in the reference's own terms — *"the reference's loop has no break, so the LAST image item wins… `PostAlertModal` picked a different one, silently, and nothing could have noticed"*. It also records the second drift in the same eight lines, which the row does not mention: an item whose `getAsFile()` answers null used to abandon the entire paste rather than being skipped, so one unreadable representation could throw away a real screenshot sitting behind it. The row describes a revision this module has moved past.
+
 **low** · `divergence` · reference byte **2,125,403**
 
 ```
@@ -1888,6 +2116,8 @@ onImagePaste(e){const i=this,o=(e.clipboardData||e.originalEvent.clipboardData).
 > Verified: The reference's onImagePaste loops over all clipboard items with no break and reassigns unconditionally, so it keeps the LAST image item. Our PostAlertModal.selectPastedImage returns on the FIRST item whose type startsWith('image'), so it keeps the first.
 
 ### PAM-13 — img tab with no URL: the reference dispatches an upload whenever the module-level fc array EXISTS (even when empty); ours requires at least one file
+
+**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC.** `return fc ? void this.doImagurFileListUpload(e) : void 0` tests whether a module-level array EXISTS, not whether it holds anything — so an empty file list dispatches an upload of nothing, which either no-ops in the uploader or posts an alert with no image and no URL. Reproducing that means reproducing a bug whose only outcomes are a wasted request or an empty alert. Ours requires at least one file, which is the same behaviour for every case a presenter can actually reach and differs only where the reference misfires.
 
 **low** · `divergence` · reference byte **2,128,708**
 
@@ -1901,6 +2131,8 @@ if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\
 
 ### PAM-14 — Element ids and name attributes added on the six text inputs/textareas that the reference leaves unnamed
 
+**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC, and the reference is not consistent about this either.** The ids and `name` attributes are OURS and they are what make `<label for>` and `aria-labelledby` work: a text input with no accessible name is unreachable by a screen reader, and this repository adds them for the same reason it gives the captured trade span a `role` and a keydown. **The reference names some of its own** — const 62 is `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",…]`, so the send-later input carries both — which makes this a difference in consistency rather than in kind. Nothing about them is visible to a member, and none is read by any selector in the captured stylesheets.
+
 **low** · `divergence` · reference byte **2,131,663**
 
 ```
@@ -1912,6 +2144,8 @@ if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\
 > Verified: I could not refute it; both halves of the claim verify. Our six controls carry id+name at exactly the cited lines, and the reference's app-post-alert-modal consts array — which I read in full, not sampled — carries neither on any of the six.
 
 ### PAM-17 — The alertMsg payload's sendTxt / sendEmail / sendTweet / dontCrossPost / dontPush fields are refused by our server rather than sent
+
+**MEASURED REFUSAL — already recorded, verified 2026-08-30 13:54 UTC.** `schema.ts:259-266` carries it in full: every one of those fields is *"an instruction to a downstream this deployment does not have — SMS, the mailer's alert path, Twitter, and the cross-post fan-out `linkedRoomAlerts` is itself blocked on. Storing a flag no consumer reads is the thing this repository refuses by name, so they are refused at the boundary and the refusal is recorded rather than the column being created empty."* PAM-02 and PAM-03 are the two CONTROLS for two of these flags and are blocked on the same absences; this row is the payload half of the same fact. Nothing was added; the row is closed against the record that already existed.
 
 **low** · `divergence` · reference byte **2,128,708**
 
@@ -2083,6 +2317,8 @@ this.appService.appEventBus.subscribe("getAlertsAdvancedSearchSuccess",i=>{conso
 
 ### RS-01 — Roster row: the presenter-only "Trial" badge is not rendered, though the data to render it is already on the wire
 
+**BUILT 2026-08-30 13:32 UTC.** `O(7, isPresenter && e.isFT ? 7 : -1)` on const 9. `isFT` was already on the wire and already read by two other gates, so the chip was the one thing missing — and it is the one distinction the roster is actually used to make: a presenter scanning the list could not tell a trial from a paying member.
+
 **medium** · `missing-behaviour` · reference byte **2,034,640**
 
 ```
@@ -2094,6 +2330,8 @@ O(1,i.showUserAvatar(e.isP)?1:-1),m(4),Ze(e.nick),m(),O(6,e.data.badges?6:-1),m(
 > Verified: I could not refute it. The reference roster row really does render a presenter-only "Trial" badge, and our only roster row render does not.
 
 ### RS-02 — Roster row: the badges div is rendered ALWAYS and EMPTY — the reference gates it on e.data.badges and fills it via parseBadges
+
+**BUILT 2026-08-30 13:32 UTC.** Const 8's class list was here with no content and no gate — a wrapper nobody fills, which is the defect this repository names by that description. `badgesFor` is `RoomFeeds`'s and is the **same** resolution the message rows use, including its dark-variant fallback and its skip for a badge deleted from the account; passing it in rather than re-deriving is what stops the rail and the log disagreeing about who wears what. Upstream reaches the same place through `parseBadges`, which builds an HTML string; real elements here for the reason `MessageBody` records.
 
 **medium** · `missing-behaviour` · reference byte **2,034,694**
 
@@ -2107,6 +2345,8 @@ O(6,e.data.badges?6:-1),m(),O(7,i.appService.globals.isPresenter&&e.isFT?7:-1),m
 
 ### RS-05 — Roster avatar has no hideAvatars gate — a room that hides avatars still shows them in the roster
 
+**BUILT 2026-08-30 13:32 UTC, and it is the one of the five that was a leak.** `showUserAvatar(e) { return !sessData.hideAvatars || !!e }` at byte 2,036,617 — **the roster's avatar gate is not the message log's**: a presenter's picture shows even in a room that hides avatars, because a member has to be able to tell who is running the room. This rail rendered every avatar unconditionally, so a room with avatars turned off still published every member's picture in the list of everybody present.
+
 **medium** · `missing-control` · reference byte **2,036,617**
 
 ```
@@ -2118,6 +2358,8 @@ showUserAvatar(e){return!this.appService.globals.sessData.hideAvatars||!!e}
 > Verified: The roster avatar is rendered with no hideAvatars gate anywhere in our source. RoomSidebar.svelte:681-686 emits `<img class="rosterImg mr-3" alt={user.displayName} src={user.avatarUrl} ...>` with the only enclosing branch being `{#if !rowIsFull(user)} ...
 
 ### RS-06 — Archives ▸ "Recording" renders with no handler at all
+
+**BLOCKED 2026-08-30 13:32 UTC — the same blocker as G01, and the same item.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab, which is a SERVER page. There is no archive service here and no recordings or archive table in either database. Wiring it would open a tab onto a 404 carrying a session token in the URL, which is worse than an inert item.
 
 **medium** · `missing-behaviour` · reference byte **2,467,757**
 
@@ -2131,6 +2373,8 @@ function gPe(t,n){if(1&t){const e=Y();d(0,"a",50),x("click",function(){return D(
 
 ### RS-07 — "Only select from Trials?" is a Yes/No question answered by OK/Cancel buttons
 
+**BUILT 2026-08-30 13:32 UTC.** `buttons: {confirm: {label:"Yes", className:"btn-success"}, cancel: {label:"No", className:"btn-danger"}}` at byte 2,516,822. **"Cancel" was not merely unhelpful, it was wrong:** the No branch is not a cancellation — `ondismiss` runs `roster.draw(false)`, which draws from everybody — so a member pressing Cancel to back out got a random user anyway. `RoomConfirmation` gained four OPTIONAL fields defaulting to OK/Cancel, because that is what `bootbox.confirm(message, callback)` renders and what every other call site in this room passes.
+
 **medium** · `wrong-constant` · reference byte **2,516,822**
 
 ```
@@ -2142,6 +2386,8 @@ getRandomUser(){const e=this;bootbox.confirm({message:"Only select from Trials?"
 > Verified: The message text and dismiss semantics are built, but the reference's button labels/classes are genuinely absent. `getRandomUser()` (routes/+page.svelte:353-364) sets `dialogs.confirmation = {message:'Only select from Trials?', onconfirm, ondismiss}`; the `RoomConfirmation` interface (lib/room/dialogs.svelte.ts:33-43) has only `message`/`…
 
 ### RS-09 — The second tip-me control lives in our SIDEBAR; the reference renders it in the navbar and our navbar has none
+
+**BUILT 2026-08-30 13:32 UTC, and the row's framing is one step off in a useful way: the reference renders the tip TWICE.** `aPe` (byte 2,466,601) is the sidebar's `<p>` and this room had it; `APe` (byte 2,472,922) is the navbar's `<li>`, const 139 `[1,"nav-item",3,"click","title"]` wrapping const 140 `d-flex align-items-center btn btn-primary btn-sm`, gated `O(14, isTipEnabled ? 14 : -1)` immediately before Benzinga. **`tip-button.ts` was already written expecting both** — its own docblock says *"the two call sites read `tip.visible`"* while only one existed. The `<li>` carries the click where the sidebar's `<button>` does, which is const 139's own shape.
 
 **medium** · `divergence` · reference byte **2,485,267**
 
@@ -2155,6 +2401,8 @@ APe,5,2,"li",89)(15,PPe,3,2,"li",90)(16,NPe,10,1,"li",91)
 
 ### RS-03 — Roster row: the stars / years indicator (stars-container) is absent, and its CSS ships with no producer
 
+**BLOCKED 2026-08-30 13:32 UTC.** `O(9, disableStarYears || e.isP || !e.data.years ? -1 : 9)` needs `e.data.years`, and **that value has no supply anywhere in this repository** — the same absence the MESSAGE-side star already carries, recorded twice at `gates.ts:110` and `room-config-client.ts:82` (*"its `item.membershipYears` supply does not exist yet"*). The message-side markup exists and is gated on a value that is always undefined; adding the roster's copy would be a second node that can never render. The CSS shipping with no producer is explained by the same fact. What would unblock it: a membership age on the roster row, which is a controller-side decision about what `years` means (account age? membership age? per room?) rather than a transcription.
+
 **low** · `missing-behaviour` · reference byte **2,034,694**
 
 ```
@@ -2166,6 +2414,8 @@ O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPrese
 > Verified: The roster star/years indicator is genuinely absent from our roster row, and the near-miss refutation is a component conflation. Reference: the gate at bundle byte 2,034,694 is confirmed verbatim, its slot-9 body `F2e` at byte 2,033,362 renders `span const 11 > i const 20 > span const 21` with `Ze(e.data.years)`, and the const table at by…
 
 ### RS-04 — Roster row: the "New" badge is absent
+
+**BLOCKED 2026-08-30 13:32 UTC, on the same absence as RS-03.** `O(8, isNewIndicatorOn && isPresenter && e.isNew ? 8 : -1)` needs `e.isNew`, and `isNew` is declared on the message type (`types.ts:85`, `:336`) and populated by nothing, anywhere. The gate's other two terms exist; the row flag does not. Same unblocking condition: a server-side definition of what makes a member new.
 
 **low** · `missing-behaviour` · reference byte **2,034,694**
 
@@ -2179,6 +2429,8 @@ O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPrese
 
 ### RS-08 — simUserCount is added to the headcount unclamped — the reference clamps it to 0…5000
 
+**BUILT 2026-08-30 13:32 UTC — the same clamp as G14, in the one place that computes the number.** `RoomRoster.#connectedCount` is what both the navbar and this badge read, so `clampSimUserCount` there fixes both surfaces at once. The lower bound is the half that mattered: a negative setting **subtracted from a real roster**. See `#lib/sim-user-count.ts` for the transcription and the three details that would each be a real change if tidied.
+
 **low** · `missing-control` · reference byte **2,499,381**
 
 ```
@@ -2190,6 +2442,8 @@ this.simUserCount=Number(e),this.simUserCount>5e3&&(this.simUserCount=5e3),this.
 > Verified: I could not refute this. The reference clamp is real and I read the bytes: at offset 2499381 (ngOnInit of the desktop room component) the bundle reads `const e=this.appService.globals.sessData.simUserCount` (offset 2498511) and then `e&&(this.simUserCount=Number(e),this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this…
 
 ### RS-10 — Mobile App Info and the tip <p> are in the opposite order to the reference
+
+**BUILT 2026-08-30 13:32 UTC.** `H(12, rPe, …)(13, aPe, …)` at byte 2,470,612. Both are `<p>` buttons in the same block, so the one a member's eye lands on first is whichever the room happens to have configured; the reference puts the thing the ROOM offers before the thing the PRESENTER asks for.
 
 **low** · `divergence` · reference byte **2,470,612**
 
@@ -2203,6 +2457,8 @@ H(12,rPe,2,1,"p")(13,aPe,5,2,"p"),T(14,"hr"
 
 ### RS-11 — The connection lines have a different element shape and the opposite order
 
+**BUILT 2026-08-30 13:32 UTC — four nodes in two shapes, and we had two nodes in one.** `H(15,lPe,3,0,"p")(16,cPe,3,0,"p"), d(17,"p"), H(18,dPe,3,0,"span")(19,uPe,3,0,"span")`: the two FAILURE lines are a `<p>` each because they are sentences, and the two SUCCESS marks share one `<p>` as `<span>`s because they are labels. We had one `<p>` per service with both states inside it, so **on a healthy connection the room drew two stacked lines where the reference draws one**, and CHAT came second where the reference puts it first. The literals are transcribed with their own non-uniform spacing — `" Reconnecting Chat..."` has a leading space and no trailing one, `" Reconnecting Media... "` has both — written as expressions because Svelte normalises whitespace at element boundaries.
+
 **low** · `divergence` · reference byte **2,470,790**
 
 ```
@@ -2214,6 +2470,8 @@ H(12,rPe,2,1,"p")(13,aPe,5,2,"p"),T(14,"hr"
 > Verified: I could not refute it; the divergence is real on all three counts, and there is no second implementation anywhere in apps/room/src. (a) ORDER: the reference emits the Chat slot first in BOTH states — H(15,lPe)="Reconnecting Chat...", H(16,cPe)="Reconnecting Media...
 
 ### RS-12 — Benzinga: the default URL is not reproduced, so the item hides unless altBenzingaLinkURL is set
+
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30 13:32 UTC, and the reason is a CREDENTIAL rather than a preference.** The default is `https://ptrv3.protradingroom.com/public/bz/index.html?sessID=${sessionID}&id=${sessData.uuid}&tok=${sesionToken}` — a page on the reference vendor's own host, **carrying this room's session token in the query string**. Reproducing it would send every room's session token to a third party on every load of the sidebar item, for every room that has not set `altBenzingaLinkURL`. That is not a transcription decision. Two things follow and both are the owner's: whether this deployment should point at that host at all, and — if some Benzinga page is wanted — what identifier it may be given, because a session token in a URL is a session token in referrer headers, proxy logs and browser history. Until then the item renders only when the room supplies its own URL, which is `altBenzingaLinkURL`'s own branch and is safe by construction. The sibling gap (`benzinga-logo.png` is absent from this repository) is already recorded in `RoomNavbar.svelte`.
 
 **low** · `divergence` · reference byte **2,499,501**
 

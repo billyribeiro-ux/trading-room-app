@@ -20,12 +20,14 @@ import { ROOM_SETTINGS } from './room-settings-schema';
  *     the moment the two drift.
  */
 
+import { scriptListNames } from './script-list-names';
+
 const GENERATOR = readFileSync(new URL('../../scripts/extract-manage-schema.mjs', import.meta.url), 'utf8');
 
 function declaredList(name: string): string[] {
-  const block = GENERATOR.match(new RegExp(`const ${name} = \\[([^\\]]*)\\]`));
-  expect(block, `scripts/extract-manage-schema.mjs must declare ${name}`).not.toBeNull();
-  return [...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]).sort();
+  const declared = scriptListNames(GENERATOR, name);
+  expect(declared, `scripts/extract-manage-schema.mjs must declare ${name}`).not.toBeNull();
+  return declared ?? [];
 }
 
 /** What `(public)/sso/[code]/+server.ts` and its helpers actually read. */
@@ -94,10 +96,9 @@ describe('the verifier script that cannot run here', () => {
   const VERIFIER = readFileSync(new URL('../../scripts/verify-room-settings-schema.mjs', import.meta.url), 'utf8');
 
   it('expects exactly the settings the generated schema marks wired', () => {
-    const block = VERIFIER.match(/const EXPECTED_WIRED_SETTINGS = \[([^\]]*)\]/);
-    expect(block, 'the verifier must declare EXPECTED_WIRED_SETTINGS').not.toBeNull();
+    const expected = scriptListNames(VERIFIER, 'EXPECTED_WIRED_SETTINGS');
+    expect(expected, 'the verifier must declare EXPECTED_WIRED_SETTINGS').not.toBeNull();
 
-    const expected = [...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]).sort();
     const actual = ROOM_SETTINGS.filter((definition) => definition.wired)
       .map((definition) => definition.name)
       .sort();

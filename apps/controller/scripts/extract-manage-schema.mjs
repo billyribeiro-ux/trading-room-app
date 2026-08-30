@@ -410,6 +410,34 @@ const ROOM_CONSUMED = [
 ];
 
 /**
+ * Settings the room consumes but that cross ONLY to a presenter.
+ *
+ * A fourth list, and it exists because `ROOM_CONSUMED` above has to keep meaning exactly one thing:
+ * `room-config-boundary.test.ts` asserts it equals `ROOM_VISIBLE_SETTINGS` name for name, which is
+ * the list every member receives. A presenter-only setting is consumed by the room and is not on
+ * that list, so folding it in would have made the two disagree and the honest fix is a second list
+ * rather than a looser assertion.
+ *
+ * Mirrors `ROOM_PRESENTER_SETTINGS` in `src/lib/room-config.ts`, which is where the reasoning lives.
+ * The duplication is the same deliberate one the file header explains: this script has to run before
+ * the module it would import exists.
+ */
+const ROOM_PRESENTER_CONSUMED = [
+  /* "Restream URL" - the rtmp:// destination the room republishes to.
+
+     It crosses to a presenter alone because an rtmp destination usually carries its own stream key
+     inline - YouTube hands out rtmp://a.rtmp.youtube.com/live2/STREAM-KEY as ONE string, and the
+     reference validator (startsWith rtmp:// and no space) accepts exactly that. The reference reads
+     it from globals.sessData.restreamToURL, which every viewer receives; the divergence is
+     deliberate and argued where the allow-list is defined.
+
+     Also the SECOND setting the room writes back. SC-13 in the surface audit: the pane Set and
+     Clear buttons wrote it as a per-viewer PREFERENCE that nothing anywhere read, so a presenter
+     set a destination and the room republished nowhere while the pane showed the value back. */
+  'restreamToURL'
+];
+
+/**
  * The WordPress SSO door, via `(public)/sso/[code]/+server.ts`.
  *
  * A customer's WooCommerce decides whether a member has paid; that route checks the assertion their
@@ -429,7 +457,7 @@ const SSO_CONSUMED = [
   'tokenExpiresIn'
 ];
 
-const WIRED_SETTINGS = new Set([...LOGIN_CONSUMED, ...ROOM_CONSUMED, ...SSO_CONSUMED]);
+const WIRED_SETTINGS = new Set([...LOGIN_CONSUMED, ...ROOM_CONSUMED, ...ROOM_PRESENTER_CONSUMED, ...SSO_CONSUMED]);
 
 /* Reuse the outline decoder so the parse below sees the same tree the docs do. */
 const tempDirectory = mkdtempSync(join(tmpdir(), 'proroom-schema-'));
@@ -950,9 +978,15 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // documented, and which owns the alerts table and the fan-out. Durable rows, an ephemeral sweep
 // timer, and an atomic conditional UPDATE so firing is exactly-once.
 //
+// 104 since 2026-08-30: `restreamToURL`. Thirty-fifth find, and the first that does NOT cross to
+// every member — it goes over a third allow-list, ROOM_PRESENTER_SETTINGS, for the reason written
+// beside it above. Not from the settings enumeration either: it came out of the room-surface audit
+// as SC-12 (the textarea never seeded) and SC-13 (the write going to a per-viewer preference that
+// nothing read), and the setting turned out to be the thing both halves were missing.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 103 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 104 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

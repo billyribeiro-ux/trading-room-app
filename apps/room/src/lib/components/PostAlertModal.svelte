@@ -20,6 +20,8 @@
     onclose: () => void;
     ontab: (tab: AlertTab) => void;
     onalert: (message: string) => void;
+    /** PAM-11 — passed straight through to the scheduler pane, which asks before it schedules. */
+    onconfirm: (message: string, accept: () => void) => void;
     onpost: (submission: PostAlertSubmission) => Promise<boolean>;
     onpastepost: (submission: PastedImageSubmission) => Promise<boolean>;
     /**
@@ -59,6 +61,7 @@
     onclose,
     ontab,
     onalert,
+    onconfirm,
     onpost,
     onpastepost,
     stickyNonTradeAlert = false,
@@ -74,6 +77,14 @@
   let previews = $state.raw<string[]>([]);
   let dragging = $state(false);
   let fileInput = $state<HTMLInputElement>();
+  /**
+   * PAM-05 — `this.showSendLater = !1` (byte 2,123,544), and it gates five nodes.
+   *
+   * A plain `$state`, and deliberately NOT a preference: it is which half of one decision the
+   * presenter is currently making, and it resets with the modal. See the markup for the five gates.
+   */
+  let showSendLater = $state(false);
+
   let keepOpen = $state(false);
   let postOnX = $state(false);
   let dontPush = $state(false);
@@ -571,19 +582,56 @@
           enforced on the server: `scheduled-alerts.remote.ts` refuses all three commands without the
           setting, because a gate that only removes a control is not a gate.
         -->
-        {#if schedulerAvailable}
+        {#if schedulerAvailable && showSendLater}
           <ScheduledAlerts
             body={alertText}
             {nonTradeAlert}
+            {onalert}
+            {onconfirm}
             onscheduled={() => {
+              showSendLater = false;
               if (!keepOpen) onclose();
               else clearInputFields();
             }}
           />
         {/if}
       </div>
+      <!--
+        ── PAM-05 — POST ALERT AND SEND LATER ARE MUTUALLY EXCLUSIVE, and both were on screen ─────
+
+        The reference's five gates, read together at byte 2,139,315:
+
+        ```js
+        O(66, showSendLater && hasAlertScheduler ? 66 : -1)   // the send-later form
+        O(68, showSendLater && scheduledAlerts.length > 0 && hasAlertScheduler ? 68 : -1)
+        O(69, !showSendLater && hasAlertScheduler ? 69 : -1)  // " Send Later? "   (JTe, const 76)
+        O(70, showSendLater ? 70 : -1)                        // " Cancel "        (ZTe, const 77)
+        O(71, showSendLater ? -1 : 71)                        // "Post Alert"
+        ```
+
+        Node 71 is the one that matters: **Post Alert is REMOVED while the scheduler is open.** This
+        room rendered the whole scheduling pane inline and kept Post Alert beside it, so a presenter
+        who had filled in a date and a repeat could still press the green button and send the alert
+        immediately — losing the schedule they had just typed, with nothing to say so. The two are
+        one decision with two answers and the reference makes you pick.
+
+        The Cancel button is `btn btn-primary me-1` and sits where Post Alert was; "Send Later?" is
+        `btn btn-link` with a calendar icon. Both labels carry the reference's own surrounding
+        spaces, written as expressions because Svelte normalises whitespace at element boundaries.
+      -->
       <div class="text-right">
-        <button class="btn btn-success" onclick={postAlert}>Post Alert</button>
+        {#if schedulerAvailable && !showSendLater}
+          <button class="btn btn-link" onclick={() => (showSendLater = true)}>
+            <i class="fas fa-calendar"></i>{' Send Later? '}
+          </button>
+        {/if}
+        {#if showSendLater}
+          <button class="btn btn-primary me-1" onclick={() => (showSendLater = false)}
+            >{' Cancel '}</button
+          >
+        {:else}
+          <button class="btn btn-success" onclick={postAlert}>Post Alert</button>
+        {/if}
       </div>
     </div>
   {/snippet}

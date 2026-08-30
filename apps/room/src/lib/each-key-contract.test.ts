@@ -165,7 +165,14 @@ describe('every {#each} key says something true', () => {
         `${file} should hold ${count} unkeyed each block(s)`
       ).toBeGreaterThanOrEqual(count);
     };
-    unkeyedAt('src/lib/components/RoomMessage.svelte', 2);
+    /*
+      ONE each, not two, since 2026-08-30: the segment renderer became `MessageBody.svelte`, so the
+      unkeyed segment block moved and the one left in `RoomMessage.svelte` is the CARD's captured
+      `evidenceBodySegments` list. Both are asserted, because "the file has at least one" would be
+      satisfied by the wrong one surviving.
+    */
+    unkeyedAt('src/lib/components/RoomMessage.svelte', 1);
+    unkeyedAt('src/lib/components/MessageBody.svelte', 1);
     /*
       MOVED, 2026-08-28, and re-pointed rather than dropped. This was `+page.svelte`'s
       `bodySegmentsPrivate` snippet — a link split threaded into `PrivateChatPanel` as a prop. It is

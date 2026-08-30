@@ -1072,6 +1072,79 @@ export const ROOM_VISIBLE_SETTINGS = [
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
 
 /**
+ * A THIRD allow-list: settings that cross to a PRESENTER and to nobody else.
+ *
+ * ## Why a third list rather than a wider second one
+ *
+ * `ROOM_VISIBLE_SETTINGS` is delivered to every member. `apps/room`'s `+page.server.ts` returns it
+ * as `sessData` from the page load, and SvelteKit serialises a load's return into the SSR payload —
+ * so a name added there is a name in the HTML of every viewer's page, participants and muted
+ * members included. That is correct for the ninety settings on it, every one of which decides
+ * something the viewer's own browser has to draw.
+ *
+ * `restreamToURL` is not one of those. It decides where the ROOM republishes its stream, only a
+ * presenter can set it, and only a presenter's pane displays it.
+ *
+ * ## And in practice it is credential-shaped, whatever the schema says
+ *
+ * The Manage page keeps `restreamToURLKey` as a separate field, so on paper the destination and the
+ * key are separate values and only the second is a secret. In practice the platforms this points at
+ * do not split them: YouTube hands out `rtmp://a.rtmp.youtube.com/live2/<STREAM-KEY>` and Twitch
+ * `rtmp://<ingest>/app/live_<KEY>` as ONE string, and the reference's own validator
+ * (`startsWith("rtmp://") && !includes(" ")`) accepts exactly that. Anybody holding the string can
+ * publish to the presenter's channel.
+ *
+ * The reference reads it from `globals.sessData.restreamToURL` — i.e. it ships it to everyone. That
+ * is the divergence this list exists to make, and it is recorded rather than matched.
+ *
+ * ## What makes it safe to project at all
+ *
+ * `internal/room-config/[code]` is called with `?email=`, computes `isP` for THAT member, and the
+ * room's own client caches per `shortCode\u0000email` inside a per-request `WeakMap`. So the
+ * projection is genuinely per-member and cannot be served out of a shared cache. A caller who names
+ * no member, or names one with no membership row, is a guest and gets nothing — deny-by-default,
+ * the same posture as the two lists above.
+ */
+export const ROOM_PRESENTER_SETTINGS = [
+  /*
+    "Restream URL" — the rtmp:// destination the room republishes to.
+
+    SC-13 in the surface audit is the write half and SC-12 is this one. Ours wrote it as a per-user
+    PREFERENCE (`onPreferenceChange('restreamToURL', ...)`) that nothing anywhere read, so Set
+    Restream URL changed one viewer's stored preferences and the room restreamed nowhere; and the
+    textarea opened empty on a room that already had a destination configured, so pressing Set on an
+    untouched pane would have cleared it — if the write had gone anywhere.
+  */
+  'restreamToURL'
+] as const satisfies readonly (keyof RoomSettings)[];
+
+const ROOM_PRESENTER_ONLY = new Set<string>(ROOM_PRESENTER_SETTINGS);
+
+/**
+ * The presenter-only settings, projected — `{}` for anyone who is not one.
+ *
+ * Takes the decision rather than the member, so the caller has to have ALREADY computed presenter
+ * authority from data the server owns. There is deliberately no overload that accepts a membership
+ * row and works it out here: `internal/room-config` computes `isP` once, for its own `member`
+ * block, and a second computation is a second thing that can disagree.
+ */
+export function roomPresenterConfig(
+  room: Partial<RoomSettings>,
+  isPresenter: boolean
+): Readonly<Record<string, unknown>> {
+  if (!isPresenter) return {};
+  const resolved = resolveRoomConfig(room);
+  const values: Record<string, unknown> = {};
+  for (const name of ROOM_PRESENTER_SETTINGS) {
+    const value = resolved.values[name];
+    // Same rule as `roomVisibleConfig`: unset is omitted rather than serialised as a null the room
+    // would have to tell apart from an empty string.
+    if (value !== undefined) values[name] = value;
+  }
+  return values;
+}
+
+/**
  * The settings the ROOM APPLICATION may WRITE back, through `POST /internal/room-setting/{code}`.
  *
  * A second allow-list, and a strictly narrower one: reading a setting exposes it, writing one lets
@@ -1088,19 +1161,38 @@ const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
  * Nothing else belongs here today. `hideFiles`, for one, is edited on the Manage page and read by
  * the room; a room that could switch it off would be overriding its own owner.
  */
-export const ROOM_WRITABLE_SETTINGS = ['overwriteCashRegisterSound'] as const satisfies readonly (keyof RoomSettings)[];
+export const ROOM_WRITABLE_SETTINGS = [
+  'overwriteCashRegisterSound',
+  /*
+    "Restream URL" — the write half of SC-13, and the reason `isRoomWritableSetting` below had to
+    learn about the presenter list.
+
+    `startRestream` in the reference sends the admin command `setRestreamURL` with
+    `{ restreamToURL }`, and `''` to clear — a durable per-room destination, not a broadcast, so it
+    belongs here for exactly the reason `overwriteCashRegisterSound` does. Presenter-only on both
+    sides: the endpoint re-checks the named member is an owner or true presenter, and the room's
+    command gates on the connected member's role before it ever calls out.
+  */
+  'restreamToURL'
+] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_WRITABLE = new Set<string>(ROOM_WRITABLE_SETTINGS);
 
 /**
  * Whether the room is allowed to write this setting.
  *
- * Deliberately also requires the setting to be visible: the room resolves its own gate from the
- * value it was sent, so a setting it may write but never read is one whose UI cannot show the
- * result of the write.
+ * Deliberately also requires the setting to be readable BY THE PARTY THAT CAN WRITE IT: the room
+ * resolves its own gate from the value it was sent, so a setting it may write but never read is one
+ * whose UI cannot show the result of the write.
+ *
+ * Presenter-only counts, and nothing is loosened by that. The endpoint that consults this already
+ * refuses any caller who is not the owner or a true presenter of the room, so the only party that
+ * can reach a write is the same party `ROOM_PRESENTER_SETTINGS` projects to. Requiring the general
+ * read list instead would have meant shipping `restreamToURL` to every viewer in order to let a
+ * presenter change it, which is the trade this split exists to refuse.
  */
 export function isRoomWritableSetting(name: string): boolean {
-  return ROOM_WRITABLE.has(name) && ROOM_VISIBLE.has(name);
+  return ROOM_WRITABLE.has(name) && (ROOM_VISIBLE.has(name) || ROOM_PRESENTER_ONLY.has(name));
 }
 
 /**

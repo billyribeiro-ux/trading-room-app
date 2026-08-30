@@ -312,6 +312,31 @@ export class RoomLocalCapture {
    * stays SILENT unless that comes back denied - somebody who just dismissed the prompt themselves
    * does not need to be told they dismissed it. The `Permission denied` prefix is the test, because
    * every other state comes back as a sentinel rather than prose.
+   *
+   * ## G11 — `audioServerDisableMic` HAS NO PRODUCER HERE, and its outcome is already served
+   *
+   * ```js
+   * appEventBus.subscribe("audioServerDisableMic", () => {
+   *   this.micDisabled = !0, this.recordingReminder = !1,
+   *   bootbox.alert("There is an issue with your microphone, make sure you allowed its use on the
+   *     browser. Also, if this is a USB microphone, try to unplug it and plug it back in, then
+   *     reload the page and it should work.") })
+   * ```
+   * (bundle byte 2,503,109.)
+   *
+   * That event is raised by the AUDIO BRIDGE — the server deciding a microphone is unusable after
+   * it was already opened locally. This room has no audio bridge, which is the same absence
+   * `media-transport.svelte.ts` records for `startTalking`/`stopTalking`, so the condition cannot
+   * arise and a subscriber would be a handler nothing can call.
+   *
+   * **The outcome it exists for is already reached, and by a better route.** Upstream has ONE
+   * sentence for every microphone failure. This method branches on the actual error: a denied
+   * permission gets the browser-specific guidance from `#checkPermissionState`, and everything else
+   * gets `mediaCaptureErrorMessage`, which distinguishes an insecure context from a missing device
+   * from a device in use elsewhere. A member here is told what actually went wrong.
+   *
+   * `micDisabled` itself is the third piece and stays unmodelled, which `gates.ts:393` already
+   * records where it matters: the recording banner's `!micDisabled` term.
    */
   async #reportCaptureError(kind: MediaCaptureKind, error: unknown) {
     const errorName = captureErrorName(error);

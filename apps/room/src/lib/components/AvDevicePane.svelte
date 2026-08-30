@@ -170,60 +170,137 @@
 </script>
 
 <div class="d-flex justify-content-end align-items-center mt-2 mb-3">
+  <!--
+    SC-15 — `z("disabled", e.devicesLoading)` and
+    `z("ngClass", e.devicesLoading ? "fa-spinner fa-spin" : "fa-sync-alt")` at byte 2,154,613.
+
+    The button was always live and its icon never moved, so pressing Refresh twice fired a second
+    `getUserMedia` while the first was still resolving — and the pane looked identical throughout,
+    which is why anybody would press it twice.
+  -->
   <button
     type="button"
     title="Refresh device list"
     class="btn btn-sm btn-outline-primary"
+    disabled={devicesLoading}
     onclick={() => void loadDevices()}
   >
-    <i class="fas fa-sync-alt"></i> Refresh Devices
+    <i class={['fas', devicesLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt']}></i> Refresh Devices
   </button>
 </div>
+<!--
+  SC-16 — const 49 is `[1,"alert","alert-info"]` and this read `text-center my-3`.
+
+  Not cosmetic: `alert-info` is a bordered, coloured block and the pair below it — the error, const
+  50 `alert alert-danger` — already was one. A loading state that renders as bare centred text next
+  to an error that renders as a panel reads as two different KINDS of message, when they are the two
+  outcomes of the same button.
+-->
 {#if devicesLoading}
-  <div class="text-center my-3">
-    <i class="fas fa-spinner fa-spin"></i> Loading devices...
+  <div class="alert alert-info">
+    <i class="fas fa-spinner fa-spin"></i>{' Loading devices... '}
   </div>
 {/if}
+<!--
+  ── SC-09 — THE ERROR HAD NO WAY OUT ──────────────────────────────────────────────────────────
+
+  ```js
+  function uDe(t,n){ … d(0,"div",50), T(1,"i",92), v(2), d(3,"button",93),
+      x("click", () => loadDevices()), T(4,"i",94), v(5," Retry ") … Ne(" ", e.devicesLoadError, " ") }
+  50 [1,"alert","alert-danger"]   92 [1,"fas","fa-exclamation-triangle"]
+  93 ["type","button",1,"btn","btn-sm","btn-outline-secondary","ml-2",3,"click"]   94 [1,"fas","fa-redo"]
+  ```
+  (byte 2,141,127.)
+
+  Every one of the five errors this pane can raise is TRANSIENT — a denied permission the member can
+  grant, a device they can plug in, a page they can reload over HTTPS. The Refresh button above is
+  the way out and it is at the top of the pane, above a red block that ends the reading; a member who
+  fixes the problem the message describes has nothing beside the message to press. The reference puts
+  Retry inside the alert, which is where somebody who has just read it is looking.
+
+  The surrounding spaces on the message are `Ne(" ", e.devicesLoadError, " ")`.
+-->
 {#if devicesLoadError}
-  <div class="alert alert-danger">{devicesLoadError}</div>
+  <div class="alert alert-danger">
+    <i class="fas fa-exclamation-triangle"></i>{` ${devicesLoadError} `}
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary ml-2"
+      onclick={() => void loadDevices()}
+    >
+      <i class="fas fa-redo"></i>{' Retry '}
+    </button>
+  </div>
 {/if}
+<!--
+  ── SC-10 — AN EMPTY SELECT IS NOT A MESSAGE ──────────────────────────────────────────────────
+
+  ```js
+  O(99,  audioDevicesList?.length > 0 ? 99  : devicesLoading || devicesLoadError ? -1 : 100)
+  O(101, videoDevicesList?.length > 0 ? 101 : devicesLoading || devicesLoadError ? -1 : 102)
+  function mDe(t,n){ d(0,"div",100), T(1,"i",101), v(2," Please connect audio devices. ") }
+  function vDe(t,n){ d(0,"div",100), T(1,"i",104), v(2," Please connect video devices. ") }
+  100 [1,"form-group","text-white"]  101 [1,"fas","fa-microphone-slash"]  104 [1,"fas","fa-video-slash"]
+  ```
+  (byte 2,142,196.)
+
+  The gate replaces the WHOLE group — label, select and the "Selected:" line — rather than adding a
+  message beside it. That matters here more than upstream: this pane deliberately starts with both
+  lists empty (see the header), so an empty select was the FIRST thing a member saw every time they
+  opened it, with a dropdown that opens onto nothing and no statement of why.
+
+  The three-way gate is the reference's own and each arm is a different sentence: devices, or the
+  loading/error block above has already said something, or connect one.
+-->
 <div class="mt-2">
-  <div class="form-group">
-    <label for="audio-deviceList">Audio device (input):</label>
-    <select
-      id="audio-deviceList"
-      aria-label="Audio device (input)"
-      class="form-select"
-      bind:value={currentAudioDevice}
-      onchange={() => onPreferenceChange('audioDeviceID', currentAudioDevice)}
-    >
-      {#each audioDevices as device (device.deviceId)}
-        <option value={device.deviceId}>{device.label}</option>
-      {/each}
-    </select>
-    <small class="text-white mt-1 d-block">
-      <i class="fas fa-check-circle text-success"></i>
-      Selected: {selectedLabel(audioDevices, currentAudioDevice)}
-    </small>
-  </div>
-  <div class="form-group">
-    <label for="video-deviceList">Video device (input):</label>
-    <select
-      id="video-deviceList"
-      aria-label="Video device (input)"
-      class="form-select"
-      bind:value={currentVideoDevice}
-      onchange={() => onPreferenceChange('videoDeviceID', currentVideoDevice)}
-    >
-      {#each videoDevices as device (device.deviceId)}
-        <option value={device.deviceId}>{device.label}</option>
-      {/each}
-    </select>
-    <small class="text-white mt-1 d-block">
-      <i class="fas fa-check-circle text-success"></i>
-      Selected: {selectedLabel(videoDevices, currentVideoDevice)}
-    </small>
-  </div>
+  {#if audioDevices.length > 0}
+    <div class="form-group">
+      <label for="audio-deviceList">Audio device (input):</label>
+      <select
+        id="audio-deviceList"
+        aria-label="Audio device (input)"
+        class="form-select"
+        bind:value={currentAudioDevice}
+        onchange={() => onPreferenceChange('audioDeviceID', currentAudioDevice)}
+      >
+        {#each audioDevices as device (device.deviceId)}
+          <option value={device.deviceId}>{device.label}</option>
+        {/each}
+      </select>
+      <small class="text-white mt-1 d-block">
+        <i class="fas fa-check-circle text-success"></i>
+        Selected: {selectedLabel(audioDevices, currentAudioDevice)}
+      </small>
+    </div>
+  {:else if !devicesLoading && !devicesLoadError}
+    <div class="form-group text-white">
+      <i class="fas fa-microphone-slash"></i>{' Please connect audio devices. '}
+    </div>
+  {/if}
+  {#if videoDevices.length > 0}
+    <div class="form-group">
+      <label for="video-deviceList">Video device (input):</label>
+      <select
+        id="video-deviceList"
+        aria-label="Video device (input)"
+        class="form-select"
+        bind:value={currentVideoDevice}
+        onchange={() => onPreferenceChange('videoDeviceID', currentVideoDevice)}
+      >
+        {#each videoDevices as device (device.deviceId)}
+          <option value={device.deviceId}>{device.label}</option>
+        {/each}
+      </select>
+      <small class="text-white mt-1 d-block">
+        <i class="fas fa-check-circle text-success"></i>
+        Selected: {selectedLabel(videoDevices, currentVideoDevice)}
+      </small>
+    </div>
+  {:else if !devicesLoading && !devicesLoadError}
+    <div class="form-group text-white">
+      <i class="fas fa-video-slash"></i>{' Please connect video devices. '}
+    </div>
+  {/if}
 </div>
 <div class="mt-4">
   <div class="ml-4">

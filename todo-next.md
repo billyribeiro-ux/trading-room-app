@@ -74,22 +74,22 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,319 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
-| 3 | `routes/+page.svelte` | 1,504 | no |
+| 3 | `routes/+page.svelte` | 1,543 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
-| 5 | `lib/components/RoomMessage.svelte` | 1,267 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
+| 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 988 | no |
-| 8 | `lib/components/RoomOverlays.svelte` | 915 | no |
+| 8 | `lib/components/RoomOverlays.svelte` | 964 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 824 | no |
-| 11 | `lib/components/RoomSidebar.svelte` | 774 | no |
+| 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
 | 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
-| 14 | `lib/components/PostAlertModal.svelte` | 608 | no |
+| 14 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 595 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 596 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
 | 18 | `lib/components/FilesPane.svelte` | 556 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
@@ -104,35 +104,37 @@ guessed.
 | 28 | `lib/components/StreamTabs.svelte` | 305 | no |
 | 29 | `lib/components/ScreenTabs.svelte` | 300 | no |
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
-| 31 | `lib/components/MessageMenu.svelte` | 292 | no |
-| 32 | `lib/components/ScheduledAlerts.svelte` | 271 | no |
-| 33 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
-| 34 | `lib/components/RoomShell.svelte` | 238 | no |
-| 35 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
-| 36 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
-| 37 | `lib/components/GiphyPicker.svelte` | 215 | no |
-| 38 | `lib/components/RichTextEditor.svelte` | 191 | no |
-| 39 | `lib/components/Modal.svelte` | 157 | no |
-| 40 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
-| 41 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 42 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
-| 43 | `lib/components/BootboxDialog.svelte` | 131 | no |
-| 44 | `lib/components/MobileRestorePane.svelte` | 130 | no |
-| 45 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 46 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 47 | `lib/components/CloseSessionPane.svelte` | 104 | no |
-| 48 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 49 | `lib/components/ChatSearchBar.svelte` | 88 | no |
-| 50 | `lib/components/CompactMessageRow.svelte` | 77 | no |
-| 51 | `lib/components/PositionsContainer.svelte` | 74 | no |
-| 52 | `lib/components/ModeratorMessage.svelte` | 73 | no |
-| 53 | `lib/components/ToastHost.svelte` | 64 | no |
-| 54 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
-| 55 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 56 | `lib/components/ChatTabStrip.svelte` | 55 | no |
-| 57 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
+| 32 | `lib/components/MessageMenu.svelte` | 252 | no |
+| 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
+| 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
+| 35 | `lib/components/RoomShell.svelte` | 238 | no |
+| 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
+| 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
+| 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
+| 39 | `lib/components/RichTextEditor.svelte` | 191 | no |
+| 40 | `lib/components/Modal.svelte` | 157 | no |
+| 41 | `lib/components/MessageBody.svelte` | 173 | no |
+| 42 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 43 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 44 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
+| 45 | `lib/components/BootboxDialog.svelte` | 145 | no |
+| 46 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 47 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 48 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 49 | `lib/components/CloseSessionPane.svelte` | 104 | no |
+| 50 | `lib/components/RoomBranding.svelte` | 91 | no |
+| 51 | `lib/components/ChatSearchBar.svelte` | 88 | no |
+| 52 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 53 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 54 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 55 | `lib/components/ToastHost.svelte` | 64 | no |
+| 56 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
+| 57 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
+| 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 66 surfaces audited · 1,072 of 31,646 lines · 3.4%.**
+**2 of 70 surfaces audited · 1,072 of 32,792 lines · 3.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -146,15 +148,17 @@ guessed.
 > readers, 51 were refuted on verification — 32 already built here under another name, 19 resting on
 > reference code that is dead or unreachable.
 
-| 56 | `lib/components/PositionsControls.svelte` | 44 | no |
-| 57 | `routes/logout/+page.svelte` | 31 | no |
-| 58 | `routes/+layout.svelte` | 27 | no |
-| 59 | `lib/components/FollowChatStylePane.svelte` | 151 | no |
-| 60 | `lib/components/UserNotesPane.svelte` | 114 | no |
-| 61 | `lib/components/LogArchiveModals.svelte` | 147 | no |
-| 62 | `lib/components/ChatArchivePane.svelte` | 143 | no |
-| 63 | `lib/components/AvDevicePane.svelte` | 265 | no |
-| 64 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
+| 60 | `lib/components/PositionsControls.svelte` | 44 | no |
+| 61 | `routes/logout/+page.svelte` | 31 | no |
+| 62 | `routes/+layout.svelte` | 27 | no |
+| 63 | `lib/components/FollowChatStylePane.svelte` | 151 | no |
+| 64 | `lib/components/UserNotesPane.svelte` | 114 | no |
+| 65 | `lib/components/LogArchiveModals.svelte` | 147 | no |
+| 66 | `lib/components/ChatArchivePane.svelte` | 143 | no |
+| 67 | `lib/components/AvDevicePane.svelte` | 342 | no |
+| 68 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
+| 69 | `lib/components/RestreamPane.svelte` | 105 | no |
+| 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

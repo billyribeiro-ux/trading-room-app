@@ -133,6 +133,21 @@ const render = (over: Record<string, unknown> = {}) => {
       onrequestreload: count('requestreload'),
       onshowrecpreview: count('showrecpreview'),
       onhiderecpreview: count('hiderecpreview'),
+      /*
+        The seven that arrived with G04-G07 and G12/G13. Defaults chosen so the BASE render is the
+        plainest room there is — no MediaMTX tab, no local screens, the count visible, the sidebar
+        setting off — and every test that wants one of them says so in its own `over`.
+      */
+      /* RS-09 — hidden by default: a room that has not configured a tip is the ordinary room. */
+      tip: { visible: false, label: '', url: '' },
+      alwaysShowRoster: false,
+      rosterCountVisible: true,
+      streamingTabAvailable: false,
+      localScreens: [],
+      onmutetalkinguser: count('mutetalkinguser'),
+      onopenstreamingtab: count('openstreamingtab'),
+      onreopenpreview: count('reopenpreview'),
+      onstoplocalscreen: count('stoplocalscreen'),
       ...over
     }
   }) as Record<string, unknown>;
@@ -279,5 +294,243 @@ describe('the gates the page resolves for it', () => {
     const webcam = '[title="Start / Stop WebCam"]';
     expect(shown.root.querySelector(webcam), 'positive control').not.toBeNull();
     expect(hidden.root.querySelector(webcam)).toBeNull();
+  });
+});
+
+/**
+ * ── G04, G05, G06, G07, G12, G13 — the six rows of 2026-08-30 ────────────────────────────────────
+ *
+ * MOUNTED rather than SSR-rendered, and for these six that is not a preference. Five of them are
+ * CLICKS and one is a gate whose two states are only distinguishable by rendering both, so an SSR
+ * first frame would show the markup and prove nothing about what pressing it does.
+ */
+describe('G12 — the users counter is a control with two gestures', () => {
+  /*
+    `d(3,"span",79), x("click", … toggleSideBarUsersCount())("dblclick", … hideCount = !hideCount)`
+    at byte 2,484,941; const 79 carries `3,"click","dblclick"`. The enumeration mislabelled which is
+    which — CLICK opens the sidebar, DBLCLICK hides the number.
+  */
+  const counter = (root: HTMLElement) => root.querySelector<HTMLElement>('span.users');
+
+  it('opens the sidebar on CLICK when alwaysShowRoster is on', () => {
+    const { root, state } = render({ alwaysShowRoster: true });
+    counter(root)?.click();
+    flushSync();
+    expect(state.sidebarOpen).toBe(true);
+  });
+
+  it('does NOTHING on click without it, because the setting gates the whole statement', () => {
+    /*
+      `this.alwaysShowRoster && (this.showSidebar = !this.showSidebar, …)` — the control is inert in
+      a room that did not ask for it, which is upstream's own behaviour and not a bug being copied:
+      the hamburger next to it does the same job unconditionally.
+    */
+    const { root, state } = render({ alwaysShowRoster: false });
+    counter(root)?.click();
+    flushSync();
+    expect(state.sidebarOpen).toBe(false);
+  });
+
+  it('hides the NUMBER on double-click, and puts it back on a second', () => {
+    const { root } = render();
+    expect(counter(root)?.textContent).toContain('0');
+
+    counter(root)?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    flushSync();
+    expect(counter(root)?.textContent).not.toContain('0');
+    /* The icon stays: `hideCount` hides the count, not the control. */
+    expect(counter(root)?.querySelector('i.fa-user')).not.toBeNull();
+
+    counter(root)?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    flushSync();
+    expect(counter(root)?.textContent).toContain('0');
+  });
+});
+
+describe('G13 — the roster count honours the owner setting here too', () => {
+  it('renders no number when the room hides the count from viewers', () => {
+    /*
+      `O(5, hideCount || !rosterCountVisibleToViewers && !isPresenter ? -1 : 5)` at byte 2,487,511.
+      This room already honoured the same setting for the SIDEBAR badge (`roster-gates.ts`, used at
+      `RoomSidebar.svelte:545`) and rendered the number unconditionally one element away — a gate
+      applied in one of two places is not a gate.
+    */
+    const { root } = render({ rosterCountVisible: false });
+    const counter = root.querySelector<HTMLElement>('span.users');
+    expect(counter, 'the counter itself stays').not.toBeNull();
+    expect(counter?.textContent).not.toContain('0');
+    expect(counter?.querySelector('span.ml-1')).toBeNull();
+  });
+
+  it('renders it when the setting allows, which is the control', () => {
+    const { root } = render({ rosterCountVisible: true });
+    expect(root.querySelector('span.users span.ml-1')?.textContent).toContain('0');
+  });
+});
+
+describe('G04 — each talking name is a control', () => {
+  const talking = [{ userID: 7, mediaValue: { name: 'Ada' } }];
+
+  it('reports the speaker that was clicked', () => {
+    /*
+      `d(0,"span",147)` at byte 2,473,449, const 147 `[3,"click"]`, bound to
+      `muteTalkingUserDialog(o)`. Ours was a bare span, so a presenter watching one member hold the
+      floor had no way to take it back short of opening the roster — and `muteAllNonAdmins`, which
+      is built, is all-or-nothing.
+    */
+    const { root, media, calls } = render();
+    media.startTalking(talking[0]);
+    flushSync();
+
+    const name = root.querySelector<HTMLElement>('span.talking-string span[role="button"]');
+    expect(name, 'the speaker name is not a control').not.toBeNull();
+    expect(name?.textContent).toContain('Ada');
+
+    name?.click();
+    flushSync();
+    expect(calls.mutetalkinguser).toBe(1);
+  });
+
+  it('is reachable from the keyboard, which the reference span is not', () => {
+    /* Ours: the capture binds a click to a bare span, and a span is neither focusable nor typed. */
+    const { root, media, calls } = render();
+    media.startTalking(talking[0]);
+    flushSync();
+
+    const name = root.querySelector<HTMLElement>('span.talking-string span[role="button"]');
+    expect(name?.getAttribute('tabindex')).toBe('0');
+    name?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushSync();
+    expect(calls.mutetalkinguser).toBe(1);
+  });
+});
+
+describe('G05, G06 and G07 — the three new screenshare entries', () => {
+  const items = (root: HTMLElement) =>
+    [...root.querySelectorAll('.screen-options-start-screen li')].map((li) =>
+      (li.textContent ?? '').trim()
+    );
+
+  it('offers OBS / RTMP only when the room has MediaMTX', () => {
+    /* `O(13, sessData.useMediaMTX ? 13 : -1)`, byte 2,480,950. */
+    expect(items(render({ streamingTabAvailable: true }).root).join(' | ')).toContain(
+      'OBS / RTMP / Stream / Restream'
+    );
+    expect(items(render({ streamingTabAvailable: false }).root).join(' ')).not.toContain(
+      'OBS / RTMP'
+    );
+  });
+
+  it('carries the `New` badge the reference gives it', () => {
+    const { root } = render({ streamingTabAvailable: true });
+    expect(
+      root.querySelector('.screen-options-start-screen .badge.text-bg-danger')?.textContent
+    ).toBe('New');
+  });
+
+  it('opens the streaming tab when pressed', () => {
+    const { root, calls } = render({ streamingTabAvailable: true });
+    root
+      .querySelector<HTMLElement>(
+        '.screen-options-start-screen li[title="OBS / RTMP / Stream / Restream"]'
+      )
+      ?.click();
+    flushSync();
+    expect(calls.openstreamingtab).toBe(1);
+  });
+
+  it('offers Reopen Screenshare Preview only while sharing, and it is the way back', () => {
+    /*
+      `hidePreviewWindows()` set `previewWindowsVisible = false` and NOTHING set it true again, so a
+      presenter who hid the preview cards could not get them back without reloading the room.
+    */
+    const { root, media, calls } = render();
+    expect(items(root).join(' ')).not.toContain('Reopen Screenshare Preview');
+
+    media.screenSharing = true;
+    flushSync();
+    const entry = [...root.querySelectorAll<HTMLElement>('.screen-options-start-screen li')].find(
+      (li) => (li.textContent ?? '').includes('Reopen Screenshare Preview')
+    );
+    expect(entry, 'the entry is missing while sharing').not.toBeUndefined();
+    entry?.click();
+    flushSync();
+    expect(calls.reopenpreview).toBe(1);
+  });
+
+  it('offers one Stop Sharing entry per LOCAL screen, naming each', () => {
+    /* `ht(16, d4e, 3, 1, "li", null, WB)` over `screenProducers` — this browser's own shares. */
+    const { root } = render({
+      localScreens: [
+        { id: 'p1', screenName: 'FUTURES' },
+        { id: 'p2', screenName: 'Screen 2' }
+      ]
+    });
+    expect(items(root)).toContain('Stop Sharing FUTURES');
+    expect(items(root)).toContain('Stop Sharing Screen 2');
+  });
+
+  it('stops the screen that was named, not the first one', () => {
+    /*
+      The failure this guards is the one a repeater invites: closing over the wrong entry stops a
+      different screen, and a presenter watching the WRONG pane vanish has no way to tell what
+      happened. Asserted by id rather than by call count.
+    */
+    const stopped: string[] = [];
+    const { root } = render({
+      localScreens: [
+        { id: 'p1', screenName: 'FUTURES' },
+        { id: 'p2', screenName: 'Screen 2' }
+      ],
+      onstoplocalscreen: (id: string) => stopped.push(id)
+    });
+    [...root.querySelectorAll<HTMLElement>('.screen-options-start-screen li')]
+      .find((li) => (li.textContent ?? '').includes('Screen 2'))
+      ?.click();
+    flushSync();
+    expect(stopped).toEqual(['p2']);
+  });
+});
+
+describe('RS-09 — the tip button is rendered TWICE upstream and we had one', () => {
+  /*
+    `APe` at byte 2,472,922 is the NAVBAR's copy — `d(0,"li",139)` with the click on the item and
+    `d(1,"a",140)` inside it — gated `O(14, isTipEnabled ? 14 : -1)` immediately before Benzinga.
+    `aPe` (2,466,601) is the sidebar's, and this room had that one. `tip-button.ts` was written
+    expecting both: its docblock says "the two call sites read `tip.visible`" while only one existed.
+  */
+  const tip = { visible: true, label: 'Buy me a coffee', url: 'https://example.test/tip' };
+
+  it('renders it with the reference s class list and its doubled label', () => {
+    const { root } = render({ tip });
+    const item = root.querySelector<HTMLElement>('li.nav-item[title="Buy me a coffee"]');
+    expect(item, 'the navbar tip item is missing').not.toBeNull();
+    /* `title` AND the text, which is upstream's doubling on both copies. */
+    expect(item?.textContent?.trim()).toBe('Buy me a coffee');
+    expect(item?.querySelector('a')?.className).toBe(
+      'd-flex align-items-center btn btn-primary btn-sm'
+    );
+    expect(item?.querySelector('i.fa-dollar-sign')).not.toBeNull();
+  });
+
+  it('renders nothing when the room has not configured one, which is the control', () => {
+    /* `tipButtonFor` resolves the three-way gate; an unconfigured room reaches `visible: false`. */
+    const { root } = render();
+    expect(root.querySelector('li.nav-item[title="Buy me a coffee"]')).toBeNull();
+    expect(root.querySelector('i.fa-dollar-sign')).toBeNull();
+  });
+
+  it('sits immediately before Benzinga, which is the reference s order', () => {
+    /* `O(14, isTipEnabled ? 14 : -1), m(), O(15, sessData.hasBenzingaNews ? 15 : -1)`. */
+    const { root } = render({
+      tip,
+      benzinga: { visible: true, url: 'https://example.test/bz', logoUrl: '/bz.png' }
+    });
+    const items = [...root.querySelectorAll('ul.navbar-nav > li')];
+    const tipAt = items.findIndex((li) => li.getAttribute('title') === 'Buy me a coffee');
+    const benzingaAt = items.findIndex((li) => li.classList.contains('benzinga-li'));
+    expect(tipAt, 'the tip item must render').toBeGreaterThan(-1);
+    expect(benzingaAt, 'and Benzinga beside it').toBeGreaterThan(-1);
+    expect(tipAt).toBeLessThan(benzingaAt);
   });
 });

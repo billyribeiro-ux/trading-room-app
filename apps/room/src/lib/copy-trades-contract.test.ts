@@ -76,7 +76,13 @@ describe('tradeOrderId', () => {
   });
 });
 
-const message = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
+/*
+  BOTH HALVES LEFT `RoomMessage.svelte` on 2026-08-30 and this file reads them where they now live:
+  the three body passes are `message-body-segments.ts` (upstream they are pipes) and the span that
+  renders a trade segment is `MessageBody.svelte`. Neither changed in the move.
+*/
+const passes = readFileSync(new URL('./message-body-segments.ts', import.meta.url), 'utf8');
+const renderer = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
 const chrome = readFileSync(new URL('./room-message-chrome.ts', import.meta.url), 'utf8');
 const actions = readFileSync(new URL('./room/message-actions.svelte.ts', import.meta.url), 'utf8');
 
@@ -91,12 +97,12 @@ describe('the render', () => {
     a `#label` does, and for the same reason.
   */
   it('is gated on the setting AND the log type', () => {
-    expect(codeOf(message)).toContain("copyTrades && kind === 'alert'");
+    expect(codeOf(passes)).toContain("context.copyTrades && context.kind === 'alert'");
   });
 
   it('renders the captured class and id', () => {
-    expect(codeOf(message)).toContain('class="tradeColor"');
-    expect(codeOf(message)).toContain('id={segment.tradeId}');
+    expect(codeOf(renderer)).toContain('class="tradeColor"');
+    expect(codeOf(renderer)).toContain('id={segment.tradeId}');
   });
 
   /*
@@ -105,8 +111,10 @@ describe('the render', () => {
     trade segment wraps SEGMENTS rather than carrying a string, and it is invisible unless asserted.
   */
   it('parses the order’s own text rather than rendering it raw', () => {
-    expect(message).toContain('children: parseLabelsTickersAndLinks(piece.text)');
-    expect(message).toContain('{@render bodySegments(segment.children ?? [])}');
+    expect(passes).toContain('children: parseLabelsTickersAndLinks(piece.text, false, context)');
+    /* The renderer calls ITSELF for a trade's children — Svelte 5's replacement for `svelte:self`. */
+    expect(renderer).toContain('segments={segment.children ?? []}');
+    expect(renderer).toContain("import MessageBody from './MessageBody.svelte'");
   });
 
   /*
@@ -122,7 +130,7 @@ describe('the render', () => {
       nine hundred characters of explanation. Sixth time in this repository an assertion has met its
       own explanation — and the first where it produced a slice rather than a match.
     */
-    const code = codeOf(message);
+    const code = codeOf(renderer);
     const at = code.indexOf('class="tradeColor"');
     expect(at, 'the trade span is missing').toBeGreaterThan(-1);
     const span = code.slice(at, at + 900);

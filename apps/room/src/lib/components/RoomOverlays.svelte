@@ -1,6 +1,7 @@
 <script lang="ts">
   import RoomBranding from '#lib/components/RoomBranding.svelte';
   import { saveCloseMessageThen } from '#lib/room/close-message.js';
+  import { saveRestreamUrlThen } from '#lib/room/restream-url.js';
   import type { SvelteSet } from 'svelte/reactivity';
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
@@ -112,6 +113,7 @@
     messageChrome,
     presenterColors,
     alertLabels,
+    captionsAvailable,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -183,6 +185,14 @@
      * array, so this is the second consumer of one parse rather than a second parse.
      */
     alertLabels: readonly AlertLabel[];
+    /**
+     * `RoomGates.speechRecognitionAvailable` — USM-15, passed straight to `ModalHost`.
+     *
+     * Resolved on the PAGE and not here, unlike the `data.sessData` reads above it: the `!== true`
+     * rule (absent means NOT disabled) belongs to `RoomGates`, which is also what
+     * `RoomRecording.beginSpeechRecognition` refuses on. One reading of the setting, two consumers.
+     */
+    captionsAvailable: boolean;
     /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
     alertsDisplayMode: ChatDisplayMode;
     chatLogDisplayMode: ChatDisplayMode;
@@ -534,6 +544,37 @@
 
 <!-- One hidden sink per remote microphone. The reasoning travelled with the markup. -->
 <RemoteAudioSinks {mediaTransport} />
+<!--
+  ── G03 — THE OVERLAY HAD ONLY ITS SUCCESS HALF ───────────────────────────────────────────────
+
+  There are TWO elements on this class and this room had one of them:
+
+  ```js
+  function iRe(t,n){ 1&t && (d(0,"div",9), T(1,"i",37), v(2," Reconnecting Chat... "), u()) }
+  O(7, o.appService.globals.socketConnected ? -1 : 7)          // byte 2,548,292
+   9  [1,"notConnectedOverlay","animated","fadeIn"]            // the failure overlay
+  10  ["id","connectedMsg",1,"notConnectedOverlay","animated","fadeIn"]   // the 3s success flash
+  37  [1,"fas","fa-cog","fa-spin"]
+  ```
+
+  So a member whose chat connection dropped saw nothing at all, and then — once it came back — a
+  three-second tick saying "Conected" for a failure they were never told about. The half that was
+  built is the half nobody needs.
+
+  `roomEvents.connected` is `socketConnected`'s counterpart and starts FALSE, so this is on screen
+  during the first connect too. That is upstream's own behaviour: `globals.socketConnected` is never
+  initialised, only assigned, so it is `undefined` until the socket opens. Gating on
+  `hasConnectedBefore` as well would read better and would be OURS, and the wording is the
+  reference's own — a room whose chat has not connected yet IS a room whose chat is connecting.
+
+  " Reconnecting Chat... " keeps its leading and trailing spaces, written as an expression because
+  Svelte normalises whitespace at element boundaries.
+-->
+{#if !roomEvents.connected}
+  <div class="notConnectedOverlay animated fadeIn">
+    <i class="fas fa-cog fa-spin"></i>{' Reconnecting Chat... '}
+  </div>
+{/if}
 <div
   id="connectedMsg"
   class="notConnectedOverlay animated fadeIn"
@@ -571,6 +612,8 @@
   mobileIosUrl={data.sessData?.customMobileAppEnabled ? data.sessData?.customMobileAppIOSUrl : null}
   hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
   isLimitedPresenter={media.limitedPresenter}
+  hasMic={data.user.hasMic === true}
+  {captionsAvailable}
   canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
   alertSearchFilter={feeds.alertSearchFilter}
   {chatMode}
@@ -605,6 +648,8 @@
   onAlertTab={(tab) => (modals.alertTab = tab)}
   onTheme={(next) => modals.setTheme(next)}
   onPreferenceChange={(key, value) => prefs.save(key, value)}
+  restreamUrl={data.sessData?.restreamToURL}
+  onSaveRestreamUrl={(url) => void saveRestreamUrlThen(url, { dialogs })}
   saveData={mediaTransport.saveData}
   onSaveDataChange={(enabled) => mediaTransport.setSaveData(enabled)}
   onDoNotDisturbChange={(enabled) => (prefs.doNotDisturbOn = enabled)}
@@ -633,7 +678,7 @@
   {onDisplayModeChange}
   onQaAction={(action, item, payload) =>
     messageActions.handle('alert', action, item, payload, false, 'qa')}
-  onMentionUser={(name) => messageActions.mention(name)}
+  onMentionUser={(name) => messageActions.mentionFromUserModal(name)}
   onPrivateChat={(user) => {
     userActions.selectedMessageUser = user;
     privateChat.show();
@@ -797,6 +842,10 @@
     mode="confirm"
     message={dialogs.confirmation.message}
     className={dialogs.confirmation.className}
+    confirmLabel={dialogs.confirmation.confirmLabel ?? 'OK'}
+    confirmClassName={dialogs.confirmation.confirmClassName ?? 'btn-primary'}
+    cancelLabel={dialogs.confirmation.cancelLabel ?? 'Cancel'}
+    cancelClassName={dialogs.confirmation.cancelClassName ?? 'btn-secondary btn-default'}
     onclose={() => {
       const dismissed = dialogs.confirmation?.ondismiss;
       dialogs.confirmation = null;

@@ -409,6 +409,7 @@
             {displayMode}
             {item}
             kind="chat"
+            extraChatMsg={true}
             {...chrome}
             followedStyle={followedUsers[item.senderEmailHash]?.followChatStyle}
             presenterStyle={presenterColorsFor(presenterColors, item.senderEmailHash)}

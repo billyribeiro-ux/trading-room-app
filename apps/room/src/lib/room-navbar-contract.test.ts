@@ -143,6 +143,20 @@ function props(overrides: Stub = {}): Stub {
     onrequestreload: noop,
     onshowrecpreview: noop,
     onhiderecpreview: noop,
+    /*
+      The eight that arrived with the 2026-08-30 navbar rows. Defaults chosen so the BASE render is
+      the plainest room there is: no tip, no MediaMTX tab, no local screens, the count visible, the
+      sidebar setting off. Every test that wants one says so in its own override.
+    */
+    tip: { visible: false, label: '', url: '' },
+    alwaysShowRoster: false,
+    rosterCountVisible: true,
+    streamingTabAvailable: false,
+    localScreens: [],
+    onmutetalkinguser: noop,
+    onopenstreamingtab: noop,
+    onreopenpreview: noop,
+    onstoplocalscreen: noop,
     ...overrides
   };
 }

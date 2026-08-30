@@ -9,6 +9,16 @@
     className?: string;
     title?: string;
     value?: string;
+    /**
+     * RS-07 — `buttons: {confirm: {label, className}, cancel: {label, className}}`.
+     *
+     * Defaulted to what a `bootbox.confirm` with no `buttons` block renders, because that is what
+     * every other call site in this room passes and must keep getting. See `RoomConfirmation`.
+     */
+    confirmLabel?: string;
+    confirmClassName?: string;
+    cancelLabel?: string;
+    cancelClassName?: string;
     children?: Snippet;
     /**
      * Replaces the default footer.
@@ -28,6 +38,10 @@
     className = '',
     title = '',
     value = '',
+    confirmLabel = 'OK',
+    confirmClassName = 'btn-primary',
+    cancelLabel = 'Cancel',
+    cancelClassName = 'btn-secondary btn-default',
     children,
     footer
   }: Props = $props();
@@ -113,16 +127,16 @@
         {#if footer}
           {@render footer()}
         {:else if mode === 'confirm' || mode === 'prompt'}
-          <button
-            type="button"
-            class="btn btn-secondary btn-default bootbox-cancel"
-            onclick={onclose}
-          >
-            Cancel
+          <button type="button" class="btn {cancelClassName} bootbox-cancel" onclick={onclose}>
+            {cancelLabel}
           </button>
-          <button type="button" class="btn btn-primary bootbox-accept" onclick={accept}>OK</button>
+          <button type="button" class="btn {confirmClassName} bootbox-accept" onclick={accept}
+            >{confirmLabel}</button
+          >
         {:else}
-          <button type="button" class="btn btn-primary bootbox-accept" onclick={onclose}>OK</button>
+          <button type="button" class="btn {confirmClassName} bootbox-accept" onclick={onclose}
+            >{confirmLabel}</button
+          >
         {/if}
       </div>
     </div>

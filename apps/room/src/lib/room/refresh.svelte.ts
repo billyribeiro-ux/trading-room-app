@@ -85,6 +85,34 @@ export function createRoomRefresh(deps: RoomRefreshDeps) {
     /**
      * `visibilitychange` — `globals.appHasFocus`, and the catch-up on the way back.
      *
+     * ## G16 — TWO REFERENCE BEHAVIOURS ARE DELIBERATELY NOT REPRODUCED, recorded rather than left
+     *
+     * ```js
+     * appVisibilityChange(e) {
+     *   e ? this.visibilityChangeTimer = setTimeout(() => {
+     *         document.addEventListener("visibilitychange", () => { … })
+     *       }, 1e4)
+     *     : …
+     * }
+     * ```
+     * (bundle byte 2,511,416.)
+     *
+     * **The 10 000 ms arming delay.** Upstream does not listen for a whole ten seconds after the
+     * room loads. That delay exists to protect a socket handshake still in flight from a visibility
+     * flip during load; this room's equivalent is `invalidateAll()` and a five-second poll, neither
+     * of which a mid-load flip can corrupt — the poll is idempotent and the load is a fetch. Arming
+     * immediately means a member who tabs away during the first ten seconds is actually noticed.
+     *
+     * **`unloadRoster()` on hide and `showSidebar && loadRoster()` on show.** The roster is a
+     * separate fetch upstream, so dropping it while hidden saves a subscription. Here it arrives
+     * with the page load and is refreshed by the same `invalidateAll()` this method already calls;
+     * unloading it would mean an empty sidebar for one frame on every return to the tab, in
+     * exchange for nothing.
+     *
+     * Recorded here because the sibling refusal — the 500 ms `alwaysShowRoster` timer — is recorded
+     * in `always-show-roster-contract.test.ts` and this one was not, which is how a deliberate
+     * divergence reads as an oversight to the next comparison.
+     *
      * THE CATCH-UP AND THE POLL'S OWN IMMEDIATE REFRESH ARE THE SAME REQUEST, so only one goes out.
      * `missedChatWhileHidden` is set while hidden; when it is set this is a catch-up and
      * `refreshAll` is the wider re-read. When it is not, the tab was never away long enough to miss

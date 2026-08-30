@@ -143,6 +143,21 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * BROWSER, which is why every read and write path here asks the server instead, and why the chat and
  * typing fan-outs became audience-aware. `chat-tabs-contract.test.ts`.
  *
+ * `restreamToURL` left last, on 2026-08-30, and it is the only row here that did NOT come from this
+ * enumeration. It came from the room-surface audit, as SC-12 and SC-13, and the setting turned out
+ * to be the thing both halves were missing: SC-12 is a textarea that opened empty on a room with a
+ * destination already configured, and SC-13 is what the Set/Clear buttons did instead —
+ * `onPreferenceChange('restreamToURL', …)`, which is `prefs.save`, this VIEWER's own settings row.
+ * Those two lines were the only occurrences of the name in `apps/room/src`. Nothing read it, so the
+ * room republished nowhere while the pane showed the value back to the presenter who typed it,
+ * which is the specific reason the defect could survive being looked at.
+ *
+ * It is also the first wired setting that does not cross to every member. An rtmp destination
+ * usually carries its own stream key inline, so it goes over `ROOM_PRESENTER_SETTINGS` — a third
+ * allow-list, projected only to a member the controller has already decided is a presenter. The
+ * reference reads it from `globals.sessData.restreamToURL`, which every viewer receives; that
+ * divergence is deliberate and argued where the list is defined. `restream-url-contract.test.ts`.
+ *
  * `enableQAReactions` left before it, and it is the clearest case yet for READING a row before
  * sizing it.
  * It was filed as a one-line wire because `sourceMessageBehavior.react` already carried the rule
@@ -168,7 +183,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'obsStreamKey',
   'recordChat',
   'recsInRoom',
-  'restreamToURL',
   'advancedSearchAlerts',
   'backupClusterID',
   'banIPList',

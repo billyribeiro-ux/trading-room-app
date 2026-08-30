@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ScreenShareMenu from '#lib/components/ScreenShareMenu.svelte';
+  import type { TipButton } from '#lib/tip-button.js';
   import type { RoomMedia, TalkingUser } from '#lib/room/media.svelte.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomRoster, RosterMember } from '#lib/room/roster.svelte.js';
@@ -27,6 +29,14 @@
 
   interface Props {
     isPresenter: boolean;
+    /**
+     * `globals.user.hasMic` — the durable membership permission, which widens ONE item below.
+     *
+     * `O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)` at bundle byte
+     * 2,489,576, where slot 29 is `f4e` — the `Session Control` item. It is the only entry in the
+     * presenter block whose gate is not plain `isPresenter`, and it is why this prop exists.
+     */
+    hasMic?: boolean;
     /*
       BINDABLE, both of them, and that is a defect this extraction nearly shipped.
 
@@ -163,10 +173,51 @@
     /** The recording preview lives in its own window; the page owns opening and closing it. */
     onshowrecpreview: () => void;
     onhiderecpreview: () => void;
+
+    /** RS-09 — the tip control, already resolved. `tip-button.ts` holds the three-way gate. */
+    tip: TipButton;
+    /**
+     * G12 — `toggleSideBarUsersCount` is `alwaysShowRoster && (…)`: the SETTING gates the whole
+     * statement, so in a room without it clicking the counter does nothing at all.
+     */
+    alwaysShowRoster: boolean;
+    /**
+     * G13 — `!sessData.rosterCountVisibleToViewers && !isPresenter` inverted, resolved by the page
+     * through `rosterCountVisibleTo()` so the navbar and the sidebar badge cannot answer it
+     * differently. `hideCount` is this component's own and is NOT folded in here.
+     */
+    rosterCountVisible: boolean;
+    /** G05 — `sessData.useMediaMTX`, which gates the OBS / RTMP entry alone. */
+    streamingTabAvailable: boolean;
+    /**
+     * G07 — the screens THIS browser is sharing, in the order they were started.
+     *
+     * `pt(yr(18, 4, e.mediaSoupService.screenProducers))` — a `keyvalue` pipe over the LOCAL
+     * producer map, so a presenter sees their own shares and never anyone else's.
+     */
+    localScreens: readonly { readonly id: string; readonly screenName: string }[];
+    /** G04 — one speaker name in the talking indicator, clicked. */
+    onmutetalkinguser: (user: TalkingUser) => void;
+    /** G05 — `openStreamingTab()`: session control, streaming tab, OBS tab. */
+    onopenstreamingtab: () => void;
+    /** G06 — `reopenPreviewWindow()`, which is the only way back from Hide Preview Windows. */
+    onreopenpreview: () => void;
+    /** G07 — `mediaService.stopSharingProducer(key)` for one of this browser's own screens. */
+    onstoplocalscreen: (producerId: string) => void;
   }
+
+  /**
+   * G12 — `hideCount`, a component field upstream and a component field here.
+   *
+   * It is not a preference: nothing persists it there, a reload shows the count again, and that is
+   * the right behaviour for a double-click meant to peek past a number rather than to configure the
+   * room. A plain `$state` for that reason, and deliberately not routed through `RoomPrefs`.
+   */
+  let hideCount = $state(false);
 
   let {
     isPresenter,
+    hasMic = false,
     sidebarOpen = $bindable(),
     mobileNavOpen = $bindable(),
     media,
@@ -217,7 +268,16 @@
     ongetmypinanddoinfo,
     onrequestreload,
     onshowrecpreview,
-    onhiderecpreview
+    onhiderecpreview,
+    tip,
+    alwaysShowRoster,
+    rosterCountVisible,
+    streamingTabAvailable,
+    localScreens,
+    onmutetalkinguser,
+    onopenstreamingtab,
+    onreopenpreview,
+    onstoplocalscreen
   }: Props = $props();
 </script>
 
@@ -239,8 +299,49 @@
       changed as people came and went. It is the same number as the sidebar badge and is
       now computed the same way.
     -->
-  <span title="Users Connected" class="users ml-1 mr-1 d-flex align-items-center">
-    <i class="fas fa-user"></i><span class="ml-1">{roster.connectedCount}</span>
+  <!--
+    ── G12 and G13 — THE USERS COUNTER HAS TWO HANDLERS AND ONE GATE, and it had none of them ────
+
+    ```js
+    d(3,"span",79),                                                        // byte 2,484,941
+      x("click",  () => g().toggleSideBarUsersCount())
+       ("dblclick",() => { const o = g(); return o.hideCount = !o.hideCount }),
+      T(4,"i",56), H(5,kPe,2,1,"span",80)
+    O(5, e.hideCount || !sessData.rosterCountVisibleToViewers && !isPresenter ? -1 : 5)
+    ```
+
+    Const 79 carries `3,"click","dblclick"` — this element is the control, and ours was a bare
+    `<span>`. The two gestures do unrelated things and the enumeration mislabelled which is which:
+    CLICK opens the sidebar, DBLCLICK hides the number.
+
+    **G13 is the one that matters.** `rosterCountVisibleToViewers` is an owner setting, and this
+    room already honours it for the SIDEBAR badge — `rosterCountVisibleTo()` in `roster-gates.ts`,
+    used at `RoomSidebar.svelte:545`. The navbar rendered the same number unconditionally, so an
+    owner who turned the count off for viewers had it leaked one element away. A gate applied in one
+    of two places is not a gate.
+
+    `hideCount` is component state and stays component state, because that is what it is upstream —
+    a field on the room component, not a preference. It survives nothing: a reload shows the count
+    again, which is what a double-click meant to peek past a number should do.
+
+    `toggleSideBarUsersCount` is `alwaysShowRoster && (showSidebar = !showSidebar, …)` — the
+    setting gates the whole statement, so in a room without it the click does nothing, exactly as
+    upstream. Its `loadRoster()` half has no counterpart and is already refused with its reason in
+    `always-show-roster-contract.test.ts`: the roster arrives with the page load here.
+  -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <span
+    title="Users Connected"
+    class="users ml-1 mr-1 d-flex align-items-center"
+    onclick={() => {
+      if (alwaysShowRoster) sidebarOpen = !sidebarOpen;
+    }}
+    ondblclick={() => (hideCount = !hideCount)}
+  >
+    <i class="fas fa-user"></i>{#if !hideCount && rosterCountVisible}<span class="ml-1"
+        >{roster.connectedCount}</span
+      >{/if}
   </span>
   <!--
       `FPe`, const 137: the same action as the sidebar button, reachable without opening
@@ -320,6 +421,42 @@
         supplies a logo and is absent otherwise. A room in that state still gets the sidebar item,
         so the feature is reachable either way. Restore the second copy by adding the asset.
       -->
+      <!--
+        ── RS-09 — THE TIP BUTTON IS RENDERED TWICE UPSTREAM, and we had one of them ──────────────
+
+        ```js
+        function APe(t,n){ … d(0,"li",139), x("click", () => doTipToUser()),
+                             d(1,"a",140), T(2,"i",35), d(3,"span",36), v(4) …
+                           xn("title", sessData.tipMeBtnTxt), Ze(sessData.tipMeBtnTxt) }
+        O(14, e.isTipEnabled ? 14 : -1)          // byte 2,487,938, immediately before Benzinga
+        139 [1,"nav-item",3,"click","title"]
+        140 [1,"d-flex","align-items-center","btn","btn-primary","btn-sm"]
+        ```
+
+        `aPe` (byte 2,466,601) is the SIDEBAR's copy and this room has it; this is the navbar's, and
+        `tip-button.ts` was written expecting both — its own docblock says *"the two call sites read
+        `tip.visible`"* while only one existed. The label is bound to the `title` AND to the text,
+        which is upstream's doubling on both copies.
+
+        The `<li>` carries the click here where the sidebar's `<button>` does, so the whole item is
+        the target rather than the button inside it. That is const 139's `3,"click"` and not a
+        choice; `role`/`tabindex`/`onkeydown` are ours, for the reason every other captured
+        click-on-a-non-control in this file carries them.
+      -->
+      {#if tip.visible}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <li
+          class="nav-item"
+          title={tip.label}
+          onclick={() => window.open(tip.url, '_blank', 'noopener,noreferrer')}
+        >
+          <!-- svelte-ignore a11y_missing_attribute -->
+          <a class="d-flex align-items-center btn btn-primary btn-sm">
+            <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
+          </a>
+        </li>
+      {/if}
       {#if benzinga.visible && benzinga.logoUrl}
         <li class="nav-item animated fadeIn benzinga-li">
           <a
@@ -353,14 +490,74 @@
             <i class="icon fa fa-microphone"></i>
             &nbsp;
             <span class="talking-string">
+              <!--
+                G04 — `d(0,"span",147)` at byte 2,473,449, const 147 `[3,"click"]`: each name is a
+                CONTROL, bound to `muteTalkingUserDialog(o)`. Ours was a bare `<span>`, so a
+                presenter watching one member hold the floor had no way to take it back short of
+                opening the roster and finding them — and `muteAllNonAdmins`, which is built, is
+                all-or-nothing.
+
+                The comma and the surrounding spaces are `ns(" ", i > 0 ? "," : "", " ", name, " ")`
+                and were already right; only the handler was missing. `role`/`tabindex`/`onkeydown`
+                are OURS, because the capture puts a click on a bare span and a span is neither
+                focusable nor keyboard-reachable — the same addition, for the same reason, as the
+                trade-order span in `MessageBody`.
+
+                The gate is inside `muteTalkingUserDialog`, not here: upstream's whole method body
+                is behind `globals.user.isPresenter`, so a member clicking a name gets no dialog
+                rather than a dialog whose command is refused.
+              -->
               {#each media.talking as talkingUser, index (talkingUser.userID)}
-                <span>
+                <span
+                  role="button"
+                  tabindex="0"
+                  onclick={() => onmutetalkinguser(talkingUser)}
+                  onkeydown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    onmutetalkinguser(talkingUser);
+                  }}
+                >
                   {index > 0 ? ',' : ''}
                   {talkingUser.mediaValue.name}
                 </span>
               {/each}
             </span>
             &nbsp;
+            <!--
+              ── G08 — THE IDLE WAVEFORM IS A MEASURED REFUSAL, not an omission ────────────────────
+
+              The reference switches between two images here:
+
+              ```js
+              O(8, e.mediaService.presenterTalking ? 8 : 9)          // byte 2,473,901
+              146  ["id","talkingLevelsImg","src","/assets/images/talking.gif",1,"talkingWaveform",…]
+              148  ["id","nolevelsImg","src","/assets/images/notalking.png",1,"talkingWaveform",…]
+              ```
+
+              **`presenterTalking` is not a fact this room can know.** It is written by exactly two
+              subscribers (byte 1,117,020) — `guiEventBus.subscribe("presenterTalking", …)` and its
+              `presenterNotTalking` twin — and the only thing that emits them is the SERVER socket
+              relaying `case "presenterTalking"` at byte 1,014,971. It is a live audio-activity
+              signal computed somewhere we do not have, and it is NOT the same thing as the list
+              beside it: "talking" in `talkingUsers` means A MICROPHONE IS OPEN, which
+              `media-transport.svelte.ts` records at length, and there is no level detection
+              anywhere in the reference either — its single `createAnalyser` is the AV-settings mic
+              test, and `audioLevel`, `activeSpeaker` and `volumeChange` do not occur at all.
+
+              So building the branch means one of two dishonest things: an image nothing can ever
+              show, or one that always shows. Neither is the reference. The waveform stays, which is
+              the state a room with an open microphone is actually in.
+
+              **This is also what explains `notalking.png`.** The audit row noticed the asset ships
+              here with no consumer and read that as strong evidence the branch was dropped. It is
+              evidence of something narrower: the MARKUP was transcribed from a capture whose driving
+              signal did not cross with it. The asset stays — it is a captured asset, and deleting it
+              would be deciding this can never be built.
+
+              WHAT WOULD UNBLOCK IT: our own server computing and pushing an activity signal on the
+              room channel. At that point this is one `{#if}` and the second const above.
+            -->
             <img
               id="talkingLevelsImg"
               src="/assets/images/talking.gif"
@@ -628,78 +825,21 @@
             <a><i class="fas fa-2x fa-spinner fa-spin"></i></a>
           </li>
         {/if}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <li
-          title="Start/Stop Screen Sharing"
-          class="screen-sharing nav-item dropdown"
-          onclick={(event) => event.stopPropagation()}
-        >
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <a
-            id="dropdownScreenSharing"
-            data-bs-toggle="dropdown"
-            aria-haspopup="true"
-            aria-expanded={menus.screen}
-            class={[
-              'nav-link dropdown-toggle d-flex align-items-center',
-              { muted: !media.screenSharing, 'text-white': media.screenSharing }
-            ]}
-            onclick={() => ontoggletopmenu('screen')}
-          >
-            <i class="fas fa-2x fa-desktop"></i>
-            <span class="ml-2 mainNavItem">Start/Stop Screen Sharing</span>
-          </a>
-          <ul
-            aria-labelledby="dropdownScreenSharing"
-            data-bs-popper={menus.screen ? 'static' : undefined}
-            class={[
-              'screen-options-start-screen dropdown-menu dropdown-menu-end',
-              { show: menus.screen }
-            ]}
-            style={menus.screen ? 'display: block;' : undefined}
-          >
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li
-              title="(Regular Bandwidth) ** RECOMMENDED"
-              onclick={() => onpromptforscreenname('screen')}
-            >
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a aria-hidden="true">{shareScreenText}</a>
-            </li>
-            <div class="dropdown-divider"></div>
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li title="OBS" onclick={() => onpromptforscreenname('camera')}>
-              <!-- svelte-ignore a11y_missing_attribute -->
-              <a aria-hidden="true">{virtualCamText}</a>
-            </li>
-            <!--
-                `e4e` in the capture, verbatim - TWO dividers, then a bare `li > a` with no
-                icon, bound to `mediaService.stopSharingAll()`:
-
-                  T(0,"div",115)(1,"div",115),
-                  d(2,"li")(3,"a",163), x("click", () => onstopsharingall()),
-                  v(4," Stop Sharing All Screens"), u()()
-
-                The nav item is labelled "Start/Stop Screen Sharing" but there was no stop
-                anywhere in the menu; `onstopscreensharing()` existed and was only ever
-                reachable through a remote `mutescreens` command from a presenter.
-              -->
-            {#if media.screenSharing}
-              <div class="dropdown-divider"></div>
-              <div class="dropdown-divider"></div>
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-              <li onclick={onstopscreensharing}>
-                <!-- svelte-ignore a11y_missing_attribute -->
-                <a aria-hidden="true">{stopSharingAllText}</a>
-              </li>
-            {/if}
-          </ul>
-        </li>
+        <ScreenShareMenu
+          screenSharing={media.screenSharing}
+          menuOpen={menus.screen}
+          {shareScreenText}
+          {virtualCamText}
+          {stopSharingAllText}
+          {streamingTabAvailable}
+          {localScreens}
+          ontoggle={() => ontoggletopmenu('screen')}
+          {onpromptforscreenname}
+          {onstopscreensharing}
+          {onopenstreamingtab}
+          {onreopenpreview}
+          {onstoplocalscreen}
+        />
         {#if !media.camLaunching && !hideWebcamForRoom}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -722,6 +862,33 @@
             <a><i class="fas fa-2x fa-spinner fa-spin"></i></a>
           </li>
         {/if}
+      {/if}
+      <!--
+        ── SC-14 — SESSION CONTROL IS NOT PLAIN `isPresenter` ──────────────────────────────────
+
+        ```js
+        O(29, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 29)     // byte 2,489,576
+        function f4e(t,n){ d(0,"li",192), x("click", () => doSessionControl()),
+            d(1,"a",193), T(2,"i",194), d(3,"span",108), v(4,"Session Control") … }
+        ```
+
+        This item sat inside the presenter block with everything else, and it is the one entry there
+        whose gate upstream is wider: rendered when `(isPresenter || user.hasMic)` AND NOT
+        `isLimitedPresenter`. A member whose membership carries the mic permission gets it, and the
+        modal answers them with the device picker alone (`ModalHost.svelte`'s `{:else if hasMic}`
+        arm, SC-14/SC-17). Without this they could produce audio and had no way to choose which
+        microphone it came from.
+
+        `media.limitedPresenter` is the reference's own term and it is not redundant: `giveMicScreen`
+        assigns `globals.user.isPresenter = globals.isLimitedPresenter = e.give`, so somebody handed
+        mic and screen at runtime satisfies `isPresenter` — and upstream deliberately withholds this
+        item from them. A temporary grant is not room administration.
+
+        The three sibling items above (recording, microphone, screenshare) stay on plain
+        `isPresenter`: those drive what the room SENDS to everybody, which is the reason recorded at
+        the top of that block.
+      -->
+      {#if (isPresenter || hasMic) && !media.limitedPresenter}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <li

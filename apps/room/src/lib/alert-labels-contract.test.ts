@@ -149,20 +149,39 @@ describe('the replace loop, reproduced including the parts that look wrong', () 
   being guarded is a guard going missing.
 */
 describe('the component applies labels to alerts only, ahead of the ticker pass', () => {
+  /*
+    TWO FILES since 2026-08-30: the three passes are `#lib/message-body-segments.ts` (upstream they
+    are pipes, and `source-size-contract` forced the seam) and the BADGE is still the component's.
+    Both are read here, because the ORDER between the passes and the markup that renders their
+    output are one behaviour split across a boundary — and a boundary is exactly where two green
+    tests start describing different things.
+  */
   const component = readFileSync(
     new URL('./components/RoomMessage.svelte', import.meta.url),
     'utf8'
   );
-  const source = component.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const passes = readFileSync(new URL('./message-body-segments.ts', import.meta.url), 'utf8');
+  /* The BADGE is `MessageBody.svelte`'s since the segment renderer became a component. */
+  const renderer = readFileSync(
+    new URL('./components/MessageBody.svelte', import.meta.url),
+    'utf8'
+  );
+  const strip = (text: string) =>
+    text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const source = strip(component);
+  const passesSource = strip(passes);
 
   it("gates the label pass on kind === 'alert'", () => {
-    expect(source).toContain("kind === 'alert' && alertLabels.length > 0");
-    expect(source).toContain('splitAlertLabels(value, alertLabels)');
+    expect(passesSource).toContain("context.kind === 'alert' && context.alertLabels.length > 0");
+    expect(passesSource).toContain('splitAlertLabels(value, context.alertLabels)');
   });
 
   it('runs labels first and feeds only the non-label pieces to the ticker/link pass', () => {
-    const fn = source.slice(source.indexOf('function parseBodySegments'));
-    const body = fn.slice(0, fn.indexOf('function parseTickersAndLinks'));
+    const at = passesSource.indexOf('export function parseBodySegments');
+    const until = passesSource.indexOf('function parseTickersAndLinks');
+    expect(at, 'the entry point must exist').toBeGreaterThan(-1);
+    expect(until, 'and the ticker pass after it').toBeGreaterThan(at);
+    const body = passesSource.slice(at, until);
     expect(body.indexOf('splitAlertLabels')).toBeGreaterThan(-1);
     // The `$TICKER` split must be reached only through the text branch, never applied to a label.
     expect(body.indexOf('splitAlertLabels')).toBeLessThan(body.indexOf('parseTickersAndLinks'));
@@ -170,9 +189,11 @@ describe('the component applies labels to alerts only, ahead of the ticker pass'
   });
 
   it('renders the badge with the captured class and both colours', () => {
-    expect(source).toContain('class={ALERT_LABEL_BADGE_CLASS}');
-    expect(source).toContain('style={alertLabelBadgeStyle(segment.label)}');
+    expect(renderer).toContain('class={ALERT_LABEL_BADGE_CLASS}');
+    expect(renderer).toContain('style={alertLabelBadgeStyle(segment.label)}');
     // The badge shows the label NAME, never the raw `#hash` it replaced.
-    expect(source).toContain('{segment.label.name}');
+    expect(renderer).toContain('{segment.label.name}');
+    /* And the parent no longer knows about it, which is what makes the move a move. */
+    expect(source).not.toContain('ALERT_LABEL_BADGE_CLASS');
   });
 });

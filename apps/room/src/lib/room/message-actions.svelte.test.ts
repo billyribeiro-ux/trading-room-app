@@ -113,6 +113,7 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
 
   return {
     actions,
+    chat,
     dialogs,
     toasts,
     composer,
@@ -330,5 +331,64 @@ describe('the small ones', () => {
     actions.handle('chat', 'report', item());
     actions.handle('alert', 'question', item());
     expect(opened).toEqual(['user', 'reply', 'report', 'qa']);
+  });
+});
+
+describe('RM-20 — the user modal s @Mention remembers which column opened it', () => {
+  /*
+    `doUserInfo` emits a SECOND event beside `doUserInfo` (byte 1,352,030) whose only subscriber is
+    the user modal (byte 2,074,524), which stores it so its own `doMention` (byte 2,077,087) can
+    route the three-term way. `grep -rn doUserInfoExtra src` returned zero here, so the modal's
+    @Mention always wrote to the main composer no matter which column the card came from.
+
+    Asserted through the two COMPOSER buffers rather than through the private field, because the
+    field is an implementation detail and the buffer is the thing a member sees.
+  */
+  const openCardFrom = (fromExtraColumn: boolean) => {
+    const harness = make();
+    harness.actions.handle('chat', 'user', item(), undefined, fromExtraColumn);
+    return harness;
+  };
+
+  it('sends the mention to the EXTRA composer when the card came from that column', () => {
+    const { actions, chat } = openCardFrom(true);
+    actions.mentionFromUserModal('Ada');
+    expect(chat.extraComposer).toBe('@Ada ');
+    expect(chat.composer).toBe('');
+  });
+
+  it('sends it to the MAIN composer when the card came from the main log', () => {
+    /* The control, and the one that fails if the flag is never cleared. */
+    const { actions, chat } = openCardFrom(false);
+    actions.mentionFromUserModal('Ada');
+    expect(chat.composer).toBe('@Ada ');
+    expect(chat.extraComposer).toBe('');
+  });
+
+  it('does NOT go stale, which is the one place we diverge from the reference', () => {
+    /*
+      Upstream emits ONLY when `extraChatColumn && (extraChatMsg || focus === 'textAreaTxtExtra')`,
+      so opening a card from the main log with main focus emits nothing and the modal keeps the last
+      extra-column answer. Ours records it on every open. Same answer in every case but this one.
+    */
+    const harness = make();
+    harness.actions.handle('chat', 'user', item(), undefined, true);
+    harness.actions.handle('chat', 'user', item(), undefined, false);
+    harness.actions.mentionFromUserModal('Ada');
+    expect(harness.chat.composer).toBe('@Ada ');
+    expect(harness.chat.extraComposer).toBe('');
+  });
+
+  it('still honours the FOCUS half, which mentionTargetIsExtra owns', () => {
+    /*
+      Two ways to reach the extra column and this method supplies only one of them. Typing in the
+      extra composer and then opening a card from the main log must still mention there — that is
+      the `focus === 'textAreaTxtExtra'` term, and it is not duplicated in the new method.
+    */
+    const { actions, chat } = openCardFrom(false);
+    chat.focused('textAreaTxtExtra');
+    actions.mentionFromUserModal('Ada');
+    expect(chat.extraComposer).toBe('@Ada ');
+    expect(chat.composer).toBe('');
   });
 });

@@ -645,6 +645,28 @@ export interface RoomSessionSettings {
    * raises. This is the owner's term, and it was the missing half.
    */
   recordingReminder?: boolean;
+  /**
+   * "Restream URL" — the `rtmp://` destination the room republishes its stream to.
+   *
+   * ## The ONE key on this interface that does not reach every member
+   *
+   * Everything above crosses through `ROOM_VISIBLE_SETTINGS` and is delivered to whoever loads the
+   * page. This one crosses through `ROOM_PRESENTER_SETTINGS` instead — a third allow-list on the
+   * controller, projected by `internal/room-config/[code]` only for a member it has already decided
+   * is the owner or a true presenter. A participant's `sessData` does not carry the key at all, so
+   * `undefined` here means either "not configured" or "not yours to see", and the room must not try
+   * to tell those apart: neither one is a value it may display.
+   *
+   * The reference does not make that distinction — it reads `globals.sessData.restreamToURL` from a
+   * payload every viewer receives. The divergence is deliberate and argued where the list is
+   * defined: an rtmp destination usually carries its own stream key inline
+   * (`rtmp://a.rtmp.youtube.com/live2/<KEY>`), and the reference's own validator accepts exactly
+   * that shape.
+   *
+   * Also the SECOND setting this room writes back, through {@link writeRoomSetting} — see
+   * `setRestreamUrl` in `session-commands.remote.ts`.
+   */
+  restreamToURL?: string;
 }
 
 /** The connected member's per-room standing, which is per room and not per account. */

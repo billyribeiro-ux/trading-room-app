@@ -44,6 +44,27 @@ export const REPEAT_MODES = ['', 'daily', 'weekly'] as const;
 export type RepeatMode = (typeof REPEAT_MODES)[number];
 
 /**
+ * PAM-07 — what each mode is CALLED in the select, which is not what it is worth on the wire.
+ *
+ * ```js
+ * d(15,"option",66), v(16,"Off"), d(17,"option",67), v(18,"Daily"), d(19,"option",68), v(20,"Weekly")
+ * 66 ["selected","","value",""]   67 ["value","daily"]   68 ["value","weekly"]
+ * ```
+ * (byte 2,120,818.) The composer rendered the VALUES — a select showing its own storage format,
+ * with an option reading `off` because the empty string was being defaulted for display. The values
+ * are unchanged and remain what `isRepeatMode` refuses anything else against.
+ *
+ * Beside `REPEAT_MODES` rather than in the component, because the two have to stay in step: a mode
+ * added without a label would render an empty option, which is the failure this table makes
+ * impossible by TYPE — `Record<RepeatMode, string>` will not compile with one missing.
+ */
+export const REPEAT_MODE_LABEL: Readonly<Record<RepeatMode, string>> = {
+  '': 'Off',
+  daily: 'Daily',
+  weekly: 'Weekly'
+};
+
+/**
  * Deny-by-default, because this value crosses from a browser into a row that fires on its own.
  *
  * An unrecognised repeat is not coerced to `''`; the caller is expected to refuse the whole request.

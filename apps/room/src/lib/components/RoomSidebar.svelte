@@ -6,6 +6,7 @@
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
   import type { RoomRoster, RosterMember } from '#lib/room/roster.svelte.js';
   import type { RosterSessionFlags } from '#lib/roster-gates.js';
+  import type { MessageBadge } from '#lib/types.js';
 
   /*
     `.room-sidebar` — the room's left rail: the viewer's own card, the Users block with its four
@@ -69,7 +70,26 @@
       hideAppInfo?: boolean;
       hideRecs?: boolean;
       hideChatLog?: boolean;
+      /**
+       * RS-05 — `showUserAvatar(e) { return !sessData.hideAvatars || !!e }` (byte 2,036,617).
+       *
+       * The roster's avatar has its OWN gate and it is not the message log's: a presenter's avatar
+       * shows even in a room that hides avatars, because a member has to be able to tell who is
+       * running the room. The rail rendered every avatar unconditionally, so a room that turned
+       * avatars off still published every member's picture in the sidebar.
+       */
+      hideAvatars?: boolean;
     };
+    /**
+     * RS-02 — the badges a roster row wears, resolved by the page.
+     *
+     * `parseBadges(e.data.badges)` upstream, which builds an HTML string from the account's badge
+     * definitions. This room already has that resolution — `RoomFeeds.badgesFor(emailHash)`, with
+     * the dark-variant fallback and the deleted-badge skip written out there — and it is the SAME
+     * function the message rows use. Passed as a resolver rather than pre-resolved per row, because
+     * the rail renders a list that changes on every roster frame.
+     */
+    badgesFor: (emailHash: string | null | undefined) => readonly MessageBadge[];
     roster: RoomRoster<Entry & RosterMember & { email: string }>;
     menus: RoomMenus;
     /** Whether the realtime channel is up. The "Chat" line reports it. */
@@ -146,6 +166,7 @@
     sidebarOpen,
     theme,
     isPresenter,
+    badgesFor,
     session,
     roster,
     menus,
@@ -225,18 +246,15 @@
             `[1,"fas","fa-dollar-sign"]`, `[1,"ms-1"]`. The label is bound to BOTH the `title`
             attribute and the text, which is upstream's own doubling and not a mistake here.
           -->
-          {#if tip.visible}
-            <p>
-              <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                title={tip.label}
-                onclick={() => window.open(tip.url, '_blank', 'noopener,noreferrer')}
-              >
-                <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
-              </button>
-            </p>
-          {/if}
+          <!--
+            RS-10 — THE ORDER IS THE REFERENCE'S: `H(12, rPe, …)(13, aPe, …)` at byte 2,470,612,
+            with `O(12, sessData.hideAppInfo ? -1 : 12)` and `O(13, isTipEnabled ? 13 : -1)`. Mobile
+            App Info comes first and the tip second, and these two were the other way round.
+
+            It reads as cosmetic and is not quite: both are `<p>` buttons in the same block, so the
+            one a member's eye lands on first is whichever the room happens to have configured. The
+            reference puts the thing the ROOM offers before the thing the PRESENTER asks for.
+          -->
           {#if !session?.hideAppInfo}
             <p>
               {#if mobileAppAvailable}
@@ -248,6 +266,18 @@
                   onclick={ongetmobilepin}>Mobile App Info</button
                 >
               {/if}
+            </p>
+          {/if}
+          {#if tip.visible}
+            <p>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                title={tip.label}
+                onclick={() => window.open(tip.url, '_blank', 'noopener,noreferrer')}
+              >
+                <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
+              </button>
             </p>
           {/if}
           <hr />
@@ -262,21 +292,40 @@
               is that they report state. `mediaConnected` already tracks the SFU socket, and
               `roomEventsConnected` tracks the SSE channel that carries chat.
             -->
+          <!--
+            ── RS-11 — FOUR NODES IN TWO SHAPES, and we had two nodes in one ─────────────────────
+
+            ```js
+            H(15,lPe,3,0,"p")(16,cPe,3,0,"p"), d(17,"p"), H(18,dPe,3,0,"span")(19,uPe,3,0,"span")
+            O(15, socketConnected ? -1 : 15)   O(16, mediaSoupService.connected ? -1 : 16)
+            O(18, socketConnected ? 18 : -1)   O(19, mediaSoupService.connected ? 19 : -1)
+            ```
+
+            The two FAILURE lines are a `<p>` each — they are sentences, and a sentence gets a line.
+            The two SUCCESS marks share one `<p>` and are `<span>`s inside it — they are labels, and
+            two labels sit on one line. We had one `<p>` per service with the two states swapped
+            inside it, so on a healthy connection the room drew two stacked lines where the
+            reference draws one, and CHAT came second where the reference puts it first.
+
+            The literals are transcribed with their own spacing, which is not uniform and is
+            upstream's: `" Reconnecting Chat..."` has a leading space and no trailing one,
+            `" Reconnecting Media... "` has both, and `"Chat "` / `"Media "` each carry a trailing
+            space before their tick. Written as expressions because Svelte normalises whitespace at
+            element boundaries.
+          -->
+          {#if !roomEventsConnected}
+            <p><i class="fas fa-cog fa-spin"></i>{' Reconnecting Chat...'}</p>
+          {/if}
+          {#if !mediaConnected}
+            <p><i class="fas fa-cog fa-spin"></i>{' Reconnecting Media... '}</p>
+          {/if}
           <p>
-            {#if mediaConnected}
-              <i class="fas fa-check"></i> Media
-            {:else}
-              <i class="fas fa-cog fa-spin"></i>Reconnecting Media...
+            {#if roomEventsConnected}
+              <span>{'Chat '}<i class="fas fa-check"></i></span>
             {/if}
-          </p>
-          <p>
-            <span>
-              {#if roomEventsConnected}
-                Chat <i class="fas fa-check"></i>
-              {:else}
-                <i class="fas fa-cog fa-spin"></i>Reconnecting Chat...
-              {/if}
-            </span>
+            {#if mediaConnected}
+              <span>{'Media '}<i class="fas fa-check"></i></span>
+            {/if}
           </p>
         </li>
         <li class="nav-item">
@@ -673,14 +722,27 @@
                               </div>
                             {:else}
                               <div class="media">
-                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                                <img
-                                  class="rosterImg mr-3"
-                                  alt={user.displayName}
-                                  src={user.avatarUrl}
-                                  onclick={() => onopenrosteruserinfo(user)}
-                                />
+                                <!--
+                                  RS-05 — `O(1, i.showUserAvatar(e.isP) ? 1 : -1)`, and
+                                  `showUserAvatar(e) { return !sessData.hideAvatars || !!e }` at
+                                  byte 2,036,617.
+
+                                  The roster's avatar gate is NOT the message log's: a presenter's
+                                  picture shows even in a room that hides avatars, because a member
+                                  has to be able to tell who is running the room. This rendered
+                                  every avatar unconditionally, so a room with avatars turned off
+                                  still published every member's picture here.
+                                -->
+                                {#if !session?.hideAvatars || user.isP === true}
+                                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                                  <img
+                                    class="rosterImg mr-3"
+                                    alt={user.displayName}
+                                    src={user.avatarUrl}
+                                    onclick={() => onopenrosteruserinfo(user)}
+                                  />
+                                {/if}
                                 <div class="media-body">
                                   <div class="mt-0 mb-0 nickName d-inline">
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -690,7 +752,43 @@
                                       ondblclick={() => onopenrosteruserinfo(user)}
                                       >{user.displayName}</span
                                     >
-                                    <div class="d-inline-block align-baseline mr-1"></div>
+                                    <!--
+                                      RS-02 and RS-01 — `O(6, e.data.badges ? 6 : -1)` and
+                                      `O(7, isPresenter && e.isFT ? 7 : -1)` at byte 2,034,694.
+
+                                      The badges div was rendered ALWAYS and EMPTY: const 8's class
+                                      list with no content and no gate, which is a wrapper nobody
+                                      fills. The Trial chip (const 9) had no node at all — so a
+                                      presenter scanning the roster could not tell a trial from a
+                                      paying member, which is the one distinction that list is used
+                                      to make.
+
+                                      `badgesFor` is `RoomFeeds`'s and is the SAME resolution the
+                                      message rows use, including its dark-variant fallback and its
+                                      skip for a badge deleted from the account. Upstream reaches
+                                      the same place through `parseBadges`, which builds an HTML
+                                      string; real elements here for the reason `MessageBody`
+                                      records — text that is never parsed as markup cannot be
+                                      markup.
+                                    -->
+                                    {#each badgesFor(user.emailHash) as badge, badgeIndex (`${user.id}-${badgeIndex}`)}
+                                      {#if badge.imageUrl}
+                                        <img
+                                          class="user-badge-img"
+                                          src={badge.imageUrl}
+                                          alt={badge.imageUrl}
+                                        />
+                                      {:else}
+                                        <span
+                                          class="badge px-1 mx-1 user-badge d-inline-block align-baseline mr-1"
+                                          style="background-color: {badge.backgroundColor}; color: {badge.color};"
+                                          >{badge.text}</span
+                                        >
+                                      {/if}
+                                    {/each}
+                                    {#if isPresenter && user.isFT === true}
+                                      <span class="badge bg-danger trial-badge">Trial</span>
+                                    {/if}
                                     <!-- svelte-ignore a11y_interactive_supports_focus -->
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <a

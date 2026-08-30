@@ -353,6 +353,17 @@
   function getRandomUser() {
     dialogs.confirmation = {
       message: 'Only select from Trials?',
+      /*
+        RS-07 — the buttons are the ANSWER to the question, and they said OK and Cancel.
+        `buttons: {confirm:{label:"Yes",className:"btn-success"}, cancel:{label:"No",className:
+        "btn-danger"}}` at byte 2,516,822. "Cancel" reads as abandon-the-whole-thing where it
+        actually means draw from everybody — a different action rather than none, which is exactly
+        what `ondismiss` below does.
+      */
+      confirmLabel: 'Yes',
+      confirmClassName: 'btn-success',
+      cancelLabel: 'No',
+      cancelClassName: 'btn-danger',
       onconfirm: () => {
         dialogs.confirmation = null;
         roster.draw(true);
@@ -533,6 +544,22 @@
     unreadQaAlertIds,
     defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
   });
+
+  /**
+   * G07 — the screens THIS browser is sharing, for the navbar's per-screen stop entries.
+   *
+   * Upstream repeats over `mediaSoupService.screenProducers`, the LOCAL producer map. The nearest
+   * thing here is the screen TAB list, where `ownerId === null` is documented as "one of this
+   * browser's own" — `RoomScreens.stop` asks `isLocalScreen` first, so a share started here is
+   * stopped here and no frame is ever addressed for it. Filtering on that is what keeps a
+   * presenter's menu from offering to stop somebody else's screen, which upstream's map cannot
+   * contain and ours could.
+   */
+  const localScreenShares = $derived(
+    mediaTransport.screens
+      .filter((screen) => screen.ownerId === null)
+      .map((screen) => ({ id: screen.id, screenName: screen.screenName }))
+  );
 
   /* Seeded from `loadedChatStyle`, which `createRoom` derives from the member's preferences, so it
      is declared after the call for that reason alone. */
@@ -1033,6 +1060,7 @@
         -->
         <RoomNavbar
           {isPresenter}
+          hasMic={data.user.hasMic === true}
           bind:sidebarOpen
           bind:mobileNavOpen
           {media}
@@ -1084,6 +1112,15 @@
           onrequestreload={requestReload}
           onshowrecpreview={() => recording.showRecPreview()}
           onhiderecpreview={() => recording.hideRecPreview()}
+          tip={tipButtonFor(data.sessData)}
+          alwaysShowRoster={data.sessData?.alwaysShowRoster === true}
+          rosterCountVisible={gates.rosterCountVisible}
+          streamingTabAvailable={data.sessData?.useMediaMTX === true}
+          localScreens={localScreenShares}
+          onmutetalkinguser={(user) => userActions.muteTalkingUserDialog(user)}
+          onopenstreamingtab={() => modals.openSessionControl('streaming-selection')}
+          onreopenpreview={() => (previewWindowsVisible = true)}
+          onstoplocalscreen={(producerId) => mediaTransport.stopLocalScreen(producerId)}
         />
         {/snippet}
 
@@ -1128,6 +1165,7 @@
           {chatAlertsDetached}
           rosterVisible={gates.rosterVisible}
           rosterCountVisible={gates.rosterCountVisible}
+          badgesFor={(emailHash) => feeds.badgesFor(emailHash)}
           archivesAvailable={gates.archivesAvailable}
           {rowVisible}
           {rosterRowClass}
@@ -1410,6 +1448,7 @@
       {messageChrome}
       presenterColors={data.presenterColors}
       alertLabels={gates.alertLabels}
+      captionsAvailable={gates.speechRecognitionAvailable}
       alertsDisplayMode={displayModes.alerts}
       chatLogDisplayMode={displayModes.chat}
       onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}
