@@ -41,7 +41,7 @@ const SEED: readonly Row[] = [
 
 const make = (
   options: {
-    feed?: TradeAlertFeed;
+    feed?: TradeAlertFeed<SwingAlertAction>;
     seed?: readonly Row[];
     enabled?: boolean;
     uploadFails?: boolean;
@@ -89,29 +89,37 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('the two feeds differ in the descriptor and nowhere else', () => {
-  it('carries exactly the four members that were measured to differ', () => {
+  it('carries exactly the five members that were measured to differ', () => {
     /*
       This is the executable half of the extraction's argument. Every difference between the swing
-      half and the day trade half of `+page.svelte` was folded into these four values; anything a
-      later change adds here is a fifth difference, and adding one should be a decision rather than
-      a drift.
+      half and the day trade half of `+page.svelte` was folded into these values; anything a later
+      change adds here is one more difference, and adding one should be a decision rather than a
+      drift.
+
+      FOUR until 2026-08-30. `send` is the fifth and it was a decision: `submit` used to build its
+      own endpoint from the action name — ``fetch(`?/${action}`)`` — so the descriptor did not carry
+      anything about writes at all, and that WAS the defect, because the name was assembled at
+      runtime and connected to nothing. The mutation is per feed exactly as the read endpoint is,
+      and it belongs beside it.
     */
     expect(Object.keys(SWING_ALERT_FEED).sort()).toEqual([
       'endpoint',
       'initialDays',
       'loadFailure',
-      'logDays'
+      'logDays',
+      'send'
     ]);
     expect(Object.keys(DAY_TRADE_ALERT_FEED).sort()).toEqual(Object.keys(SWING_ALERT_FEED).sort());
   });
 
-  it('and the two disagree on all four, which is why neither is a default', () => {
+  it('and the two disagree on all five, which is why neither is a default', () => {
     expect(SWING_ALERT_FEED.endpoint).not.toBe(DAY_TRADE_ALERT_FEED.endpoint);
     expect(SWING_ALERT_FEED.loadFailure).not.toBe(DAY_TRADE_ALERT_FEED.loadFailure);
     // 42 and 21 — the load's fixed windows, and NOT `months * 30` in either case.
     expect(SWING_ALERT_FEED.initialDays).toBe(42);
     expect(DAY_TRADE_ALERT_FEED.initialDays).toBe(21);
     expect(SWING_ALERT_FEED.logDays(2)).not.toBe(DAY_TRADE_ALERT_FEED.logDays(2));
+    expect(SWING_ALERT_FEED.send).not.toBe(DAY_TRADE_ALERT_FEED.send);
   });
 });
 
@@ -209,10 +217,53 @@ describe('every public getter is reactive', () => {
 });
 
 describe('the mutations and the window', () => {
-  it('posts to the action it is given and refetches afterwards', async () => {
-    const { alerts } = make();
+  it('dispatches through the feed and refetches afterwards, in that order', async () => {
+    /*
+      REWRITTEN when the six actions became remote commands on 2026-08-30.
+
+      It asserted `seen` was `['?/swingAlertMsg', '/api/swing-alerts?days=42']` — one stubbed
+      `fetch` recording both the mutation and the refetch, which worked because both were `fetch`.
+      The mutation is `feed.send` now, so a stub feed is what records it; the REAL `send` is proven
+      by `swing-alerts-contract.test.ts` and `day-trade-alerts-contract.test.ts`, which call the
+      commands against a live database.
+
+      The two properties this class owns are unchanged and both are asserted: the action and values
+      reach `send` untouched, and the log is refetched for the CURRENT window afterwards — not by
+      `invalidateAll()`, which would reset the window to the one the page load always returns.
+    */
+    const dispatched: [string, unknown][] = [];
+    const { alerts } = make({
+      feed: {
+        ...SWING_ALERT_FEED,
+        send: (action, values) => {
+          dispatched.push([action, values]);
+          // Nothing has been refetched yet at the moment the mutation runs.
+          expect(seen).toEqual([]);
+          return Promise.resolve();
+        }
+      }
+    });
+
     await alerts.submit('swingAlertMsg', { symbol: 'AAPL' });
-    expect(seen).toEqual(['?/swingAlertMsg', '/api/swing-alerts?days=42']);
+
+    expect(dispatched).toEqual([['swingAlertMsg', { symbol: 'AAPL' }]]);
+    expect(seen).toEqual(['/api/swing-alerts?days=42']);
+  });
+
+  it('does NOT refetch when the mutation was refused', async () => {
+    /*
+      The refusal reaches the pane, which is what shows the presenter what the server actually said.
+      A refetch here would redraw the same rows and read as success — and it would also swallow the
+      rejection, because `submit` awaits it.
+    */
+    const { alerts } = make({
+      feed: { ...SWING_ALERT_FEED, send: () => Promise.reject(new Error('Presenters only.')) }
+    });
+
+    await expect(alerts.submit('swingAlertMsg', { symbol: 'AAPL' })).rejects.toThrow(
+      'Presenters only.'
+    );
+    expect(seen, 'a refused mutation still refetched the log').toEqual([]);
   });
 
   it('empties the list BEFORE refetching, as the reference does', async () => {

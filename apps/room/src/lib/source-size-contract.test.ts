@@ -971,8 +971,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       not hold this class: it had no field, no lifecycle and nothing rendered, so it was never
       overlay state. The `why` below is now true of everything left.
     */
-    max: 242,
-    why: 'the overlay state machine - five fields the template reads and this class alone writes'
+    /*
+      RAISED 242 -> 307 on 2026-08-30, for the poll conversion — `TODO.md` row AG.
+
+      `submitPollAction(action, values)` was twelve lines: a `FormData` loop, ``fetch(`?/${action}`)``
+      and a boolean. It is five named methods and one shared failure policy now, and the whole of the
+      growth is that shape plus the WHY.
+
+      The raise is recorded as a decision rather than absorbed, because the standing rule is that a
+      ceiling only goes down and a raise is a conversation. What was bought for it:
+
+        - the endpoint is no longer assembled at runtime. `remote-call-sites-contract.test.ts` opens
+          with what that costs — `presenterCommand`'s action was deleted while its call site kept
+          posting to it for three commits, compiling the whole way. Five imported symbols cannot do
+          that;
+        - the arguments are typed at the call site rather than stringified into a form body;
+        - a refusal is logged instead of discarded. `submitPollAction` answered `false` and threw the
+          response away, so a presenter whose poll was refused saw nothing anywhere.
+
+      The alternative on offer was one method taking a union of five names — which is the defect
+      being removed, wearing a different call shape — or deleting the paragraphs that explain the
+      failure policy, which `CLAUDE.md` names directly: prose explaining a real subtlety is not
+      shaved to hit a number.
+    */
+    max: 307,
+    why: 'the overlay state machine, plus the five poll commands and the failure policy they share'
   },
   {
     file: 'lib/room/notes.svelte.ts',
@@ -1001,8 +1024,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       half: a viewer who may read notes but not edit them must not be handed an editor. In markup at
       one of two call sites, that rule is one refactor from being dropped.
     */
-    max: 219,
-    why: 'the notes tab - four actions, one flag, and the two link mounts that belong to them'
+    /*
+      RAISED 219 -> 311 on 2026-08-30, for the session-note conversion — `TODO.md` row AG.
+
+      `submitMutation` was ``fetch(`?/${action}`)`` over a six-member union of ACTION NAMES with a
+      `FormData` body and a `deserialize()` of the response. It is a discriminated union, a `switch`
+      over six imported commands, and a two-type-parameter signature that types each payload against
+      the command it reaches.
+
+      Recorded as a decision rather than absorbed. What was bought:
+
+        - deleting one of the six commands is now a build error at the line that calls it, where
+          before it compiled and silently did nothing — the `presenterCommand` failure exactly;
+        - `values` is checked per action at five of the six call sites, where it was
+          `Record<string, boolean | string | number>`;
+        - the two type assertions that remain are NAMED at the lines that perform them, and both were
+          already being performed invisibly by `deserialize<Success, …>`.
+
+      Roughly two thirds of the growth is the docblock, and most of that is one paragraph that has to
+      exist: the two-argument shape survives because the six call sites are prop callbacks in
+      `PresentationArea.svelte`, which another agent owned during this change. A raise with the
+      reason omitted is how the next reader "simplifies" the assertions back out.
+    */
+    max: 311,
+    why: 'the notes tab - four actions, one flag, the two link mounts, and the six-command dispatch'
   },
   {
     file: 'lib/room/recording.ts',
@@ -2967,8 +3012,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       stream, per-CHANNEL content) is the one `message-mutation-frames.ts` exists for, and the next
       person to add a field to this frame needs to meet it here rather than three files away.
     */
-    max: 1709,
-    why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
+    /*
+      1,709 -> 1,005, 2026-08-30. SEVEN HUNDRED AND FOUR LINES LEFT, which is the largest fall this
+      entry has recorded and the one this ratchet exists to make permanent.
+
+      `TODO.md` row AG: the last seventeen form actions became remote functions in one change — the
+      six session notes for `session-notes.remote.ts`, the five polls for `polls.remote.ts`, the
+      three Swing and three Day Trade mutations for `swing-alerts.remote.ts` and
+      `day-trade-alerts.remote.ts`. Four helpers went with them (`refuseSwingAlert`,
+      `refuseDayTradeAlert` and the two field readers), along with every import only they used —
+      `fail` among them, because there is no longer an action in this file that can return one.
+
+      `logout` is all that is left of `export const actions`, and this file is now a LOAD plus one
+      redirect. The `why` below says so.
+    */
+    max: 1005,
+    why: 'the loader, plus `logout`; 3,233 before the remote-function conversions began'
   },
   /*
     THE ROOM MODULES, capped from 2026-08-16 — and the reason they are here is that the three
@@ -5052,8 +5111,39 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/trade-alerts.svelte.ts',
-    max: 337,
-    why: 'ONE class, two instances; 9 of its 14 declaration pairs were byte-identical before the merge'
+    /*
+      RAISED 337 -> 504 on 2026-08-30, for the trade-alert conversion — `TODO.md` row AG.
+
+      This is the largest raise in the change and it deserves the most argument. `submit` was
+      fourteen lines: a `FormData` loop, ``fetch(`?/${action}`)``, a `deserialize()` and three
+      branches that flattened every server refusal into `'Unable to save.'`. It is two lines now. The
+      167 lines are everything that replaced the parts of it that were WRONG rather than merely
+      untyped:
+
+        - `send` on the feed descriptor, with a `switch` per feed over three imported commands. The
+          endpoint is no longer assembled at runtime, and a deleted command is a build error at the
+          line that calls it rather than a 404 that surfaced as "Unable to save";
+        - `TradeAlertMutationValues`, replacing `Record<string, string | number>`. Every key is
+          named, the two id keys are separate — so a Day Trade composer cannot hand a `swingAlertID`
+          to a Swing command and have it silently ignored — and `direction` carries its union;
+        - `draftFrom` and `idFrom`, which are `swingAlertFieldsFrom` and
+          `Number(formData.get('swingAlertID'))` arriving from `+page.server.ts`. They did not
+          disappear when the actions left; they moved to the edge that now holds the values, and
+          `+page.server.ts` fell by 704 lines in the same change.
+
+      Roughly half of the growth is comment, and the two paragraphs that could not be dropped are the
+      ones a later reader would otherwise undo: why `TradeAlertMutationValues` is one optional-field
+      shape rather than a discriminated union (there is no discriminant — `Action` is a class type
+      parameter, not a per-call literal), and why a missing field is a loud throw rather than `?? ''`
+      (the old default existed so the server schema could refuse it a round trip later).
+
+      The alternative on offer was splitting the file. It was refused: `TradeAlertFeed`, the two feed
+      constants and the class are one mechanism, and the whole justification for this file existing
+      is that the two features differ ONLY in that descriptor — a split would put half the evidence
+      for that claim in another file.
+    */
+    max: 504,
+    why: 'ONE class, two instances, and the two three-command dispatches that are the only difference'
   },
   /*
     ── THE SWEEP, 2026-08-28: THIRTY-SIX COMPONENTS THAT HAD NEVER BEEN CAPPED ────────────────────
