@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
 
 /*
@@ -116,5 +117,134 @@ describe('the group chat control is presenter-only, and not for a runtime presen
       control is not the same as refusing the act, and this repository has the scar to prove it.
     */
     expect(read('../routes/chat-mode.remote.ts')).toContain('presenterRoom()');
+  });
+});
+
+/*
+  THE USER CARD'S WHOLE BODY IS PRESENTER-ONLY, and until now nothing said so.
+
+  This block exists because of a claim that turned out to be WRONG, and the investigation was worth
+  more than the claim would have been. A surface audit reported that the reference's
+  `user.hidePrivateInfo` — the flag suppressing the extra tabs (slot 5), the Last Login / Email /
+  Badges / Location rows (slot 17) and the Permissions row (slot 23), at byte 2,068,025 — "does not
+  exist anywhere in our source", and concluded that this room renders all three unconditionally.
+
+  It does not. Measured by walking the markup:
+
+  * `{#if isPresenter && !isLimitedPresenter}` opens at the tab list and closes after the Admin
+    Notes pane, so the tabs AND every row inside them are presenter-only. There is no `{:else}`: a
+    member opening a card sees the header and the footer buttons, and no body at all.
+  * `email` and `locStr` never reach a member in the first place — `roster-privacy.test.ts` filters
+    them off the SSE frame, after a 2026-08-18 defect where the sidebar declined to draw data it had
+    already been handed.
+  * Last Login and Email in that card come from `user-detail.remote.ts`, which is presenter-only on
+    the server.
+
+  So the reference's client-side flag has three server-side refusals here instead, which is
+  strictly stronger: `hidePrivateInfo` hides data that still arrives.
+
+  ## What the investigation DID find
+
+  Nothing asserted that gate. The privacy of every field in that card rested on one `{#if}` with no
+  test — and the assertions above record how easily a `toContain` proves to be about a different
+  occurrence of the same string. This is that assertion, anchored the same way.
+*/
+/**
+ * The `{#if}` that wraps the user card's whole body, found in the TREE rather than by position.
+ *
+ * There are three `isPresenter && !isLimitedPresenter` gates in this file and two comments quoting
+ * the shape, so the one that matters has to be identified by what it CONTAINS — the tab list — and
+ * not by being the first, the last, or the nearest to some string.
+ *
+ * ## The parse is caught, and that is not defensive coding
+ *
+ * At module scope an unparseable `ModalHost.svelte` throws during COLLECTION, and vitest then
+ * reports this file as having no tests — the one failure shape that reads as absence rather than
+ * breakage in a CI log. `package-scripts-contract.test.ts` records the same correction for the same
+ * reason; a negative control here produced exactly that output before this was wrapped.
+ */
+const bodyGate = (() => {
+  const found: { start: number; end: number }[] = [];
+  let parseError: unknown = null;
+  try {
+    const visit = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      const candidate = node as { type?: string; start?: number; end?: number };
+      if (
+        candidate.type === 'IfBlock' &&
+        typeof candidate.start === 'number' &&
+        typeof candidate.end === 'number' &&
+        modalHost.slice(candidate.start, candidate.end).includes('id="nav-tab" role="tablist"') &&
+        modalHost
+          .slice(candidate.start, candidate.start + 80)
+          .includes('isPresenter && !isLimitedPresenter')
+      ) {
+        found.push({ start: candidate.start, end: candidate.end });
+      }
+      for (const value of Object.values(node as Record<string, unknown>)) {
+        if (Array.isArray(value)) value.forEach(visit);
+        else if (value && typeof value === 'object') visit(value);
+      }
+    };
+    visit(parse(modalHost, { modern: true }).fragment);
+  } catch (cause) {
+    parseError = cause;
+  }
+  return { blocks: found, block: found[0], parseError };
+})();
+
+/** True only when the gate was found AND the offset falls inside it. Never vacuously true. */
+const isInsideGate = (offset: number) =>
+  bodyGate.block !== undefined && bodyGate.block.start < offset && offset < bodyGate.block.end;
+
+describe('the user card shows a member nothing about another member', () => {
+  it('is guarded by exactly one such block, which the tree can find', () => {
+    /* If this is undefined every assertion below would pass vacuously on `undefined < n`. */
+    expect(
+      bodyGate,
+      'no `{#if isPresenter && !isLimitedPresenter}` wraps the tab list'
+    ).toBeDefined();
+  });
+
+  it('gates the tab list, and therefore everything in it, on a server-decided presenter', () => {
+    const tabs = modalHost.indexOf('id="nav-tab" role="tablist"');
+    expect(tabs, 'the user card tab list').toBeGreaterThan(-1);
+    expect(
+      isInsideGate(tabs),
+      'a member must not be offered the System, Actions or Admin Notes tabs'
+    ).toBe(true);
+  });
+
+  it.each([
+    ['Last Login', '<th scope="row">Last Login:'],
+    ['Email', '<th scope="row">Email:'],
+    ['Permissions', '<th scope="row">Permissions:']
+  ])('keeps the %s row inside that same gate', (_label, marker) => {
+    /*
+      PARSED, not sliced, and the first draft is why.
+
+      These rows carry no gate of their own — correctly, because they are inside the body — so what
+      has to hold is that the body's gate CONTAINS them. A text slice between the gate and the row
+      cannot say that: the draft asserted the slice held no `{:else}`, and tripped immediately on an
+      `{:else}` belonging to a nested block several levels in. Only the tree knows which `{:else}`
+      belongs to which `{#if}`, so this asks the tree, as `state-raw-contract.test.ts` does.
+    */
+    const row = modalHost.indexOf(marker);
+    expect(row, `the ${_label} row`).toBeGreaterThan(-1);
+    expect(
+      isInsideGate(row),
+      'the row must fall inside the presenter gate, not merely after it'
+    ).toBe(true);
+  });
+
+  it('never receives the two fields at all, which is the half a render gate cannot give', () => {
+    /*
+      The gate above is a courtesy. `roster-privacy.test.ts` is the guarantee: it subscribes a real
+      member to a real room and inspects the bytes they were handed. Named here so the connection
+      between the two is findable from either end.
+    */
+    const privacy = read('./server/roster-privacy.test.ts');
+    expect(privacy).toContain('locStr');
+    expect(privacy).toContain('email');
   });
 });

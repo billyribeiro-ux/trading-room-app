@@ -33,6 +33,76 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:20 UTC — A claimed privacy gap was refuted, and the investigation found the real one: nothing asserted the gate
+
+**Runtime impact: NO.** No behaviour changed. What changed is that the user card's privacy is now
+pinned by a test, and the audit register carries a correction it did not have.
+
+#### The claim, and why it was wrong
+
+The surface audit reported UIM-03 at high severity: the reference's `user.hidePrivateInfo` — the
+flag suppressing the extra tabs (slot 5), the Last Login / Email / Badges / Location rows (slot 17)
+and the Permissions row (slot 23), at byte 2,068,025 — *"does not exist anywhere in our source"*,
+concluding that this room renders all three unconditionally.
+
+Read rather than grepped: `ModalHost.svelte`'s `{#if isPresenter && !isLimitedPresenter}` opens at
+the user card's tab list and closes after the Admin Notes pane. **The tabs and every row inside them
+are presenter-only, and there is no `{:else}`** — a member opening a card sees the header and the
+footer buttons and no body at all. Confirmed against the Svelte compiler's own AST, not by eye.
+
+Two further refusals sit under it, and neither is a render gate:
+
+| field | refusal |
+| --- | --- |
+| `email`, `locStr` | filtered off the SSE roster frame — `roster-privacy.test.ts`, after a real 2026-08-18 defect |
+| Last Login, Email | `user-detail.remote.ts`, presenter-only on the server |
+
+The reference's `hidePrivateInfo` is a client flag over data that still arrives. This is three
+server-side refusals, which is strictly stronger.
+
+#### Why two adversarial verifiers passed it, which is the part worth keeping
+
+The claim was framed as *"`hidePrivateInfo` does not exist anywhere in our source"*. **That is true**,
+and both verifiers checked it. Neither checked whether the OUTCOME is achieved another way.
+
+**A gap stated as a missing NAME is the shape most likely to survive verification while being
+wrong** — and the register now says so at the top, because 222 other entries share that risk.
+
+#### What the investigation actually found
+
+**Nothing asserted that gate.** The privacy of every field in the user card — another member's
+email, last login, location, permissions — rested on one `{#if}` with no test anywhere.
+
+It has one now, and it is built the hard way on purpose. The gate is found in the **tree**, by what
+it contains, because `ModalHost.svelte` holds three `isPresenter && !isLimitedPresenter` gates plus
+two comments quoting the shape — and the previous commit records a `toContain` in this very file
+proving to be about the wrong occurrence. Each row is then asserted to fall inside that block's
+offsets, which a text slice cannot do: the first draft tried, and tripped on an `{:else}` belonging
+to a nested block several levels in. Only the tree knows which `{:else}` belongs to which `{#if}`.
+
+#### One more shape corrected, for the second time today
+
+Parsing at module scope means an unparseable `ModalHost.svelte` throws during COLLECTION, and vitest
+reports the file as having no tests — the failure shape that reads as absence rather than breakage.
+A negative control produced exactly that output. The parse is caught now and a failure is a named
+assertion, the same correction `package-scripts-contract.test.ts` carries.
+
+#### Negative controls — three
+
+| mutation | result |
+| --- | --- |
+| the card body gate widened to any presenter | RED ×5 |
+| the gate deleted with the compiler, leaving the body unconditional | RED ×4 |
+| the same, before the parse was caught | **"no tests"** — the shape above |
+
+The second control also showed an OUTER gate stepping into the deleted one's place, so the finder
+now asserts it matched **exactly one** block, which is what its title always claimed.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,508 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
 ### 2026-08-30 02:50 UTC — Two gates the reference has that this room rendered without, and a hollow assertion of my own
 
 **Runtime impact: YES.** A free-trial member in a room with `disablePMForTrials` is no longer offered
