@@ -52,8 +52,38 @@ the live room, as either role, and it downloads a JSON by itself.
 
 ## 1. Rename `ptr_clone` → `tradingroom`
 
-**Status 2026-08-10: the runtime role is DONE by migration; the rest is smaller than this entry
-claimed, and belongs at the source repository.**
+**Status 2026-08-31: the runtime role is DONE by migration and now PROVEN on a live cluster; the
+rest is smaller than this entry claimed, and its "belongs at the source repository" is withdrawn.**
+
+**Two blockers this entry inherited are gone, and neither was retired by doing the work.**
+
+*"Deliberately not done from this repository: `services/**` is a mirror"* — **false, and recorded as
+false.** `CLAUDE.md` states this repository is `services/**`'s authority, and
+`verify-backend-provenance.mjs:122-128` is the measurement behind it: it searched `scripts`, `ops`,
+every per-app scripts directory, `.github` and the root manifest, found **no sync in either
+direction**, and records the owner confirming on 2026-08-12 that the siblings are reference only.
+The same entry routed the work to root `TODO.md` item **P**, which no longer exists.
+
+*"every one of those assertions is a runtime check needing a provisioned cluster to verify"* — a
+cluster was started here on 2026-08-31 (PostgreSQL 16.13, the version this entry names) and the
+whole chain was run against it. **What this entry asserted from reading is now measured:**
+
+| measured 2026-08-31 | result |
+| --- | --- |
+| `0001` → `0009` applied in order on a fresh database | **all nine OK**, each in a transaction |
+| `0009` re-run on the same database | clean; prints *"parity verified: 87 relation, 26 column, 22 policy facts mirrored to tradingroom_app"* |
+| table privileges, both roles | **87 each — exact parity** |
+| RLS policies targeting `tradingroom_app` | **22**, and **zero** name `ptr_clone_app` |
+| `tradingroom_app` + tenant A's GUC | sees tenant A's room and no other |
+| `tradingroom_app` + tenant B's GUC | sees tenant B's room and no other |
+| `tradingroom_app` with **no** tenant GUC | **0 rows — fails closed** |
+| `ptr_clone_app` + a valid tenant GUC | **0 rows** |
+
+That last line is `0009`'s own security claim, in its own words — *"after this runs, `ptr_clone_app`
+holds object privileges but is named by no policy, so under FORCE ROW LEVEL SECURITY it reads zero
+rows from every tenant table"* — and it is now a measurement rather than a reading. **The baseline
+role is already inert with respect to tenant data.** What retiring it still needs is revoking the 87
+object privileges it holds, which is a migration, not a question.
 
 `services/api/migrations/0009_rename_runtime_roles.sql` renames `ptr_clone_app` →
 `tradingroom_app`, forward-only, guarded and idempotent. Proven against PostgreSQL 16.13 on all four
@@ -227,57 +257,6 @@ Blocks entry 1.
 
 ---
 
-## 3b. `services/media/Cargo.lock` violates a named authority
-
-**Status:** open, one-line fix, needs the sibling's agreement.
-
-`new-room-control/docs/ENGINEERING-SSOT.md` §1 names "the sole workspace lock
-`services/Cargo.lock`". A second lock exists here at `services/media/Cargo.lock`,
-beneath a workspace member. It is one of only two files distinguishing this
-`services/` copy from the sealed upstream tree, and it is not permitted by the
-authority table.
-
-It was previously written off as "harmless" in `services/SYNC-PROVENANCE.md`.
-That was wrong; corrected there.
-
-Removing it is trivial, but `services/**` is a mirror, so it must be resolved at
-the source and re-synced rather than deleted here.
-
----
-
-## 3c. This repository has no enforced gates for its own documentation
-
-**Status:** open.
-
-`new-room-control` has `AGENTS.md`, `CONTRIBUTING.md`, a normative SSOT, an
-executable `services/**` seal, and `scripts/verify-documented-test-counts.mjs`
-wired into its test chain so a stale documented number fails the build.
-
-This repository has none of that beyond the `AGENTS.md` added on 2026-08-03.
-Concretely:
-
-- no `quality` script and no CI parity;
-- the drift check in `services/SYNC-PROVENANCE.md` is manual, so it can rot;
-- no gate verifies any number in `docs/*.md` — the test count, table count and
-  route count will silently go stale.
-
-This is not hypothetical. `docs/REPOSITORY-STATE-2026-07-30.md` was materially
-wrong for three days and nothing caught it, and the `services/` divergence went
-undetected for a day.
-
-**2026-08-05:** partially addressed in kind rather than by a gate. Claims that used to live only
-in prose are now executable — `comment-safety-contract.test.ts`, `webcam-contract.test.ts`,
-`alerts-background-contract.test.ts`, `alerts-toolbar-contract.test.ts`,
-`screen-tab-bar-contract.test.ts`, `const-table-parser.test.ts` — and the state document
-(`docs/ROOM-STATE-2026-08-06.md`) records the runtime measurement behind every "fixed" row. There
-is still no gate over the NUMBERS in `docs/*.md`, so treat any count as true only for its date.
-
-Entry 2 (consolidation) resolves most of this by putting both halves under one
-set of gates. Until then, treat every documented number as true only for its
-stated date.
-
----
-
 ## 4. Media: prove the path, not just the boundary
 
 **Status:** open. Detail in `docs/PRODUCT-OVERVIEW.md` §8.1.
@@ -333,34 +312,6 @@ failed once under full-workspace load with `MID already exists in RTP listener
 [mid:0]` at `media/src/server.rs:1739`. Passes isolated ×3, passes with the media
 lib alone, passed on the next full run. Order- or load-dependent, in a media path
 that will see far more concurrency in production than this suite does.
-
----
-
-## 7. Pre-Canned polls no longer reach a member's browser — RESOLVED 2026-08-11
-
-**Status:** closed. The loader returns `[]` to anyone who is not a presenter, and does not run the
-query at all for them.
-
-It selected `savedPolls` and returned them to EVERY role. A member never opens the poll panel, so
-they never SAW the list — but their browser was handed **every unsent draft a presenter had
-written**, in the SSR HTML and in `__sveltekit` data, on every page load. Invisible is not private:
-it reaches the browser, any cache in front of it, and any HAR attached to a support ticket. Same
-class as the `password_hash` spread into the page payload on 2026-08-04.
-
-Gated on `connectedUser.isP` — the membership's own answer, the same predicate the poll panel
-renders from — rather than on `role`, which gets it wrong in both directions: a Participant granted
-presenter rights in the controller would be refused, and a Presenter who had them withheld served.
-
-**It also pre-empts entry 5.** `GET /api/v1/rooms/{id}/saved-polls` refuses non-staff with 403, so
-the cutover would have started failing member page loads. An empty list here is what that route
-already agrees with — the concern this entry was originally written to record.
-
-Pinned by three tests in `page-load-contract.test.ts`, including that the empty list is the
-ternary's FIRST branch, so a member's load makes no database read for polls at all. Negative
-control: removing the gate fails two of them.
-
-The two writes needed no change: `savePoll` and `deleteSavedPoll` were already
-`role === 'staff' || role === 'admin'`, which is what `require_staff` enforces.
 
 ---
 
