@@ -112,6 +112,8 @@ function pEe(t,n){if(1&t){const e=Y();d(0,"div",50)(1,"div",52),H(2,lEe,5,0,"div
 
 ### G2 — `.pc-messages` has no CSS rule anywhere, so the private-chat log cannot scroll
 
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** The transcribed rule is in `captured-runtime-components.css:6691` (`app-privchat .pc-messages:not(:root)`), and `app.css:319` adds the host rule it needs — `app-privchatscroller { display: block; height: 100% }` — with a paragraph explaining that a custom element is `display: inline` until something says otherwise, so a percentage height inside it resolved against `auto`. This row describes a revision the panel has moved past.
+
 **high** · `missing-behaviour` · reference byte **2,194,497**
 
 ```
@@ -124,6 +126,8 @@ dependencies:[uf],styles:[".pc-messages[_ngcontent-%COMP%]{height:calc(100% - 50
 
 ### G3 — `PAGE_SIZE = 50` and `Math.floor(log.length / 50)` replace the scroller's component-owned page counter, and re-request the same page
 
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** `PAGE_SIZE` no longer exists in this panel; paging is `RoomLogPages` (`#paging`), which is the extracted `currPage`/`hasMoreData`/`isLoadingMore` machinery this row's own verification note said the repository already had. `loadMore` refuses while `loadingMore` or `!hasMoreData`, so the same page cannot be requested twice.
+
 **high** · `invented-value` · reference byte **2,193,442**
 
 ```
@@ -135,6 +139,8 @@ loadMore(){this.loadMoreLastID="pcm-"+this.msgs[0]._id,this.appService.guiEventB
 > Verified: I tried to find a component-owned page counter for private chat and it is genuinely absent. What I found instead confirms the claim and sharpens it: this repo DOES have the reference's counter machinery, extracted and named `RoomLogPages` (`lib/room/log-pages.svelte.ts`) — `#page` documented as "`this.currPage`, per log" (:62), `#hasMore`…
 
 ### G4 — `hasMoreData` is never modelled, so Load More never disappears when the history runs out
+
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** `get hasMore()` is `this.#paging.hasMoreData && !this.#searchTerm` — the reference's own gate — and the badge reads it. `switchToUser` resets the paging with `newLoadMorePaging()`, which is `PCswitchChatToUser`'s `currPage = 0, hasMoreData = !0, isLoadingMore = !1`.
 
 **high** · `missing-behaviour` · reference byte **2,194,388**
 
@@ -196,6 +202,10 @@ this.appService.appEventBus.subscribe("getPCLog",e=>{this.isLoadingMore=!1,0==e.
 
 ### G15 — Avatar `src` has no gravatar fallback, so an empty `avatarUrl` renders a broken image
 
+**BUILT 2026-08-30 08:40 UTC — AND IT UNCOVERED A LIVE PRIVACY DEFECT.** `avatarSrc(pic, avt, size)` at both sites, with the capture's two sizes (`?d=mm&s=25` in the header at byte 2,195,104, `&s=32` in the list at 2,196,585).
+
+**The value this row wanted to put in an outbound URL was every member's raw email address.** `lib/server/private-chat.ts` filled `avt` with `sender.email` and `peer.email`, so a member asking for their own history was handed the other participant's address, and the tab strip carried one per conversation. `private-chat-delivery.test.ts` had already found and fixed that exact leak on the live broadcast — its docblock names it — but its assertion read ONE file, so the two read paths shipped the address for weeks. Both now send `hashEmail(...)`, which is gravatar's own md5-of-the-lowercased-address and what the reference sends; that contract now sweeps every producer of the field. Stated plainly at the code: an md5 of an address is not strong protection, and what it stops is the plaintext being handed out and forwarded to a third party.
+
 **medium** · `missing-behaviour` · reference byte **2,196,189**
 
 ```
@@ -207,6 +217,8 @@ z("src",e.pic||"https://secure.gravatar.com/avatar/"+e.avt+"?d=mm&s=32",Mt)
 > Verified: I could not refute it. Both private-chat avatar images bind `pic` directly with no `||` fallback, and no fallback is applied at any upstream hop.
 
 ### G16 — Tab online status is hard-coded false for every server-supplied conversation
+
+**BUILT 2026-08-30 08:40 UTC.** An `onlineUserIds: () => ReadonlySet<number>` option, read once per recompute of the tab strip, supplied from `roster.users`. `checkUserOnlineStatus` (byte 2,203,628) re-runs on `getRoster`, `onUserJoin` and `onUserLeave`; deriving it does the same without three subscriptions to keep in step, and reads the roster once rather than upstream's O(roster × tabs) nested loop. **One deliberate divergence:** upstream's function only ever writes `!0` and has no branch that clears the flag, so a member who leaves stays lit until something rebuilds the tab list. Ours goes back to false, which is what the dot claims to mean.
 
 **medium** · `missing-behaviour` · reference byte **2,203,228**
 
@@ -220,6 +232,8 @@ checkUserOnlineStatus(){if(this.privChatVisible&&this.appService.globals.roster&
 
 ### G17 — The clear-search button does not clear the input when the typed term was never submitted
 
+**BUILT 2026-08-30 08:40 UTC.** `searchTerm = ''` before `onsearch('')`, and the order is the fix — `o.value = ""` then `onEnterSearchChat("")` at byte 2,195,340. The local `$state` is written rather than the DOM node, because `bind:value` owns that element and reaching past a binding to set `.value` is how the two disagree.
+
 **medium** · `defect` · reference byte **2,195,340**
 
 ```
@@ -231,6 +245,8 @@ d(7,"span",34),x("click",function(){D(e);const o=It(6),s=g();return o.value="",E
 > Verified: I tried to refute this and could not. The clear button at PrivateChatPanel.svelte:281 is `onclick={() => onsearch('')}` and nothing else — there is no `$effect` anywhere in PrivateChatPanel.svelte (grep for `$effect` in that file returns zero lines), no element ref, and no write to the input's own `.value`.
 
 ### G18 — The whole body is gated on `tabs.length > 0`; the reference gates only the LIST column on it
+
+**BUILT 2026-08-30 08:40 UTC.** Two independent gates, as `O(16, o.chatTabs && o.chatTabs.length > 0 ? 16 : -1), O(17, "" !== o.currUser ? 17 : 18)` has at byte 2,219,468. The window this closes is between `openFromRoster` and `getAllPCLogs` returning: a selected peer and no tabs yet, where the panel used to say "No active chat" and show no composer, then change its mind.
 
 **medium** · `divergence` · reference byte **2,219,468**
 
@@ -255,6 +271,8 @@ z("ngClass",ct(7,YDe,o.appService.globals.preferences.pmLogsOnRight))
 > Verified: The `pmLogsOnRight` preference is written but never read anywhere in apps/room/src. PrivateChatPanel.svelte:306 renders `<div class="d-flex h-100 pc-body">` as a static class string; the component's props list (PrivateChatPanel.svelte:118-138, 19 props) has no layout/side prop, and the render site at +page.svelte:1440-1463 passes none.
 
 ### G6 — Tab list is rendered in the wrong order — the reference reverses it so the most recent conversation is first
+
+**BUILT 2026-08-30 08:40 UTC.** `const orderedTabs = $derived([...tabs].reverse())` — `pt(e.chatTabs.slice().reverse())` at byte 2,196,816. The reversal is for DISPLAY only and the model stays ascending, which is the reference's own ordering and what every other reader of the getter expects. A spread rather than `reverse()` in place, because that mutates the array the caller still holds.
 
 **medium** · `missing-behaviour` · reference byte **2,196,816**
 
@@ -292,6 +310,8 @@ closeTab(e){this.user=null,this.recvdUser=null,this.currUser="",console.log("clo
 
 ### G19 — No "Loading..." spinner badge while a page is in flight
 
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** The two exclusive branches are in the panel — `{#if hasMore && !searching}` for the badge, `{:else if loadingMore}` for the spinner — which is `O(2, …), O(3, o.isLoadingMore ? 3 : -1)`.
+
 **low** · `missing-behaviour` · reference byte **2,191,172**
 
 ```
@@ -304,6 +324,8 @@ function zDe(t,n){1&t&&(d(0,"div",2)(1,"span",5),T(2,"i",6),v(3," Loading..."),u
 
 ### G21 — Composer textarea: placeholder has two dots not three, and `name`/`spellcheck`/`form-control` are missing
 
+**BUILT 2026-08-30 08:40 UTC.** All four, from the const at byte 2,217,341 — `name="txt-area"`, `spellcheck="true"`, `class="txt-area form-control"` and the three-dot placeholder. `form-control` is the one that is not cosmetic: it gives the box its border, padding and focus ring, where the `w-100` standing in its place only made it wide. The structure is corrected too — the flex row moves off `#textAreaHolderPM` onto the capture's inner `div.d-flex.mx-0`, with a `div.flex-fill.px-0` around the textarea, which is the element G1's button column attaches to. The whole composer const table (50, 52, 53, 54, 55, 56) is transcribed in the comment, including the two entries belonging to rows still open.
+
 **low** · `wrong-constant` · reference byte **2,217,341**
 
 ```
@@ -315,6 +337,8 @@ function zDe(t,n){1&t&&(d(0,"div",2)(1,"span",5),T(2,"i",6),v(3," Loading..."),u
 > Verified: I could not refute this. Our PrivateChatPanel composer genuinely lacks the attributes and the wrapper structure, and nothing elsewhere in apps/room/src supplies them.
 
 ### G23 — Delayed re-scroll fires at 60 ms; the reference uses 500 ms
+
+**BUILT 2026-08-30 08:40 UTC.** `PRIVATE_CHAT_RESCROLL_MS = 500`, exported so the contract reads the value rather than restating it. The second scroll exists because the first runs against a box whose height is not final — avatars still loading, a long message not yet wrapped — and 60ms fired before either settled, so it re-scrolled to the same wrong place and a conversation opened part-way up its own last message. A `setTimeout` and not `tick()`, which is the opposite of the choice made in `CarouselDialog` and for the opposite reason: what is being waited for is the BROWSER finishing layout, which Svelte does not know about.
 
 **low** · `wrong-constant` · reference byte **2,191,427**
 

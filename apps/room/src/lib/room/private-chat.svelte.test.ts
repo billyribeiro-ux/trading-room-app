@@ -44,6 +44,8 @@ const make = (
     viewerOnly?: boolean;
     isPresenter?: boolean;
     sendFails?: boolean;
+    /** Who the roster says is connected — `checkUserOnlineStatus`'s input. */
+    onlineIds?: readonly number[];
   } = {}
 ) => {
   const dialogs = new RoomDialogs();
@@ -56,6 +58,7 @@ const make = (
   let menuClosed = 0;
   let invalidated = 0;
   let incoming: PrivateChatMessage[] = [];
+  const onlineIds = new Set<number>(options.onlineIds ?? []);
 
   const chat = new RoomPrivateChat<User>({
     dialogs,
@@ -75,6 +78,8 @@ const make = (
     playSound: (name) => sounds.push(name),
     closeUserMenu: () => (menuClosed += 1),
     selectRosterUser: (user) => selected.push(user),
+    /* Nobody on the roster unless a test says otherwise — see the online-status case. */
+    onlineUserIds: () => onlineIds,
     onCleared: () => cleared.push(1),
     onThreadDeleted: () => ((invalidated += 1), Promise.resolve())
   });
@@ -380,6 +385,7 @@ describe('paging', () => {
       playSound: () => {},
       closeUserMenu: () => {},
       selectRosterUser: () => {},
+      onlineUserIds: () => new Set<number>(),
       onCleared: () => {},
       onThreadDeleted: () => Promise.resolve()
     });

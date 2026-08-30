@@ -1672,7 +1672,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Flagged for the owner, as this session's other raises are. `private-chat.svelte.ts` beside it
       absorbed a state machine and still came out a line SHORTER, because `RoomPeerHistory` left.
     */
-    max: 402,
+    /*
+      402 -> 525, 2026-08-30. Seven rows of the surface audit, and most of the addition is why.
+
+      G6 the newest-first reversal, G15 the gravatar fallback (both sizes), G17 the clear button that
+      never cleared its own input, G18 the two independent gates the capture has where this had one
+      wrapping both columns, G21 the composer's four transcribed attributes and the wrapper structure
+      the button column will attach to.
+
+      The G21 note is the longest and earns it: it carries the whole composer const table (50, 52,
+      53, 54, 55, 56) including the two entries belonging to rows still open, so that the next piece
+      attaches to the element the capture names rather than to one invented for it.
+    */
+    max: 525,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -3263,7 +3275,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       widen on a `true`, and the two would have shared a code path that only one of them is allowed
       to take.
     */
-    max: 605,
+    /*
+      605 -> 672, 2026-08-30. G16 and G23.
+
+      G16 is the roster-driven online status — every server-supplied tab was built `online: false`
+      and nothing ever consulted the roster, so the status dot was permanently grey for anyone the
+      page loaded with. About forty of the added lines are the option's docblock, and they are the
+      part worth keeping: `checkUserOnlineStatus` only ever writes `true`, so this diverges by
+      letting the dot go back to false, and that divergence needs its argument written down.
+
+      G23 is one number — 60ms to the capture's 500 — plus why the second scroll exists at all and
+      why it is a `setTimeout` where this codebase otherwise reaches for `tick()`.
+    */
+    max: 672,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -3808,7 +3832,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the inline alert box is seeded from the stored preference instead of starting closed every
       time.
     */
-    max: 1336,
+    /*
+      1336 -> 1345, 2026-08-30. Nine lines: `onlineUserIds` for the private-chat panel (G16), and the
+      note saying why the roster is read at recompute time rather than pushed in on three events.
+    */
+    max: 1345,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

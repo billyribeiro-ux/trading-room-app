@@ -636,6 +636,12 @@ export function createRoom(deps: RoomDeps) {
     playSound: (name) => playSoundEffect(name),
     closeUserMenu: () => menus.openUserMenu(null),
     selectRosterUser: (user) => userActions.select(user),
+    /*
+      `checkUserOnlineStatus` — the roster IS the answer, read at the moment the tab strip
+      recomputes rather than pushed into it on three separate events. `roster.users` is the
+      connected list; a `Set` because the strip asks it once per tab.
+    */
+    onlineUserIds: () => new Set(roster.users.map((user) => user.id)),
     onCleared: () => userActions.clearSelectedMessageUser(),
     onThreadDeleted: () => invalidateAll()
   });

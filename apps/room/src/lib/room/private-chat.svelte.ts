@@ -133,6 +133,14 @@ export interface PrivateChatPrefs {
   rather than here. It leaves as an `onCleared` callback rather than as a field this class would
   then co-own with a feature it knows nothing about.
 */
+/**
+ * How long after the first scroll the second one fires — `setTimeout(…, 500)` at byte 2,192,880.
+ *
+ * Exported so the contract that guards it reads THIS value rather than restating the number, which
+ * is how the two stop agreeing. It was 60 here until 2026-08-30; see {@link RoomPrivateChat.scrollToBottom}.
+ */
+export const PRIVATE_CHAT_RESCROLL_MS = 500;
+
 export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminChat: boolean }> {
   readonly #dialogs: RoomDialogs;
   readonly #prefs: PrivateChatPrefs;
@@ -158,6 +166,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   readonly #peerHistory: RoomPeerHistory;
   /** The Load More counter and its guards; `$state.raw` because it is only ever replaced whole. */
   #paging;
+  #onlineUserIds;
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -174,6 +183,33 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     playSound: (name: SoundEffectName) => void;
     closeUserMenu: () => void;
     selectRosterUser: (user: User) => void;
+    /**
+     * Who is on the roster right now, as user ids — G16's `checkUserOnlineStatus`.
+     *
+     * ```js
+     * checkUserOnlineStatus() {                                    // byte 2,203,628
+     *   if (this.privChatVisible && this.appService.globals.roster && this.chatTabs)
+     *     for (const e of this.appService.globals.roster)
+     *       for (const i of this.chatTabs)
+     *         i.uid === e.userXrefID && (i.online = !0)
+     * }
+     * ```
+     *
+     * Every server-supplied tab was built `online: false` and nothing ever consulted the roster, so
+     * the `bg-success` dot on the tab strip was permanently grey for anyone the page loaded with —
+     * only a peer whose first message arrived this session ever lit up.
+     *
+     * **A FUNCTION AND NOT A LIST**, so the tab getter reads the roster at the moment it recomputes.
+     * Upstream re-runs `checkUserOnlineStatus` on `getRoster`, `onUserJoin` and `onUserLeave`; a
+     * `$derived` over the roster does the same thing without three subscriptions to keep in step.
+     *
+     * **And it can go back to FALSE, which upstream's cannot.** `checkUserOnlineStatus` only ever
+     * writes `!0` — it has no branch that clears the flag — so a member who leaves stays lit until
+     * something rebuilds `chatTabs`. Deriving it means the dot answers the roster at all times,
+     * which is what the dot claims to mean. A deliberate divergence, and the safer direction: the
+     * failure it removes is telling a presenter somebody is present when they have gone.
+     */
+    onlineUserIds: () => ReadonlySet<number>;
     /** `selectedMessageUser = null` — owned by the message-action path, cleared when this closes. */
     onCleared: () => void;
     onThreadDeleted: () => Promise<void>;
@@ -187,6 +223,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#playSound = options.playSound;
     this.#closeUserMenu = options.closeUserMenu;
     this.#selectRosterUser = options.selectRosterUser;
+    this.#onlineUserIds = options.onlineUserIds;
     this.#onCleared = options.onCleared;
     this.#onThreadDeleted = options.onThreadDeleted;
 
@@ -275,6 +312,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
         pic: tab.pic,
         unread: 0,
         isA: tab.isA,
+        /* Filled from the roster below, where every tab is answered at once. */
         online: false
       });
     }
@@ -282,9 +320,15 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     for (const profile of this.#peerProfiles) {
       if (!byId.has(profile.uid)) byId.set(profile.uid, profile);
     }
+    /* Read ONCE for the whole strip rather than per tab — upstream's nested loop is O(roster × tabs). */
+    const online = this.#onlineUserIds();
     return (
       [...byId.values()]
-        .map((tab) => ({ ...tab, unread: this.#unreadByPeer[tab.uid] ?? 0 }))
+        .map((tab) => ({
+          ...tab,
+          unread: this.#unreadByPeer[tab.uid] ?? 0,
+          online: online.has(tab.uid)
+        }))
         // `newMessage()` splices a tab out and pushes it, so the most recent sits last.
         .sort(
           (a, b) => (this.#lastActivityByPeer[a.uid] ?? 0) - (this.#lastActivityByPeer[b.uid] ?? 0)
@@ -381,14 +425,36 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     return formatCompactTime(at);
   }
 
-  /** `scrollPCLogToBottom` - the scroller's own handler, which also re-runs after a tick. */
+  /**
+   * `scrollPCLogToBottom` — scroll now, and again once the rows have settled.
+   *
+   * ```js
+   * scrollToBottom(e = !1, i = !1) {                              // byte 2,192,880
+   *   try {
+   *     this.scrollRef.nativeElement.scrollTop = this.scrollRef.nativeElement.scrollHeight;
+   *     const o = this;
+   *     setTimeout(() => { o.scrollRef.nativeElement.scrollTop = o.scrollRef.nativeElement.scrollHeight }, 500)
+   *   } catch {}
+   * }
+   * ```
+   *
+   * **The delay was 60ms and the reference's is 500** — G23. The second scroll exists because the
+   * first one runs against a box whose height is not final: avatars are still loading, and a long
+   * message has not wrapped yet. 60ms fires before either settles, so it re-scrolled to the same
+   * wrong place and the conversation opened part-way up its own last message.
+   *
+   * `setTimeout` and not `tick()`, which is the opposite of the choice made in `CarouselDialog` and
+   * for the opposite reason: `tick()` waits for Svelte to finish rendering, and what is being waited
+   * for here is the BROWSER finishing layout after images arrive — which Svelte does not know about
+   * and cannot await.
+   */
   scrollToBottom() {
     const run = () => {
       const scroller = document.querySelector('.pc-messages');
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     };
     run();
-    setTimeout(run, 60);
+    setTimeout(run, PRIVATE_CHAT_RESCROLL_MS);
   }
 
   /**

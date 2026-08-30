@@ -33,6 +33,95 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 08:40 UTC — Seven private-chat rows, four already built, and a member's email address in an outbound URL
+
+**Runtime impact: YES.** The private-chat tab strip shows the newest conversation first, lights the
+dot for whoever is actually on the roster, and draws a gravatar instead of a broken image for a
+member with no picture. The clear-search button clears its own box. The conversation and composer no
+longer disappear while the tab list is still loading. The composer gets its real border and focus
+ring back, and a thread opens scrolled to the bottom instead of part-way up its last message.
+
+**AND A LIVE PRIVACY DEFECT, FOUND WHILE BUILDING ONE OF THEM.** G15 asks for the reference's
+gravatar fallback — `pic || "https://secure.gravatar.com/avatar/" + avt + "?d=mm&s=32"`. `avt` is
+gravatar's key: the md5 of the lowercased address. **`lib/server/private-chat.ts` was filling it with
+the address itself**, at both read paths — `toMessage` on every page of every thread, and
+`loadConversations` on the tab strip. So a member asking for their own history was handed the other
+participant's raw email, and the tab list carried one per conversation. Building the fallback as
+written would have forwarded all of them to gravatar.com.
+
+`private-chat-delivery.test.ts` already carries this exact finding and its fix — *"the same frame
+also carried `avt: user.email`, the sender's raw address, where every sibling in this codebase sends
+`hashEmail(...)`"* — because the leak was found and closed on the live broadcast. **Its assertion
+read one file.** So the sibling read paths, in a different module, shipped the address for weeks with
+a green contract sitting next to them. That test now sweeps every producer of the field by shape
+rather than checking one spelling in one file, over comment-stripped source — its first run reported
+its own explanatory paragraph as the defect, which is the fourth time prose has voted in a source
+assertion here.
+
+Stated at the code rather than implied: an md5 of an email address is not strong protection and a
+known address can be confirmed against it. What it stops is the plaintext being handed out and
+forwarded into a third-party image URL.
+
+**FOUR ROWS WERE ALREADY BUILT, and are marked by reading rather than built twice.** G2 (`.pc-messages`
+has no rule anywhere), G3 (`PAGE_SIZE = 50` and `Math.floor(log.length / 50)`), G4 (`hasMoreData`
+never modelled) and G19 (no loading badge) all describe a revision this panel has moved past: the
+rule is in `captured-runtime-components.css` with the `app-privchatscroller` host rule beside it in
+`app.css`, and the paging is `RoomLogPages` — the extracted `currPage`/`hasMoreData`/`isLoadingMore`
+machinery G3's own verification note observed the repository already had. Checking each row against
+the source before writing anything is what kept four features from being reimplemented on top of
+themselves.
+
+**The seven that were real.**
+
+- **G6** — `pt(e.chatTabs.slice().reverse())`, byte 2,196,816. Reversed for DISPLAY only; the model
+  stays ascending, which is the reference's own ordering (`newMessage` splices a tab out and pushes
+  it) and what every other reader of the getter expects.
+- **G15** — `avatarSrc` at both sites, with the capture's two sizes. A member with no picture rendered
+  `<img src="">`, which resolves to the page itself.
+- **G16** — the online dot answered from the roster, read once per recompute rather than upstream's
+  O(roster × tabs) nested loop. **One deliberate divergence:** `checkUserOnlineStatus` only ever
+  writes `true` and has no branch that clears the flag, so a member who leaves stays lit until
+  something rebuilds the list. Ours goes back to false, which is what the dot claims to mean.
+- **G17** — `searchTerm = ''` before `onsearch('')`, matching `o.value = ""` then
+  `onEnterSearchChat("")`. The local state is written rather than the DOM node, because `bind:value`
+  owns that element.
+- **G18** — two independent gates. The window it closes is between `openFromRoster` and
+  `getAllPCLogs` returning: a selected peer and no tabs, where the panel said "No active chat" and
+  showed no composer, then changed its mind.
+- **G21** — `name`, `spellcheck`, `form-control` and the third dot. `form-control` is the one that is
+  not cosmetic — the `w-100` standing in its place only made the box wide. The flex row also moved
+  off the holder onto the capture's inner `div.d-flex.mx-0`, with a `div.flex-fill.px-0` around the
+  textarea, because that is the element G1's button column attaches to; the whole composer const
+  table is transcribed in the comment, including the two entries for rows still open, so the next
+  piece lands on a named element rather than an invented one.
+- **G23** — 60ms to the capture's 500. The second scroll is a correction to the first, which runs
+  before avatars load and before a long message wraps; 60ms fired before either settled. A
+  `setTimeout` and not `tick()` — the opposite of the choice made in `CarouselDialog` this morning,
+  and for the opposite reason: what is waited for is the browser finishing layout.
+
+**Negative controls, all ten seen RED — and the one that did not fire found a HOLLOW ASSERTION.**
+Nine went red first time: the raw email back on the read path (caught by both contracts); the
+gravatar fallback removed; the reversal removed; `reverse()` mutating in place; the roster read once
+per tab instead of once per strip; the clear button's two statements swapped; `form-control` back to
+`w-100`; the re-scroll back to 60ms; and the roster supply dropped at the construction site.
+
+**The tenth — merging the two column gates back together — passed.** The assertion sliced from the
+gate to `.pc-logs` and checked `toContain('{/if}')`, and the list column contains
+`{#if tab.unread > 0} … {/if}`, so the slice could not tell an inner close from the gate's own. A
+pattern that cannot distinguish two shapes measures neither. The gate's close is now asserted as the
+exact two lines it must be; re-run against the mutation it failed, and passes on the real file. **A
+control that does not fire is investigated, never counted** — this is the third time that rule has
+paid this session and the first time the test rather than the mutation was at fault.
+
+**Verified.** `private-chat-strip-contract.test.ts` 13 new assertions; `PrivateChatPanel.test.ts` 28,
+two of them corrected for the reversal and two added for it and for the fallback;
+`private-chat-delivery.test.ts` 9 with the widened sweep; `private-chat.svelte.test.ts` 23 after the
+harness gained the roster. Whole `src/lib` suite 3,796 passed, 1 skipped. Three ceilings raised with
+their reasons, and `orphaned-comment-contract` caught a docblock left stranded above the one that
+replaced it. `svelte-check` 0 errors, 0 warnings. Full `pnpm run gate` before the push, `gate-exit`
+echoed into the log and read from there. **Nothing was opened in a browser**, and the **Svelte MCP has
+been unavailable for this entire session**.
+
 ### 2026-08-30 08:05 UTC — The all-rooms Welcome Mat, and an authority that was never on a server
 
 **Runtime impact: YES, on both applications.** A presenter can replace the Welcome Mat of every room

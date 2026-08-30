@@ -107,23 +107,23 @@ interface SizedEntry {
  */
 const SIZED_BY_CSS: Record<string, Record<string, SizedEntry>> = {
   'lib/components/PrivateChatPanel.svelte': {
-    '{peer.pic}': {
+    '{avatarSrc(peer.pic, peer.emailHash, 25)}': {
       count: 1,
       sheet: 'lib/styles/captured-runtime-components.css',
       selector: 'app-privchat .avatarImg:not(:root)',
       width: '32px',
       height: '32px',
       requiresAncestor: 'app-privchat',
-      why: 'the open private-chat header avatar. `avatarImg-active` narrows it to 25x25 in the same sheet; both are fixed squares, so the header never reflows.'
+      why: 'the open private-chat header avatar. `avatarImg-active` narrows it to 25x25 in the same sheet; both are fixed squares, so the header never reflows. The `src` went through `avatarSrc` on 2026-08-30 for the gravatar fallback — the BOX is unchanged, which is the whole point of it being CSS.'
     },
-    '{tab.pic}': {
+    '{avatarSrc(tab.pic, tab.avt, 32)}': {
       count: 1,
       sheet: 'lib/styles/captured-runtime-components.css',
       selector: 'app-privchat .avatarImg:not(:root)',
       width: '32px',
       height: '32px',
       requiresAncestor: 'app-privchat',
-      why: 'the per-tab avatar in the private-chat tab strip.'
+      why: 'the per-tab avatar in the private-chat tab strip. Through `avatarSrc` since 2026-08-30; the rule that sizes it is unchanged.'
     }
   },
   'lib/components/notes/CarouselDialog.svelte': {

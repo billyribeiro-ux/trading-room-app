@@ -1,0 +1,220 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+import { codeOf } from './source-comments.js';
+import { PRIVATE_CHAT_RESCROLL_MS } from './room/private-chat.svelte.js';
+
+/**
+ * Seven rows of the `PrivateChatPanel` surface audit, and one defect none of them was looking for.
+ *
+ * | row | what it wanted |
+ * | --- | --- |
+ * | G6 | the tab strip reversed, so the newest conversation is first |
+ * | G15 | the gravatar fallback, `?d=mm&s=25` in the header and `&s=32` in the list |
+ * | G16 | the online dot answered from the roster instead of hard-coded false |
+ * | G17 | the clear-search button clearing the input it sits beside |
+ * | G18 | two independent gates where this had one wrapping both columns |
+ * | G21 | the composer's four transcribed attributes, and the wrapper structure |
+ * | G23 | the re-scroll delay, 500ms and not 60 |
+ *
+ * ## AND THE DEFECT: `avt` WAS THE MEMBER'S RAW EMAIL
+ *
+ * G15 asks for `pic || "https://secure.gravatar.com/avatar/" + avt + "?d=mm&s=32"`. Building it
+ * against `avt` as it stood would have put **every member's email address into an outbound URL to
+ * gravatar.com**, because `lib/server/private-chat.ts` filled that field with `sender.email` and
+ * `peer.email`. `private-chat-delivery.test.ts` had already found and fixed that exact leak on the
+ * live broadcast, and its assertion read one file — so the two READ paths shipped the address for
+ * weeks. That contract now sweeps every producer of the field; this one covers the consumer.
+ *
+ * ## Four rows of this surface were ALREADY BUILT, and are marked by reading rather than rebuilt
+ *
+ * G2 (`.pc-messages` has no rule), G3 (`PAGE_SIZE = 50`), G4 (`hasMoreData` unmodelled) and G19 (no
+ * loading badge) all describe a revision this panel has moved past: the rule is in
+ * `captured-runtime-components.css` with an `app-privchatscroller` host rule beside it in `app.css`,
+ * and the paging is `RoomLogPages` — `hasMoreData`, `loadingMore` and the component-owned counter
+ * the audit said was missing. Verified against the source before anything was written, which is what
+ * kept them from being built twice.
+ */
+
+const read = (path: string) => codeOf(path, readFileSync(new URL(path, import.meta.url), 'utf8'));
+
+const PANEL = read('./components/PrivateChatPanel.svelte');
+const STATE = read('./room/private-chat.svelte.ts');
+const SERVER = read('./server/private-chat.ts');
+const ROOM = read('./room/create-room.svelte.ts');
+
+describe('the avatar', () => {
+  it('falls back to a gravatar, at the size each site uses', () => {
+    /*
+      Two sizes, and both are the capture's: 25 in the header tab (byte 2,195,104), 32 in the list
+      (2,196,585). One number for both would make one of them a scaled bitmap, since
+      `app-privchat .avatarImg` and `.avatarImg-active` are fixed squares at exactly those numbers.
+    */
+    expect(PANEL).toContain('`https://secure.gravatar.com/avatar/${avt}?d=mm&s=${size}`');
+    expect(PANEL).toContain('avatarSrc(peer.pic, peer.emailHash, 25)');
+    expect(PANEL).toContain('avatarSrc(tab.pic, tab.avt, 32)');
+  });
+
+  it('prefers the member s own picture, which is the `||` and not a ternary on emptiness', () => {
+    /* `e.pic || …` — an empty string is falsy, which is the whole mechanism. */
+    expect(PANEL).toContain('return pic || `https://secure.gravatar.com/avatar/');
+  });
+
+  it('is fed a HASH by the server, never an address', () => {
+    /*
+      The defect. `avt` is the gravatar key — `md5` of the lowercased address — and the two read
+      paths sent the raw email until 2026-08-30. `private-chat-delivery.test.ts` sweeps every
+      producer; this asserts the two that were wrong, by name, so a revert is visible from here too.
+    */
+    expect(SERVER).toContain('avt: hashEmail(sender.email)');
+    expect(SERVER).toContain('avt: hashEmail(peer.email)');
+    expect(SERVER).not.toContain('avt: sender.email');
+    expect(SERVER).not.toContain('avt: peer.email');
+  });
+});
+
+describe('the tab strip', () => {
+  it('reverses for DISPLAY and leaves the model ascending', () => {
+    /*
+      `pt(e.chatTabs.slice().reverse())` at byte 2,196,816. The model's order is the reference's own
+      — `newMessage` splices a tab out and pushes it, so the most recent sits last — and every other
+      reader of the getter expects that. Reversing the sort instead would have moved the divergence
+      somewhere harder to see.
+    */
+    expect(PANEL).toContain('const orderedTabs = $derived([...tabs].reverse());');
+    expect(PANEL).toContain('{#each orderedTabs as tab (tab.uid)}');
+    /* A spread, because `reverse()` mutates the array the caller still holds. */
+    expect(PANEL).not.toContain('tabs.reverse()');
+  });
+
+  it('answers the online dot from the roster, at the moment the strip recomputes', () => {
+    /*
+      `checkUserOnlineStatus` (byte 2,203,628) runs on `getRoster`, `onUserJoin` and `onUserLeave`.
+      A function read inside the getter is the same thing without three subscriptions to keep in
+      step — and it can go back to FALSE, which upstream's cannot: that function only ever writes
+      `!0`, so a member who leaves stays lit until something rebuilds the tab list.
+    */
+    expect(STATE).toContain('onlineUserIds: () => ReadonlySet<number>;');
+    expect(STATE).toContain('const online = this.#onlineUserIds();');
+    expect(STATE).toContain('online: online.has(tab.uid)');
+    expect(ROOM).toContain('onlineUserIds: () => new Set(roster.users.map((user) => user.id))');
+  });
+
+  it('reads the roster ONCE per recompute, not once per tab', () => {
+    /* Upstream's nested loop is O(roster × tabs). A `Set` read once outside the map is O(tabs). */
+    const at = STATE.indexOf('const online = this.#onlineUserIds();');
+    expect(at, 'the read must exist').toBeGreaterThan(-1);
+    const mapAt = STATE.indexOf('.map((tab) => ({', at);
+    expect(mapAt, 'and it must come before the map').toBeGreaterThan(at);
+    expect(STATE.slice(mapAt)).not.toContain('this.#onlineUserIds()');
+  });
+});
+
+describe('the search box', () => {
+  it('clears its own input, before it searches', () => {
+    /*
+      `x("click", function() { const o = It(6); o.value = ""; return E(s.onEnterSearchChat("")) })`
+      at byte 2,195,340. This called `onsearch('')` alone, and the page passes `searchTerm` UNBOUND —
+      so typing without submitting and then clicking clear changed no prop and left the text sitting
+      beside results it did not produce.
+    */
+    const at = PANEL.indexOf('id="addon-chat-clear"');
+    expect(at, 'the clear button must exist').toBeGreaterThan(-1);
+    const closes = PANEL.indexOf('</span>', at);
+    expect(closes, 'the button must be closed').toBeGreaterThan(at);
+    const button = PANEL.slice(at, closes);
+    expect(button).toContain("searchTerm = '';");
+    expect(button.indexOf("searchTerm = '';")).toBeLessThan(button.indexOf("onsearch('')"));
+  });
+
+  it('writes the local state rather than reaching past the binding to the DOM', () => {
+    /* `bind:value` owns the element; setting `.value` beside it is how the two disagree. */
+    expect(PANEL).toContain('bind:value={searchTerm}');
+    expect(PANEL).not.toContain('.value = ');
+  });
+});
+
+describe('the two columns', () => {
+  it('gates them independently, as `O(16, …), O(17, …)` does', () => {
+    /*
+      Byte 2,219,468. The window that makes it visible is between `openFromRoster` and
+      `getAllPCLogs` returning: a selected peer, no tabs yet. This showed "No active chat" and no
+      composer, then changed its mind.
+    */
+    /*
+      ## THIS ASSERTION WAS HOLLOW ON ITS FIRST DRAFT, and its own negative control found it
+
+      It read: slice from the gate to `.pc-logs`, then `toContain('{/if}')` and
+      `not.toContain('{:else}')`. Deleting the gate's closing `{/if}` did not fail it, because the
+      list column contains `{#if tab.unread > 0} … {/if}` and the slice could not tell an inner close
+      from the gate's own.
+
+      A pattern that cannot distinguish two shapes is a pattern that measures neither. The gate's
+      close is asserted as the exact two lines it must be, and the `{:else}` check stays because the
+      old structure had one — a single "No active chat" serving both columns.
+    */
+    expect(PANEL).toContain('      {/if}\n      <div class="pc-logs">');
+    const listGate = PANEL.indexOf('{#if tabs.length > 0}');
+    expect(listGate, 'the list gate must exist').toBeGreaterThan(-1);
+    const logs = PANEL.indexOf('<div class="pc-logs">');
+    expect(logs, 'the logs column must exist').toBeGreaterThan(-1);
+    expect(PANEL.slice(listGate, logs), 'no shared else branch').not.toContain('{:else}');
+  });
+});
+
+describe('the composer', () => {
+  it('carries the four attributes the const table names', () => {
+    /*
+      `["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true",
+        "placeholder","Type your message here...",1,"txt-area","form-control",…]` — byte 2,217,341.
+
+      `form-control` is the one that is not cosmetic: it gives the box its border, padding and focus
+      ring inside `.textSendDiv`. `w-100`, which stood in its place, only made it wide.
+    */
+    expect(PANEL).toContain('name="txt-area"');
+    expect(PANEL).toContain('spellcheck="true"');
+    expect(PANEL).toContain('class="txt-area form-control"');
+    expect(PANEL).toContain('placeholder="Type your message here..."');
+    /*
+      Three dots, and the two-dot version gone. Asserted as `here.."` — the closing quote is what
+      makes the string a whole attribute value, so a three-dot placeholder does not match it. Without
+      that quote the check would be vacuous: `here..` is a prefix of `here...`.
+    */
+    expect(PANEL).not.toContain('Type your message here.."');
+    expect(PANEL).not.toContain('class="txt-area w-100"');
+  });
+
+  it('puts the flex row on the element the capture puts it on', () => {
+    /*
+      `["id","textAreaHolderPM",1,"textSendDiv"]` — no flex classes — with an inner `div.d-flex.mx-0`
+      and a `div.flex-fill.px-0` around the textarea. The row was on the holder, which is where the
+      button column (G1, still open) would have had nowhere to sit.
+    */
+    expect(PANEL).toContain('<div class="textSendDiv" id="textAreaHolderPM">');
+    expect(PANEL).toContain('<div class="d-flex mx-0">');
+    expect(PANEL).toContain('<div class="flex-fill px-0">');
+    expect(PANEL).not.toContain('class="d-flex align-items-center textSendDiv"');
+  });
+});
+
+describe('the re-scroll', () => {
+  it('waits the reference s 500ms, read from the constant rather than restated', () => {
+    /*
+      `setTimeout(…, 500)` at byte 2,192,880. It was 60, which fires before avatars load and before a
+      long message wraps — so it re-scrolled to the same wrong place and a conversation opened
+      part-way up its own last message.
+    */
+    expect(PRIVATE_CHAT_RESCROLL_MS).toBe(500);
+    expect(STATE).toContain('setTimeout(run, PRIVATE_CHAT_RESCROLL_MS);');
+    expect(STATE).not.toContain('setTimeout(run, 60)');
+  });
+
+  it('scrolls immediately as well, which is what the second one is a correction to', () => {
+    const at = STATE.indexOf('scrollToBottom() {');
+    expect(at, 'the method must exist').toBeGreaterThan(-1);
+    const closes = STATE.indexOf('\n  }', at);
+    expect(closes, 'the method must be closed').toBeGreaterThan(at);
+    const body = STATE.slice(at, closes);
+    expect(body.indexOf('run();')).toBeLessThan(body.indexOf('setTimeout('));
+  });
+});

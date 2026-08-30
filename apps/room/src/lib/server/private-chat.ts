@@ -1,6 +1,7 @@
 import { and, desc, eq, like, or } from 'drizzle-orm';
 import { db } from './db';
 import { privateMessages, users } from './db/schema';
+import { hashEmail } from './connection';
 
 /**
  * The private-chat store, shaped by the capture's four server commands:
@@ -54,7 +55,26 @@ function toMessage(row: Row, sender: UserRow, recipientId: number): PrivateChatM
     txt: row.body,
     uid: row.senderId,
     recvdID: recipientId,
-    avt: sender.email,
+    /*
+      ── A HASH, NEVER THE ADDRESS ────────────────────────────────────────────────────────────
+
+      This read `sender.email` until 2026-08-30, so every page of every thread handed the OTHER
+      participant's raw address to the browser that asked for it.
+
+      `private-chat-delivery.test.ts` already records this exact leak and the fix for it — *"the
+      same frame also carried `avt: user.email`, the sender's raw address, where every sibling in
+      this codebase sends `hashEmail(...)`"* — but its assertion reads ONE file,
+      `private-chat.remote.ts`. The live broadcast was fixed; these two read paths were not, and
+      nothing looked at them. That contract now covers every producer of `avt`, which is what turns
+      a fixed instance into a fixed class.
+
+      `avt` is the AVATAR KEY and nothing else: `hashEmail` is `md5(email.trim().toLowerCase())`,
+      which is gravatar's own identifier scheme and what the reference sends. Stated plainly: an MD5
+      of an address is not a strong protection and a known address can be confirmed against it. What
+      it stops is the plaintext being handed out and forwarded into a third-party image URL — which
+      is precisely what the gravatar fallback beside it would have done with the value that was here.
+    */
+    avt: hashEmail(sender.email),
     pic: sender.avatarUrl,
     isA: sender.role === 'staff' || sender.role === 'admin'
   };
@@ -192,6 +212,9 @@ export function searchThread(
  * The tab shape is the capture's:
  * `{name, uid, avt, pic, unread, isA, online}`. `online` is filled in by the client from the
  * roster (`checkUserOnlineStatus`), so it is false here rather than guessed.
+ *
+ * `avt` is the gravatar key — `hashEmail(peer.email)`, never the address itself. It read
+ * `peer.email` until 2026-08-30; see `toMessage`.
  */
 export type PrivateChatTab = {
   name: string;
@@ -232,7 +255,8 @@ export function loadConversations(room: string, userId: number): PrivateChatTab[
     tabs.push({
       name: peer.displayName,
       uid: peer.id,
-      avt: peer.email,
+      /* A hash and not the address — see `toMessage` above, and the contract that now covers both. */
+      avt: hashEmail(peer.email),
       pic: peer.avatarUrl,
       unread: 0,
       isA: peer.role === 'staff' || peer.role === 'admin',
