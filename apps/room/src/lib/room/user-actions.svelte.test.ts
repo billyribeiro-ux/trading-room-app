@@ -2,7 +2,7 @@
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { TalkingEntry } from '#lib/mute-all-non-admins.js';
+import { type TalkingEntry, muteTalkingUserPrompt } from '#lib/mute-all-non-admins.js';
 import type { ModalTargetUser } from '#lib/types.js';
 import { RoomUserDetail } from './user-detail';
 import { MISSING_SCHEME_ALERT, TOAST_ONLY_ACTIONS } from '#lib/user-action-intent.js';
@@ -1150,5 +1150,65 @@ describe('session send-to-room broadcasts', () => {
     harness.dialogs.prompt?.onconfirm('example.test/go');
 
     expect(harness.urlsSent).toEqual([]);
+  });
+});
+
+describe('G04 — muteTalkingUserDialog', () => {
+  /*
+    ```js
+    muteTalkingUserDialog(e) {
+      globals.user.isPresenter && bootbox.prompt(
+        "Would you like to force stop " + e.mediaValue.name +
+        " from talking? (forces a remote mute for all). type: yes to proceed",
+        i => { i && "yes" == i.toLowerCase() && sendServerCommand("muteTalkingUser", e) })
+    }
+    ```
+    (byte 2,529,373.) A PROMPT with a typed word, not a confirm, and that is right for what it does:
+    it mutes a microphone for everyone in the room, and an accidental click on one name in a list of
+    names is exactly the mistake a confirm dialog does not prevent.
+  */
+  const speaker = { userID: 7, mediaValue: { name: 'Ada' } };
+
+  it('asks in the reference s own words, naming the speaker', () => {
+    const { actions, dialogs } = make({ isPresenter: true });
+    actions.muteTalkingUserDialog(speaker);
+    expect(dialogs.prompt?.title).toBe(muteTalkingUserPrompt('Ada'));
+    /* An empty box: `bootbox.prompt(message, callback)` takes no default value. */
+    expect(dialogs.prompt?.value).toBe('');
+  });
+
+  it('sends `mutemic` for that peer when the word is typed', () => {
+    const { actions, dialogs, sent } = make({ isPresenter: true });
+    actions.muteTalkingUserDialog(speaker);
+    dialogs.prompt?.onconfirm('yes');
+    expect(sent).toEqual([{ subCmd: 'mutemic', targetUserId: 7 }]);
+  });
+
+  it('accepts the word in any case, as `toLowerCase()` does', () => {
+    const { actions, dialogs, sent } = make({ isPresenter: true });
+    actions.muteTalkingUserDialog(speaker);
+    dialogs.prompt?.onconfirm('YES');
+    expect(sent).toHaveLength(1);
+  });
+
+  it('sends NOTHING for anything else, including an empty box', () => {
+    /* `i && "yes" == i.toLowerCase()` — two terms, and both of them refuse. */
+    for (const answer of ['', 'no', 'y', ' yes']) {
+      const { actions, dialogs, sent } = make({ isPresenter: true });
+      actions.muteTalkingUserDialog(speaker);
+      dialogs.prompt?.onconfirm(answer);
+      expect(sent, `"${answer}" must not send`).toEqual([]);
+    }
+  });
+
+  it('gives a MEMBER no dialog at all, because the whole method is behind the gate', () => {
+    /*
+      `globals.user.isPresenter &&` wraps the entire body upstream. A member gets no prompt rather
+      than a prompt whose command the server refuses — and the server refuses it independently
+      either way (`+page.server.ts:1654-1670`).
+    */
+    const { actions, dialogs } = make({ isPresenter: false });
+    actions.muteTalkingUserDialog(speaker);
+    expect(dialogs.prompt).toBeNull();
   });
 });

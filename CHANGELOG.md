@@ -33,6 +33,96 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 12:36 UTC — Seven navbar rows, and a coverage report that had been counting its own comments
+
+**Runtime impact: YES.** A presenter can take the floor back from ONE speaker: every name in the
+talking indicator is a control now, and pressing it asks for the word "yes" before muting that
+microphone for the whole room. A presenter sharing two screens can stop one of them. A presenter who
+hid the screenshare preview can get it back — until now nothing in the room set that flag true again,
+so the only way out was a reload. Rooms with MediaMTX have the OBS / RTMP entry that opens session
+control on the streaming tab. And an owner who hides the headcount from viewers now has it hidden in
+the navbar as well as in the sidebar, which is where it was already honoured.
+
+**Rows closed: G04, G05, G06, G07, G12, G13 built; G08 a measured refusal.**
+
+#### G13 was a gate applied in one of the two places that publish the number
+
+`rosterCountVisibleToViewers` is an owner setting, and this room already honoured it for the sidebar
+badge through `rosterCountVisibleTo()`. The navbar rendered the same number unconditionally one
+element away. Both now resolve through that one helper, so they cannot answer differently.
+
+#### G06 was the way back from a one-way door
+
+The audit row's closing note turned out to be the important half: `previewWindowsVisible` was written
+`false` by Hide Preview Windows and **nothing in this room ever wrote it true**. The missing menu
+entry was not a missing convenience; it was the reason another control could not be undone.
+
+#### G08 — a measured refusal, and it explains an orphan asset
+
+`presenterTalking` is written by two subscribers to a command the SERVER relays (byte 1,014,971). It
+is a live audio-activity signal computed somewhere we do not have, and it is not the same thing as
+the talking list beside it — "talking" there means a microphone is open, and there is no level
+detection anywhere in the reference either. Building the branch means an image that can never show
+or one that always shows. The refusal is recorded at the code, and it settles the row's strongest
+argument: `notalking.png` ships here with no consumer because the markup was transcribed from a
+capture whose driving signal did not cross with it.
+
+#### THE COVERAGE REPORT HAD BEEN COUNTING ITS OWN COMMENTS
+
+`gate/audit-feature-coverage.mjs` read our whole source as one string and asked whether each
+reference command was NAMED anywhere — including inside comments. This repository quotes the
+reference in prose constantly and by design, so **twenty-one commands that appear here only in
+comments were counted as present**. The report said 107 of 135 were named in our source; the honest
+number is **85**. Four of the six presentation-area tab ids were the same story.
+
+It was found by the G08 refusal above: writing down why `presenterNotTalking` cannot be built here
+made the command disappear from the list of open questions. **The explanation for why something is
+missing counted as evidence that it is present** — the worst direction for that particular report to
+fail in.
+
+The scanner strips comments now. Its note records that the first line-comment rule was too greedy
+and deleted real code, producing a larger "discovery" that was an artefact; the narrow rule and the
+greedy one now agree, which is why the number is trusted. **None of the twenty-one is new work** —
+several are ours in a different shape (`getChatLog` is `log-pages.remote.ts`, `getSessionFiles` is
+`files-pane.remote.ts`, `chatMsg` is the SSE frame `chat-messages.remote.ts` publishes) — and that
+list has always described itself as questions to answer by reading. What changed is that the
+questions are now asked about the code rather than about the commentary.
+
+#### The audit document counts its own remaining work now
+
+"How many rows are left" came out **three different ways in ten minutes** — 158, then 218, then 151
+— not because the document changed but because each grep recognised a different subset of the eight
+ways a closed row says it is closed. Every one of those numbers had been quoted as progress. The
+dispositions are a fixed vocabulary now, the header states the totals, and
+`room-surface-audit-counts.test.ts` fails if either is wrong or if a row grows a shape no count can
+see. **143 open · 81 closed · 224 rows** as of this entry.
+
+#### One extraction
+
+`ScreenShareMenu.svelte` — G05, G06 and G07 added three entries to the screen-sharing dropdown and
+put `RoomNavbar.svelte` 186 lines over its ceiling. The seam is real rather than convenient: a
+self-contained control with its own open state, its own six entries and its own gates, whose every
+prop is an INPUT rather than a value it reaches back through the navbar to read.
+
+Three ceilings were raised with their reasons recorded — `+page.svelte` by 21 (one `$derived` and
+why it must sit below `createRoom`), `user-actions.svelte.ts` by 55, `RoomNavbar.svelte` by 91 after
+the extraction, of which 34 are G08's refusal.
+
+#### What was run
+
+`pnpm run gate` in `apps/room`, green, exit code echoed into the log and read from there. 239 test
+files, 3,961 passed, 1 skipped. Nothing was opened in a browser.
+
+**Eight negative controls, each seen RED after the commit and reverted:** the roster count ungated;
+the counter's click made to ignore `alwaysShowRoster`; the per-screen repeater made to close over the
+first screen rather than the one clicked; the OBS / RTMP entry ungated; the speaker name stripped of
+its click; the typed-word check removed from the mute prompt; the coverage scanner made to count
+comments again (two assertions red, which is the one that matters — it is the defect this commit
+fixes); and the audit header set back to the numbers it carried an hour ago.
+
+**The Svelte MCP server is still disconnected for this session**, so `svelte-autofixer` could not be
+run on the four `.svelte` files touched here.
+
 ### 2026-08-30 11:56 UTC — The last three `RoomMessage` rows: the extra column's gif id, the user modal's @Mention, and four card class lists
 
 **Runtime impact: YES.** A member with several badges no longer pushes the timestamp and the kebab

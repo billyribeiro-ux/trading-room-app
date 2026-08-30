@@ -94,18 +94,59 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   per ROOM while chat is per CHANNEL, so a frame carrying a body would put admin-channel text on
   every subscriber's wire. `publishChatToRoom` exists for exactly that reason.
 */
+/*
+  ── 2026-08-30: THIS LIST GREW BY TWENTY-ONE NAMES AND NOTHING WAS BUILT OR UNBUILT ─────────────
+
+  The scanner behind it read our whole source as one string and asked "is this command NAMED
+  anywhere?" — INCLUDING inside comments. This repository's comments quote the reference constantly
+  and by design, so twenty-one commands that appear here only in prose were being counted as
+  present. The report said 107 of 135 were named in our source; the honest number is 85.
+
+  It was found the way these always are — a MEASURED REFUSAL written into `RoomNavbar.svelte`
+  explaining why `presenterNotTalking` cannot be built here made the command disappear from this
+  list. The explanation for why something is missing counted as evidence that it is present, which
+  is the worst direction for a list of open questions to fail in.
+
+  `gate/audit-feature-coverage.mjs` strips comments now, and its own note records that the first
+  attempt at the line rule was too greedy and deleted real code — producing a bigger "discovery"
+  that was an artefact. The narrow rule and the greedy one now agree, which is why this number is
+  trusted.
+
+  **The twenty-one are not new work.** Several are ours under a different shape — `getChatLog` /
+  `getAlertsLog` are `log-pages.remote.ts`, `getSessionFiles` is `files-pane.remote.ts`,
+  `chatMsg` is the SSE frame `chat-messages.remote.ts` publishes — and this list has never claimed
+  otherwise: its own heading says these are QUESTIONS TO ANSWER BY READING, not a backlog. What
+  changed is that the questions are now asked about the code rather than about the commentary.
+*/
 const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'alertQAMsg',
+  'archiveLogs',
   'callScreeen',
+  'changeUserPerms',
+  'chatMsg',
+  'chatReactions',
+  'connectToRoom',
+  'deleteQAAlertMsg',
   'demux',
+  'doPCLogSearch',
   'doShowMsgToAll',
+  'editUsernameByUser',
+  'getAlertsLog',
+  'getAllPCLogs',
+  'getAllUserPM',
+  'getChatLog',
   'getMyRepeater',
   'getMyState',
+  'getPCLog',
+  'getScheduledAlerts',
+  'getSessionFiles',
+  'getSessionMediaState',
   'getSessionNotes',
   'hardResetSession',
   'lockSession',
   'pingPopup',
   'presenterNotTalking',
+  'presenterTalking',
   'privMsg',
   'reloadSessionConfig',
   'resetAllMediaServers',
@@ -115,36 +156,53 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'resetSession',
   'saveAndCloseSession',
   'setSessionState',
+  'setUserProfilePic',
   'softResetSession',
+  'startRecMtx',
   'startWebcam',
   'stopConsumer',
   'stopOBStream',
   'stopRecMsg',
   'stopRecMtx',
   'stopWebcam',
+  'unarchiveLogs',
   'updateUserPM',
-  'userDeleteChatMsg'
+  'userDeleteChatMsg',
+  'userLoggedIn'
 ];
 
 /*
-  Two tab ids, and they are absent for opposite reasons — which is exactly why the list is names and
-  not a count.
+  SIX tab ids, and it was two — for the same reason the command list moved, and with the same
+  meaning: nothing was unbuilt.
 
-  `recordings` is a REAL gap and stays one deliberately: the reference's pane is one iframe onto a
-  SERVER archive page, and there are zero recordings or archive tables in either database, so
-  building the surface would front nothing. TODO.md carries the blocker.
+  The check is `source.includes('presAreaTabs-<name>')`, a STRING id. This room does not use string
+  ids for tabs; it uses a typed union — `mainTab === 'videoplayer'`, `mainTab === 'files'` — and the
+  only places the captured id string appears here are comments quoting the reference. Strip those
+  and four more ids stop being "named".
 
-  `files` is NOT a gap. The reference uses the id as a value — `onMainTabChange(e)` at bundle byte
-  1,968,370 tests `"presAreaTabs-files" == this.selectedMainTab` and calls `getSessionFiles()` — and
-  this room reaches the same behaviour through a typed union (`mainTab === 'files'`,
-  `PresentationArea.svelte:616-640`) with the pane's own remote query doing the fetching
-  (`files-pane.remote.ts`). A string id and a discriminated union are the same decision written two
-  ways; only one of them is greppable, and it is not ours.
+  So four of these six are the case this block already described for `files`: a string id and a
+  discriminated union are the same decision written two ways, and only one of them is greppable.
+  `videoplayer` (`PresentationArea.svelte:520-541`), `streams`, `dayTradeAlerts` and `swingAlerts`
+  are all built and gated end to end.
 
-  The audit's own earlier report of "two presentation-area tabs missing" named `videoplayer` as the
-  second, and that was wrong: it is built and gated end to end at `PresentationArea.svelte:520-541`.
+  `recordings` is the one REAL gap and stays one deliberately: the reference's pane is one iframe
+  onto a SERVER archive page, and there are zero recordings or archive tables in either database, so
+  building the surface would front nothing. `TODO.md` carries the blocker.
+
+  **What this says about the check itself is worth more than the list.** A greppable-string test
+  cannot see a typed union, so for THIS room it can only ever report the reference's vocabulary back
+  — which is useful for commands, where the wire really does carry the name, and close to useless
+  for tabs, where it does not. Recorded rather than deleted: the list is still the cheapest way to
+  notice a tab the reference has and nobody here has read.
 */
-const ABSENT_TABS: readonly string[] = ['files', 'recordings'];
+const ABSENT_TABS: readonly string[] = [
+  'dayTradeAlerts',
+  'files',
+  'recordings',
+  'streams',
+  'swingAlerts',
+  'videoplayer'
+];
 
 describe('the reference wire vocabulary', () => {
   const report = auditCoverage();

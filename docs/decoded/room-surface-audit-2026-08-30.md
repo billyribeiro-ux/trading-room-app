@@ -43,6 +43,34 @@ describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **
 the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
 byte offsets make the second reading the tempting one.
 
+## Where the work stands
+
+**143 open · 81 closed · 224 rows.**
+
+Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
+parses this document and fails if either is wrong. It exists because the answer to "how many are
+left" came out **three different ways in ten minutes** on 2026-08-30 — 158, then 218, then 151 — not
+because the document changed, but because each grep recognised a different subset of the ways a
+closed row says it is closed. Every one of those numbers had been quoted as progress.
+
+A row is finished in one of eight ways and only three of them are code. **The other five are the
+expensive ones to lose**, because a row that was read, measured and deliberately not built looks
+exactly like a row nobody has opened yet:
+
+| disposition | what it means |
+| --- | --- |
+| `BUILT` | built here, against the cited reference bytes |
+| `HALF BUILT` | built, where the row named a larger scope than the part that was right to build |
+| `FIXED` | a defect of OURS removed, rather than a reference behaviour added |
+| `ALREADY BUILT` | present under a name the audit's reader did not search for |
+| `MEASURED REFUSAL` | read, measured, deliberately not built — with the measurement at the code |
+| `DELIBERATE DIVERGENCE` | matching the reference here would reproduce a defect |
+| `OWNER DECISION` | not ours to decide; what the owner has to answer is named |
+| `BLOCKED` | cannot be finished from this checkout; what would unblock it is named |
+
+The disposition is the first line under the row's heading, in bold. A row with no disposition line
+carries its `**severity** · category · reference byte` line there instead, and is open.
+
 Also recorded per surface: how many reference behaviours were confirmed **present** here. A list of
 only gaps reads as though nothing works, and 965 behaviours were confirmed built.
 
@@ -1454,6 +1482,8 @@ function iRe(t,n){1&t&&(d(0,"div",9),T(1,"i",37),v(2," Reconnecting Chat... "),u
 
 ### G04 — Talking-user names in the navbar are not clickable — `muteTalkingUserDialog(e)` absent
 
+**BUILT 2026-08-30 12:36 UTC.** `muteTalkingUserDialog` in `RoomUserActions`, raised by each speaker name (const 147 `[3,"click"]`, byte 2,473,449). **A PROMPT with a typed word rather than a confirm, and that is upstream's choice for the right reason:** this mutes a microphone for everyone in the room, and an accidental click on one name in a list of names is exactly the mistake a confirm dialog does not prevent. `i && "yes" == i.toLowerCase()` is transcribed including the fact that it is not trimmed. The command mapping is not restated — `sendServerCommand('muteTalkingUser')` has no counterpart here and `remotePresCommand`/`mutemic` is the same act addressed to one peer, which is written out once on `muteAllNonAdmins` and pointed at from here. `role`/`tabindex`/`onkeydown` are OURS: the capture binds a click to a bare span.
+
 **medium** · `missing-control` · reference byte **2,473,449**
 
 ```
@@ -1465,6 +1495,8 @@ E(g(3).muteTalkingUserDialog(o))})
 > Verified: I could not refute it. In our source the talking-user names are rendered as a bare, inert <span> inside the navbar's talkingIndicator: RoomNavbar.svelte:284-291 loops `{#each media.talking as talkingUser, index (talkingUser.userID)}` emitting `<span>{index > 0 ?
 
 ### G05 — Screenshare menu: " OBS / RTMP / Stream / Restream " item + `openStreamingTab()` (gated on `sessData.useMediaMTX`)
+
+**BUILT 2026-08-30 12:36 UTC.** `a4e` at byte 2,479,514 with its leading divider inside the gate, its `title`, and the `badge text-bg-danger ms-1` **New** span (const 188). Upstream's handler is three chained jQuery `.tab('show')` calls; all three targets already exist here as STATE — `openSessionControl('streaming-selection')`, and `streamingControlTab` already defaults to `'obs-streaming'` — so the page opens the modal on the right tab and no component reaches into another's DOM.
 
 **medium** · `missing-control` · reference byte **2,479,514**
 
@@ -1478,6 +1510,8 @@ E(g(3).openStreamingTab())}),d(2,"a",158),v(3," OBS / RTMP / Stream / Restream "
 
 ### G06 — Screenshare menu: " Reopen Screenshare Preview" item → `reopenPreviewWindow()`
 
+**BUILT 2026-08-30 12:36 UTC — and it is the way back from a one-way door.** The row's own closing note is the important half: `previewWindowsVisible` was written `false` by Hide Preview Windows and **nothing ever wrote it true**, so a presenter who hid the preview cards could not get them back without reloading the room. `c4e` at byte 2,479,924 is gated on the same `isScreenSharing` the Stop-All entry above it carries, and its divider comes AFTER the item, which is why it is written separately rather than folded into that pair.
+
 **medium** · `missing-control` · reference byte **2,479,924**
 
 ```
@@ -1490,6 +1524,8 @@ E(g(3).reopenPreviewWindow())}),v(2," Reopen Screenshare Preview")
 
 ### G07 — Screenshare menu: per-screen "Stop Sharing {screenName}" repeater (d4e over `screenProducers`)
 
+**BUILT 2026-08-30 12:36 UTC.** One entry per screen this browser is sharing, `d4e` at byte 2,480,060. Upstream repeats over `mediaSoupService.screenProducers`, a LOCAL producer map that cannot contain anybody else's share; the nearest thing here is the screen TAB list, which contains everyone's — so the page filters on `ownerId === null`, which `RoomScreens` documents as "one of this browser's own". Without that filter the menu would offer a presenter the chance to stop a screen they are not sharing. `stopLocalScreen(producerId)` already existed, because the browser's own "Stop sharing" bar calls it.
+
 **medium** · `missing-control` · reference byte **2,480,060**
 
 ```
@@ -1501,6 +1537,8 @@ function d4e(t,n){if(1&t){const e=Y();d(0,"li")(1,"a",163),x("click",function(){
 > Verified: The navbar screenshare menu genuinely has no per-producer repeater: RoomNavbar.svelte's dropdown ends at the all-screens item gated on media.screenSharing, its only {#each} in the file is over media.talking (line 285), and its props carry no screen list. Grep found zero hits for stopSharingProducer/screenProducers-as-state and no per-scre…
 
 ### G08 — Talking indicator never shows the idle image: `#nolevelsImg` / notalking.png branch absent
+
+**MEASURED REFUSAL — recorded at the code 2026-08-30 12:36 UTC, deliberately NOT built.** `presenterTalking` is written by exactly two subscribers (byte 1,117,020) and the only thing that emits them is the SERVER socket relaying `case "presenterTalking"` at byte 1,014,971. It is a live audio-activity signal computed somewhere this room does not have, and it is NOT the list beside it: "talking" in `talkingUsers` means A MICROPHONE IS OPEN, which `media-transport.svelte.ts` records at length — and there is no level detection anywhere in the reference either, its single `createAnalyser` being the AV-settings mic test. Building the branch means an image that can never show or one that always shows; neither is the reference. **This also settles the row's strongest argument:** `notalking.png` ships here with no consumer because the MARKUP was transcribed from a capture whose driving signal did not cross with it. The asset stays. What would unblock it: our own server computing and pushing an activity signal, after which this is one `{#if}` and const 148.
 
 **medium** · `missing-behaviour` · reference byte **2,542,272**
 
@@ -1538,6 +1576,8 @@ this.appService.appEventBus.subscribe("audioServerDisableMic",()=>{this.micDisab
 
 ### G12 — Navbar users counter has neither of its two handlers: click → `toggleSideBarUsersCount()`, dblclick → `hideCount` toggle
 
+**BUILT 2026-08-30 12:36 UTC.** Both, and the row is right that the enumeration mislabels them: CLICK opens the sidebar and DBLCLICK hides the number. `toggleSideBarUsersCount` is `alwaysShowRoster && (…)`, so the setting gates the whole statement and the control is inert in a room that did not ask for it — upstream's own behaviour, and the hamburger beside it does the same job unconditionally. Its `loadRoster()` half has no counterpart and was already refused with its reason in `always-show-roster-contract.test.ts`. `hideCount` stays component state because that is what it is upstream: nothing persists it, and a reload showing the count again is right for a gesture meant to peek past a number rather than configure the room.
+
 **medium** · `missing-control` · reference byte **2,484,941**
 
 ```
@@ -1549,6 +1589,8 @@ x("click",function(){return D(e),E(g().toggleSideBarUsersCount())})("dblclick",f
 > Verified: Both handlers are genuinely absent from our source, and so is the visibility field the dblclick toggles. WHAT I READ IN OUR SOURCE.
 
 ### G13 — Navbar roster count is shown to everyone — the `hideCount || (!rosterCountVisibleToViewers && !isPresenter)` gate is not applied
+
+**BUILT 2026-08-30 12:36 UTC.** The page resolves it through the same `rosterCountVisibleTo()` the SIDEBAR badge uses, so the two cannot answer differently — which was the defect: an owner setting honoured in one of the two places that publish the number is not honoured. `hideCount` is combined here rather than folded into that helper, because it is this component's state and not a room setting.
 
 **medium** · `missing-control` · reference byte **2,487,511**
 

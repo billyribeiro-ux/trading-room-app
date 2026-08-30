@@ -168,6 +168,34 @@ export function extractPresentationTabs(bundle) {
  * docblock explaining what the reference does is evidence that somebody READ the reference, never
  * that this room answers that frame.
  */
+/**
+ * COMMENTS OUT, and this is the sixth time in this repository that prose has voted in a check.
+ *
+ * This scanner answers one question — "is this reference command NAMED anywhere in our source?" —
+ * and the answer decides whether it appears on a list of things to go and read. On 2026-08-30 a
+ * MEASURED REFUSAL was written into `RoomNavbar.svelte` explaining, in prose, why
+ * `presenterNotTalking` cannot be built here. The command promptly disappeared from the absent
+ * list: the explanation for why it is missing counted as evidence that it is present.
+ *
+ * That is the worst direction for this particular report to fail in — a command drops off the list
+ * of open questions precisely because somebody documented it. Both comment syntaxes are stripped,
+ * for the reason `custom-player-contract.test.ts` records: `.svelte` files carry `<!-- -->` as well.
+ *
+ * THE LINE RULE IS DELIBERATELY THE NARROW ONE — a line whose first non-space characters are `//`,
+ * and nothing else. A general `//`-to-end-of-line rule also eats the inside of every string and
+ * regex that happens to contain two slashes, which on the first attempt here silently deleted real
+ * code and produced a report that looked like a discovery. A trailing comment after code is left
+ * standing; that is a known and accepted hole, and it is a far smaller one than a stripper that
+ * removes source.
+ *
+ * @param {string} text
+ */
+const stripComments = (text) =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^[ \t]*\/\/[^\n]*$/gm, '');
+
 function roomSource() {
   const SKIP = new Set(['node_modules', '.svelte-kit', 'build', 'dist', 'coverage']);
   const IS_TEST = /\.(test|spec)\.(ts|js)$|\.(test|spec)\.svelte\.ts$|\.svelte\.(test|spec)\.ts$/;
@@ -179,7 +207,8 @@ function roomSource() {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
       else if (IS_TEST.test(entry.name)) continue;
-      else if (/\.(ts|js|svelte|css)$/.test(entry.name)) text += readFileSync(full, 'utf8');
+      else if (/\.(ts|js|svelte|css)$/.test(entry.name))
+        text += stripComments(readFileSync(full, 'utf8'));
     }
   };
   walk(join(ROOM, 'src'));

@@ -589,7 +589,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1512 -> 1508, 2026-08-30, and DOWN. `oncomposerfocus` added; the number falls because the
       previous raise anticipated more than the composer extraction ended up needing here.
     */
-    max: 1508,
+    /*
+      1,508 -> 1,529, 2026-08-30. Twenty-one lines, and nineteen of them are one `$derived` and its
+      reason: `localScreenShares`, the screens THIS browser is sharing, for the navbar's per-screen
+      stop entries (G07).
+
+      The reason is the whole of it. Upstream repeats over `mediaSoupService.screenProducers`, a
+      LOCAL producer map that cannot contain anybody else's share. The nearest thing here is the
+      screen TAB list, which contains everyone's — so the filter is `ownerId === null`, which
+      `RoomScreens` documents as "one of this browser's own". Without it the menu would offer a
+      presenter the chance to stop a screen they are not sharing.
+
+      **It sits below `createRoom`, and that placement is load-bearing.** A `$derived` reading
+      `mediaTransport` above that destructuring is a temporal-dead-zone read that evaluates
+      immediately on the server — which is the exact shape of the defect that answered 500 on every
+      room load for eleven days, and which `svelte-check` is silent about.
+    */
+    max: 1529,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1359,6 +1375,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one-line note saying only the class that asked the controller can know it.
     */
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
+  },
+  {
+    file: 'lib/components/ScreenShareMenu.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The navbar's Start/Stop Screen Sharing dropdown: six entries, three of them behind
+      `isScreenSharing`, one behind `sessData.useMediaMTX`, and one repeated per screen this browser
+      is sharing. It came out of `RoomNavbar.svelte` when G05, G06 and G07 added three of those six
+      in one pass.
+
+      What to check if this number climbs. Has it started DECIDING? It must not — `screenSharing`,
+      `streamingTabAvailable` and `localScreens` are all resolved before they arrive. And has it
+      acquired knowledge of the OTHER top-level menus? `menuOpen` is one boolean because the navbar
+      owns which menu is open; a second such prop means that ownership has leaked.
+    */
+    max: 208,
+    why: 'the navbar screen-sharing dropdown; six entries and the four gates between them'
   },
   {
     file: 'lib/components/MessageBody.svelte',
@@ -3377,7 +3411,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       anything those two methods touch; they were adjacent to the permission checkboxes only because
       both were wired in the same week.
     */
-    max: 880,
+    /*
+      880 -> 935, 2026-08-30. G04 — `muteTalkingUserDialog`, and fifty-five lines of which forty-six
+      are the argument for the shape.
+
+      Two of them matter to a reader. It is a PROMPT with a typed word rather than a confirm, and
+      that is upstream's choice for the right reason: this mutes a microphone for everyone in the
+      room, and an accidental click on one name in a list of names is exactly what a confirm dialog
+      does not prevent. And the command mapping — `sendServerCommand('muteTalkingUser')` has no
+      counterpart here; `remotePresCommand` / `mutemic` is the same act addressed to one peer — is
+      NOT restated: it is written once on `muteAllNonAdmins` above, and this method points at it.
+    */
+    max: 935,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -4677,7 +4722,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rendered on a URL and a logo with no `hasBenzingaNews` term at all; the three settings now
       arrive as ONE prop, so a surface cannot take two of the three and forget the third.
     */
-    max: 1006,
+    /*
+      1,006 -> 1,063, 2026-08-30. G04, G12 and G13 — and the screenshare menu left in the same pass.
+
+      The three rows added a click and a keydown to each speaker name (the reference binds a click
+      to a bare span; a span is neither focusable nor keyboard-reachable, so the role and the key
+      handler are ours for the same reason the trade-order span's are), the two gestures const 79
+      declares on the users counter, and the gate that had been applied to the sidebar badge and not
+      to the navbar — `rosterCountVisibleToViewers`, an owner setting leaked one element away from
+      where it was honoured.
+
+      G05, G06 and G07 added three entries to the screen-sharing dropdown, which put this file 186
+      lines over. `ScreenShareMenu.svelte` is the answer and the seam is real rather than
+      convenient: a self-contained control with its own open state, its own six entries and its own
+      gates, whose every prop is an INPUT rather than a value it reaches back through the navbar to
+      read. That is the test `RoomMessage.svelte`'s entry records for the split it refused.
+
+      1,063 -> 1,097 in the same commit: G08's MEASURED REFUSAL, thirty-four lines and every one of
+      them the reason. The reference switches the talking indicator between `talking.gif` and
+      `notalking.png` on `mediaService.presenterTalking`, and that flag is written by two
+      subscribers to a SERVER-relayed command this room's server does not send. Building the branch
+      means an image that can never show or one that always shows; neither is the reference. The
+      note also settles a loose end the audit row raised — `notalking.png` ships here with no
+      consumer, and this is why.
+
+      A refusal costs lines exactly once and saves the next reader a re-derivation, which is the
+      trade this file exists to make. It is not licence for the next one.
+    */
+    max: 1097,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

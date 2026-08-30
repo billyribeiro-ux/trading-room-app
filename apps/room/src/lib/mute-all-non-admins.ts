@@ -94,3 +94,23 @@ export const MUTE_STAGGER_MS = 100;
 
 /** `bootbox.confirm('Mute all non-admin users currently speaking?', …)`, verbatim. */
 export const MUTE_ALL_CONFIRM = 'Mute all non-admin users currently speaking?';
+
+/**
+ * The SINGLE-target sibling — `muteTalkingUserDialog`'s prompt, at bundle byte 2,529,373.
+ *
+ * ```js
+ * bootbox.prompt("Would you like to force stop " + e.mediaValue.name +
+ *   " from talking? (forces a remote mute for all). type: yes to proceed", …)
+ * ```
+ *
+ * Built here rather than at the call site for the same reason the sentence above is: these are the
+ * two doors to one corridor — `muteAllNonAdmins` and this one both end in `mutemic` addressed to a
+ * peer — and a captured string retyped at a call site is a captured string that drifts. The
+ * reference's own spacing and its lower-case `type:` are kept; so is the fact that it names the
+ * speaker in the middle of the sentence rather than at the front.
+ */
+export const muteTalkingUserPrompt = (name: string) =>
+  `Would you like to force stop ${name} from talking? (forces a remote mute for all). type: yes to proceed`;
+
+/** `"yes" == i.toLowerCase()` — the typed word, named so a test asserts it rather than a literal. */
+export const MUTE_TALKING_USER_CONFIRM_WORD = 'yes';

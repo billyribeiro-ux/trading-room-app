@@ -3,8 +3,10 @@ import { isHttpError } from '@sveltejs/kit';
 import {
   MUTE_ALL_CONFIRM,
   MUTE_STAGGER_MS,
+  MUTE_TALKING_USER_CONFIRM_WORD,
   type RosterAuthority,
   type TalkingEntry,
+  muteTalkingUserPrompt,
   nonAdminTalkingUsers
 } from '#lib/mute-all-non-admins.js';
 import type { RoomPermissionKey } from '#lib/permission-keys.js';
@@ -460,6 +462,59 @@ export class RoomUserActions<
               .catch((cause) => console.error('[presenterCommand]', cause));
           }, MUTE_STAGGER_MS * index);
         });
+      }
+    };
+  }
+
+  /**
+   * ── G04 — `muteTalkingUserDialog(e)`, the navbar speaker names' own control ───────────────────
+   *
+   * ```js
+   * muteTalkingUserDialog(e) {
+   *   this.appService.globals.user.isPresenter && bootbox.prompt(
+   *     "Would you like to force stop " + e.mediaValue.name +
+   *     " from talking? (forces a remote mute for all). type: yes to proceed",
+   *     i => { i && "yes" == i.toLowerCase() &&
+   *            this.appService.sendServerCommand("muteTalkingUser", e) })
+   * }
+   * ```
+   *
+   * (bundle byte 2,529,373; the click that reaches it is `d(0,"span",147)` at 2,473,449, one per
+   * name in the talking indicator.) The speaker names in this room's navbar were a bare `<span>`,
+   * so a presenter watching somebody hold the floor had no way to take it back short of opening the
+   * roster and finding them — and `muteAllNonAdmins`, which IS built, is all-or-nothing.
+   *
+   * ## A PROMPT and not a confirm, because the reference chose the harder gesture
+   *
+   * The word has to be typed. That is upstream's, and it is right for what this does: it mutes a
+   * microphone for *everyone in the room*, not for the presenter pressing it, and an accidental
+   * click on a name in a list of names is exactly the mistake a confirm dialog does not prevent.
+   * The comparison is `toLowerCase()`'d and anything else — including an empty box — sends nothing.
+   *
+   * ## The command mapping is `muteAllNonAdmins`'s, and is not repeated here
+   *
+   * Upstream's `sendServerCommand('muteTalkingUser', muser)` has no counterpart in this room;
+   * `remotePresCommand` / `mutemic` is the same act addressed to one peer, carried out by that
+   * peer's own browser, with the server re-checking that the caller is a presenter and that the
+   * subCmd is one of three (`+page.server.ts:1654-1670`). The reasoning is written out once, on
+   * `muteAllNonAdmins` above; this is the single-target door to the same corridor.
+   */
+  muteTalkingUserDialog(user: TalkingEntry) {
+    // `this.appService.globals.user.isPresenter &&` — the whole method is behind it, so a member
+    // clicking a name gets no dialog rather than a dialog whose Send is refused.
+    if (!this.#isPresenter()) return;
+
+    this.#dialogs.prompt = {
+      title: muteTalkingUserPrompt(user.mediaValue.name),
+      // `bootbox.prompt(message, callback)` — no `value`, so the box opens empty.
+      value: '',
+      onconfirm: (value) => {
+        this.#dialogs.prompt = null;
+        // `i && "yes" == i.toLowerCase()` — verbatim, including that it is not trimmed upstream.
+        if (!value || value.toLowerCase() !== MUTE_TALKING_USER_CONFIRM_WORD) return;
+        void this.#commands
+          .presenter({ subCmd: 'mutemic', targetUserId: user.userID })
+          .catch((cause) => console.error('[presenterCommand]', cause));
       }
     };
   }
