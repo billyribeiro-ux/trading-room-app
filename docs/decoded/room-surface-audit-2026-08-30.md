@@ -45,7 +45,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**123 open · 101 closed · 224 rows.**
+**114 open · 110 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1869,6 +1869,8 @@ function GTe(t,n){1&t&&ht(0,zTe,4,6,"div",35,Yx),2&t&&pt(g().appService.globals.
 
 ### PAM-02 — sendText checkbox "Text this out?" (gated on sessData.twillioApiSID) is absent
 
+**BLOCKED 2026-08-30 13:54 UTC, and the GATE is the more interesting half.** Upstream renders the checkbox when `sessData.twillioApiSID` is truthy — that is, it decides whether to show a control by looking at **a credential**, and `twillioApiSID` is one of the seven this room's boundary refuses outright (`room-config-boundary.test.ts`). Reproducing the gate is not an option and the correct shape is not in doubt: a server-derived boolean saying *this room can send text messages*, with the credential staying on the controller. What is actually blocked is the thing behind it — **there is no SMS downstream in this deployment**, so the checkbox would set a flag that `schema.ts:259-266` already refuses at the boundary with its reason recorded. What would unblock it: a Twilio integration on the controller and the derived boolean beside it.
+
 **medium** · `missing-control` · reference byte **2,118,228**
 
 ```
@@ -1881,6 +1883,8 @@ function VTe(t,n){if(1&t){const e=Y();d(0,"div",35)(1,"input",46),Ve("ngModelCha
 
 ### PAM-03 — dontCrossPost checkbox "Don't cross post to linked alert rooms" (gated on sessData.linkedRoomAlerts) is absent
 
+**BLOCKED 2026-08-30 13:54 UTC.** The checkbox suppresses a fan-out that does not exist: `linkedRoomAlerts` — posting one alert into several linked rooms — has no implementation here, which `schema.ts:259-266` already names (*"the cross-post fan-out `linkedRoomAlerts` is itself blocked on"*). A control that turns OFF a behaviour the room does not have is the clearest possible example of a control with no consumer. What would unblock it: the fan-out.
+
 **medium** · `missing-control` · reference byte **2,119,618**
 
 ```
@@ -1892,6 +1896,8 @@ function WTe(t,n){if(1&t){const e=Y();d(0,"div",35)(1,"input",54),Ve("ngModelCha
 > Verified: I could not refute this. Searched apps/room/src exhaustively for dontCrossPost, dont-cross, crossPost/cross_post/crosspost/cross-post/"Cross Post", the id alert-dont-cross-post-label, alert-cross, linkedRoomAlerts/linkedRoom*/linkedAlert/otherRooms/toLinked, and behavioural synonyms (fanout, fan-out, syndicate, relayAlert, mirrorAlert, pr…
 
 ### PAM-04 — The two inline-entry event-bus subscriptions (inlineAlertEntry / inlineAlertEntryImage) have no counterpart, and the toggle that feeds them has no consumer
+
+**ALREADY BUILT — verified by reading 2026-08-30 13:54 UTC, not rebuilt.** Both subscriptions have counterparts and both are cited to the same bytes the row names: `composer.svelte.ts:360` is `inlineAlertEntry` (byte 2,125,143) and `:409` is `inlineAlertEntryImage` (byte 2,125,263), and `AlertChatArea.svelte:260-266,415-454` is the emitter — the inline box's Enter handler and its paste handler, with the reference's own `emit(…)` quoted at each. The row also records one DELIBERATE DIVERGENCE that is already written down at `composer.svelte.ts:370`: upstream's subscription calls the modal's `postAlert()` and so inherits whatever that modal was last left holding, so a presenter who ticked "Don't send to push" an hour ago silently gets it again from a box in a different column. This room posts a plain alert; the modal is where those decisions are made and where they are visible.
 
 **medium** · `missing-behaviour` · reference byte **2,125,143**
 
@@ -1953,6 +1959,8 @@ d(2,"form")(3,"div",21)(4,"label",59),v(5,"NOTE: All times should be on "),d(6,"
 
 ### PAM-10 — sendLaterAsEmail / sendLaterAsNick inputs and their "Send as email:" / "Send as Name:" labels are absent (deliberate security refusal)
 
+**MEASURED REFUSAL — confirmed and now reaching a second place, 2026-08-30 13:54 UTC.** The row names it correctly. Two form fields that let a presenter post an alert under **someone else's name and email address** are an identity claim asserted by the client, which is the 2026-08-07 privilege escalation in a different costume; the sender is derived on the server from the session and the two fields are refused at the boundary (`schema.ts:259-266`). What changed today is that the refusal now shapes a SENTENCE as well as a payload: PAM-11's confirm ends at the date, where upstream's ends *"send as: <nick> (<email>) ?"* — quoting values that cannot vary here would imply a choice the presenter does not have.
+
 **low** · `missing-control` · reference byte **2,124,312**
 
 ```
@@ -1964,6 +1972,8 @@ this.sendLaterAsEmail=this.appService.globals.user.email,this.sendLaterAsNick=th
 > Verified: Could not refute. The reference genuinely renders both controls — I re-read the bundle and found the compiled template at byte offset 2121637 (NOT 2124312 as the record states; I did not verify that offset and it should be corrected or dropped): label "Send as email:" bound to s.sendLaterAsEmail and label "Send as Name:" bound to s.sendLa…
 
 ### PAM-11 — postAlertLater's confirm and success dialogs are absent
+
+**BUILT 2026-08-30 13:54 UTC, minus the identity clause.** Scheduling happened on one click. **The DATE is the reason for the question:** a `datetime-local` with a typo in it — a month, a year, an AM for a PM — schedules an alert to the entire room at a time nobody meant, and the only way to notice was to open the manage table afterwards and read it back. The confirm quotes the date in prose, which is where a wrong one is visible, and `Alert scheduled OK.` follows verbatim. `onalert` and `onconfirm` are passed in rather than owned: two components raising bootboxes from different places is how one replaces the other mid-read, which `dialogs.svelte.ts` records at length. The `send as:` clause is dropped for PAM-10's reason.
 
 **low** · `missing-behaviour` · reference byte **2,130,310**
 
@@ -1977,6 +1987,8 @@ bootbox.confirm("Send this alert on: "+o.toString()+". send as: "+this.sendLater
 
 ### PAM-12 — onImagePaste selects the LAST image clipboard item in the reference (no break); ours selects the first
 
+**ALREADY BUILT — verified by reading 2026-08-30 13:54 UTC, not rebuilt.** `pastedImageFrom` in `#lib/pasted-image.ts` keeps the LAST image item and its docblock says why in the reference's own terms — *"the reference's loop has no break, so the LAST image item wins… `PostAlertModal` picked a different one, silently, and nothing could have noticed"*. It also records the second drift in the same eight lines, which the row does not mention: an item whose `getAsFile()` answers null used to abandon the entire paste rather than being skipped, so one unreadable representation could throw away a real screenshot sitting behind it. The row describes a revision this module has moved past.
+
 **low** · `divergence` · reference byte **2,125,403**
 
 ```
@@ -1988,6 +2000,8 @@ onImagePaste(e){const i=this,o=(e.clipboardData||e.originalEvent.clipboardData).
 > Verified: The reference's onImagePaste loops over all clipboard items with no break and reassigns unconditionally, so it keeps the LAST image item. Our PostAlertModal.selectPastedImage returns on the FIRST item whose type startsWith('image'), so it keeps the first.
 
 ### PAM-13 — img tab with no URL: the reference dispatches an upload whenever the module-level fc array EXISTS (even when empty); ours requires at least one file
+
+**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC.** `return fc ? void this.doImagurFileListUpload(e) : void 0` tests whether a module-level array EXISTS, not whether it holds anything — so an empty file list dispatches an upload of nothing, which either no-ops in the uploader or posts an alert with no image and no URL. Reproducing that means reproducing a bug whose only outcomes are a wasted request or an empty alert. Ours requires at least one file, which is the same behaviour for every case a presenter can actually reach and differs only where the reference misfires.
 
 **low** · `divergence` · reference byte **2,128,708**
 
@@ -2001,6 +2015,8 @@ if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\
 
 ### PAM-14 — Element ids and name attributes added on the six text inputs/textareas that the reference leaves unnamed
 
+**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC, and the reference is not consistent about this either.** The ids and `name` attributes are OURS and they are what make `<label for>` and `aria-labelledby` work: a text input with no accessible name is unreachable by a screen reader, and this repository adds them for the same reason it gives the captured trade span a `role` and a keydown. **The reference names some of its own** — const 62 is `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",…]`, so the send-later input carries both — which makes this a difference in consistency rather than in kind. Nothing about them is visible to a member, and none is read by any selector in the captured stylesheets.
+
 **low** · `divergence` · reference byte **2,131,663**
 
 ```
@@ -2012,6 +2028,8 @@ if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\
 > Verified: I could not refute it; both halves of the claim verify. Our six controls carry id+name at exactly the cited lines, and the reference's app-post-alert-modal consts array — which I read in full, not sampled — carries neither on any of the six.
 
 ### PAM-17 — The alertMsg payload's sendTxt / sendEmail / sendTweet / dontCrossPost / dontPush fields are refused by our server rather than sent
+
+**MEASURED REFUSAL — already recorded, verified 2026-08-30 13:54 UTC.** `schema.ts:259-266` carries it in full: every one of those fields is *"an instruction to a downstream this deployment does not have — SMS, the mailer's alert path, Twitter, and the cross-post fan-out `linkedRoomAlerts` is itself blocked on. Storing a flag no consumer reads is the thing this repository refuses by name, so they are refused at the boundary and the refusal is recorded rather than the column being created empty."* PAM-02 and PAM-03 are the two CONTROLS for two of these flags and are blocked on the same absences; this row is the payload half of the same fact. Nothing was added; the row is closed against the record that already existed.
 
 **low** · `divergence` · reference byte **2,128,708**
 

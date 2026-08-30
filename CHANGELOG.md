@@ -33,6 +33,67 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 13:54 UTC — The post-alert modal's thirteen rows: a button that discarded the schedule you had just typed
+
+**Runtime impact: YES.** A presenter who opens Send Later can no longer press the green **Post
+Alert** button beside it and send the alert immediately, losing the date and repeat they had just
+entered with nothing on screen to say so. Scheduling asks first, quoting the date back. The repeat
+select says **Off / Daily / Weekly** instead of showing its own storage format, the weekend checkbox
+says what the reference says, and the form now answers the question a `datetime-local` field always
+raises: *whose* 09:00 is this?
+
+**`PostAlertModal.svelte`'s thirteen rows are closed: PAM-05, PAM-07, PAM-08, PAM-09, PAM-11 built;
+PAM-04 and PAM-12 already built; PAM-02 and PAM-03 blocked; PAM-10, PAM-13, PAM-14 and PAM-17
+recorded.**
+
+#### PAM-05 is a lost-work bug, not a layout row
+
+`O(71, showSendLater ? -1 : 71)` removes "Post Alert" while the scheduler is open. This room
+rendered the whole scheduling pane inline and kept the green button beside it. The two are one
+decision with two answers, and the reference makes you pick; we offered both and let the wrong one
+throw the other away.
+
+#### PAM-02's gate is the more interesting half
+
+Upstream decides whether to show the "Text this out?" checkbox by looking at **`sessData.twillioApiSID`
+— a credential**, and that is one of the seven this room's boundary refuses outright. The correct
+shape here is not in doubt: a server-derived boolean saying *this room can send text messages*, with
+the credential staying on the controller. What is actually blocked is what sits behind it — there is
+no SMS downstream — so it is recorded with both halves rather than built against a flag nothing
+reads.
+
+#### Two rows were already built and one refusal now shapes a sentence
+
+PAM-04's two event-bus subscriptions have counterparts cited to the same bytes the row names, and
+PAM-12's clipboard rule already keeps the LAST image item with its reasoning written out. **PAM-10**
+— the refusal of `sendLaterAsNick` / `sendLaterAsEmail`, two fields that let a presenter post under
+someone else's identity — now shapes PAM-11's confirm as well as the payload: upstream's question
+ends *"send as: <nick> (<email>) ?"*, and quoting values that cannot vary here would imply a choice
+the presenter does not have.
+
+#### What was run
+
+`pnpm run gate` in `apps/room`, green, exit code echoed into the log and read from there. 243 test
+files, 4,012 passed, 1 skipped. Five ceilings raised with their reasons recorded.
+
+**Six negative controls, and the first one found the TEST.** PAM-05's assertion read
+`expect(branch.indexOf('{:else}')).toBeLessThan(branch.indexOf('Post Alert'))`, and moving Post
+Alert out of the else so both render together left it GREEN: `indexOf` returns **-1** when the
+marker is gone, and -1 is less than every index, so deleting the `{:else}` satisfied the very
+assertion that existed to require it. That is the same -1 trap `slice-anchor-contract` guards for
+slice bounds, met in a comparison instead. It asserts the exact structure now — brittle to
+formatting, which is the right trade when the two buttons being in one `{#if}/{:else}` *is* the
+feature — and the same mutation turns it red. The other five (raw repeat modes, the reverted weekend
+label, the timezone note deleted, the confirm removed, the success alert removed) were red first
+time.
+
+**This is the fourth control this session to find a test rather than the code**, and all four were
+the same shape: an assertion that reads as a requirement and is satisfied by the thing it forbids.
+
+**The Svelte MCP server is still disconnected for this session.**
+
+**114 audit rows remain open; 110 are closed.** Five surfaces are complete.
+
 ### 2026-08-30 13:32 UTC — The sidebar's twelve rows: an avatar setting that leaked, a wrapper nobody filled, and a Cancel button that did not cancel
 
 **Runtime impact: YES.** A room that hides avatars no longer publishes every member's picture in the

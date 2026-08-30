@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,334 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
 | 3 | `routes/+page.svelte` | 1,541 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
@@ -87,7 +87,7 @@ guessed.
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
 | 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
-| 14 | `lib/components/PostAlertModal.svelte` | 608 | no |
+| 14 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 596 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 582 | no |
@@ -106,7 +106,7 @@ guessed.
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
 | 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
 | 32 | `lib/components/MessageMenu.svelte` | 252 | no |
-| 33 | `lib/components/ScheduledAlerts.svelte` | 271 | no |
+| 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
 | 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
 | 35 | `lib/components/RoomShell.svelte` | 238 | no |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 68 surfaces audited · 1,072 of 32,294 lines · 3.4%.**
+**2 of 68 surfaces audited · 1,072 of 32,428 lines · 3.4%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

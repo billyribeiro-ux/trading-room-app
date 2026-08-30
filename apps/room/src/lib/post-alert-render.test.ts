@@ -48,6 +48,7 @@ function renderModal(tab: 'text' | 'url' | 'media') {
       onclose: () => {},
       ontab: () => {},
       onalert: () => {},
+      onconfirm: () => {},
       onpost: async () => true,
       onpastepost: async () => true
     }

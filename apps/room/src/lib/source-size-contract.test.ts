@@ -2499,7 +2499,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs again the session-control modal is still the extraction — it is now seven panes
       in one file, and this one owns three `$state` locals and a function that nothing else reads.
     */
-    max: 6334,
+    /*
+      6,334 -> 6,335, 2026-08-30. One line: `onconfirm={onConfirm}` on `PostAlertModal`, so PAM-11's
+      confirm reaches the scheduler pane through the callback `PollPanel` next door already uses.
+    */
+    max: 6335,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4533,7 +4537,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       One deliberate divergence, argued at the code: the selection lives in a `SvelteSet` here rather
       than as `checked` on the room's shared parsed table, which is where the reference keeps it.
     */
-    max: 609,
+    /*
+      609 -> 652, 2026-08-30. PAM-05 — Post Alert and Send Later are MUTUALLY EXCLUSIVE, and both
+      were on screen.
+
+      `O(71, showSendLater ? -1 : 71)` at byte 2,139,561 is the whole finding: the reference REMOVES
+      Post Alert while the scheduler is open. This room rendered the scheduling pane inline and kept
+      the green button beside it, so a presenter who had filled in a date and a repeat could still
+      send the alert immediately — losing the schedule they had just typed, with nothing to say so.
+      The five gates that make it one decision with two answers are transcribed at the markup, which
+      is most of the addition. Five more lines for PAM-11's `onconfirm`, threaded through to the
+      scheduler pane, which does not own the room's dialog stack.
+    */
+    max: 657,
     why: 'the alert composer and its per-open resets'
   },
   {
@@ -4894,7 +4910,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one locale-data lookup per scheduled alert per render — and now calls the shared `shortWhen`,
       which is built once per page. Two lines out, and a real per-item cost with them.
     */
-    max: 272,
+    /*
+      272 -> 317, 2026-08-30. PAM-07, PAM-08 and PAM-09 — a select showing its own storage format,
+      a relabelled checkbox, and the note that answers the question the form otherwise raises.
+
+      PAM-09 is the one worth the lines: a `datetime-local` input carries no timezone, so a
+      presenter scheduling for 09:00 had no way to know whose 09:00 it is. The reference answers
+      that before it is asked and underlines the answer, and the note is TRUE here as well as
+      transcribed — the room stores an epoch and `scheduled-alert.ts` fires on it.
+
+      PAM-07's labels live in `scheduled-alert.ts` beside `REPEAT_MODES` as a
+      `Record<RepeatMode, string>`, so a mode added without a label does not compile.
+    */
+    /*
+      317 -> 357 in the same commit: PAM-11, the confirm before a schedule and the success alert.
+
+      The DATE is the reason for the question. A `datetime-local` with a typo in it — a month, a
+      year, an AM for a PM — schedules an alert to the entire room at a time nobody meant, and the
+      only way to notice was to open the manage table afterwards and read it back. Asking quotes the
+      date in prose, which is where a wrong one is visible.
+
+      The reference's question ends "send as: <nick> (<email>) ?" and ours does not: PAM-10 refuses
+      those two fields, so the clause would quote values that cannot vary and would imply a choice
+      the presenter does not have.
+    */
+    max: 357,
     why: 'the send-later pane and the manage table; one question, one component'
   },
   {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { REPEAT_MODES, type RepeatMode } from '#lib/scheduled-alert.js';
+  import { REPEAT_MODES, REPEAT_MODE_LABEL, type RepeatMode } from '#lib/scheduled-alert.js';
   import { shortWhen } from '#lib/short-when.js';
   import {
     listScheduledAlerts,
@@ -35,6 +35,10 @@
    * leaves a presenter believing an alert is cancelled when it is still going to fire.
    */
   interface Props {
+    /** PAM-11 — `bootbox.alert`, the room's own. This pane does not own the dialog stack. */
+    onalert: (message: string) => void;
+    /** PAM-11 — `bootbox.confirm`. The date is quoted back before anything is scheduled. */
+    onconfirm: (message: string, accept: () => void) => void;
     /** The composer's alert text. Empty disables scheduling, exactly as it disables posting. */
     body: string;
     nonTradeAlert: boolean;
@@ -42,7 +46,7 @@
     onscheduled?: () => void;
   }
 
-  let { body, nonTradeAlert, onscheduled }: Props = $props();
+  let { body, nonTradeAlert, onscheduled, onalert, onconfirm }: Props = $props();
 
   /**
    * The datetime-local value, as the browser gives it: `YYYY-MM-DDTHH:mm`, in the VIEWER's timezone.
@@ -88,8 +92,41 @@
     if (managing) await refresh();
   }
 
+  /**
+   * ── PAM-11 — SCHEDULING ASKS FIRST, and it used to happen on one click ────────────────────────
+   *
+   * ```js
+   * bootbox.confirm("Send this alert on: " + o.toString() + ". send as: " + this.sendLaterAsNick +
+   *   " (" + this.sendLaterAsEmail + ") ?", function(s){ if (s) { … sendServerCommand("alertMsgLater", r),
+   *   bootbox.alert("Alert scheduled OK."), … } })
+   * ```
+   * (bytes 2,130,310 and 2,130,900.)
+   *
+   * The date is the whole reason for the question. A `datetime-local` field with a typo in it —
+   * a month, a year, an AM for a PM — schedules an alert to the entire room at a time nobody meant,
+   * and the only way to notice is to open the manage table afterwards and read it back. Asking
+   * quotes the date in prose, which is where a wrong one is visible.
+   *
+   * ## The identity clause is REMOVED, and that is PAM-10's refusal reaching this sentence
+   *
+   * Upstream's question ends *"send as: <nick> (<email>) ?"*, because its form lets a presenter
+   * post an alert under someone else's name and address. This room refuses those two fields —
+   * `sendLaterAsNick` / `sendLaterAsEmail` are not on the wire and the server derives the sender
+   * from the session — so the clause would be quoting values that cannot vary. Naming them would
+   * imply a choice the presenter does not have.
+   *
+   * `onconfirm` and `onalert` are the room's own dialog primitives, passed in for the reason every
+   * other component here takes them: this pane does not own the dialog stack, and two components
+   * raising bootboxes from different places is how one replaces the other mid-read.
+   */
   async function schedule() {
     if (!canSchedule) return;
+    onconfirm(`Send this alert on: ${new Date(sendOnLocal).toString()} ?`, () => {
+      void send();
+    });
+  }
+
+  async function send() {
     busy = true;
     problem = '';
     try {
@@ -104,6 +141,9 @@
       repeat = '';
       ignoreWeekends = false;
       if (managing) await refresh();
+      // `bootbox.alert("Alert scheduled OK.")` — verbatim, including the full stop the room's own
+      // lock sentences do not have.
+      onalert('Alert scheduled OK.');
       onscheduled?.();
     } catch (error) {
       /*
@@ -132,18 +172,49 @@
 </script>
 
 <section class="scheduler">
+  <!--
+    ── PAM-09 — THE NOTE, and it answers the question the form otherwise raises ──────────────────
+
+    ```js
+    d(4,"label",59), v(5,"NOTE: All times should be on "),
+      d(6,"span",60), v(7,"your local time zone")
+    59  [1,"mb-3","mt-1"]      60  [2,"text-decoration","underline"]
+    ```
+    (byte 2,120,860.) A `datetime-local` input has no timezone in it, so a presenter scheduling an
+    alert for 09:00 has no way to know whose 09:00 it is — theirs, the server's, or the room's. The
+    reference answers that before it is asked, and underlines the answer. The room stores an epoch
+    and `scheduled-alert.ts` fires on it, so the note is TRUE here as well as transcribed.
+  -->
+  <p class="tz-note">
+    NOTE: All times should be on <span class="tz-underline">your local time zone</span>
+  </p>
   <div class="row">
     <label class="field">
-      <span>Send on</span>
+      <!-- PAM-09 — `d(8,"label",61), v(9,"Send on this date & time:")`, const 61 `[1,"me-1"]`. -->
+      <span>Send on this date &amp; time:</span>
       <input type="datetime-local" bind:value={sendOnLocal} disabled={busy} />
     </label>
 
     <label class="field">
-      <span>Repeat</span>
-      <select bind:value={repeat} disabled={busy}>
+      <!-- PAM-09 — `d(12,"label",64), v(13,"Repeat:")`, const 64 `[1,"m-0","me-1"]`. -->
+      <span>Repeat:</span>
+      <!--
+        PAM-07 — THE OPTIONS ARE LABELLED, and ours rendered the wire values.
+
+        ```js
+        d(15,"option",66), v(16,"Off"), d(17,"option",67), v(18,"Daily"),
+        d(19,"option",68), v(20,"Weekly")
+        66 ["selected","","value",""]   67 ["value","daily"]   68 ["value","weekly"]
+        ```
+        The VALUES stay `''` / `daily` / `weekly` — they are what crosses the wire and what
+        `isRepeatMode` refuses anything else against — and only the TEXT changes. A select whose
+        options read "off", "daily", "weekly" is a control showing its own storage format; the
+        empty-string mode reading "off" in the manage table below is the reference's own labelling
+        of the same value and stays as it is, because that table is a different node upstream too.
+      -->
+      <select aria-label="Repeat Scheduled Alert" bind:value={repeat} disabled={busy}>
         {#each REPEAT_MODES as mode (mode)}
-          <!-- `e.repeat || "off"` — the reference labels the empty string this way in its own table. -->
-          <option value={mode}>{mode || 'off'}</option>
+          <option value={mode}>{REPEAT_MODE_LABEL[mode]}</option>
         {/each}
       </select>
     </label>
@@ -151,7 +222,8 @@
     {#if weekendsApply}
       <label class="check">
         <input type="checkbox" bind:checked={ignoreWeekends} disabled={busy} />
-        <span>Skip weekends</span>
+        <!-- PAM-08 — `v(3,"Ignore weekends?")` at byte 2,120,631. Ours read "Skip weekends". -->
+        <span>Ignore weekends?</span>
       </label>
     {/if}
   </div>
@@ -202,6 +274,19 @@
 </section>
 
 <style>
+  /*
+    PAM-09's note. `mb-3 mt-1` on the label and `text-decoration: underline` on the span are the
+    reference's own consts 59 and 60; this sheet is scoped, so they are written as rules rather than
+    as bootstrap utility classes the rest of this component does not use either.
+  */
+  .tz-note {
+    margin: 0.25rem 0 1rem;
+  }
+
+  .tz-underline {
+    text-decoration: underline;
+  }
+
   .scheduler {
     display: flex;
     flex-direction: column;

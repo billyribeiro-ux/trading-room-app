@@ -4324,6 +4324,7 @@
     {onclose}
     ontab={onAlertTab}
     onalert={onAlert}
+    onconfirm={onConfirm}
     onpost={onPostAlert}
     onpastepost={onPastePostAlert}
     {stickyNonTradeAlert}
