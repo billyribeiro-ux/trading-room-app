@@ -67,6 +67,9 @@ const modalRaw = readFileSync(`${ROOT}${MODAL}`, 'utf8');
 const REPORT = 'lib/components/AlertSendReportModal.svelte';
 const report = read(REPORT);
 const reportRaw = readFileSync(`${ROOT}${REPORT}`, 'utf8');
+/* RPT-08's two halves live outside the modal now: the string here, the guard in the dispatcher. */
+const BEHAVIOUR_RAW = readFileSync(`${ROOT}lib/message-behavior.ts`, 'utf8');
+const ACTIONS = read('lib/room/message-actions.svelte.ts');
 
 const BUNDLE = readFileSync(
   fileURLToPath(
@@ -238,17 +241,42 @@ describe('RPT-08 — a report opened over a message with no id says so', () => {
     expect(slice).toContain('bootbox.alert("No reports found.")');
   });
 
-  it('carries the reference’s string, verbatim, on the no-id branch', () => {
-    expect(reportRaw).toContain("const NO_REPORTS_FOUND = 'No reports found.';");
-    expect(report).toContain('{#if targetMessage?.id}');
-    expect(report).toContain('{NO_REPORTS_FOUND}');
+  it('carries the reference’s string verbatim, in the transcription module', () => {
+    expect(BEHAVIOUR_RAW).toContain("export const NO_REPORTS_FOUND = 'No reports found.';");
   });
 
   /*
-    HALF, and marked as half. Upstream refuses at the ENTRY POINT — the modal never opens. This
-    room opens it from `message-actions.svelte.ts`, which this change does not own, so the refusal
-    lands inside the dialog instead of instead of it. The audit row names the one-line change.
+    CLOSED 2026-08-30 — the guard moved to where upstream's is, and this is the pair of assertions
+    that says so.
+
+    It was HALF: the string was rendered on the `{:else}` of an `{#if targetMessage?.id}` INSIDE the
+    component, one step after the dialog had already opened, because the change that carried it
+    could not edit the opener. Both halves are asserted below, and the second is the one that
+    matters — a refusal that lands after the thing it refuses is not the reference's behaviour, it
+    is the reference's words over ours.
   */
+  it('refuses at the ENTRY POINT, where the reference refuses', () => {
+    const at = ACTIONS.indexOf("if (action === 'report')");
+    expect(at, 'the report branch moved').toBeGreaterThan(-1);
+    const branch = ACTIONS.slice(at, at + 200);
+    expect(branch, 'opens only for a message that has an id').toContain(
+      "if (item.id) this.#openModal('report');"
+    );
+    expect(branch, 'and otherwise raises the reference’s own string').toContain(
+      'this.#dialogs.alert = NO_REPORTS_FOUND;'
+    );
+  });
+
+  it('leaves NO second answer behind it in the component', () => {
+    /*
+      The negative half, and it is the whole reason the branch was deleted rather than left. With
+      the entry point refusing, an id-less message cannot construct this modal, so an `{:else}`
+      here would be a branch nothing can reach — which this repository forbids by name, and which
+      would quietly become the answer again if anyone ever removed the guard.
+    */
+    expect(report, 'the unreachable gate is gone').not.toContain('{#if targetMessage?.id}');
+    expect(report, 'and so is the string it guarded').not.toContain('NO_REPORTS_FOUND');
+  });
 });
 
 describe('SRCH-02 — a failed search is told apart from an empty one', () => {

@@ -36,6 +36,8 @@ type User = {
   hasScreen?: boolean;
   hasCam?: boolean;
   canEditNotes?: boolean;
+  /* The roster wire's name for the free-trial flag. `targetFor` renames it to `isTrial`. */
+  isFT?: boolean;
 };
 
 const ROW = (over: Partial<User> = {}): User => ({
@@ -988,6 +990,40 @@ describe('the permission checkboxes seed from the roster row', () => {
     );
     expect(target.permissions, 'still the role letter').toBe('r');
     expect(target.hasMic, 'and the flag is beside it, not on top of it').toBe(true);
+  });
+
+  /*
+    UIM-09, the one field of eleven that had a supply.
+
+    The Trial badge has had markup and a gate at `ModalHost.svelte:2771` — `{#if isPresenter &&
+    targetUser.isTrial}` — and nothing ever set `isTrial`, so the gate read `undefined` for every
+    member in every room and the badge could not render for anyone. A control whose only reachable
+    state is "off" is indistinguishable from one that was never built, which is why the audit row
+    read as a missing feature rather than as a missing assignment.
+
+    The supply was already on the wire: `room_members.is_trial` reaches this room as `isFT` on the
+    `/roster/` frame (`sess/[room]/events/+server.ts:202`), on every roster row. Only the rename at
+    the boundary was absent.
+
+    The other ten fields in that row stay unsupplied and are recorded refusals, not oversights —
+    `location` and `ip` are deliberately filtered off the roster wire after a real 2026-08-18
+    privacy defect, and four more are per-session facts this product's server never learns.
+  */
+  it("carries the free-trial flag through as `isTrial`, under the modal's name", () => {
+    const { actions } = make();
+    expect(actions.targetFor(ROW({ isFT: true })).isTrial, 'a trial member').toBe(true);
+    expect(actions.targetFor(ROW({ isFT: false })).isTrial, 'a paid member').toBe(false);
+  });
+
+  it('an absent isFT seeds FALSE, not undefined', () => {
+    /*
+      The badge's gate is a truthiness test, so `undefined` and `false` render identically there and
+      this looks like a distinction without a difference. It is not: `undefined` is the value the
+      defect had, and a test that accepts it would pass against the broken code. Pinning `false`
+      is what makes the assertion above mean "supplied" rather than "falsy".
+    */
+    const { actions } = make();
+    expect(actions.targetFor(ROW()).isTrial).toBe(false);
   });
 
   it('a REDACTED row seeds every box false rather than throwing', () => {

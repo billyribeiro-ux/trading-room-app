@@ -33,6 +33,129 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 22:05 UTC — The size ratchet asked for a slice, and the slice found a third defect
+
+**Runtime impact: NO by itself** — one pure module, two classes delegating to it, no behaviour
+changed. It is recorded separately from the two rows above because what it FOUND is not a
+refactoring note.
+
+Closing UIM-09 and RPT-08 pushed two files past their ceilings, and both had exactly **one line of
+headroom**: `message-actions.svelte.ts` 705 against 706, `user-actions.svelte.ts` 934 against 935.
+`source-size-contract.test.ts` says what to do about that in its own failure message — *"Ceilings
+here only go DOWN: extract a slice into a module or component rather than raising this number"* —
+and row AL had already followed exactly that instruction in the same file the day before.
+
+**The slice was `room/modal-target.ts`: how a `ModalTargetUser` gets built.** Two mappings lived on
+two different classes — a roster row on `RoomUserActions.targetFor`, a message's sender as an inline
+literal in `RoomMessageActions` — plus the no-selection placeholder. All three moved. Both mappings
+are pure now: a row in, an object out, no room state, no session, no wire, readable and testable
+without constructing a class and its collaborators.
+
+**Then the contract that guards this subject found a third one.** `entitlement-shape-contract.test.ts`
+exists because these two mappings drifted once before, and the second was missing all five permission
+fields — every checkbox drew unchecked whatever the membership said, and Save then wrote `false` for
+each key it was not given. Gathering the first two let that test ask a question it could not ask
+while they were apart: *does either class still assemble one of these?* It does:
+
+```
+AssertionError: user-actions.svelte.ts assembles a modal target itself
+  — call the builder in room/modal-target.ts: expected 1 to be +0
+```
+
+`openManagedInfo` — the muted and followed lists — had been building its own `ModalTargetUser` since
+before either of the other two were consolidated, and **nothing had ever searched for it**, because
+the old assertion counted `nick: user.displayName` and this one writes `nick: user.nick`. It is now
+`modalTargetFromManagedUser`, beside its two siblings, with the two things it decides rather than
+carries written down: `status: 'online'` is sound because `openManagedInfo` refuses before reaching
+it when `userXrefID` or `_id` is missing, which is exactly what a logged-out row lacks.
+
+That is the argument for extracting rather than raising, made better than any argument I could have
+written for it: the ceiling did not just cost me a comment, it surfaced a latent defect of the same
+class the module's own contract was written for.
+
+**Ceilings, all three intended and no others:**
+
+| file | was | is | why |
+| --- | --- | --- | --- |
+| `lib/room/user-actions.svelte.ts` | 935 | **892** | DOWN. The number follows the code rather than being parked above it |
+| `lib/room/modal-target.ts` | — | **178** | new, capped in the commit that created it |
+| `lib/room/message-actions.svelte.ts` | 706 | **708** | UP by two, and the extraction came first — those two lines ARE the RPT-08 guard |
+
+**A mistake worth recording, because it was silent.** Two of my ceiling edits used unbounded
+replacements — a `sed` on `max: 142,` and a Python `str.replace` on `max: 895,` — and each hit every
+entry that happened to carry that number. Three ceilings I had no business touching moved:
+`EmojiPicker.svelte`, `ChatSearchBar.svelte` and `refresh.svelte.ts`. **The suite stayed green
+through all of it**, because loosening a ceiling by one line breaks nothing — a ratchet only fails
+when a file grows. Caught by diffing every `max:` line against `HEAD` rather than by any test, and
+all three are restored to their `HEAD` values. The general lesson: a ratchet cannot detect its own
+loosening, so a diff of the ratchet itself is part of reading the change.
+
+**Negative control:** the message-side construction re-inlined → both new assertions RED, each
+naming the file and the remedy (`message-actions.svelte.ts assembles a modal target itself`, and the
+delegation assertion). Restored.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,437 passed,
+1 skipped, gate-exit=0**.
+
+### 2026-08-30 21:40 UTC — The last two audit rows: a badge that could never light, and a refusal that arrived after the thing it refused
+
+**Runtime impact: YES, twice.** A presenter now sees the Trial badge on a free-trial member's card,
+and pressing Alert Send Report on a message with no id raises the reference's own refusal instead of
+opening a report about nothing.
+
+Both rows were closed as `BLOCKED` earlier the same day, each on a change in a file another agent
+held open. Both files are free now, so neither stays blocked. This is what closes
+`room-surface-audit-2026-08-30.md` at **0 open · 224 closed**.
+
+**UIM-09 — the Trial badge had markup, a gate, and no supply.** `ModalHost.svelte:2771` has read
+`{#if isPresenter && targetUser.isTrial}` for as long as the badge has existed, and nothing ever set
+`isTrial`. So it was `undefined` for every member in every room: a control whose only reachable state
+was "off", which from the outside is indistinguishable from a control nobody built. That is why the
+audit row read as a missing feature.
+
+The supply was already on the wire. `room_members.is_trial` reaches this room as `isFT` on the
+`/roster/` frame (`sess/[room]/events/+server.ts:202`), on every roster row; only the rename at the
+boundary was absent. `RoomUserActions.targetFor` sets `isTrial: user.isFT ?? false` now, and
+`isFT?: boolean` joined the class's `User` constraint beside the five permission flags — so it was
+two lines, not the one the row predicted, and the row is corrected to say so.
+
+The other ten fields in that row stay unsupplied and are recorded refusals rather than oversights:
+`location` and `ip` are deliberately filtered off the roster wire after a real 2026-08-18 privacy
+defect, four more are per-session facts this product's server never learns, and `years` has no
+producer anywhere. A default on any of those would have made a measured refusal look like an
+oversight, which is the reason `?? false` is pinned by its own assertion here and nowhere else.
+
+**RPT-08 — the refusal was in the right words and the wrong place.** Upstream:
+`openAlertSendReport(e){ e ? emit("doAlertSendReportModal", e) : bootbox.alert("No reports found.") }`
+at bundle byte 1,349,819. It refuses at the ENTRY POINT and the modal is never constructed.
+
+Ours carried the string verbatim but rendered it on the `{:else}` of an `{#if targetMessage?.id}`
+*inside* the modal — the dialog opened, and then told you there was nothing in it. That was recorded
+as half of the row at the time, honestly, because the change that carried the string could not edit
+the opener.
+
+`RoomMessageActions` is the one opener — this file holds the only call to `#openModal('report')`, and
+`ModalHost.svelte:5878` renders on `name === 'report'` — so the guard there is the whole guard. Two
+decisions came with it, and both are the kind that get quietly undone later:
+
+- **The component's `{:else}` was deleted, not left.** With the entry point refusing, an id-less
+  message cannot construct the modal, so that branch was unreachable — which this repository forbids
+  by name — and it would have become the answer again the moment anyone removed the guard.
+- **The string moved to `lib/message-behavior.ts`**, where the reference's other message-menu
+  transcriptions are pinned, rather than following its consumer into the dispatcher.
+
+**Negative controls — four, each mutation verified as landed, each seen RED, each restored:**
+
+| assertion | mutation | result |
+| --- | --- | --- |
+| `isTrial` is supplied | the assignment deleted | `expected undefined to be true` and `expected undefined to be false` — the defect's own state |
+| `?? false` is load-bearing | `user.isFT ?? false` → `user.isFT` | exactly ONE test red, the one written for it: the two assertions are independent |
+| the guard is at the entry point | guard removed, modal always opens | `expected … to contain "if (item.id) this.#openModal('report');"` |
+| no second answer in the component | the `{:else}` restored | `the unreachable gate is gone: expected … not to contain '{#if targetMessage?.id}'` |
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log. **Not run:** the controller gate,
+which no file here touches.
+
 ### 2026-08-30 21:02 UTC — Three contract tests were failing for being busy, not for being wrong
 
 **Runtime impact: NO. Three test files and nothing else — no `src/lib` module, route or component

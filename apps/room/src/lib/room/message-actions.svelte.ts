@@ -1,5 +1,6 @@
 import { isHttpError } from '@sveltejs/kit';
 
+import { NO_REPORTS_FOUND } from '#lib/message-behavior.js';
 import { toggleReaction } from '#lib/reaction-toggle.js';
 import type {
   MessageAction,
@@ -15,6 +16,7 @@ import type { RoomComposer } from './composer.svelte';
 import type { RoomDialogs } from './dialogs.svelte';
 import type { EvidencePatch } from './feeds.svelte';
 import { RoomMessageDeletion, type AlertDeleteCheck } from './message-delete';
+import { modalTargetFromMessage } from './modal-target';
 import type { RoomToasts } from './toasts.svelte';
 
 /** The one wire command every operation here goes through. */
@@ -442,16 +444,7 @@ export class RoomMessageActions {
       if (action !== 'reaction') this.#closeMessageMenu();
       this.#selectedMessage = item;
     }
-    this.#selectUser({
-      id: item.senderId,
-      nick: item.senderName,
-      emailHash: item.senderEmailHash,
-      pic: item.senderAvatarUrl,
-      status: item.senderStatus ?? 'offline',
-      ...(item.senderStatus && item.senderStatus !== 'offline'
-        ? { userXrefID: String(item.senderId), _id: String(item.senderId) }
-        : {})
-    });
+    this.#selectUser(modalTargetFromMessage(item));
 
     if (action === 'user') {
       /* RM-20 — `doUserInfoExtra`, recorded for the modal's own @Mention button. */
@@ -462,7 +455,16 @@ export class RoomMessageActions {
       this.mention(item.senderName, this.#chat.mentionTargetIsExtra(fromExtraColumn));
     }
     if (action === 'reply') this.#openModal('reply');
-    if (action === 'report') this.#openModal('report');
+    if (action === 'report') {
+      /*
+        RPT-08. Upstream refuses at the ENTRY POINT, and this is it: the only call to
+        `#openModal('report')` in the repository, so this guard is the whole guard. The argument and
+        the reference bytes are at `NO_REPORTS_FOUND` in `lib/message-behavior.ts`, beside the
+        string, rather than restated here.
+      */
+      if (item.id) this.#openModal('report');
+      else this.#dialogs.alert = NO_REPORTS_FOUND;
+    }
     if (action === 'question') {
       // `openAlertQAModal` clears the marker as it opens:
       //   e.hasOwnProperty('unreadQA') && delete e.unreadQA

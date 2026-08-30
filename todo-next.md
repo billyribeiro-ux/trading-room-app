@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,949 lines · 3.1%.**
+**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -160,7 +160,7 @@ guessed.
 | 69 | `lib/components/RestreamPane.svelte` | 105 | no |
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
-| 72 | `lib/components/AlertSendReportModal.svelte` | 164 | no |
+| 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

@@ -3737,8 +3737,47 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       explanation moved with the code it explains, which is the distinction this file's own header
       draws between an extraction and a shorter comment.
     */
-    max: 706,
+    /*
+      706 -> 708, 2026-08-30, for RPT-08's entry-point guard — and the extraction came FIRST, which
+      is the order this rule asks for rather than the number.
+
+      Upstream refuses a report on a message with no id at the entry point:
+      `openAlertSendReport(e){e?emit(…):bootbox.alert("No reports found.")}`. This file holds the
+      only call to `#openModal('report')`, so the guard belongs here and nowhere else. It is four
+      lines where there was one, plus one import.
+
+      Paid for by sending the message-sender mapping to `room/modal-target.ts`: nine lines of object
+      literal became one call, and the same commit took sixty-three lines off `user-actions.svelte.ts`
+      for the same reason. That left this file two over rather than seventeen, and those two are the
+      guard itself. A raise this size after an extraction that large is the honest record; shaving a
+      comment to land on 706 would have been the dishonest one, and this file's header forbids it.
+    */
+    max: 708,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
+  },
+  {
+    file: 'lib/room/modal-target.ts',
+    /*
+      Created 2026-08-30 and capped in the same commit, at the size it actually landed.
+
+      It is the two mappings that build a `ModalTargetUser` — one from a roster row, one from a
+      message's sender — which lived on `RoomUserActions` and `RoomMessageActions` and had already
+      drifted apart once. `entitlement-shape-contract.test.ts` records what that cost: the second
+      construction was missing all five permission fields, so every checkbox drew unchecked whatever
+      the membership said, and Save then wrote `false` for each one it was not given.
+
+      It landed at 143 with two mappings and grew to 178 in the same commit, because gathering those
+      two let `entitlement-shape-contract.test.ts` ask a question it could not ask before — does
+      either class still assemble one of these? — and the answer was a THIRD, `openManagedInfo`,
+      building its own since long before either consolidation. The old assertion had searched for
+      `nick: user.displayName`; that one writes `nick: user.nick`.
+
+      Most of this file is that history and the reason each default is the value it is. The code is
+      about sixty lines and should stay there: a FOURTH source is the thing this module exists to
+      make obvious rather than to accommodate.
+    */
+    max: 178,
+    why: 'how a roster row, a message and a managed-chat row each become the modal’s target'
   },
   {
     file: 'lib/room/message-delete.ts',
@@ -4120,7 +4159,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       counterpart here; `remotePresCommand` / `mutemic` is the same act addressed to one peer — is
       NOT restated: it is written once on `muteAllNonAdmins` above, and this method points at it.
     */
-    max: 935,
+    /*
+      935 -> 892, 2026-08-30, and DOWN is the direction worth noting.
+
+      `targetFor`'s mapping, the no-selection placeholder and `openManagedInfo`'s own inline literal
+      all left for `room/modal-target.ts`, where a message's sender is built the same way. This
+      class kept a three-line `targetFor` that delegates, because that is the name every caller and
+      contract test already uses.
+
+      The number follows the code rather than being left where it was: a ceiling parked above the
+      real figure reads like a limit while licensing every line back.
+    */
+    max: 892,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 

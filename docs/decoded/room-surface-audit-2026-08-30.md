@@ -1886,17 +1886,23 @@ O(5,e.user.hidePrivateInfo?-1:5),m(11),Ze(e.user.nick),m(),O(17,e.user.hidePriva
 
 ### UIM-09 — System tab, Location, Last Login, Trial/New and Temporary Access Only have no data supply — every value resolves to 'n/a' or false
 
-**BLOCKED — one field has a live supply and the one-line change is in a file this change does not
-own; the rest are measured refusals.** Taken field by field, because the row groups eleven that have
-different answers:
+**HALF BUILT 2026-08-30 — the one field of eleven that had a supply is now supplied; the other ten
+are measured refusals.** It was BLOCKED for part of a day on a change in a file another agent held
+open; that change landed the same day and the block is gone. Taken field by field, because the row
+groups eleven that have different answers:
 
 * **`loggedIn` and `email` are SUPPLIED now** — `user-detail.remote.ts` and `RoomUserDetail.decorate`,
   the presenter-only `userInfoDB` lookup. The row predates them. Both cells fill.
-* **`isTrial` HAS a supply and is one line away.** `room_members.is_trial` reaches this room as
-  `isFT` on the SSE roster frame (`routes/sess/[room]/events/+server.ts:202`), so every roster `User`
-  carries it. What is missing is `isTrial: user.isFT` in `RoomUserActions.targetFor`
-  (`src/lib/room/user-actions.svelte.ts:340`) — a file another agent owns concurrently. **That is the
-  whole unblock.** The Trial badge's markup and its gate are already correct here (UIM-10).
+* **`isTrial` is SUPPLIED, 2026-08-30.** `room_members.is_trial` reaches this room as `isFT` on the
+  SSE roster frame (`routes/sess/[room]/events/+server.ts:202`), so every roster `User` carried it
+  all along; only the rename at the boundary was missing. `RoomUserActions.targetFor` now sets
+  `isTrial: user.isFT ?? false`, and `isFT?: boolean` joined the class's `User` constraint beside
+  the five permission flags — which is why this was two lines rather than the one the row predicted.
+  The Trial badge's markup and gate were already correct (UIM-10), so `{#if isPresenter &&
+  targetUser.isTrial}` at `ModalHost.svelte:2771` had been reading `undefined` for every member in
+  every room: a badge whose only reachable state was "off". Two contract tests in
+  `user-actions.svelte.test.ts`, and the `?? false` is pinned separately from the supply because an
+  absent field and a false one must mean the same thing to a truthiness gate.
 * **`temporaryAccessOnly` is a recorded refusal, not a gap**, and the row's stated danger is gone:
   `permission-keys.ts` explains that it is in neither the reference's own permission log line nor the
   controller's `PERMISSION_KEYS`, so there is no column to write it to — and Save sends
@@ -2640,18 +2646,34 @@ ngOnInit(){this.clearInput();const e=this.appService.localstorage.getObject("use
 
 ### RPT-08 — Entry-point guard: a message with no id must raise bootbox 'No reports found.' instead of opening the modal
 
-**HALF BUILT 2026-08-30, and marked as half.** The reference's own string is carried, verbatim:
+**BUILT 2026-08-30.** Closed later the same day by moving the guard to the entry point; what
+follows describes both stages, because the half-built stage is why the string sits where it does.
+The reference's own string is carried, verbatim:
 `openAlertSendReport(e){e?…:bootbox.alert("No reports found.")}` at **1,349,819** (the row cites
 1,349,868, which is mid-method; its own verifier had it right). `AlertSendReportModal.svelte` renders
 it on the `{:else}` of `{#if targetMessage?.id}`, so an id-less report no longer opens a heading
 reading `Alert Sent Report. AlertID: ` — a real title with an empty identifier, which reads as a report
 about nothing rather than as a refusal.
 
-**What is NOT built is the guard's POSITION.** Upstream refuses at the entry point and the modal never
-opens. Here the modal is opened by `RoomMessageActions` — `src/lib/room/message-actions.svelte.ts:380`,
-`if (action === 'report') this.#openModal('report')` — which this change does not own. **The unblock is
-one line there:** refuse with the dialogs primitive when the selected message has no id, instead of
-opening the modal. `MessageMenu.svelte:220` is the wrong layer for it; it holds no dialog.
+**The guard's POSITION was the other half, and it is built now.** Upstream refuses at the entry point
+and the modal is never constructed. `RoomMessageActions` is the ONE opener — this file holds the only
+call to `#openModal('report')`, and `ModalHost.svelte:5878` renders the modal on `name === 'report'`
+— so `if (item.id) this.#openModal('report'); else this.#dialogs.alert = NO_REPORTS_FOUND;` there is
+the whole guard. `MessageMenu.svelte:220` was never the layer for it; it holds no dialog.
+
+Two consequences worth stating, because both are the kind of thing that gets undone later:
+
+* **The component's `{:else}` was DELETED, not left.** With the entry point refusing, an id-less
+  message cannot construct the modal, so that branch became unreachable — and an unreachable branch
+  is what this repository forbids by name. It would also have quietly become the answer again if
+  anyone removed the guard, which is exactly the silent regression a second answer buys you.
+* **The string moved to `lib/message-behavior.ts`**, where the reference's other message-menu
+  transcriptions are pinned, rather than travelling to the dispatcher that now uses it. A captured
+  string with one consumer still belongs with its siblings.
+
+Both halves are asserted in `alert-report-modal-contract.test.ts`, and each was seen red on its own
+mutation: removing the guard fails the entry-point assertion, and restoring the `{:else}` fails the
+no-second-answer one.
 
 **low** · `missing-behaviour` · reference byte **1,349,868**
 

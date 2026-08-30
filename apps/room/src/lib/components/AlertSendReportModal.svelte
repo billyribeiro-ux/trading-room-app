@@ -43,22 +43,6 @@
    */
   const REPORT_UNAVAILABLE =
     'Delivery reporting is not available here: this room records no per-recipient delivery for an alert, so there is nothing to report on.';
-
-  /**
-   * RPT-08's refusal string, verbatim — shown when the modal is open over a message with no id.
-   *
-   * `openAlertSendReport(e){e?…emit("doAlertSendReportModal",e):bootbox.alert("No reports found.")}`
-   * at bundle byte 1,349,819 (the audit row cites 1,349,868, which is mid-method). Upstream refuses
-   * at the ENTRY POINT and never opens the modal; this room opens it from `message-actions`, which
-   * that change did not own, so the refusal lands one step later — inside the dialog rather than
-   * instead of it. That is HALF of the row and it is marked as half: what is reproduced is the
-   * message a presenter reads, not the guard that stops the dialog appearing.
-   *
-   * Before this, an id-less report opened a dialog titled `Alert Sent Report. AlertID: ` — a real
-   * heading with an empty identifier, which reads as a report about nothing rather than as a
-   * refusal.
-   */
-  const NO_REPORTS_FOUND = 'No reports found.';
 </script>
 
 <app-alert-send-report-modal>
@@ -149,12 +133,16 @@
       needs jQuery + flot, which this room does not load and should not; `PollPanel`'s own
       `drawPieChart` is the shape a pie would take here instead.
     -->
-    {#if targetMessage?.id}
-      <div class="mt-3 text-center">{REPORT_UNAVAILABLE}</div>
-    {:else}
-      <!-- RPT-08, the half of it this component can reach. See `NO_REPORTS_FOUND`. -->
-      <div class="mt-3 text-center">{NO_REPORTS_FOUND}</div>
-    {/if}
+    <!--
+      No `{#if targetMessage?.id}` here any more, and its absence is the point.
+
+      This carried an `{:else}` rendering `No reports found.` — RPT-08's refusal, one step after the
+      dialog had already opened, because the component could not reach the opener. It can now:
+      `RoomMessageActions` refuses at the entry point, where upstream refuses, so the modal is never
+      constructed without an id and that branch became unreachable. It was deleted rather than kept
+      as a second answer to a question already settled one layer up.
+    -->
+    <div class="mt-3 text-center">{REPORT_UNAVAILABLE}</div>
     {#snippet footer()}
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
         Close
