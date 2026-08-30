@@ -12,6 +12,7 @@
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import { FONT_FAMILIES, FONT_SIZES, LINE_HEIGHTS, NOTE_PALETTE_ROWS } from '#lib/note-palette.js';
   import type { NoteVersion } from '#lib/types.js';
   import type { SessionImageFile } from '#lib/session-image-files.js';
 
@@ -95,91 +96,6 @@
   }: Props = $props();
 
   const componentId = $props.id();
-  const fontFamilies = [
-    'Arial',
-    'Arial Black',
-    'Comic Sans MS',
-    'Courier New',
-    'Helvetica Neue',
-    'Helvetica',
-    'Impact',
-    'Lucida Grande',
-    'Tahoma',
-    'Times New Roman',
-    'Verdana'
-  ] as const;
-  const fontSizes = ['8', '9', '10', '11', '12', '14', '18', '24', '36'] as const;
-  const lineHeights = ['1.0', '1.2', '1.4', '1.5', '1.6', '1.8', '2.0', '3.0'] as const;
-  const palette = [
-    '#000000',
-    '#424242',
-    '#636363',
-    '#9C9C94',
-    '#CEC6CE',
-    '#EFEFEF',
-    '#F7F7F7',
-    '#FFFFFF',
-    '#FF0000',
-    '#FF9C00',
-    '#FFFF00',
-    '#00FF00',
-    '#00FFFF',
-    '#0000FF',
-    '#9C00FF',
-    '#FF00FF',
-    '#F7C6CE',
-    '#FFE7CE',
-    '#FFEFC6',
-    '#D6EFD6',
-    '#CEDEE7',
-    '#CEE7F7',
-    '#D6D6E7',
-    '#E7D6DE',
-    '#E79C9C',
-    '#FFC69C',
-    '#FFE79C',
-    '#B5D6A5',
-    '#A5C6CE',
-    '#9CC6EF',
-    '#B5A5D6',
-    '#D6A5BD',
-    '#E76363',
-    '#F7AD6B',
-    '#FFD663',
-    '#94BD7B',
-    '#73A5AD',
-    '#6BADDE',
-    '#8C7BC6',
-    '#C67BA5',
-    '#CE0000',
-    '#E79439',
-    '#EFC631',
-    '#6BA54A',
-    '#4A7B8C',
-    '#3984C6',
-    '#634AA5',
-    '#A54A7B',
-    '#9C0000',
-    '#B56308',
-    '#BD9400',
-    '#397B21',
-    '#104A5A',
-    '#085294',
-    '#311873',
-    '#731842',
-    '#630000',
-    '#7B3900',
-    '#846300',
-    '#295218',
-    '#083139',
-    '#003163',
-    '#21104A',
-    '#4A1031'
-  ] as const;
-  const paletteRows = Array.from({ length: 8 }, (_unused, row) =>
-    palette.slice(row * 8, row * 8 + 8)
-  );
-
   let host: HTMLDivElement | undefined;
   let editor = $state<Editor | null>(null);
   let revision = $state(0);
@@ -681,21 +597,35 @@
 </script>
 
 <app-note>
+  <!--
+    `{' '}` ON EVERY LABEL BELOW, AND WHY IT IS AN EXPRESSION RATHER THAN A SPACE
+
+    `T0e` pads its text nodes: `v(3," Set as Welcome Mat ")`, `v(9," Bring Everyone here ")`,
+    `v(14," Done ")`, `Ne(" Version History (", n, ") ")`, and `S0e`'s `v(8," Revert ")`. Svelte
+    trims whitespace at the edges of an element's children, so a trailing space written as text is
+    compiled away and only an expression survives — measured, not assumed, in
+    `files-pane-contract.test.ts`'s `the padded text nodes` block, which is where the argument for
+    the idiom lives and where the FilesPane trio next door is pinned. No pixel depends on it; the DOM
+    text node does, and that is what a byte-for-byte comparison of the two trees reads.
+
+    The LEADING space needs nothing: it sits between the icon element and the text, where Svelte
+    keeps it.
+  -->
   <div class="d-flex justify-content-end align-items-center flex-wrap">
     <button
       class="btn btn-light text-center m-1"
       type="button"
       onclick={() => onSetWelcomeMat(false)}
-      ><i class="fas fa-home"></i> Set as Welcome Mat
+      ><i class="fas fa-home"></i> Set as Welcome Mat{' '}
     </button>
     <button
       class="btn btn-light text-center m-1"
       type="button"
       onclick={() => onSetWelcomeMat(true)}
-      ><i class="fas fa-home"></i> Apply as Welcome Mat to all rooms
+      ><i class="fas fa-home"></i> Apply as Welcome Mat to all rooms{' '}
     </button>
     <button class="btn btn-success text-center m-1" type="button" onclick={onBringEveryone}
-      ><i class="fas fa-eye"></i> Bring Everyone here
+      ><i class="fas fa-eye"></i> Bring Everyone here{' '}
     </button>
     <!--
       `F0e`, rendered by `T0e` only when `carouselInNote`. Const 14 gives the classes, 15 the icon.
@@ -703,7 +633,7 @@
     -->
     {#if carouselInNote}
       <button class="btn btn-secondary text-center m-1" type="button" onclick={editCarousel}
-        ><i class="fas fa-images"></i> Edit Carousel
+        ><i class="fas fa-images"></i> Edit Carousel{' '}
       </button>
     {/if}
     <!--
@@ -721,11 +651,11 @@
         class={['btn btn-warning text-center m-1', { active: showVersionHistory }]}
         type="button"
         onclick={() => onVersionHistoryOpenChange(!showVersionHistory)}
-        ><i class="fas fa-history"></i> Version History ({versions.length})
+        ><i class="fas fa-history"></i> Version History ({versions.length}){' '}
       </button>
     {/if}
     <button class="btn btn-primary text-center m-1" type="button" onclick={() => void done()}
-      ><i class="fas fa-check"></i> {saving ? 'Saving…' : 'Done'}
+      ><i class="fas fa-check"></i> {saving ? 'Saving…' : 'Done'}{' '}
     </button>
   </div>
 
@@ -773,7 +703,7 @@
               type="button"
               onclick={() => onRequestRestore(version)}
             >
-              <i class="fas fa-undo"></i> Revert
+              <i class="fas fa-undo"></i> Revert{' '}
             </button>
           </li>
         {/each}
@@ -985,7 +915,7 @@
           >
           {#if openMenu === 'font'}
             <div class="note-dropdown-menu note-check dropdown-fontname" role="list">
-              {#each fontFamilies as font (font)}
+              {#each FONT_FAMILIES as font (font)}
                 <button
                   type="button"
                   class={[
@@ -1018,7 +948,7 @@
           >
           {#if openMenu === 'fontSize'}
             <div class="note-dropdown-menu note-check dropdown-fontsize" role="list">
-              {#each fontSizes as size (size)}
+              {#each FONT_SIZES as size (size)}
                 <button
                   type="button"
                   class={[
@@ -1084,7 +1014,7 @@
                   >
                   <div class="note-holder">
                     <div class="note-color-palette">
-                      {#each paletteRows as row (row[0])}
+                      {#each NOTE_PALETTE_ROWS as row (row[0])}
                         <div class="note-color-row">
                           {#each row as color (color)}
                             <button
@@ -1132,7 +1062,7 @@
                 >
                 <div class="note-holder">
                   <div class="note-color-palette">
-                    {#each paletteRows as row (row[0])}
+                    {#each NOTE_PALETTE_ROWS as row (row[0])}
                       <div class="note-color-row">
                         {#each row as color (color)}
                           <button
@@ -1242,7 +1172,7 @@
           >
           {#if openMenu === 'lineHeight'}
             <div class="note-dropdown-menu note-check dropdown-line-height" role="list">
-              {#each lineHeights as height (height)}
+              {#each LINE_HEIGHTS as height (height)}
                 <button
                   type="button"
                   class={[
@@ -1552,10 +1482,6 @@
     }}
     onsubmit={insertCarousel}
   />
-{/if}
-
-{#if giphyApiKey && openMenu === null && dialog === null}
-  <!-- Giphy is opened by the toolbar button through this captured picker surface. -->
 {/if}
 
 <!--

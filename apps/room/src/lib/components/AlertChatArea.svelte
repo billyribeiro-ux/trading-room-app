@@ -51,6 +51,7 @@
     inlineAlertKeyPrevents,
     inlineAlertPosts
   } from '#lib/inline-alert-key.js';
+  import { chatComposerKeyAction, chatComposerKeyPrevents } from '#lib/chat-composer-key.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
@@ -423,33 +424,18 @@
   let inlineAlertText = $state('');
 
   /**
-   * `onKey(e)` — byte 2,047,478, and its three branches are NOT the chat composer's.
+   * `onKey(e)` for the INLINE ALERT box — byte 2,047,478.
    *
-   * ```js
-   * onKey(e) {
-   *   if (13 == e.keyCode) {
-   *     e.preventDefault();
-   *     const i = $("#textAreaAlertTxt");
-   *     if (e.shiftKey) i.val(i.val());
-   *     else {
-   *       if (!e.altKey) return i.val().trim() && emit("inlineAlertEntry", i.val()),
-   *                             i.val(""), i.height("23px"), !1;
-   *       i.val(i.val() + "\n")
-   *     }
-   *   }
-   * }
-   * ```
+   * The rule and the whole argument for it are `#lib/inline-alert-key.js`, which is where they are
+   * executable. Not restated here: two places recording one rule is how one of them goes stale, and
+   * that module's own docblock is the one a reader is sent to by every name below.
    *
-   * **Enter posts. ALT+Enter inserts a newline. SHIFT+Enter does NOTHING** — `i.val(i.val())` is a
-   * no-op after `preventDefault`, so the newline is swallowed. That last one reads as a bug and is
-   * the shipped behaviour, and it is the opposite of the chat composer one column over, where
-   * Shift+Enter is the newline. Reproduced rather than harmonised: a presenter's muscle memory for
-   * this box is the reference's, and "fixing" it would post an alert where they expected a line
-   * break.
-   *
-   * The RAW text is sent, not the trimmed one — `emit("inlineAlertEntry", i.val())` after testing
-   * `i.val().trim()`. So leading whitespace survives into the alert, exactly as it does through the
-   * modal, whose own composer "deliberately does not trim inputs".
+   * ONE correction belongs beside this call rather than only in the audit. That module's docblock
+   * ends *"One column over, in the chat composer, Shift+Enter is the newline"* — a claim about the
+   * REFERENCE, and the reference contradicts it. `app-chat`'s `onKey` (byte 1,439,821) and
+   * `app-extra-chat`'s (2,386,131) carry the identical `e.shiftKey ? (i.val(i.val()), …)` swallow.
+   * The sentence describes THIS ROOM's chat composer, not upstream's. `#lib/chat-composer-key.js`
+   * carries the measurement and the divergence this room keeps.
    */
   function onInlineAlertKey(event: KeyboardEvent): void {
     const action = inlineAlertKeyAction(event);
@@ -489,6 +475,60 @@
     const text = inlineAlertText;
     inlineAlertText = '';
     oninlinealertimage(image, text);
+  }
+
+  /**
+   * ── ACA-01 — WHAT ENTER DOES IN THE CHAT COMPOSER ──────────────────────────────────────────────
+   *
+   * The DECISION is `#lib/chat-composer-key.js`, measured on both compiled copies. What each
+   * outcome DOES is here, because each of the three things upstream's send branch does beside
+   * posting belongs to a different owner in this room, and a module that reached for all three
+   * would be the composer.
+   *
+   * ```js
+   * e.preventDefault();
+   * this.showTyping && this.refreshTypingStatus(!0);              // ← 1. every Enter
+   * e.shiftKey ? … : e.altKey ? (i.val(i.val()+"\n"), autoExpand) //   2. the ALT newline
+   *   : (this.showEmojiChooser = !1, this.sendMessage(), autoExpand)  // 3. close the emoji panel
+   * ```
+   *
+   * **1 — the typing signal stops at Enter, not five seconds later.** `refreshTypingStatus(!0)` is
+   * the FORCED form, which is the same call `onstoppedtyping` already makes on blur; it runs before
+   * the branch, so an Alt+Enter newline stops it too. Without it this member kept showing as typing
+   * to everyone in the channel for up to five seconds after their message had already arrived —
+   * `TypingSignal`'s debounce is the only thing that would eventually have cleared it, and the
+   * message landing is a better signal than a timer.
+   *
+   * **2 — ALT+Enter was posting the message.** Ours sent on any Enter without Shift, so a member
+   * reaching for upstream's newline modifier published instead. The `\n` goes on the END of the
+   * value rather than at the caret, which is `i.val(i.val() + "\n")` transcribed rather than
+   * improved: guessing a caret insertion here would be inventing behaviour, and Shift+Enter already
+   * covers the caret case.
+   *
+   * **3 — the emoji panel stays open across a send.** `menus.set('emoji', false)` is this room's
+   * `showEmojiChooser = !1`, and it is on the SEND branch alone in the reference — a newline does
+   * not close it. The page owns `menus` so only one panel is open across every column at once,
+   * which is why this asks it rather than holding a flag.
+   *
+   * SHIFT+Enter is deliberately NOT upstream's swallow. The measurement and the argument are in the
+   * module; the effect here is that `'ignore'` reaches the browser untouched and the newline lands
+   * at the caret.
+   */
+  function handleComposerKey(
+    event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }
+  ): void {
+    const action = chatComposerKeyAction(event);
+    if (action === 'ignore') return;
+    if (chatComposerKeyPrevents(action)) event.preventDefault();
+    const field = event.currentTarget;
+    onstoppedtyping();
+    if (action === 'newline') {
+      chat.composer += '\n';
+      onexpandcomposer(field);
+      return;
+    }
+    menus.set('emoji', false);
+    void onsend().then(() => onexpandcomposer(field));
   }
 
   function holdAlertsScroller(node: HTMLElement) {
@@ -1228,13 +1268,7 @@
                     }}
                     onpaste={handleComposerPaste}
                     onblur={onstoppedtyping}
-                    onkeydown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        const field = event.currentTarget;
-                        void onsend().then(() => onexpandcomposer(field));
-                      }
-                    }}></textarea>
+                    onkeydown={handleComposerKey}></textarea>
                 </div>
                 <!--
                           Which set of composer buttons applies is a pure width question, so it is
