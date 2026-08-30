@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**51 open · 173 closed · 224 rows.**
+**44 open · 180 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -3441,6 +3441,22 @@ nses+=this.total+": ["+i.senderNick+" - "+i.x+" ]: "+s+"\n",$("#responsesTxt").a
 
 ### FP-01 — Opening the Files MAIN tab does not refetch the file list
 
+**BUILT 2026-08-30.** `#lib/room/main-tab-refetch.ts` — `onMainTabChange`'s two refetches, in the
+one place every write to `mainTab` passes.
+
+**The interesting half is the FIRST PASS**, and it is why this is a class rather than an `$effect`
+reading `mainTab` directly. An effect runs once at mount with whatever tab the room opened on, so a
+refetch there would fire a second load on top of the one that just delivered the page — for every
+viewer, on every navigation. Upstream cannot have that problem: its version is a click handler and
+there is no such thing as running it for the initial value. The first call seeds and returns false,
+exactly as `RoomArrivals.fresh` does.
+
+The reference's two commands — `getSessionFiles()` and `loadVideos()` — collapse into one
+`invalidate('room:data')`, which is not a simplification: this route has a single `+page.server.ts`
+load that builds files and the video state together, and a caller trying to be narrower would be
+inventing a second source of truth for `data.files`. The Refresh button already records that
+argument. Two controls seen red.
+
 **low** · `missing-behaviour` · reference byte **1,968,369**
 
 ```
@@ -3452,6 +3468,13 @@ nses+=this.total+": ["+i.senderNick+" - "+i.x+" ]: "+s+"\n",$("#responsesTxt").a
 > Verified: Opening the Files main tab genuinely does not trigger a file-list refetch in our source. MainTabStrip.svelte's Files handlers assign `mainTab` (and toggle the cog dropdown) and nothing else; FilesPane.svelte contains zero `$effect`, zero `onMount` and zero `{@attach}`, so becoming visible runs no code; `mainTab` is a plain `$state` in +pa…
 
 ### FP-03 — Active pane class string is emitted in a different order than the reference helper produces
+
+**FIXED 2026-08-30.** `tab-pane fade show active`, which is what `Hr = t => ({"show active": t})`
+(byte 1,916,418) produces over const 29's static `tab-pane fade`.
+
+Same class SET either way, so nothing renders differently; what it costs is a byte-for-byte DOM diff
+against a capture, which reports it as a difference and sends somebody looking. Free to match.
+Control seen red.
 
 **low** · `divergence` · reference byte **1,916,418**
 
@@ -3465,6 +3488,14 @@ Hr=t=>({"show active":t})
 
 ### FP-05 — Tab click handler is duplicated on both the <li> and the <a>; the reference has it on the <li> only
 
+**FIXED 2026-08-30.** The anchor's `onclick` is gone from all three tabs; the `<li>`'s stays, which
+is where const 31/33/36 put the listener while 32/34/35 carry `ngClass` and nothing else.
+
+The anchor click bubbled to the `<li>`, so the handler ran twice per click. The assignment is
+idempotent, so nothing observable broke — **which is exactly why it would have stayed**. The
+`onkeydown` stays and is deliberate: the reference's anchors are not keyboard operable and ours are,
+so this row's fix is not "make the anchor inert". Control seen red.
+
 **low** · `divergence` · reference byte **2,015,447**
 
 ```
@@ -3476,6 +3507,15 @@ d(53,"a",32)(54,"span"),v(55,"Files")
 > Verified: I tried to refute this and could not. Our source really does carry the same tab-select click on BOTH the `<li>` and the `<a>`, three times over, and nothing anywhere in apps/room/src removes, extracts or justifies the anchor half.
 
 ### FP-06 — onFileTabChange's console.log side effect is not reproduced
+
+**MEASURED REFUSAL, recorded 2026-08-30.** The row states its own disposition — *"a debug
+`console.log` left in a shipped bundle; recorded for completeness, not something to add"* — and it is
+right.
+
+Kept as a row rather than deleted because the value of having read it is knowing that
+`onFileTabChange` does NOTHING ELSE: the reference's tab change is an assignment and a log, so the
+absence of any other side effect on that path is confirmed rather than assumed. That is what a
+`missing-behaviour` row is worth when the behaviour is a log line.
 
 **low** · `missing-behaviour` · reference byte **1,960,015**
 
@@ -3489,6 +3529,16 @@ onFileTabChange(e){console.log("tab",e),this.selectedFileTab=e}
 
 ### FP-09 — Search term is trimmed here and is not trimmed in the reference's filter pipe
 
+**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The reference's `filter` pipe lower-cases the term
+and does not trim it (read verbatim at byte 1,914,488), so typing a single space filters the list to
+rows whose text happens to contain a space — most of them, and unpredictably. Ours trims, so a
+whitespace-only query is an empty query and the list is unchanged.
+
+Both are answers to a query nobody means to type. Ours is the one whose result a person can predict,
+and reproducing the other would mean writing a filter that treats the space bar as a search term. The
+divergence is one character of code and this paragraph is the whole of it; nothing else in the pipe
+differs — any string-valued own property, case-insensitive substring, empty term returns the list.
+
 **low** · `divergence` · reference byte **1,914,488**
 
 ```
@@ -3501,6 +3551,23 @@ transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>{let s=!1;return"string
 
 ### FP-12 — In-file comments cite const numbers that do not match THIS bundle
 
+**FIXED 2026-08-30, and the fix is a test rather than an edit.**
+
+The row is not "a comment has a typo". The citations named `app-presentationarea.full.js`, one of the
+thirteen reference-capture roots **this repository does not hold**, so every index in them was
+unverifiable by anybody but their author while reading as verified. Three were wrong: the
+Stop-Playing-For-All glyph is const **157** and was cited as 158; the two alert-sound buttons are
+**267** and **269** (with **260**/**261** the click-less placeholders and **268** the bell) and were
+cited as 261/262/263; the `pe="button"` typo is on **261 and 269** and was cited as 263.
+
+Every transcribed VALUE was correct, which is the part worth stating: the comments were right about
+what the reference does and wrong about where to look, and the second is what a reader checks.
+
+`files-pane-rows-contract.test.ts` decodes the component's const table out of the pinned v4 bundle
+and asserts all six entries, so a renumbering in a future capture goes red instead of quietly making
+the comments wrong again. The sentences saying which numbers were stale are kept — a correction with
+no record of what it corrected is one somebody re-derives. Control seen red.
+
 **low** · `wrong-constant` · reference byte **1,946,166**
 
 ```
@@ -3512,6 +3579,24 @@ function Lwe(t,n){if(1&t){const e=Y();d(0,"button",241),x("click",function(){ret
 > Verified: I could not refute it. The const-index citations in FilesPane.svelte's comments genuinely do not match this bundle, and I confirmed it by reading both bundles rather than trusting the claim.
 
 ### FP-13 — Row/tab classification reads a stored `kind` column, not contentType at render time
+
+**HALF BUILT 2026-08-30 — the divergence is kept and is now applied consistently, which is what
+the row actually found.**
+
+Deciding once at upload (`kindForContentType` → `shared_files.kind`) rather than testing a string at
+four render sites is the better shape and stays. What the row caught is that **the divergence was
+three-quarters applied**: the row filter, the tab counts and the Play button read `kind`, while
+`alertSoundButtonFor` alone still ran `contentType.indexOf('audio/')`.
+
+That is a substring test where `kindForContentType` uses `startsWith`, so the two parted company on a
+type like `application/x-audio/foo` — a row **absent from the Sounds tab and offered the
+Set-Alert-Sound button anyway**. One pane, two answers to one question. The gate reads `kind` now and
+`FileRow` no longer carries `contentType` at all, so the second predicate is unwritable rather than
+merely absent.
+
+The remaining half is upstream's own: a row whose content type changes after upload is not
+reclassified here. Nothing in this application changes it — it is written once by the uploader — so
+that is a property of the schema rather than a gap. Control seen red.
 
 **low** · `divergence` · reference byte **1,949,656**
 

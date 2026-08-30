@@ -7,6 +7,7 @@
   } from '#lib/chat-mode.js';
       import { page } from '$app/state';
   import { invalidate, invalidateAll } from '$app/navigation';
+  import { MainTabRefetch } from '#lib/room/main-tab-refetch.js';
   // The first remote function in this app. Aliased because the local wrapper below keeps the name.
     import { getMyMobilePin, restoreMobileAppTokens } from './mobile-pin.remote';
     import { focusOnScreen } from './presenter-commands.remote';
@@ -90,6 +91,20 @@
   // `class="nav-link active"` with `aria-selected="true"`, and `notes-tab` carries
   // `class="nav-link presAreaTabs-notes"` with `aria-selected="false"`. The room opens on Screens.
   let mainTab: MainTab = $state('screens');
+
+  /**
+   * `FP-01` — opening Files or the video player refetches the room, as `onMainTabChange` does.
+   *
+   * The rule and the reason it needs a first-pass seed are in `#lib/room/main-tab-refetch.ts`; what
+   * is here is the effect that reads the tab. A plain field and not `$state`, for the reason
+   * `arrivals.ts` records: nothing renders from it, and an effect that read its own marker reactively
+   * would re-run on the write that was meant to end it.
+   */
+  const mainTabRefetch = new MainTabRefetch();
+
+  $effect(() => {
+    if (mainTabRefetch.opened(mainTab)) void invalidate('room:data');
+  });
 
   /**
    * The MediaMTX stream list and its selected tab, owned by `room-mtx.svelte.ts`.

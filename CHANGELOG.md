@@ -33,6 +33,99 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 19:25 UTC — The Files pane: a list up to five seconds stale, a click that fired twice, and const numbers nobody could check
+
+**Runtime impact: YES.** Opening the Files tab or the video player refetches the room instead of
+waiting for the five-second poll. A tab click runs its handler once rather than twice. The
+Set-Alert-Sound button now appears on exactly the rows the Sounds tab shows. And the active pane's
+class attribute matches the reference's byte for byte.
+
+Seven rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `FP-01` through `FP-13` — which
+closes the `FilesPane` surface. **44 open · 180 closed · 224 rows.**
+
+#### `FP-12` is the largest of them, and it is not a typo fix
+
+The comments in `FilesPane.svelte` cited const indices from `app-presentationarea.full.js` — one of
+the thirteen reference-capture roots **this repository does not hold**. So every index in them was
+unverifiable by anybody but their author, while reading as verified. Three were wrong: the
+Stop-Playing-For-All glyph is const 157 (cited as 158), the two alert-sound buttons are 267 and 269
+with 260/261 the click-less placeholders and 268 the bell (cited as 261/262/263), and the
+`pe="button"` typo is on 261 and 269 (cited as 263).
+
+Every transcribed VALUE was correct, which is the part worth stating: the comments were right about
+what the reference does and wrong about where to look — and the second is what a reader checks.
+
+The fix is a test rather than an edit. `files-pane-rows-contract.test.ts` decodes the component's
+const table out of the pinned v4 bundle and asserts all six entries, so a renumbering in a future
+capture goes red instead of quietly making the comments wrong again. The sentences recording which
+numbers were stale are kept: a correction with no record of what it corrected is one somebody
+re-derives.
+
+#### `FP-01` — the first pass is the whole design
+
+`onMainTabChange` refetches for two of the seven tabs. The obvious implementation is an `$effect` on
+`mainTab`, and it is wrong: an effect runs once at mount with whatever tab the room opened on, so a
+refetch there fires a second load on top of the one that just delivered the page — for every viewer,
+on every navigation. Upstream cannot have that problem; its version is a click handler.
+
+So `MainTabRefetch.opened()` seeds on the first call and returns false, exactly as `RoomArrivals.fresh`
+does, and returns false again for a repeat of the tab already showing, because an effect re-runs for
+reasons that have nothing to do with the strip and each of those must not be a round trip.
+
+The reference's two commands collapse into one `invalidate('room:data')` — not a simplification: this
+route has a single load that builds files and the video state together, and a caller trying to be
+narrower would be inventing a second source of truth for `data.files`.
+
+#### `FP-13` — one pane, two answers to one question
+
+Deciding a file's bucket once at upload rather than testing a string at four render sites is the
+better shape and stays. What the row caught is that the divergence was **three-quarters applied**:
+the row filter, the tab counts and the Play button read the stored `kind`, while `alertSoundButtonFor`
+alone still ran `contentType.indexOf('audio/')`.
+
+That is a substring test where `kindForContentType` uses `startsWith`, so the two parted company on a
+type like `application/x-audio/foo` — a row absent from the Sounds tab and offered the
+Set-Alert-Sound button anyway. `FileRow` no longer carries `contentType` at all, so the second
+predicate is unwritable rather than merely absent.
+
+#### `FP-05` and `FP-03` — two that broke nothing
+
+The tab click sat on both the `<li>` and the `<a>`, so an anchor click bubbled and ran the handler
+twice. The assignment is idempotent, so nothing observable broke — **which is exactly why it would
+have stayed**. The `onkeydown` stays: the reference's anchors are not keyboard operable and ours are,
+so the fix is not "make the anchor inert".
+
+`FP-03` is a class attribute emitted as `active show` where the reference's helper produces
+`show active`. Same set, different string, and a byte-for-byte DOM diff against a capture reports it.
+
+#### The two refused
+
+`FP-06` is a `console.log` left in a shipped bundle; the row said not to add it and it is right. It
+is kept as a row rather than deleted because having read it confirms `onFileTabChange` does nothing
+else. `FP-09` is the search term: the reference does not trim it, so typing a single space filters to
+rows containing a space — most of them, unpredictably. Ours trims. Reproducing the other would mean
+writing a filter that treats the space bar as a search term.
+
+#### A note on where these tests live
+
+`files-pane-contract.test.ts` and `files-gates.test.ts` read `docs/source/`, so **neither runs in
+this checkout** — the suite prints that exclusion on every invocation. A row whose only test cannot
+run locally is a row whose negative control cannot be seen red, and this repository treats an unseen
+control as no control. So the four buildable rows are pinned in a new file that reads the v4 bundle,
+which IS in the repository and SHA-256 pinned.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **258 test files, 4,283 tests, 1
+skipped.** `svelte-check` clean at 1,474 files. **Six negative controls, each seen red**: the
+first-pass seed removed; the repeat guard removed; the class order put back; the anchor click put
+back; the alert-sound gate moved onto the url; and the stale const index restored.
+
+`unbound-method-contract` refused the new class until it was registered — the fourth time in three
+days. `svelte-autofixer` returns no issues and no suggestions for the changed markup. Two size
+ceilings raised with their arguments, plus one new module declared. **Nothing was opened in a
+browser.**
+
 ### 2026-08-30 19:07 UTC — The presentation column: a caption that never went away, a dismissal that was forgotten, and four things in the wrong order
 
 **Runtime impact: YES.** A caption clears seven seconds after the room falls silent instead of
