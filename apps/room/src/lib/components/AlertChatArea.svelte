@@ -35,7 +35,7 @@
     `chatEnabled`, `alertFilterConfigured`. Authority is computed once, on the page, from data the
     server owns. A pane that re-derived any of them would be a second opinion about permission.
   */
-  import { tick } from 'svelte';
+  import { tick, type Snippet } from 'svelte';
 
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
@@ -107,6 +107,24 @@
 
     /** The ROLE, decided on the page from `data.user.role`. Never asserted by a component. */
     isPresenter: boolean;
+    /**
+     * `globals.isLimitedPresenter` — `acA-07`, and the term this file's own comment already named.
+     *
+     * `giveMicScreen` assigns `globals.user.isPresenter = globals.isLimitedPresenter = e.give`, so
+     * somebody handed mic and screen at runtime satisfies `isPresenter`. The archive control is one
+     * of the places the reference withholds from exactly those people.
+     */
+    isLimitedPresenter?: boolean;
+    /**
+     * `acA-08` — the extra chat column, when the room's split direction puts it INSIDE this split.
+     *
+     * A snippet rather than a component, because the column is the page's: it takes thirty props off
+     * the page's own state and threading them through here to be handed straight back is the shape
+     * `source-size-contract.test.ts` records refusing for the alert and presentation panes. The
+     * decision about WHICH of the two homes it gets is `RoomShell`'s and the page's — this component
+     * only provides the place.
+     */
+    extraChatArea?: Snippet;
     doNotDisturbOn: boolean;
     pollIsActive: boolean;
     /**
@@ -310,6 +328,8 @@
     polls,
     menus,
     isPresenter,
+    isLimitedPresenter = false,
+    extraChatArea,
     doNotDisturbOn,
     pollIsActive,
     alertFilterConfigured,
@@ -640,24 +660,45 @@
                     >
                   </li>
                 {/if}
-                <li class="nav-item mx-1">
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!--
+                  `acA-12` — the whole `nav-item` is the hit target, not the anchor inside it.
+
+                  ```js
+                  d(11,"li",12), x("click", () => o.toggleAlertsToolbarSearchOnly()),
+                    d(12,"a",13), T(13,"i",14), u()(),
+                  d(14,"li",15), x("click", () => o.toggleAlertsToolbar())   // byte 2,055,851
+                  12 [1,"nav-item","mx-1",3,"click"]   13 ["title","Search",1,"nav-link","p-0"]
+                  ```
+
+                  Const 13 carries NO click. So upstream the `mx-1` margin is part of what you can
+                  press and here it was dead space — a smaller target on a control people hit with a
+                  mouse many times a session, for no reason other than where the handler was hung.
+
+                  The private-chat button is bound on the `<a>` in BOTH (`W_e` at 1,421,660), which
+                  is why this is not applied to it: the difference is real and specific to the two
+                  toolbar toggles, in both columns.
+                -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <li class="nav-item mx-1" onclick={ontogglealertssearch}>
                   <!-- svelte-ignore a11y_missing_attribute -->
-                  <a title="Search" class="nav-link p-0" onclick={ontogglealertssearch}>
+                  <a title="Search" class="nav-link p-0">
                     <i class="fas fa-search"></i>
                   </a>
                 </li>
-                <li class="nav-item dropdown ml-2" style="position: static;">
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <li
+                  class="nav-item dropdown ml-2"
+                  style="position: static;"
+                  onclick={ontogglealertstoolbar}
+                >
                   <!-- svelte-ignore a11y_consider_explicit_label -->
                   <!-- svelte-ignore a11y_missing_attribute -->
                   <a
                     aria-haspopup="true"
                     aria-expanded="false"
                     class="nav-link dropdown-toggle p-0"
-                    onclick={ontogglealertstoolbar}
                   >
                     <i title="Settings" class="fas fa-cog chat-header-gear"></i>
                   </a>
@@ -834,7 +875,14 @@
                           onclick={onsavealerts}
                           ><i class="fas fa-save"></i>
                         </span>
-                        {#if isPresenter}
+                        <!--
+                          `acA-07` — `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` at byte
+                          2,043,456. The comment eight lines above has stated the full gate since
+                          this block was written and the code applied half of it, which is the
+                          shape `CLAUDE.md` names outright: *"every comment claiming X is
+                          bounded/constant/checked still matches the next line."* It did not.
+                        -->
+                        {#if isPresenter && !isLimitedPresenter}
                           <!-- svelte-ignore a11y_click_events_have_key_events -->
                           <!-- svelte-ignore a11y_no_static_element_interactions -->
                           <div
@@ -964,11 +1012,25 @@
               <!-- svelte-ignore a11y_missing_attribute -->
               <a class="navbar-brand ml-1 mr-1"
                 ><i class="fas fa-comment"></i>
+                <!--
+                  `acA-11`, first half — `function j_e(t,n){1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}`
+                  at byte 1,420,732, gated by `O(5, 0 == o.chatTabs.length ? 5 : -1)` at 1,453,850.
+
+                  The label appears ONLY when there are no channels — because the tab strip is what
+                  normally names this column, and `ChatTabStrip` suppresses itself in that same case
+                  (the second half of this row). Without both, a room with no channels configured
+                  showed a bare comment glyph beside an empty styled `<ul>`, and nothing said
+                  "Chat".
+
+                  `&nbsp;` and not a space: it is `\xa0` in the capture, and a plain space here
+                  would be collapsed away by the surrounding whitespace.
+                -->
+                {#if chatTabs.length === 0}<span>&nbsp;Chat</span>{/if}
                 {#if doNotDisturbOn}
                   <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
                 {/if}</a
               >
-              <ChatTabStrip tabs={chatTabs} bind:active={chat.tab} />
+              <ChatTabStrip tabs={chatTabs} bind:active={chat.tab} unread={chat.unread} />
               <ul class="nav ml-auto align-items-center">
                 {#if showPmButton}
                   <li class="nav-item">
@@ -980,24 +1042,35 @@
                     </a>
                   </li>
                 {/if}
-                <li class="nav-item mx-1">
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- `acA-12`, the chat column's twin. See the alerts column above. -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <li class="nav-item mx-1" onclick={() => chat.search.toggle('main')}>
                   <!-- svelte-ignore a11y_missing_attribute -->
-                  <a title="Search" class="nav-link p-0" onclick={() => chat.search.toggle('main')}>
+                  <a title="Search" class="nav-link p-0">
                     <i class="fas fa-search"></i>
                   </a>
                 </li>
-                <li class="nav-item dropdown ml-2" style="position: static;">
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <!--
+                  `acA-04` — `x("click", () => o.toggleChatToolbar())` on the `li` at index 13, byte
+                  1,453,560. It opened the SETTINGS MODAL here, which is not what the reference's
+                  chat gear does and was defensible only while the extended toolbar had nothing in
+                  it. It has the Mod Only checkbox now. The settings modal is still reached from the
+                  sidebar and from the alerts column, so nothing lost its only route.
+                -->
+                <li
+                  class="nav-item dropdown ml-2"
+                  style="position: static;"
+                  onclick={() => chat.search.toggleExtended('main')}
+                >
                   <!-- svelte-ignore a11y_consider_explicit_label -->
                   <!-- svelte-ignore a11y_missing_attribute -->
                   <a
                     aria-haspopup="true"
                     aria-expanded="false"
                     class="nav-link dropdown-toggle p-0"
-                    onclick={() => onopenmodal('settings')}
                   >
                     <i title="Settings" class="fas fa-cog chat-header-gear"></i>
                   </a>
@@ -1014,10 +1087,14 @@
           -->
           {#if chat.search.isOpen('main')}
             <ChatSearchBar
+              column="main"
               term={chat.search.term('main')}
               oninput={(value) => chat.search.setTerm('main', value)}
               onsubmit={() => onchatsearch('main', chat.search.term('main'))}
               onclear={() => chat.search.clear('main')}
+              extended={chat.search.isExtended('main')}
+              modOnly={chat.modOnly('main')}
+              onmodonly={(next) => chat.setModOnly('main', next)}
             />
           {/if}
 
@@ -1374,6 +1451,31 @@
         </div>
       {/if}
     </as-split-area>
+
+    <!--
+      `acA-08` — the extra chat column's SECOND home.
+
+      ```js
+      function V4e(t,n){ … d(4,"as-split-area",211)(5,"app-chat",212) … ,
+        H(6, j4e, 2, 1, "as-split-area", 211), u()() }
+      … O(6, !preferences.extraChatColumn ||
+             "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
+      ```                                                                     // byte 2,490,857
+
+      The reference puts the column in one of TWO places depending on the room's split direction: a
+      third area of the OUTER split for `ltr`/`rtl` (`H4e`, const 207), and a FOURTH area of THIS
+      inner split for `ttb`/`btt` — const 211, the same `chat-box` the main column uses. In a
+      top/bottom room the second column therefore lands BELOW the chat pane, inside the alert-chat
+      stack, rather than beside the presentation area.
+
+      This room had only the outer form, ungated, so a `ttb` room drew the column in the wrong half
+      of the screen. `RoomShell` owns the outer half; the snippet is rendered here because this
+      component owns the inner split and a caller cannot reach inside it.
+
+      OPTIONAL, and the default is nothing: every construction that renders this pane without a
+      second column — the tests, and any room whose viewer has the preference off — passes none.
+    -->
+    {@render extraChatArea?.()}
 
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div

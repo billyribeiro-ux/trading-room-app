@@ -1,5 +1,17 @@
 import type { ActivePoll } from '#lib/types.js';
 
+/**
+ * What the page should do with the poll modal, having been told what the server now holds.
+ *
+ * `poll-02`. A verdict rather than a boolean, because "no poll" is TWO different situations and the
+ * boolean could only express one of them: a room that has never had a poll, and a poll that has just
+ * ended under a panel somebody is looking at. The reference distinguishes them with an EVENT —
+ * `case "pollDone": emit("pollDone")` at byte 1,024,082, and `subscribe("pollDone", () =>
+ * this.hidePanel())` at 2,106,987 — and this room has state rather than events, so the transition is
+ * what has to be detected.
+ */
+export type PollDelivery = 'open' | 'ended' | null;
+
 /*
   The poll modal's own state — the first of the six room state classes, and the shape the rest
   follow.
@@ -41,6 +53,21 @@ export class RoomPolls {
   #restoreToken = $state(0);
   /** The poll this browser has already auto-opened, so it is not re-opened on every re-render. */
   #deliveredId = $state<number | null>(null);
+  /**
+   * The poll the SERVER last said was running, whoever it belongs to and whether or not it was shown.
+   *
+   * PLAIN, not `$state`, and the asymmetry with `#deliveredId` above is deliberate. That one is a
+   * latch the effect reads and writes and whose convergence the tests argue; this one is written in
+   * `deliver` and read only by the next call to `deliver`. Nothing renders from it, so making it
+   * reactive would add a dependency to an effect that already assigns it — the shape `arrivals.ts`
+   * records refusing for `#seeded` and for the same reason.
+   *
+   * It is not `#deliveredId` because that is cleared for three reasons that are not "the poll
+   * ended": you wrote it, you already answered it, or this browser has shown it once. A presenter
+   * ending their own poll would otherwise never close anyone's panel, because their poll was never
+   * delivered to them.
+   */
+  #activeId: number | null = null;
 
   get openMode(): 'setup' | 'auto' {
     return this.#openMode;
@@ -95,24 +122,35 @@ export class RoomPolls {
    * minimised flag with it, because a minimised modal for a poll that no longer exists is a
    * restore button that opens nothing. It ASSIGNS from inside an `$effect`; the tests argue why.
    */
-  deliver(poll: ActivePoll | null, viewerId: number): boolean {
+  deliver(poll: ActivePoll | null, viewerId: number): PollDelivery {
     if (!poll) {
+      /*
+        `poll-02` — THE POLL ENDED, which is not the same as there never having been one.
+
+        Reported only on the TRANSITION. Returning `'ended'` for the steady state of "no poll" would
+        make the setup panel impossible to open: a presenter builds a poll while `activePoll` is
+        null, so the page would close the modal on the same pass that opened it.
+      */
+      const ended = this.#activeId !== null;
+      this.#activeId = null;
       this.#deliveredId = null;
       this.#minimized = false;
-      return false;
+      return ended ? 'ended' : null;
     }
+
+    this.#activeId = poll.id;
 
     if (
       poll.senderId === viewerId ||
       poll.userAnswerChoice !== null ||
       this.#deliveredId === poll.id
     ) {
-      return false;
+      return null;
     }
 
     this.#deliveredId = poll.id;
     this.#openMode = 'auto';
     this.#minimized = false;
-    return true;
+    return 'open';
   }
 }

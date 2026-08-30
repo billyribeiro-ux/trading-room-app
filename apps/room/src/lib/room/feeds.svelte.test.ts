@@ -257,3 +257,57 @@ describe('the pipelines are reactive', () => {
     expect(seen, 'the extra column does not follow its channel').toEqual([1, 2]);
   });
 });
+
+/**
+ * `acA-04` — the Mod Only predicate, executed.
+ *
+ * ```js
+ * const {modOnly: r} = globals.filterChatMsgs;
+ * r && (e = e.filter(a => { if (a.uid === s.userXrefID || r && a.isA) return !0 }))
+ * ```                                                                        // byte 1,414,769
+ *
+ * Two survivors, not one: the moderators' messages AND your own. A filter that hid what you had just
+ * typed would read as the send having failed.
+ */
+describe('the Mod Only filter', () => {
+  const log = [
+    row({ id: 1, senderId: 2, body: 'from a member', isAdmin: false }),
+    row({ id: 2, senderId: 3, body: 'from a mod', isAdmin: true }),
+    row({ id: 3, senderId: 9, body: 'mine', isAdmin: false })
+  ];
+
+  it('shows every message while it is off', () => {
+    const { feeds } = make({ messages: log });
+    expect(feeds.visibleChat.map((item) => item.id)).toEqual([1, 2, 3]);
+  });
+
+  it('keeps the moderators and the reader, and drops everyone else', () => {
+    const { feeds, chat } = make({ messages: log });
+    chat.setModOnly('main', true);
+    expect(feeds.visibleChat.map((item) => item.id)).toEqual([2, 3]);
+  });
+
+  it('is per COLUMN — filtering one leaves the other alone', () => {
+    /*
+      Both columns are pointed at `main` here on purpose: the two feeds then differ by nothing except
+      which switch they read, which is the whole claim.
+    */
+    const { feeds, chat } = make({ messages: log });
+    chat.extraTab = 'main';
+    chat.setModOnly('main', true);
+    expect(feeds.visibleChat.map((item) => item.id)).toEqual([2, 3]);
+    expect(feeds.visibleExtraChat.map((item) => item.id)).toEqual([1, 2, 3]);
+  });
+
+  it('applies to SEARCH RESULTS too, which upstream cannot do', () => {
+    /*
+      Upstream's toggle re-requests the log and drops the search, so the question never arises there.
+      Here the results stand in for the log through the same pipeline — and a result set that
+      contradicted the checkbox above it is the defect `alertSearchFilter` exists to prevent.
+    */
+    const { feeds, chat } = make({ messages: [] });
+    feeds.setChatSearchResults('main', log);
+    chat.setModOnly('main', true);
+    expect(feeds.visibleChat.map((item) => item.id)).toEqual([2, 3]);
+  });
+});

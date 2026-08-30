@@ -33,6 +33,384 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 19:07 UTC — The presentation column: a caption that never went away, a dismissal that was forgotten, and four things in the wrong order
+
+**Runtime impact: YES.** A caption clears seven seconds after the room falls silent instead of
+staying pinned over the presentation area for the rest of the session. Dismissing the caption overlay
+is remembered across a reload. A viewer sees "Connecting to …" while a screenshare consumer is being
+built and "… started screen sharing" when it lands. A room with no notes shows a heading and a New
+Note button instead of two empty boxes. A phone no longer spends part of its short presentation
+column on the webcam strip. And four things move into the reference's order.
+
+Eight rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `PA-01` through `PA-08` — which
+closes the `PresentationArea` surface. **51 open · 173 closed · 224 rows.**
+
+#### `PA-01` — the port's own TYPE was half the defect
+
+`setCurrentCaption: (caption: Caption) => void` **cannot express "the room went quiet"**, so nothing
+in this application could ever clear a caption. The last line anybody spoke stayed over the
+presentation area indefinitely: the room falls silent, the presenter moves on, and a sentence from
+twenty minutes ago is still captioning whatever is on screen now.
+
+`caption-staleness.ts` is `startSpeechChecker` transcribed. Two details are worth the lines. The
+interval EQUALS the window — 7,000 ms both — so a caption survives between 7 and 14 seconds of
+silence; that is upstream's shape and improving on it is not this row's decision. And it stops itself
+from inside the stale branch, so a silent room holds no timer at all rather than one waking up every
+seven seconds for the life of the page.
+
+#### `PA-02` — two paths to one setting, and one of them was not a setting
+
+The overlay's X wrote `subtitles = false` through a `$bindable`, which lands on a bare private-field
+write in `RoomPrefs` with **no `save()`** — so the dismissal was forgotten on reload, while the
+navbar checkbox for the same preference persisted correctly. It goes through `prefs.save` now, and
+`subtitles` is a plain prop with an `onhidespeechreco` callback beside it, because dismissing writes
+four pieces of state the component does not own.
+
+The other three statements are the ones an implementation drops because nothing visible depends on
+them at the moment you press the button: the caption goes, the checker stops, and history mode
+resets so re-enabling the overlay later does not reopen it in the transcript view.
+
+#### `PA-03` — where the two toasts go is the whole row
+
+"Connecting to …" goes BEFORE `consume()`, which is what makes it a connecting notice rather than a
+second arrival notice: building the consumer is a round trip to the SFU, and this is the only
+feedback a viewer gets while it happens. "… started screen sharing" goes INSIDE `if (remote)`,
+because a null `remote` is the dedupe path the server's at-least-once `newProducer` requires — a
+toast outside it fires once per `getProducers` snapshot.
+
+`screenLoading` and its three companions are **not** built. Their markup is quoted nowhere in the
+row or in the bytes it cites, and a spinner invented rather than read is not something this
+repository ships. Recorded at the disposition rather than half-built.
+
+#### `PA-04` — an empty state, and the gate that belongs in a method
+
+The reference has two SLOTS decided by the host — the empty state and the pane — not a branch inside
+the pane, so that is what this builds. `btn-small` is Bootstrap 3's spelling and does nothing under
+the Bootstrap this room ships; it is the capture's and a class list is evidence, so it stays.
+
+The button goes through a new `RoomNotes.requestNewNote()` rather than writing `newNoteOpen =
+noteGates.editorMounted` in markup, and the gate is why: a viewer who may READ notes but not edit
+them must not be handed an editor, and at one of two call sites in markup that rule is one refactor
+from being dropped. `mountNewNoteLink` calls the same method now.
+
+#### `PA-05` through `PA-08` — four orderings, and why they need tests
+
+Only one tab pane is `show active` at a time. The caption overlay is `z-index: 9999` wherever it
+sits. The four children of the presentation split area are block-level in a flex column. So **nothing
+about the rendered page looks wrong either way**, which is exactly why an order fix is one refactor
+from being silently undone — every one of these is pinned by position against a marker that cannot
+appear twice.
+
+What they actually cost: tab order for a keyboard user (the overlay's three `z-index: 10000` buttons
+came before the whole tab strip, so tabbing into the column met the caption controls first), a
+slot-by-slot diff against the reference that stopped lining up two thirds of the way down, and — in
+`MainTabStrip`'s case — a strip and a content area **ordered differently from each other**, because
+the strip had kept the reference's order all along.
+
+`PA-05` is the one with a runtime cost, and it was measured on both hosts rather than inferred from
+one: the reference's mobile host has four children and no `app-webcam-holder`, while the desktop host
+has five and puts it first. A phone's presentation column is short.
+
+#### What the gate found
+
+`unbound-method-contract` refused the new class until it was registered — the third time in three
+days that its completeness check has asked rather than anybody remembering. Its note now records the
+specific risk: `onclose={captionStaleness.stop}` would lose `this` and leave a timer running with
+nothing to clear.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **257 test files, 4,257 tests, 1
+skipped.** `svelte-check` clean at 1,470 files. **Ten negative controls, each seen red**, and each
+mutation checked to have landed: the checker never armed; the non-persisting write; the checker left
+running; the arrival toast outside the dedupe; the strip back on mobile; the strip back to third;
+no empty state; the new-note rule restated in markup; the overlay back to first; and the videoplayer
+back after the alert panes.
+
+One test bug found by a control and fixed rather than worked around: `const remote = await
+session.consume(info);` occurs FOUR times in `media-transport.svelte.ts`, so the ordering assertion
+was comparing the connecting toast against the WEBCAM consumer 3,800 characters earlier. It is scoped
+to `addRemoteScreen` now — the same wrong-occurrence trap `gatesAround` hit earlier the same day.
+
+Svelte MCP: `svelte-autofixer` returns no issues and no suggestions for the changed region of
+`PresentationArea.svelte`. Five size ceilings raised with their arguments, plus one new module
+declared. **Nothing was opened in a browser.**
+
+### 2026-08-30 18:46 UTC — The poll panel: a sound with no caller, a panel that outlived its poll, and labels on the wrong curve
+
+**Runtime impact: YES.** A poll arriving now makes a sound (unless you are on do-not-disturb). A poll
+ending closes the panel of everyone still looking at it, instead of leaving an answerer with a live
+Vote button for a poll that no longer exists. Pie-slice labels sit on the pie instead of drifting
+outside it left and right. Dragging the panel snaps to the room edges like every other floating panel
+does. And holding Enter in the choice box adds one choice rather than one per key repeat.
+
+Eight rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `poll-01` through `poll-11` — which
+closes the `PollPanel` surface. **59 open · 165 closed · 224 rows.**
+
+#### `poll-01` — a sound this room loaded on every page and played from nowhere
+
+`fileShare` was declared in `#lib/sound-effects.ts`, mapped to a file that ships, and called by
+nothing: `grep -rn fileShare src` outside that module returned no hits at all. It plays now, gated on
+`doNotDisturbOn` the way the reference gates it, and INSIDE the branch that opens the panel — upstream
+never delivers `gotPoll` to the person who wrote the poll, and a sound with no panel behind it is a
+noise nothing explains.
+
+#### `poll-02` — state where the reference has an event, and why that is the whole row
+
+The reference broadcasts `pollDone` and every open panel hides. Here the signal is `data.activePoll`
+going null, which is **true of two different situations**: a room that has never had a poll, and a
+poll that ended a moment ago. Only the second may close anything — a presenter builds a poll while
+`activePoll` is null, so a verdict read off the steady state would shut the setup panel on the same
+pass that opened it. So `deliver` returns `'open' | 'ended' | null` and reports the TRANSITION.
+
+The transition is tracked on a field of its own rather than on `#deliveredId`, and that is the part
+an obvious implementation gets wrong. `#deliveredId` is cleared for three reasons that are not "the
+poll ended" — you wrote it, you already answered it, this browser has already shown it once — so the
+AUTHOR of a poll, for whom `deliver` always returns `null`, would never be told their own poll had
+gone. Two of the six new tests are exactly those two people, and the negative control that reads the
+transition off `#deliveredId` fails both.
+
+What it was leaving behind: an answerer who had not yet voted kept a fully interactive panel, and
+`sendAnswer` would then post against a poll the server had cleared.
+
+#### `poll-03` — two expressions, in different units, for one circle
+
+The pie was drawn on `min(w, h) / 2 - 10`. Its labels were placed at 32% of the container box in each
+axis — and the box is `width: 100%` by a fixed `height: 300px`, so 32% is about 173px sideways and
+96px down. The labels traced an ellipse around a circle: outside the pie left and right, inside it
+top and bottom. flot's `radius: .8` (byte 2,104,707) is a fraction of the PIE's radius, the same
+number in both axes.
+
+One `pieRadius()` answers both now, and the contract counts the expression so it stays one.
+
+#### `poll-07` — the one panel that rolled its own drag
+
+`panel-drag.ts` has implemented `snap: true`'s containment-edge half since it was written, and the
+private chat and the webcam holders both use it. The poll panel does its own pointer handling for its
+maximise and minimise states, and it was the panel without the snap. It now calls the same
+`clampAndSnap`, so the 20px tolerance is one number rather than two. The cross-element half of
+jQuery UI's `snap` needs a registry this app does not have — recorded once, in `panel-drag.ts`, for
+all four panels.
+
+#### `poll-08` and `poll-11(a)` — the two one-liners that are not cosmetic
+
+The choice input was bound to `keydown` where the reference binds `keyup.enter`. Holding Enter
+repeats `keydown`, so it added a choice per repeat. And `formatVisiblePollResponses` joined its rows
+where the reference appends them one at a time, each carrying its own newline — the same string minus
+its last character. The empty case stays the empty string rather than becoming a lone newline, which
+a bare `+ '\n'` would have made it.
+
+#### The three that were measured and refused
+
+- **`poll-09`** — the `localStorage` "savedPolls" migration is a ONE-SHOT promotion of legacy data to
+  the server. Saved polls are a server table here and always have been, so there is no legacy array
+  to promote: building it would mean reading a key nothing has ever written.
+- **`poll-10`** — the reference ships `savePollResults()` and **no way to reach it**. The audit's
+  reader read all nine template functions and none binds it; const entry 48 is a click-less duplicate
+  used as a conditional placeholder. `formatPollResultsDownload` stays as the transcription of the
+  payload — deleting it would delete the evidence, not the dead code, and `dead-export-contract`
+  records in as many words that a symbol only a test reads is still read.
+- **`poll-11(b)`** — the reference's `setTimeout(… calcPieData(), 100)` exists because flot must
+  re-measure its container after a display change. This draws to a canvas, which keeps its bitmap
+  across `display: none`. Reproducing the timer would be adding a delay to work around a measurement
+  this implementation does not have to make.
+
+#### What the gate found
+
+`state-raw-contract` caught `chartBox` declared as deep `$state` when it is only ever replaced. Two
+numbers behind a proxy read once per label per render — small, and exactly the shape that contract
+exists to stop accumulating.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **255 test files, 4,228 tests, 1
+skipped.** `svelte-check` clean at 1,469 files. **Seven negative controls, each seen red**, and each
+mutation checked to have landed: the do-not-disturb gate removed; the close ungated by which modal is
+open; the labels back on the ellipse; one drag axis left unsnapped; `keyup` back to `keydown`; the
+ending transition read off `#deliveredId`; and the trailing newline removed.
+
+Svelte MCP: `svelte-autofixer` on the changed region of `PollPanel.svelte` returns only its two
+standing suggestions — the `bind:this` on the canvas and the `requestAnimationFrame` inside the
+redraw effect — both of which are the documented design here. Three size ceilings raised with their
+arguments. **Nothing was opened in a browser.**
+
+### 2026-08-30 18:40 UTC — `{@const}` is legacy, and the obvious replacement is a silent staleness bug
+
+**Runtime impact: NO** — twelve template tags migrated to the syntax the official documentation now
+prescribes, with the compiler output measured to confirm the migration preserves reactivity.
+
+Svelte's own `{@const ...}` page opens with *"`{@const x = y}` is legacy syntax — use
+`{const x = $derived(y)}` instead"*, and the declaration-tags page dates the replacement to Svelte
+**5.56**. This repository is on **5.56.10**, so the old form is legacy here today rather than at some
+future upgrade.
+
+#### The measurement, which is why this is not a `sed`
+
+`{const x = y}` reads like the drop-in replacement. It is not. Compiling one block three ways and
+looking for a `$.derived` call in the output:
+
+```
+{@const d = n * 2}            ->  derived: true
+{const d = n * 2}             ->  derived: FALSE
+{const d = $derived(n * 2)}   ->  derived: true
+```
+
+A bare declaration tag is evaluated when its block is created and never again. Twelve sites migrated
+to that form would each have gone stale the moment the state behind them changed — a class of defect
+no type check, lint rule or `svelte-check` run can see, and one that shows up only as a number that
+stops moving. `ChatTabStrip`'s new unread badge, built an hour earlier, is exactly such a site.
+
+So the migration is `{@const x = y}` → `{const x = $derived(y)}`, and
+`declaration-tag-contract.test.ts` **re-runs that three-way compilation as a test** rather than
+quoting it, because the compiler is the authority and it can change.
+
+#### What moved
+
+Twelve sites across eight components: `RoomOverlays` (3), `PresenterMuteRows` (2), `NotesPane` (2),
+and one each in `ChatTabStrip`, `FilesPane`, `ModalHost`, `DayTradeAlertsPane` and `SwingAlertsPane`.
+Three tests that pinned the old string follow the code. The contract also refuses a BARE `{const}`
+anywhere, with the message saying that a deliberately non-reactive one belongs in the file as a named
+exception with its reason — there is no such site today, and that is the conversation the assertion
+exists to force rather than a rule against ever having one.
+
+The comment-stripping matters here and is why `codeOf` is used: four `.svelte` files in this room
+quote compiled reference code containing `{const e=Y();`, and a raw scan reports every one of them.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0, **254 test files, 4,212 tests, 1 skipped**. `svelte-check`
+clean at 1,467 files. Two negative controls seen red: the legacy tag put back, and one site reduced
+to a bare `{const}`. Nothing was opened in a browser.
+
+### 2026-08-30 18:15 UTC — The chat columns: what you have not read, who you are reading, and where the second column goes
+
+**Runtime impact: YES.** Every chat channel now carries an unread count on its tab, and a presenter
+also sees how many of those said their name. A "Mod Only" checkbox filters a chat column to the
+moderators' messages and your own. In a top/bottom room the second chat column lands below the chat
+pane instead of beside the presentation area. And a member handed mic and screen at runtime no longer
+gets an Archive Alerts button the reference withholds from them.
+
+Six rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `acA-04`, `acA-06`, `acA-07`,
+`acA-08`, `acA-11`, `acA-12` — which closes the `AlertChatArea` surface. **67 open · 157 closed ·
+224 rows.**
+
+#### `acA-07` — a comment that had been right about a gate the code got wrong
+
+One `&&`. The archive control was gated on `isPresenter` while the comment eight lines above it had
+said `isPresenter && !media.limitedPresenter` since the block was written. That is the failure
+`CLAUDE.md` names in as many words — *"every comment claiming X is bounded/constant/checked still
+matches the next line"* — and it had a real consequence, because `giveMicScreen` assigns
+`globals.user.isPresenter = globals.isLimitedPresenter = e.give`: somebody handed mic and screen was
+being offered a control upstream keeps from exactly those people. `O(2, isPresenter &&
+!isLimitedPresenter ? 2 : -1)`, byte 2,043,456.
+
+#### `acA-06` — the unread counters, and a gate stated once instead of twice
+
+`chat-tab-unread.ts` holds the arithmetic as three pure functions; `RoomChat` holds ONE MAP PER
+COLUMN, because the reference does (`app-chat` at byte 1,429,032, `app-extra-chat` at 2,375,500) and
+a shared map would clear the badge in the column that is *not* showing the channel you opened. The
+count is taken in `events.svelte.ts` from the SSE frame, which already carries the channel and a
+server-decided `isMention`, and it sits **above** the own-sender guard because upstream's
+subscription has no sender filter and the guard here is about a refetch — the case where the two
+differ is a message typed into the extra column arriving on a channel the main column is not showing.
+
+Upstream states `globals.isPresenter` twice: once deciding whether to count a mention, once deciding
+whether to draw it. It is stated once here, at the count, and `ChatTabStrip` carries no role of its
+own — `expect(strip).not.toContain('isPresenter')` is an assertion, because a strip that took the
+role would be a second authority on a question the server already answered.
+
+#### `acA-04` — Mod Only, and a toolbar that finally has something in it
+
+The switch is per column on `RoomChat` (`filterChatMsgs = {modOnly, modOnlyExtra}`, byte 981,131);
+the predicate is one `.filter` in `RoomFeeds`, transcribed from byte 1,414,769. Two survivors, not
+one — the moderators' messages AND your own — which reads like an oversight until you try it, because
+a filter that hid what you had just typed looks like the send having failed.
+
+`RoomChatSearch` now holds `showChatToolbarExtended`. Its docblock used to argue that it should not:
+*"a flag whose only reader would be markup that does not exist is what `CLAUDE.md` refuses by name."*
+That was correct on 2026-08-29 and stopped being correct when this checkbox was built, so the
+sentence is replaced rather than deleted. The chat gear opens that bar now instead of the settings
+modal, which is what `toggleChatToolbar()` binds upstream (byte 1,435,047); the modal keeps its
+routes from the sidebar and the alerts column.
+
+**One divergence:** the checkbox id carries the column. `"mod-only"` occurs four times in the bundle,
+twice per column, so a room with both bars open ships two elements with one id and the extra column's
+`<label for>` operates the main column's checkbox. That is a functional break, not a cosmetic one.
+
+#### `acA-08` — the second column has three homes upstream and had a fourth here
+
+The reference places it three ways and this room shipped one ungated top-level area in every case, so
+a top/bottom viewer got the second column beside the presentation pane. All three are built now over
+ONE `<ExtraChatPane>` call: the phone's plain area (`nRe`, byte 2,496,359, whose gate carries **no
+direction term** — measured, not assumed), `H4e`'s top-level area with the nested split, and `j4e`'s
+`chat-box` inside `AlertChatArea`'s own split (byte 2,490,857).
+
+The part that is not a transcription is the arithmetic. `as-split` treats `size` as a proportion and
+normalises across however many areas there are; flex-basis percentages do not, so binding `chatSize`
+to both inner chat areas verbatim would emit `alerts + chat + chat` and overflow the stack.
+`RoomSplit.#innerScale` does the division `as-split` does for free.
+
+`extra-chat-column-contract.test.ts`'s two old assertions — "gated exactly as K4e gates index 3" and
+"it is an area, not a pane nested inside the chat column" — were **true of two forms out of three**
+and neither could have caught this. They are rewritten against the three measured gates.
+
+#### `acA-11` and `acA-12` — the small ones, and why they are not cosmetic
+
+`acA-11` is both halves of one behaviour: the brand grows `&nbsp;Chat` when there are no channels
+(`j_e`, byte 1,420,732) and the strip suppresses its whole `<ul>` in the same case (byte 1,453,947).
+The verifier's note that this is unreachable while every room has two built-ins is correct and is why
+it stayed `low` — but the empty styled `nav-tabs` strip was already shipping, and
+`chatTabsWithBadges` makes the other half reachable.
+
+`acA-12` moves four toolbar clicks from the `<a>` to the `<li>`, which is what const 12 carries and
+const 13 does not. The contract also asserts the private-chat click is still on its ANCHOR, because
+it is bound there in both applications — a later consistency pass tidying all three to match would be
+undoing a measurement.
+
+#### What the gate found that the work did not
+
+Three things, and each was a real hole rather than a formality:
+
+- **Two mount harnesses were rendering `AlertChatArea` without `chatTabs`**, a required prop. Nothing
+  had noticed because the only reader was `<ChatTabStrip tabs={chatTabs}>` and `{#each undefined}`
+  renders nothing. `acA-11` put `chatTabs.length` in the brand, which is not so forgiving. Both
+  harnesses had been exercising a component in a state its own types forbid.
+- **`orphaned-comment-contract`** caught the constructor docblock in `split.svelte.ts` separated from
+  its constructor by the new field.
+- **`slice-anchor-contract`** caught four unasserted `indexOf`/`lastIndexOf` slice bounds in the new
+  tests, which is exactly the class of assertion-that-cannot-fail this repository has now found six
+  times.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — `format:check`, `lint`, `check`, `test`, `build` — exit 0, with the
+code echoed into a log and read from there. **253 test files, 4,206 tests, 1 skipped.** The run also
+prints, as every run here does, that 42 evidence-bound test files are excluded because 13 of the 14
+reference-capture roots are gitignored; this run does not cover them.
+
+**Seventeen negative controls, each seen RED**, and each mutation checked to have landed before the
+run — a `python` replace that silently matches nothing produces a green control and a false claim,
+which has happened here. The controls: the archive gate reduced to one term; the `&nbsp;Chat` label
+removed; the strip's presence gate forced true; a toolbar click moved back to its anchor; the unread
+count taking the open tab; the switch never clearing; the mention gate removed; the count moved below
+the own-sender guard; the Mod Only predicate removed; its own-messages term removed; the switch made
+shared; the id made constant; the extended section forced open; the side area ungated by direction;
+the inner slot removed; the renormalisation removed; and a second `<ExtraChatPane>` call site.
+
+Svelte MCP: `list-sections` and `get-documentation` for `{@const}`, `{#snippet}`, `{@render}` and the
+declaration tags; `svelte-autofixer` returned no issues for `ChatTabStrip` and `ChatSearchBar`, and
+for `RoomShell` returned only the two findings that predate this change (a suppressed
+`a11y_no_noninteractive_tabindex` on the gutter, and its two documented `$effect`s). It was **not**
+run on `AlertChatArea.svelte` or `routes/+page.svelte` — 73KB and 79KB — which stays recorded as
+outstanding rather than claimed.
+
+**Nothing was opened in a browser.** The room's Playwright job exists but was not run here.
+
+One thing found and deliberately not done: the official docs now call `{@const}` legacy in favour of
+the `{const x = ...}` declaration tags added in Svelte 5.56, which this repository is on. There are
+twelve `{@const}` sites across eight components. Migrating one of them would leave two idioms in the
+tree, so it is recorded as its own piece of work rather than half-done here.
+
 ### 2026-08-30 17:19 UTC — The trade-alert panes: an Edit that looked broken, and a picture you could not save
 
 **Runtime impact: YES.** Pressing Edit on a trade alert flashes the composer, so it no longer reads

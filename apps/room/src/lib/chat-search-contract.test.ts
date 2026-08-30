@@ -59,7 +59,11 @@ function bodyOf(source: string, declaration: string): string {
 describe('results are filtered exactly as the log is', () => {
   const pipeline = bodyOf(
     FEEDS,
-    'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+    `chatMessagesFor(
+    tab: ChatTab,
+    searchResults: readonly Message[] | null,
+    column: 'main' | 'extra'
+  ) {`
   );
 
   it('takes the results as a parameter and puts them where the merged log goes', () => {
@@ -96,10 +100,10 @@ describe('results are filtered exactly as the log is', () => {
       above by making them unreachable, so the getters are checked to be pass-throughs.
     */
     expect(FEEDS).toContain(
-      'return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);'
+      "return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults, 'main');"
     );
     expect(FEEDS).toContain(
-      'return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);'
+      "return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults, 'extra');"
     );
   });
 

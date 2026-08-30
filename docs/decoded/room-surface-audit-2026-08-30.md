@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**73 open · 151 closed · 224 rows.**
+**51 open · 173 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -2879,6 +2879,26 @@ O(9,o.showPMBtn?9:-1)
 
 ### acA-04 — "Mod Only" chat filter checkbox has no counterpart anywhere in apps/room/src
 
+**BUILT 2026-08-30.** The switch is per column on `RoomChat` (`filterChatMsgs = {modOnly, modOnlyExtra}`,
+byte 981,131); the predicate is one `.filter` in `RoomFeeds.chatMessagesFor`, transcribed from byte
+1,414,769 — the moderators' messages AND your own survive it, which reads like an oversight until
+you try it, because a filter that hid what you had just typed looks like the send having failed. The
+checkbox is the capture's const table 43/44/45 (byte 1,450,283) in `ChatSearchBar`'s extended
+section, which this room had never rendered because nothing had ever been built to put in it —
+`RoomChatSearch` now holds `showChatToolbarExtended` and both of the reference's toggles, and the
+chat gear opens it rather than the settings modal, which is what `toggleChatToolbar()` binds
+upstream (byte 1,435,047).
+
+**Two divergences, both recorded at the code.** The id carries the column — `"mod-only"` occurs four
+times in the bundle, twice per column, so a room with both bars open ships two elements with one id
+and the extra column's `<label for>` operates the main column's checkbox. And the toggle does not
+re-request page 0 of the log the way upstream's does: this filter is a view over rows already held,
+so the refetch would only throw away the pages a reader had scrolled back to.
+
+Contracts: `alert-chat-area-contract.test.ts` (the markup, the two ids, the held flag),
+`chat.svelte.test.ts` (per-column switch), `feeds.svelte.test.ts` (the predicate, executed, including
+over search results). Five negative controls seen red.
+
 **medium** · `missing-control` · reference byte **1,423,104**
 
 ```
@@ -2890,6 +2910,21 @@ function X_e(t,n){if(1&t){const e=Y();d(0,"div",43)(1,"input",44),Ve("ngModelCha
 > Verified: I could not refute the claim. Reference verified by reading bytes: `function X_e` begins at exactly offset 1423104 in main.d1d09071be31f1ba.js and renders `input,44` two-way bound to `appService.globals.filterChatMsgs.modOnly` with a change handler `toggleModOnlyFilter()` and label text " Mod Only "; it belongs to component `app-chat` (se…
 
 ### acA-06 — Chat tab unread-count badge and presenter-only mention count are not rendered
+
+**BUILT 2026-08-30.** `chat-tab-unread.ts` holds the arithmetic; `RoomChat` holds one map per
+column, because the reference keeps a separate `unreadMsgs` on `app-chat` and on `app-extra-chat`
+(bytes 1,429,032 and 2,375,500) and a shared map would clear the badge in the column that is *not*
+showing the channel you opened. `events.svelte.ts` counts from the SSE frame — which already carries
+`room` and a server-decided `isMention` — above the own-sender guard, where the reference's
+subscription takes it. `ChatTabStrip` renders const 28 and the `text-danger` span inside it.
+
+**One deliberate simplification.** Upstream states `globals.isPresenter` twice, once deciding whether
+to count a mention and once deciding whether to draw it, so the second can never differ from the
+first. It is stated once here, at the count, and the strip carries no role of its own —
+`expect(strip).not.toContain('isPresenter')` is a contract assertion, because a strip that took the
+role would be a second authority on a question the server answered.
+
+Contracts: `alert-chat-area-contract.test.ts`, `chat.svelte.test.ts`. Four negative controls seen red.
 
 **medium** · `missing-control` · reference byte **1,420,987**
 
@@ -2903,6 +2938,18 @@ function $_e(t,n){if(1&t&&(d(0,"span",28),v(1),H(2,H_e,2,1,"span",29),u()),2&t){
 
 ### acA-07 — The alerts archive control drops the !isLimitedPresenter half of its gate — and the file's own comment states the full gate
 
+**FIXED 2026-08-30.** `{#if isPresenter && !isLimitedPresenter}` around
+`#addon-chat-messages-archive`, fed from `+page.svelte` as `media.limitedPresenter`. The component
+takes it as a prop and decides no role of its own.
+
+This is the shape `CLAUDE.md` names outright — *"every comment claiming X is bounded/constant/checked
+still matches the next line"* — and it did not: the comment eight lines above the gate had stated
+both terms since the block was written. Somebody handed mic and screen at runtime satisfies
+`isPresenter` (`giveMicScreen` assigns `globals.user.isPresenter = globals.isLimitedPresenter =
+e.give`), so the room was offering them a control the reference withholds. Contract:
+`alert-chat-area-contract.test.ts`, which walks the block rather than checking proximity. Control
+seen red.
+
 **medium** · `missing-control` · reference byte **2,043,456**
 
 ```
@@ -2914,6 +2961,25 @@ O(2,e.appService.globals.isPresenter&&!e.appService.globals.isLimitedPresenter?2
 > Verified: I could not refute it. The `!limitedPresenter` half of the gate is applied nowhere on the alerts-archive path, under any name.
 
 ### acA-08 — Extra chat column: wrong container class, no roomSplitDir gate, and the desktop ttb/btt placement inside the inner split is not modelled
+
+**BUILT 2026-08-30.** The reference has THREE forms and this room shipped a fourth that is none of
+them — one ungated top-level area in every case, so a top/bottom room drew the second column beside
+the presentation pane instead of below the chat one. All three are built now, over one shared
+`<ExtraChatPane>` call: the phone's plain `alert-chat-box` area (`nRe`, byte 2,496,359, whose gate
+carries **no direction term** — measured, not assumed), `H4e`'s top-level area with the
+`alert-chat-box-extra-column` class and the nested split, and `j4e`'s `chat-box` area inside
+`AlertChatArea`'s own split (byte 2,490,857).
+
+**The arithmetic is the part that is not a transcription.** `as-split` treats `size` as a proportion
+and normalises across however many areas there are; flex-basis percentages do not, so binding
+`chatSize` to both inner chat areas verbatim would emit `alerts + chat + chat` and overflow the
+stack. `RoomSplit.#innerScale` does the division `as-split` does for free.
+
+The class ships despite having no CSS rule in any of this room's stylesheets and no reader in the
+bundle, because its twin `alert-chat-regular` is in exactly the same position and this room already
+ships that one. Contract: `extra-chat-column-contract.test.ts`, whose old two assertions were
+rewritten — both were true of two forms out of three and neither could have caught this. Four
+negative controls seen red.
 
 **medium** · `divergence` · reference byte **2,490,857**
 
@@ -2927,6 +2993,18 @@ function j4e(t,n){if(1&t){const e=Y();d(0,"as-split-area",211)(1,"app-extra-chat
 
 ### acA-11 — The empty-tabs " Chat" brand label and the tab-strip <ul> presence gate are both absent
 
+**BUILT 2026-08-30.** Both halves, because neither reads right alone: the brand grows
+`{#if chatTabs.length === 0}<span>&nbsp;Chat</span>{/if}` (`j_e`, byte 1,420,732, gated at
+1,453,850) and `ChatTabStrip` wraps its whole `<ul>` in `{#if tabs.length > 0}` (byte 1,453,947).
+`&nbsp;` and not a space: it is `\xa0` in the capture and a plain space would be collapsed by the
+surrounding whitespace.
+
+The verifier's note — that the gap is unreachable while every room has two built-in channels — is
+correct and is why this stayed `low`. It stops being unreachable the moment a room configures its
+channels through `chatTabsWithBadges`, and the empty styled `nav-tabs` strip was already shipping.
+Contract: `alert-chat-area-contract.test.ts`, including a mount that asserts no `<ul>` for an empty
+list. Two controls seen red.
+
 **low** · `missing-control` · reference byte **1,420,732**
 
 ```
@@ -2938,6 +3016,15 @@ function j_e(t,n){1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}
 > Verified: Both controls are genuinely absent from our markup, but the gap is unreachable in practice and that must be stated with it. (1) The empty-tabs brand label: AlertChatArea.svelte:763-770 renders navbar-brand as `<i class="fas fa-comment">` plus the conditional DND badge only — no `&nbsp;Chat` span and no gate.
 
 ### acA-12 — Search and gear clicks are bound to the <a> in ours and to the <li> in the reference
+
+**BUILT 2026-08-30.** All four toolbar toggles — search and gear, in both columns — now hang on the
+`<li>`, which is what const 12 `[1,"nav-item","mx-1",3,"click"]` carries and const 13 does not (byte
+2,055,851). The `mx-1` margin was dead space on a control people press many times a session.
+
+**The private-chat button is left on its `<a>`, and that is the row's real content.** It is bound
+there in BOTH applications (`W_e`, byte 1,421,660), so the difference is specific to these two
+toggles; the contract asserts the PM click is on an anchor precisely so a later consistency pass does
+not undo a measurement. Control seen red.
 
 **low** · `divergence` · reference byte **2,055,851**
 
@@ -2957,6 +3044,20 @@ d(11,"li",12),x("click",function(){return D(s),E(o.toggleAlertsToolbarSearchOnly
 
 ### PA-01 — No speech-reco staleness checker — a caption never clears after the room falls silent
 
+**BUILT 2026-08-30.** `#lib/room/caption-staleness.ts` — `startSpeechChecker` transcribed, with
+the interval and the window both at the reference's 7,000 ms, so a caption survives between 7 and 14
+seconds of silence. `onCaption` arms it; going stale sends the null.
+
+**The port's own TYPE was half the defect.** `setCurrentCaption: (caption: Caption) => void` cannot
+express "the room went quiet", so nothing in this application could ever clear a caption and the last
+line anybody spoke stayed pinned over the presentation area for the rest of the session. It is
+`Caption | null` now, and the widening says so where it is declared.
+
+The checker stops itself from inside the stale branch, which is upstream's own shape and is
+load-bearing: a silent room holds no timer at all, in every room, presenting or not. Ten behavioural
+tests in `room/caption-staleness.test.ts` drive a fake clock; two source assertions pin the two ends.
+One control seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,956,753**
 
 ```
@@ -2970,6 +3071,20 @@ startSpeechChecker(){this.speechRecoInterval||(this.speechRecoInterval=setInterv
 
 ### PA-02 — The overlay's close button does not persist `showSpeechRecoOverlay` and does not reset history mode
 
+**BUILT 2026-08-30.** `hideSpeechRecognition()` on the page, all five statements: persist through
+`prefs.save('showSpeechRecoOverlay', false)`, clear the caption, reset history mode, stop the checker.
+
+**Two paths to one setting, and one of them was not a setting.** The X wrote `subtitles = false`
+through a `$bindable`, which lands on a bare private-field write in `RoomPrefs` with no `save()` —
+so dismissing the overlay was forgotten on reload, while the navbar checkbox for the SAME preference
+persisted correctly. `subtitles` is a plain prop now with an `onhidespeechreco` callback beside it,
+because the dismissal writes four pieces of state the component does not own.
+
+The three statements that are easy to drop, because nothing visible depends on them at the moment
+you press the button, are the ones recorded at the code: the caption goes, the checker stops (or a
+timer keeps waking to clear a box nobody is shown), and history mode resets so re-enabling the
+overlay later does not reopen it in the transcript view. Two controls seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,957,245**
 
 ```
@@ -2981,6 +3096,24 @@ hideSpeechRecognition(e){e.preventDefault(),e.stopPropagation(),this.appService.
 > Verified: I could not find the behaviour anywhere in apps/room/src under any name. The overlay's X calls only `onclose={() => (subtitles = false)}` (PresentationArea.svelte:437), which lands on `set subtitles(next) { this.#subtitles = next; }` (prefs.svelte.ts:508-510) — a bare private-field write with no `save()`/`persist()`.
 
 ### PA-03 — The two screenshare info toasts are absent — "… started screen sharing" and "Connecting to …"
+
+**HALF BUILT 2026-08-30 — both toasts built, the loading state refused with the reason.**
+
+Both `info()` calls are in `addRemoteScreen`, and WHERE is the whole of it. "Connecting to …" goes
+BEFORE `consume()`, which is what makes it a connecting notice rather than a second arrival notice:
+building the consumer is a round trip to the SFU and this is the only feedback a viewer gets while it
+happens. "… started screen sharing" goes INSIDE `if (remote)`, because a null `remote` is the dedupe
+path the server's at-least-once `newProducer` requires — outside it, the toast fires once per
+`getProducers` snapshot.
+
+Upstream's `e.uid != globals.user.id` guard is already spent here: `addRemoteScreen` returns above
+for this peer's own producer, for the stronger reason that consuming yourself is a server refusal.
+
+**`screenLoading` / `callingScreenName` / `screenPresenter` / `screenPresenterAvatar` are NOT built.**
+They drive a loading placeholder whose markup is quoted nowhere in this row or in the bytes it cites,
+and a spinner invented rather than read is not something this repository ships. That is a separate
+row when somebody reads `app-presentationarea`'s loading branch, not something to guess at now.
+Contract: `presentation-area-contract.test.ts`, one control seen red.
 
 **medium** · `missing-behaviour` · reference byte **1,960,202**
 
@@ -2994,6 +3127,19 @@ appEventBus.subscribe("addScreenStream",e=>{"screen"==e.mode&&this.alertsService
 
 ### PA-04 — `#notes` has no empty state — the "No Notes to display…" heading and its " New Note " button are absent from the pane
 
+**BUILT 2026-08-30.** `LSe` transcribed — the `<h3>No Notes to display...</h3>` and the
+`btn btn-small btn-primary` button — as a SLOT of the host beside the pane, which is what the
+reference has (`H(44,LSe,5,0,"div")(45,zSe,6,0)` at byte 2,015,227, gated `O(44, sessionNotes ? 45 :
+44)`) rather than a branch inside `NotesPane`.
+
+`btn-small` is Bootstrap 3's spelling and does nothing under the Bootstrap this room ships. It is the
+capture's, and a class list is evidence, so it is reproduced rather than corrected to `btn-sm`.
+
+The button goes through a new `RoomNotes.requestNewNote()` rather than writing the gate in markup,
+because the gate is the interesting half: a viewer who may READ notes but not edit them must not be
+handed an editor, and at one of two call sites in markup that rule is one refactor from being
+dropped. `mountNewNoteLink` now calls the same method. Two controls seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,927,385**
 
 ```
@@ -3005,6 +3151,16 @@ function LSe(t,n){if(1&t){const e=Y();d(0,"div")(1,"h3"),v(2,"No Notes to displa
 > Verified: I could not refute it. The reference pair is real and I re-read all three anchors myself: `LSe` at byte 1927385 renders `div > h3 "No Notes to display..."` plus `button[119]` labelled " New Note " wired to `g().newNote()`; the container declaration at byte 2015227 reads `d(43,"div",24),H(44,LSe,5,0,"div")(45,zSe,6,0),u()` (so slot 44 is t…
 
 ### PA-05 — `app-webcam-holder` is rendered on mobile, where the reference host omits it entirely
+
+**BUILT 2026-08-30.** `{#if !split.isMobileScreen}` around the strip.
+
+Measured on both hosts rather than inferred from one: the mobile host `Z4e` (byte 2,495,149) has four
+children and none is `app-webcam-holder`, while the desktop host `q4e` (2,492,999) has five and puts
+it first. A phone's presentation column is short and the reference keeps its height for the
+presentation.
+
+`previewWindowsVisible` was never standing in for this — it is a presenter-facing hide-all switch,
+which is why the gap survived. Control seen red.
 
 **medium** · `divergence` · reference byte **2,495,149**
 
@@ -3018,6 +3174,14 @@ function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),H(1,Y4e,7,1,"div",213)(2,Q4e
 
 ### PA-06 — Host child order: `app-webcam-holder` is node 1 in the reference, third in ours
 
+**FIXED 2026-08-30.** The strip is the first child of the split area, before the moderator bar and
+the positions iframe, which is node 1 in `q4e`. Contract pins all four siblings in order, so the next
+component added between them cannot quietly reorder the three.
+
+Visual and reading order only, as the row says — the four siblings are block-level in a flex column.
+That is exactly why it needs a test: nothing about the rendered page looks wrong either way, so the
+fix is one refactor from being silently undone. Control seen red.
+
 **low** · `divergence` · reference byte **2,492,999**
 
 ```
@@ -3030,6 +3194,16 @@ function q4e(t,n){if(1&t&&(d(0,"as-split-area",208),T(1,"app-webcam-holder"),H(2
 
 ### PA-07 — The speech-reco overlay is the LAST child of `.mainPresentationAreaHolder` in the reference, the first in ours
 
+**FIXED 2026-08-30.** The overlay is the holder's final child, after the tab strip, the panes, the
+two players and the `<audio>` — which is where `H(89,u2e,9,7,"div",52),u())` puts it at byte
+2,016,249.
+
+Paint order never cared (`z-index: 9999`). **Tab order did**: the overlay's three `z-index: 10000`
+buttons — transcript, history, close — came before the whole tab strip in the DOM, so a viewer
+tabbing into the presentation column met the caption controls before anything they were there to use.
+The file's own comment argued correctly for putting the overlay INSIDE the holder and never said
+where in it; both facts are recorded together now. Control seen red.
+
 **low** · `divergence` · reference byte **2,016,249**
 
 ```
@@ -3041,6 +3215,14 @@ H(86,n2e,1,2,"app-ytplayer",49)(87,i2e,1,1,"app-scplayer",50),T(88,"audio",51),H
 > Verified: Verified on both sides. In the reference the caption overlay is the LAST child of the holder: at byte 2016327 the create block ends `H(89,u2e,9,7,"div",52),u())`, immediately after `H(86,n2e,...,"app-ytplayer",49)(87,i2e,...,"app-scplayer",50),T(88,"audio",51)` (read at 2016100-2016500), and `u2e` is the overlay (defined at byte 1952943:…
 
 ### PA-08 — Pane order inside `#mainTabsContent`: videoplayer sits after the two trade-alert panes in ours, before them in the reference
+
+**FIXED 2026-08-30.** Videoplayer, then swing, then day-trade, then files — slots 47/48/49/50.
+
+The row's sharpest observation is the one that makes this worth doing: `MainTabStrip` already kept
+the reference's order, so **the strip and the content were ordered differently from each other**. Only
+one pane carries `show active` at a time, so nothing was visibly misplaced; what it cost was tab and
+reading order, and a slot-by-slot diff against the reference that stopped lining up two thirds of the
+way down. Control seen red.
 
 **low** · `divergence` · reference byte **2,017,654**
 
@@ -3060,6 +3242,17 @@ O(47,o.hideVideoPlayer&&!o.isP||o.isP?47:-1),m(),O(48,o.hasSwingTradeAlerts?48:-
 
 ### poll-01 — No sound is played when a poll arrives for answering
 
+**BUILT 2026-08-30.** `playSoundEffect('fileShare')` in the page's delivery effect, gated on
+`prefs.doNotDisturbOn` — the same gate every other arrival sound in this room uses, and upstream's
+own (`globals.preferences.doNotDisturbOn || soundEffects.fileShare.play()`, byte 2,507,038).
+
+The row's real finding is the one it states in passing: the key was declared, the file shipped, the
+sound was loaded on every page, and `grep -rn fileShare src` found **no caller anywhere**. The call
+sits inside the `'open'` branch rather than beside it — upstream's `gotPoll` never reaches the viewer
+who wrote the poll (`i.senderUID != globals.user.userXrefID`, byte 1,024,082) and `deliver` refuses
+that person plus two more, so a sound with no panel behind it would be a noise nothing explains.
+Contract: `poll-panel-contract.test.ts`, with a control seen red.
+
 **medium** · `missing-behaviour` · reference byte **2,507,038**
 
 ```
@@ -3071,6 +3264,26 @@ Service.appEventBus.subscribe("gotPoll",i=>{this.appService.globals.preferences.
 > Verified: I tried to find a poll-arrival sound under any name and could not. Our entire poll-arrival path is the effect at /home/user/trading-room-app/apps/room/src/routes/+page.svelte:623 — `if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';` — and the decision it delegates to, `RoomPolls.deliver` (/home/user/trading-room-app…
 
 ### poll-02 — A poll ending elsewhere does not close an open panel
+
+**BUILT 2026-08-30.** `RoomPolls.deliver` returns a verdict — `'open' | 'ended' | null` — and the
+page closes the poll modal on `'ended'`.
+
+**The row is really about state versus events, and that is why a boolean could not have carried it.**
+The reference has `case "pollDone": emit("pollDone")` (byte 1,024,082) and a subscription wired once
+for the component's life (2,106,987); this room has `data.activePoll` going null, which is true both
+of a room that has never had a poll and of a poll that ended a moment ago. The first must NOT close
+anything — a presenter builds a poll with `activePoll` null, so a verdict from the steady state would
+shut the setup panel on the pass that opened it — so the TRANSITION is what is detected, on a field
+of its own.
+
+That field is not `#deliveredId`, and the distinction is the one an obvious implementation gets
+wrong: `#deliveredId` is cleared for three reasons that are not "the poll ended" — you wrote it, you
+already answered it, this browser has shown it once — so the author of a poll, for whom `deliver`
+always returns `null`, would never be told their own poll had gone. Two of the six behavioural tests
+are exactly those two people, and the control that reads the transition off `#deliveredId` fails both.
+
+Behaviour: `room/polls.svelte.test.ts`. The page's half: `poll-panel-contract.test.ts`, which also
+pins the `modals.modal === 'poll'` guard, because `closeActive()` closes whatever is open.
 
 **medium** · `missing-behaviour` · reference byte **2,106,987**
 
@@ -3084,6 +3297,15 @@ pollChoicesTotals),this.calcPieData()}}),this.appService.appEventBus.subscribe("
 
 ### poll-03 — Pie-slice labels are placed on a container-relative ellipse, not at 0.8 of the pie radius
 
+**FIXED 2026-08-30.** The labels are placed in PIXELS at `PIE_LABEL_RADIUS` (0.8, the reference's
+`radius: .8` from `EB` at byte 2,104,707) times the pie's radius, from the measured centre of the
+chart box.
+
+The defect was two expressions in different units describing one circle: the pie was drawn on
+`min(w,h)/2 - 10` and the labels placed at 32% of the box in each axis, on a box that is `width:
+100%` by a fixed `height: 300px`. One `pieRadius()` answers both now, and the contract counts the
+expression so it stays one. Control seen red.
+
 **low** · `wrong-constant` · reference byte **2,104,707**
 
 ```
@@ -3095,6 +3317,15 @@ const EB={series:{pie:{show:!0,innerRadius:0,label:{show:!0,radius:.8,color:"#FA
 > Verified: Our label placement is genuinely container-percentage based and unrelated to the pie radius. PollPanel.svelte:446-454 computes `left = 50 + cos(angle)*32` and `top = 50 + sin(angle)*32` and emits them as `%` of #pollPieChart, whose box is declared `width: 100%; height: 300px` at PollPanel.svelte:736-739 — so the label ring is an ellipse (…
 
 ### poll-07 — Dragging does not snap (jQuery UI snap:true)
+
+**BUILT 2026-08-30.** Both axes go through `clampAndSnap` from `#lib/panel-drag.js`, which is where
+the private chat and the webcam holders already got their snap — this panel is the one floating panel
+in the room that rolls its own pointer handling, and it was the one without it.
+
+`SNAP_TOLERANCE` is jQuery UI's own 20px and is now read from one place rather than copied. The
+cross-element half of `snap: true` — snapping to every other snappable element — needs a registry
+this application does not have, and `panel-drag.ts` has recorded that gap since it was written, once,
+for all four panels rather than four times. Control seen red: one axis left unsnapped.
 
 **low** · `missing-behaviour` · reference byte **2,108,197**
 
@@ -3108,6 +3339,12 @@ initDrag(){$("#pollModalCompHolder").draggable({appendTo:"body",containment:".wr
 
 ### poll-08 — Choice input commits on keydown, reference on keyup
 
+**FIXED 2026-08-30.** `onkeyup`, which is what the const table binds (`"keyup.enter"`, byte
+2,113,811).
+
+Not a one-frame difference: holding Enter repeats `keydown`, so the input added a choice per repeat.
+Control seen red.
+
 **low** · `divergence` · reference byte **2,113,811**
 
 ```
@@ -3119,6 +3356,16 @@ initDrag(){$("#pollModalCompHolder").draggable({appendTo:"body",containment:".wr
 > Verified: Our PollPanel binds the choice-commit to keydown; the reference const table binds keyup.enter, and nothing in our tree supplies keyup timing for this control. Searched exhaustively: `grep -rn "keyup"` over apps/room/src returns only RoomSidebar.svelte:643 (onkeyup={onusersearchkey}) and ModalHost.svelte:5620 — nothing in PollPanel; `pollC…
 
 ### poll-09 — No localStorage "savedPolls" legacy migration
+
+**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The row argues its own disposition and the
+argument holds: saved polls are a server table here (`saved_polls`, `schema.ts:382`), written by
+`savePoll` / `deleteSavedPoll` and loaded with the page. The reference's `loadPollsFromStorage()` is a
+ONE-SHOT migration that promotes a legacy `localStorage` array to the server and then deletes the key
+— and there is no legacy `localStorage` array in this application to promote, because this
+application never wrote one.
+
+Building it would mean reading a key nothing has ever written, and the `deleteSavedPoll` shape
+differs besides: by row id here, by array index plus a full JSON resend there.
 
 **low** · `missing-behaviour` · reference byte **2,111,310**
 
@@ -3132,6 +3379,22 @@ Polls",{savedSessionPolls:JSON.stringify(e)}),this.savedPolls=e,this.appService.
 
 ### poll-10 — savePollResults() has a formatter but no Blob/saveAs download
 
+**MEASURED REFUSAL, recorded 2026-08-30.** There is no user-facing control in the reference to
+reproduce. The audit's own reader read all nine template functions (`ATe`/`PTe`/`RTe`/`ITe`/`OTe`/
+`NTe`/`LTe`/`BTe`/`UTe`, 2,101,231–2,104,700) and **none binds `savePollResults`**; const entry 48 is
+a click-less duplicate of entry 52, used only as the `ɵɵconditional` placeholder. So the reference
+ships the method and no way to reach it, and the row's own verdict was *"a divergence, not a missing
+user-facing control"*.
+
+`formatPollResultsDownload` stays. It is the transcription of the reference's payload — results text
+plus `"\n\nUser Responses:\n"` plus the archive rows — and deleting it would delete the evidence
+rather than the dead code. Its only importer is its test, which `dead-export-contract.test.ts`
+records as a real reader in as many words: *"a symbol only a test reads is still read, and excluding
+tests would have condemned every constant a contract test pins."*
+
+Inventing a download button the reference does not offer is the other direction, and it is not this
+document's job to decide it — that is an owner question, not a gap.
+
 **low** · `divergence` · reference byte **2,112,115**
 
 ```
@@ -3144,6 +3407,21 @@ var s="Poll Results ",r=new Blob([e],{type:"text/plain"});s+=(new Date).toDateSt
 1.
 
 ### poll-11 — Responses textarea has no trailing newline; redraw is rAF not a 100 ms timer
+
+**HALF BUILT 2026-08-30 — (a) fixed, (b) refused with the reason.**
+
+**(a) The trailing newline is real and is fixed.** The reference appends one row at a time and each
+row carries its own `"\n"` (byte 2,106,688), so the box always ends in one; `formatVisiblePollResponses`
+joined instead and lost the last character. The empty case stays the empty string rather than
+becoming a lone newline, which a bare `+ '\n'` would have made it. Control seen red.
+
+**(b) The 100 ms re-plot is refused, and the row itself supplies the reason.** `setTimeout(() =>
+this.calcPieData(), 100)` exists because flot must re-MEASURE its container after a display change.
+This room draws to a canvas, which keeps its bitmap across `display: none`, and its redraw is an
+`$effect` on `panelWidth`/`panelHeight`/`pieData` scheduling a `requestAnimationFrame`. A maximise
+changes a dimension and redraws one frame EARLIER than the reference; a restore-from-minimise changes
+neither and needs no redraw. Reproducing the timer would be adding a delay to work around a
+measurement this implementation does not have to make.
 
 **low** · `divergence` · reference byte **2,106,688**
 

@@ -1149,6 +1149,30 @@ export class RoomMediaTransport {
         ownerId: owner?.id ?? null
       }
     ];
+    /*
+      `PA-03`, first toast — `"Connecting to " + e.nick + "..."`.
+
+      ```js
+      subscribe("callingScreenStart", e => {
+        e.uid != globals.user.id && alertsService.info("Connecting to " + e.nick + "..."),
+        this.screenLoading = !0, … })                                        // byte 1,960,202
+      ```
+
+      BEFORE `consume()`, which is what makes it a "connecting" notice rather than a second arrival
+      notice: building the consumer is a round trip to the SFU and this is the only feedback a viewer
+      gets while it happens.
+
+      The `e.uid != globals.user.id` guard is already spent — `addRemoteScreen` returns above for
+      this peer's own producer, and for the stronger reason that consuming yourself is a server
+      refusal. Re-testing it here would be a second spelling of a decision already made.
+
+      NOT built with it: `screenLoading` / `callingScreenName` / `screenPresenter` /
+      `screenPresenterAvatar`, the four fields the same handler sets. They drive a loading placeholder
+      whose markup is not quoted anywhere in the audit row, and a spinner invented rather than read is
+      not something this repository ships. Recorded at the disposition rather than half-built.
+    */
+    this.#toasts.info(`Connecting to ${info.displayName ?? 'Presenter'}...`);
+
     // A viewer is brought to the screen too, not just the presenter sharing it. The capture emits
     // `selectScreenTabOfId` from the viewer's side as well - `callScreenOfUserWEBRTC` when a
     // viewer starts watching a screen, and `handleScreenSwitchToTalking` when the presenter who
@@ -1173,7 +1197,19 @@ export class RoomMediaTransport {
     const remote = await session.consume(info);
     // `consume` returns null when this producer is already being consumed, which is the dedupe the
     // server's at-least-once `newProducer` requires.
-    if (remote) this.#screenStreams.set(info.producerId, remote.stream);
+    if (remote) {
+      this.#screenStreams.set(info.producerId, remote.stream);
+      /*
+        `PA-03`, second toast — `subscribe("addScreenStream", e => { "screen" == e.mode &&
+        alertsService.info(e.userName + " started screen sharing") })`, byte 1,960,202.
+
+        Gated on the STREAM, not on the producer: `"screen" == e.mode` is upstream's way of saying
+        "this is a share and not a camera", which this method has already decided by returning above
+        on anything without `share`. Inside the `if` because a null `remote` is the dedupe path — a
+        producer already being consumed announces itself once, not once per `getProducers` snapshot.
+      */
+      this.#toasts.info(`${info.displayName ?? 'Presenter'} started screen sharing`);
+    }
   }
 
   /**

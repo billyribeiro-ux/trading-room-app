@@ -6143,7 +6143,7 @@
           the glyph is a function rather than a nested ternary in the markup.
         -->
         {#each CONNECTIVITY_ROWS as row (row.key)}
-          {@const state = testStates[row.key]}
+          {const state = $derived(testStates[row.key])}
           <div class={[`status-item ${row.spacing}`, connectivityRowClasses(state)]}>
             <span class="fw-medium">{row.label}</span>
             <span

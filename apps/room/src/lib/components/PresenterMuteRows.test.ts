@@ -19,7 +19,7 @@ import PresenterMuteRows from './PresenterMuteRows.svelte';
   ## What source text cannot reach, and why each one matters
 
   **1. `id` and `for` are a PAIR.** The markup writes `id={rowId}` and `for={rowId}` from one
-  `{@const}`, so a `toContain` proves both strings exist. It cannot prove they RESOLVE to each
+  declaration tag, so a `toContain` proves both strings exist. It cannot prove they RESOLVE to each
   other — that is `label.control`, computed by the DOM from the document. `screen-volume.ts:111`
   states the stakes exactly: *"a duplicated form-control id makes the overlay's own checkboxes
   unclickable by their labels"*. A member clicks "Mute" and nothing happens.

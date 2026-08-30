@@ -76,22 +76,22 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,481 | no |
 | 2 | `lib/components/notes/NoteEditor.svelte` | 1,696 | no |
-| 3 | `routes/+page.svelte` | 1,558 | no |
-| 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
+| 3 | `routes/+page.svelte` | 1,714 | no |
+| 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
-| 7 | `lib/components/PresentationArea.svelte` | 988 | no |
+| 7 | `lib/components/PresentationArea.svelte` | 1,088 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,055 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
-| 10 | `lib/components/PollPanel.svelte` | 824 | no |
+| 10 | `lib/components/PollPanel.svelte` | 895 | no |
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
 | 12 | `lib/components/EmojiPicker.svelte` | 702 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 596 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 625 | no |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
-| 18 | `lib/components/FilesPane.svelte` | 556 | no |
+| 18 | `lib/components/FilesPane.svelte` | 554 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | no |
 | 20 | `lib/components/notes/NotesPane.svelte` | 521 | no |
 | 21 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
@@ -108,7 +108,7 @@ guessed.
 | 32 | `lib/components/MessageMenu.svelte` | 252 | no |
 | 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
 | 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
-| 35 | `lib/components/RoomShell.svelte` | 238 | no |
+| 35 | `lib/components/RoomShell.svelte` | 268 | no |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
 | 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
@@ -124,17 +124,17 @@ guessed.
 | 48 | `lib/components/WebcamStrip.svelte` | 124 | no |
 | 49 | `lib/components/CloseSessionPane.svelte` | 104 | no |
 | 50 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 51 | `lib/components/ChatSearchBar.svelte` | 88 | no |
+| 51 | `lib/components/ChatSearchBar.svelte` | 141 | no |
 | 52 | `lib/components/CompactMessageRow.svelte` | 77 | no |
 | 53 | `lib/components/PositionsContainer.svelte` | 74 | no |
 | 54 | `lib/components/ModeratorMessage.svelte` | 73 | no |
 | 55 | `lib/components/ToastHost.svelte` | 64 | no |
 | 56 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 | 57 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 58 | `lib/components/ChatTabStrip.svelte` | 55 | no |
+| 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 71 surfaces audited · 1,072 of 33,259 lines · 3.2%.**
+**2 of 71 surfaces audited · 1,072 of 33,847 lines · 3.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -7949,3 +7949,4 @@ a reference bug with no counterpart in our Svelte scoping.
 remaining reference dumps (`account-page`, `mising`, `must-match`, `gap-dump`, the `.less` sources)
 are **not** claimed as gaps until a surface in `apps/room/src` needs them — that is the standard this
 section applies, and applying it is what turned an open-ended pile into a bounded list.
+

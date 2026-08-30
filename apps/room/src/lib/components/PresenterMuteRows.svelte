@@ -94,8 +94,8 @@
 
 {#if talkingUsers.length > 0}
   {#each talkingUsers as user, index (user.userID)}
-    {@const muted = isMutedFor(preferences, user.userID)}
-    {@const rowId = presenterRowId(index, idPrefix)}
+    {const muted = $derived(isMutedFor(preferences, user.userID))}
+    {const rowId = $derived(presenterRowId(index, idPrefix))}
     <!-- Const 111 / 117 — `[1,'my-1']` in both tables. -->
     <div class="my-1">
       <!--

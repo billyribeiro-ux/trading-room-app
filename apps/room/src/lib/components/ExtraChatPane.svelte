@@ -35,6 +35,7 @@
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import ChatSearchBar from './ChatSearchBar.svelte';
   import ChatTabStrip from './ChatTabStrip.svelte';
+  import type { ChatTabUnreadCounts } from '#lib/room/chat-tab-unread.js';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
   import RoomMessage from './RoomMessage.svelte';
@@ -64,6 +65,11 @@
      * are looking at — and it arrives with the page as `data.chatTabs`. See `#lib/chat-tabs.ts`.
      */
     chatTabs: readonly string[];
+    /**
+     * `acA-06` — THIS column's unread counts. `app-extra-chat` keeps its own `unreadMsgs` map (byte
+     * 2,375,500) and clears its own on a switch, so the two columns badge independently.
+     */
+    unread?: ChatTabUnreadCounts;
     /** The chat surfaces' display mode, resolved on the page. `#lib/chat-display-mode.ts`. */
     displayMode: ChatDisplayMode;
     /** `#textAreaTxtExtra`'s value. Bindable for the same reason the main composer is. */
@@ -184,7 +190,22 @@
     onsearchinput: (value: string) => void;
     onsearchsubmit: () => void;
     onsearchclear: () => void;
-    onsettings: () => void;
+    /**
+     * `acA-04` — `showChatToolbarExtended` for THIS column, and the checkbox it gates.
+     *
+     * `app-extra-chat` carries its own copy of the whole bar (const table at byte 2,395,378, the
+     * checkbox at 2,396,458) and its own `filterChatMsgs.modOnlyExtra`, so nothing here is shared
+     * with the main column but the component that draws it.
+     */
+    searchExtended: boolean;
+    modOnly: boolean;
+    onmodonly: (next: boolean) => void;
+    /**
+     * The gear — `toggleChatToolbar()`, byte 1,435,047. It was named `onsettings` and opened the
+     * settings modal, which is not what the reference's gear does; it was renamed with `acA-04`,
+     * when the extended toolbar gained the first control it had to show.
+     */
+    ontoggletoolbar: () => void;
     onimageupload: () => void;
     onrte: () => void;
     onselectgif: (url: string) => void;
@@ -193,6 +214,7 @@
   let {
     tab = $bindable('off-topic'),
     chatTabs,
+    unread = {},
     displayMode,
     composer = $bindable(''),
     messages,
@@ -228,7 +250,10 @@
     onsearchinput,
     onsearchsubmit,
     onsearchclear,
-    onsettings,
+    searchExtended,
+    modOnly,
+    onmodonly,
+    ontoggletoolbar,
     onimageupload,
     onrte,
     onselectgif
@@ -345,7 +370,7 @@
             <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
           {/if}</a
         >
-        <ChatTabStrip tabs={chatTabs} bind:active={tab} />
+        <ChatTabStrip tabs={chatTabs} bind:active={tab} {unread} />
         <ul class="nav ml-auto align-items-center">
           <!-- `O(9, o.showPMBtn ? 9 : -1)` — the same gate the main pane's PM button uses. -->
           {#if showPmButton}
@@ -375,7 +400,7 @@
               aria-haspopup="true"
               aria-expanded="false"
               class="nav-link dropdown-toggle p-0"
-              onclick={onsettings}
+              onclick={ontoggletoolbar}
             >
               <i title="Settings" class="fas fa-cog chat-header-gear"></i>
             </a>
@@ -386,10 +411,14 @@
 
     {#if searchOpen}
       <ChatSearchBar
+        column="extra"
         term={searchTerm}
         oninput={onsearchinput}
         onsubmit={onsearchsubmit}
         onclear={onsearchclear}
+        extended={searchExtended}
+        {modOnly}
+        {onmodonly}
       />
     {/if}
 

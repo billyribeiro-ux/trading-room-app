@@ -57,7 +57,12 @@
   import RoomSidebar from '#lib/components/RoomSidebar.svelte';
   import RoomShell from '#lib/components/RoomShell.svelte';
   import { DUMP_CONTRACT } from '#lib/dump-contract.js';
-  import { initializeSoundEffects, setSoundEffectsVolume, unloadSoundEffects } from '#lib/sound-effects.js';
+  import {
+    initializeSoundEffects,
+    playSoundEffect,
+    setSoundEffectsVolume,
+    unloadSoundEffects
+  } from '#lib/sound-effects.js';
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
 
@@ -255,6 +260,35 @@
     { timestamp: number; sender: string; text: string; live?: boolean }[]
   >([]);
   let speechRecoHistoryMode = $state(false);
+
+  /**
+   * `hideSpeechRecognition` — the overlay's X, all five statements of it.
+   *
+   * ```js
+   * hideSpeechRecognition(e) { e.preventDefault(), e.stopPropagation(),
+   *   this.appService.globals.preferences.showSpeechRecoOverlay = !1,
+   *   this.appService.setPreference("showSpeechRecoOverlay", !1),
+   *   this.showSpeechRecognition = !1, this.currentSpeechReco = null,
+   *   this.lastSpeechRecoEvent = 0, this.stopSpeechChecker(),
+   *   this.speechRecoHistoryMode = !1 }                                      // byte 1,957,245
+   * ```
+   *
+   * `PA-02`. This was `subtitles = false`, which lands on a bare private-field write in
+   * `RoomPrefs` — no `save()`, so **dismissing the overlay was forgotten on reload**, while the
+   * navbar checkbox for the same preference persisted correctly. `prefs.save` is the one path that
+   * writes the field, the checkbox and the server together.
+   *
+   * The other three statements are the ones an implementation drops because nothing visible depends
+   * on them the moment you press the button: the caption goes, the checker stops (or a timer keeps
+   * waking up to clear something nobody is being shown), and history mode resets, so re-enabling the
+   * overlay later does not reopen it in the transcript view the reader left it in.
+   */
+  function hideSpeechRecognition(): void {
+    prefs.save('showSpeechRecoOverlay', false);
+    currentCaption = null;
+    speechRecoHistoryMode = false;
+    captionStaleness.stop();
+  }
   /**
    * How many finalised lines the transcript keeps.
    *
@@ -480,6 +514,7 @@
     media,
     split,
     polls,
+    captionStaleness,
     alerts,
     menus,
     dialogs,
@@ -664,7 +699,44 @@
   $effect(() => {
     // The decision is `RoomPolls.deliver` — who may see this poll, and whether this browser has
     // already shown it. It ASSIGNS inside an effect on purpose, and its docblock argues the latch.
-    if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';
+    const delivery = polls.deliver(data.activePoll, data.user.id);
+
+    if (delivery === 'open') {
+      modals.modal = 'poll';
+      /*
+        `poll-01` — THE POLL ARRIVAL SOUND, which this room had a file and a key for and no caller.
+
+        ```js
+        subscribe("gotPoll", i => { globals.preferences.doNotDisturbOn || soundEffects.fileShare.play(),
+          guiEventBus.emit("doPollModal", {mode:"answer", … }) })            // byte 2,507,038
+        ```
+
+        `fileShare` was declared in `#lib/sound-effects.ts` and mapped to a file that ships, and
+        `grep -rn fileShare src` found no caller anywhere — the sound was loaded on every page and
+        played by nothing.
+
+        Gated on `doNotDisturbOn`, which is the same gate every other arrival sound in this room
+        uses, and it is INSIDE the `'open'` branch rather than beside it: the reference's `gotPoll`
+        never reaches a viewer who wrote the poll (`i.senderUID != globals.user.userXrefID`, byte
+        1,024,082) and `deliver` refuses the same person plus two more. A sound for a poll no panel
+        opened for is a noise with nothing to explain it.
+      */
+      if (!prefs.doNotDisturbOn) playSoundEffect('fileShare');
+      return;
+    }
+
+    /*
+      `poll-02` — the poll ENDED, and somebody may be looking at a panel for it.
+
+      `subscribe("pollDone", () => this.hidePanel())` — byte 2,106,987, wired once for the component's
+      life rather than per mode, so it closes the panel for every viewer who has one open. Ours had
+      no counterpart at all: an answerer who had not yet voted kept a fully interactive panel for a
+      poll that no longer existed, and `sendAnswer` would then post against it.
+
+      Only when the poll modal is the one showing. `closeActive()` runs the close bookkeeping for
+      whatever is open, and a poll ending must not shut somebody's settings modal.
+    */
+    if (delivery === 'ended' && modals.modal === 'poll') modals.closeActive();
   });
 
   /*
@@ -1227,6 +1299,8 @@
           -->
           {#snippet chatAlertsPane()}
             <AlertChatArea
+              isLimitedPresenter={media.limitedPresenter}
+              extraChatArea={extraChatInnerArea}
               {broadcasts}
               {split}
               {alerts}
@@ -1317,7 +1391,8 @@
               viewerOnlyMode={gates.viewerOnlyMode}
               doNotDisturbOn={prefs.doNotDisturbOn}
               bind:mainTab
-              bind:subtitles={prefs.subtitles}
+              subtitles={prefs.subtitles}
+              onhidespeechreco={hideSpeechRecognition}
               {currentCaption}
               {captionHistory}
               bind:speechRecoHistoryMode
@@ -1357,20 +1432,34 @@
           {/snippet}
 
           <!--
-            `q4e` — the extra chat column, its own `as-split-area` holding `app-extra-chat`.
+            `acA-08` — the extra chat column has THREE forms upstream, not one, and this room shipped
+            a fourth that is none of them.
 
-            A third area, not a second pane inside the chat column: `K4e` renders three areas and
-            gates this one on `!hideChatAlerts && preferences.extraChatColumn`. Const 227 is the
-            only mobile area carrying an `order` binding, which `RoomSplit.extraChatAreaStyle`
-            records; the note there used to end "which this room does not model", and it does now.
+            ```js
+            // phone: nRe, byte 2,496,359 — const 227 ["minSize","0",1,"alert-chat-box",3,"size","order"]
+            O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)
+
+            // desktop ltr/rtl: H4e, const 207
+            //   ["minSize","0",1,"alert-chat-box","alert-chat-box-extra-column",3,"size","order"]
+            //   holding an <as-split> whose single area is const 211, `chat-box`
+            O(2, e.hideChatAlerts || !preferences.extraChatColumn ||
+                 "ltr" !== preferences.roomSplitDir && "rtl" !== preferences.roomSplitDir ? -1 : 2)
+
+            // desktop ttb/btt: j4e, byte 2,490,857 — a FOURTH area of the INNER stack, const 211
+            O(6, !preferences.extraChatColumn ||
+                 "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
+            ```
+
+            What shipped here was one ungated top-level area in every case, so a top/bottom room drew
+            the second column beside the presentation area instead of below the chat pane, and the
+            `alert-chat-box-extra-column` class hook — which the phone form correctly does NOT carry
+            — never existed at all.
+
+            The three forms share ONE `<ExtraChatPane>` call: it takes thirty props off this page's
+            state, and three transcriptions of that call is three places to forget a prop.
           -->
-          {#snippet extraChatPane()}
-            <as-split-area
-              minsize="0"
-              class="alert-chat-box as-split-area"
-              style={split.extraChatAreaStyle}
-            >
-              <ExtraChatPane
+          {#snippet extraChatColumn()}
+            <ExtraChatPane
                 bind:tab={chat.extraTab}
                 bind:composer={chat.extraComposer}
                 messages={feeds.visibleExtraChat}
@@ -1384,6 +1473,7 @@
                 {giphyApiKey}
                 chrome={messageChrome}
                 chatTabs={data.chatTabs}
+                unread={chat.extraUnread}
                 displayMode={displayModes.chat}
                 followedUsers={userActions.followedUsers}
                 presenterColors={data.presenterColors}
@@ -1409,12 +1499,77 @@
                 onsearchinput={(value) => chat.search.setTerm('extra', value)}
                 onsearchsubmit={() => searchChat('extra', chat.search.term('extra'))}
                 onsearchclear={() => chat.search.clear('extra')}
-                onsettings={() => modals.open('settings')}
+                searchExtended={chat.search.isExtended('extra')}
+                modOnly={chat.modOnly('extra')}
+                onmodonly={(next) => chat.setModOnly('extra', next)}
+                ontoggletoolbar={() => chat.search.toggleExtended('extra')}
                 onimageupload={() => composer.openImageUpload()}
                 onrte={() => composer.openExtraRTE()}
                 onselectgif={(url) => composer.selectGif('', url)}
-              />
+            />
+          {/snippet}
+
+          <!-- The phone's form: a plain `alert-chat-box` top-level area, const 227. -->
+          {#snippet extraChatPane()}
+            <as-split-area
+              minsize="0"
+              class="alert-chat-box as-split-area"
+              style={split.extraChatAreaStyle}
+            >
+              {@render extraChatColumn()}
             </as-split-area>
+          {/snippet}
+
+          <!--
+            `H4e` — the desktop left/right form. A top-level area carrying the extra-column class,
+            and inside it an `as-split` of its own whose single `chat-box` area holds the pane. The
+            nested split is the capture's and is kept: it is what makes the column line up with the
+            chat pane beside it rather than with the whole alert-chat stack.
+
+            `alert-chat-box-extra-column` HAS NO CSS RULE — measured: the only selectors carrying the
+            name in any of this room's stylesheets are `.alert-chat-box-extra-column-sm …`, a
+            different class, and the bundle reads it back nowhere. It ships anyway, because its twin
+            `alert-chat-regular` is in exactly the same position and `AlertChatArea.svelte:567`
+            already ships that one: the pair is what a stylesheet or a script would target, and
+            keeping one half of it is how the two stop being a pair.
+          -->
+          {#snippet extraChatSideArea()}
+            <as-split-area
+              minsize="0"
+              class="alert-chat-box alert-chat-box-extra-column as-split-area"
+              style={split.extraChatAreaStyle}
+            >
+              <as-split
+                minsize="0"
+                class={split.innerIsVertical
+                  ? 'as-percent as-vertical as-init'
+                  : 'as-percent as-horizontal as-init'}
+                style={split.innerIsVertical ? undefined : 'flex-direction: row;'}
+                dir="ltr"
+              >
+                <as-split-area minsize="0" class="chat-box as-split-area" style="flex: 0 0 100%;">
+                  {@render extraChatColumn()}
+                </as-split-area>
+              </as-split>
+            </as-split-area>
+          {/snippet}
+
+          <!--
+            `j4e` — the desktop top/bottom form, rendered INSIDE `AlertChatArea`'s own split. The
+            gate is here rather than there because the state it reads is this page's; the component
+            owns the place, not the decision. `split.extraChatIsInside` carries the three terms and
+            the renormalised size.
+          -->
+          {#snippet extraChatInnerArea()}
+            {#if split.extraChatIsInside && !gates.hideChatAlerts}
+              <as-split-area
+                minsize="0"
+                class="chat-box as-split-area"
+                style={split.innerExtraChatAreaStyle}
+              >
+                {@render extraChatColumn()}
+              </as-split-area>
+            {/if}
           {/snippet}
 
         <RoomShell
@@ -1431,6 +1586,7 @@
           {chatAlertsPane}
           {presentationPane}
           {extraChatPane}
+          {extraChatSideArea}
         />
       </div>
     </div>

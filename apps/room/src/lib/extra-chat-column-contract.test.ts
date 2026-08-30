@@ -114,6 +114,14 @@ const scrollCode = stripComments(
 const prefsCode = stripComments(PREFS_SOURCE);
 const paneCode = stripComments(PANE);
 const modalCode = stripComments(MODAL);
+/*
+  `acA-08` — the MAIN chat/alerts pane, which owns the inner split the top/bottom form is placed
+  inside, and the geometry class that renormalises the three sizes when it is.
+*/
+const paneMainCode = stripComments(
+  readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8')
+);
+const splitModule = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
 
 describe('the preference', () => {
   it('is wired, where it used to be a dead element id', () => {
@@ -134,28 +142,97 @@ describe('the preference', () => {
   });
 });
 
-describe('the column is its own split area', () => {
-  it('gated exactly as K4e gates index 3', () => {
-    /*
-      `O(3, !e.hideChatAlerts && e.appService.globals.preferences.extraChatColumn ? 3 : -1)`.
+describe('the column is a split area, and WHICH split it belongs to is the room direction', () => {
+  /*
+    `acA-08`, 2026-08-30. This block used to assert one ungated top-level area, and both of its
+    claims were wrong in a way only the bundle could show:
 
-      The gate reads `extraChatColumnVisible` rather than the preference directly, because
-      `hideChat` turns the column off WITHOUT persisting — see the collapse below. That is upstream's
-      shape too: it assigns `preferences.extraChatColumn` at runtime and remembers the old value in
-      `extraChatColumnWasEnabled`.
-    */
+    ```js
+    // phone — nRe, byte 2,496,359. NO direction term.
+    O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)
+
+    // desktop left/right — K4e node 2, byte 2,493,526
+    O(2, e.hideChatAlerts || !preferences.extraChatColumn ||
+         "ltr" !== preferences.roomSplitDir && "rtl" !== preferences.roomSplitDir ? -1 : 2)
+
+    // desktop top/bottom — V4e node 6, byte 2,490,857. A FOURTH area of the INNER stack.
+    O(6, !preferences.extraChatColumn ||
+         "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
+    ```
+
+    So "not a pane nested inside the chat column" was true of two forms out of three, and the room
+    shipped the wrong one for a top/bottom viewer. The old assertion could not have caught it: it
+    read only the snippet it already knew about.
+  */
+  it('places the phone form at the top level with no direction term', () => {
     expect(shellCode).toContain(
       '{#if !hideChatAlerts && extraChatColumnVisible}{@render extraChatPane()}'
     );
   });
 
-  it('and it is an area, not a pane nested inside the chat column', () => {
-    const from = pageCode.indexOf('{#snippet extraChatPane()}');
+  it('places the desktop left/right form beside the chat pane, gated on the direction', () => {
+    expect(shellCode).toContain(
+      '{#if !hideChatAlerts && extraChatColumnVisible && split.roomIsHorizontal}'
+    );
+    expect(shellCode).toContain('{@render extraChatSideArea()}');
+  });
+
+  it('gives the left/right form the extra-column class and the nested split H4e carries', () => {
+    const from = pageCode.indexOf('{#snippet extraChatSideArea()}');
     expect(from, 'the snippet must exist').toBeGreaterThan(-1);
-    const snippet = pageCode.slice(from, pageCode.indexOf('{/snippet}', from));
-    expect(snippet).toContain('<as-split-area');
+    const to = pageCode.indexOf('{/snippet}', from);
+    expect(to, 'the snippet never closes').toBeGreaterThan(from);
+    const snippet = pageCode.slice(from, to);
+    expect(snippet).toContain('class="alert-chat-box alert-chat-box-extra-column as-split-area"');
     expect(snippet).toContain('style={split.extraChatAreaStyle}');
-    expect(snippet).toContain('<ExtraChatPane');
+    expect(snippet).toContain('<as-split');
+    expect(snippet).toContain('class="chat-box as-split-area"');
+    expect(snippet).toContain('{@render extraChatColumn()}');
+  });
+
+  it('places the desktop top/bottom form INSIDE the alert-chat split', () => {
+    /*
+      The gate is on the page, because the state it reads is the page's; `AlertChatArea` provides
+      the place and decides nothing. `split.extraChatIsInside` carries all three terms.
+    */
+    const from = pageCode.indexOf('{#snippet extraChatInnerArea()}');
+    expect(from, 'the snippet must exist').toBeGreaterThan(-1);
+    const to = pageCode.indexOf('{/snippet}', from);
+    expect(to, 'the snippet never closes').toBeGreaterThan(from);
+    const snippet = pageCode.slice(from, to);
+    expect(snippet).toContain('{#if split.extraChatIsInside && !gates.hideChatAlerts}');
+    expect(snippet).toContain('class="chat-box as-split-area"');
+    expect(snippet).toContain('style={split.innerExtraChatAreaStyle}');
+    expect(pageCode).toContain('extraChatArea={extraChatInnerArea}');
+    expect(paneMainCode).toContain('{@render extraChatArea?.()}');
+  });
+
+  it('has exactly ONE <ExtraChatPane> call, which all three forms render', () => {
+    /*
+      Thirty props. Three transcriptions of that call is three places to forget one, and the two that
+      were not being looked at would be the ones that lost it.
+    */
+    expect(pageCode.split('<ExtraChatPane').length - 1).toBe(1);
+    const from = pageCode.indexOf('{#snippet extraChatColumn()}');
+    expect(from, 'the shared snippet must exist').toBeGreaterThan(-1);
+    const to = pageCode.indexOf('{/snippet}', from);
+    expect(to, 'the shared snippet never closes').toBeGreaterThan(from);
+    expect(pageCode.slice(from, to)).toContain('<ExtraChatPane');
+  });
+
+  it('renormalises the inner sizes, because flex-basis does not do what as-split does', () => {
+    /*
+      Upstream binds `size` to `chatSize` on BOTH inner chat areas and `as-split` normalises the
+      proportions across however many areas there are. Percentages do not: alerts + chat + chat comes
+      to more than 100% of the stack.
+    */
+    expect(splitModule).toContain(
+      '#innerScale = $derived(this.#extraChatIsInside ? 1 / (2 - this.#resolvedChatAlertsSplit) : 1);'
+    );
+    expect(splitModule).toContain('flexSize(this.#resolvedChatAlertsSplit * this.#innerScale)');
+    expect(splitModule).toContain(
+      'flexSize((1 - this.#resolvedChatAlertsSplit) * this.#innerScale)'
+    );
   });
 });
 
@@ -221,13 +298,17 @@ describe('both columns share one pipeline, and that is the point', () => {
       filter — five steps that must agree, in two places that would drift.
     */
     expect(feedsModule).toContain(
-      'chatMessagesFor(tab: ChatTab, searchResults: readonly Message[] | null = null) {'
+      `chatMessagesFor(
+    tab: ChatTab,
+    searchResults: readonly Message[] | null,
+    column: 'main' | 'extra'
+  ) {`
     );
     expect(feedsModule).toContain(
-      'return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults);'
+      "return this.chatMessagesFor(this.#chat.tab, this.#chatSearchResults, 'main');"
     );
     expect(feedsModule).toContain(
-      'return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults);'
+      "return this.chatMessagesFor(this.#chat.extraTab, this.#extraChatSearchResults, 'extra');"
     );
   });
 

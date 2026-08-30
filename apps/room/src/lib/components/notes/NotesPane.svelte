@@ -378,8 +378,8 @@
 
 <ul id="notesTabs" role="tablist" class="nav nav-tabs noteTabset">
   {#each notes as note (note.id)}
-    {@const tabId = String(note.id)}
-    {@const menuId = `${componentId}-note-menu-${note.id}`}
+    {const tabId = $derived(String(note.id))}
+    {const menuId = $derived(`${componentId}-note-menu-${note.id}`)}
     <li role="presentation" class="nav-item">
       <!--
         The captured application has no href on this Bootstrap tab anchor.

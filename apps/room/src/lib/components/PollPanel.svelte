@@ -11,6 +11,7 @@
     formatVisiblePollResponses,
     pollDeleteConfirmation
   } from '#lib/poll-behavior.js';
+  import { clampAndSnap } from '#lib/panel-drag.js';
   import type { ActivePoll, SavedPoll } from '#lib/types.js';
 
   type PollMode = 'setup' | 'answer' | 'results' | 'done';
@@ -60,6 +61,25 @@
     onend
   }: Props = $props();
 
+  /**
+   * `radius: .8` — where flot rings the pie with its labels, as a fraction of the pie's radius.
+   *
+   * `EB`, byte 2,104,707, which is the whole options object the reference hands `$.plot`. Named
+   * rather than inlined because it is the reference's number and not a taste, and a bare `0.8` in a
+   * geometry expression is the first thing a later reader "tunes".
+   */
+  const PIE_LABEL_RADIUS = 0.8;
+
+  /**
+   * The pie's radius for a given box — ONE expression, read by the drawing and by the labels.
+   *
+   * They were two expressions, in different units, and that is precisely what `poll-03` was: the pie
+   * was drawn on `min(w,h)/2 - 10` while the labels were placed at 32% of the box in each axis.
+   */
+  function pieRadius(width: number, height: number): number {
+    return Math.max(0, Math.min(width, height) / 2 - 10);
+  }
+
   let mode = $state<PollMode>('setup');
   let pollTab = $state<PollTab>('new');
   let pollQuestion = $state('');
@@ -82,6 +102,20 @@
     left: 0
   };
   let chartCanvas = $state<HTMLCanvasElement | undefined>();
+  /**
+   * `poll-03` — the chart box, measured, because the labels sit on a CIRCLE and the box is not one.
+   *
+   * `#pollPieChart` is `width: 100%` by a fixed `height: 300px`, so a percentage offset from its
+   * centre traces an ellipse: 32% of a ~540px-wide panel is ~173px sideways and ~96px down. flot
+   * places labels at `radius: .8` — eight tenths of the PIE's radius, the same number in both axes —
+   * and the pie radius here is `min(width, height) / 2 - 10`. The two agree only when the box is
+   * square, which it never is.
+   *
+   * Written by `drawPieChart`, which measures the parent anyway; reactive because `labelStyle` reads
+   * it during render and a plain `let` would leave the first frame's labels at the origin. `.raw`
+   * because it is only ever REPLACED — a deep proxy over two numbers is overhead on every label.
+   */
+  let chartBox = $state.raw({ width: 0, height: 0 });
   let priorOpen = false;
   let priorRestoreToken = 0;
   let pointerState:
@@ -357,13 +391,31 @@
     const dy = event.clientY - pointerState.startY;
 
     if (pointerState.kind === 'drag') {
-      panelLeft = Math.min(
+      /*
+        `poll-07` — `snap: !0`, byte 2,108,197, and the reason it goes through `clampAndSnap` rather
+        than being written out here.
+
+        The clamp was already `containment: ".wrapper"`; what was missing was the snap. Every other
+        floating panel in this room got it from `panel-drag.ts` — the private chat and the webcam
+        holders both do — and this one is the outlier that rolls its own pointer handling for its
+        maximise and minimise states. Sharing the FUNCTION rather than copying its four lines is what
+        keeps the tolerance one number: `SNAP_TOLERANCE`, jQuery UI's own 20px.
+
+        What is reproduced is snapping to the CONTAINMENT edges. jQuery UI's `snap: true` also snaps
+        to every other snappable element, which needs a registry this application does not have —
+        `panel-drag.ts` records that gap once, for all four panels, rather than four times.
+      */
+      panelLeft = clampAndSnap(
+        pointerState.left + dx,
+        bounds.left,
         bounds.left + bounds.width - panelWidth,
-        Math.max(bounds.left, pointerState.left + dx)
+        true
       );
-      panelTop = Math.min(
+      panelTop = clampAndSnap(
+        pointerState.top + dy,
+        bounds.top,
         bounds.top + bounds.height - panelHeight,
-        Math.max(bounds.top, pointerState.top + dy)
+        true
       );
       return;
     }
@@ -416,6 +468,7 @@
 
     const width = parent.clientWidth;
     const height = parent.clientHeight;
+    chartBox = { width, height };
     const ratio = window.devicePixelRatio || 1;
     chartCanvas.width = Math.round(width * ratio);
     chartCanvas.height = Math.round(height * ratio);
@@ -425,7 +478,7 @@
     context.clearRect(0, 0, width, height);
 
     const colors = ['#edc240', '#afd8f8', '#cb4b4b', '#4da74d', '#9440ed'];
-    const radius = Math.max(0, Math.min(width, height) / 2 - 10);
+    const radius = pieRadius(width, height);
     const centerX = width / 2;
     const centerY = height / 2;
     let angle = -Math.PI / 2;
@@ -443,15 +496,27 @@
     }
   }
 
+  /**
+   * `label: { show: !0, radius: .8, … }` — byte 2,104,707.
+   *
+   * In flot a pie label radius at or below 1 is a FRACTION OF THE PIE'S RADIUS, so the labels ring
+   * the pie at a constant distance in both axes. This used to be 32% of the container box in each
+   * axis, which is an ellipse on a box that is 100% wide and 300px tall — labels drifting outside
+   * the pie on the left and right and sitting inside it top and bottom.
+   *
+   * The radius is `PIE_RADIUS` below, the same expression `drawPieChart` uses to draw the pie, and
+   * the two read one function so they cannot drift apart.
+   */
   function labelStyle(index: number) {
     const priorPercentage = pieData
       .slice(0, index)
       .reduce((sum, datum) => sum + datum.data, 0);
     const centerPercentage = priorPercentage + pieData[index].data / 2;
     const angle = -Math.PI / 2 + (centerPercentage / 100) * Math.PI * 2;
-    const left = 50 + Math.cos(angle) * 32;
-    const top = 50 + Math.sin(angle) * 32;
-    return `position: absolute; left: ${left}%; top: ${top}%; transform: translate(-50%, -50%); background: rgba(34, 34, 34, 0.8); font-size: 12px; text-align: center; padding: 2px; color: white;`;
+    const distance = pieRadius(chartBox.width, chartBox.height) * PIE_LABEL_RADIUS;
+    const left = chartBox.width / 2 + Math.cos(angle) * distance;
+    const top = chartBox.height / 2 + Math.sin(angle) * distance;
+    return `position: absolute; left: ${left}px; top: ${top}px; transform: translate(-50%, -50%); background: rgba(34, 34, 34, 0.8); font-size: 12px; text-align: center; padding: 2px; color: white;`;
   }
 
   $effect(() => {
@@ -584,7 +649,13 @@
                   placeholder="Enter a choice (i.e. Up, Down, Sideways)"
                   class="form-control"
                   bind:value={pollChoice}
-                  onkeydown={(event) => {
+                  onkeyup={(event) => {
+                    /*
+                      `poll-08` — `"keyup.enter"` in const table entry for this input, byte
+                      2,113,811. It was `onkeydown`, and the difference is not one frame: holding
+                      Enter down repeats `keydown` and added a choice per repeat, where the reference
+                      commits once, on release.
+                    */
                     if (event.key === 'Enter') addChoice();
                   }}
                 />
