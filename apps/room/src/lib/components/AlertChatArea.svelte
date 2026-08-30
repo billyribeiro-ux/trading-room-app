@@ -224,6 +224,15 @@
       payload?: MessageActionEvent
     ) => void;
     onprivatechat: () => void;
+    /**
+     * `O(9, o.showPMBtn ? 9 : -1)`, byte 1,453,980 — whether this column offers private chat.
+     *
+     * `gates.showPmButton` has existed since it was written and `ExtraChatPane` has used it; THIS
+     * column had no prop and rendered the entry point unconditionally, so a free-trial member in a
+     * room with `disablePMForTrials` was refused private chat in one column and offered it in the
+     * other. A prop, not a `gates` read, for the reason `ExtraChatPane`'s own props note gives.
+     */
+    showPmButton: boolean;
     onexpandcomposer: (element: HTMLTextAreaElement | undefined) => void;
     /** One keystroke in the main composer — `updateLastTypedTime()`. */
     ontyped: (value: string) => void;
@@ -289,6 +298,7 @@
     onarchivealerts,
     onmessageaction,
     onprivatechat,
+    showPmButton,
     onexpandcomposer,
     ontyped,
     onstoppedtyping,
@@ -768,14 +778,16 @@
               >
               <ChatTabStrip tabs={chatTabs} bind:active={chat.tab} />
               <ul class="nav ml-auto align-items-center">
-                <li class="nav-item">
-                  <!-- svelte-ignore a11y_missing_attribute -->
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <a title="Open Private chat" class="nav-link" onclick={onprivatechat}>
-                    <i class="fas fa-comments"></i>
-                  </a>
-                </li>
+                {#if showPmButton}
+                  <li class="nav-item">
+                    <!-- svelte-ignore a11y_missing_attribute -->
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <a title="Open Private chat" class="nav-link" onclick={onprivatechat}>
+                      <i class="fas fa-comments"></i>
+                    </a>
+                  </li>
+                {/if}
                 <li class="nav-item mx-1">
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->

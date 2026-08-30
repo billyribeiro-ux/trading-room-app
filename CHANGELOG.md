@@ -33,6 +33,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 02:50 UTC — Two gates the reference has that this room rendered without, and a hollow assertion of my own
+
+**Runtime impact: YES.** A free-trial member in a room with `disablePMForTrials` is no longer offered
+private chat in the main chat column, and the three radios that change the room's chat mode for
+everybody are no longer drawn for members.
+
+#### Both are the same failure: the gate exists here, and one of its call sites forgot it
+
+**The private-chat entry point** — `O(9, o.showPMBtn ? 9 : -1)`, byte 1,453,980.
+`gates.showPmButton` has computed the rule since it was written, and `ExtraChatPane` gates on it with
+a comment quoting that exact line. `AlertChatArea` — the MAIN column — took no such prop and rendered
+the entry point unconditionally. A trial member was refused private chat in the extra column and
+offered it in the main one, which makes a room's rules look arbitrary rather than enforced.
+
+**The group chat control** — `O(290, isPresenter && !isLimitedPresenter ? 290 : -1)`, byte 2,288,249.
+Three radios that change the chat mode for everybody, rendered for every member.
+
+#### What that second one was, precisely, because the distinction matters
+
+**Not a privilege escalation.** `chat-mode.remote.ts` calls `presenterRoom()`, so the server refuses
+a member and the room's mode never moved. What a member actually got was a confirm dialog and a 403
+— a control whose only possible effect is a refusal. The audit that surfaced it rated it as a
+`missing-control` at high severity; the accurate reading is a UI leak over a server that already
+holds, and it is worth saying so rather than banking the more alarming version.
+
+`!isLimitedPresenter` carries its own weight. `giveMicScreen` makes a member a presenter at runtime
+(`globals.user.isPresenter = globals.isLimitedPresenter = e.give`), and disabling the room's chat is
+not among the things that grant hands over. The same three-way test is already used twice in that
+file, which is where the shape was read from.
+
+#### A hollow assertion of mine, caught by its own negative control
+
+The first version of `authority-gate-contract.test.ts` asserted
+`expect(modalHost).toContain('{#if isPresenter && !isLimitedPresenter}')`.
+
+`ModalHost.svelte` contains **three** such gates — the username row, the administrative body, and
+this one — plus two comments quoting the shape. So the assertion was satisfied by a gate elsewhere
+in the file: **removing `!isLimitedPresenter` from the block under test left it green.** The
+position check beside it was no better, because it took `indexOf` of the first match, which was one
+of the others.
+
+Both assertions are anchored to their control now — `lastIndexOf('{#if ', control)` finds the gate
+that actually precedes the markup, and asserts on the text between them. The same correction was
+applied to the private-chat assertion, which had the same shape and had not yet been caught.
+
+That is the second time in this session a `toContain` has proved to be about a different occurrence
+than the one intended, and the second time only a negative control found it.
+
+#### One more assertion, deliberately
+
+`chat-mode.remote.ts` still calling `presenterRoom()` is pinned here. Hiding a control is not the
+same as refusing the act, and a later reader who notices the radios are now presenter-only might
+reasonably think the server check became redundant. It did not.
+
+#### Negative controls — five, two of which found the flaw above
+
+| mutation | result |
+| --- | --- |
+| the main column drops its gate | RED |
+| **the group gate loses `!isLimitedPresenter`** | **GREEN — the hollow assertion** |
+| the same, after anchoring | RED |
+| the group gate removed entirely | RED |
+| only one column is fed the getter | RED |
+| the server gate removed | RED |
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,502 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
+Not verified: no browser. Both are `{#if}`s over markup and are asserted at the source, which is the
+form that can see a call site with no prop at all — the thing a mount test structurally cannot.
+
 ### 2026-08-30 02:15 UTC — Five viewer preferences had live consumers and no control anywhere, and four of them were ON
 
 **Runtime impact: YES.** A presenter can now silence the beep and the popup that fire on every
