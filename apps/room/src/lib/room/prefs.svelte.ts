@@ -82,6 +82,7 @@ export class RoomPrefs {
   #popupOnUserLeave;
   #beepOnUserJoin;
   #beepOnUserLeave;
+  #updatePositionsIframe;
   #trimChatLogs;
   #chatPopup;
   #chatBadges;
@@ -146,6 +147,11 @@ export class RoomPrefs {
     this.#beepOnUserJoin = $state(loadedSettings.beepOnUserJoin !== false);
 
     this.#beepOnUserLeave = $state(loadedSettings.beepOnUserLeave !== false);
+    /*
+      `updatePositionsIframe:!0` in the reference's defaults, byte 980,052 — so `!== false`, not the
+      `=== true` `+page.svelte` read off the decoded blob, which made the refresh off for everybody.
+    */
+    this.#updatePositionsIframe = $state(loadedSettings.updatePositionsIframe !== false);
 
     /**
      * `preferences.trimChatLogs` — "Reduce chat log memory", the settings modal's own label.
@@ -441,6 +447,11 @@ export class RoomPrefs {
     return this.#beepOnUserLeave;
   }
 
+  /** `preferences.updatePositionsIframe` — the positions panel's own auto-refresh. */
+  get updatePositionsIframe() {
+    return this.#updatePositionsIframe;
+  }
+
   get trimChatLogs() {
     return this.#trimChatLogs;
   }
@@ -596,6 +607,16 @@ export class RoomPrefs {
       if (key === 'enableRTE') this.#enableRTE = value;
       if (key === 'extraChatColumn') this.#extraChatColumn = value;
       if (key === 'visibilityChangeEnabled') this.#visibilityChangeEnabled = value;
+      /*
+        FIVE MORE whose consumer existed and whose control never reached it, 2026-08-30 — see
+        `#lib/viewer-alert-prefs.ts`. These lines are the half that makes a write take effect NOW
+        rather than on the next reload, which is the half `recordingStartSound` was missing.
+      */
+      if (key === 'popupOnUserJoin') this.#popupOnUserJoin = value;
+      if (key === 'popupOnUserLeave') this.#popupOnUserLeave = value;
+      if (key === 'beepOnUserJoin') this.#beepOnUserJoin = value;
+      if (key === 'beepOnUserLeave') this.#beepOnUserLeave = value;
+      if (key === 'updatePositionsIframe') this.#updatePositionsIframe = value;
       /*
         Both halves, because this preference has TWO controls: the navbar's
         `presentation-subtitles` checkbox and the settings modal's `app-speech-reco-overlay`. The

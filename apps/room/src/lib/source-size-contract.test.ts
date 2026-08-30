@@ -1687,6 +1687,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'app-webcam-holder - the card strip, three props, and the two transcriptions behind it'
   },
   {
+    file: 'lib/components/ViewerAlertPrefsPane.svelte',
+    /*
+      Created 2026-08-30 and capped at what it landed at. Five controls whose consumers were live and
+      whose switches did not exist, behind the two room gates the reference gives them. If this
+      climbs, the question is whether a sixth gated preference belongs here or in its own pane.
+    */
+    max: 140,
+    why: 'the alerts tab’s five gated viewer preferences — the arrival group, and the positions refresh'
+  },
+  {
     file: 'lib/components/AvDevicePane.svelte',
     /*
       Extracted from `ModalHost.svelte` on 2026-08-30 and capped at what it landed at. Most of it is
@@ -1929,7 +1939,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       nothing else in this file touched. It came out because the fix it carries needed lines here,
       and that is the trade this entry exists to force.
     */
-    max: 5999,
+    /*
+      6,999 -> 6,006 on 2026-08-30 — seven lines for one prop, one mount and one import, carrying
+      five controls the reference has and this room did not.
+
+      Recorded as a raise and flagged for the owner, and worth reading beside the two entries above:
+      this file entered the day at 6,189 and leaves it at 6,005, because the A/V pane and the report
+      of what it cost went out. The ratchet took 190 lines and gave 7 back for a feature.
+    */
+    max: 6006,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2409,7 +2427,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       their names and why a blob value outside them is refused rather than coerced, with its own
       test — so what this file gained is a value, not a decision.
     */
-    max: 635,
+    /*
+      RAISED 635 -> 656 on 2026-08-30, for five preferences that could not be written.
+
+      The four arrival preferences had a field, a seed and a getter here and no `save()` case, so a
+      control writing one would have taken effect on the next reload rather than at once — the same
+      half `recordingStartSound` was missing. `updatePositionsIframe` had no field at all and its
+      default was inverted against the reference. Twenty-one lines: one field, one seed, one getter,
+      five save cases, and the two paragraphs saying why the default moved.
+
+      Flagged for the owner. The alternative was an extraction invented to satisfy a number, on a
+      class whose whole shape is one field, one seed, one getter and one case per preference.
+    */
+    max: 656,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {

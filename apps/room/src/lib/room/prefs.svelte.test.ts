@@ -82,6 +82,39 @@ describe('save() is the only way in, and it does all three things', () => {
     expect(persisted, 'the server was not told').toEqual([['chatGif', false]]);
   });
 
+  /*
+    THE FIVE ADDED 2026-08-30, and this block exists because a negative control found nothing to fail.
+
+    Four of them had a field, a seed and a getter here and NO `save()` case, so a control writing one
+    would have persisted it and left the state this page already read it into unchanged — the setting
+    would take effect on the next reload. That is not hypothetical: it is exactly how
+    `recordingStartSound` behaved, and the comment beside these cases says so.
+
+    Deleting the `beepOnUserJoin` case left every test in this repository green. The five below are
+    what stops that, and they assert all three things `save()` owes a modelled preference: the
+    getter moves, the snapshot mirrors, and the server is told.
+  */
+  it.each([
+    ['beepOnUserJoin', (prefs: ReturnType<typeof make>['prefs']) => prefs.beepOnUserJoin],
+    ['popupOnUserJoin', (prefs: ReturnType<typeof make>['prefs']) => prefs.popupOnUserJoin],
+    ['beepOnUserLeave', (prefs: ReturnType<typeof make>['prefs']) => prefs.beepOnUserLeave],
+    ['popupOnUserLeave', (prefs: ReturnType<typeof make>['prefs']) => prefs.popupOnUserLeave],
+    [
+      'updatePositionsIframe',
+      (prefs: ReturnType<typeof make>['prefs']) => prefs.updatePositionsIframe
+    ]
+  ])('moves %s at once, not on the next reload', (key, read) => {
+    const { prefs, persisted } = make('{}');
+    // All five seed to ON: `!== false`, which is the reference's own default for each.
+    expect(read(prefs), `${key} must default on`).toBe(true);
+
+    prefs.save(key, false);
+
+    expect(read(prefs), 'the state the consumer reads did not move').toBe(false);
+    expect(prefs.loaded[key], 'the snapshot was not mirrored').toBe(false);
+    expect(persisted, 'the server was not told').toEqual([[key, false]]);
+  });
+
   it('persists even a key it holds no state for', () => {
     // The blob carries far more than the 27 modelled preferences; an unmodelled key must still
     // round-trip rather than being silently dropped because no `if` matched it.

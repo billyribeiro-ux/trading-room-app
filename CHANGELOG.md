@@ -33,6 +33,110 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 02:15 UTC — Five viewer preferences had live consumers and no control anywhere, and four of them were ON
+
+**Runtime impact: YES.** A presenter can now silence the beep and the popup that fire on every
+arrival and every departure — there was no way to. And the positions panel's thirty-second refresh
+is on by default, as the reference has it, with a switch to turn it off.
+
+#### The inverse of the shape this repository usually catches
+
+Not a control with no consumer. A **consumer with no control** — which is worse, because the feature
+is on and unreachable rather than off and harmless.
+
+| preference | consumer, all along | writer, before this |
+| --- | --- | --- |
+| `beepOnUserJoin` | `arrival-announcement.ts` | **none** |
+| `popupOnUserJoin` | `arrival-announcement.ts` | **none** |
+| `beepOnUserLeave` | `arrival-announcement.ts` | **none** |
+| `popupOnUserLeave` | `arrival-announcement.ts` | **none** |
+| `updatePositionsIframe` | `PositionsContainer` | **none** |
+
+Measured by grepping every `.svelte` in the room for each name: zero hits. `RoomPrefs` held the four
+arrival preferences as seeded `$state` with getters, seeded `!== false` — on unless turned off — and
+nothing could turn them off.
+
+#### Three halves were missing, not one
+
+1. **No control.** Nothing wrote any of the five.
+2. **No `save()` case.** Even with a control, a write would have persisted and left the state this
+   page already read it into unchanged — the setting would take effect on the next reload. That is
+   not hypothetical: the comment beside those cases records `recordingStartSound` behaving exactly
+   that way, where the checkbox flipped, the POST succeeded, and the sound still played.
+3. **An inverted default.** `+page.svelte` read `prefs.loaded.updatePositionsIframe === true` off the
+   decoded settings blob. An absent key is not `true`, so the refresh was off for everybody — against
+   a reference whose defaults block ends `…makeUsersFollowMyScreens:!1, showAlertsFrom:!1,
+   updatePositionsIframe:!0` at byte 980,052. It reads the seeded getter now, `!== false`, which also
+   makes the new switch take effect at once.
+
+#### The reference, transcribed
+
+Four checkboxes in a group the capture gives an id and a title (byte 2,269,797) —
+`["id","appBeepOnUserJoinLeave","title","Beep on user"]` with ids `beep-on-user-join`,
+`popup-on-user-join`, `beep-on-user-leave`, `popup-on-user-leave`, labels " Beep on user join " …
+" Popup on user leave ", each with an `on`/`off` span. Every handler is the same two statements
+(byte 2,252,100). Plus `app-positions-update`, labelled " Update Positions ", whose handler also
+emits `updatePositionsIframeChanged` — reproduced here by reading the seeded getter, which updates
+the container without a second channel.
+
+Two gates, both transcribed:
+
+| | |
+| --- | --- |
+| arrival group | `(sessData.beepOnUserJoin \|\| sessData.userJoinAndLeavePopup) && isPresenter` (byte 2,285,369) |
+| positions | `sessData.positionsIframe && sessData.positionsIframeUrl` (byte 2,285,255) |
+
+The positions switch carries no presenter term and is offered to members too — asserted, because the
+difference between the two gates is easy to tidy into a bug.
+
+#### The quirk, reproduced rather than tidied
+
+The LEAVE beep is gated on the room's `beepOnUserJoin`; there is no `beepOnUserLeave` room setting
+upstream. `arrival-announcement.ts` already recorded this from the consuming side, citing byte
+2,230,981 where the room's own settings pane renders `beepOnUserJoin` twice, once per direction.
+Only the VIEWER preference is per-direction — which is exactly what these four are.
+
+#### Where it landed, and what the ratchet made of it
+
+`ViewerAlertPrefsPane.svelte` holds both gates; `viewer-alert-prefs.ts` resolves the room half, so
+the three-gate logic is testable without mounting anything. The first draft put the positions
+checkbox inline in `ModalHost` and passed nine props: the ratchet failed three files, and folding
+them into one value and one pane brought `RoomOverlays.svelte` back **under** its ceiling.
+
+| ceiling | before | after |
+| --- | ---: | ---: |
+| `lib/components/RoomOverlays.svelte` | 850 | **850** (unchanged; the module gave ten lines back) |
+| `lib/components/ModalHost.svelte` | 5,999 | 6,006 |
+| `lib/room/prefs.svelte.ts` | 635 | 656 |
+
+Both raises are flagged for the owner. `ModalHost` entered today at **6,189** and leaves at 6,004.
+
+#### Negative controls — seven, and one found a hole
+
+| mutation | result |
+| --- | --- |
+| the room gate reads an absent setting as on | RED |
+| the positions gate stops needing a URL | RED |
+| a switch writes its element id instead of the preference name | RED |
+| the arrival group loses its presenter gate | RED |
+| the positions default flips back to `=== true` | RED |
+| **a `save()` case deleted** | **GREEN — nothing failed** |
+| the same, after the fix | RED |
+| the seed default inverted | RED |
+
+That green line is the finding, and it is the same class as the one the last commit turned up:
+deleting the `beepOnUserJoin` case from `save()` left every test in the repository passing. Five
+parameterised cases now assert all three things `save()` owes a modelled preference — the getter
+moves, the snapshot mirrors, the server is told.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,495 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
+Not verified: no browser. The pane is asserted through a real mount in jsdom — clicks, gates and the
+written key — but nobody has watched a presenter silence a join beep in a running room.
+
 ### 2026-08-30 01:30 UTC — The private-chat log could not scroll, and its Load More re-fetched pages it already had
 
 **Runtime impact: YES.** A private conversation longer than the panel is now reachable — it was not

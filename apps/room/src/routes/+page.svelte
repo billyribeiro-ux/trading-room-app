@@ -1270,7 +1270,7 @@
               positionsAvailable={data.sessData?.positionsIframe === true &&
                 String(data.sessData?.positionsIframeUrl ?? '').trim().length > 0}
               positionsIframeUrl={data.sessData?.positionsIframeUrl}
-              positionsAutoRefresh={prefs.loaded.updatePositionsIframe === true}
+              positionsAutoRefresh={prefs.updatePositionsIframe}
               hideStreams={gates.streamsHidden}
               modMessage={data.sessData?.modMessage ?? ''}
               bufferSizeLevel={prefs.bufferSizeLevel}

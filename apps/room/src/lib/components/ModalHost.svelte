@@ -1,5 +1,7 @@
 <script lang="ts">
   import AvDevicePane from '#lib/components/AvDevicePane.svelte';
+  import ViewerAlertPrefsPane from '#lib/components/ViewerAlertPrefsPane.svelte';
+  import type { ViewerAlertPrefs } from '#lib/viewer-alert-prefs.js';
   import type { RoomPeerHistory } from '#lib/room/peer-history.svelte.js';
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
@@ -275,6 +277,11 @@
      * two fabricated device ids until 2026-08-30, and neither told the truth.
      */
     capture: CaptureSettings;
+    /**
+     * The alerts tab's five gated viewer preferences — five controls the reference has, this room
+     * did not, and every one of them sat over a live consumer. See `#lib/viewer-alert-prefs.ts`.
+     */
+    viewerAlerts: ViewerAlertPrefs;
     onManagedUserRemoval: (list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) => void;
     onManagedUserInfo: (user: ManagedChatUser) => void;
     /**
@@ -503,6 +510,7 @@
     onSavePermissions,
     streamingType,
     capture,
+    viewerAlerts,
     onManagedUserRemoval,
     onManagedUserInfo,
     privateMessageHistoryEnabled,
@@ -3274,6 +3282,8 @@
             >
           </div>
         </div>
+
+        <ViewerAlertPrefsPane {viewerAlerts} {isPresenter} {onPreferenceChange} />
 
         <div class="p-2 text-mode-box">
           <div id="appSpeechRecoOverlay" title="Show Speech Recognition Overlay" class="pb-2">

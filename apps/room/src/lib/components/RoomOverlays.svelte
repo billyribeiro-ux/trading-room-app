@@ -5,6 +5,7 @@
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
   import { captureSettingsFrom } from '#lib/capture-settings.js';
+  import { viewerAlertPrefsFrom } from '#lib/viewer-alert-prefs.js';
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
@@ -630,6 +631,7 @@
   onSavePermissions={(user, granted) => userActions.savePermissions(user, granted)}
   streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
   capture={captureSettingsFrom(prefs.loaded)}
+  viewerAlerts={viewerAlertPrefsFrom(data.sessData, prefs)}
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}
