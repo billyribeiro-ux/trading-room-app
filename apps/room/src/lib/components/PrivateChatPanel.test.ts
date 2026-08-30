@@ -65,6 +65,10 @@ interface Calls {
   switchuser: number[];
   loadmore: number;
   send: number;
+  /** The composer button column's three, G1. */
+  imageupload: number;
+  selectgif: string[];
+  emoji: string[];
 }
 
 const render = (props: Partial<Record<string, unknown>> = {}) => {
@@ -77,7 +81,10 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     download: 0,
     switchuser: [],
     loadmore: 0,
-    send: 0
+    send: 0,
+    imageupload: 0,
+    selectgif: [],
+    emoji: []
   };
 
   target = document.createElement('div');
@@ -88,6 +95,12 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     props: {
       open: true,
       pmLogsOnRight: false,
+      canPostImages: true,
+      webinarMode: false,
+      giphyApiKey: 'giphy-test-key',
+      onimageupload: () => (calls.imageupload += 1),
+      onselectgif: (_title: string, url: string) => calls.selectgif.push(url),
+      onemoji: (glyph: string) => calls.emoji.push(glyph),
       doNotDisturb: false,
       isPresenter: false,
       peer: null,

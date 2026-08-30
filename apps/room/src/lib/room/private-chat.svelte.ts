@@ -1,5 +1,6 @@
 import { isHttpError } from '@sveltejs/kit';
-import { tick } from 'svelte';
+
+import { restoreAfterLoadMore, scrollPrivateChatToBottom } from './private-chat-scroll';
 
 import {
   mergeOlderMessagesBy,
@@ -150,23 +151,6 @@ export interface PrivateChatPrefs {
   rather than here. It leaves as an `onCleared` callback rather than as a field this class would
   then co-own with a feature it knows nothing about.
 */
-/**
- * How long after the first scroll the second one fires — `setTimeout(…, 500)` at byte 2,192,880.
- *
- * Exported so the contract that guards it reads THIS value rather than restating the number, which
- * is how the two stop agreeing. It was 60 here until 2026-08-30; see {@link RoomPrivateChat.scrollToBottom}.
- */
-export const PRIVATE_CHAT_RESCROLL_MS = 500;
-
-/**
- * How far to overscroll past the restored anchor after `Load More` — the reference's `- 20`.
- *
- * `scrollIntoView(true)` puts the anchor at the very top of the box, which hides the `Load More`
- * badge and the last line of the page just fetched. Exported for the same reason the delay above
- * is: a contract that restates the number is a contract that can disagree with the code.
- */
-export const LOAD_MORE_OVERSCROLL_PX = 20;
-
 export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminChat: boolean }> {
   readonly #dialogs: RoomDialogs;
   readonly #prefs: PrivateChatPrefs;
@@ -194,6 +178,10 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   #paging;
   #onlineUserIds;
   #notify;
+  #canPost;
+  #uploadImages;
+  /** The composer's image dialog while it is open — see `beginImageUpload`. */
+  #imageUpload;
   /** `loadMoreLastID` — the row to scroll back to once older history lands. See `loadMore`. */
   #loadMoreAnchorId = '';
   /** `privChatSearchResults` — the search's own bucket, so it cannot overwrite the thread. */
@@ -242,6 +230,22 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
      */
     onlineUserIds: () => ReadonlySet<number>;
     /**
+     * Upload one or more images and hand back their URLs — G1's `imgUpload()`.
+     *
+     * The room's uploader, injected, exactly as `RoomTradeAlerts` takes it: this class knows what
+     * to do with a URL and deliberately not how bytes reach the CDN.
+     */
+    uploadImages: (files: readonly File[]) => Promise<readonly string[]>;
+    /**
+     * `canPost` — may this member post at all, G13.
+     *
+     * The room's answer, injected, because it already decides who may chat and a second opinion
+     * computed in here is how two places come to disagree about one authority. The composer's own
+     * render gate upstream is `O(4, e.isConnected && e.chatEnabled ? 4 : -1)`, which is the same
+     * question asked of the same values.
+     */
+    canPost: () => boolean;
+    /**
      * Raise a toast and a browser notification — G12's `alertService.info` plus `new Notification`.
      *
      * Injected rather than reached for, exactly as `playSound` is: this class knows WHEN somebody
@@ -264,6 +268,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#selectRosterUser = options.selectRosterUser;
     this.#onlineUserIds = options.onlineUserIds;
     this.#notify = options.notify;
+    this.#canPost = options.canPost;
+    this.#uploadImages = options.uploadImages;
     this.#onCleared = options.onCleared;
     this.#onThreadDeleted = options.onThreadDeleted;
 
@@ -276,6 +282,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#searching = $state(false);
 
     this.#searchResults = $state.raw<PrivateChatMessage[]>([]);
+
+    this.#imageUpload = $state(false);
 
     this.#threads = $state.raw<Record<number, PrivateChatMessage[]>>({});
 
@@ -513,36 +521,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     return formatCompactTime(at);
   }
 
-  /**
-   * `scrollPCLogToBottom` — scroll now, and again once the rows have settled.
-   *
-   * ```js
-   * scrollToBottom(e = !1, i = !1) {                              // byte 2,192,880
-   *   try {
-   *     this.scrollRef.nativeElement.scrollTop = this.scrollRef.nativeElement.scrollHeight;
-   *     const o = this;
-   *     setTimeout(() => { o.scrollRef.nativeElement.scrollTop = o.scrollRef.nativeElement.scrollHeight }, 500)
-   *   } catch {}
-   * }
-   * ```
-   *
-   * **The delay was 60ms and the reference's is 500** — G23. The second scroll exists because the
-   * first one runs against a box whose height is not final: avatars are still loading, and a long
-   * message has not wrapped yet. 60ms fires before either settles, so it re-scrolled to the same
-   * wrong place and the conversation opened part-way up its own last message.
-   *
-   * `setTimeout` and not `tick()`, which is the opposite of the choice made in `CarouselDialog` and
-   * for the opposite reason: `tick()` waits for Svelte to finish rendering, and what is being waited
-   * for here is the BROWSER finishing layout after images arrive — which Svelte does not know about
-   * and cannot await.
-   */
+  /** `scrollPCLogToBottom` — delegated to `private-chat-scroll.ts`, which owns both numbers. */
   scrollToBottom() {
-    const run = () => {
-      const scroller = document.querySelector('.pc-messages');
-      if (scroller) scroller.scrollTop = scroller.scrollHeight;
-    };
-    run();
-    setTimeout(run, PRIVATE_CHAT_RESCROLL_MS);
+    scrollPrivateChatToBottom();
   }
 
   /**
@@ -619,54 +600,11 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     const anchor = this.#threads[peerId]?.[0];
     this.#loadMoreAnchorId = anchor ? `pcm-${anchor._id}` : '';
     await this.loadLog(peerId, next.page);
-    this.#restoreAfterLoadMore();
-  }
-
-  /**
-   * Put the reader back where they were after `Load More` prepends older history — G14.
-   *
-   * ```js
-   * this.appService.appEventBus.subscribe("getPCLog", e => {          // byte 2,191,427
-   *   this.isLoadingMore = !1,
-   *   0 == e.length && (this.hasMoreData = !1, this.loadMoreLastID = ""),
-   *   this.loadMoreLastID && (
-   *     document.getElementById(this.loadMoreLastID).scrollIntoView(!0),
-   *     this.scrollRef.nativeElement.parentElement.scrollTop =
-   *       this.scrollRef.nativeElement.parentElement.scrollTop - 20)
-   * })
-   * ```
-   *
-   * Without it the older page is inserted above the viewport and the scroll position stays where it
-   * was — which is now a different message — so a reader pressing `Load More` was thrown backwards
-   * through history they had not read yet.
-   *
-   * **The `-20` is the reference's and it is not arbitrary.** `scrollIntoView(true)` aligns the
-   * anchor to the very TOP of the box, which hides the `Load More` badge and the last line of the
-   * page just fetched; twenty pixels of overscroll leaves both visible. Transcribed rather than
-   * tuned — it is a number about the reference's own row height, and guessing a different one would
-   * be inventing a value nobody can check.
-   *
-   * `CompactMessageRow` already emits `id="pcm-{message._id}"`, so the anchor existed all along and
-   * nothing scrolled to it.
-   */
-  #restoreAfterLoadMore(): void {
+    /* The anchor crosses as an argument: it belongs to the paging that produced it, not to the
+       module that scrolls. `private-chat-scroll.ts` carries the `-20` and why it is transcribed. */
     const anchorId = this.#loadMoreAnchorId;
     this.#loadMoreAnchorId = '';
-    if (!anchorId) return;
-
-    /*
-      After the render that inserted the rows, not before it — the anchor's new position does not
-      exist until then. `tick()` and not `setTimeout`, the opposite of `scrollToBottom`'s choice and
-      for the reason given there: what is waited for here is Svelte inserting the rows, which it
-      knows about exactly.
-    */
-    void tick().then(() => {
-      const anchor = document.getElementById(anchorId);
-      if (!anchor) return;
-      anchor.scrollIntoView(true);
-      const scroller = document.querySelector('.pc-messages');
-      if (scroller) scroller.scrollTop = scroller.scrollTop - LOAD_MORE_OVERSCROLL_PX;
-    });
+    await restoreAfterLoadMore(anchorId);
   }
 
   /*
@@ -704,6 +642,30 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
 
   /** `sendMessage()` - `sendPrivChat(currUser, text, recvdUser)`. Empty text sends nothing. */
   async send() {
+    /*
+      ── `canPost` — G13, byte 2,208,062 ────────────────────────────────────────────────────
+
+      ```js
+      sendMessage() {
+        if (!this.canPost) return void bootbox.alert("Sorry, you can't post to this channel");
+        …
+      }
+      ```
+
+      There was no gate here at all: a member whose chat had been muted or disabled could type into
+      the private composer and the message went to the server, which refused it — so the refusal
+      arrived as a generic failure rather than as the reason.
+
+      `canPost` is the CALLER's answer, not this class's. The room already decides who may chat, and
+      a second opinion computed here is the shape `CLAUDE.md` forbids: two places deciding one
+      authority is how they come to disagree. The server refuses independently regardless — this is
+      the message, not the enforcement.
+    */
+    if (!this.#canPost()) {
+      this.#dialogs.alert = "Sorry, you can't post to this channel";
+      return;
+    }
+
     const text = this.#draft.trim();
     if (!text || this.#peerId === null) return;
 
@@ -717,6 +679,59 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#draft = '';
     // The echo on `/privChat` is what actually appends it, so nothing is inserted here.
     this.scrollToBottom();
+  }
+
+  /** Whether the composer's image dialog is on screen — G1's `imgUpload()`. */
+  get imageUpload(): boolean {
+    return this.#imageUpload;
+  }
+
+  /**
+   * `imgUpload()` — open the composer's image dialog for THIS conversation.
+   *
+   * A dialog of its own rather than the chat composer's, which is the rule `RoomOverlays` already
+   * records for the swing form: *"routing the swing upload through the composer's handler would post
+   * the image into chat instead of putting its URL in the form."* The same is true here, and worse —
+   * an image meant for one person would land in the room.
+   */
+  beginImageUpload(): void {
+    this.#imageUpload = true;
+  }
+
+  cancelImageUpload(): void {
+    this.#imageUpload = false;
+  }
+
+  /**
+   * The chosen image, uploaded and sent as a private message.
+   *
+   * ONE file. `ImageUploadDialog` is shared with the chat composer, which allows several; the
+   * reference's own private-chat dialog sets `multiple='false'`, so the extras are dropped here
+   * rather than by forking the component — the same call `RoomTradeAlerts` makes.
+   *
+   * The URL is SENT rather than put in the draft, which is what `sendPrivChat` does with it: an
+   * image in a private conversation is a message, and leaving it in the box would make a presenter
+   * press Enter on a URL they did not type.
+   */
+  async completeImageUpload(files: readonly File[]): Promise<void> {
+    this.#imageUpload = false;
+    const [file] = files;
+    if (!file) return;
+
+    let url: string | undefined;
+    try {
+      [url] = await this.#uploadImages([file]);
+    } catch (error) {
+      console.error(error);
+      this.#dialogs.alert = 'Upload Failed...';
+      return;
+    }
+    if (!url) {
+      this.#dialogs.alert = 'Upload Failed...';
+      return;
+    }
+    this.#draft = url;
+    await this.send();
   }
 
   /** `deleteThisPM()` - confirm, then `deletePeerPCLog {peerID}`, then drop the tab. */

@@ -580,7 +580,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       panel (G5) and `onclosepeer` calling `privateChat.closeTab()` (G8), each with the sentence
       saying what it was doing wrong before.
     */
-    max: 1492,
+    /*
+      1492 -> 1512, 2026-08-30. G1 and G13 for the private composer: `canPostImages`, `webinarMode`,
+      the Giphy key and three callbacks handed to the panel, plus `chatEnabled` crossing into
+      `RoomDeps` so the `canPost` refusal asks the same authority the main composer renders on.
+    */
+    max: 1512,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1336,7 +1341,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       (`PAM-01`), with the note recording that this is the second consumer of one parse rather than a
       second parse.
     */
-    max: 906,
+    /*
+      906 -> 920, 2026-08-30. A THIRD `ImageUploadDialog` instance, for the private composer (G1).
+
+      A third and not a share of the composer's, for the reason this file already records beside the
+      swing form's: routing a feature's upload through the chat composer's handler posts the image
+      into chat instead of into that feature. Here the cost of getting it wrong is larger — an image
+      meant for one person would land in the room.
+    */
+    max: 920,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1649,6 +1662,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the note tab strip and the three confirmations; everything else passes through'
   },
   {
+    file: 'lib/components/PrivateChatComposer.svelte',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30 — which is what the check that demanded it is for.
+
+      `pEe` at reference byte 2,198,563: the private composer's textarea, its three-button column
+      (emoji, image upload, GIF), both popovers, the webinar-mode notice and `autoExpand`. It exists
+      as a component because G1's button column put `PrivateChatPanel.svelte` past its ceiling, and
+      it is a good seam — nothing here knows about tabs, threads, paging, search or the roster.
+
+      Most of the length is transcription and reasons: the const table by value, why `form-control`
+      matters where `w-100` did not, why the emoji button alone is ungated, and why `autoExpand`
+      resizes `.pc-messages` as well as the box.
+
+      Twenty-five of the 325 are keyboard access on the two popover spans and the note saying why
+      eslint could not have asked for it: the spread attributes mean Svelte cannot see statically
+      that there is no role, so `a11y_click_events_have_key_events` never fires and an ignore for it
+      is an ignore for nothing. The linter's silence there is not evidence the spans are reachable.
+
+      If this climbs, the thing to check is whether the composer has started DECIDING who may post.
+      It must not: `canPostImages` arrives already answered, and `canPost` is enforced in
+      `RoomPrivateChat.send` from the room's own gate.
+    */
+    max: 325,
+    why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
+  },
+  {
     file: 'lib/components/PrivateChatPanel.svelte',
     /*
       CAPPED 2026-08-28, having been uncapped — the third component found without a ceiling in two
@@ -1697,7 +1736,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       says why the class is used rather than two orderings of the markup — DOM order is the reading
       order a screen reader and the tab key follow.
     */
-    max: 540,
+    /*
+      540 -> 520, 2026-08-30, and DOWN because the composer left.
+
+      G1's button column would have put this file at 716. The ratchet refused it and its remedy is a
+      slice, so `PrivateChatComposer.svelte` came out carrying `pEe` whole — the textarea, the three
+      buttons, both popovers, the webinar notice and `autoExpand`. The panel is smaller than it was
+      before the feature, which is what an extraction is supposed to look like.
+    */
+    max: 520,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -3280,6 +3327,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'one member’s whole private history, for a moderator; a modal, not the panel'
   },
   {
+    file: 'lib/room/private-chat-scroll.ts',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30. `app-privchatscroller`'s two scroll behaviours and the two
+      numbers they turn on: the 500ms re-scroll (byte 2,192,880) and the Load More anchor restore
+      with its `-20` (2,191,427).
+
+      It came out of `private-chat.svelte.ts`, whose own ceiling entry had named it as the seam. It
+      holds NO state and reads none — both functions take or find the element they act on, and the
+      Load More anchor crosses as an argument because it belongs to the paging that produced it.
+      That is what makes this a module and not a second class, and it is the thing to re-check if it
+      grows: state arriving here means the seam was drawn in the wrong place.
+    */
+    max: 110,
+    why: "the private-chat log's two scrolls, and the two transcribed numbers they turn on"
+  },
+  {
     file: 'lib/room/private-chat.svelte.ts',
     /* +3, 2026-08-16: the same `#lib/*.js` import reflow as `files.svelte.ts` above. */
     /*
@@ -3324,7 +3387,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The seam if this grows again is the SCROLLING — `scrollToBottom`, `#restoreAfterLoadMore` and
       the two constants are one concern that touches no other part of this class.
     */
-    max: 912,
+    /*
+      912 -> 928, 2026-08-30, after the SCROLLING came out.
+
+      G1's image-upload path and G13's `canPost` refusal put this at 1,010, and the entry below had
+      already named the seam: `scrollToBottom`, the Load More restore and the two constants are one
+      concern that touches nothing else here. They are `private-chat-scroll.ts` now, and this file
+      kept a two-line delegation and its docblock.
+
+      So the net of two features is +16 lines. The next seam, if this grows again, is the SEARCH —
+      `search`, `#searchResults` and the `log` getter's choice between two buckets.
+    */
+    max: 928,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -3878,7 +3952,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       panel decides WHEN somebody is told while `RoomToasts` decides how — the same split
       `playSound` above it already makes.
     */
-    max: 1365,
+    /*
+      1365 -> 1382, 2026-08-30. `canPost` and `uploadImages` for the private composer (G13, G1), each
+      with the sentence saying which authority it forwards and why this file does not compute one.
+    */
+    max: 1382,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

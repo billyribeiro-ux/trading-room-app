@@ -512,6 +512,8 @@
     rosterSession: () => rosterSession,
     theme: () => theme,
     chatAlertsDetached: () => chatAlertsDetached,
+    /* G13 — the private composer's `canPost`, which is the same authority the main one renders on. */
+    chatEnabled: () => chatEnabled,
     appHasFocus: () => roomRefresh.appHasFocus,
     mainElement: () => mainElement,
     alertChatElement: () => alertChatElement,
@@ -1449,6 +1451,19 @@
       doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
       pmLogsOnRight={prefs.pmLogsOnRight}
+      {canPostImages}
+      {webinarMode}
+      {giphyApiKey}
+      onimageupload={() => privateChat.beginImageUpload()}
+      onselectgif={(_title, url) => {
+        /*
+          `sendGif(o.title, o.images.original.url)` — the double-clicked GIF is SENT, not staged.
+          The title is the alt text upstream keeps for the grid and has no place in the message.
+        */
+        privateChat.draft = url;
+        void privateChat.send();
+      }}
+      onemoji={(glyph) => (privateChat.draft += glyph)}
       peer={userActions.selectedMessageUser}
       tabs={privateChat.tabs}
       currentUserId={privateChat.peerId}

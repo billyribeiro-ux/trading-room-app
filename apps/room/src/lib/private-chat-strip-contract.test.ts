@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { codeOf } from './source-comments.js';
-import { LOAD_MORE_OVERSCROLL_PX, PRIVATE_CHAT_RESCROLL_MS } from './room/private-chat.svelte.js';
+/*
+  The two scroll numbers moved to `private-chat-scroll.ts` on 2026-08-30, when the composer's
+  image-upload path put `private-chat.svelte.ts` past its ceiling and the seam that entry had already
+  named came due. The values are unchanged; only their home is.
+*/
+import { LOAD_MORE_OVERSCROLL_PX, PRIVATE_CHAT_RESCROLL_MS } from './room/private-chat-scroll.js';
 
 /**
  * Seven rows of the `PrivateChatPanel` surface audit, and one defect none of them was looking for.
@@ -39,7 +44,14 @@ import { LOAD_MORE_OVERSCROLL_PX, PRIVATE_CHAT_RESCROLL_MS } from './room/privat
 const read = (path: string) => codeOf(path, readFileSync(new URL(path, import.meta.url), 'utf8'));
 
 const PANEL = read('./components/PrivateChatPanel.svelte');
+/*
+  The composer became its own component on 2026-08-30, when G1's button column put the panel past its
+  ceiling and the size ratchet's remedy is a slice rather than a bigger number. Nothing about the
+  markup below changed in the move, which is why these assertions are re-pointed and not rewritten.
+*/
+const COMPOSER = read('./components/PrivateChatComposer.svelte');
 const STATE = read('./room/private-chat.svelte.ts');
+const SCROLL = read('./room/private-chat-scroll.ts');
 const SERVER = read('./server/private-chat.ts');
 const ROOM = read('./room/create-room.svelte.ts');
 
@@ -171,17 +183,17 @@ describe('the composer', () => {
       `form-control` is the one that is not cosmetic: it gives the box its border, padding and focus
       ring inside `.textSendDiv`. `w-100`, which stood in its place, only made it wide.
     */
-    expect(PANEL).toContain('name="txt-area"');
-    expect(PANEL).toContain('spellcheck="true"');
-    expect(PANEL).toContain('class="txt-area form-control"');
-    expect(PANEL).toContain('placeholder="Type your message here..."');
+    expect(COMPOSER).toContain('name="txt-area"');
+    expect(COMPOSER).toContain('spellcheck="true"');
+    expect(COMPOSER).toContain('class="txt-area form-control"');
+    expect(COMPOSER).toContain('placeholder="Type your message here..."');
     /*
       Three dots, and the two-dot version gone. Asserted as `here.."` — the closing quote is what
       makes the string a whole attribute value, so a three-dot placeholder does not match it. Without
       that quote the check would be vacuous: `here..` is a prefix of `here...`.
     */
-    expect(PANEL).not.toContain('Type your message here.."');
-    expect(PANEL).not.toContain('class="txt-area w-100"');
+    expect(COMPOSER).not.toContain('Type your message here.."');
+    expect(COMPOSER).not.toContain('class="txt-area w-100"');
   });
 
   it('puts the flex row on the element the capture puts it on', () => {
@@ -190,10 +202,10 @@ describe('the composer', () => {
       and a `div.flex-fill.px-0` around the textarea. The row was on the holder, which is where the
       button column (G1, still open) would have had nowhere to sit.
     */
-    expect(PANEL).toContain('<div class="textSendDiv" id="textAreaHolderPM">');
-    expect(PANEL).toContain('<div class="d-flex mx-0">');
-    expect(PANEL).toContain('<div class="flex-fill px-0">');
-    expect(PANEL).not.toContain('class="d-flex align-items-center textSendDiv"');
+    expect(COMPOSER).toContain('<div class="textSendDiv" id="textAreaHolderPM">');
+    expect(COMPOSER).toContain('<div class="d-flex mx-0">');
+    expect(COMPOSER).toContain('<div class="flex-fill px-0">');
+    expect(COMPOSER).not.toContain('class="d-flex align-items-center textSendDiv"');
   });
 });
 
@@ -205,16 +217,16 @@ describe('the re-scroll', () => {
       part-way up its own last message.
     */
     expect(PRIVATE_CHAT_RESCROLL_MS).toBe(500);
-    expect(STATE).toContain('setTimeout(run, PRIVATE_CHAT_RESCROLL_MS);');
-    expect(STATE).not.toContain('setTimeout(run, 60)');
+    expect(SCROLL).toContain('setTimeout(run, PRIVATE_CHAT_RESCROLL_MS);');
+    expect(SCROLL).not.toContain('setTimeout(run, 60)');
   });
 
   it('scrolls immediately as well, which is what the second one is a correction to', () => {
-    const at = STATE.indexOf('scrollToBottom() {');
-    expect(at, 'the method must exist').toBeGreaterThan(-1);
-    const closes = STATE.indexOf('\n  }', at);
-    expect(closes, 'the method must be closed').toBeGreaterThan(at);
-    const body = STATE.slice(at, closes);
+    const at = SCROLL.indexOf('export function scrollPrivateChatToBottom()');
+    expect(at, 'the function must exist').toBeGreaterThan(-1);
+    const closes = SCROLL.indexOf('\n}', at);
+    expect(closes, 'the function must be closed').toBeGreaterThan(at);
+    const body = SCROLL.slice(at, closes);
     expect(body.indexOf('run();')).toBeLessThan(body.indexOf('setTimeout('));
   });
 });
@@ -279,7 +291,7 @@ describe('the second cluster — G5, G7 and G14', () => {
     expect(body.indexOf('this.#loadMoreAnchorId =')).toBeLessThan(
       body.indexOf('await this.loadLog')
     );
-    expect(body.indexOf('await this.loadLog')).toBeLessThan(body.indexOf('#restoreAfterLoadMore'));
+    expect(body.indexOf('await this.loadLog')).toBeLessThan(body.indexOf('restoreAfterLoadMore'));
   });
 
   it('G14 — overscrolls by the reference s own twenty pixels', () => {
@@ -288,7 +300,7 @@ describe('the second cluster — G5, G7 and G14', () => {
       the last line of the page just fetched. Read from the constant rather than restated.
     */
     expect(LOAD_MORE_OVERSCROLL_PX).toBe(20);
-    expect(STATE).toContain('scroller.scrollTop = scroller.scrollTop - LOAD_MORE_OVERSCROLL_PX;');
+    expect(SCROLL).toContain('box.scrollTop = box.scrollTop - LOAD_MORE_OVERSCROLL_PX;');
   });
 
   it('G14 — waits for the render that inserted the rows, with tick and not a timer', () => {
@@ -297,6 +309,129 @@ describe('the second cluster — G5, G7 and G14', () => {
       wait is for the BROWSER finishing layout after images arrive, which Svelte cannot await; here it
       is for Svelte inserting rows, which it knows exactly.
     */
-    expect(STATE).toContain('void tick().then(() => {');
+    expect(SCROLL).toContain('await tick();');
+  });
+});
+
+describe('the composer button column — G1, G11 and G13', () => {
+  const COMPOSER_SRC = read('./components/PrivateChatComposer.svelte');
+
+  it('has all three buttons, by the consts that name them', () => {
+    /*
+      `d(5,"div",56)(6,"span",57), T(7,"i",58), H(8,cEe,…,"span",59)(9,hEe,…,"span",60)` at byte
+      2,198,563. The private composer was a textarea and nothing else, so a private conversation
+      could carry no emoji, no image and no GIF — every one of which the main chat composer beside it
+      has had since it was written.
+    */
+    expect(COMPOSER_SRC).toContain('textAreaBtnsCol');
+    expect(COMPOSER_SRC).toContain('class="far fa-smile"');
+    expect(COMPOSER_SRC).toContain('class="fas fa-image"');
+    expect(COMPOSER_SRC).toContain('<span>GIF</span>');
+  });
+
+  it('gates the image and GIF on canPostImages and the emoji on NOTHING', () => {
+    /*
+      `O(8, i.canPostImages ? 8 : -1), O(9, i.canPostImages ? 9 : -1)` — and no such gate on the
+      emoji span, which is the capture's split and the sensible one: an emoji is text.
+    */
+    const emoji = COMPOSER_SRC.indexOf("'ngb-popover-pm-emoji'");
+    const gate = COMPOSER_SRC.indexOf('{#if canPostImages}');
+    expect(emoji, 'the emoji button must exist').toBeGreaterThan(-1);
+    expect(gate, 'and the gate must come after it').toBeGreaterThan(emoji);
+    expect(COMPOSER_SRC.slice(gate)).toContain('class="fas fa-image"');
+    expect(COMPOSER_SRC.slice(gate)).toContain('<span>GIF</span>');
+  });
+
+  it('opens one popover at a time, as a union and not two flags', () => {
+    /*
+      `toggleEmojiPanel` and `toggleGiphyPanel` are mutually exclusive in every composer in the
+      bundle, and two booleans can represent a state that cannot happen.
+    */
+    expect(COMPOSER_SRC).toContain("let composerPopover = $state<'emoji' | 'giphy' | null>(null);");
+  });
+
+  it('carries the webinar notice with its tooltip verbatim', () => {
+    /*
+      Const 61, including the reference's own missing apostrophe in "everyones" and its trailing
+      ellipsis. A tooltip tidied on the way in is a tooltip that no longer matches the capture.
+    */
+    expect(COMPOSER_SRC).toContain(
+      'In webinar mode users only see their own chat messages, while Presenters see everyones messages...'
+    );
+    expect(COMPOSER_SRC).toContain('class="px-1 webinarMode"');
+  });
+
+  it('does NOT carry the RTE button, which is a recorded decision', () => {
+    /* The reference puts `openRTEModal` on exactly two composers and private chat is not one. */
+    expect(COMPOSER_SRC).not.toContain('openRTEModal');
+    expect(COMPOSER_SRC).not.toContain('fa-font');
+  });
+
+  it('G11 — autoExpand resizes the LOG as well as the box, which the main composer s does not', () => {
+    /*
+      ```js
+      e.style.height = o,
+      querySelector(".pc-messages").style.height = `calc(100% - ${o} - 15px)`
+      … "" === e.value.trim() && (e.style.height = "23px",
+      querySelector(".pc-messages").style.height = "calc(100% - 50px)")
+      ```
+
+      `.pc-messages` is `calc(100% - 50px)` — fifty pixels reserved for a one-line composer — so a
+      composer that grows without the log shrinking pushes the log's bottom off the panel, and the
+      newest message disappears exactly when somebody is replying to it.
+    */
+    expect(COMPOSER_SRC).toContain('`calc(100% - ${height} - 15px)`');
+    expect(COMPOSER_SRC).toContain("log.style.height = 'calc(100% - 50px)'");
+    /* The `+ 2` is the capture's, and `+page.svelte` records why it is not padding for luck. */
+    expect(COMPOSER_SRC).toContain('`${element.scrollHeight + 2}px`');
+    expect(COMPOSER_SRC).toContain("element.style.height = '23px';");
+  });
+
+  it('G11 — finds THIS panel s log rather than the first one in the document', () => {
+    /* `this.elementRef.nativeElement.querySelector` is component-scoped; `closest` is the same. */
+    expect(COMPOSER_SRC).toContain("element.closest('app-privchat')?.querySelector");
+    expect(COMPOSER_SRC).not.toContain("document.querySelector('.pc-messages')");
+  });
+
+  it('G11 — re-runs when the draft changes from anywhere, not only on input', () => {
+    /*
+      An emoji inserted, a send that cleared the box, a GIF URL put in and sent — the reference gets
+      that half for free by calling `autoExpand` from each of those places.
+    */
+    expect(COMPOSER_SRC).toContain('$effect(() => {');
+    expect(COMPOSER_SRC).toContain('untrack(autoExpand);');
+    expect(COMPOSER_SRC).toContain('oninput={autoExpand}');
+  });
+
+  it('G13 — the refusal is the reference s sentence, and the authority is the room s', () => {
+    /*
+      `if (!this.canPost) return void bootbox.alert("Sorry, you can't post to this channel")` at byte
+      2,208,062. There was no gate at all: a muted member typed, the server refused, and the refusal
+      arrived as a generic failure rather than as the reason.
+
+      `canPost` is INJECTED. The room already decides who may chat, and a second opinion computed in
+      the panel is how two places come to disagree about one authority.
+    */
+    expect(STATE).toContain('canPost: () => boolean;');
+    expect(STATE).toContain('this.#dialogs.alert = "Sorry, you can\'t post to this channel";');
+    const at = STATE.indexOf('async send()');
+    expect(at, 'send must exist').toBeGreaterThan(-1);
+    const refusal = STATE.indexOf('if (!this.#canPost())', at);
+    expect(refusal, 'the gate must be inside send').toBeGreaterThan(at);
+    expect(refusal, 'and before anything is trimmed or sent').toBeLessThan(
+      STATE.indexOf('const text = this.#draft.trim();', at)
+    );
+  });
+
+  it('G1 — the image dialog is this conversation s OWN, not the chat composer s', () => {
+    /*
+      `RoomOverlays` already records the rule for the swing form: routing a feature's upload through
+      the composer's handler posts the image into chat instead of into that feature. Here the cost of
+      getting it wrong is larger — an image meant for one person would land in the room.
+    */
+    const OVERLAYS = read('./components/RoomOverlays.svelte');
+    expect(OVERLAYS).toContain('{#if privateChat.imageUpload}');
+    expect(OVERLAYS).toContain('void privateChat.completeImageUpload(files)');
+    expect(STATE).toContain('beginImageUpload(): void {');
   });
 });

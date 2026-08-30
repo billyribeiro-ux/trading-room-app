@@ -33,6 +33,91 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 10:05 UTC — The private composer's button column, and an extraction that made the panel smaller than before the feature
+
+**Runtime impact: YES.** A private conversation can now carry an emoji, an image and a GIF. The
+composer grows with what is typed — and shrinks the message log by the same amount, so the newest
+message does not slide off the panel while somebody replies to it. A member who may not post is told
+why instead of watching a send fail.
+
+**G1 — the whole column was absent.** `pEe` at byte 2,198,563 is `textAreaBtnsCol` (const 56) with
+an emoji span (57/58), an image-upload span (63/64) and a GIF span (65). The private composer was a
+textarea and nothing else, so a private conversation could carry none of the three — every one of
+which the main chat composer beside it has had since it was written. The image and GIF are gated on
+`canPostImages` and the emoji deliberately is not, which is the capture's split and the sensible one:
+an emoji is text. The webinar notice (53/61/62) came with it, tooltip verbatim including the
+reference's own missing apostrophe in "everyones" and its trailing ellipsis.
+
+**AND THE EXTRACTION MADE THE PANEL SMALLER THAN IT WAS BEFORE THE FEATURE.** The column put
+`PrivateChatPanel.svelte` at 716 lines against a 540 ceiling, and `source-size-contract`'s remedy is
+a slice rather than a bigger number. `PrivateChatComposer.svelte` carries `pEe` whole — the textarea,
+the three buttons, both popovers, the notice and `autoExpand` — and the panel is **516** lines, below
+where it started. It is the same seam `CarouselDialog` was this morning: nothing in it knows about
+tabs, threads, paging, search or the roster.
+
+**A SECOND EXTRACTION FELL OUT OF THE SAME RULE, and its seam had been named in advance.** The
+image-upload path and the `canPost` refusal put `private-chat.svelte.ts` at 1,010 lines. The entry
+that raised its ceiling an hour earlier had already written down where the next cut goes:
+*"`scrollToBottom`, `#restoreAfterLoadMore` and the two constants are one concern that touches no
+other part of this class."* That is `private-chat-scroll.ts` now — 108 lines, no state, both
+functions taking or finding the element they act on, and the Load More anchor crossing as an argument
+because it belongs to the paging that produced it. **A note that names its own trigger is the only
+kind that can be checked later instead of remembered**, and this is the second time this session one
+has fired.
+
+**G11 — the composer never expanded at all**, so a member typing three lines saw one with the rest
+scrolled out of a box the captured `.txt-area` rule gives `overflow-y: auto`. The second half is what
+makes it different from the main composer's variant: `.pc-messages` is `calc(100% - 50px)`, fifty
+pixels reserved for a one-line composer, so a composer that grows without the log shrinking pushes
+the log's bottom off the panel. Scoped with `closest('app-privchat')` rather than a bare
+`document.querySelector`, which is the same scoping `this.elementRef.nativeElement.querySelector`
+gives upstream. It re-runs on any change to the draft and not only on input — an emoji, a cleared box
+after a send, a GIF URL — which is the half the reference gets for free by calling `autoExpand` from
+each of those places.
+
+**G13 — there was no gate at all.** A member whose chat was muted or disabled typed, the message went
+to the server, and the refusal arrived as a generic failure rather than as the reason. Now the
+reference's own sentence, before anything is trimmed or sent, and the draft is kept so nothing typed
+is lost to it. **`canPost` is injected and not computed here:** the room already decides who may chat
+— `chatComposerAvailable`, the same value the main composer's render gate uses, which is upstream's
+own pairing at `O(4, e.isConnected && e.chatEnabled ? 4 : -1)` — and a second opinion in the panel is
+how two places come to disagree about one authority. The server refuses independently regardless;
+this is the message, not the enforcement.
+
+**The image dialog is this conversation's own**, a third `ImageUploadDialog` instance rather than a
+share of the chat composer's. `RoomOverlays` already records that rule for the swing form, and here
+the cost of getting it wrong is larger: an image meant for one person would land in the room. One
+file, as the reference's own dialog sets `multiple='false'`, and the URL is SENT rather than left in
+the draft — `sendPrivChat` is what upstream does with it, and staging it would make somebody press
+Enter on a URL they did not type.
+
+**One thing lost and rebuilt on the way, worth recording.** A `git checkout --` meant to revert a
+malformed extraction discarded the button column with it, because that work was uncommitted. Rebuilt
+directly as the component rather than added-then-extracted, which is what it should have been.
+
+**And eslint's silence turned out not to be evidence.** The two popover spans carried
+`svelte-ignore a11y_click_events_have_key_events`, and the linter refused them as *"used, but not
+warned"* — because the spread attributes mean Svelte cannot see statically that there is no role, so
+the rule never fires. An ignore for a warning that cannot happen is an ignore for nothing, and its
+presence read as "we looked at this". Both spans have `role="button"`, a `tabindex`, an `aria-label`
+and a keydown now — the same divergence `GiphyPicker` already makes for its own two — and the note
+says plainly that the linter's silence there was never evidence the spans were reachable.
+
+**Negative controls, all ten seen RED after the commit, all first time.** Gating the emoji button on
+`canPostImages` too; deleting the GIF button; dropping the log resize from `autoExpand`; changing the
+`+ 2` to `+ 0`; swapping `closest('app-privchat')` for a bare `document.querySelector`; removing the
+effect that re-runs on any draft change; deleting the `canPost` gate; moving it after the trim so a
+refusal would arrive later than it should; staging an uploaded image instead of sending it; and
+routing the private image dialog away so nothing opened it.
+
+**Verified.** `private-chat-strip-contract.test.ts` 29, ten new; `private-chat.svelte.test.ts` 34,
+four new and executed — the `canPost` refusal measured by what did NOT leave the room, and the upload
+by what was sent. Whole `src/lib` suite 3,831 passed, 1 skipped. Two components capped on arrival,
+`PrivateChatPanel` lowered 540 → 520, three others raised with their reasons. `svelte-check` 0
+errors, 0 warnings. Full `pnpm run gate` before the push, `gate-exit` echoed into the log and read
+from there. **Nothing was opened in a browser**, and the **Svelte MCP has been unavailable for this
+entire session**.
+
 ### 2026-08-30 09:20 UTC — Six more private-chat rows, a preference that had never been read, and one refusal
 
 **Runtime impact: YES.** An incoming private message raises a toast and a browser notification when

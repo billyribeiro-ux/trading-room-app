@@ -713,6 +713,16 @@
   />
 {/if}
 <!--
+  `imgUpload()` from the PRIVATE composer — G1, and a third instance for the reason the note below
+  gives: a private image routed through the chat composer's handler would be posted into the ROOM.
+-->
+{#if privateChat.imageUpload}
+  <ImageUploadDialog
+    onclose={() => privateChat.cancelImageUpload()}
+    onupload={(files) => void privateChat.completeImageUpload(files)}
+  />
+{/if}
+<!--
     `imgUpload('swing')` — the swing form's own upload dialog.
 
     A SECOND instance rather than a share of the composer's `modal === 'image-upload'`: the

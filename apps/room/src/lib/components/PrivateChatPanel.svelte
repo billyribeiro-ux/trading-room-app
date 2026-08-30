@@ -1,5 +1,6 @@
 <script lang="ts">
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
+  import PrivateChatComposer from '#lib/components/PrivateChatComposer.svelte';
   import { panelDragResize } from '#lib/panel-drag.js';
 
   /*
@@ -93,6 +94,24 @@
     open: boolean;
     /** `preferences.pmLogsOnRight` — G5, which side the conversation column sits on. */
     pmLogsOnRight: boolean;
+    /**
+     * `canPostImages` — whether the composer's image and GIF buttons render at all, G1.
+     *
+     * `O(8, i.canPostImages ? 8 : -1), O(9, i.canPostImages ? 9 : -1)` at byte 2,198,563. The page
+     * already derives this as `isPresenter || sessData.userUploads === true` for the main composer;
+     * this is the same authority answered once and handed on.
+     */
+    canPostImages: boolean;
+    /** `webinarMode` — the composer's notice, `O(2, i.webinarMode ? 2 : -1)`. */
+    webinarMode: boolean;
+    /** The Giphy key, or empty when the room has none. */
+    giphyApiKey: string;
+    /** `imgUpload()` — open this conversation's own image dialog. */
+    onimageupload: () => void;
+    /** `sendGif(title, url)` — the double-clicked GIF. */
+    onselectgif: (title: string, url: string) => void;
+    /** `emojiSelect` — the glyph goes into the draft. */
+    onemoji: (glyph: string) => void;
     doNotDisturb: boolean;
     isPresenter: boolean;
     /**
@@ -134,6 +153,12 @@
   let {
     open,
     pmLogsOnRight,
+    canPostImages,
+    webinarMode,
+    giphyApiKey,
+    onimageupload,
+    onselectgif,
+    onemoji,
     doNotDisturb,
     isPresenter,
     peer,
@@ -467,69 +492,23 @@
               `onKey(e)` in the capture, which calls `preventDefault()` on 13 either way.
             -->
           <!--
-            G21 — the composer's own consts, at byte 2,217,341:
+            The composer is `PrivateChatComposer.svelte` — `pEe` at byte 2,198,563, which is a
+            textarea, a three-button column, two popovers, a webinar notice and `autoExpand`.
 
-            ```
-            ["id","textAreaHolderPM",1,"textSendDiv"]
-            ["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true",
-             "placeholder","Type your message here...",1,"txt-area","form-control",
-             3,"keyup","paste","focus"]
-            ```
-
-            Four differences, and each of them was a small invention:
-
-              `Type your message here..`   TWO dots where the capture has three
-              `class="txt-area w-100"`     `w-100` for the capture's `form-control`
-              no `name`                    the capture names it `txt-area`
-              no `spellcheck`              the capture sets it `"true"` explicitly
-
-            `form-control` is the one that is not cosmetic: it is what gives the box its border,
-            padding and focus ring inside `.textSendDiv`, and `w-100` only made it wide.
-
-            The FLEX ROW was also on the wrong element. The capture's holder is
-            `["id","textAreaHolderPM",1,"textSendDiv"]` — no flex classes at all — with an inner
-            `div.d-flex.mx-0` carrying the row, and the textarea has a `flex-fill px-0` wrapper of
-            its own. That inner row is where the button column (G1) attaches, so the structure is put
-            right now rather than restructured a second time when that row is built.
-
-            The full column, decoded from the same table:
-
-            ```
-            50 ["id","textAreaHolderPM",1,"textSendDiv"]
-            52 [1,"d-flex","mx-0"]                        the inner row
-            53 [1,"px-1","webinarMode"]                   the webinar notice — still open
-            54 [1,"flex-fill","px-0"]                     the textarea's own wrapper
-            55 the textarea, above
-            56 [1,"justify-content-center","align-items-center","d-flex","flex-row","p-0","m-0",
-                "text-center","textAreaBtnsCol"]          the button column — G1, still open
-            ```
-
-            52 and 54 are transcribed here; 53 and 56 belong to rows that are still open and are
-            written down so the next piece attaches to the right element instead of inventing one.
+            It is a component rather than more of this file because G1's button column put this one
+            past its ceiling and the size ratchet's remedy is a slice, not a bigger number. A good
+            seam: nothing in it knows about tabs, threads, paging, search or the roster.
           -->
-          <div class="textSendDiv" id="textAreaHolderPM">
-            <div class="d-flex mx-0">
-              <div class="flex-fill px-0">
-                <textarea
-                  name="txt-area"
-                  id="textAreaTxtPM"
-                  rows="1"
-                  spellcheck="true"
-                  class="txt-area form-control"
-                  placeholder="Type your message here..."
-                  bind:value={draft}
-                  onkeydown={(event) => {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    if (event.shiftKey || event.altKey) {
-                      draft += '\n';
-                      return;
-                    }
-                    onsend();
-                  }}></textarea>
-              </div>
-            </div>
-          </div>
+          <PrivateChatComposer
+            bind:draft
+            {canPostImages}
+            {webinarMode}
+            {giphyApiKey}
+            {onsend}
+            {onimageupload}
+            {onselectgif}
+            {onemoji}
+          />
         {/if}
       </div>
     </div>

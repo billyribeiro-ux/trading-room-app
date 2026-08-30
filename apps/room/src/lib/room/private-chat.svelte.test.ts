@@ -48,6 +48,10 @@ const make = (
     onlineIds?: readonly number[];
     /** `preferences.chatPopup` — whether an incoming message raises a toast. */
     chatPopup?: boolean;
+    /** `canPost` — the room's answer to whether this member may post at all (G13). */
+    canPost?: boolean;
+    /** What the injected uploader hands back, so `completeImageUpload` can be executed. */
+    uploadUrls?: readonly string[];
   } = {}
 ) => {
   const dialogs = new RoomDialogs();
@@ -62,6 +66,8 @@ const make = (
   let incoming: PrivateChatMessage[] = [];
   const onlineIds = new Set<number>(options.onlineIds ?? []);
   const notified: { title: string; body: string; icon: string; emailHash: string }[] = [];
+  const uploaded: File[] = [];
+  const uploadUrls = options.uploadUrls ?? ['/uploads/one.png'];
 
   const chat = new RoomPrivateChat<User>({
     dialogs,
@@ -89,6 +95,8 @@ const make = (
     /* Nobody on the roster unless a test says otherwise — see the online-status case. */
     onlineUserIds: () => onlineIds,
     notify: (title, body, icon, emailHash) => notified.push({ title, body, icon, emailHash }),
+    canPost: () => options.canPost ?? true,
+    uploadImages: (files) => (uploaded.push(...files), Promise.resolve(uploadUrls)),
     onCleared: () => cleared.push(1),
     onThreadDeleted: () => ((invalidated += 1), Promise.resolve())
   });
@@ -103,6 +111,7 @@ const make = (
     deleted,
     selected,
     notified,
+    uploaded,
     setIncoming: (rows: PrivateChatMessage[]) => (incoming = rows),
     menuClosed: () => menuClosed,
     invalidated: () => invalidated
@@ -397,6 +406,8 @@ describe('paging', () => {
       selectRosterUser: () => {},
       onlineUserIds: () => new Set<number>(),
       notify: () => {},
+      canPost: () => true,
+      uploadImages: () => Promise.resolve([]),
       onCleared: () => {},
       onThreadDeleted: () => Promise.resolve()
     });
@@ -516,5 +527,66 @@ describe('the six that behave', () => {
     const absent = make({ onlineIds: [], session: { privateChats: [] } });
     absent.chat.ingest(message({ _id: 'q', uid: 9 }));
     expect(absent.chat.tabs.find((tab) => tab.uid === 9)?.online).toBe(false);
+  });
+});
+
+describe('the composer s two behaviours that live in the class', () => {
+  it('G13 — refuses to send when the room says this member may not post', () => {
+    /*
+      `if (!this.canPost) return void bootbox.alert("Sorry, you can't post to this channel")` at byte
+      2,208,062. There was no gate: the message went to the server, which refused it, so the refusal
+      arrived as a generic failure rather than as the reason.
+    */
+    const harness = make({ canPost: false });
+    void harness.chat.switchToUser(9);
+    harness.chat.draft = 'hello';
+    void harness.chat.send();
+
+    expect(harness.dialogs.alert).toBe("Sorry, you can't post to this channel");
+    expect(harness.sent, 'and nothing left the room').toEqual([]);
+    expect(harness.chat.draft, 'the draft is kept, so nothing is lost').toBe('hello');
+  });
+
+  it('G1 — an uploaded image is SENT rather than left in the box', () => {
+    /*
+      `sendPrivChat` is what the reference does with the URL. An image in a private conversation is a
+      message, and leaving it in the draft would make somebody press Enter on a URL they did not type.
+    */
+    const harness = make({ uploadUrls: ['/uploads/cat.png'] });
+    return harness.chat.switchToUser(9).then(async () => {
+      harness.chat.beginImageUpload();
+      expect(harness.chat.imageUpload, 'the dialog opens').toBe(true);
+
+      await harness.chat.completeImageUpload([new File(['x'], 'cat.png', { type: 'image/png' })]);
+
+      expect(harness.chat.imageUpload, 'and closes').toBe(false);
+      expect(harness.uploaded).toHaveLength(1);
+      expect(harness.sent).toEqual([{ peerId: 9, body: '/uploads/cat.png' }]);
+    });
+  });
+
+  it('G1 — takes ONE file, as the reference s own dialog does', () => {
+    /*
+      `ImageUploadDialog` is shared with the chat composer, which allows several; the reference's
+      private dialog sets `multiple='false'`. The extras are dropped here rather than by forking it —
+      the same call `RoomTradeAlerts` makes.
+    */
+    const harness = make({ uploadUrls: ['/uploads/first.png'] });
+    return harness.chat.switchToUser(9).then(async () => {
+      await harness.chat.completeImageUpload([
+        new File(['a'], 'a.png', { type: 'image/png' }),
+        new File(['b'], 'b.png', { type: 'image/png' })
+      ]);
+      expect(harness.uploaded).toHaveLength(1);
+    });
+  });
+
+  it('G1 — says so when the upload fails, and sends nothing', () => {
+    const harness = make({ uploadUrls: [] });
+    return harness.chat.switchToUser(9).then(async () => {
+      await harness.chat.completeImageUpload([new File(['x'], 'a.png', { type: 'image/png' })]);
+      expect(harness.dialogs.alert).toBe('Upload Failed...');
+      expect(harness.sent).toEqual([]);
+    });
   });
 });

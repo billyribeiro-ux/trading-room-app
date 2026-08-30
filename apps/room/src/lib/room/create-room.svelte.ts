@@ -179,6 +179,14 @@ export interface RoomDeps {
   rosterSession: () => RoomSessionSettings;
   theme: () => Theme;
   chatAlertsDetached: () => boolean;
+  /**
+   * Whether this member may post to chat at all — `chatComposerAvailable` in `+page.svelte`.
+   *
+   * Added 2026-08-30 for the private composer's `canPost` refusal (G13). It is the SAME value the
+   * main composer's render gate uses, and it crosses as a thunk for the reason the block above
+   * states: a `$derived` handed as a value captures only the first one.
+   */
+  chatEnabled: () => boolean;
   appHasFocus: () => boolean;
   mainElement: () => HTMLElement | undefined;
   alertChatElement: () => HTMLElement | undefined;
@@ -652,6 +660,15 @@ export function createRoom(deps: RoomDeps) {
       owns the queue, the duplicate guard and the `?d=mm&s=50` gravatar fallback the icon needs, so
       the panel says WHEN and this says how, exactly as `playSound` above does.
     */
+    /*
+      G13 — `if (!this.canPost) return void bootbox.alert("Sorry, you can't post to this channel")`.
+
+      The same `chatEnabled` the main composer's render gate uses, which is upstream's own pairing:
+      its composer is `O(4, e.isConnected && e.chatEnabled ? 4 : -1)`. One authority, asked once.
+    */
+    canPost: () => deps.chatEnabled(),
+    /* G1 — the room's uploader. This class knows what to do with a URL, not how bytes get there. */
+    uploadImages: (files) => composer.uploadAlertFiles(files),
     notify: (title, body, icon, emailHash) => {
       /*
         `alertService.info(e.txt, "Message from " + e.n, {enableHtml: !0})` — the message is the BODY

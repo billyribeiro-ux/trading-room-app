@@ -100,6 +100,12 @@ behind it is reproducible by re-reading the offset, which is the point of quotin
 
 ### G1 — The whole composer button column is absent: emoji picker, image upload, GIF picker
 
+**BUILT 2026-08-30 10:05 UTC.** All three, in a component of their own. `textAreaBtnsCol` (const 56), the emoji span (57/58), the image-upload span (63/64) and the GIF span (65), with the image and GIF gated on `canPostImages` and the emoji deliberately not — the capture's split and the sensible one, since an emoji is text. The webinar notice (53/61/62) is there too, its tooltip verbatim including the reference's own missing apostrophe in "everyones".
+
+**A COMPONENT because the ratchet said so.** The column put `PrivateChatPanel.svelte` at 716 lines and `source-size-contract` refused it, so `PrivateChatComposer.svelte` came out carrying `pEe` whole. The panel is now **516** lines — smaller than before the feature — which is what an extraction is supposed to look like.
+
+**The image dialog is this conversation's OWN**, a third `ImageUploadDialog` instance rather than a share of the chat composer's. `RoomOverlays` already records that rule for the swing form; here the cost of getting it wrong is larger, because an image meant for one person would land in the room. The URL is SENT rather than staged, which is what `sendPrivChat` does with it. **`openRTEModal` is deliberately absent**, as `AlertChatArea` already records: the reference puts it on exactly two composers and private chat is not one of them.
+
 **high** · `missing-control` · reference byte **2,198,563**
 
 ```
@@ -154,6 +160,8 @@ loadMore(){this.loadMoreLastID="pcm-"+this.msgs[0]._id,this.appService.guiEventB
 
 ### G11 — `autoExpand` is not applied to the private-chat textarea, so `.pc-messages` is never resized either
 
+**BUILT 2026-08-30 10:05 UTC.** Both halves, byte 2,203,228. The composer never expanded at all, so a member typing three lines saw one with the rest scrolled out of a box the captured `.txt-area` rule gives `overflow-y: auto`. **The second half is what makes this different from the main composer's variant:** `.pc-messages` is `calc(100% - 50px)` — fifty pixels reserved for a one-line composer — so a composer that grows without the log shrinking pushes the log's bottom off the panel, and the newest message disappears exactly when somebody is replying to it. The `+ 2` is the capture's and `+page.svelte` already records why it is not padding for luck. Scoped with `closest('app-privchat')` rather than a bare `document.querySelector`, which is the same scoping `this.elementRef.nativeElement.querySelector` gives upstream. It re-runs on any change to the draft and not only on input — an emoji, a cleared box after a send, a GIF URL — which is the half the reference gets for free by calling `autoExpand` from each of those places.
+
 **medium** · `missing-behaviour` · reference byte **2,203,228**
 
 ```
@@ -179,6 +187,8 @@ autoExpand(e){P("autoExpand:"),e.style.height="0";const i=window.getComputedStyl
 > Verified: Confirmed absent from our source after an exhaustive search. `RoomPrivateChat.ingest()` fires only the sound (private-chat.svelte.ts:373) and there is no toast or OS notification on the incoming-PM path.
 
 ### G13 — `canPost` refusal ("Sorry, you can't post to this channel") is not modelled
+
+**BUILT 2026-08-30 10:05 UTC.** The reference's own sentence, raised through this room's dialog primitive, before anything is trimmed or sent. There was no gate at all: a member whose chat was muted or disabled typed, the message went to the server, and the refusal came back as a generic failure rather than as the reason. **`canPost` is injected, not computed here** — the room already decides who may chat (`chatComposerAvailable`, the same value the main composer's render gate uses, which is upstream's own pairing at `O(4, e.isConnected && e.chatEnabled ? 4 : -1)`), and a second opinion in the panel is how two places come to disagree about one authority. The server refuses independently regardless; this is the message, not the enforcement. The draft is kept, so nothing a member typed is lost to a refusal.
 
 **medium** · `missing-behaviour` · reference byte **2,208,062**
 
