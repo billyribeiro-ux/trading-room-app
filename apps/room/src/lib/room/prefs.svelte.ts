@@ -85,6 +85,7 @@ export class RoomPrefs {
   #updatePositionsIframe;
   #trimChatLogs;
   #chatPopup;
+  #pmLogsOnRight;
   #chatBadges;
   #chatGif;
   #makeUsersFollowMyScreens;
@@ -161,6 +162,26 @@ export class RoomPrefs {
      * derived view, which reaches the same steady state and also bounds the DOM.
      */
     this.#trimChatLogs = $state(loadedSettings.trimChatLogs !== false);
+
+    /**
+     * `preferences.pmLogsOnRight` — which side of the private-chat panel the conversation sits on.
+     *
+     * ```js
+     * z("ngClass", ct(7, YDe, o.appService.globals.preferences.pmLogsOnRight))   // byte 2,219,468
+     * const YDe = t => ({ "flex-row-reverse": t })                               // offset 2,194,594
+     * ```
+     *
+     * **A PREFERENCE WITH NO READER UNTIL 2026-08-30.** The settings modal has written it since that
+     * modal was built (`onPreferenceChange('pmLogsOnRight', !previous)`) and nothing in the room ever
+     * read it back, so the toggle changed its own state and nothing else — the exact shape
+     * `CLAUDE.md` names, and one that `dead-preference-keys.ts` deliberately does NOT cover for,
+     * because the key is real and the control is meant to do something.
+     *
+     * Defaults FALSE, unlike its neighbours above: the list-on-the-left layout is what the panel has
+     * always rendered, and `!== false` would silently flip every existing member's panel on the first
+     * load after this shipped.
+     */
+    this.#pmLogsOnRight = $state(loadedSettings.pmLogsOnRight === true);
 
     /**
      * `preferences.chatPopup` — a toast and a browser notification when somebody mentions you.
@@ -460,6 +481,10 @@ export class RoomPrefs {
     return this.#chatPopup;
   }
 
+  get pmLogsOnRight() {
+    return this.#pmLogsOnRight;
+  }
+
   get chatBadges() {
     return this.#chatBadges;
   }
@@ -603,6 +628,8 @@ export class RoomPrefs {
       if (key === 'chatGif') this.#chatGif = value;
       if (key === 'chatBadges') this.#chatBadges = value;
       if (key === 'chatPopup') this.#chatPopup = value;
+      /* G5 — the write existed and the read did not; this is the line that makes the toggle act. */
+      if (key === 'pmLogsOnRight') this.#pmLogsOnRight = value;
       if (key === 'trimChatLogs') this.#trimChatLogs = value;
       if (key === 'enableRTE') this.#enableRTE = value;
       if (key === 'extraChatColumn') this.#extraChatColumn = value;

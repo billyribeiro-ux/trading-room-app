@@ -18,6 +18,8 @@ import {
   messages
 } from '#lib/server/db/schema.js';
 import { applyChatMute } from '#lib/server/chat-mute.js';
+import { publishToRoom } from '#lib/server/room-events.js';
+import { messageMutationFrame } from '#lib/message-mutation-frames.js';
 import { toggleReaction } from '#lib/reaction-toggle.js';
 import { parseReactions } from '#lib/server/reactions.js';
 
@@ -144,6 +146,31 @@ export const messageAction = command(messageActionArgs, async (args) => {
       ? capturedRoomItem({ id: user.id, emailHash: hashEmail(user.email) }, kind, id, room)
       : null;
 
+  /*
+    ── THE ROOM IS TOLD, and until 2026-08-30 it was not ────────────────────────────────────────────
+
+    Every branch below wrote a row and announced nothing. A presenter deleted a message and every
+    other viewer kept it on screen; a reaction was invisible to everyone but the person who clicked
+    it; an edit waited for somebody to happen to reload. `EMOJI-01` in the surface audit names the
+    reaction half; the delete and edit halves are the same defect and were found beside it.
+
+    `#lib/message-mutation-frames.ts` holds the four reference frame names, the evidence for each,
+    and why ours carry no payload where the reference's carry the whole row.
+
+    `actorUserId` and the self-skip: the browser that sent this command calls `invalidateAll()`
+    itself the moment it resolves, so a frame that did not name its actor would make every action
+    cost that browser two full page-data refetches. The `alerts` and `chat` channels already skip
+    their own sender for exactly this reason and in these words — *"Our own post already refetched.
+    Re-invalidating would refetch twice per alert."* The id is not authority and nothing reads it as
+    such; it is only ever compared against the recipient's own.
+  */
+  const announce = (change: 'update' | 'delete') => {
+    publishToRoom(room, {
+      channel: 'cmds',
+      data: { cmd: messageMutationFrame(kind, change), actorUserId: user.id }
+    });
+  };
+
   /** Writes one override column, leaving the others as they were. */
   function recordOverride(
     evidenceKey: string,
@@ -245,6 +272,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
         })
         .onConflictDoNothing()
         .run();
+      announce('delete');
       return;
     }
 
@@ -266,6 +294,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
           .where(and(eq(alerts.roomShortCode, room), eq(alerts.id, id)))
           .run();
       });
+      announce('delete');
       return;
     }
 
@@ -275,6 +304,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
     db.delete(messages)
       .where(and(eq(messages.roomShortCode, room), eq(messages.id, id)))
       .run();
+    announce('delete');
     return;
   }
 
@@ -302,6 +332,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
         emoji
       );
       recordOverride(captured.evidenceKey, { reactionsJson: JSON.stringify(reactions) });
+      announce('update');
       return;
     }
 
@@ -312,6 +343,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
         .set({ reactionsJson: JSON.stringify(toggledReactions(alert.reactionsJson, key, emoji)) })
         .where(and(eq(alerts.roomShortCode, room), eq(alerts.id, id)))
         .run();
+      announce('update');
       return;
     }
 
@@ -321,6 +353,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
       .set({ reactionsJson: JSON.stringify(toggledReactions(message.reactionsJson, key, emoji)) })
       .where(and(eq(messages.roomShortCode, room), eq(messages.id, id)))
       .run();
+    announce('update');
     return;
   }
 
@@ -363,6 +396,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
         error(403, 'Not yours to edit.');
       }
       recordOverride(captured.evidenceKey, { body: newBody });
+      announce('update');
       return;
     }
 
@@ -373,6 +407,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
         .set({ body: newBody })
         .where(and(eq(alerts.roomShortCode, room), eq(alerts.id, id)))
         .run();
+      announce('update');
       return;
     }
 
@@ -385,6 +420,7 @@ export const messageAction = command(messageActionArgs, async (args) => {
       .set({ body: newBody, bodyHtml: newBodyHtml })
       .where(and(eq(messages.roomShortCode, room), eq(messages.id, id)))
       .run();
+    announce('update');
     return;
   }
 
@@ -401,12 +437,14 @@ export const messageAction = command(messageActionArgs, async (args) => {
     if (id < 0) {
       if (!captured) error(404, 'Message not found.');
       recordOverride(captured.evidenceKey, { answered: true });
+      announce('update');
       return;
     }
     db.update(messages)
       .set({ answered: true })
       .where(and(eq(messages.roomShortCode, room), eq(messages.id, id)))
       .run();
+    announce('update');
     return;
   }
 

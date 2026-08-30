@@ -87,7 +87,19 @@ const READERS = [
     side effect". What both assert is that the room may ask this question, not that the answer is
     free.
   */
-  'restoreMobileTokens'
+  'restoreMobileTokens',
+  /*
+    `checkWelcomeMatPasswordRemotely` — the third question-shaped POST, added 2026-08-30, and the
+    only one that answers with DATA as well as a boolean: on a correct password it returns the short
+    codes of the rooms the caller's account owns.
+
+    A READER, and the data does not change that. Nothing on the controller changes — the writes all
+    happen in the room application, against its own database, gated on this answer. The list is on
+    this call rather than a second one precisely so that a `config-read` token alone cannot
+    enumerate an account's rooms: the gate and the data it unlocks are one round trip, and a wrong
+    password returns `{required, ok:false, rooms:[]}`. The endpoint's own header carries the rest.
+  */
+  'checkWelcomeMatPasswordRemotely'
 ];
 
 describe('the capability minted for each controller call', () => {

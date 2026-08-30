@@ -26,6 +26,8 @@ function renderNotes(notes: readonly RoomNote[]): string {
       newNoteOpen: false,
       notes,
       simplifiedEditor: false,
+      /* The carousel's image browser reads this; an empty room offers none. */
+      sessionImages: [],
       ...callbacks
     }
   }).body;

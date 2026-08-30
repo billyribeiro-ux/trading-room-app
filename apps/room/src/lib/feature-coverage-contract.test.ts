@@ -69,11 +69,34 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   `globals.sessData`, and the fourth dialog button — `Delete Searched`, which deletes by a LIKE
   pattern the caller typed — is deliberately not drawn beside the reversible one.
 */
+/*
+  `savePresenterColors` left on 2026-08-30, and its absence had been hiding the same class of defect
+  `forceStopScreen`'s did: the CONTROL existed and the behaviour did not. The settings modal has
+  drawn two colour pickers under *"These colors will affect how ALL USERS see your messages and
+  alerts"* since it was built, and Save wrote a preference key nothing read, in a store no other
+  viewer can see. Cited at `routes/presenter-colors.remote.ts` and `lib/presenter-colors.ts`, and
+  the citation is there to record a DIVERGENCE rather than a transcription: the reference's client
+  sends `key: hashEmail(user.email)` — the client naming whose colours it is writing, over a hash
+  that is in every roster row — and ours derives that key on the server from the session. The wire
+  shape deliberately does not match, and `presenter-colors.remote.ts` says why at length.
+*/
+/*
+  `deleteChatMsg`, `deleteAlertMsg` and `updateChatMsg` left on 2026-08-30 — three names, one
+  defect, and it is the class this list exists to surface: the CONTROL existed and the propagation
+  did not. Nine commands mutated a rendered row and told nobody, so a presenter deleted a message
+  and every other viewer kept it on screen. Cited at `lib/message-mutation-frames.ts`, which holds
+  all four reference frames (`updateAlertMsg` was never on this list; it is on our wire now too) with
+  the byte each was read at.
+
+  The divergence recorded beside them: the reference's two `update` frames carry the whole row and
+  ours carry nothing but the name and who acted. That is the same "the row is the authority" rule
+  `changeChatMode` follows, plus one this room has that the reference does not — its SSE stream is
+  per ROOM while chat is per CHANNEL, so a frame carrying a body would put admin-channel text on
+  every subscriber's wire. `publishChatToRoom` exists for exactly that reason.
+*/
 const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'alertQAMsg',
   'callScreeen',
-  'deleteAlertMsg',
-  'deleteChatMsg',
   'demux',
   'doShowMsgToAll',
   'getMyRepeater',
@@ -91,7 +114,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'resetMediaServer',
   'resetSession',
   'saveAndCloseSession',
-  'savePresenterColors',
   'setSessionState',
   'softResetSession',
   'startWebcam',
@@ -100,7 +122,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'stopRecMsg',
   'stopRecMtx',
   'stopWebcam',
-  'updateChatMsg',
   'updateUserPM',
   'userDeleteChatMsg'
 ];

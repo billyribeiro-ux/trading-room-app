@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Editor } from '@tiptap/core';
-  import Image from '@tiptap/extension-image';
   import Link from '@tiptap/extension-link';
   import { TableKit } from '@tiptap/extension-table';
   import TextAlign from '@tiptap/extension-text-align';
@@ -14,6 +13,11 @@
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
   import type { NoteVersion } from '#lib/types.js';
+  import type { SessionImageFile } from '#lib/session-image-files.js';
+
+  import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
+
+  import CarouselDialog from './CarouselDialog.svelte';
   import {
     PtrCarousel,
     findCarousel,
@@ -22,6 +26,7 @@
     numericRange,
     type CarouselSlide
   } from './carousel';
+  import { IMAGE_FLOATS, IMAGE_WIDTHS, NoteImage } from './note-image';
   import { safeNoteHtml } from './safe-html';
   import { noteVersionDate, noteVersionPreview } from './version-history';
 
@@ -30,15 +35,9 @@
 
   type EditorDialog = 'carousel' | 'image' | 'link' | 'video';
 
-  /** The modal's rows carry an identity for the keyed each block; the node's slides do not. */
-  type EditorCarouselSlide = CarouselSlide & {
-    key: number;
-  };
-
   interface Props {
     readonly contentHtml: string;
     readonly giphyApiKey: string;
-    readonly noteId: number;
     readonly onBringEveryone: () => void;
     readonly onDirtyChange: (dirty: boolean) => void;
     readonly onDone: () => void;
@@ -65,6 +64,15 @@
       transcription, what the capture does and does not evidence, and the one decision taken beyond
       it; this component only draws the two shapes.
     */
+    /**
+     * The room's shared IMAGE files, already filtered — the carousel's "Select Image" browser.
+     *
+     * Filtered by the page rather than here (`#lib/session-image-files.ts`), for the reason every
+     * other room fact reaches this component already decided. The reference fetches this list on
+     * every open (`getSessionFiles`, byte 1,477,053); the page load already carries the same rows
+     * and every upload path invalidates it, so the browser reads what the Files pane reads.
+     */
+    readonly sessionImages: readonly SessionImageFile[];
     readonly simplifiedEditor: boolean;
     readonly versions: readonly NoteVersion[];
   }
@@ -72,7 +80,6 @@
   let {
     contentHtml,
     giphyApiKey,
-    noteId,
     onBringEveryone,
     onDirtyChange,
     onDone,
@@ -82,6 +89,7 @@
     onUploadImages,
     onVersionHistoryOpenChange,
     showVersionHistory,
+    sessionImages,
     simplifiedEditor,
     versions
   }: Props = $props();
@@ -191,15 +199,20 @@
   let imageUrl = $state('');
   let imageFiles = $state.raw<readonly File[]>([]);
   let videoUrl = $state('');
-  let carouselSlideKey = 1;
-  let carouselSlides = $state.raw<readonly EditorCarouselSlide[]>([newCarouselSlide()]);
-  let carouselInterval = $state(5);
-  let carouselHeight = $state(90);
-  /*
-    Which carousel the modal is currently editing, as a document position, or null when it is going
-    to insert a new one. The reference keeps a separate `isEditingCarousel` boolean beside the
-    element it found; one value that is either a position or nothing cannot disagree with itself.
-  */
+  /**
+   * What the carousel dialog OPENS on — a seed, not live state.
+   *
+   * `CarouselDialog` owns everything the presenter types; this holds only what it starts from, and
+   * the dialog is mounted inside `{#if dialog === 'carousel'}` so it is re-seeded on every open.
+   * Plain {@link CarouselSlide}s: the each-block key and the URL staging field are the dialog's own
+   * bookkeeping and never leave it.
+   */
+  let carouselSeed = $state.raw<{
+    slides: readonly CarouselSlide[];
+    interval: number;
+    height: number;
+  }>({ slides: [], interval: 5, height: 90 });
+
   let editingCarouselPos = $state<number | null>(null);
   let giphyOpen = $state(false);
   let revisionQueued = false;
@@ -242,7 +255,7 @@
         }),
         TextStyleKit,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
-        Image.configure({ allowBase64: false }),
+        NoteImage.configure({ allowBase64: false }),
         Youtube.configure({
           controls: true,
           nocookie: true,
@@ -290,10 +303,6 @@
     };
   });
 
-  function newCarouselSlide(): EditorCarouselSlide {
-    return { key: carouselSlideKey++, url: '', link: '' };
-  }
-
   /*
     `carouselInNote` in the reference, which computes it once when the editor opens as
     `(this.tab.noteContent || '').includes('data-ptr-carousel')`. Ours tracks the live document
@@ -306,6 +315,58 @@
     void revision;
     return editor !== null && hasCarousel(editor.state.doc);
   });
+
+  /**
+   * The image the caret is on, and the three things the popover can do to it.
+   *
+   * `void revision` for the same reason `carouselInNote` does it: `revision` is bumped by
+   * `onSelectionUpdate`, so reading it is what makes this recompute when the caret moves. A
+   * `$derived` and not an `$effect` — the value is derived from editor state and nothing else, and
+   * an effect assigning it would re-run per keystroke to produce the same answer.
+   *
+   * `isActive('image')` rather than inspecting the node ourselves: it is what the editor already
+   * uses for every other toolbar button here, and it answers for a node selection and a caret
+   * inside an inline image alike.
+   */
+  let imageSelected = $derived.by(() => {
+    void revision;
+    return editor !== null && editor.isActive('image');
+  });
+
+  let imageWidth = $derived.by(() => {
+    void revision;
+    const value: unknown = editor?.getAttributes('image').width;
+    return typeof value === 'string' ? value : null;
+  });
+
+  let imageFloat = $derived.by(() => {
+    void revision;
+    const value: unknown = editor?.getAttributes('image').float;
+    return typeof value === 'string' ? value : null;
+  });
+
+  /*
+    `updateAttributes` and not a replacement node: the image keeps its `src`, `alt` and everything
+    else, and a `null` clears the attribute rather than writing the string "null". That is what makes
+    `resizeNone` and `floatNone` the ABSENCE of a value, which is what the capture's names say.
+  */
+  function setImageWidth(width: string | null): void {
+    command((instance) => instance.chain().focus().updateAttributes('image', { width }).run());
+  }
+
+  function setImageFloat(float: string | null): void {
+    command((instance) => instance.chain().focus().updateAttributes('image', { float }).run());
+  }
+
+  /**
+   * `removeMedia` — delete the selected image.
+   *
+   * `deleteSelection` rather than a node-specific delete, because `isActive('image')` is already the
+   * condition for showing this control and the selection IS the image when it is true.
+   */
+  function removeImage(): void {
+    command((instance) => instance.chain().focus().deleteSelection().run());
+  }
 
   /** The modal is editing an existing carousel rather than placing a new one. */
   let isEditingCarousel = $derived(editingCarouselPos !== null);
@@ -338,13 +399,13 @@
     openMenu = null;
     giphyOpen = false;
     const slides = normalizeSlides(target.attrs.slides);
-    // `0 === h.length && h.push({...})` — an empty carousel still opens with one blank row to fill.
-    carouselSlides =
-      slides.length === 0
-        ? [newCarouselSlide()]
-        : slides.map((slide) => ({ ...slide, key: carouselSlideKey++ }));
-    carouselInterval = numericRange(target.attrs.interval, 1, 60, 5);
-    carouselHeight = numericRange(target.attrs.height, 10, 100, 90);
+    // An empty carousel still opens with one blank row to fill — `CarouselDialog` applies that rule
+    // (`0 === h.length && h.push({...})`), because it is the one that owns the rows.
+    carouselSeed = {
+      slides,
+      interval: numericRange(target.attrs.interval, 1, 60, 5),
+      height: numericRange(target.attrs.height, 10, 100, 90)
+    };
     editingCarouselPos = target.pos;
     dialog = 'carousel';
   }
@@ -442,9 +503,7 @@
     } else if (kind === 'video') {
       videoUrl = '';
     } else {
-      carouselSlides = [newCarouselSlide()];
-      carouselInterval = 5;
-      carouselHeight = 90;
+      carouselSeed = { slides: [], interval: 5, height: 90 };
       // Opened from the toolbar, so this places a NEW carousel however the last one was reached.
       editingCarouselPos = null;
     }
@@ -496,31 +555,44 @@
     dialog = null;
   }
 
-  function addCarouselSlide(): void {
-    carouselSlides = [...carouselSlides, newCarouselSlide()];
-  }
-
-  function updateCarouselSlide(index: number, field: keyof CarouselSlide, value: string): void {
-    carouselSlides = carouselSlides.map((slide, slideIndex) =>
-      slideIndex === index ? { ...slide, [field]: value } : slide
-    );
-  }
-
-  function removeCarouselSlide(index: number): void {
-    carouselSlides = carouselSlides.filter((_slide, slideIndex) => slideIndex !== index);
-    if (carouselSlides.length === 0) carouselSlides = [newCarouselSlide()];
-  }
-
-  function insertCarousel(): void {
+  /**
+   * What `CarouselDialog` hands back, put into the document.
+   *
+   * The dialog edits; this decides where the result lands, because only the editor knows whether
+   * the modal was opened over an existing node. The `https://` filter stays HERE rather than moving
+   * with the rows: it is a rule about what the document will accept, not about what a presenter may
+   * type, and `parseCarouselSlides` applies the same one on the way back in.
+   */
+  function insertCarousel(config: {
+    slides: readonly CarouselSlide[];
+    interval: number;
+    height: number;
+  }): void {
     const instance = editor;
-    const slides = carouselSlides.filter(({ url }) => url.trim().startsWith('https://'));
-    if (slides.length === 0 || instance === null) return;
+    const slides = config.slides.filter(({ url }) => url.trim().startsWith('https://'));
+    /*
+      `window.bootbox.alert("Please add at least one image URL.")` — byte 1,478,230, the else of the
+      reference's own `generateCarouselHtml()` check. This RETURNED SILENTLY, which is the shape
+      `CLAUDE.md` names outright: the primary button is always enabled, so pressing Insert Carousel
+      with an empty or non-`https://` slide list closed nothing, inserted nothing and said nothing.
+
+      The dialog is deliberately left OPEN — the presenter is being told to fix the thing in front of
+      them, and closing it would take away the rows they have to fix. That is upstream's order too:
+      only the success branch dismisses.
+
+      A missing editor is NOT this message. That is a bug in this component, not a mistake by the
+      presenter, and telling them to add an image URL would send them to look at working input.
+    */
+    if (instance === null) return;
+    if (slides.length === 0) {
+      errorMessage = 'Please add at least one image URL.';
+      return;
+    }
 
     const attrs = {
-      // `key` is the each-block identity for the rows in the modal and has no business on the node.
       slides: slides.map(({ link, url }) => ({ link, url })),
-      interval: numericRange(carouselInterval, 1, 60, 5),
-      height: numericRange(carouselHeight, 10, 100, 90)
+      interval: numericRange(config.interval, 1, 60, 5),
+      height: numericRange(config.height, 10, 100, 90)
     };
     const pos = editingCarouselPos;
 
@@ -549,11 +621,47 @@
     openMenu = null;
   }
 
+  /**
+   * The GIF a double-click chose, waiting for the confirmation — `note-editor-gif-insert-confirm`.
+   *
+   * ```js
+   * sendGif(e, i) {                                                  // byte 1,482,885
+   *   this.sendingGif || (
+   *     this.modalService.dismissAll(),
+   *     this.sendingGif = !0,
+   *     bootbox.confirm(
+   *       `You sure you want to insert this image:<br/><img src='${i}' style='width: 100%;'>`,
+   *       o => { this.sendingGif = !1,
+   *              o && $("#summernoteEdit-" + this.tab._id).summernote("insertImage", i, e) }))
+   * }
+   * ```
+   *
+   * This inserted immediately. The preview is the point: a Giphy result is a thumbnail in a grid,
+   * and the thing that lands in the note is the ORIGINAL — a different, larger image the presenter
+   * has not seen at the size it will appear.
+   *
+   * `this.sendingGif` is a re-entrancy guard and it is transcribed as one. A double-click that
+   * registers twice — which is what a double-click on a slow machine does — inserted two copies.
+   * Holding the pending GIF in one nullable value is that guard: a second `onselect` while one is
+   * pending is refused rather than replacing it, because the presenter is looking at a preview of
+   * the first and would confirm a different image than the one on screen.
+   *
+   * The picker closes on select, which is upstream's `modalService.dismissAll()`.
+   */
+  let pendingGif = $state.raw<{ title: string; url: string } | null>(null);
+
   function insertGif(title: string, url: string): void {
-    if (url.startsWith('https://')) {
-      editor?.chain().focus().setImage({ src: url, alt: title }).run();
-    }
     giphyOpen = false;
+    if (pendingGif !== null) return;
+    if (!url.startsWith('https://')) return;
+    pendingGif = { title, url };
+  }
+
+  function confirmGif(): void {
+    const chosen = pendingGif;
+    pendingGif = null;
+    if (chosen === null) return;
+    editor?.chain().focus().setImage({ src: chosen.url, alt: chosen.title }).run();
   }
 
   function startResize(event: PointerEvent): void {
@@ -673,7 +781,85 @@
     </div>
   {/if}
 
-  <div id={`summernoteEdit-${noteId}`} class="note-view" hidden></div>
+  <!--
+    ── A HIDDEN ELEMENT NOTHING READ, DELETED 2026-08-30 ────────────────────────────────────────
+
+    `<div id="summernoteEdit-{noteId}" class="note-view" hidden></div>` stood here. It was the
+    reference's mount point: summernote initialises ON the `.note-view` element and then REPLACES it
+    with its own frame, so upstream has ONE element that is both the rendered note and the editor.
+
+    Ours does not work that way. Tiptap mounts into `.note-editor-host` below, and the read-only
+    rendered note is `NotesPane.svelte`'s own `.note-view#summernoteEdit-{id}` in the non-editing
+    branch. So this element was a mount point for a library this app does not use, hidden, holding
+    nothing, read by nothing, written by nothing — `CLAUDE.md`'s "nothing exists without a consumer"
+    in its purest form, and `note-editor-height-and-mount` said so.
+
+    A duplicate `id` in the document was the second cost: `NotesPane` renders the same id for the
+    same note, so `document.getElementById('summernoteEdit-3')` could return either, and which one
+    depended on render order. Nothing looked it up here, but the reference's own code does exactly
+    that lookup and a port of any of it would have found the empty one.
+
+    **THE `noteId` PROP WENT WITH IT, because that div was its only reader.** eslint said so on the
+    first gate run after the deletion, and the prop was then exactly what the div had been: a value
+    handed in that nothing consumes. `NotesPane` already passes `activeNote.id` into every callback
+    it needs it in — `onSave`, `onDelete`, `onRestoreVersion` — so the editor never had to know its
+    own id, and the version endpoint this component reads is reached through `onLoadVersions`.
+  -->
+  <!--
+    ── THE IMAGE POPOVER'S THREE BUILT GROUPS — `note-editor-image-popover` ─────────────────────
+
+    ```js
+    popover: { image: [                                          // reference byte 1,469,073
+      ["custom", ["imageAttributes"]],
+      ["image",  ["resizeFull","resizeHalf","resizeQuarter","resizeNone"]],
+      ["float",  ["floatLeft","floatRight","floatNone"]],
+      ["remove", ["removeMedia"]]
+    ]}
+    ```
+
+    Once an image was in a note there was no way to resize it, float it or remove it — only a raw
+    text delete.
+
+    **WHAT IS EVIDENCED IS THE GROUP LIST, AND NOTHING ELSE.** Summernote is not in the bundle, so
+    its popover's markup, its position and its icons are unknown, and none of them is guessed here.
+    This is a strip above the editor rather than a floating popover over the image, and it is one
+    because inventing a popover's geometry to look like a capture nobody has is how a component
+    acquires decisions nothing can check.
+
+    **`imageAttributes` IS DELIBERATELY NOT BUILT.** It is a third-party summernote plugin whose
+    dialog is unevidenced twice over — not in this bundle, and not in the reference's own source.
+    Building a src/alt/title dialog here would be inventing a surface and then transcribing nothing.
+    Recorded at the audit row as the one group of four that stays open.
+
+    `note-image.ts` carries what the two attributes are and why the width is an attribute where
+    summernote writes a style.
+  -->
+  {#if imageSelected}
+    <div class="note-image-popover btn-group btn-group-sm" role="group" aria-label="Image">
+      {#each IMAGE_WIDTHS as option (option.command)}
+        <button
+          type="button"
+          class={['btn btn-outline-secondary', { active: imageWidth === option.width }]}
+          aria-pressed={imageWidth === option.width}
+          onclick={() => setImageWidth(option.width)}>{option.label}</button
+        >
+      {/each}
+      {#each IMAGE_FLOATS as option (option.command)}
+        <button
+          type="button"
+          class={['btn btn-outline-secondary', { active: imageFloat === option.float }]}
+          aria-pressed={imageFloat === option.float}
+          onclick={() => setImageFloat(option.float)}>{option.label}</button
+        >
+      {/each}
+      <button
+        type="button"
+        class="btn btn-outline-danger"
+        aria-label="Remove this image"
+        onclick={removeImage}><i class="fas fa-trash"></i></button
+      >
+    </div>
+  {/if}
   <div
     class={['note-editor note-frame', { fullscreen, codeview: codeView }]}
     style:height={fullscreen ? '100vh' : `${editorHeight}px`}
@@ -1156,7 +1342,14 @@
         >
       </div>
       {#if giphyApiKey && giphyOpen}
+        <!--
+          `hint` is passed because `app-note` is the ONE surface of the four whose wording differs:
+          `*Double click an image to insert it` at byte 1,467,154, against `select it` at the other
+          three. In a note the double-click puts the GIF straight into the document; everywhere else
+          it selects one to confirm and send. See the prop's own note.
+        -->
         <GiphyPicker
+          hint="*Double click an image to insert it"
           apiKey={giphyApiKey}
           popoverId={`${componentId}-note-giphy`}
           onclose={() => (giphyOpen = false)}
@@ -1338,96 +1531,53 @@
     </div>
   </div>
 {:else if dialog === 'carousel'}
-  <div
-    class="note-modal open note-carousel-modal"
-    aria-hidden="false"
-    role="dialog"
-    aria-label={carouselDialogTitle}
-  >
-    <div class="note-modal-content">
-      <div class="note-modal-header">
-        <!--
-          Dismissing has to clear the target as well as the dialog. The reference does the same in
-          its modal's rejection handler: `() => { this.isEditingCarousel = !1; }`. Without it the
-          next carousel inserted from the toolbar would overwrite the one last opened for editing.
-        -->
-        <button
-          type="button"
-          class="close"
-          aria-label="Close"
-          onclick={() => {
-            dialog = null;
-            editingCarouselPos = null;
-          }}><i class="note-icon-close"></i></button
-        >
-        <h4 class="note-modal-title">{carouselDialogTitle}</h4>
-      </div>
-      <div class="note-modal-body">
-        {#each carouselSlides as slide, index (slide.key)}
-          <div class="carousel-slide-row">
-            <label for={`${componentId}-carousel-url-${index}`}>Image URL</label>
-            <input
-              id={`${componentId}-carousel-url-${index}`}
-              name={`noteCarouselUrl${index}`}
-              class="form-control"
-              type="url"
-              value={slide.url}
-              oninput={(event) => updateCarouselSlide(index, 'url', event.currentTarget.value)}
-            />
-            <label for={`${componentId}-carousel-link-${index}`}>Link / URL</label>
-            <input
-              id={`${componentId}-carousel-link-${index}`}
-              name={`noteCarouselLink${index}`}
-              class="form-control"
-              type="url"
-              value={slide.link}
-              oninput={(event) => updateCarouselSlide(index, 'link', event.currentTarget.value)}
-            />
-            <button type="button" class="btn btn-danger" onclick={() => removeCarouselSlide(index)}
-              >Delete slide</button
-            >
-          </div>
-        {/each}
-        <button type="button" class="btn btn-secondary" onclick={addCarouselSlide}>Add slide</button
-        >
-        <label for={`${componentId}-carousel-interval`}>Interval (seconds)</label>
-        <input
-          id={`${componentId}-carousel-interval`}
-          name="noteCarouselInterval"
-          class="form-control"
-          type="number"
-          min="1"
-          max="60"
-          bind:value={carouselInterval}
-        />
-        <label for={`${componentId}-carousel-height`}>Height (%)</label>
-        <input
-          id={`${componentId}-carousel-height`}
-          name="noteCarouselHeight"
-          class="form-control"
-          type="number"
-          min="10"
-          max="100"
-          bind:value={carouselHeight}
-        />
-      </div>
-      <div class="note-modal-footer">
-        <button
-          type="button"
-          class="btn btn-primary note-btn note-btn-primary"
-          onclick={insertCarousel}>{carouselDialogAction}</button
-        >
-      </div>
-    </div>
-  </div>
+  <!--
+    The carousel modal, its file browser and its two confirmations are `CarouselDialog.svelte`.
+
+    Mounted inside this branch rather than kept alive and hidden, deliberately: the dialog seeds its
+    own state from these props at construction, so closing it is what discards a half-typed carousel
+    and opening it is what re-reads the note. The note at the top of that file carries the rest.
+  -->
+  <CarouselDialog
+    title={carouselDialogTitle}
+    action={carouselDialogAction}
+    slides={carouselSeed.slides}
+    interval={carouselSeed.interval}
+    height={carouselSeed.height}
+    {sessionImages}
+    {onUploadImages}
+    ondismiss={() => {
+      dialog = null;
+      editingCarouselPos = null;
+    }}
+    onsubmit={insertCarousel}
+  />
 {/if}
 
 {#if giphyApiKey && openMenu === null && dialog === null}
   <!-- Giphy is opened by the toolbar button through this captured picker surface. -->
 {/if}
 
+<!--
+  `sendGif`'s confirmation, byte 1,482,885 — the same dialog the chat composer has always raised,
+  with the one word that differs between the two surfaces passed in. See `insertGif`.
+-->
+{#if pendingGif !== null}
+  <GifConfirmDialog
+    url={pendingGif.url}
+    message="You sure you want to insert this image:"
+    onclose={() => (pendingGif = null)}
+    onconfirm={confirmGif}
+  />
+{/if}
+
 {#if errorMessage !== null}
-  <BootboxDialog mode="alert" message={errorMessage} onclose={() => (errorMessage = null)} />
+  <BootboxDialog
+    mode="alert"
+    className="above-note-modal"
+    message={errorMessage}
+    onclose={() => (errorMessage = null)}
+  />
 {/if}
 
 <style>
@@ -1479,6 +1629,15 @@
     text-align: left;
   }
 
+  /*
+    The image popover's own spacing. It is a real rule and not a hook: `btn-group btn-group-sm` gives
+    the strip its shape, and this is the gap that keeps it off the editor frame it sits above. A
+    class carrying no declarations would be the `.flipped`-with-no-CSS defect `CLAUDE.md` names.
+  */
+  .note-image-popover {
+    margin-bottom: 6px;
+  }
+
   .note-modal.open {
     display: block;
     z-index: 1070;
@@ -1496,14 +1655,6 @@
     max-height: calc(100vh - 40px);
     margin: 20px auto;
     overflow: auto;
-  }
-
-  .carousel-slide-row {
-    display: grid;
-    gap: 4px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #ddd;
   }
 
   /*

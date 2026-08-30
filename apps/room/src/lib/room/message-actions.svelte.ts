@@ -486,6 +486,30 @@ export class RoomMessageActions {
         if (!succeeded && item.evidenceKey) this.#patchEvidence(item, { answered: false });
       });
     }
+    /*
+      ── RM-19: WE DELIBERATELY DO NOT REPRODUCE THE MUTATION ──────────────────────────────────
+
+      ```js
+      copyMessage() {                                              // byte 1,355,969
+        this.msg.txt = sf(this.msg.txt).result,
+        navigator.clipboard.writeText(this.msg.txt),
+        this.alertsService.info("Copied to clipboard.")
+      }
+      ```
+
+      `this.msg.txt = …` writes the stripped text back onto the MESSAGE, so copying a message
+      silently rewrites the one on screen: formatting, links and ticker colouring vanish from the
+      log for everyone looking at that browser, and nothing put them back. The clipboard is correct
+      either way — `sf(...).result` is the same plain text this produces.
+
+      So the strip happens into a DETACHED element and the message is left alone. Recorded rather
+      than silently improved: this is a place where matching the reference would mean reproducing a
+      defect, and the next person comparing the two should find the reason here rather than assume
+      the line was missed.
+
+      `textContent` on a detached `<div>` and not a regex, because the body is HTML the server
+      sanitised — entity decoding and tag stripping in one step, by the parser that will render it.
+    */
     if (action === 'copy' && typeof navigator !== 'undefined') {
       const container = document.createElement('div');
       container.innerHTML = item.body;

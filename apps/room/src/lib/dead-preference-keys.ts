@@ -78,7 +78,42 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
     reference's names, which are different strings. `chat-display-mode.ts` holds the wiring.
   */
   'alertDisplayMode',
-  'chatDisplayMode'
+  'chatDisplayMode',
+  /*
+    A THIRD OF THAT KIND, added 2026-08-30, and the most expensive of the three.
+
+    The settings modal's two presenter colour pickers wrote `onPreferenceChange('presenterStyle',
+    { color, bkgColor })` — this presenter's own settings blob, read by nothing, in a store no other
+    viewer can see — under a heading reading *"These colors will affect how ALL USERS see your
+    messages and alerts"*. The reference does not persist a preference at all here: it sends
+    `savePresenterColors` to the server, which stores the pair against the presenter and pushes
+    `presenterColorsChanged` to the room. So the key is invented in the same way the two above are,
+    and for the same reason — a control modelled at the wrong LEVEL, as a per-user preference, when
+    the thing it changes is how everyone else's screen paints this person's messages.
+
+    The live feature stores rows in `presenter_colors` and nothing writes a preference, so this key
+    can never be revived. `presenter-colors.ts` holds it.
+
+    Not an element id, like the two above it: `presenter-text-color` and `presenter-bg-color` are
+    `<input type="color">` with `bind:value`, so they never reached `updateSettingCheck` and never
+    persisted under their ids.
+  */
+  'presenterStyle',
+  /*
+    A FOURTH, added 2026-08-30 with the Stream Player pane.
+
+    Enable / Disable Stream Player wrote `streamingPlayerEnabled` into this presenter's own settings
+    blob and nothing anywhere read it. Same level error as the three above — a room-level presenter
+    act modelled as a per-user preference — with one difference that is worth the paragraph: the
+    other three were fixed by wiring the control, and this one could not be.
+
+    The reference gets the player's state and its URL from ITS server (`invokeAdminCmd("streamStatus")`
+    -> `rc.enablePlayer`, `rc.playerURL`, byte 2,170,505). The client composes neither, and that
+    server is not in the capture. The feature is a public page that renders one room's screenshares
+    to whoever holds a link, which needs an anonymous media grant nobody has designed. So the buttons
+    are disabled with the reason on screen and the key is retired here.
+  */
+  'streamingPlayerEnabled'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);

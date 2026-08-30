@@ -101,14 +101,28 @@ describe('the document title', () => {
   });
 
   /*
-    TWO CONSUMERS ARE NOT BUILT, and they are named rather than left to look finished.
+    ONE CONSUMER IS NOT BUILT — it was two, and this assertion did its job.
 
-    The transcript window's `&name=` parameter (bytes 1,958,716 and 2,532,633) and the private-chat
-    notification flasher, which alternates the tab between `"<sender> messaged you - <room>"` and the
-    room name (2,207,601). Both are recorded in `docs/decoded/missing-settings-triage.md`; this
-    assertion exists so that adding either without updating that document fails here.
+    It read: *"this assertion exists so that adding either without updating that document fails
+    here."* On 2026-08-30 the private-chat notification flasher was built (surface-audit row G27) and
+    this went red, which is exactly the tripwire working. The title now alternates between
+    `"<sender> messaged you - <room>"` and the room name every two seconds while a private message
+    is unread and the composer does not have focus — `private-chat-title-flash.ts` carries the
+    transcription.
+
+    What is STILL a gap is the transcript window's `&name=` parameter, bytes 1,958,716 and
+    2,532,633, and it keeps its half of the assertion. The flasher's half moves to the module that
+    now owns it rather than being deleted: `private-chat-strip-contract.test.ts` asserts the string
+    IS there, so the two together still say where it may and may not appear.
+
+    `docs/decoded/missing-settings-triage.md` records the remaining one.
   */
-  it('has not quietly grown the two consumers that are still gaps', () => {
+  it('has not quietly grown the consumer that is still a gap', () => {
+    /*
+      The PAGE must not carry the flasher — it belongs to the private-chat module, and a copy here
+      would be a second thing writing `document.title` with no way to tell which won.
+    */
     expect(pageCode).not.toContain('messaged you -');
+    expect(pageCode).not.toContain('transcriptWindow');
   });
 });

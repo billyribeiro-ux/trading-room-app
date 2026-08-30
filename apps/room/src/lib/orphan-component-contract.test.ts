@@ -2,6 +2,8 @@ import { globSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { svelteCodeOf, tsCodeOf } from './source-comments.js';
+
 /**
  * EVERY COMPONENT IS REACHED BY SOMETHING THE PRODUCT RENDERS.
  *
@@ -90,46 +92,16 @@ const sources = new Map(paths.map((path) => [path, readFileSync(`${ROOT}/${path}
  * and the docblocks here name almost every component in the tree. A file that merely discusses
  * `<ToggleRow>` must not thereby render it.
  */
-const tsCodeOf = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
-/**
- * A `.svelte` file with its comments removed — and NOT by running the `.ts` stripper over it.
- *
- * ## The bug this shape exists to avoid, measured on this repository
- *
- * The obvious implementation runs `/\*[\s\S]*?\*\//` over the whole file. In a Svelte file that is
- * wrong, because the TEMPLATE is not JavaScript and `/*` there is usually not a comment at all:
- *
- *     <input accept="image/*" ... />          NoteEditor.svelte:1278
- *
- * That `/` and `*` open a "comment" the regex then closes at the next real `*&#47;` — **7,002
- * characters later** — and everything between is deleted, including
- * `<BootboxDialog mode="alert" … />` on line 1430. The naive stripper removed **10,374 of this
- * file's 54,609 characters**, and a walk over the result would have reported a live component as
- * rendered by nobody.
- *
- * It did not, only because `BootboxDialog` is rendered from seven other files as well. That is luck,
- * not correctness. **Four of the 58 `.svelte` files here carry a `/*` glued to a preceding
- * character** — `NoteEditor`, `ImageUploadDialog`, `PostAlertModal` and `RoomOverlays` — so the next
- * component that happens to be rendered only inside one of those windows would be reported orphaned,
- * and whoever met that report would delete working code.
- *
- * ## The rule, which is about where the syntax is in force
- *
- * `/* … *&#47;` and `//` are JavaScript and CSS comment syntax. In a Svelte file that syntax exists
- * only inside `<script>` and `<style>`; the template's comments are `<!-- -->` and nothing else. So
- * markup comments are removed everywhere, and JS-style comments are removed **only within those two
- * blocks**. An `accept="image/*"` in the template is then what it actually is: an attribute value.
- */
-const svelteCodeOf = (source: string) =>
-  source
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(
-      /(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2>)/g,
-      (_match, open, _tag, body, close) => open + tsCodeOf(body) + close
-    );
+/*
+  `tsCodeOf` and `svelteCodeOf` MOVED to `#lib/source-comments.ts` on 2026-08-30, with the whole of
+  the argument that used to stand here.
 
+  They were correct and they were LOCAL, while eighty-two other contract tests carried the naive
+  two-liner — and one written that day lost half of `NoteEditor.svelte` to it before the loud half of
+  the failure caught it. A rule that is right in one file and wrong in eighty-two is a rule in the
+  wrong place. The tripwire below still lives here, because what it guards is this corpus.
+*/
 const isRoute = (path: string) => /(^|\/)\+(page|layout|error)\.svelte$/.test(path);
 
 /** Component name → the file(s) that define it. A list, because two directories may share a name. */
@@ -221,14 +193,20 @@ describe('the render graph is walkable at all', () => {
   all fifty-five would be a large, risky sweep for a hazard that, measured, bites exactly one file
   today:
 
-    NoteEditor.svelte        LOSES `<BootboxDialog>` — `accept="image/*"` at :1278 opens a window
-                             the regex closes 7,000 characters later, over the real render at :1430
+    NoteEditor.svelte        LOSES `<BootboxDialog>`, `<CarouselDialog>` and `<GifConfirmDialog>`
+                             — `accept="image/*"` in
+                             its Insert Image dialog opens a window the regex closes thousands of
+                             characters later, over the real renders below it
+    CarouselDialog.svelte    the same, from 2026-08-30: the carousel's per-slide file input carries
+                             `accept="image/*"` too, and it was extracted OUT of `NoteEditor` — so
+                             the hazard travelled with the markup rather than being introduced. It
+                             loses `<BootboxDialog>` for exactly the same reason
     PostAlertModal.svelte    has `accept="image/*"`, and NO `*&#47;` follows it anywhere in the file
     ImageUploadDialog.svelte the same
     RoomOverlays.svelte      its glued `/*` is inside a comment that DISCUSSES `/*`. Harmless.
 
-  So the honest scope is ONE file, and it is this gate's own subject — now fixed. The other three
-  were checked and are not hazards, which is worth stating precisely because the first draft of this
+  So the honest scope is TWO files, both of them this gate's own subject and both read correctly by
+  the tests that matter. The other three were checked and are not hazards, which is worth stating precisely because the first draft of this
   paragraph called two of them "latent" and that was wrong: a non-greedy `/\*[\s\S]*?\*&#47;` with no
   closing `*&#47;` anywhere after it matches NOTHING, so those two files lose not one character. The
   control written for them did not fire, and chasing why is what produced this measurement.
@@ -240,8 +218,8 @@ describe('the render graph is walkable at all', () => {
   ## What this asserts
 
   That the naive strip and the correct one agree on which components a file renders. They agree today
-  for every file but `NoteEditor`, which this gate reads correctly and the naive one does not — so
-  `NoteEditor` is the one recorded exception, by name, with its measurement.
+  for every file but `NoteEditor` and `CarouselDialog`, which this gate reads correctly and the naive
+  one does not — so those two are the recorded exceptions, by name, with their measurements.
 
   A new hazardous file fails here, naming itself, and whoever meets it can then decide whether the
   test that reads it needs `svelteCodeOf`. That is a tripwire rather than a fix, and it is called
@@ -260,12 +238,23 @@ describe('no NEW file becomes hazardous to a naive comment strip', () => {
     new Set([...source.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)].map((match) => match[1]));
 
   /**
-   * Measured 2026-08-29 and left in place deliberately: `accept="image/*"` at :1278 opens a window
-   * the naive regex closes 7,002 characters later, swallowing `<BootboxDialog>` at :1430. The
-   * attribute is correct markup and the render is correct markup; it is the STRIPPER that is wrong,
-   * which is why this is an exception here and not a change to that component.
+   * Measured 2026-08-29 and left in place deliberately: `accept="image/*"` opens a window the naive
+   * regex closes thousands of characters later, swallowing the renders after it. The attribute is
+   * correct markup and the render is correct markup; it is the STRIPPER that is wrong, which is why
+   * these are exceptions here and not changes to those components.
+   *
+   * `CarouselDialog` joined on 2026-08-30 when the carousel modal was extracted out of `NoteEditor`
+   * — the per-slide file input went with it, and so did the hazard. `NoteEditor` now loses the
+   * extracted component's own tag as well, which is the clearest possible statement of what the
+   * naive strip costs: the render this gate exists to find is the one it eats.
    */
-  const KNOWN = new Map([['lib/components/notes/NoteEditor.svelte', ['BootboxDialog']]]);
+  const KNOWN = new Map([
+    [
+      'lib/components/notes/NoteEditor.svelte',
+      ['BootboxDialog', 'CarouselDialog', 'GifConfirmDialog']
+    ],
+    ['lib/components/notes/CarouselDialog.svelte', ['BootboxDialog']]
+  ]);
 
   it('loses no component tag that the correct stripper keeps', () => {
     const hazards: string[] = [];

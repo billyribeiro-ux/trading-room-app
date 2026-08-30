@@ -1,5 +1,8 @@
 import { isHttpError } from '@sveltejs/kit';
 
+import { restoreAfterLoadMore, scrollPrivateChatToBottom } from './private-chat-scroll';
+import { startTitleFlash, stopTitleFlash } from './private-chat-title-flash';
+
 import {
   mergeOlderMessagesBy,
   newLoadMorePaging,
@@ -95,6 +98,22 @@ export interface PrivateChatCommands {
 export interface PrivateChatPrefs {
   readonly doNotDisturbOn: boolean;
   readonly chatSoundOn: boolean;
+  /**
+   * `preferences.chatPopup` — the toast and browser notification, G12.
+   *
+   * Beside `chatSoundOn` because upstream reads them in the SAME expression and gates both on
+   * `doNotDisturbOn`. `RoomPrefs` already owns it and the @-mention popup already reads it; the
+   * private channel simply never did.
+   */
+  readonly chatPopup: boolean;
+  /**
+   * `preferences.pmLogsOnRight` — G5, the side the conversation column sits on.
+   *
+   * It has been WRITTEN by the settings modal since that modal was built and read by nothing, which
+   * is the "a control whose only effect is changing its own label" shape `CLAUDE.md` names — and
+   * `dead-preference-keys.ts` deliberately does not list it, so nothing was covering for it either.
+   */
+  readonly pmLogsOnRight: boolean;
 }
 
 /*
@@ -158,6 +177,18 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   readonly #peerHistory: RoomPeerHistory;
   /** The Load More counter and its guards; `$state.raw` because it is only ever replaced whole. */
   #paging;
+  #onlineUserIds;
+  #notify;
+  #canPost;
+  #uploadImages;
+  #roomName;
+  #composerHasFocus;
+  /** The composer's image dialog while it is open — see `beginImageUpload`. */
+  #imageUpload;
+  /** `loadMoreLastID` — the row to scroll back to once older history lands. See `loadMore`. */
+  #loadMoreAnchorId = '';
+  /** `privChatSearchResults` — the search's own bucket, so it cannot overwrite the thread. */
+  #searchResults;
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -174,6 +205,70 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     playSound: (name: SoundEffectName) => void;
     closeUserMenu: () => void;
     selectRosterUser: (user: User) => void;
+    /**
+     * Who is on the roster right now, as user ids — G16's `checkUserOnlineStatus`.
+     *
+     * ```js
+     * checkUserOnlineStatus() {                                    // byte 2,203,628
+     *   if (this.privChatVisible && this.appService.globals.roster && this.chatTabs)
+     *     for (const e of this.appService.globals.roster)
+     *       for (const i of this.chatTabs)
+     *         i.uid === e.userXrefID && (i.online = !0)
+     * }
+     * ```
+     *
+     * Every server-supplied tab was built `online: false` and nothing ever consulted the roster, so
+     * the `bg-success` dot on the tab strip was permanently grey for anyone the page loaded with —
+     * only a peer whose first message arrived this session ever lit up.
+     *
+     * **A FUNCTION AND NOT A LIST**, so the tab getter reads the roster at the moment it recomputes.
+     * Upstream re-runs `checkUserOnlineStatus` on `getRoster`, `onUserJoin` and `onUserLeave`; a
+     * `$derived` over the roster does the same thing without three subscriptions to keep in step.
+     *
+     * **And it can go back to FALSE, which upstream's cannot.** `checkUserOnlineStatus` only ever
+     * writes `!0` — it has no branch that clears the flag — so a member who leaves stays lit until
+     * something rebuilds `chatTabs`. Deriving it means the dot answers the roster at all times,
+     * which is what the dot claims to mean. A deliberate divergence, and the safer direction: the
+     * failure it removes is telling a presenter somebody is present when they have gone.
+     */
+    onlineUserIds: () => ReadonlySet<number>;
+    /**
+     * Upload one or more images and hand back their URLs — G1's `imgUpload()`.
+     *
+     * The room's uploader, injected, exactly as `RoomTradeAlerts` takes it: this class knows what
+     * to do with a URL and deliberately not how bytes reach the CDN.
+     */
+    uploadImages: (files: readonly File[]) => Promise<readonly string[]>;
+    /**
+     * The room's name, which is what the tab title returns to — G27's `globals.sessionName`.
+     *
+     * A thunk because it comes from the page's data and is replaced on every `invalidateAll()`.
+     */
+    roomName: () => string;
+    /**
+     * Whether the private composer has focus — the other half of G27's gate.
+     *
+     * `!$("#textAreaTxtPM").is(":focus")`. Injected rather than queried here so this class does not
+     * reach into the DOM for a decision, which is the split every other collaborator here makes.
+     */
+    composerHasFocus: () => boolean;
+    /**
+     * `canPost` — may this member post at all, G13.
+     *
+     * The room's answer, injected, because it already decides who may chat and a second opinion
+     * computed in here is how two places come to disagree about one authority. The composer's own
+     * render gate upstream is `O(4, e.isConnected && e.chatEnabled ? 4 : -1)`, which is the same
+     * question asked of the same values.
+     */
+    canPost: () => boolean;
+    /**
+     * Raise a toast and a browser notification — G12's `alertService.info` plus `new Notification`.
+     *
+     * Injected rather than reached for, exactly as `playSound` is: this class knows WHEN somebody
+     * should be told and deliberately not HOW, and `RoomToasts` already owns the queue, the
+     * duplicate guard and the gravatar fallback the notification icon needs.
+     */
+    notify: (title: string, body: string, icon: string, emailHash: string) => void;
     /** `selectedMessageUser = null` — owned by the message-action path, cleared when this closes. */
     onCleared: () => void;
     onThreadDeleted: () => Promise<void>;
@@ -187,6 +282,12 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#playSound = options.playSound;
     this.#closeUserMenu = options.closeUserMenu;
     this.#selectRosterUser = options.selectRosterUser;
+    this.#onlineUserIds = options.onlineUserIds;
+    this.#notify = options.notify;
+    this.#canPost = options.canPost;
+    this.#uploadImages = options.uploadImages;
+    this.#roomName = options.roomName;
+    this.#composerHasFocus = options.composerHasFocus;
     this.#onCleared = options.onCleared;
     this.#onThreadDeleted = options.onThreadDeleted;
 
@@ -197,6 +298,10 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#searchTerm = $state('');
 
     this.#searching = $state(false);
+
+    this.#searchResults = $state.raw<PrivateChatMessage[]>([]);
+
+    this.#imageUpload = $state(false);
 
     this.#threads = $state.raw<Record<number, PrivateChatMessage[]>>({});
 
@@ -275,6 +380,7 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
         pic: tab.pic,
         unread: 0,
         isA: tab.isA,
+        /* Filled from the roster below, where every tab is answered at once. */
         online: false
       });
     }
@@ -282,9 +388,15 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     for (const profile of this.#peerProfiles) {
       if (!byId.has(profile.uid)) byId.set(profile.uid, profile);
     }
+    /* Read ONCE for the whole strip rather than per tab — upstream's nested loop is O(roster × tabs). */
+    const online = this.#onlineUserIds();
     return (
       [...byId.values()]
-        .map((tab) => ({ ...tab, unread: this.#unreadByPeer[tab.uid] ?? 0 }))
+        .map((tab) => ({
+          ...tab,
+          unread: this.#unreadByPeer[tab.uid] ?? 0,
+          online: online.has(tab.uid)
+        }))
         // `newMessage()` splices a tab out and pushes it, so the most recent sits last.
         .sort(
           (a, b) => (this.#lastActivityByPeer[a.uid] ?? 0) - (this.#lastActivityByPeer[b.uid] ?? 0)
@@ -292,8 +404,18 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     );
   }
 
+  /**
+   * What the scroller renders: the search results while searching, the thread otherwise — G25.
+   *
+   * `this.msgs = this.appService.globals.privChatSearchResults` while a term is set, and
+   * `this.msgs = this.appService.globals.privChatLog[this.currUser]` when it is cleared. Two
+   * buckets, one view — which is what makes clearing a search a swap rather than a refetch, and what
+   * keeps the older pages a reader had already loaded.
+   */
   get log(): PrivateChatMessage[] {
-    return this.#peerId === null ? [] : (this.#threads[this.#peerId] ?? []);
+    if (this.#peerId === null) return [];
+    if (this.#searching) return this.#searchResults;
+    return this.#threads[this.#peerId] ?? [];
   }
 
   canOpenFor(user: User) {
@@ -373,6 +495,64 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     }
 
     if (!this.#prefs.doNotDisturbOn && !isMine && this.#prefs.chatSoundOn) this.#playSound('pling');
+
+    /*
+      ── THE TOAST AND THE BROWSER NOTIFICATION — G12, byte 2,205,900 ──────────────────────────
+
+      ```js
+      !this.appService.globals.preferences.doNotDisturbOn &&
+      this.appService.globals.preferences.chatPopup && (
+        this.alertService.info(e.txt, "Message from " + e.n, { enableHtml: !0 }),
+        window.Notification) &&
+        new Notification("Message from " + e.n, {
+          body: e.txt,
+          icon: e.pic || "https://secure.gravatar.com/avatar/" + e.avt + "?d=mm&s=50" })
+      ```
+
+      Only the SOUND was fired here. A member with the panel closed, or with a different
+      conversation open, had no way to learn a private message had arrived — which is the one thing
+      a private message needs to do.
+
+      **Inside the `else` in the capture, and inside the same condition here.** Upstream raises this
+      in the branch where the message is NOT for the conversation on screen; there is no point
+      telling somebody about a message they are looking at. That is the same `#peerId !== peerId`
+      test the unread count above uses, so both live under it.
+
+      `?d=mm&s=50` and not the strip's 32: `RoomToasts.notify` already carries that exact fallback
+      for the @-mention popup, so this passes the hash and lets it build the URL — one transcription
+      of the gravatar shape rather than a second copy of it.
+    */
+    if (
+      !isMine &&
+      this.#peerId !== peerId &&
+      !this.#prefs.doNotDisturbOn &&
+      this.#prefs.chatPopup
+    ) {
+      this.#notify(`Message from ${message.n}`, message.txt, message.pic, message.avt);
+    }
+
+    /*
+      ── THE TAB TITLE — G27, byte 2,207,480 ─────────────────────────────────────────────────
+
+      ```js
+      (!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine &&
+        (this.notificationInterval = setInterval(…, 2e3))
+      ```
+
+      Not mine, and only when the composer does not have focus — somebody typing into the box is
+      already looking at it, and flashing the title at them is noise. `document.hasFocus()` answers
+      the `!window.onfocus` half: the reference is testing whether the WINDOW is focused at all, and
+      that is the case the whole feature exists for.
+
+      Restarting replaces whatever was flashing, which is the first line of upstream's `newMessage`
+      — a message from somebody else must name THAT sender.
+
+      `private-chat-title-flash.ts` owns the interval and the title; this decides when.
+    */
+    if (!isMine && !this.#composerHasFocus()) {
+      startTitleFlash(message.n, this.#roomName());
+    }
+
     if (this.#peerId === peerId) this.scrollToBottom();
   }
 
@@ -381,14 +561,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     return formatCompactTime(at);
   }
 
-  /** `scrollPCLogToBottom` - the scroller's own handler, which also re-runs after a tick. */
+  /** `scrollPCLogToBottom` — delegated to `private-chat-scroll.ts`, which owns both numbers. */
   scrollToBottom() {
-    const run = () => {
-      const scroller = document.querySelector('.pc-messages');
-      if (scroller) scroller.scrollTop = scroller.scrollHeight;
-    };
-    run();
-    setTimeout(run, 60);
+    scrollPrivateChatToBottom();
   }
 
   /**
@@ -400,6 +575,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   async switchToUser(peerId: number) {
     this.#peerId = peerId;
     this.#searchTerm = '';
+    /* Results belong to the thread that produced them; carrying them across would be another peer's. */
+    this.#searchResults = [];
+    this.#searching = false;
     if (!this.#threads[peerId]) this.#threads = { ...this.#threads, [peerId]: [] };
     this.#unreadByPeer = { ...this.#unreadByPeer, [peerId]: 0 };
     // `PCswitchChatToUser`: currPage = 0, hasMoreData = !0, isLoadingMore = !1, loadMoreLastID = "".
@@ -421,12 +599,22 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     // arrived is not an empty page.
     this.#paging = settleLoadMore(this.#paging, incoming.length);
 
+    /*
+      A SEARCH FILLS ITS OWN BUCKET — `privChatSearchResults`, G25. It used to overwrite
+      `#threads[peerId]`, which is why clearing a search had to refetch and why every older page the
+      reader had loaded was thrown away.
+    */
+    if (searchTerm) {
+      this.#searchResults = incoming;
+      return;
+    }
+
     // Page 0 replaces; a later page is older history and goes in front, deduped on `_id` because
     // offset paging over a live tail hands the boundary row back twice.
     this.#threads = {
       ...this.#threads,
       [peerId]:
-        page === 0 || searchTerm
+        page === 0
           ? incoming
           : mergeOlderMessagesBy(incoming, this.#threads[peerId] ?? [], (message) => message._id)
     };
@@ -444,8 +632,43 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     if (peerId === null || this.#paging.loadingMore || !this.#paging.hasMoreData) return;
     const next = startLoadMore(this.#paging);
     this.#paging = next;
+    /*
+      `this.loadMoreLastID = "pcm-" + this.msgs[0]._id` — byte 2,193,442, recorded BEFORE the
+      request. It is the row that is currently at the top, and after the older page is prepended it
+      is the row the reader was looking at. See `#restoreAfterLoadMore`.
+    */
+    const anchor = this.#threads[peerId]?.[0];
+    this.#loadMoreAnchorId = anchor ? `pcm-${anchor._id}` : '';
     await this.loadLog(peerId, next.page);
+    /* The anchor crosses as an argument: it belongs to the paging that produced it, not to the
+       module that scrolls. `private-chat-scroll.ts` carries the `-20` and why it is transcribed. */
+    const anchorId = this.#loadMoreAnchorId;
+    this.#loadMoreAnchorId = '';
+    await restoreAfterLoadMore(anchorId);
   }
+
+  /*
+    ── `getAllPCLogsLoading` IS NOT MODELLED, AND THAT IS MEASURED — G7 ────────────────────────
+
+    ```js
+    O(1, e.getAllPCLogsLoading ? 1 : 2)      // "Loading private chats. Please wait..." / "No active chat"
+    O(3, e.getAllPCLogsLoading ? 3 : -1)     // the tab column's own "Loading all private chats." block
+    ```
+
+    Upstream needs that flag because it POSTs `getAllPCLogs` when the panel opens. **This room has
+    no such moment.** The conversation list is `loadConversations(...)` in `+page.server.ts:743`,
+    resolved before the page is rendered and delivered with it, and the only thing that refreshes it
+    is `invalidateAll()` — which keeps the previous list on screen while it runs. There is no
+    instant at which the strip exists and its contents are unknown.
+
+    So both of the reference's loading branches would be branches that can never render, which is a
+    branch that can never be checked — the dead-control shape this repository removes rather than
+    adds. The same call was made and recorded for the note carousel's file browser on 2026-08-30.
+
+    What WOULD make this real is fetching the list on open instead of at page load. That is a
+    plausible future change, and this note is here so whoever makes it knows two empty states are
+    waiting for the flag rather than discovering it from the capture a second time.
+  */
 
   /** `hasMoreData && !searchTerm` — the badge's gate, which is the server's answer and not a count. */
   get hasMore(): boolean {
@@ -459,6 +682,30 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
 
   /** `sendMessage()` - `sendPrivChat(currUser, text, recvdUser)`. Empty text sends nothing. */
   async send() {
+    /*
+      ── `canPost` — G13, byte 2,208,062 ────────────────────────────────────────────────────
+
+      ```js
+      sendMessage() {
+        if (!this.canPost) return void bootbox.alert("Sorry, you can't post to this channel");
+        …
+      }
+      ```
+
+      There was no gate here at all: a member whose chat had been muted or disabled could type into
+      the private composer and the message went to the server, which refused it — so the refusal
+      arrived as a generic failure rather than as the reason.
+
+      `canPost` is the CALLER's answer, not this class's. The room already decides who may chat, and
+      a second opinion computed here is the shape `CLAUDE.md` forbids: two places deciding one
+      authority is how they come to disagree. The server refuses independently regardless — this is
+      the message, not the enforcement.
+    */
+    if (!this.#canPost()) {
+      this.#dialogs.alert = "Sorry, you can't post to this channel";
+      return;
+    }
+
     const text = this.#draft.trim();
     if (!text || this.#peerId === null) return;
 
@@ -472,6 +719,78 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#draft = '';
     // The echo on `/privChat` is what actually appends it, so nothing is inserted here.
     this.scrollToBottom();
+  }
+
+  /**
+   * `onTextareaFocus()` — the member is looking at the composer, so stop flashing at them.
+   *
+   * ```js
+   * onTextareaFocus() {
+   *   this.notificationInterval && clearInterval(this.notificationInterval),
+   *   document.title !== this.appService.globals.sessionName &&
+   *     (document.title = this.appService.globals.sessionName)
+   *   …
+   * }
+   * ```
+   *
+   * The rest of upstream's method attaches the `input` listener that `autoExpand` needs;
+   * `PrivateChatComposer` binds that declaratively, so only this half crosses.
+   */
+  composerFocused(): void {
+    stopTitleFlash(this.#roomName());
+  }
+
+  /** Whether the composer's image dialog is on screen — G1's `imgUpload()`. */
+  get imageUpload(): boolean {
+    return this.#imageUpload;
+  }
+
+  /**
+   * `imgUpload()` — open the composer's image dialog for THIS conversation.
+   *
+   * A dialog of its own rather than the chat composer's, which is the rule `RoomOverlays` already
+   * records for the swing form: *"routing the swing upload through the composer's handler would post
+   * the image into chat instead of putting its URL in the form."* The same is true here, and worse —
+   * an image meant for one person would land in the room.
+   */
+  beginImageUpload(): void {
+    this.#imageUpload = true;
+  }
+
+  cancelImageUpload(): void {
+    this.#imageUpload = false;
+  }
+
+  /**
+   * The chosen image, uploaded and sent as a private message.
+   *
+   * ONE file. `ImageUploadDialog` is shared with the chat composer, which allows several; the
+   * reference's own private-chat dialog sets `multiple='false'`, so the extras are dropped here
+   * rather than by forking the component — the same call `RoomTradeAlerts` makes.
+   *
+   * The URL is SENT rather than put in the draft, which is what `sendPrivChat` does with it: an
+   * image in a private conversation is a message, and leaving it in the box would make a presenter
+   * press Enter on a URL they did not type.
+   */
+  async completeImageUpload(files: readonly File[]): Promise<void> {
+    this.#imageUpload = false;
+    const [file] = files;
+    if (!file) return;
+
+    let url: string | undefined;
+    try {
+      [url] = await this.#uploadImages([file]);
+    } catch (error) {
+      console.error(error);
+      this.#dialogs.alert = 'Upload Failed...';
+      return;
+    }
+    if (!url) {
+      this.#dialogs.alert = 'Upload Failed...';
+      return;
+    }
+    this.#draft = url;
+    await this.send();
   }
 
   /** `deleteThisPM()` - confirm, then `deletePeerPCLog {peerID}`, then drop the tab. */
@@ -549,20 +868,84 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
    * "No active chat".
    */
   close() {
+    /* `closePanel(){ …, this.notificationInterval && (clearInterval(…), document.title = …), … }` */
+    stopTitleFlash(this.#roomName());
     this.#open = false;
     this.#peerId = null;
     this.#onCleared();
     this.#searchTerm = '';
     this.#searching = false;
+    this.#searchResults = [];
     this.#draft = '';
   }
 
-  /** `onEnterSearchChat(value)` - a term searches this thread; an empty one restores it. */
+  /**
+   * `closeTab(uid)` — the X on the header tab, G8.
+   *
+   * ```js
+   * closeTab(e) { this.user = null, this.recvdUser = null, this.currUser = "" }   // byte 2,205,022
+   * ```
+   *
+   * It clears `currUser`, which by `O(17, "" !== o.currUser ? 17 : 18)` drops the panel back to its
+   * empty pane. The room's wiring cleared the selected user and left `peerId` alone, so the header
+   * tab vanished and the thread and composer stayed — a conversation with nobody's name on it.
+   *
+   * Separate from {@link RoomPrivateChat.close}, which is the PANEL's X and hides the panel as well.
+   * This closes the conversation and leaves the panel open, which is why the two are not one method.
+   */
+  closeTab(): void {
+    /* `closePanel` clears the interval and restores the title; closing the tab is the same act. */
+    stopTitleFlash(this.#roomName());
+    this.#peerId = null;
+    this.#searchTerm = '';
+    this.#searching = false;
+    this.#searchResults = [];
+    this.#draft = '';
+    this.#onCleared();
+  }
+
+  /**
+   * `onEnterSearchChat(value)` — a term searches this thread; an empty one RESTORES it — G25.
+   *
+   * ```js
+   * clearSearchTerm() {                                            // byte 2,209,001
+   *   this.pmSearchTerm = "",
+   *   this.appService.guiEventBus.emit("setSearchTermPC", {searchTerm: this.pmSearchTerm, uid: this.currUser}),
+   *   this.appService.globals.privChatSearchResults = [],
+   *   this.msgs = this.appService.globals.privChatLog[this.currUser],
+   *   this.appService.appEventBus.emit("scrollPCLogToBottom", {force:!0, repeat:!0})
+   * }
+   * ```
+   *
+   * ## Two buckets, because the search overwrote the conversation
+   *
+   * Upstream keeps results in `privChatSearchResults` and swaps `msgs` back to the untouched
+   * `privChatLog[currUser]`. This held ONE array per peer and wrote the results into it, so:
+   *
+   *   - clearing the search cost a round trip to fetch page 0 again, and
+   *   - every older page the reader had loaded was discarded, so `Load More` had to be pressed all
+   *     the way back down.
+   *
+   * The thread and the results are now separate, and clearing is a local swap with no request —
+   * which is what makes it instant and what makes the pages survive.
+   *
+   * The scroll is upstream's too, on both paths: a fresh set of rows means the box is looking at
+   * whatever the old ones left it pointing at.
+   */
   async search(term: string) {
     if (this.#peerId === null) return;
+    const trimmed = term.trim();
     this.#searchTerm = term;
-    this.#searching = Boolean(term.trim());
-    await this.loadLog(this.#peerId, 0, term.trim());
+    this.#searching = Boolean(trimmed);
+
+    if (!trimmed) {
+      /* `privChatSearchResults = []` then `msgs = privChatLog[currUser]` — a swap, not a fetch. */
+      this.#searchResults = [];
+      this.scrollToBottom();
+      return;
+    }
+
+    await this.loadLog(this.#peerId, 0, trimmed);
     this.scrollToBottom();
   }
 

@@ -40,6 +40,15 @@ export interface CmdsFrame {
   /** `changeChatMode`'s payload — `g`, `p` or `d`. The row in `room_state` is the authority. */
   mode?: string;
   /**
+   * Who performed the act, on the four message-mutation frames — see `#lib/message-mutation-frames.ts`.
+   *
+   * ONLY ever compared against the recipient's own id, to skip a refetch that browser has already
+   * done. It is not authority and nothing may read it as such: the frame carries no payload, so
+   * there is nothing for a forged id to unlock, and the server has already applied every rule
+   * before publishing.
+   */
+  actorUserId?: number;
+  /**
    * `mtxStartStream` / `mtxStopStream` carry the stream under `muser` — the reference's own key
    * (byte 1010826), and the reason `mtx-streams.ts` describes an MTX stream as "simply another
    * muser". Typed `unknown` because `isMtxStream` is what decides.

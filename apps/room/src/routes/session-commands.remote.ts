@@ -4,6 +4,7 @@ import { presenterRoom } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { roomState } from '#lib/server/db/schema.js';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
+import { recordSessionEvent } from '#lib/server/session-history.js';
 
 /*
   COMMANDS THAT ACT ON THE SESSION, rather than on a PERSON or a SCREEN.
@@ -112,7 +113,14 @@ export const refreshRoster = command(z.void(), async () => {
  */
 export const softReset = command(z.void(), async () => {
   ensureDatabase();
-  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'softResetDone' } });
+  const room = presenterRoom();
+  publishToRoom(room, { channel: 'cmds', data: { cmd: 'softResetDone' } });
+  /*
+    Recorded AFTER the broadcast, which is the ordering `session-history.ts` argues: a history row
+    can then only ever describe something that actually happened, and a failure to log can never
+    take the act with it.
+  */
+  recordSessionEvent(room, 'Session reset', 'Soft reset — media rebuilt, room data reloaded.');
 });
 
 /**
@@ -149,7 +157,9 @@ export const softReset = command(z.void(), async () => {
  */
 export const hardReset = command(z.void(), async () => {
   ensureDatabase();
-  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'hardReset' } });
+  const room = presenterRoom();
+  publishToRoom(room, { channel: 'cmds', data: { cmd: 'hardReset' } });
+  recordSessionEvent(room, 'Session reset', 'Hard reset — every connection dropped and rebuilt.');
 });
 
 /**
@@ -171,7 +181,9 @@ export const hardReset = command(z.void(), async () => {
  */
 export const openSession = command(z.void(), async () => {
   ensureDatabase();
-  publishToRoom(presenterRoom(), { channel: 'cmds', data: { cmd: 'openSession' } });
+  const room = presenterRoom();
+  publishToRoom(room, { channel: 'cmds', data: { cmd: 'openSession' } });
+  recordSessionEvent(room, 'Session opened', 'The room was reopened to members.');
 });
 
 /**
@@ -229,5 +241,17 @@ export const saveCloseMessage = command(
         set: { closedMessage: message || null, updatedAt: now }
       })
       .run();
+
+    /*
+      The VALUE says which of the two things happened, because an empty message is how a presenter
+      CLEARS it — logging the text itself would put an empty string in the pane and read as a bug.
+      The message is deliberately not copied into the history either way: it is presenter-authored
+      text of up to 2000 characters and the pane renders `eventValue` inline.
+    */
+    recordSessionEvent(
+      room,
+      'Close message saved',
+      message ? 'The room now has a close message.' : 'The close message was cleared.'
+    );
   }
 );

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, max } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, max, notInArray } from 'drizzle-orm';
 import type { NoteVersion, RoomNote } from '#lib/types.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
@@ -10,6 +10,15 @@ import {
 import { sanitizeNoteHtml } from '#lib/server/notes.js';
 
 const COALESCE_WINDOW_MS = 30_000;
+
+/**
+ * How many versions a note keeps — `this.maxVersions = 3` at reference byte 1,468,359.
+ *
+ * Exported because two places have to agree about it and a second literal is how they stop:
+ * `saveNoteContent` prunes to it and `getNoteVersions` reads to it. The tests that prove the cap
+ * import it rather than restating `3`, so raising it here is one edit and not a hunt.
+ */
+export const NOTE_VERSION_LIMIT = 3;
 
 function noteDto(row: Note): RoomNote {
   return {
@@ -142,6 +151,50 @@ export function saveNote(input: {
           updatedAt: input.now
         })
         .run();
+
+      /*
+        ── THE CAP, AND WHY IT IS A DELETE AND NOT A LIMIT ──────────────────────────────────────
+
+        `this.maxVersions = 3` — byte 1,468,359 — enforced on every save at 1,469,897:
+
+        ```js
+        this.prevVersions.unshift(i),
+        this.prevVersions.length > this.maxVersions &&
+          (this.prevVersions = this.prevVersions.slice(0, this.maxVersions))
+        ```
+
+        This table had NO cap. `getNoteVersions` was an unbounded `SELECT` with no `LIMIT`,
+        `NotesPane` refetches it on every `updatedAt` change — which is every three-second autosave —
+        and one row per result is rendered behind `Version History (N)`. So a long-lived note grew a
+        read path without bound, which is the first question `CLAUDE.md` says to ask of one: what
+        does this cost at 10,000 rows, and what bounds it?
+
+        A `LIMIT 3` on the read would have bounded the QUERY and left the rows, and that is the
+        version of this fix that looks tidier and is worse: the table still grows forever, and the
+        rows past the third become data nothing can reach. Deleting them is what the reference does
+        and it is what makes the number mean something.
+
+        Only on the INSERT branch. The coalescing update above rewrites the newest row in place, so
+        the count cannot have changed and a delete there would be a query per keystroke-window for a
+        row set that is already the right size.
+
+        `NOT IN (newest three)` rather than `version <= n - 3`: `version` is monotonic per note but
+        the restore path writes a new version rather than rewinding the counter, so arithmetic on it
+        would be a second assumption where the ordering is the only one needed.
+      */
+      const keep = transaction
+        .select({ id: noteVersions.id })
+        .from(noteVersions)
+        .where(eq(noteVersions.noteId, input.noteId))
+        .orderBy(desc(noteVersions.version))
+        .limit(NOTE_VERSION_LIMIT)
+        .all()
+        .map((row) => row.id);
+
+      transaction
+        .delete(noteVersions)
+        .where(and(eq(noteVersions.noteId, input.noteId), notInArray(noteVersions.id, keep)))
+        .run();
     }
 
     const updated = transaction
@@ -265,6 +318,112 @@ export function setWelcomeMatNote(input: {
   });
 }
 
+/**
+ * Make one note the welcome mat of EVERY room named, by copying its content into each.
+ *
+ * ## What the reference evidences, and what it does not
+ *
+ * `setWelcomeMatNoteTab {id, allRooms, pw}` and the setting's own help text — *"Presenters will need
+ * to enter the password to replace all the rooms welcome mats"* — are the whole of the evidence. The
+ * reference's SERVER is not in the capture, so how it applies one note to many rooms is unknown, and
+ * this is the decision taken in its absence:
+ *
+ * **A COPY PER ROOM, not a shared note.** `notes.room_short_code` is what every read in this file
+ * scopes by, and it is the fence that keeps one room's notes out of another's. Referencing a single
+ * note from many rooms would require removing that scope from the welcome-mat read, which is the one
+ * change nothing here is allowed to make. So each room gets its own note carrying this content, and
+ * the rooms stay independent afterwards: editing the mat in room A does not silently rewrite room B's.
+ *
+ * That is a real behavioural difference from a shared note and it is stated rather than implied. It
+ * is also the safer of the two readings: "replace all the rooms welcome mats" describes a one-time
+ * act, and a shared note would make it a permanent coupling nobody asked for.
+ *
+ * ## The source room is written the same way as the others
+ *
+ * It already holds the note, so its "copy" is the existing row being flagged. Handling it through
+ * the same loop rather than as a special case is what keeps the two paths from drifting — and the
+ * source room may not even be in the list, if the controller's account no longer owns it.
+ *
+ * ## One transaction
+ *
+ * A half-applied welcome mat across an account is worse than none: some rooms would greet members
+ * with the new note and some with the old, and nothing would say which. better-sqlite3 transactions
+ * are synchronous, so this is atomic without any of the interleaving a promise-based one would allow.
+ */
+export function setWelcomeMatNoteEverywhere(input: {
+  sourceRoom: string;
+  rooms: readonly string[];
+  noteId: number;
+  now: Date;
+  userId: number;
+}): RoomNote | null {
+  ensureDatabase();
+  return db.transaction((transaction) => {
+    const source = transaction
+      .select()
+      .from(notes)
+      .where(
+        and(
+          eq(notes.roomShortCode, input.sourceRoom),
+          eq(notes.id, input.noteId),
+          isNull(notes.deletedAt)
+        )
+      )
+      .get();
+    /* Refuses a note id from another room, which is what makes every write below safe. */
+    if (source === undefined) return null;
+
+    for (const room of input.rooms) {
+      /* Demote whatever this room currently greets people with — this room's, and only this room's. */
+      transaction
+        .update(notes)
+        .set({ isWelcomeMat: false })
+        .where(and(eq(notes.roomShortCode, room), isNull(notes.deletedAt)))
+        .run();
+
+      if (room === input.sourceRoom) {
+        transaction
+          .update(notes)
+          .set({ isWelcomeMat: true, updatedAt: input.now, updatedById: input.userId })
+          .where(eq(notes.id, source.id))
+          .run();
+        continue;
+      }
+
+      /*
+        The copy is APPENDED rather than overwriting whatever that room's previous mat was. The
+        previous one is demoted above and keeps existing, so a presenter in that room can put it back
+        — which matters because the person who ran this was not necessarily in their room.
+
+        `position` is the next free one there, read inside the transaction so two accounts doing this
+        at once cannot collide on it.
+      */
+      const highest = transaction
+        .select({ value: max(notes.position) })
+        .from(notes)
+        .where(and(eq(notes.roomShortCode, room), isNull(notes.deletedAt)))
+        .get();
+
+      transaction
+        .insert(notes)
+        .values({
+          roomShortCode: room,
+          name: source.name,
+          contentHtml: source.contentHtml,
+          isWelcomeMat: true,
+          position: (highest?.value ?? 0) + 1,
+          createdAt: input.now,
+          updatedAt: input.now,
+          updatedById: input.userId
+        })
+        .run();
+    }
+
+    const updated = transaction.select().from(notes).where(eq(notes.id, source.id)).get();
+    return updated === undefined ? null : noteDto(updated);
+  });
+}
+
 export function getNoteVersions(room: string, noteId: number): readonly NoteVersion[] | null {
   ensureDatabase();
   /*
@@ -279,11 +438,18 @@ export function getNoteVersions(room: string, noteId: number): readonly NoteVers
     .get();
   if (note === undefined) return null;
 
+  /*
+    `LIMIT` as well as the prune on write, and both on purpose. The prune is what bounds the TABLE;
+    this is what bounds the QUERY, and it is the half that survives a row arriving by any path the
+    prune does not run on — a restore, a migration, a future writer. Belt and braces on a read that
+    `NotesPane` reissues on every three-second autosave.
+  */
   return db
     .select()
     .from(noteVersions)
     .where(eq(noteVersions.noteId, noteId))
     .orderBy(desc(noteVersions.version))
+    .limit(NOTE_VERSION_LIMIT)
     .all()
     .map(noteVersionDto);
 }

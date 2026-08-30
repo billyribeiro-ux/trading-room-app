@@ -87,6 +87,20 @@
      * its stream and is hidden rather than torn down.
      */
     saveData?: boolean;
+    /**
+     * The anti-leak watermark's text, or `null` for none — `#lib/user-id-watermark.ts`.
+     *
+     * THIS PANE HAD NO WATERMARK AT ALL until 2026-08-30, and it is the surface the setting is named
+     * for: a room with `overlayUserIdOnScreenshare` on got the viewer's id burned over the MTX
+     * stream player and nothing over the screenshare (`SV-SP-01`). The reference draws the same span
+     * on both — `app-screenshare-view` const 9 is `[1,"overlay-userID-container"]`, rendered by
+     * `Q0e` at byte 1,494,134 behind `O(10, !isPresenter && sessData.overlayUserIdOnScreenshare ?
+     * 10 : -1)` at byte 1,502,175.
+     *
+     * Arrives already decided, like every other authority value here: the gate has two terms and an
+     * empty-id case, and a copy of it per component is a copy that stops matching.
+     */
+    userIdWatermark?: string | null;
     /** Reports a drag upward; the parent owns the per-screen pan map. */
     onpan?: (x: number, y: number) => void;
     ontogglezoom?: () => void;
@@ -107,6 +121,7 @@
     detached = false,
     viewerOnlyMode = false,
     saveData = false,
+    userIdWatermark = null,
     onpan,
     ontogglezoom,
     onzoomin,
@@ -342,6 +357,21 @@
         ></video>
       </div>
     </div>
+
+    <!--
+      `Q0e` — the anti-leak watermark, byte 1,494,134. The same span `StreamingView` draws, from the
+      same answer (`#lib/user-id-watermark.ts`), on the surface `overlayUserIdOnScreenshare` is named
+      for and did not cover until 2026-08-30.
+
+      INSIDE `#video-screen-container-{id}` rather than beside it, and both halves of that matter:
+      the captured rule is `.video-screen-container { position: relative }`, which is what the
+      overlay's own `position: relative; bottom: 50%` is measured against; and the container is what
+      `toggleFullscreen` fullscreens, so the watermark goes fullscreen WITH the picture instead of
+      being clipped away — which is precisely the state a recording would be made in.
+    -->
+    {#if userIdWatermark}
+      <span class="overlay-userID-container"> {userIdWatermark} </span>
+    {/if}
 
     <!--
       Only the popped-out window draws a cluster over the video. See the header comment: the

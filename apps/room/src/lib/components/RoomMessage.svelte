@@ -21,6 +21,7 @@
   } from '#lib/message-formatters.js';
   import { messageMenuAllows, sourceMessageBehavior } from '#lib/message-behavior.js';
   import type { FollowChatStyle } from '#lib/types.js';
+  import { type PresenterColors } from '#lib/presenter-colors.js';
   import { hideMessageAvatar, type ChatDisplayMode } from '#lib/chat-display-mode.js';
 
   type MessageKind = 'alert' | 'chat';
@@ -54,6 +55,30 @@
      */
     alertLabels?: readonly AlertLabel[];
     followedStyle?: FollowChatStyle;
+    /**
+     * This SENDER's presenter colours, looked up by the call site from the room's map.
+     *
+     * Per message and therefore not on `RoomMessageChrome`, for the same reason `followedStyle` is
+     * not: the MAP is the same for every message, the lookup is not. Both are looked up at the same
+     * three call sites, from the same `item.senderEmailHash`.
+     *
+     * `#lib/presenter-colors.ts` holds the reference transcription and the precedence table. In
+     * short: this beats the viewer's `chatStyle` and the message's own colours, and loses to
+     * `followedStyle`, which is the viewer's explicit decision about one particular person.
+     */
+    presenterStyle?: PresenterColors;
+    /**
+     * Whether the kebab menu is drawn at all. Default TRUE — every log draws it.
+     *
+     * FALSE has exactly one caller: the advanced-alert-search modal, and it is a recorded divergence
+     * rather than a preference. The reference renders `app-st-message` there with its full menu
+     * (byte 2,421,116) and binds ONE handler of its own, `copyTradeOnClick`. This room has no route
+     * from that modal to the message-action command — `ModalHost` is handed `onQaAction` and nothing
+     * else — so drawing the menu here would draw twelve entries that cannot act, which is the
+     * dead-control defect this repository spends most of its time removing. Drawing the row without
+     * a kebab is the honest half of the reference's behaviour; the other half is named in the audit.
+     */
+    showMenu?: boolean;
     chatStyle?: FollowChatStyle;
     allowDeleteOwnMessage?: boolean;
     usersPublicReply?: boolean;
@@ -123,6 +148,8 @@
     currentUserName = '',
     alertLabels = [],
     followedStyle,
+    presenterStyle,
+    showMenu = true,
     chatStyle,
     allowDeleteOwnMessage = false,
     usersPublicReply = false,
@@ -213,17 +240,54 @@
   const avatarRowClass = $derived(
     `d-flex ${reverseMessage ? 'flex-row-reverse ' : ''}justify-content-center align-items-start flex-nowrap mt-1`
   );
+  /*
+    ── THE PRESENTER'S COLOURS OVERRIDE THE MESSAGE'S OWN, and that is the whole of the wiring ─────
+
+    The reference applies them by overwriting the same three assignments `msg.bkgColor` /
+    `msg.fontColor` made, in the same `ngOnInit`, four lines later (bundle byte 1,346,945). So they
+    are plugged in HERE, at the two values those assignments produce, rather than as a fourth branch
+    in `effectiveStyle` — which is what makes the full precedence fall out with no new condition:
+    `followedStyle` still wins below, `chatStyle` still loses to a message that has a background,
+    and the presenter's pair now IS that background.
+
+    `evidenceKey` excludes it for the same reason it excludes `effectiveStyle`: a captured row
+    renders the DOM that was captured, and a presenter whose hash happens to match a captured
+    sender's must not repaint the evidence.
+
+    `presenter-colors.ts` carries the four-row precedence table and the one measured divergence
+    (font size, which a message with its own background has never taken here either).
+  */
+  const senderPresenterStyle = $derived(item.evidenceKey ? undefined : presenterStyle);
+  const messageBackgroundColor = $derived(senderPresenterStyle?.bgColor ?? item.backgroundColor);
+  const messageFontColor = $derived(senderPresenterStyle?.color ?? item.fontColor);
   const effectiveStyle = $derived(
     item.evidenceKey
       ? undefined
-      : (followedStyle ?? (kind === 'chat' && !item.backgroundColor ? chatStyle : undefined))
+      : (followedStyle ?? (kind === 'chat' && !messageBackgroundColor ? chatStyle : undefined))
   );
+  /*
+    THE BOX'S BACKGROUND, resolved once — and the reason it is one value is a defect it was hiding.
+
+    Two things are painted from it: the box itself, and the kebab's inversion below. They were two
+    separate expressions, and the second one read only `item.backgroundColor` — so whenever the box
+    took its background from `followedStyle` while the message ALSO carried one of its own, the
+    kebab inverted a colour that was not on screen anywhere. The comment beneath already said what
+    it should be (*"color: <box background>"*); the code did not, and nothing compared them.
+
+    Found on 2026-08-30 by the presenter-colour precedence test, which made the case common rather
+    than rare: a presenter's pair is set once and applies to every message they send, so "followed
+    user who is also a presenter with colours" is an ordinary state rather than a corner. Captured
+    rows are unaffected — they have no `effectiveStyle`, so this resolves to exactly what the old
+    expression did.
+  */
+  const resolvedBackgroundColor = $derived(effectiveStyle?.bgColor ?? messageBackgroundColor);
   const messageBoxStyle = $derived.by(() => {
     if (item.evidenceMessageBoxStyle !== undefined) {
       return item.evidenceMessageBoxStyle ?? undefined;
     }
-    const backgroundColor = effectiveStyle?.bgColor ?? item.backgroundColor;
-    return backgroundColor ? `background-color: ${backgroundColor};` : undefined;
+    return resolvedBackgroundColor
+      ? `background-color: ${resolvedBackgroundColor};`
+      : undefined;
   });
   // The only inline style the captured DOM ever puts on `.msgMenu` is this background inversion:
   // app-room/complete.html has 13 kebab anchors carrying `color: <box background>; filter:
@@ -232,7 +296,9 @@
   // size into that anchor shrank the kebab on newly posted messages while captured ones (which
   // have no effectiveStyle) stayed at 20px.
   const backgroundInversionStyle = $derived(
-    item.backgroundColor ? `color: ${item.backgroundColor}; filter: invert(1);` : undefined
+    resolvedBackgroundColor
+      ? `color: ${resolvedBackgroundColor}; filter: invert(1);`
+      : undefined
   );
   const invertedTextStyle = $derived(
     effectiveStyle
@@ -253,7 +319,7 @@
   });
   const bodyStyle = $derived.by(() => {
     if (item.evidenceBodyStyle !== undefined) return item.evidenceBodyStyle ?? undefined;
-    const color = effectiveStyle?.color ?? item.fontColor;
+    const color = effectiveStyle?.color ?? messageFontColor;
     const fontSize = effectiveStyle?.fontSize;
     return (
       [color ? `color: ${color};` : '', fontSize ? `font-size: ${fontSize}px;` : '']
@@ -269,12 +335,40 @@
     See `#lib/mention` for the reference's own three terms.
   */
   const isMention = $derived(isMentionOf(item.body, currentUserName, isAdminMessage));
+  /**
+   * RM-07 — `questionColor` applies on ALERTS too, and the `kind === 'chat'` gate here was ours.
+   *
+   * ```js
+   * Kn(13, Ew, e.msg.isMention && !e.hasCustomFollowedUserColors,
+   *          e.msg.txt.includes("?") && !e.hasCustomFollowedUserColors)   // byte 1,331,638
+   * const Ew = (t, n) => ({ mentionColor: t, questionColor: n })
+   * ```
+   *
+   * Two conditions and neither mentions the log type. The card's alert branch reads the same
+   * expression as its chat branch, so an alert containing a question mark is tinted upstream and
+   * was not here — which matters most on the surface where questions are the point, since an alert
+   * is what `hasQAOnAlerts` invites a question about.
+   */
   const isQuestion = $derived(
-    item.evidenceQuestion ??
-      (kind === 'chat' && item.body.includes('?') && followedStyle === undefined)
+    item.evidenceQuestion ?? (item.body.includes('?') && followedStyle === undefined)
+  );
+  /**
+   * RM-03 — the two colour classes the COMPACT body was missing.
+   *
+   * The same `Ew` map as the card's, applied by the compact member body `p_e` (byte 1,378,508), its
+   * reply body `f_e` (1,378,951) and the compact admin body. Ours carried only layout classes, so a
+   * member mentioned in compact mode got no highlight at all — and the mention colour is the one
+   * signal that says a message is addressed to you.
+   *
+   * A separate derived from `messageBodyClass` and not a shared suffix, because the two bodies have
+   * different layout classes and mirror on `reverseMessage`; the shared part is the CONDITIONS,
+   * which are these two expressions and are written once here.
+   */
+  const bodyColorClasses = $derived(
+    `${isMention && followedStyle === undefined ? ' mentionColor' : ''}${isQuestion ? ' questionColor' : ''}`
   );
   const messageBodyClass = $derived(
-    `msg-left text-formated preText ml-2 mr-2 p-0${isMention && followedStyle === undefined ? ' mentionColor' : ''}${isQuestion ? ' questionColor' : ''}${presenterMessagesOnTheRight ? ' presenter-msg-right' : ''}`
+    `msg-left text-formated preText ml-2 mr-2 p-0${bodyColorClasses}${presenterMessagesOnTheRight ? ' presenter-msg-right' : ''}`
   );
   const reactions = $derived(Object.entries(item.reactions ?? {}));
   const visibleBadges = $derived(
@@ -528,12 +622,23 @@
         inside the handler; a span is not focusable and not reachable by keyboard, so this carries
         the role and the key handler that make it a control. The class and the id are unchanged,
         because both are what the captured stylesheet and the captured handler select on.
+
+        RM-24 — `title="Copy order"` was OURS and is gone. The reference's span is
+        `'<span class="tradeColor" id="id_' + o._id + '">'` (byte 1,414,920) and carries no title, so
+        a member hovering an order in the original sees nothing. A tooltip nobody wrote is a
+        behaviour nobody can check against the capture.
+
+        `aria-label` takes its place rather than nothing at all, and the two are not the same thing:
+        `title` shows a tooltip to everyone, `aria-label` names the control for a screen reader and
+        is invisible. This span is `role="button"` — ours, because the capture puts a click handler
+        on a bare span — and a button whose only content is the order text needs a name that says
+        what activating it does.
       --><span
         class="tradeColor"
         id={segment.tradeId}
         role="button"
         tabindex="0"
-        title="Copy order"
+        aria-label="Copy this order"
         onclick={(event) => {
           event.stopPropagation();
           runAction('copy-trade', { text: segment.text });
@@ -575,14 +680,45 @@
 {/snippet}
 
 
-<app-st-message>
-  {#if showDateSeparator}
-    <div class="separator">
-      <!-- svelte-ignore a11y_missing_attribute -->
-      <a>{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}</a>
-    </div>
-  {/if}
-  {#if displayMode === 'c'}
+<!--
+  ONE separator, rendered by whichever host is on screen.
+
+  The reference has it in BOTH components — each `styles:[…]` block carries its own `.separator`
+  rule — so it must sit INSIDE a host or neither rule reaches it. A snippet is how that is one
+  implementation and two call sites rather than two copies:
+  `alert-chat-style-contract.test.ts` asserts there is exactly one, and it is right to.
+-->
+{#snippet dateSeparator()}
+  <div class="separator">
+    <!-- svelte-ignore a11y_missing_attribute -->
+    <a>{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}</a>
+  </div>
+{/snippet}
+
+<!--
+  ── TWO HOSTS, ONE PER MODE — RM-01 ─────────────────────────────────────────────────────────────
+
+  The reference has TWO COMPONENTS here, not one with a branch: `app-st-message` renders the card
+  and `app-st-compactmessage` renders the single line, each with its own `styles:[…]` block. The
+  feed picks between them (`y_e` renders `app-st-message`, its sibling `app-st-compactmessage`).
+
+  This rendered BOTH modes inside the CARD host, so the compact branch inherited its
+  stylesheet: 16px text where the compact component sets 14px, a 35px avatar where it sets 25px,
+  `font-weight: 900` on the username where it sets 800 — and `nowrap` and `reactions-container`,
+  which the compact markup already wore, had no rule anywhere in this repository.
+
+  Two hosts rather than one component per mode, deliberately. The branch reads two dozen values off
+  this component — every gate, every style, both formatters, the menu's allow-list — and a component
+  taking those as props would be two dozen props whose only purpose is to reach back here. That is
+  the trade `source-size-contract` records for the note editor's toolbar, made again: the SEAM the
+  reference draws is the host element and its stylesheet, and that is exactly what crosses.
+
+  `lib/styles/compact-message.css` carries the transcription and why it cannot come from the
+  generated sheet.
+-->
+{#if displayMode === 'c'}
+  <app-st-compactmessage>
+    {#if showDateSeparator}{@render dateSeparator()}{/if}
     <!--
       `app-st-compactmessage` — one line per message instead of a card.
 
@@ -603,25 +739,27 @@
             { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }
           ]}
         >
+          {#if showMenu}
           <MessageMenu
-            allows={menuAllows}
-            variant={reverseMessage ? 'compactAdmin' : 'compactMember'}
-            {menuOpen}
-            style={usernameStyle}
-            reactionPopoverId={reactionPickerOpen && reactionPickerTrigger === 'menu'
-              ? `message-reaction-popover-${kind}-${item.id}`
-              : undefined}
-            onaction={(action, event) => runAction(action, event)}
-            ontoggle={() => {
-              reactionPickerOpen = false;
-              reactionPickerTrigger = null;
-              ontoggle(item.id);
-            }}
-            onreactiontoggle={() => {
-              reactionPickerOpen = !reactionPickerOpen;
-              reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
-            }}
-          />
+              allows={menuAllows}
+              variant={reverseMessage ? 'compactAdmin' : 'compactMember'}
+              {menuOpen}
+              style={usernameStyle}
+              reactionPopoverId={reactionPickerOpen && reactionPickerTrigger === 'menu'
+                ? `message-reaction-popover-${kind}-${item.id}`
+                : undefined}
+              onaction={(action, event) => runAction(action, event)}
+              ontoggle={() => {
+                reactionPickerOpen = false;
+                reactionPickerTrigger = null;
+                ontoggle(item.id);
+              }}
+              onreactiontoggle={() => {
+                reactionPickerOpen = !reactionPickerOpen;
+                reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
+              }}
+            />
+          {/if}
           {#if !hideAvatar}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -647,21 +785,71 @@
             </strong>
           </span>
           <!--
-            THE STAMP IS BRACKETED HERE and it is not in the regular renderer: ` [{h:mm a}] `
-            against the card's bare `hh:mm a`. Both are the capture's own — `Ct(29,27,e.msg.t,
-            "h:mm a")` wrapped in the literal brackets, versus `"hh:mm a"` unbracketed on the card —
-            so the two formats differ by a leading zero as well as by the brackets.
+            ── TWO STAMPS, ONE PER LOG — RM-02 ──────────────────────────────────────────────────
+
+            The compact member row branches on the log before it renders a time:
+            `O(26, "alerts" === e.logType ? 26 : 27)` in `b_e` at byte 1,380,680.
+
+            `r_e` (1,377,512) is the ALERTS row — `Ct(3, 3, e.msg.t, "short")` in a
+            `[1,"created-at","mr-2",3,"ngStyle"]` span, then the `alert-qa` button gated
+            `!isQAMsg && hasQAOnAlerts`. `a_e` (1,377,804) is the chat row, and that is the
+            bracketed one.
+
+            **This rendered the bracketed chat time for every kind**, so an alerts log switched to
+            compact mode lost the Q&A entry point entirely — no way to ask a question, and no
+            `btn-danger animated flash` marker saying one was waiting. The date was wrong too: a
+            bracketed `h:mm a` where the reference gives Angular's `short`, which is
+            `M/d/yy, h:mm a` and is what `alertDateFormatter` already produces for the card.
+
+            The button is the card's, verbatim, down to the literal spaces inside each span —
+            const 69 `["title","Ask a question",1,"btn","btn-sm","btn-secondary","me-1","alert-qa",
+            3,"click","ngClass","ngStyle"]` is the same const the card branch uses.
           -->
-          <span
-            {...{ placement: 'top' } as Record<string, string>}
-            {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
-            class={reverseMessage
-              ? 'created-at ml-1 nowrap d-inline-block float-right align-baseline'
-              : 'created-at d-inline-block align-baseline'}
-            style={dateStyle}
-          >
-            [{item.evidenceTimestampText ?? compactTimeFormatter.format(item.createdAt)}]
-          </span>
+          {#if kind === 'alert'}
+            <span>
+              <span class="created-at mr-2" style={dateStyle}
+                >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
+              >
+              {#if !isQaMessage && hasQaOnAlerts}
+                <button
+                  title="Ask a question"
+                  class={[
+                    'btn btn-sm btn-secondary me-1 alert-qa',
+                    {
+                      'btn-danger': Boolean(item.unreadQa),
+                      animated: Boolean(item.unreadQa),
+                      flash: Boolean(item.unreadQa)
+                    }
+                  ]}
+                  style={bodyStyle}
+                  onclick={() => runAction('question')}
+                >
+                  {#if item.questionCount}
+                    <span class="me-1">{' '}({item.questionCount}){' '}</span>
+                  {/if}
+                  <i class="fas fa-question-circle"></i>
+                  {#if item.questionAnswered}<span>{' '}✅</span>{/if}
+                </button>
+              {/if}
+            </span>
+          {:else}
+            <!--
+              THE STAMP IS BRACKETED HERE and it is not in the regular renderer: ` [{h:mm a}] `
+              against the card's bare `hh:mm a`. Both are the capture's own — `Ct(29,27,e.msg.t,
+              "h:mm a")` wrapped in the literal brackets, versus `"hh:mm a"` unbracketed on the card
+              — so the two formats differ by a leading zero as well as by the brackets.
+            -->
+            <span
+              {...{ placement: 'top' } as Record<string, string>}
+              {@attach ngbTooltipWith(alertDateFormatter.format(item.createdAt))}
+              class={reverseMessage
+                ? 'created-at ml-1 nowrap d-inline-block float-right align-baseline'
+                : 'created-at d-inline-block align-baseline'}
+              style={dateStyle}
+            >
+              [{item.evidenceTimestampText ?? compactTimeFormatter.format(item.createdAt)}]
+            </span>
+          {/if}
           {#if visibleBadges.length > 0}
             <div
               class={reverseMessage
@@ -702,8 +890,17 @@
               ? 'd-inline-flex msg-left preText ml-2 float-right align-baseline'
               : 'd-inline-flex msg-left preText align-baseline'}
           >
+            <!--
+              RM-14 — `function Age(t,n){1&t&&(d(0,"div",27),v(1,"\u2705"),u())}` at byte 1,331,360,
+              with const 27 `[1,"ms-1","private-reply"]`.
+
+              `answered-check` was OURS and it carried no CSS anywhere in this repository — a class
+              with no rule, which is the defect `CLAUDE.md` names by that description. The reference
+              reuses the reply wrapper's own classes for the tick, which reads oddly and is what it
+              does: `ms-1` is the gap and `private-reply` the inherited type treatment.
+            -->
             {#if item.answered && kind !== 'alert'}
-              <div class="answered-check">✅</div>
+              <div class="ms-1 private-reply">✅</div>
             {/if}
             {#if item.replyToBody}
               <div class="ms-1 private-reply">
@@ -713,9 +910,9 @@
               </div>
             {:else}
               <div
-                class={reverseMessage
+                class={(reverseMessage
                   ? 'msg-left preText ml-2 d-inline-block float-right align-baseline'
-                  : 'msg-left preText d-inline-block align-baseline'}
+                  : 'msg-left preText d-inline-block align-baseline') + bodyColorClasses}
                 style={bodyStyle}
               >
                 {@render bodySegments(stockSegments)}
@@ -737,17 +934,53 @@
                   </span>
                 {/if}
               {/each}
+              <!--
+                RM-04 — the add-reaction pill, `g_e` at byte 1,380,270.
+
+                ```js
+                O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)
+                function g_e(t,n){ … d(0,"span",52), x("click", () => addReaction()), T(1,"i",37) … }
+                ```
+
+                Both compact reaction containers — `__e` (member, 1,380,430) and `$1e` (admin,
+                1,371,909) — end with it. Ours rendered existing pills only, so in compact mode a
+                reaction could be added ONLY through the kebab menu, and the kebab is the one control
+                a member is least likely to open to do something the card offers in one click.
+
+                The gate is upstream's and is not the card's: chat always, alerts only when the row
+                is a Q&A message. `menuAllows.reaction` is this room's own answer to the same
+                question and already gates the strip, so the two compose rather than duplicate.
+              -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              {#if kind === 'chat' || (kind === 'alert' && isQaMessage)}
+                <span
+                  class="badge chat-reaction"
+                  aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
+                    ? `message-reaction-popover-${kind}-${item.id}`
+                    : undefined}
+                  onclick={() => {
+                    reactionPickerOpen = !reactionPickerOpen;
+                    reactionPickerTrigger = reactionPickerOpen ? 'pill' : null;
+                  }}
+                >
+                  <i class="far fa-smile"></i>
+                </span>
+              {/if}
             </span>
           {/if}
         </div>
       </div>
     </div>
-  {:else}
-
+  </app-st-compactmessage>
+{:else}
+  <app-st-message>
+    {#if showDateSeparator}{@render dateSeparator()}{/if}
     <div class={messageBoxClass} style={messageBoxStyle}>
       <div {...{ clas: 'd-flex flex-column  align-items-center w-100 ' } as Record<string, string>}>
         <div class={messageRowClass}>
           <div class={avatarRowClass}>
+            {#if showMenu}
             <MessageMenu
               allows={menuAllows}
               variant="regular"
@@ -767,6 +1000,7 @@
                 reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
               }}
             />
+            {/if}
             {#if !hideAvatar}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -978,8 +1212,26 @@
                 {/each}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!--
+                  RM-13 — `chat-reaction-hover` was OURS on this pill, and it made the control
+                  unreachable on a touch device.
+
+                  The class is REAL and captured — `.msg-box:hover .chat-reaction-hover{display:
+                  inline-block}` with `.chat-reaction-hover{display:none}` at byte 1,366,420 — but
+                  **no reference template applies it**. A rule with no wearer upstream is a rule
+                  upstream does not use, and reading one as an instruction is how a stylesheet
+                  becomes a spec.
+
+                  What it cost: the pill sat at `display: none` until the enclosing `.msg-box` was
+                  hovered. There is no hover on a phone, so adding a reaction was impossible there —
+                  the reference's pill is always visible, which is why it needs no such rule.
+
+                  The captured rule STAYS in `captured-runtime-components.css`. That file is
+                  evidence, not our stylesheet, and deleting a captured rule because we stopped
+                  wearing it would edit the record.
+                -->
                 <span
-                  class="badge chat-reaction chat-reaction-hover"
+                  class="badge chat-reaction"
                   aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
                     ? `message-reaction-popover-${kind}-${item.id}`
                     : undefined}
@@ -996,12 +1248,20 @@
         </div>
       </div>
     </div>
-  {/if}
-  {#if reactionPickerOpen}
-    <EmojiPicker
-      popoverId={`message-reaction-popover-${kind}-${item.id}`}
-      onselect={() => {}}
-      onentry={chooseReaction}
-    />
-  {/if}
-</app-st-message>
+  </app-st-message>
+{/if}
+<!--
+  The reaction picker sits OUTSIDE both hosts, and it did not before.
+
+  It is a popover: `ngbPopover` renders into `container: "body"` upstream, and this one is portalled
+  by `EmojiPicker` itself. Keeping it inside whichever host is rendering would mean writing it twice
+  — once per branch — for an element that belongs to neither, and a duplicated popover is two
+  popovers with one id.
+-->
+{#if reactionPickerOpen}
+  <EmojiPicker
+    popoverId={`message-reaction-popover-${kind}-${item.id}`}
+    onselect={() => {}}
+    onentry={chooseReaction}
+  />
+{/if}

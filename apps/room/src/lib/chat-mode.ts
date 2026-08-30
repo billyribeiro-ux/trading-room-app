@@ -66,9 +66,25 @@ export function isChatMode(value: string): value is ChatMode {
  * what a mode means is the one that should own what it is called.
  */
 export function chatModeConfirmPrompt(mode: ChatMode): string {
-  const label = mode === 'p' ? '"Webinar Mode"?' : mode === 'd' ? '"Disabled"?' : '"Group Chat"?';
-  return `Are you sure you want to change the chat mode to ${label}`;
+  return `Are you sure you want to change the chat mode to "${CHAT_MODE_LABELS[mode]}"?`;
 }
+
+/**
+ * The three modes by their NAMES, which is the only form a person ever reads.
+ *
+ * Lifted out of {@link chatModeConfirmPrompt} when the Session History pane arrived: `g` in a
+ * presenter's history says nothing, and a second ternary spelling the same three names would be a
+ * second place for them to drift. The confirm prompt's own quotes and trailing `?` stay with the
+ * SENTENCE — they belong to that sentence and not to the label, which is what the history entry
+ * proves by needing the label without them.
+ *
+ * The words are the capture's, from the same three lines the prompt is transcribed from.
+ */
+export const CHAT_MODE_LABELS: Readonly<Record<ChatMode, string>> = {
+  g: 'Group Chat',
+  p: 'Webinar Mode',
+  d: 'Disabled'
+};
 
 /** `this.chatEnabled = 'd' != e` — the ROOM's rule, and the first of three. */
 export function chatComposerEnabled(mode: ChatMode): boolean {

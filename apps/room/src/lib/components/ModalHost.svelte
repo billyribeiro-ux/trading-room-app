@@ -32,12 +32,24 @@
     MessageReactions,
     ModalName,
     ModalTargetUser,
+    RoomMessageItem,
     SavedPoll,
     SettingsTab,
     Theme,
     TradeCopyPayload
   } from '#lib/types.js';
+  import type { AlertLabel } from '#lib/alert-labels.js';
+  import RoomMessage from '#lib/components/RoomMessage.svelte';
+  import { mediumDateFormatter, sameCalendarDay } from '#lib/message-formatters.js';
+  import type { SessionHistoryEntry } from '#lib/server/session-history.js';
+  import { getSessionHistory } from '../../routes/session-history.remote';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import {
+    PRESENTER_COLOR_DEFAULTS,
+    seedPresenterColors,
+    type PresenterColorMap
+  } from '#lib/presenter-colors.js';
+  import { clearPresenterColors, savePresenterColors } from '../../routes/presenter-colors.remote';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import type { MessageBadge } from '#lib/types.js';
   import AlertQaModal from './AlertQaModal.svelte';
@@ -101,6 +113,14 @@
     stickyNonTradeAlert?: boolean;
     /** `sessData.hasAlertScheduler`, forwarded to the composer — see `PostAlertModal`'s own prop. */
     schedulerAvailable?: boolean;
+    /**
+     * The room's configured Alert Labels, forwarded to the composer's picker (`PAM-01`).
+     *
+     * Parsed ONCE on the page (`gates.alertLabels`) — `parseAlertLabels` runs `JSON.parse`, and the
+     * alerts log already needs the same table to render the badges. Two parses of one setting is how
+     * a picker offers a label the renderer does not know.
+     */
+    alertLabels?: readonly AlertLabel[];
     theme: Theme;
     roomSplitDir: 'ltr' | 'ttb' | 'rtl' | 'btt';
     sessionControlInitialTab:
@@ -189,6 +209,15 @@
      * question stays text.
      */
     messageChrome: RoomMessageChrome;
+    /**
+     * Every presenter's message colours for this room, keyed by the sender's email hash.
+     *
+     * Two consumers here, and they are different halves of the same feature: the Q&A thread renders
+     * messages and needs the map to look each sender up, and the settings modal's two colour
+     * pickers open on THIS presenter's entry — `messageChrome.currentUserEmailHash` — rather than
+     * on a constant, which is what they did until 2026-08-30. `presenter-colors.ts` holds the rest.
+     */
+    presenterColors: PresenterColorMap;
     /**
      * The two display modes the settings modal's Text Mode radios show and set.
      *
@@ -456,6 +485,7 @@
     alertTab,
     stickyNonTradeAlert = false,
     schedulerAvailable = false,
+    alertLabels = [],
     theme,
     roomSplitDir,
     sessionControlInitialTab,
@@ -495,6 +525,7 @@
     onQuestionSend,
     alertQuestions = [],
     messageChrome,
+    presenterColors,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -568,6 +599,52 @@
    */
   let advancedSearch = $state(emptySearch());
   let advancedSearchResults = $state.raw<SearchableAlert[]>([]);
+
+  /**
+   * One search hit, in the shape `RoomMessage` renders.
+   *
+   * `searchAlertLog` already selects every field this needs — it joins `users` for the name, avatar,
+   * role and status and hashes the address — so nothing is invented here and nothing is fetched
+   * again. The cast is a WIDENING at the type level only: `SearchableAlert` is deliberately the
+   * narrow shape the pure filter needs (`alerts-advanced-search.ts` says so), and the rows this
+   * modal actually holds are the wide ones the remote query returned.
+   *
+   * `reactions` are passed through because the row carries them and the log renders them; nothing
+   * here can toggle one, which is what `showMenu={false}` and the refusing action handler below
+   * make true rather than merely unlikely.
+   */
+  const searchResultItem = (result: SearchableAlert): RoomMessageItem => {
+    const row = result as SearchableAlert & Partial<RoomMessageItem>;
+    return {
+      ...row,
+      id: row.id,
+      senderId: row.senderId ?? 0,
+      senderName: row.senderName ?? '',
+      senderEmailHash: row.senderEmailHash,
+      senderAvatarUrl: row.senderAvatarUrl ?? '',
+      body: row.body,
+      createdAt: new Date(result.createdAt)
+    };
+  };
+
+  /**
+   * The ONE thing a search result can do — `copyTradeOnClick`, the reference's own extra binding.
+   *
+   * Everything else is refused rather than forwarded, and the refusal is silent because nothing can
+   * reach it: the kebab is not drawn (`showMenu={false}`), so `copy-trade` is the only action the
+   * row emits. The `if` is here so that a later change which draws more controls fails closed
+   * instead of quietly routing a delete through this modal.
+   */
+  function runSearchResultAction(
+    action: MessageAction,
+    _item: RoomMessageItem,
+    payload?: unknown
+  ): void {
+    if (action !== 'copy-trade') return;
+    const text = (payload as { text?: string } | undefined)?.text ?? '';
+    if (!text || typeof navigator === 'undefined') return;
+    void navigator.clipboard.writeText(text);
+  }
   let advancedSearchLoading = $state(false);
   /* The search reached `ALERT_SEARCH_LIMIT`, so the list is the newest matches and not all of them.
      Rendered, because a cap the reader cannot see is the defect this change removed. */
@@ -742,7 +819,6 @@
   */
   const groupChatMode = $derived(chatMode);
   const fileUploadInputId = 'fupload';
-  let streamPlayerEnabled = $state(false);
   /*
     Seeded from the saved preference, then owned locally.
 
@@ -784,6 +860,42 @@
       ? rtmpIngestUrl(ingest.streamServerMTX, ingest.ingestPath, ingest.rtmpToken)
       : ''
   );
+  /*
+    The Session History pane's three pieces of state — `SC-01`.
+
+    `$state.raw` on the list: it is replaced wholesale by every fetch and never mutated, so a deep
+    proxy over it would be overhead on every row rendered.
+
+    NOT loaded when the modal opens. Upstream's empty branch draws a `Load History` button, which
+    only makes sense if the pane starts empty — the presenter asks. A fetch on open would make that
+    button unreachable and would query on every open of a modal whose other six tabs are the common
+    ones.
+  */
+  let sessionHistoryEntries = $state.raw<SessionHistoryEntry[]>([]);
+  let sessionHistoryLoading = $state(false);
+  let sessionHistoryError = $state<string | null>(null);
+
+  /**
+   * `fetchSessionHistory()` — byte 1,145,917, and both buttons call it.
+   *
+   * Upstream has no failure path at all: `i && i.data && (globals.sessionHistory = i.data)` leaves
+   * the pane exactly as it was when the call fails, so a presenter clicking Refresh on a broken
+   * connection sees nothing happen. Shown here instead, for the reason every refusal in this file is
+   * shown: silence is indistinguishable from success.
+   */
+  async function loadSessionHistory() {
+    if (sessionHistoryLoading) return;
+    sessionHistoryLoading = true;
+    sessionHistoryError = null;
+    try {
+      sessionHistoryEntries = await getSessionHistory();
+    } catch (cause) {
+      sessionHistoryError = refusalMessage(cause, 'Could not load the session history.');
+    } finally {
+      sessionHistoryLoading = false;
+    }
+  }
+
   let reportLoading = $state(true);
   /*
     ── THE TWO TEXT-MODE RADIOS WERE DEAD, and this is the third control of that exact shape ────────
@@ -801,8 +913,24 @@
     which the owner's `altChatRender` can force — and a change is reported back up rather than kept
     here, because the logs that render it are not inside this component.
   */
-  let presenterTextColor = $state('#f7fd37');
-  let presenterBackgroundColor = $state('#000000');
+  /*
+    ── THE PRESENTER'S TWO COLOUR PICKERS, and what they used to be ────────────────────────────────
+
+    They were seeded from these two CONSTANTS and their Save button wrote
+    `onPreferenceChange('presenterStyle', …)` — a key in this presenter's own settings blob that
+    nothing read, in a store no other viewer can see — under a heading reading *"These colors will
+    affect how ALL USERS see your messages and alerts"*. All three claims in that sentence were
+    false at once, and reopening the modal showed these constants whatever had been picked.
+
+    They are seeded from the room's stored map now (the effect below, on modal open, which is where
+    the reference seeds them too) and both buttons send a real command. `presenter-colors.ts` holds
+    the transcription, `presenter-colors.remote.ts` the write.
+
+    Plain `$state` strings rather than an object, because `bind:value` on `<input type="color">`
+    writes them individually — the same reason `chatStyle` below is `$state` and not `$state.raw`.
+  */
+  let presenterTextColor = $state(PRESENTER_COLOR_DEFAULTS.dark.color);
+  let presenterBackgroundColor = $state(PRESENTER_COLOR_DEFAULTS.dark.bgColor);
   let chatStyle = $state<FollowChatStyle>({
     color: '#f7fd37',
     tickerColor: '#f7fd37',
@@ -2069,6 +2197,50 @@
     onPreferenceChange('chatStyle', { ...chatStyle });
   }
 
+  /**
+   * Whatever the presenter's colour Save or Reset came back with, shown rather than swallowed.
+   *
+   * The same `bootbox.alert` shape `micScreenAlert` uses. A colour write that is refused — a role
+   * lost between opening the modal and pressing Save, most plausibly — has to say so, because the
+   * pickers keep showing the chosen colour either way and silence would read as success.
+   */
+  let presenterColorAlert = $state<string | null>(null);
+
+  /**
+   * Save — the reference's `savePresenterStyle()`, byte 2,243,496.
+   *
+   * The key it sends is deliberately absent from ours; `presenter-colors.remote.ts` explains why at
+   * length. The page re-reads the row when the broadcast comes back, so nothing is assigned here on
+   * success: the two pickers already hold what was sent, and the LOG is repainted by the load.
+   */
+  async function savePresenterStyle() {
+    try {
+      await savePresenterColors({ color: presenterTextColor, bgColor: presenterBackgroundColor });
+    } catch (cause) {
+      presenterColorAlert = refusalMessage(cause, 'Those colors were not saved.');
+    }
+  }
+
+  /**
+   * Reset — the reference's `resetPresenterStyle()`, byte 2,243,637, which is a SEND and not a
+   * local revert.
+   *
+   * Upstream sends the empty pair and restores the pickers to `globals.presenterStyle[theme]`; ours
+   * deletes the row and restores the same theme default. Until 2026-08-30 this button assigned two
+   * constants and sent nothing, so a presenter who had saved colours could not un-save them.
+   */
+  async function resetPresenterStyle() {
+    const defaults = PRESENTER_COLOR_DEFAULTS[theme];
+    try {
+      await clearPresenterColors();
+    } catch (cause) {
+      presenterColorAlert = refusalMessage(cause, 'Those colors were not cleared.');
+      return;
+    }
+    presenterTextColor = defaults.color;
+    presenterBackgroundColor = defaults.bgColor;
+  }
+
   $effect(() => {
     if (name !== 'user') return;
     userInfoTab = 'info';
@@ -2089,6 +2261,18 @@
   $effect(() => {
     if (name !== 'settings') return;
     chatStyle = { ...initialChatStyle };
+    /*
+      The presenter's own pair, from the room's map, or the theme default — the reference's seed at
+      bundle byte 2,241,150. In THIS effect rather than one of its own so that the settings modal
+      still has exactly one open-time seeding effect; `effect-not-derived-contract.test.ts` counts
+      them, and two effects keyed on the same `name` would be two answers to one question.
+
+      It reads `theme` as well, so switching theme while the modal is open re-seeds — which is what
+      the reference's `switchTheme` does at byte 2,254,236, verbatim the same four lines.
+    */
+    const seed = seedPresenterColors(presenterColors, messageChrome.currentUserEmailHash, theme);
+    presenterTextColor = seed.color;
+    presenterBackgroundColor = seed.bgColor;
   });
 
   $effect(() => {
@@ -2916,6 +3100,13 @@
   <!-- `bootbox.alert(...)` in the capture, both for the refusal and the confirmation. -->
   {#if micScreenAlert}
     <BootboxDialog mode="alert" message={micScreenAlert} onclose={() => (micScreenAlert = null)} />
+  {/if}
+  {#if presenterColorAlert}
+    <BootboxDialog
+      mode="alert"
+      message={presenterColorAlert}
+      onclose={() => (presenterColorAlert = null)}
+    />
   {/if}
 </app-play-youtube-modal>
 <app-user-settings-modal>
@@ -3927,22 +4118,11 @@
             </div>
           </div>
           <div class="text-right">
-            <button
-              type="button"
-              class="btn btn-outline-danger mx-1"
-              onclick={() => {
-                presenterTextColor = '#f7fd37';
-                presenterBackgroundColor = '#000000';
-              }}>Reset</button
+            <button type="button" class="btn btn-outline-danger mx-1" onclick={resetPresenterStyle}
+              >Reset</button
             >
-            <button
-              type="button"
-              class="btn btn-outline-light"
-              onclick={() =>
-                onPreferenceChange('presenterStyle', {
-                  color: presenterTextColor,
-                  bkgColor: presenterBackgroundColor
-                })}>Save changes</button
+            <button type="button" class="btn btn-outline-light" onclick={savePresenterStyle}
+              >Save changes</button
             >
           </div>
         </div>
@@ -4148,6 +4328,7 @@
     onpastepost={onPastePostAlert}
     {stickyNonTradeAlert}
     {schedulerAvailable}
+    {alertLabels}
   />
 </app-post-alert-modal>
 <app-poll-modal id="pollModalCompHolder" class="pollModalHolder" bind:this={pollPanelHost}>
@@ -4440,27 +4621,50 @@
             </p>
             <p>
               Stream Player enabled:
-              <span style:color={streamPlayerEnabled ? 'green' : 'red'}>{streamPlayerEnabled}</span>
+              <span style:color="red">false</span>
             </p>
+            <!--
+              ── THESE TWO BUTTONS ARE INERT, AND SAYING SO IS THE FIX ────────────────────────────
+
+              They used to flip a local `streamPlayerEnabled` and write
+              `onPreferenceChange('streamingPlayerEnabled', true | false)` — a key in THIS
+              presenter's own settings blob, read by nothing anywhere in the repository. A
+              room-level presenter act modelled as a per-user preference, which is the same defect
+              `chat-mode.ts` and `presenter-colors.ts` each record; the label went green and
+              nothing else in the world changed.
+
+              Wiring them was measured and REFUSED rather than attempted, because what the
+              reference does cannot be reproduced from anything held here:
+
+                getPlayerLink() { let i = yield invokeAdminCmd("streamStatus");
+                                  this.streamingPlayerEnabled = i.rc.enablePlayer;
+                                  this.streamingLinkPlayer = i.rc.playerURL }   (byte 2,170,505)
+
+              `playerURL` arrives FROM THE SERVER. The client composes nothing, and that server is
+              not in the capture. So the feature is a public, unauthenticated page that renders one
+              room's screenshares to whoever holds a link — which needs an anonymous media grant,
+              and minting one is an authorization decision this repository's own standard forbids
+              inventing: every authority decision is made on the server from data the server owns,
+              and there is no such data here yet.
+
+              Disabled with the reason on screen, rather than removed: the reference draws this
+              pane, and a presenter who has been told the tool is unavailable is better served than
+              one who cannot find where it went. The blocker is recorded in `TODO.md` and against
+              `SC-04` / `SC-05` in the surface audit. `streamingPlayerEnabled` joins
+              `dead-preference-keys.ts` so the copies already written are pruned.
+            -->
             <div class="mt-4">
-              <button
-                class="btn btn-outline-primary btn-sm m-1"
-                onclick={() => {
-                  streamPlayerEnabled = true;
-                  onPreferenceChange('streamingPlayerEnabled', true);
-                }}
-              >
+              <button class="btn btn-outline-primary btn-sm m-1" disabled>
                 <i class="fas fa-desktop"></i> Enable Stream Player
               </button>
-              <button
-                class="btn btn-outline-danger btn-sm m-1"
-                onclick={() => {
-                  streamPlayerEnabled = false;
-                  onPreferenceChange('streamingPlayerEnabled', false);
-                }}
-              >
+              <button class="btn btn-outline-danger btn-sm m-1" disabled>
                 <i class="fas fa-stop"></i> Disable Stream Player
               </button>
+            </div>
+            <div class="alert alert-info m-2">
+              The stream player is not available in this deployment: it needs a public playback
+              page, and there is no server here that issues one. The buttons above are shown because
+              the tool exists upstream, and are disabled because pressing them would change nothing.
             </div>
           </div>
           <div
@@ -4704,10 +4908,77 @@
           }
         ]}
       >
-        <div class="p-4 text-center">No session history.</div>
-        <div class="p-4 text-center">
-          <button class="btn btn-primary"><i class="fas fa fa-sync"></i> Load History </button>
-        </div>
+        <!--
+          ── THE BUTTON HAD NO HANDLER AT ALL ─────────────────────────────────────────────────────
+
+          Not a handler that did nothing — no `onclick`. `No session history.` was rendered
+          unconditionally above it, so the pane said the same thing whatever the room had done.
+          `SC-01`, and the exact shape `CLAUDE.md` names: a control whose only effect is nothing.
+
+          Both of upstream's branches now, decoded with `app-session-control-modal`'s own consts
+          table (119 = `[1,"list-group","text-dark"]`, 120 = `[1,"p-4","text-center"]`,
+          121 = the `btn btn-primary`, 122 = `[1,"fas","fa","fa-sync"]`, 123 = the list-group item,
+          124 = `[1,"d-flex","w-100","justify-content-between"]`, 125 = `[1,"mb-1"]`):
+
+            EDe (empty)  "No session history." + a `Load History` button
+            DDe (loaded) a `Refresh` button, then one `<a>` per entry: `<h5>` eventName,
+                         `<small>` created through `date:'medium'`, `<p>` eventValue
+
+          The `<a>` carries no `href` upstream and none here: it is a styled row, not a link, which
+          is why it has no click of its own either. `aria-current="true"` is the capture's, on every
+          row rather than on one — reproduced rather than corrected, because these strings are what a
+          DOM diff compares.
+
+          `mediumDateFormatter` already existed for the Files pane's uploaded-at column; Angular's
+          `date:'medium'` is one format and this room resolves it in one place.
+        -->
+        {#if sessionHistoryError}
+          <div class="alert alert-danger m-4">{sessionHistoryError}</div>
+        {/if}
+        {#if sessionHistoryEntries.length === 0}
+          <div class="p-4 text-center">No session history.</div>
+          <div class="p-4 text-center">
+            <button type="button" class="btn btn-primary" onclick={loadSessionHistory}
+              ><i class="fas fa fa-sync"></i>
+              {sessionHistoryLoading ? 'Loading…' : 'Load History'}
+            </button>
+          </div>
+        {:else}
+          <div class="list-group text-dark">
+            <div class="p-4 text-center">
+              <button type="button" class="btn btn-primary" onclick={loadSessionHistory}
+                ><i class="fas fa fa-sync"></i>
+                {sessionHistoryLoading ? 'Loading…' : 'Refresh'}
+              </button>
+            </div>
+            {#each sessionHistoryEntries as entry (entry.id)}
+              <!--
+                `<a>` with no `href`, which is the capture's own element and is why the warning is
+                suppressed rather than fixed. The three alternatives are all worse:
+
+                  a `<div>`   changes the rendered DOM these class strings are diffed against, for
+                              no behavioural gain — the element is inert upstream too;
+                  an `href`   invents a link that goes nowhere, which is the defect this repository
+                              removes rather than adds;
+                  a `<button>` announces an action to a screen reader that does not exist.
+
+                `list-group-item-action` is Bootstrap's hover/focus styling and the capture applies
+                it here despite there being no action. Reproduced with the rest of the string.
+              -->
+              <!-- svelte-ignore a11y_missing_attribute -->
+              <a
+                aria-current="true"
+                class="list-group-item list-group-item-action border-bottom border-top border-dark"
+              >
+                <div class="d-flex w-100 justify-content-between">
+                  <h5 class="mb-1">{entry.eventName}</h5>
+                  <small>{mediumDateFormatter.format(new Date(entry.created))}</small>
+                </div>
+                <p class="mb-1">{entry.eventValue}</p>
+              </a>
+            {/each}
+          </div>
+        {/if}
       </div>
       <div
         id="webinar-tools"
@@ -4885,6 +5156,7 @@
   {targetMessage}
   {alertQuestions}
   {messageChrome}
+  {presenterColors}
   displayMode={alertsDisplayMode}
   {isPresenter}
   {onclose}
@@ -5434,9 +5706,49 @@
               ones.
             </p>
           {/if}
+          <!--
+            ── THE RESULTS ARE MESSAGES, and until 2026-08-30 they were escaped plain text ──────────
+
+            This was `<p>{result.body}</p>`: no sender, no timestamp, no day separator, no session
+            name, no alert-label badge, and — the part `SRCH-01` names — no trade highlighting and no
+            click-to-copy, so an order found by searching could not be copied from the place it was
+            found.
+
+            The reference renders the same component the alerts log does, `app-st-message`, byte
+            2,421,116:
+
+              d(0, "app-st-message", 46), x("click", o => copyTradeOnClick(o, "id_" + s._id)),
+              z("msg", e)("logType", "alerts")("prevD", i > 0 ? msgs[i-1].t : 0)
+               ("sessName", e?.sessName || null)
+
+            `prevD` is the previous row's timestamp, which is what draws the day separator — so the
+            separator is computed here exactly as `AlertChatArea` computes it, from the row before.
+
+            ## `showMenu={false}` is a DIVERGENCE and is recorded as one
+
+            Upstream's row carries its full kebab. This room has no route from this modal to the
+            message-action command — `ModalHost` is handed `onQaAction` and nothing else — so drawing
+            twelve entries that cannot act would be the dead-control defect this repository exists to
+            remove. The one binding the reference adds ON TOP of the component, `copyTradeOnClick`,
+            IS wired: it is the only action a search result can take here, and it is the one the
+            audit says was lost.
+          -->
           <div class="log-messages">
-            {#each advancedSearchResults as result (result.id)}
-              <p>{result.body}</p>
+            {#each advancedSearchResults as result, index (result.id)}
+              <RoomMessage
+                item={searchResultItem(result)}
+                kind="alert"
+                {...messageChrome}
+                showMenu={false}
+                menuOpen={false}
+                showDateSeparator={index === 0 ||
+                  !sameCalendarDay(
+                    new Date(result.createdAt),
+                    new Date(advancedSearchResults[index - 1].createdAt)
+                  )}
+                ontoggle={() => {}}
+                onaction={runSearchResultAction}
+              />
             {/each}
           </div>
         {:else}

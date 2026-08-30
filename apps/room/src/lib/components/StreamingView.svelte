@@ -34,12 +34,17 @@
     streamServerMTX: string;
     /** `globals.mtxToken`. The viewer's read credential, spent as `?jwt=` on the playlist. */
     mtxToken: string;
-    /** Gates the user-id overlay: upstream shows it to NON-presenters only. */
-    isPresenter: boolean;
-    /** `sessData.overlayUserIdOnScreenshare` — the room half of that same gate. */
-    overlayUserIdOnScreenshare: boolean;
-    /** `globals.user.userXrefID` — what the overlay actually prints. */
-    userXrefID: string;
+    /**
+     * The anti-leak watermark's text, or `null` for none — `#lib/user-id-watermark.ts`.
+     *
+     * ONE prop where there were two (`overlayUserIdOnScreenshare` and `userXrefID`), and the reason
+     * is the defect that arrived with the second consumer. `ScreenPane` renders the other video this
+     * setting is supposed to cover and had neither prop nor gate, so a room with the setting on was
+     * watermarking a restreamed feed and not the screenshare the setting is named for. A gate spelled
+     * out at each call site is a gate one of them will stop having; the answer arrives already
+     * decided now, which is the same rule every other authority value in this component follows.
+     */
+    userIdWatermark: string | null;
     /** `globals.audioVolume`, 0-1. */
     audioVolume: number;
     /** `preferences.doNotDisturbOn` — mutes on attach without changing the stored volume. */
@@ -68,9 +73,7 @@
     muser,
     streamServerMTX,
     mtxToken,
-    isPresenter,
-    overlayUserIdOnScreenshare,
-    userXrefID,
+    userIdWatermark,
     audioVolume,
     doNotDisturbOn,
     bufferSizeLevel = 3,
@@ -391,9 +394,13 @@
     ondblclick={toggleFullscreen}
   ></video>
 
-  <!-- `TCe` — shown to NON-presenters only, and only when the room setting is on. -->
-  {#if !isPresenter && overlayUserIdOnScreenshare}
-    <span class="overlay-userID-container"> {userXrefID} </span>
+  <!--
+    `TCe` — shown to NON-presenters only, and only when the room setting is on. Both terms, and the
+    empty-id case, are `#lib/user-id-watermark.ts` now; `ScreenPane` renders the same span from the
+    same answer.
+  -->
+  {#if userIdWatermark}
+    <span class="overlay-userID-container"> {userIdWatermark} </span>
   {/if}
 
   <div class="controls-container">

@@ -157,7 +157,13 @@ describe('the command', () => {
       added there and silently refused here.
     */
     expect(commandCode).toContain('command(z.enum(CHAT_MODES), async (mode)');
-    expect(commandCode).toContain("import { CHAT_MODES } from '#lib/chat-mode.js';");
+    /*
+      Two facts asserted separately, because they are two. Matching the whole import LINE was the
+      first shape and it broke on 2026-08-30 when `CHAT_MODE_LABELS` joined the same statement for
+      the Session History entry — a change that says nothing about where the enum comes from. What
+      matters is that `CHAT_MODES` is imported and that the module it comes from is `chat-mode.ts`.
+    */
+    expect(commandCode).toMatch(/import \{[^}]*\bCHAT_MODES\b[^}]*\} from '#lib\/chat-mode\.js'/);
   });
 
   it('upserts rather than appending a second opinion about the mode', () => {

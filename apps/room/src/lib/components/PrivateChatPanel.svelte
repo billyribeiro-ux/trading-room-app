@@ -1,5 +1,6 @@
 <script lang="ts">
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
+  import PrivateChatComposer from '#lib/components/PrivateChatComposer.svelte';
   import { panelDragResize } from '#lib/panel-drag.js';
 
   /*
@@ -91,10 +92,38 @@
   interface Props {
     /** `display: block` when open — the capture keeps the panel mounted and hides it. */
     open: boolean;
+    /** `preferences.pmLogsOnRight` — G5, which side the conversation column sits on. */
+    pmLogsOnRight: boolean;
+    /**
+     * `canPostImages` — whether the composer's image and GIF buttons render at all, G1.
+     *
+     * `O(8, i.canPostImages ? 8 : -1), O(9, i.canPostImages ? 9 : -1)` at byte 2,198,563. The page
+     * already derives this as `isPresenter || sessData.userUploads === true` for the main composer;
+     * this is the same authority answered once and handed on.
+     */
+    canPostImages: boolean;
+    /** `webinarMode` — the composer's notice, `O(2, i.webinarMode ? 2 : -1)`. */
+    webinarMode: boolean;
+    /** The Giphy key, or empty when the room has none. */
+    giphyApiKey: string;
+    /** `onTextareaFocus()` — stops the tab-title flash, G27. */
+    oncomposerfocus: () => void;
+    /** `imgUpload()` — open this conversation's own image dialog. */
+    onimageupload: () => void;
+    /** `sendGif(title, url)` — the double-clicked GIF. */
+    onselectgif: (title: string, url: string) => void;
+    /** `emojiSelect` — the glyph goes into the draft. */
+    onemoji: (glyph: string) => void;
     doNotDisturb: boolean;
     isPresenter: boolean;
-    /** The peer whose tab is pinned in the header, or null when none is selected. */
-    peer: { pic: string; nick: string } | null;
+    /**
+     * The peer whose tab is pinned in the header, or null when none is selected.
+     *
+     * `emailHash` is the gravatar key — `avt` in the capture, and the same value the tab strip
+     * carries under that name. It is here because the header tab has the same fallback as the list
+     * (`?d=mm&s=25` against the list's `s=32`, byte 2,195,104) and could not have it without one.
+     */
+    peer: { pic: string; nick: string; emailHash: string } | null;
     tabs: PrivateChatTab[];
     /** Which conversation is open. Null renders "No active chat" rather than an empty thread. */
     currentUserId: number | null;
@@ -125,6 +154,14 @@
 
   let {
     open,
+    pmLogsOnRight,
+    canPostImages,
+    webinarMode,
+    giphyApiKey,
+    oncomposerfocus,
+    onimageupload,
+    onselectgif,
+    onemoji,
     doNotDisturb,
     isPresenter,
     peer,
@@ -154,6 +191,42 @@
     part of the extraction that removes a line rather than relocating one.
   */
   let toolbarOpen = $state(false);
+
+  /**
+   * The avatar a tab shows when the member has no picture of their own — G15.
+   *
+   * ```js
+   * z("src", e.user.pic || "https://secure.gravatar.com/avatar/" + e.user.avt + "?d=mm&s=25", Mt)  // header, 2,195,104
+   * z("src", e.pic      || "https://secure.gravatar.com/avatar/" + e.avt      + "?d=mm&s=32", Mt)   // list,   byte 2,196,585
+   * ```
+   *
+   * Both sites bound `src` to `pic` alone, so a member with no picture rendered a BROKEN IMAGE —
+   * `<img src="">` resolves to the page itself. `avt` was already carried on every tab and read by
+   * nothing, which is what made this invisible: the data for the fallback was here all along.
+   *
+   * **The two sizes are the reference's and are kept.** 25 in the header tab, 32 in the list. They
+   * are what the two `avatarImg` rules size to, and one number for both would make one of them a
+   * scaled bitmap.
+   *
+   * `d=mm` is gravatar's "mystery man" default — the silhouette — so a member with no gravatar
+   * either still gets a shape rather than a 404.
+   */
+  function avatarSrc(pic: string, avt: string, size: 25 | 32): string {
+    return pic || `https://secure.gravatar.com/avatar/${avt}?d=mm&s=${size}`;
+  }
+
+  /**
+   * The tab strip, newest FIRST — G6.
+   *
+   * `pt(e.chatTabs.slice().reverse())` at byte 2,196,816. The model is ascending by last activity
+   * because `newMessage` splices a tab out and PUSHES it, so the most recent sits last; the
+   * reference reverses only for display, and this does the same rather than flipping the sort — the
+   * ordering the model carries is the one every other reader of it expects.
+   *
+   * `slice()` in the capture and a spread here, for the same reason: `reverse()` mutates, and
+   * reversing the getter's array in place would reorder a value the caller still holds.
+   */
+  const orderedTabs = $derived([...tabs].reverse());
 </script>
 
 <!--
@@ -197,7 +270,11 @@
             <li class="nav-item">
               <!-- svelte-ignore a11y_missing_attribute -->
               <a data-bs-toggle="tab" role="tab" class="nav-link active">
-                <img alt="user.name" class="avatarImg avatarImg-active" src={peer.pic} />
+                <img
+                  alt="user.name"
+                  class="avatarImg avatarImg-active"
+                  src={avatarSrc(peer.pic, peer.emailHash, 25)}
+                />
                 {peer.nick}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -281,11 +358,30 @@
                   />
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <!--
+                    G17 — `o.value = ""` BEFORE the search, at byte 2,195,340:
+
+                    ```js
+                    x("click", function() { const o = It(6); o.value = ""; return E(s.onEnterSearchChat("")) })
+                    ```
+
+                    It clears the ELEMENT and then searches, and the order is the whole fix. This
+                    called `onsearch('')` alone, and `searchTerm` is passed unbound by the page — so
+                    typing "abc" without pressing Enter and then clicking clear set the parent's term
+                    from '' to '', changed no prop, and left "abc" sitting in the box next to results
+                    it did not produce.
+
+                    Writing the local `$state` rather than the DOM node: `bind:value` above owns the
+                    element, and reaching past a binding to set `.value` is how the two disagree.
+                  -->
                   <span
                     id="addon-chat-clear"
                     title="Clear the search"
                     class="btn btn-outline-secondary pl-2 pr-2 d-inline-flex input-group-text"
-                    onclick={() => onsearch('')}
+                    onclick={() => {
+                      searchTerm = '';
+                      onsearch('');
+                    }}
                   >
                     <i class="fas fa-times"></i>
                   </span>
@@ -310,7 +406,30 @@
         </div>
       {/if}
     </div>
-    <div class="d-flex h-100 pc-body">
+    <!--
+      G5 — `z("ngClass", ct(7, YDe, o.appService.globals.preferences.pmLogsOnRight))` at byte
+      2,219,468, with `const YDe = t => ({"flex-row-reverse": t})` at 2,194,594.
+
+      **The preference has been WRITTEN since the settings modal was built and read by nothing.**
+      `onPreferenceChange('pmLogsOnRight', !previous)` persisted it, the checkbox showed its own new
+      state, and the panel never moved — the "control whose only effect is changing its own label"
+      shape `CLAUDE.md` names. `dead-preference-keys.ts` deliberately does not cover for it either,
+      because the key is real and the control is meant to do something.
+
+      `flex-row-reverse` and not two orderings of the markup: the DOM order is the reading order a
+      screen reader and the tab key follow, and reversing it visually is a presentation choice that
+      should not change either.
+    -->
+    <div class={['d-flex h-100 pc-body', { 'flex-row-reverse': pmLogsOnRight }]}>
+      <!--
+        G18 — `O(16, o.chatTabs && o.chatTabs.length > 0 ? 16 : -1), O(17, "" !== o.currUser ? 17 : 18)`
+        at byte 2,219,468. TWO independent gates, and this had one wrapping both columns.
+
+        The window that made it visible: between `openFromRoster` and `getAllPCLogs` returning there
+        is a selected peer and no tabs yet. Upstream renders the conversation and the composer; this
+        rendered "No active chat" and no composer, so a member who opened a private chat from the
+        roster watched the panel tell them there was nothing there and then change its mind.
+      -->
       {#if tabs.length > 0}
         <!--
           One row per conversation - `getAllPCLogs` fills this. The row markup is the capture's
@@ -318,7 +437,7 @@
           `pc-active` on the open one.
         -->
         <div class="list-group pc-list">
-          {#each tabs as tab (tab.uid)}
+          {#each orderedTabs as tab (tab.uid)}
             <button
               type="button"
               aria-current={currentUserId === tab.uid}
@@ -330,7 +449,7 @@
             >
               <span class="user-status-container">
                 <span class={['badge user-status-type', { 'bg-success': tab.online }]}>&nbsp;</span>
-                <img alt="t.avt" class="avatarImg" src={tab.pic} />
+                <img alt="t.avt" class="avatarImg" src={avatarSrc(tab.pic, tab.avt, 32)} />
                 <span class="pc-username ms-1">{tab.name}</span>
               </span>
               {#if tab.unread > 0}
@@ -339,63 +458,63 @@
             </button>
           {/each}
         </div>
-        <div class="pc-logs">
-          {#if currentUserId === null}
-            <div class="flex-fill p-3 text-center">No active chat</div>
-          {:else}
-            <!--
+      {/if}
+      <div class="pc-logs">
+        {#if currentUserId === null}
+          <div class="flex-fill p-3 text-center">No active chat</div>
+        {:else}
+          <!--
               `app-privchatscroller`: `.pc-messages` scrolls, with a Load More badge above the
               rows while `hasMoreData && !searchTerm`. Rows are `app-st-compactmessage` with
               `logType="pc"`.
             -->
-            <app-privchatscroller class="privChatScroller">
-              <div class="pc-messages">
-                <!--
+          <app-privchatscroller class="privChatScroller">
+            <div class="pc-messages">
+              <!--
                   `O(2, o.hasMoreData && !o.searchTerm ? 2 : -1)` then `O(3, o.isLoadingMore ? 3 : -1)`
                   at bundle byte 2,194,498 — two exclusive branches, badge or spinner.
                 -->
-                {#if hasMore && !searching}
-                  <div class="text-center">
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <span class="badge badge-warning" onclick={() => onloadmore()}>Load More</span>
-                  </div>
-                {:else if loadingMore}
-                  <div class="text-center">
-                    <span class="badge badge-warning"><i class="fas fa-spinner fa-spin"></i></span>
-                  </div>
-                {/if}
-                {#each log as message (message._id)}
-                  <CompactMessageRow {message} />
-                {/each}
-              </div>
-            </app-privchatscroller>
-            <!--
+              {#if hasMore && !searching}
+                <div class="text-center">
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
+                  <span class="badge badge-warning" onclick={() => onloadmore()}>Load More</span>
+                </div>
+              {:else if loadingMore}
+                <div class="text-center">
+                  <span class="badge badge-warning"><i class="fas fa-spinner fa-spin"></i></span>
+                </div>
+              {/if}
+              {#each log as message (message._id)}
+                <CompactMessageRow {message} />
+              {/each}
+            </div>
+          </app-privchatscroller>
+          <!--
               `#textAreaTxtPM`. Enter sends, Shift+Enter and Alt+Enter insert a newline -
               `onKey(e)` in the capture, which calls `preventDefault()` on 13 either way.
             -->
-            <div class="d-flex align-items-center textSendDiv" id="textAreaHolderPM">
-              <textarea
-                id="textAreaTxtPM"
-                class="txt-area w-100"
-                rows="1"
-                placeholder="Type your message here.."
-                bind:value={draft}
-                onkeydown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  event.preventDefault();
-                  if (event.shiftKey || event.altKey) {
-                    draft += '\n';
-                    return;
-                  }
-                  onsend();
-                }}></textarea>
-            </div>
-          {/if}
-        </div>
-      {:else}
-        <div class="flex-fill p-3 text-center">No active chat</div>
-      {/if}
+          <!--
+            The composer is `PrivateChatComposer.svelte` — `pEe` at byte 2,198,563, which is a
+            textarea, a three-button column, two popovers, a webinar notice and `autoExpand`.
+
+            It is a component rather than more of this file because G1's button column put this one
+            past its ceiling and the size ratchet's remedy is a slice, not a bigger number. A good
+            seam: nothing in it knows about tabs, threads, paging, search or the roster.
+          -->
+          <PrivateChatComposer
+            bind:draft
+            {canPostImages}
+            {webinarMode}
+            {giphyApiKey}
+            {onsend}
+            onfocus={oncomposerfocus}
+            {onimageupload}
+            {onselectgif}
+            {onemoji}
+          />
+        {/if}
+      </div>
     </div>
   </div>
 </app-privchat>

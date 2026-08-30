@@ -36,13 +36,14 @@ const editor = (simplifiedEditor: boolean) =>
     props: {
       contentHtml: '',
       giphyApiKey: '',
-      noteId: 1,
       onBringEveryone: () => undefined,
       onDirtyChange: () => undefined,
       onDone: () => undefined,
       onRequestRestore: () => undefined,
       onSave: () => undefined,
       onSetWelcomeMat: () => undefined,
+      /* The carousel's image browser reads this; an empty room offers none. */
+      sessionImages: [],
       onUploadImages: async () => [],
       onVersionHistoryOpenChange: () => undefined,
       showVersionHistory: false,

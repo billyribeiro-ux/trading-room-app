@@ -65,6 +65,11 @@ interface Calls {
   switchuser: number[];
   loadmore: number;
   send: number;
+  /** The composer button column's three, G1, and the focus that stops the title flash. */
+  composerfocus: number;
+  imageupload: number;
+  selectgif: string[];
+  emoji: string[];
 }
 
 const render = (props: Partial<Record<string, unknown>> = {}) => {
@@ -77,7 +82,11 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     download: 0,
     switchuser: [],
     loadmore: 0,
-    send: 0
+    send: 0,
+    composerfocus: 0,
+    imageupload: 0,
+    selectgif: [],
+    emoji: []
   };
 
   target = document.createElement('div');
@@ -87,6 +96,14 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     target,
     props: {
       open: true,
+      pmLogsOnRight: false,
+      canPostImages: true,
+      webinarMode: false,
+      giphyApiKey: 'giphy-test-key',
+      oncomposerfocus: () => (calls.composerfocus += 1),
+      onimageupload: () => (calls.imageupload += 1),
+      onselectgif: (_title: string, url: string) => calls.selectgif.push(url),
+      onemoji: (glyph: string) => calls.emoji.push(glyph),
       doNotDisturb: false,
       isPresenter: false,
       peer: null,
@@ -149,9 +166,50 @@ describe('the tab strip', () => {
 
     const rows = root.querySelectorAll('.pc-list button');
     expect(rows).toHaveLength(2);
-    expect(rows[1]?.classList.contains('pc-active'), 'the open conversation').toBe(true);
-    expect(rows[0]?.classList.contains('pc-active')).toBe(false);
-    expect(rows[1]?.getAttribute('aria-current'), 'and says so to a screen reader').toBe('true');
+    /* Reversed for display — see the newest-first test below. `uid: 2` is now the FIRST row. */
+    expect(rows[0]?.classList.contains('pc-active'), 'the open conversation').toBe(true);
+    expect(rows[1]?.classList.contains('pc-active')).toBe(false);
+    expect(rows[0]?.getAttribute('aria-current'), 'and says so to a screen reader').toBe('true');
+  });
+
+  it('puts the NEWEST conversation first, which the model does not', () => {
+    /*
+      `pt(e.chatTabs.slice().reverse())` at byte 2,196,816.
+
+      The model is ascending by last activity, because `newMessage` splices a tab out and PUSHES it
+      so the most recent sits last — this is the reference's own ordering and every other reader of
+      the getter expects it. The reversal is for DISPLAY only, which is why it lives in the component
+      and not in the sort.
+    */
+    const { root } = render({
+      tabs: [tab({ uid: 1, name: 'oldest' }), tab({ uid: 2, name: 'newest' })]
+    });
+    const names = [...root.querySelectorAll('.pc-username')].map((node) => node.textContent);
+    expect(names).toEqual(['newest', 'oldest']);
+  });
+
+  it('falls back to a gravatar when a member has no picture', () => {
+    /*
+      `e.pic || "https://secure.gravatar.com/avatar/" + e.avt + "?d=mm&s=32"` — byte 2,196,585, and
+      `?d=mm&s=25` for the header tab at 2,195,104. Both sites bound `src` to `pic` alone, so a
+      member with no picture rendered `<img src="">`, which resolves to the page itself.
+
+      `avt` is the gravatar KEY — `md5` of the lowercased address, which is what `hashEmail` produces
+      and what the server now sends. It sent the raw address until 2026-08-30, so building this
+      fallback against the value as it stood would have forwarded every member's email to
+      gravatar.com; `private-chat-delivery.test.ts` carries that finding.
+    */
+    const { root } = render({
+      tabs: [tab({ uid: 1, pic: '', avt: 'abc123' }), tab({ uid: 2, pic: '/uploads/me.png' })]
+    });
+    const sources = [...root.querySelectorAll('.pc-list img')].map((node) =>
+      node.getAttribute('src')
+    );
+    /* Reversed, so the one WITH a picture is first and its own `pic` is untouched. */
+    expect(sources).toEqual([
+      '/uploads/me.png',
+      'https://secure.gravatar.com/avatar/abc123?d=mm&s=32'
+    ]);
   });
 
   it('shows an unread badge only when there is something unread', () => {
@@ -163,10 +221,11 @@ describe('the tab strip', () => {
   });
 
   it('marks who is online with the status dot', () => {
+    /* Reversed for display, so `uid: 2` — the one that is NOT online — comes first. */
     const { root } = render({ tabs: [tab({ uid: 1, online: true }), tab({ uid: 2 })] });
     const dots = root.querySelectorAll('.user-status-type');
-    expect(dots[0]?.classList.contains('bg-success')).toBe(true);
-    expect(dots[1]?.classList.contains('bg-success')).toBe(false);
+    expect(dots[1]?.classList.contains('bg-success')).toBe(true);
+    expect(dots[0]?.classList.contains('bg-success')).toBe(false);
   });
 
   it('and clicking a row asks the page to switch, rather than switching itself', () => {

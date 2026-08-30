@@ -1,10 +1,11 @@
 import { command } from '$app/server';
 import { z } from 'zod';
-import { CHAT_MODES } from '#lib/chat-mode.js';
+import { CHAT_MODES, CHAT_MODE_LABELS } from '#lib/chat-mode.js';
 import { presenterRoom } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { roomState } from '#lib/server/db/schema.js';
 import { publishToRoom } from '#lib/server/room-events.js';
+import { recordSessionEvent } from '#lib/server/session-history.js';
 
 /*
   `sendServerAdminCommand('changeChatMode', {mode})` — a PRESENTER act that changes the room.
@@ -78,4 +79,13 @@ export const changeChatMode = command(z.enum(CHAT_MODES), async (mode) => {
     .run();
 
   publishToRoom(room, { channel: 'cmds', data: { cmd: 'changeChatMode', mode } });
+
+  /*
+    A standing fact about the room, which is the same test the ROW passes — see above. Recorded
+    after the broadcast so the log can only describe something that happened; `session-history.ts`
+    carries the rest of that rule.
+
+    `CHAT_MODE_LABELS` and not the letter: `g` in a presenter's history pane says nothing.
+  */
+  recordSessionEvent(room, 'Chat mode changed', `Chat is now ${CHAT_MODE_LABELS[mode]}.`);
 });

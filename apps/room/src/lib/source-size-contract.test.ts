@@ -555,7 +555,41 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1,473 -> 1,474, 2026-08-30. One line: `showPmButton={gates.showPmButton}` reaching the main
       chat column, beside the one the extra column has always had.
     */
-    max: 1474,
+    /*
+      1474 -> 1477, 2026-08-30. Three lines, one per surface that renders a message:
+      `presenterColors={data.presenterColors}` to `AlertChatArea`, `ExtraChatPane` and
+      `RoomOverlays`. The map itself is read by the load and the lookup happens at the leaf, so the
+      page's share of the presenter-colour feature is exactly this pass-through.
+    */
+    /*
+      1477 -> 1478, 2026-08-30. One line: `onpasteimage={(file) => composer.beginImagePaste(file)}`
+      on `AlertChatArea`. The chat composer had no `paste` binding at all — `acA-02` — while all
+      three ALERT composers have had one since they were built.
+    */
+    /*
+      1478 -> 1479, 2026-08-30. One line: `alertLabels={gates.alertLabels}` to `RoomOverlays`, so the
+      post-alert composer's label picker reads the SAME parsed table the alerts column renders badges
+      from. Two parses of one setting is how a picker offers a label the renderer does not know.
+    */
+    /*
+      1479 -> 1483, 2026-08-30. Four lines wiring the inline alert entry (`acA-01`) to the three
+      things it needs: the text post, the image paste, and the toggle that persists and re-scrolls.
+    */
+    /*
+      1483 -> 1492, 2026-08-30. Nine lines for two private-chat rows: `pmLogsOnRight` handed to the
+      panel (G5) and `onclosepeer` calling `privateChat.closeTab()` (G8), each with the sentence
+      saying what it was doing wrong before.
+    */
+    /*
+      1492 -> 1512, 2026-08-30. G1 and G13 for the private composer: `canPostImages`, `webinarMode`,
+      the Giphy key and three callbacks handed to the panel, plus `chatEnabled` crossing into
+      `RoomDeps` so the `canPost` refusal asks the same authority the main composer renders on.
+    */
+    /*
+      1512 -> 1508, 2026-08-30, and DOWN. `oncomposerfocus` added; the number falls because the
+      previous raise anticipated more than the composer extraction ended up needing here.
+    */
+    max: 1508,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -674,7 +708,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       (`resumeRec` plays the START sound behind the STOP preference) and a table is where a reader
       cannot skim past it, which four separate blocks were not.
     */
-    max: 927,
+    /*
+      927 -> 947, 2026-08-30. The `presenterColorsChanged` receiver.
+
+      Two lines of behaviour and eighteen of citation, and the citation is the load-bearing half:
+      the reference REPLACES its whole colour map from the frame's `i.colors`, and this refetches
+      instead. That frame decides how everybody else's messages are painted for everyone in the
+      room, so what a socket says must not be what answers it. A future reader comparing the two
+      files will see a divergence; this is why it is there.
+    */
+    /*
+      947 -> 971, 2026-08-30. The message-mutation receiver — one `if`, one comparison, and
+      twenty-two lines of citation.
+
+      Nine commands used to mutate a rendered row and tell nobody: a presenter deleted a message and
+      every other viewer kept it on screen, a reaction was visible only to the browser that clicked
+      it, a question landed with no badge moving. The receiver is small because
+      `#lib/message-mutation-frames.ts` owns the four names and the argument; what is here is the
+      one thing that cannot live there — the self-skip, and why the actor's id on this frame is not
+      authority.
+    */
+    max: 971,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -718,7 +772,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       pure decision with the whole account on it, and what remains here is the two values it needs.
       Extracting a getter that reads two private fields would mean handing both out.
     */
-    max: 304,
+    /*
+      304 -> 332, 2026-08-30. `toggleInlineEntry`, which is `toggleToolbar`'s twin because upstream's
+      two are twins: both write a flag and pull the alerts log back, because both change the
+      scroller's height. HERE and not in `RoomAlerts` for the reason that one gives — the scroller is
+      this file's element.
+    */
+    max: 332,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -1265,7 +1325,35 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `prefs.loaded` here exactly as `streamingType` beside it is. One prop rather than five,
       for the reason `#lib/capture-settings.ts` records.
     */
-    max: 850,
+    /*
+      850 -> 855, 2026-08-30. `presenterColors` forwarded to `ModalHost`, which needs it for two
+      unrelated halves of one feature: the Q&A thread renders messages, and the settings modal's
+      colour pickers seed from this presenter's own entry.
+    */
+    /*
+      855 -> 896, 2026-08-30. The chat paste confirmation.
+
+      The reference's is a `bootbox.confirm` carrying a preview `<img>` and a textarea seeded from
+      the composer (byte 1,445,719), and the two alert forms below already have that shape for their
+      own pastes — so this block sits with them rather than in a component of its own. Most of the
+      addition is the markup those three lines of dialog need plus the note saying why it is
+      `BootboxDialog` and not `ImageUploadDialog`: the file is already chosen, and a dialog whose top
+      half is a drop zone invites replacing the thing that was just pasted.
+    */
+    /*
+      896 -> 906, 2026-08-30. `alertLabels` forwarded to `ModalHost` for the composer's picker
+      (`PAM-01`), with the note recording that this is the second consumer of one parse rather than a
+      second parse.
+    */
+    /*
+      906 -> 920, 2026-08-30. A THIRD `ImageUploadDialog` instance, for the private composer (G1).
+
+      A third and not a share of the composer's, for the reason this file already records beside the
+      swing form's: routing a feature's upload through the chat composer's handler posts the image
+      into chat instead of into that feature. Here the cost of getting it wrong is larger — an image
+      meant for one person would land in the room.
+    */
+    max: 920,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1370,7 +1458,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       thread renders in the ALERTS mode rather than one of its own — upstream's Q&A modal calls
       `loadAlertsMode()`, the same function the alerts log calls.
     */
-    max: 359,
+    /*
+      359 -> 372, 2026-08-30. The presenter-colour map and its lookup.
+
+      The thread renders through the same `app-st-message` the room does, and the reference applies
+      `presenterSettings[msg.avt]` inside that component with no exception for the modal — so a
+      presenter's ANSWER here carries their colours too. Most of the addition is the paragraph
+      saying why `followedUsers` is still NOT passed: this component has never had it, and adding
+      it would be a behaviour change nothing asked for.
+    */
+    max: 372,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its composer and its own open menu row'
   },
   {
@@ -1407,8 +1504,136 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It should not: `simplifiedEditor` arrives already resolved, and `resolveNoteSurfaceGates` is
       where that kind of question is answered.
     */
-    max: 1546,
-    why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
+    /*
+      1546 -> 1740, 2026-08-30. The carousel's image browser — `note-editor-file-browser-modal`.
+
+      A presenter who had already uploaded an image through Files had no way to reach it from a
+      slide: the row offered a bare URL box and nothing else. The modal, its per-slide button, the
+      handler and four transcribed CSS rules are here, decoded with this component's own consts
+      table (77/79/80/81) and the reference's scoped style block at byte 1,486,651.
+
+      Two paragraphs of the addition are decisions rather than markup: why the `Loading images...`
+      branch is NOT drawn (this room's list arrives with the page load, so it can never render — and
+      a branch that can never render can never be checked), and why the grid item is a `<button>`
+      where the capture uses a clickable `<div>`.
+
+      This file is also the one where a naive comment strip deletes code — `accept="image/*"` at its
+      image dialog — which `orphan-component-contract.test.ts` measured on 2026-08-29 and which the
+      first draft of this feature's contract walked straight into.
+    */
+    /*
+      1855 -> 1480, 2026-08-30, and this is the entry FINALLY DOING WHAT IT SAID.
+
+      Two paragraphs above name the toolbar as the obvious extraction and say it is "not bundled
+      with a settings wire". The carousel came out first, and it came out because this gate refused
+      the row rebuild: rewriting the slide row to the reference's three states put the file at 2,214
+      lines, and the rule is `Ceilings here only go DOWN: extract a slice into a module or component
+      rather than raising this number`. `CarouselDialog.svelte` is that slice — the modal, the file
+      browser, the two confirmations and eight CSS rules, none of which touches the editor.
+
+      The toolbar is STILL the next one, and it is still not bundled with anything.
+    */
+    /*
+      1740 -> 1855, 2026-08-30. The per-slide UPLOAD — the other half of the same `E0e` row.
+
+      The browser above can only offer what is already in the room. `uploadCarouselImage` (byte
+      1,476,460) is how an image GETS there from inside the carousel dialog, and without it a
+      presenter had to leave the modal to upload — which loses every slide they had already typed,
+      because this modal holds them in component state.
+
+      A hidden file input under a styled `<label for>` (the reference's own pattern, const 58/59),
+      the ` Browse ` button's corrected label and icon (const 61/62 — it shipped this morning as the
+      invented `Select Image`, which is the MODAL's title), and the `D0e` spinner. The spinner is
+      keyed by the slide's KEY and not its index, and that divergence is most of the added prose:
+      upstream mutates a slide object it holds a reference to, ours replaces the array wholesale, so
+      an index captured before the `await` points at a different slide once `removeCarouselSlide`
+      renumbers.
+
+      The toolbar extraction named above is still the answer to this file's size and is still not
+      bundled with a feature.
+    */
+    /*
+      1560 -> 1700, 2026-08-30. `note-editor-image-popover` — and a CORRECTION to the two entries
+      below, which have named the toolbar as this file's obvious extraction since 2026-08-28.
+
+      **That was wrong, and the carousel extraction is what showed it.** `CarouselDialog` came out
+      cleanly because it touches no editor state: it is handed the values a carousel is made of and
+      hands them back once. The toolbar is the opposite — it is *nothing but* editor access. Every
+      one of its buttons calls `command((instance) => instance.chain()…)`, so extracting it produces
+      a component with roughly twenty callback props whose only purpose is to reach back into the
+      parent. That is worse code written to satisfy a number, which is the one thing this ratchet
+      must not cause.
+
+      The seams that ARE real here, in order: the version-history panel (its own list, its revert,
+      its four CSS rules, no editor beyond one command), and the link/image/video dialogs (three
+      modals with three fields between them). Neither is bundled with a feature, for the same reason
+      the carousel was not until the gate forced it.
+
+      This addition is 130 lines and about 90 of them are the reason: what the capture evidences here
+      is the four GROUP NAMES and nothing else — summernote is not in the bundle, so its popover's
+      markup, geometry and icons are unknown, and `imageAttributes` is deliberately not built rather
+      than invented. `note-image.ts` carries the attribute decisions.
+    */
+    /*
+      1502 -> 1560, 2026-08-30. `note-editor-gif-insert-confirm`, and the `hint` this surface passes.
+
+      Fifty-eight lines, forty of them the docblock on `insertGif`. The handler inserted on the
+      double-click; it now stages the GIF and `confirmGif` is what inserts. Two reasons, both worth
+      the words: the preview matters because a Giphy result is a THUMBNAIL and what lands in the note
+      is `images.original`, a larger image the presenter has not seen at the size it will appear; and
+      `this.sendingGif` is transcribed as a refusal rather than a replacement, because the presenter
+      is looking at a preview of the first GIF and a second must not swap what they are confirming.
+
+      This file is now past every carousel extraction's savings on GIF handling alone, which is the
+      argument for the toolbar coming out next rather than in another entry after this one.
+    */
+    /*
+      1480 -> 1502, 2026-08-30. `note-editor-insert-carousel-silent-noop`.
+
+      Twenty-two lines, twenty of them the reason: `insertCarousel` returned silently when no slide
+      carried an `https://` URL, so the always-enabled primary button closed nothing, inserted
+      nothing and said nothing. The reference alerts (byte 1,478,230) and `CLAUDE.md`'s fail-loud
+      rule agrees with it. The note also records what is NOT that message — a missing editor is a bug
+      in this component, not a mistake by the presenter.
+    */
+    max: 1700,
+    why: 'the note editor and its transcribed toolbar; the version panel and the three dialogs are the seams'
+  },
+  {
+    file: 'lib/components/notes/CarouselDialog.svelte',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30 — which is the whole point of the check that demanded it. Four
+      components were found uncapped in two days and 36 by one measurement; a component that arrives
+      with a ceiling cannot join them.
+
+      Set at what it lands at rather than at something aspirational. It is `app-note`'s carousel
+      surface in one file: the modal (`M0e`), the three-state slide row (`x0e` switching `D0e`/`E0e`/
+      `k0e`), the file browser (`O0e`), the two `bootbox.confirm` questions, and eight CSS rules
+      transcribed from the reference's own scoped blocks. Most of the length is transcription and the
+      reasons for four deliberate divergences — the POST that is not reproduced, the spinner keyed by
+      slide rather than index, the grid item that is a button, and the loading branch that is not
+      drawn.
+
+      If this number climbs, the thing to check is whether the dialog has started reaching for the
+      EDITOR. It must not: it is handed the values a carousel is made of and hands them back once,
+      and `NoteEditor` is what knows whether that is an insert or an edit-in-place.
+    */
+    /*
+      880 -> 920, 2026-08-30, on the day it was capped. `note-editor-add-slide-scroll`.
+
+      `addCarouselImage` scrolls the new row into view (byte 1,475,568) and this appended and
+      stopped — with the list now a `max-height: 50vh` scroller, a presenter with six slides pressed
+      ` Add slide ` and nothing appeared to happen. The lines are the handler, the bound element, and
+      the note on why `tick()` replaces upstream's bare `setTimeout` and why the query is scoped to
+      this dialog's own list rather than to `document`.
+
+      A ceiling raised on the day it was set is worth a second look, and this one was taken: the
+      addition is one behaviour from the same `x0e` row the rest of this component transcribes, not
+      a new concern arriving. If the NEXT raise is also same-day, that is the signal to split the
+      file rather than the number.
+    */
+    max: 920,
+    why: "app-note's carousel: the modal, its three-state slide row, the file browser and two confirms"
   },
   {
     file: 'lib/components/notes/NotesPane.svelte',
@@ -1420,8 +1645,56 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       untouched, `simplifiedEditor` included. If this number climbs, the thing to check is whether a
       prop has started being transformed on the way through rather than forwarded.
     */
-    max: 447,
+    /*
+      447 -> 452, 2026-08-30. `sessionImages` forwarded to the editor for the carousel's image
+      browser. Five lines: the prop, its type import, and the pass-through.
+    */
+    /*
+      452 -> 525, 2026-08-30. `note-editor-welcome-mat-all-rooms-password`.
+
+      Seventy-three lines, and about sixty of them are the reason. The reference raises THREE dialogs
+      from one button (byte 1,474,217) — a password prompt when `allRoomsWelcomeMatPW` is configured,
+      a plain confirmation when it is not, and a different confirmation for the per-room variant —
+      and only two existed here. The third could not exist while nothing knew whether a password was
+      set, because that setting is one of the seven that may never reach this room.
+
+      What is written down is why the room asks the controller which dialog to raise, why the typed
+      value goes straight out uncompared, and why an unreachable controller means "prompt" rather
+      than "confirm". None of that is guessable from the code.
+    */
+    max: 525,
     why: 'the note tab strip and the three confirmations; everything else passes through'
+  },
+  {
+    file: 'lib/components/PrivateChatComposer.svelte',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30 — which is what the check that demanded it is for.
+
+      `pEe` at reference byte 2,198,563: the private composer's textarea, its three-button column
+      (emoji, image upload, GIF), both popovers, the webinar-mode notice and `autoExpand`. It exists
+      as a component because G1's button column put `PrivateChatPanel.svelte` past its ceiling, and
+      it is a good seam — nothing here knows about tabs, threads, paging, search or the roster.
+
+      Most of the length is transcription and reasons: the const table by value, why `form-control`
+      matters where `w-100` did not, why the emoji button alone is ungated, and why `autoExpand`
+      resizes `.pc-messages` as well as the box.
+
+      Twenty-five of the 325 are keyboard access on the two popover spans and the note saying why
+      eslint could not have asked for it: the spread attributes mean Svelte cannot see statically
+      that there is no role, so `a11y_click_events_have_key_events` never fires and an ignore for it
+      is an ignore for nothing. The linter's silence there is not evidence the spans are reachable.
+
+      If this climbs, the thing to check is whether the composer has started DECIDING who may post.
+      It must not: `canPostImages` arrives already answered, and `canPost` is enforced in
+      `RoomPrivateChat.send` from the room's own gate.
+    */
+    /*
+      325 -> 335, 2026-08-30. `onfocus` for G27 — `onTextareaFocus()` stops the tab-title flash — and
+      the note saying which half of upstream's method crosses and which this component binds
+      declaratively.
+    */
+    max: 335,
+    why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
     file: 'lib/components/PrivateChatPanel.svelte',
@@ -1452,7 +1725,39 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Flagged for the owner, as this session's other raises are. `private-chat.svelte.ts` beside it
       absorbed a state machine and still came out a line SHORTER, because `RoomPeerHistory` left.
     */
-    max: 402,
+    /*
+      402 -> 525, 2026-08-30. Seven rows of the surface audit, and most of the addition is why.
+
+      G6 the newest-first reversal, G15 the gravatar fallback (both sizes), G17 the clear button that
+      never cleared its own input, G18 the two independent gates the capture has where this had one
+      wrapping both columns, G21 the composer's four transcribed attributes and the wrapper structure
+      the button column will attach to.
+
+      The G21 note is the longest and earns it: it carries the whole composer const table (50, 52,
+      53, 54, 55, 56) including the two entries belonging to rows still open, so that the next piece
+      attaches to the element the capture names rather than to one invented for it.
+    */
+    /*
+      525 -> 540, 2026-08-30. G5 — the `flex-row-reverse` swap and its prop.
+
+      Most of it is why: the preference has been WRITTEN by the settings modal since that modal was
+      built and read by nothing, so the toggle changed its own state and nothing else. The note also
+      says why the class is used rather than two orderings of the markup — DOM order is the reading
+      order a screen reader and the tab key follow.
+    */
+    /*
+      540 -> 520, 2026-08-30, and DOWN because the composer left.
+
+      G1's button column would have put this file at 716. The ratchet refused it and its remedy is a
+      slice, so `PrivateChatComposer.svelte` came out carrying `pEe` whole — the textarea, the three
+      buttons, both popovers, the webinar notice and `autoExpand`. The panel is smaller than it was
+      before the feature, which is what an extraction is supposed to look like.
+    */
+    /*
+      520 -> 524, 2026-08-30. `oncomposerfocus` passed through for G27. Four lines, three of them the
+      prop's docblock.
+    */
+    max: 524,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -1625,7 +1930,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       958 -> 959, 2026-08-29: one line, `{menus}` forwarded to `StreamingView` so its buffer-size
       dropdown can open at all. See `bootstrap-dropdown-contract.test.ts`.
     */
-    max: 959,
+    /*
+      959 -> 975, 2026-08-30. The anti-leak watermark resolved ONCE, for both videos.
+
+      `StreamingView` has carried the overlay since it was built and `ScreenPane` never had it, so a
+      room with `overlayUserIdOnScreenshare` on watermarked the restreamed feed and left the
+      SCREENSHARE — the surface the setting is named for — clean (`SV-SP-01`). The rule is
+      `#lib/user-id-watermark.ts`; what is here is one `$derived` and the paragraph saying why the
+      answer is computed at this level rather than at each of the two components.
+    */
+    /*
+      975 -> 988, 2026-08-30. The room's shared IMAGE files, filtered once for the note carousel's
+      browser. The reference fetches that list on every open; `data.files` is already here and every
+      upload path invalidates it, so this is a `$derived` over data the page holds rather than a
+      second read of it.
+    */
+    /*
+      988 -> 990, 2026-08-30. One parameter: `pw` forwarded from the notes pane to the action, for
+      `note-editor-welcome-mat-all-rooms-password`. This component only passes it along — it is not
+      where the password is typed and not where it is compared.
+    */
+    max: 990,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -1963,7 +2288,73 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rendered without, so every member was shown "Mute Microphone for all non-admins" and
       "Get my token". The fourth button in that div stays outside the gate, as the reference has it.
     */
-    max: 6022,
+    /*
+      6022 -> 6107, 2026-08-30, and the markup SHRANK by eight lines while the file grew by
+      eighty-five. That ratio is the change.
+
+      The presenter's two colour pickers had a Save button writing `onPreferenceChange(
+      'presenterStyle', ...)` — a key in this presenter's own settings blob, read by nothing, in a
+      store no other viewer can see — under a heading reading *"These colors will affect how ALL
+      USERS see your messages and alerts"*. Reset assigned two constants and sent nothing. Both
+      buttons are now one-line `onclick={handler}` against real commands; what was added is the two
+      handlers, the refusal dialog they surface, the seed inside the existing settings effect, and
+      the prose recording what each of those replaced.
+
+      If this number climbs again, the settings modal is still the extraction — it is the largest
+      contiguous region left in this file and its state is almost entirely its own.
+    */
+    /*
+      6107 -> 6129, 2026-08-30, and the CONTROLS shrank while the file grew — the second time today.
+
+      The Stream Player pane's two buttons flipped a local flag and wrote a preference key nothing
+      read. They are `disabled` now, with the reason on the screen beneath them, because the feature
+      cannot be built from anything held here: the reference gets both the state and the link from
+      ITS server (`invokeAdminCmd("streamStatus")` -> `rc.enablePlayer` / `rc.playerURL`, byte
+      2,170,505), and what it serves is a public page rendering one room's screenshares to whoever
+      holds a link — an anonymous media grant nobody has designed.
+
+      So twenty-two of these lines are the argument for NOT building it, sitting where the next
+      person will look for it. That is the trade this ratchet's header describes: an extraction
+      invented to satisfy a number would move the paragraph away from the code it explains.
+    */
+    /*
+      6129 -> 6218, 2026-08-30. The advanced search's results became MESSAGES.
+
+      They were `<p>{result.body}</p>` — escaped plain text with no sender, no timestamp, no day
+      separator and, the part `SRCH-01` names, no trade highlighting and no click-to-copy, so an
+      order found by searching could not be copied from the place it was found. They render
+      `RoomMessage` now, as the reference does (`app-st-message`, byte 2,421,116).
+
+      Two of the additions are the reason rather than the markup: why `showMenu={false}` is a
+      recorded DIVERGENCE (this modal has no route to the message-action command, so a full kebab
+      would be twelve entries that cannot act), and why the action handler refuses everything but
+      `copy-trade` even though nothing can currently emit anything else — it fails closed against a
+      later change that draws more controls.
+    */
+    /*
+      6218 -> 6229, 2026-08-30. `alertLabels` taken and handed to `PostAlertModal`. The picker itself
+      is in that component; what is here is the prop and why the parse happens on the page.
+    */
+    /*
+      6229 -> 6334, 2026-08-30. The Session History pane — `SC-01`, and it was the emptiest kind of
+      empty: `No session history.` rendered unconditionally above a `Load History` button with **no
+      `onclick` at all**. Not a handler that did nothing; no handler.
+
+      Both of upstream's branches now (`EDe` and `DDe`), decoded with `app-session-control-modal`'s
+      own consts table, plus the three pieces of state, the loader, and a failure path the reference
+      does not have — its `i && i.data && (globals.sessionHistory = i.data)` leaves the pane
+      untouched when the call fails, so a Refresh on a broken connection looks like a Refresh with
+      nothing to show.
+
+      Roughly forty of these lines are prose, and two paragraphs of it are load-bearing: why the
+      `<a>` keeps no `href` (all three alternatives are worse, and the element is inert upstream
+      too), and why nothing fetches on open (the `Load History` button only makes sense if the pane
+      starts empty).
+
+      If this climbs again the session-control modal is still the extraction — it is now seven panes
+      in one file, and this one owns three `$state` locals and a function that nothing else reads.
+    */
+    max: 6334,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2014,7 +2405,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       was restating `#lib/chat-tabs.ts`, and two places recording one fact is how one of them goes
       stale. What stayed is what is true HERE and nowhere else.
     */
-    max: 1617,
+    /*
+      1617 -> 1642, 2026-08-30. The room's presenter-colour map, read from `presenter_colors` and
+      handed to the browser keyed by sender hash — one query and its import, plus the paragraph
+      recording why it is a table rather than the reference's JSON blob and what bounds it. Room
+      state, sitting with `chatMode` and `closedMessage`, which is the shape it belongs to.
+    */
+    /*
+      1642 -> 1680, 2026-08-30. The all-rooms welcome mat's branch —
+      `note-editor-welcome-mat-all-rooms-password`.
+
+      This entry's own earlier paragraph is why the file grew: the action carried a recorded HONEST
+      GAP saying the all-rooms variant "needs a controller endpoint that enumerates the account's
+      rooms and verifies `allRoomsWelcomeMatPW`". That endpoint exists now, so the gap paragraph is
+      replaced by the branch it described — and by the argument that the authority is the SERVER's,
+      which the reference's client-side compare is not.
+    */
+    max: 1680,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
@@ -2055,7 +2462,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `senderName`. A parameter wider than the body needs makes a predicate unusable on any row that
       omits a field it never looks at — and the alternative was a second copy of the rule.
     */
-    max: 320,
+    /*
+      320 -> 339, 2026-08-30. `#inlineEntry` is seeded and persisted rather than ephemeral: a
+      presenter who opened the inline alert box got it closed again on the next reload. The addition
+      is mostly the note recording that upstream persists to localStorage only and this room uses the
+      same store every other room preference uses.
+    */
+    max: 339,
     why: "the alerts pane's toolbar, viewer filter, archive cut-off and search term"
   },
   {
@@ -2455,7 +2868,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Flagged for the owner. The alternative was an extraction invented to satisfy a number, on a
       class whose whole shape is one field, one seed, one getter and one case per preference.
     */
-    max: 656,
+    /*
+      656 -> 685, 2026-08-30. `pmLogsOnRight` — G5, a preference this class did not hold at all while
+      the settings modal wrote it and the panel could not read it.
+
+      The docblock is most of the addition: it records that the key defaults FALSE where its
+      neighbours default true, because `!== false` would have flipped every existing member's panel
+      on the first load after this shipped.
+    */
+    max: 685,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -2548,7 +2969,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       same expression that says "alert") and why there is no optimistic `#patchEvidence` (a thread
       entry is never a fixture row — `askQuestion` writes a real one even for a captured alert).
     */
-    max: 630,
+    /*
+      630 -> 656, 2026-08-30. RM-19 — the paragraph recording that we deliberately do NOT reproduce
+      `copyMessage`'s mutation.
+
+      Twenty-six lines and all of them prose: upstream writes the stripped text back onto the
+      MESSAGE before copying, so copying silently rewrites the one on screen. This is a place where
+      matching the reference would mean reproducing a defect, and the next person comparing the two
+      needs to find the reason rather than assume the line was missed.
+    */
+    max: 656,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -2610,7 +3040,41 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       owns a rich message and then refuses their save, so fewer people reach the editor here and
       everyone who reaches it can finish. `chat-rte-gate-contract.test.ts` executes that claim.
     */
-    max: 573,
+    /*
+      573 -> 687, 2026-08-30, and it is the largest raise this entry has taken. The pasted-image
+      state machine, of which roughly ninety lines are the transcription and the argument.
+
+      Three of its behaviours are decisions rather than transcription and each has its paragraph:
+      the composer is cleared BEFORE the upload awaits (so a draft typed during a slow upload
+      survives) and only when a message actually travels (the reference's own `i && (…, val(""))`
+      at byte 1,443,041); and a second paste while a confirmation is open revokes the first's object
+      URL, without which every corrected mis-paste pins its bytes for the life of the tab.
+
+      If this climbs again the extraction is the pasted-image trio — `beginImagePaste`,
+      `cancelImagePaste`, `confirmImagePaste` and their two fields — which is already the shape
+      `RoomTradeAlerts` uses for the same feature.
+    */
+    /*
+      687 -> 689, 2026-08-30. `submission.labelPrefix` threaded into the two UPLOAD composers.
+
+      Two lines, and they are the half of `PAM-01` that is easy to miss: these compose their body
+      AFTER the modal has closed, so a picker whose state only reached the draft would prefix a typed
+      alert and silently drop the labels from every alert carrying an image.
+    */
+    /*
+      689 -> 792, 2026-08-30. The inline alert entry's two send paths.
+
+      `postInlineAlert` composes through the same `composePostAlert` the modal's text tab uses and
+      goes down `postAlert`, the one path that owns the refusal and the toast; `beginAlertImagePaste`
+      reuses the pending-paste state the chat composer already had, with a `target` deciding where
+      the confirmed image goes — which is upstream's own shape, since its handler routes into the
+      post-alert modal's `onImagePaste` and there is exactly one confirmation for both.
+
+      A third of the addition is the recorded divergence: upstream's subscriber calls the MODAL's
+      method, so the inline box silently inherits whatever five checkboxes that modal was last left
+      holding.
+    */
+    max: 792,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -2885,6 +3349,41 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'one member’s whole private history, for a moderator; a modal, not the panel'
   },
   {
+    file: 'lib/room/private-chat-scroll.ts',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30. `app-privchatscroller`'s two scroll behaviours and the two
+      numbers they turn on: the 500ms re-scroll (byte 2,192,880) and the Load More anchor restore
+      with its `-20` (2,191,427).
+
+      It came out of `private-chat.svelte.ts`, whose own ceiling entry had named it as the seam. It
+      holds NO state and reads none — both functions take or find the element they act on, and the
+      Load More anchor crosses as an argument because it belongs to the paging that produced it.
+      That is what makes this a module and not a second class, and it is the thing to re-check if it
+      grows: state arriving here means the seam was drawn in the wrong place.
+    */
+    max: 110,
+    why: "the private-chat log's two scrolls, and the two transcribed numbers they turn on"
+  },
+  {
+    file: 'lib/room/private-chat-title-flash.ts',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30. The tab-title flasher — `"<sender> messaged you - <room>"`
+      alternating with the room name every two seconds, bytes 2,207,480 and 2,204,266.
+
+      A module because `RoomPrivateChat` is at its ceiling and this is self-contained: one interval
+      and the document's title, told when to start and stop, reading nothing from the panel. The same
+      seam `private-chat-scroll.ts` was cut on.
+
+      `moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt,
+      with an assertion designed to fire when either appeared. It fired.
+
+      If this grows, the thing to check is whether it has started deciding WHEN to flash. It must
+      not: that gate is two conditions in `RoomPrivateChat.ingest`, where the message is.
+    */
+    max: 90,
+    why: 'the tab-title flash for an unread private message, and the one interval behind it'
+  },
+  {
     file: 'lib/room/private-chat.svelte.ts',
     /* +3, 2026-08-16: the same `#lib/*.js` import reflow as `files.svelte.ts` above. */
     /*
@@ -2901,7 +3400,56 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       widen on a `true`, and the two would have shared a code path that only one of them is allowed
       to take.
     */
-    max: 605,
+    /*
+      605 -> 672, 2026-08-30. G16 and G23.
+
+      G16 is the roster-driven online status — every server-supplied tab was built `online: false`
+      and nothing ever consulted the roster, so the status dot was permanently grey for anyone the
+      page loaded with. About forty of the added lines are the option's docblock, and they are the
+      part worth keeping: `checkUserOnlineStatus` only ever writes `true`, so this diverges by
+      letting the dot go back to false, and that divergence needs its argument written down.
+
+      G23 is one number — 60ms to the capture's 500 — plus why the second scroll exists at all and
+      why it is a `setTimeout` where this codebase otherwise reaches for `tick()`.
+    */
+    /*
+      672 -> 912, 2026-08-30. Six rows of the surface audit, and the largest single addition this
+      file has taken.
+
+      G8 `closeTab`, G12 the toast and browser notification, G14 the `Load More` scroll restore with
+      the reference's `-20`, G25 the search's own bucket, plus the two constants the contracts read
+      instead of restating. **G7 is in here as a REFUSAL** — a paragraph explaining why
+      `getAllPCLogsLoading` is not modelled: this room resolves the conversation list at page load,
+      so both of the reference's loading branches would be branches that can never render.
+
+      Roughly 160 of the 240 lines are prose, and the ratio is the point: every one of these is a
+      behaviour whose absence was invisible, and each needed its capture quoted to be checkable.
+
+      The seam if this grows again is the SCROLLING — `scrollToBottom`, `#restoreAfterLoadMore` and
+      the two constants are one concern that touches no other part of this class.
+    */
+    /*
+      912 -> 928, 2026-08-30, after the SCROLLING came out.
+
+      G1's image-upload path and G13's `canPost` refusal put this at 1,010, and the entry below had
+      already named the seam: `scrollToBottom`, the Load More restore and the two constants are one
+      concern that touches nothing else here. They are `private-chat-scroll.ts` now, and this file
+      kept a two-line delegation and its docblock.
+
+      So the net of two features is +16 lines. The next seam, if this grows again, is the SEARCH —
+      `search`, `#searchResults` and the `log` getter's choice between two buckets.
+    */
+    /*
+      928 -> 990, 2026-08-30. G27 — the tab-title flash.
+
+      The decisions are here and the mechanism is not: WHEN to flash (a message that is not mine,
+      with the composer unfocused), when to stop (the composer taking focus, the tab closing, the
+      panel closing), and the gate's two halves transcribed from byte 2,207,480.
+      `private-chat-title-flash.ts` owns the interval and the title.
+
+      The seam named in the entry below is still the SEARCH, and it is still the next cut.
+    */
+    max: 990,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -3033,7 +3581,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       was written here and then removed, because a paragraph about a field that does not exist, in a
       file of field declarations, is the kind of thing that goes stale first. The producer says it.
     */
-    max: 59,
+    /*
+      59 -> 68, 2026-08-30. `actorUserId`, and nine lines saying what it is allowed to decide.
+
+      An id on a wire is exactly the shape of the 2026-08-07 privilege escalation, so a field that
+      names a person needs its limit written next to it rather than inferred: this one is only ever
+      compared against the recipient's own, the frame carries no payload for a forged id to unlock,
+      and the server applied every rule before publishing. The comment IS the change.
+    */
+    max: 68,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
   },
   {
@@ -3433,7 +3989,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       capability that costs this file fewer than two lines: one import, one hand-off. The same
       commit lowers `user-actions.svelte.ts` by fifteen and `ScheduledAlerts.svelte` by two.
     */
-    max: 1335,
+    /*
+      1335 -> 1336, 2026-08-30. One line: `inlineEntry: prefs.loaded.showAlertsEntry === true`, so
+      the inline alert box is seeded from the stored preference instead of starting closed every
+      time.
+    */
+    /*
+      1336 -> 1345, 2026-08-30. Nine lines: `onlineUserIds` for the private-chat panel (G16), and the
+      note saying why the roster is read at recompute time rather than pushed in on three events.
+    */
+    /*
+      1345 -> 1365, 2026-08-30. `notify` for the private-chat panel (G12) and the note on why the
+      panel decides WHEN somebody is told while `RoomToasts` decides how — the same split
+      `playSound` above it already makes.
+    */
+    /*
+      1365 -> 1382, 2026-08-30. `canPost` and `uploadImages` for the private composer (G13, G1), each
+      with the sentence saying which authority it forwards and why this file does not compute one.
+    */
+    /*
+      1382 -> 1390, 2026-08-30. `roomName` and `composerHasFocus` for G27 — the second asked of the
+      DOM here so the panel class does not reach into it for a decision.
+    */
+    max: 1390,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -3575,7 +4153,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       refused in one column and offered it in the other. Twelve lines: the prop, its docblock and
       the `{#if}`.
     */
-    max: 1200,
+    /*
+      1200 -> 1211, 2026-08-30. The presenter-colour map: one prop, one import, and the same
+      `presenterColorsFor(...)` lookup on each of the two `RoomMessage` call sites — beside the
+      `followedUsers` lookup it sits with, because they are the same kind of thing. The map is
+      shared by every message; the lookup is per message, so neither belongs on the chrome.
+    */
+    /*
+      1211 -> 1242, 2026-08-30. The composer's `paste` handler and its prop.
+
+      The filter itself is three lines because the RULE moved to `#lib/pasted-image.ts` — where it
+      replaced three separate copies, one of which had drifted into taking the FIRST image instead
+      of the reference's last. What stayed here is the one thing that cannot: `canPostImages` is a
+      page gate, so the refusal has nowhere else to live.
+    */
+    /*
+      1242 -> 1394, 2026-08-30. The inline alert entry — `acA-01`, a checkbox that controlled nothing.
+
+      The field itself is fifteen lines of markup, decoded with `app-alerts`' own consts (20, 52, 53)
+      and meeting a stylesheet that was already bridged and waiting for it. The rest is the two
+      handlers and the reason they are not the chat composer's: **Enter posts, ALT+Enter is the
+      newline, and SHIFT+Enter does nothing at all** — the exact opposite of the box one column over.
+
+      The key RULE itself is not here: it was written inline, then extracted to
+      `#lib/inline-alert-key.ts` so a test could execute it rather than copy it.
+    */
+    max: 1394,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -3619,7 +4222,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
       security-relevant half of the change; this entry carries its part.
     */
-    max: 586,
+    /*
+      586 -> 596, 2026-08-30. The presenter-colour map, exactly as `AlertChatArea` takes it — one
+      prop, one import, one lookup at the call site. This column renders the same rows, so a map
+      handed to one and not the other would paint the same message two ways in one room.
+    */
+    max: 596,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -3629,13 +4237,37 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/GifConfirmDialog.svelte',
-    max: 50,
-    why: 'the one confirmation between picking a GIF and posting it'
+    /*
+      50 -> 66, 2026-08-30. `note-editor-gif-insert-confirm`.
+
+      Sixteen lines, fourteen of them the reason a `message` prop exists at all: the note surface
+      asks `You sure you want to insert this image:` (byte 1,482,885) where the chat composer asks
+      `…post this image:`, and this one component serves both. The default is the chat string, so the
+      surface that already had this dialog is unchanged.
+    */
+    max: 66,
+    why: 'the one confirmation between picking a GIF and inserting or posting it'
   },
   {
     file: 'lib/components/GiphyPicker.svelte',
-    max: 153,
-    why: 'the GIF search grid'
+    /*
+      153 -> 216, 2026-08-30. Two audit rows, and most of the addition is why.
+
+      `note-editor-giphy-search-button` — const 88 is used TWICE in the capture
+      (`d(12,"span",88)` then `d(14,"span",88)`), and only the clear half was here, so a search could
+      be started only by pressing Enter with a visible affordance beside it that did the opposite.
+
+      `note-editor-giphy-hint-text` — `app-note` says `insert it` where three other surfaces say
+      `select it`, and this one component serves all four. A `hint` prop with the majority string as
+      its default; the entry carries the four offsets and the reason the words are not
+      interchangeable.
+
+      The rest is the two-word divergence from the capture on the new span (`text-white` for
+      `text-dark`, and `fa-2x`), which matches its own sibling rather than the reference because this
+      picker is a dark popover where the reference's is a light modal.
+    */
+    max: 216,
+    why: 'the GIF search grid, its search and clear pair, and the one word that varies by surface'
   },
   {
     file: 'lib/components/ImageUploadDialog.svelte',
@@ -3681,7 +4313,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       layout — the fields inline in the composer and a second modal beside it — which would have put
       roughly two hundred lines into the file that was already one line from its ceiling.
     */
-    max: 522,
+    /*
+      522 -> 609, 2026-08-30. The Alert Labels picker — `PAM-01`, and the producer for a consumer
+      that had already shipped: the room parsed the setting and rendered the badges, so a configured
+      label worked only if the presenter typed `#DayTrade` by hand.
+
+      Most of the addition is the decode. `zTe` at byte 2,119,145 with its consts read out of
+      `app-post-alert-modal`'s own table, the `O(62, …length > 0 ? 62 : -1)` gate at 2,138,428 that
+      puts it between Non-trade and Linked Room Alerts, and two properties that read as mistakes and
+      are the shipped markup: the id is INDEX-based and the label text ends in a question mark.
+
+      One deliberate divergence, argued at the code: the selection lives in a `SvelteSet` here rather
+      than as `checked` on the room's shared parsed table, which is where the reference keeps it.
+    */
+    max: 609,
     why: 'the alert composer and its per-open resets'
   },
   {
@@ -3797,7 +4442,54 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       **The file is smaller than it was this morning** (1032), and the captured-DOM contract that
       pins the card layout ran green throughout.
     */
-    max: 1008,
+    /*
+      1008 -> 1061, 2026-08-30. The presenter's colours, and one defect they uncovered.
+
+      The wiring is small: a prop, and two derived values that let the presenter's pair override the
+      message's own `backgroundColor` / `fontColor` — which is exactly where the reference applies
+      them, four lines after `msg.bkgColor` sets the same three slots. That placement is what makes
+      the full four-way precedence fall out with no new branch, and the comment explaining it is
+      most of the addition.
+
+      THE DEFECT: the kebab's inversion colour and the box's background were two separate
+      expressions and only one of them read `effectiveStyle`, so a followed user whose message also
+      carried a background got a kebab inverting a colour that was nowhere on screen. The comment
+      beside it already said it should be *"color: <box background>"*. It is one derived value now.
+
+      The extraction, if this climbs again, is still `bodySegments` and its four parse functions.
+    */
+    /*
+      1061 -> 1078, 2026-08-30. `showMenu`, and the paragraph saying what `false` costs.
+
+      One caller passes it and forty do not, so it defaults TRUE and the contract asserts the
+      default before it asserts the suppression — a prop that defaulted the other way would strip
+      the kebab from the whole room silently.
+    */
+    /*
+      1078 -> 1270, 2026-08-30. Eight rows of the surface audit, and most of the addition is why.
+
+      RM-01 is the structural one: TWO HOSTS, one per mode, which is the reference's own split —
+      `app-st-message` and `app-st-compactmessage` are two components with two `styles:[…]` blocks,
+      and this rendered both modes inside the card's host so the compact branch wore the card's
+      stylesheet. The date separator became a `{#snippet}` so there is still exactly one of it, which
+      `alert-chat-style-contract` asserts and is right to.
+
+      **NOT a component per mode, and that is the same trade this file records for the note editor's
+      toolbar.** The compact branch reads two dozen values off this component — every gate, both
+      formatters, the menu's allow-list, six style deriveds — and a component taking those as props
+      would be two dozen props whose only purpose is to reach back here. The seam the REFERENCE draws
+      is the host element and its stylesheet, and that is exactly what crossed:
+      `lib/styles/compact-message.css`.
+
+      The rest: RM-02 the compact alerts row (its `short` date and the Ask-a-question button), RM-03
+      the two colour classes the compact body was missing, RM-04 the add-reaction pill, RM-07
+      `questionColor` on alerts, RM-13/14/24 three invented values removed.
+
+      If this grows again the seam is the BODY SEGMENTS renderer — `bodySegments` and the six segment
+      kinds it switches on are one concern, they take a segment list and nothing else, and they are
+      already a snippet.
+    */
+    max: 1270,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {
@@ -3845,7 +4537,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ScreenPane.svelte',
-    max: 441,
+    /*
+      441 -> 471, 2026-08-30. The watermark span, its prop, and thirty lines of why.
+
+      Two of those paragraphs are load-bearing rather than decorative: the span sits INSIDE
+      `#video-screen-container-{id}` because the captured `.video-screen-container { position:
+      relative }` is what its `bottom: 50%` is measured against, and because that container is what
+      `toggleFullscreen` fullscreens — a watermark outside it is clipped away in exactly the state a
+      recording would be made in. The contract asserts that by NESTING rather than by line order.
+    */
+    max: 471,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -3935,7 +4636,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `bootstrap-dropdown-contract.test.ts` — which is the extraction, and which now fails if a
       nineteenth dropdown arrives without a way to open it.
     */
-    max: 598,
+    /*
+      598 -> 605, 2026-08-30, and the file gained seven lines while losing a prop.
+
+      `overlayUserIdOnScreenshare` + `userXrefID` + `isPresenter` became one `userIdWatermark`,
+      because the gate they spelled out here was the gate `ScreenPane` did not have. What grew is the
+      note recording that: a rule with two consumers and one implementation is how the second
+      consumer ends up uncovered.
+    */
+    max: 605,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {

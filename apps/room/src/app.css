@@ -3,6 +3,12 @@
 @import 'animate.css/animate.min.css';
 @import './lib/styles/tokens.css';
 @import './lib/styles/captured-runtime-components.css';
+/*
+  `app-st-compactmessage`'s own block. LAST, so it wins over the card's rules for anything the
+  compact host encloses — which is the cascade Angular's per-component attributes gave upstream, and
+  the reason it is imported here rather than folded into the generated file it cannot come from.
+*/
+@import './lib/styles/compact-message.css';
 
 .fa-disk::before,
 .fa-floppy-o::before {
@@ -650,6 +656,37 @@ app-chat app-roomscroller {
 
 .bootbox.modal.show {
   display: block;
+}
+
+/*
+  ── A DIALOG RAISED FROM INSIDE THE NOTE SURFACE HAS TO STACK OVER IT ────────────────────────────
+
+  Measured, not guessed. Three numbers decide this and all three are read from the sheets that ship:
+
+    .modal           z-index: 1055    `--bs-modal-zindex` in the bundled Bootstrap
+    .modal-backdrop  z-index: 1050    `--bs-backdrop-zindex`
+    .note-modal.open z-index: 1070    Summernote's, transcribed into the note components
+
+  So a `<BootboxDialog>` raised while a note modal is open paints BEHIND it — 1055 against 1070, in
+  the same stacking context, with no ancestor between them to change the answer. The dialog is there
+  and focused and answering the keyboard; it is simply invisible under the modal that asked the
+  question. `NoteEditor` has raised its upload and save failures that way since it was written, and
+  `CarouselDialog`'s two confirmations joined it on 2026-08-30 before this was measured.
+
+  Lifting the whole `.bootbox` class would put every bootbox in the app over every modal in the app,
+  which is a different and wrong claim. This is opt-in: the two components that raise a dialog from
+  inside their own modal pass `className="above-note-modal"`, and the number lives HERE, once, beside
+  the two it has to beat rather than duplicated into each component's scoped block.
+
+  1075/1074 keeps the same 1-apart relationship Bootstrap gives `.modal` and its backdrop, so the
+  backdrop dims the note modal without covering the dialog it belongs to.
+*/
+.bootbox.modal.above-note-modal {
+  z-index: 1075;
+}
+
+.bootbox.modal.above-note-modal + .modal-backdrop {
+  z-index: 1074;
 }
 
 .mainPresentationAreaHolder {

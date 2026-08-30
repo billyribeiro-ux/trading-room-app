@@ -14,6 +14,7 @@
   import EmojiPicker from './EmojiPicker.svelte';
   import Modal from './Modal.svelte';
   import RoomMessage from './RoomMessage.svelte';
+  import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
 
   /**
    * `app-alert-qa-modal` — the Q&A thread on one alert.
@@ -46,6 +47,7 @@
     targetMessage,
     alertQuestions = [],
     messageChrome,
+    presenterColors,
     displayMode,
     isPresenter,
     onclose,
@@ -83,6 +85,16 @@
       reactions: MessageReactions;
     }[];
     messageChrome: RoomMessageChrome;
+    /**
+     * Every presenter's message colours for this room, keyed by the sender's email hash.
+     *
+     * The thread renders through the same `app-st-message` the room does, and the reference applies
+     * `presenterSettings[msg.avt]` inside that component with no exception for the modal — so a
+     * presenter's ANSWER in this thread carries their colours here too. `followedUsers` is a
+     * different case and is still not passed: this component has never had it, and adding it would
+     * be a behaviour change with no evidence asked for.
+     */
+    presenterColors: PresenterColorMap;
     /**
      * The thread renders in the ALERTS mode, not a mode of its own.
      *
@@ -283,6 +295,7 @@
             evidenceQuestion: true
           }}
           {...messageChrome}
+          presenterStyle={presenterColorsFor(presenterColors, question.senderEmailHash)}
           {displayMode}
           kind="alert"
           isQaMessage={true}

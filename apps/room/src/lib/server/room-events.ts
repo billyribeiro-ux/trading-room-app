@@ -143,6 +143,20 @@ export type RoomEvent =
          */
         noteId?: number;
         /**
+         * Who performed the act, on the four message-mutation frames.
+         *
+         * `updateChatMsg` / `updateAlertMsg` / `deleteChatMsg` / `deleteAlertMsg` —
+         * `#lib/message-mutation-frames.ts` holds the names, the bytes they were read at, and why
+         * ours carry no row where the reference's carry the whole thing.
+         *
+         * Its ONLY use is on the recipient's side, compared against that listener's own id to skip a
+         * refetch the browser has already performed. It is not authority: the frame carries no
+         * payload, so there is nothing a forged id could unlock, and every rule was applied on the
+         * server before this was published. Stated because an id on a wire is exactly what the
+         * 2026-08-07 escalation was, and the difference is what it is allowed to decide.
+         */
+        actorUserId?: number;
+        /**
          * `giveMicScreen`'s payload.
          *
          * A top-level command of its own in the capture, not a `remotePresCommand` subCmd:

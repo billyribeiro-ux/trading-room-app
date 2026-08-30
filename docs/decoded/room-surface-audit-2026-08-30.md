@@ -100,6 +100,12 @@ behind it is reproducible by re-reading the offset, which is the point of quotin
 
 ### G1 — The whole composer button column is absent: emoji picker, image upload, GIF picker
 
+**BUILT 2026-08-30 10:05 UTC.** All three, in a component of their own. `textAreaBtnsCol` (const 56), the emoji span (57/58), the image-upload span (63/64) and the GIF span (65), with the image and GIF gated on `canPostImages` and the emoji deliberately not — the capture's split and the sensible one, since an emoji is text. The webinar notice (53/61/62) is there too, its tooltip verbatim including the reference's own missing apostrophe in "everyones".
+
+**A COMPONENT because the ratchet said so.** The column put `PrivateChatPanel.svelte` at 716 lines and `source-size-contract` refused it, so `PrivateChatComposer.svelte` came out carrying `pEe` whole. The panel is now **516** lines — smaller than before the feature — which is what an extraction is supposed to look like.
+
+**The image dialog is this conversation's OWN**, a third `ImageUploadDialog` instance rather than a share of the chat composer's. `RoomOverlays` already records that rule for the swing form; here the cost of getting it wrong is larger, because an image meant for one person would land in the room. The URL is SENT rather than staged, which is what `sendPrivChat` does with it. **`openRTEModal` is deliberately absent**, as `AlertChatArea` already records: the reference puts it on exactly two composers and private chat is not one of them.
+
 **high** · `missing-control` · reference byte **2,198,563**
 
 ```
@@ -111,6 +117,8 @@ function pEe(t,n){if(1&t){const e=Y();d(0,"div",50)(1,"div",52),H(2,lEe,5,0,"div
 > Verified: Confirmed on both sides. Reference: the `pEe` render function at offset 2198563 belongs to `app-privchat` (selector block at offset 2214530: `selectors:[["app-privchat"]],decls:19,vars:9`), and that component's consts array (read at offset 2217534) carries the full composer button column — `textAreaBtnsCol`, a `textAreaBtns` span with `["…
 
 ### G2 — `.pc-messages` has no CSS rule anywhere, so the private-chat log cannot scroll
+
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** The transcribed rule is in `captured-runtime-components.css:6691` (`app-privchat .pc-messages:not(:root)`), and `app.css:319` adds the host rule it needs — `app-privchatscroller { display: block; height: 100% }` — with a paragraph explaining that a custom element is `display: inline` until something says otherwise, so a percentage height inside it resolved against `auto`. This row describes a revision the panel has moved past.
 
 **high** · `missing-behaviour` · reference byte **2,194,497**
 
@@ -124,6 +132,8 @@ dependencies:[uf],styles:[".pc-messages[_ngcontent-%COMP%]{height:calc(100% - 50
 
 ### G3 — `PAGE_SIZE = 50` and `Math.floor(log.length / 50)` replace the scroller's component-owned page counter, and re-request the same page
 
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** `PAGE_SIZE` no longer exists in this panel; paging is `RoomLogPages` (`#paging`), which is the extracted `currPage`/`hasMoreData`/`isLoadingMore` machinery this row's own verification note said the repository already had. `loadMore` refuses while `loadingMore` or `!hasMoreData`, so the same page cannot be requested twice.
+
 **high** · `invented-value` · reference byte **2,193,442**
 
 ```
@@ -135,6 +145,8 @@ loadMore(){this.loadMoreLastID="pcm-"+this.msgs[0]._id,this.appService.guiEventB
 > Verified: I tried to find a component-owned page counter for private chat and it is genuinely absent. What I found instead confirms the claim and sharpens it: this repo DOES have the reference's counter machinery, extracted and named `RoomLogPages` (`lib/room/log-pages.svelte.ts`) — `#page` documented as "`this.currPage`, per log" (:62), `#hasMore`…
 
 ### G4 — `hasMoreData` is never modelled, so Load More never disappears when the history runs out
+
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** `get hasMore()` is `this.#paging.hasMoreData && !this.#searchTerm` — the reference's own gate — and the badge reads it. `switchToUser` resets the paging with `newLoadMorePaging()`, which is `PCswitchChatToUser`'s `currPage = 0, hasMoreData = !0, isLoadingMore = !1`.
 
 **high** · `missing-behaviour` · reference byte **2,194,388**
 
@@ -148,6 +160,8 @@ loadMore(){this.loadMoreLastID="pcm-"+this.msgs[0]._id,this.appService.guiEventB
 
 ### G11 — `autoExpand` is not applied to the private-chat textarea, so `.pc-messages` is never resized either
 
+**BUILT 2026-08-30 10:05 UTC.** Both halves, byte 2,203,228. The composer never expanded at all, so a member typing three lines saw one with the rest scrolled out of a box the captured `.txt-area` rule gives `overflow-y: auto`. **The second half is what makes this different from the main composer's variant:** `.pc-messages` is `calc(100% - 50px)` — fifty pixels reserved for a one-line composer — so a composer that grows without the log shrinking pushes the log's bottom off the panel, and the newest message disappears exactly when somebody is replying to it. The `+ 2` is the capture's and `+page.svelte` already records why it is not padding for luck. Scoped with `closest('app-privchat')` rather than a bare `document.querySelector`, which is the same scoping `this.elementRef.nativeElement.querySelector` gives upstream. It re-runs on any change to the draft and not only on input — an emoji, a cleared box after a send, a GIF URL — which is the half the reference gets for free by calling `autoExpand` from each of those places.
+
 **medium** · `missing-behaviour` · reference byte **2,203,228**
 
 ```
@@ -159,6 +173,8 @@ autoExpand(e){P("autoExpand:"),e.style.height="0";const i=window.getComputedStyl
 > Verified: I could not refute it. The private-chat textarea in our source has no expand wiring of any kind, and nothing in apps/room/src ever writes a height onto `.pc-messages`.
 
 ### G12 — No incoming-PM toast or desktop notification ("Message from <name>")
+
+**BUILT 2026-08-30 09:20 UTC.** `Message from <name>` as both a toast and a browser notification, gated on `!doNotDisturbOn && chatPopup` exactly as byte 2,205,900 has it, and raised only for a message that is NOT mine and NOT on the conversation already open — the same test the unread count beside it uses, because there is no point telling somebody about a message they are looking at. Only the SOUND fired before, so a member with the panel closed had no way to learn a private message had arrived. `RoomToasts` is injected rather than reached for, exactly as `playSound` is: this class knows WHEN somebody should be told and deliberately not how, and that class already owns the queue, the duplicate guard and the `?d=mm&s=50` gravatar fallback the icon needs. `chatPopup` joined `PrivateChatPrefs`; `RoomPrefs` already held it for the @-mention popup.
 
 **medium** · `missing-behaviour` · reference byte **2,205,471**
 
@@ -172,6 +188,8 @@ autoExpand(e){P("autoExpand:"),e.style.height="0";const i=window.getComputedStyl
 
 ### G13 — `canPost` refusal ("Sorry, you can't post to this channel") is not modelled
 
+**BUILT 2026-08-30 10:05 UTC.** The reference's own sentence, raised through this room's dialog primitive, before anything is trimmed or sent. There was no gate at all: a member whose chat was muted or disabled typed, the message went to the server, and the refusal came back as a generic failure rather than as the reason. **`canPost` is injected, not computed here** — the room already decides who may chat (`chatComposerAvailable`, the same value the main composer's render gate uses, which is upstream's own pairing at `O(4, e.isConnected && e.chatEnabled ? 4 : -1)`), and a second opinion in the panel is how two places come to disagree about one authority. The server refuses independently regardless; this is the message, not the enforcement. The draft is kept, so nothing a member typed is lost to a refusal.
+
 **medium** · `missing-behaviour` · reference byte **2,208,062**
 
 ```
@@ -183,6 +201,8 @@ sendMessage(){if(!this.canPost)return void bootbox.alert("Sorry, you can't post 
 > Verified: The refusal is UNREACHABLE DEAD CODE in the reference's own private-chat component, so there is no behaviour to model — and the one real refusal path that exists IS built here. 1.
 
 ### G14 — Load More loses the reader's position — no `pcm-` anchor scroll-restore and no `-20` nudge
+
+**BUILT 2026-08-30 09:20 UTC.** `loadMoreLastID` is recorded as `pcm-${firstRow._id}` BEFORE the request and restored after it, with `scrollIntoView(true)` and the reference's `- 20`. Without it the older page is inserted above the viewport while the scroll position stays where it was — now a different message — so a reader pressing `Load More` was thrown backwards through history they had not read. **The `-20` is transcribed rather than tuned:** `scrollIntoView(true)` aligns the anchor to the very top of the box, which hides the badge and the last line of the page just fetched, and guessing a different number would be inventing a value nobody can check. `CompactMessageRow` already emitted `id="pcm-{message._id}"`, so the anchor existed all along and nothing scrolled to it. `tick()` and not `setTimeout` — the opposite of `scrollToBottom`'s choice in the same class, and the note says why.
 
 **medium** · `missing-behaviour` · reference byte **2,191,427**
 
@@ -196,6 +216,10 @@ this.appService.appEventBus.subscribe("getPCLog",e=>{this.isLoadingMore=!1,0==e.
 
 ### G15 — Avatar `src` has no gravatar fallback, so an empty `avatarUrl` renders a broken image
 
+**BUILT 2026-08-30 08:40 UTC — AND IT UNCOVERED A LIVE PRIVACY DEFECT.** `avatarSrc(pic, avt, size)` at both sites, with the capture's two sizes (`?d=mm&s=25` in the header at byte 2,195,104, `&s=32` in the list at 2,196,585).
+
+**The value this row wanted to put in an outbound URL was every member's raw email address.** `lib/server/private-chat.ts` filled `avt` with `sender.email` and `peer.email`, so a member asking for their own history was handed the other participant's address, and the tab strip carried one per conversation. `private-chat-delivery.test.ts` had already found and fixed that exact leak on the live broadcast — its docblock names it — but its assertion read ONE file, so the two read paths shipped the address for weeks. Both now send `hashEmail(...)`, which is gravatar's own md5-of-the-lowercased-address and what the reference sends; that contract now sweeps every producer of the field. Stated plainly at the code: an md5 of an address is not strong protection, and what it stops is the plaintext being handed out and forwarded to a third party.
+
 **medium** · `missing-behaviour` · reference byte **2,196,189**
 
 ```
@@ -207,6 +231,8 @@ z("src",e.pic||"https://secure.gravatar.com/avatar/"+e.avt+"?d=mm&s=32",Mt)
 > Verified: I could not refute it. Both private-chat avatar images bind `pic` directly with no `||` fallback, and no fallback is applied at any upstream hop.
 
 ### G16 — Tab online status is hard-coded false for every server-supplied conversation
+
+**BUILT 2026-08-30 08:40 UTC.** An `onlineUserIds: () => ReadonlySet<number>` option, read once per recompute of the tab strip, supplied from `roster.users`. `checkUserOnlineStatus` (byte 2,203,628) re-runs on `getRoster`, `onUserJoin` and `onUserLeave`; deriving it does the same without three subscriptions to keep in step, and reads the roster once rather than upstream's O(roster × tabs) nested loop. **One deliberate divergence:** upstream's function only ever writes `!0` and has no branch that clears the flag, so a member who leaves stays lit until something rebuilds the tab list. Ours goes back to false, which is what the dot claims to mean.
 
 **medium** · `missing-behaviour` · reference byte **2,203,228**
 
@@ -220,6 +246,8 @@ checkUserOnlineStatus(){if(this.privChatVisible&&this.appService.globals.roster&
 
 ### G17 — The clear-search button does not clear the input when the typed term was never submitted
 
+**BUILT 2026-08-30 08:40 UTC.** `searchTerm = ''` before `onsearch('')`, and the order is the fix — `o.value = ""` then `onEnterSearchChat("")` at byte 2,195,340. The local `$state` is written rather than the DOM node, because `bind:value` owns that element and reaching past a binding to set `.value` is how the two disagree.
+
 **medium** · `defect` · reference byte **2,195,340**
 
 ```
@@ -231,6 +259,8 @@ d(7,"span",34),x("click",function(){D(e);const o=It(6),s=g();return o.value="",E
 > Verified: I tried to refute this and could not. The clear button at PrivateChatPanel.svelte:281 is `onclick={() => onsearch('')}` and nothing else — there is no `$effect` anywhere in PrivateChatPanel.svelte (grep for `$effect` in that file returns zero lines), no element ref, and no write to the input's own `.value`.
 
 ### G18 — The whole body is gated on `tabs.length > 0`; the reference gates only the LIST column on it
+
+**BUILT 2026-08-30 08:40 UTC.** Two independent gates, as `O(16, o.chatTabs && o.chatTabs.length > 0 ? 16 : -1), O(17, "" !== o.currUser ? 17 : 18)` has at byte 2,219,468. The window this closes is between `openFromRoster` and `getAllPCLogs` returning: a selected peer and no tabs yet, where the panel used to say "No active chat" and show no composer, then change its mind.
 
 **medium** · `divergence` · reference byte **2,219,468**
 
@@ -244,6 +274,8 @@ m(),O(16,o.chatTabs&&o.chatTabs.length>0?16:-1),m(),O(17,""!==o.currUser?17:18))
 
 ### G5 — `pmLogsOnRight` side-swap (`flex-row-reverse` on `.pc-body`) is not applied
 
+**BUILT 2026-08-30 09:20 UTC.** `class={['d-flex h-100 pc-body', { 'flex-row-reverse': pmLogsOnRight }]}` — `YDe = t => ({"flex-row-reverse": t})` at offset 2,194,594, applied at 2,219,468. The preference is now HELD by `RoomPrefs` as well, which it was not: the settings modal wrote it and persisted it and nothing in the room ever read it back, so the toggle changed its own state and nothing else. It defaults FALSE where its neighbours default true, because `!== false` would have flipped every existing member's panel on the first load after this shipped. The class rather than two orderings of the markup, because DOM order is the reading order a screen reader and the tab key follow.
+
 **medium** · `missing-control` · reference byte **2,219,468**
 
 ```
@@ -255,6 +287,8 @@ z("ngClass",ct(7,YDe,o.appService.globals.preferences.pmLogsOnRight))
 > Verified: The `pmLogsOnRight` preference is written but never read anywhere in apps/room/src. PrivateChatPanel.svelte:306 renders `<div class="d-flex h-100 pc-body">` as a static class string; the component's props list (PrivateChatPanel.svelte:118-138, 19 props) has no layout/side prop, and the render site at +page.svelte:1440-1463 passes none.
 
 ### G6 — Tab list is rendered in the wrong order — the reference reverses it so the most recent conversation is first
+
+**BUILT 2026-08-30 08:40 UTC.** `const orderedTabs = $derived([...tabs].reverse())` — `pt(e.chatTabs.slice().reverse())` at byte 2,196,816. The reversal is for DISPLAY only and the model stays ascending, which is the reference's own ordering and what every other reader of the getter expects. A spread rather than `reverse()` in place, because that mutates the array the caller still holds.
 
 **medium** · `missing-behaviour` · reference byte **2,196,816**
 
@@ -268,6 +302,8 @@ function rEe(t,n){if(1&t&&(d(0,"div",20),ht(1,oEe,8,9,"button",39,qDe),H(3,sEe,5
 
 ### G7 — No `getAllPCLogsLoading` state — neither the tab-strip loader nor the "Loading private chats" empty pane exists
 
+**MEASURED REFUSAL — recorded 2026-08-30 09:20 UTC, deliberately NOT built.** Upstream needs that flag because it POSTs `getAllPCLogs` when the panel opens. This room does not: the conversation list is `loadConversations(...)` at `+page.server.ts:743`, resolved before the page renders and delivered with it, and the only thing that refreshes it is `invalidateAll()`, which keeps the previous list on screen while it runs. **There is no instant at which the strip exists and its contents are unknown**, so both of the reference's loading branches would be branches that can never render — which is a branch that can never be checked, the same call made for the note carousel's file browser earlier today. The paragraph lives at the code, and it names what would make the flag real (fetching the list on open) so a future change finds the two waiting empty states rather than rediscovering them from the capture.
+
 **medium** · `missing-behaviour` · reference byte **2,196,694**
 
 ```
@@ -279,6 +315,8 @@ function sEe(t,n){1&t&&(d(0,"div",40)(1,"div",47),v(2,"Loading all private chats
 > Verified: I could not refute it: the loader is genuinely absent from apps/room/src. PrivateChatPanel.svelte:337 and :389 both render the static "No active chat" div with no loading branch, and RoomPrivateChat has only #peerHistoryLoading (the moderator peer-history modal, private-chat.svelte.ts:156/238/492) — nothing for the tab list.
 
 ### G8 — Header tab close (`closeTab`) does not deselect the open thread
+
+**BUILT 2026-08-30 09:20 UTC.** `closeTab()` on the panel state, wired to `onclosepeer`. It clears the peer, the search, the results bucket and the draft, then calls `onCleared` — which is what clears `selectedMessageUser`, the only thing the old wiring did. The header tab used to vanish while the thread and composer stayed: a conversation with nobody's name on it. Kept SEPARATE from `close()`, which is the panel's own X and hides the panel as well; the reference's two are two for the same reason.
 
 **medium** · `missing-behaviour` · reference byte **2,205,022**
 
@@ -292,6 +330,8 @@ closeTab(e){this.user=null,this.recvdUser=null,this.currUser="",console.log("clo
 
 ### G19 — No "Loading..." spinner badge while a page is in flight
 
+**ALREADY BUILT — verified by reading 2026-08-30 08:40 UTC, not rebuilt.** The two exclusive branches are in the panel — `{#if hasMore && !searching}` for the badge, `{:else if loadingMore}` for the spinner — which is `O(2, …), O(3, o.isLoadingMore ? 3 : -1)`.
+
 **low** · `missing-behaviour` · reference byte **2,191,172**
 
 ```
@@ -303,6 +343,8 @@ function zDe(t,n){1&t&&(d(0,"div",2)(1,"span",5),T(2,"i",6),v(3," Loading..."),u
 > Verified: The reference's app-privchatscroller renders TWO independent branches inside .pc-messages: the clickable "Load More" badge ($De, gated on hasMoreData && !searchTerm) and a separate non-clickable spinner badge (zDe, gated on isLoadingMore) whose consts are [1,"badge","badge-warning"] plus [1,"fas","fa-spinner","fa-spin"] with the text " Lo…
 
 ### G21 — Composer textarea: placeholder has two dots not three, and `name`/`spellcheck`/`form-control` are missing
+
+**BUILT 2026-08-30 08:40 UTC.** All four, from the const at byte 2,217,341 — `name="txt-area"`, `spellcheck="true"`, `class="txt-area form-control"` and the three-dot placeholder. `form-control` is the one that is not cosmetic: it gives the box its border, padding and focus ring, where the `w-100` standing in its place only made it wide. The structure is corrected too — the flex row moves off `#textAreaHolderPM` onto the capture's inner `div.d-flex.mx-0`, with a `div.flex-fill.px-0` around the textarea, which is the element G1's button column attaches to. The whole composer const table (50, 52, 53, 54, 55, 56) is transcribed in the comment, including the two entries belonging to rows still open.
 
 **low** · `wrong-constant` · reference byte **2,217,341**
 
@@ -316,6 +358,8 @@ function zDe(t,n){1&t&&(d(0,"div",2)(1,"span",5),T(2,"i",6),v(3," Loading..."),u
 
 ### G23 — Delayed re-scroll fires at 60 ms; the reference uses 500 ms
 
+**BUILT 2026-08-30 08:40 UTC.** `PRIVATE_CHAT_RESCROLL_MS = 500`, exported so the contract reads the value rather than restating it. The second scroll exists because the first runs against a box whose height is not final — avatars still loading, a long message not yet wrapped — and 60ms fired before either settled, so it re-scrolled to the same wrong place and a conversation opened part-way up its own last message. A `setTimeout` and not `tick()`, which is the opposite of the choice made in `CarouselDialog` and for the opposite reason: what is being waited for is the BROWSER finishing layout, which Svelte does not know about.
+
 **low** · `wrong-constant` · reference byte **2,191,427**
 
 ```
@@ -328,6 +372,8 @@ scrollToBottom(e=!1,i=!1){try{P("scrollPCLogToBottom called on log....force:"+e+
 
 ### G25 — Clearing the search refetches from the server; the reference restores the cached log locally
 
+**BUILT 2026-08-30 09:20 UTC.** Two buckets, as the capture has: `privChatSearchResults` beside `privChatLog[currUser]`, with `log` picking between them. Clearing a search is now a local swap with no request — `privChatSearchResults = []` then `msgs = privChatLog[currUser]` at byte 2,209,001. It used to overwrite the one thread array, so clearing cost a round trip AND discarded every older page the reader had already loaded, sending them back to press `Load More` from the bottom again. The results bucket is cleared on `switchToUser` and on both closes, because results belong to the thread that produced them.
+
 **low** · `divergence` · reference byte **2,209,001**
 
 ```
@@ -339,6 +385,12 @@ clearSearchTerm(){this.pmSearchTerm="",this.appService.guiEventBus.emit("setSear
 > Verified: Could not refute. Our private-chat search has no separate results bucket and no local restore: `search(term)` at private-chat.svelte.ts:562-568 unconditionally awaits `loadLog(this.#peerId, 0, term.trim())`, so clearing the box costs a server round trip; and loadLog at :418-421 writes the answer into the single `#threads[peerId]` array (`…
 
 ### G27 — Title-flash notification interval is absent (recorded elsewhere as a known gap)
+
+**BUILT 2026-08-30 10:40 UTC**, and the tripwire that guarded its absence is what said so. `moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt with an assertion designed to fire when either appeared — *"this assertion exists so that adding either without updating that document fails here"* — and it fired. That assertion is narrowed to the one that IS still a gap (the transcript window's `&name=`), and `private-chat-strip-contract.test.ts` now asserts the string is present in the module that owns it, so the two together still say where it may and may not appear.
+
+The title alternates every two seconds between the room's name and `<sender> messaged you - <room>`, for a message that is not mine and only while the composer does not have focus — `(!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine` at byte 2,207,480. It stops on `onTextareaFocus`, on closing the tab and on closing the panel, each transcribed from its own site. A restart names the LATEST sender, which is upstream's first line in `newMessage`.
+
+**Why it matters more than the sound already there:** a private message arriving in a background tab produced a `pling` and nothing else, and a muted tab, headphones carrying the presenter's audio, or a browser suppressing sound before any click each make that no signal at all. `private-chat-title-flash.ts` owns the interval and the title; the panel decides when. The clear is conditional and the restore is not, so a panel closing with no flash running cannot overwrite a title something else had set.
 
 **low** · `missing-behaviour` · reference byte **2,205,471**
 
@@ -358,6 +410,12 @@ clearSearchTerm(){this.pmSearchTerm="",this.appService.guiEventBus.emit("setSear
 
 ### RM-01 — app-st-compactmessage has its own component stylesheet; our compact branch renders inside the app-st-message host and inherits the CARD styles
 
+**BUILT 2026-08-30 11:20 UTC.** Two hosts, one per mode — the reference's own split, since `app-st-message` and `app-st-compactmessage` are two components with two `styles:[…]` blocks — and `lib/styles/compact-message.css`, the compact component's block transcribed from bundle bytes 1,400,248–1,404,709.
+
+**It could not come from the generator, and that is why it is a separate file.** `captured-runtime-components.css` is generated from `css/complete-app-styles.css`, and that capture carries exactly ONE `.msg-box[…]` scope — `ng-c1254915701`, the card. There is no second one. The compact component's rules exist only inside the JavaScript bundle, so no run of `pnpm css:sync-captured` can produce them and editing the generated file by hand is what its own header forbids. The new file states that provenance at the top; it is the only hand-written captured sheet in the tree.
+
+**NOT a component per mode.** The compact branch reads two dozen values off `RoomMessage` — every gate, both formatters, the menu's allow-list, six style deriveds — so a component taking those as props would be two dozen props whose only purpose is to reach back. That is the trade `source-size-contract` records for the note editor's toolbar, made again: the seam the REFERENCE draws is the host element and its stylesheet, and that is exactly what crossed. The date separator became a `{#snippet}` so there is still exactly one implementation, which `alert-chat-style-contract` asserts.
+
 **medium** · `missing-behaviour` · reference byte **1,400,248**
 
 ```
@@ -369,6 +427,8 @@ clearSearchTerm(){this.pmSearchTerm="",this.appService.guiEventBus.emit("setSear
 > Verified: I could not refute it; the claim is accurate on every point I checked, and our own CHANGELOG corroborates it. (1) MARKUP: RoomMessage.svelte:578 opens <app-st-message> unconditionally and the compact branch {#if displayMode === 'c'} runs 585-744 nested inside it, with no app-st-compactmessage host of its own (line 587 is a comment).
 
 ### RM-02 — Compact ALERT row has no "Ask a question" button and no `short` timestamp — our compact branch renders the bracketed chat time for every kind
+
+**BUILT 2026-08-30 11:20 UTC.** The compact row branches on the log as `O(26, "alerts" === e.logType ? 26 : 27)` does at byte 1,380,680: `r_e` gives the alerts row a `[1,"created-at","mr-2",3,"ngStyle"]` span with Angular's `short` date — `M/d/yy, h:mm a`, which is what `alertDateFormatter` already produces for the card — and the `alert-qa` button gated `!isQAMsg && hasQAOnAlerts`, with the `btn-danger animated flash` unread marker. `a_e` keeps the bracketed `h:mm a` for chat. An alerts log switched to compact mode had lost the Q&A entry point entirely, and the button now has a rule to be styled by, since `.alert-qa` is in the compact block too.
 
 **medium** · `missing-control` · reference byte **1,377,704**
 
@@ -382,6 +442,8 @@ Ze(Ct(3,3,e.msg.t,"short")),m(2),O(4,!e.isQAMsg&&e.appService.globals.sessData.h
 
 ### RM-03 — Compact body drops mentionColor / questionColor
 
+**BUILT 2026-08-30 11:20 UTC.** A `bodyColorClasses` derived carrying the two conditions once, applied by the card body and both compact bodies — `Kn(13, Ew, e.msg.isMention && !e.hasCustomFollowedUserColors, e.msg.txt.includes("?") && !e.hasCustomFollowedUserColors)`, which the compact member body `p_e` and reply body `f_e` read exactly as the card's does. A member mentioned in compact mode got no highlight at all, and the mention colour is the one signal that says a message is addressed to you.
+
 **medium** · `missing-behaviour` · reference byte **1,378,659**
 
 ```
@@ -393,6 +455,8 @@ Kn(13,Ew,e.msg.isMention&&!e.hasCustomFollowedUserColors,e.msg.txt.includes("?")
 > Verified: Confirmed, not refuted. In the reference both compact branches of `app-st-compactmessage` bind the mention/question ngClass: member body `p_e` and member reply body `f_e` use `Ew=(t,n)=>({mentionColor:t,questionColor:n})`, and the admin body `B1e` (const 25) uses `b1e=(t,n,e)=>({mentionColor:t,questionColor:n,"presenter-msg-right flex-fil…
 
 ### RM-04 — Compact reaction strip has no add-reaction pill
+
+**BUILT 2026-08-30 11:20 UTC.** `g_e` at byte 1,380,270, gated as both compact containers gate it — `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)`. In compact mode a reaction could previously be added ONLY through the kebab menu, which is the control a member is least likely to open for something the card offers in one click. `menuAllows.reaction` still gates the strip, so this room's own answer and the capture's compose rather than duplicate.
 
 **medium** · `missing-control` · reference byte **1,380,270**
 
@@ -429,6 +493,8 @@ if(!(a>0&&" "!=e.charAt(a)))
 > Verified: I read the reference bytes and confirmed the guard, then searched apps/room/src exhaustively for any counterpart and found none. REFERENCE (read, not searched): at byte offset 1327300 of apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js the bytes are `if(!(a>0&&" "!=e.charAt(a)))`, inside `parseStock(e,i,o){var s=e.match(new Re…
 
 ### RM-07 — questionColor is gated on `kind === 'chat'` here; the reference applies it on alerts too
+
+**BUILT 2026-08-30 11:20 UTC.** The gate was ours: the reference's two conditions mention no log type. An alert containing a question mark is tinted upstream and was not here — which matters most on the surface where questions are the point, since `hasQAOnAlerts` exists to invite one.
 
 **medium** · `divergence` · reference byte **1,331,638**
 
@@ -490,6 +556,8 @@ z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ng
 
 ### RM-13 — `chat-reaction-hover` is applied by our add-reaction pill but by NO reference template — it only exists in the card stylesheet, so the reference pill is always visible
 
+**FIXED 2026-08-30 11:20 UTC, and it had cost a CONTROL.** The class is real and captured — `.msg-box:hover .chat-reaction-hover{display:inline-block}` with `.chat-reaction-hover{display:none}` at byte 1,366,420 — but no reference template applies it. Wearing it meant the add-reaction pill sat at `display: none` until the enclosing `.msg-box` was hovered, and **there is no hover on a phone**: adding a reaction was impossible on a touch device. A rule with no wearer upstream is a rule upstream does not use, and reading one as an instruction is how a stylesheet becomes a spec. The captured RULE stays where it is — that file is evidence, and deleting one because we stopped wearing it would edit the record.
+
 **low** · `invented-value` · reference byte **1,360,390**
 
 ```
@@ -501,6 +569,8 @@ z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ng
 > Verified: I could not refute the claim; both halves check out. Our add-reaction pill really does carry `chat-reaction-hover` (RoomMessage.svelte:982) and our transcribed rules really do hide it until the row is hovered (captured-runtime-components.css:8151-8156), and the rule is live for us because `msg-box` is a genuine ancestor (RoomMessage.svelt…
 
 ### RM-14 — `answered-check` class is ours; the reference's ✅ div carries `ms-1 private-reply`
+
+**FIXED 2026-08-30 11:20 UTC.** `function Age(t,n){1&t&&(d(0,"div",27),v(1,"\u2705"),u())}` at byte 1,331,360, with const 27 `[1,"ms-1","private-reply"]`. `answered-check` was ours and carried no CSS anywhere in this repository — a class with no rule. The reference reuses the reply wrapper's own classes for the tick, which reads oddly and is what it does.
 
 **low** · `invented-value` · reference byte **1,359,087**
 
@@ -525,6 +595,8 @@ const c=s?`gifExtra_${o}`:`gif_${o}`
 > Verified: I could not refute this. The reference's `urlwrapImg(e,i,o,s)` selects `gifExtra_${o}` vs `gif_${o}` on its fourth argument, and our RoomMessage.svelte emits `id="gif_{item.id}"` unconditionally with no column-aware input under any name: a case-insensitive grep for "extra" across the whole 1,007-line RoomMessage.svelte returns zero hits,…
 
 ### RM-19 — copyMessage mutates msg.txt upstream before writing to the clipboard
+
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone. Recorded rather than silently improved — this is a place where matching the reference would mean reproducing a defect, and the next person comparing the two should find the reason rather than assume the line was missed.
 
 **low** · `divergence` · reference byte **1,355,969**
 
@@ -574,6 +646,8 @@ dge=t=>({"justify-content-end":t})
 
 ### RM-24 — `title="Copy order"` on the trade span has no reference counterpart
 
+**FIXED 2026-08-30 11:20 UTC.** The reference's span is `'<span class="tradeColor" id="id_' + o._id + '">'` at byte 1,414,920 and carries no title, so a member hovering an order in the original sees nothing. `aria-label` takes its place rather than nothing at all, and the two are not the same thing: `title` shows a tooltip to everyone, `aria-label` names the control for a screen reader and is invisible. That span is `role="button"` here — ours, because the capture puts a click handler on a bare span — and a button whose only content is the order text needs a name saying what activating it does.
+
 **low** · `invented-value` · reference byte **1,414,968**
 
 ```
@@ -592,6 +666,8 @@ o.txt.replace("[{(",'<span class="tradeColor" id="id_'+o._id+'">')
 
 ### note-editor-carousel-slide-upload — Per-slide image upload (Upload button, uploading spinner, POST to upload_server) is missing
 
+**BUILT 2026-08-30 05:18 UTC.** A hidden `<input type="file" accept="image/*">` with id `cfi_<index>` under a styled `<label for>` — the reference's own pattern, const 58 `["type","file","accept","image/*",2,"display","none",3,"change","id"]` and 59 `[1,"btn","btn-sm","btn-outline-secondary","mb-0"]` — the ` Upload ` label with `fas fa-upload`, `uploadCarouselImage`, and the `D0e` spinner (const 52 the icon, 53 `[1,"small","mt-1"]`, caption `Uploading...`). Transcribed: the first file only, the input cleared unconditionally so the same file can be chosen twice, the URL written only on success, and the failure raised as a dialog rather than a console line. **Two deliberate divergences:** the POST is NOT transcribed — `onUploadImages` already carries this room's upload (CDN when configured, `composer-image.remote.ts` otherwise) and a second `$.ajax` here would be a second uploader with its own credential handling; and the spinner is keyed by the slide's KEY rather than its index, because upstream mutates a slide object it holds a reference to while ours replaces the array wholesale, so an index captured before the `await` points at a different slide once `removeCarouselSlide` renumbers. `note-image-browser-contract.test.ts`.
+
 **high** · `missing-control` · reference byte **1,476,460**
 
 ```
@@ -603,6 +679,10 @@ uploadCarouselImage(e,i){const o=e.target,s=o.files?.[0];if(!s)return;const r=th
 > Verified: I could not refute this. The carousel dialog is the only one of its kind in our source (NoteEditor.svelte:1338-1417, the `{:else if dialog === 'carousel'}` branch) and its per-slide row renders exactly four controls: `type="url"` Image URL (:1368-1376), `type="url"` Link/URL (:1377-1385), a "Delete slide" button (:1386-1387), then the sha…
 
 ### note-editor-file-browser-modal — The whole file-browser modal ("Select Image" / getSessionFiles) has no counterpart
+
+**BUILT 2026-08-30 05:02 UTC.** The modal, a per-slide button, `selectFileForSlide`, and the four CSS rules — decoded with this component's own consts table (77 `file-browser-grid`, 79 `file-browser-item`, 80 `file-browser-thumb`, 81 `file-browser-name`) and the reference's scoped style block at byte 1,486,651, with the strings verbatim. The filter is `lib/session-image-files.ts`, transcribing `s.contentType?.includes("image/")` — `includes`, not `startsWith`. **Two deliberate divergences:** this room does not fetch on open (the page load already carries the same rows and every upload path invalidates it), so upstream's `Loading images...` branch is not drawn — a branch that can never render can never be checked; and the grid item is a `<button>` where the capture uses a clickable `<div>`, because it exists to be activated. `note-image-browser-contract.test.ts`.
+
+> **Corrected 2026-08-30 05:18 UTC.** That button shipped labelled `Select Image` with invented classes. ` Select Image ` is the MODAL's title (byte 1,466,205); the button is ` Browse `, `fas fa-folder-open`, `btn btn-sm btn-outline-info mb-0 ml-1` (const 61/62, byte 1,462,300). The contract test pinned the invented label because I wrote both from the same wrong memory — it now pins the transcribed one and asserts the invented one is gone.
 
 **high** · `missing-control` · reference byte **1,477,053**
 
@@ -616,6 +696,8 @@ openFileBrowser(e){this.fileBrowserTargetIndex=e,this.fileBrowserImages=[],this.
 
 ### note-editor-carousel-destructive-confirms — Deleting a slide and replacing a slide image happen with no confirmation
 
+**BUILT 2026-08-30 05:52 UTC.** Both questions, in the reference's own words and with its own button classes: `Delete this slide?` (`Delete`/`btn-danger`, byte 1,475,669) and `Change this image?` (`Change`/`btn-warning`, byte 1,476,242), raised through `BootboxDialog` — the primitive `NotesPane` already uses for delete-note, revert-version and welcome-mat, which this path was the one to skip. `clearCarouselImage` moves the old URL INTO the staging field rather than discarding it, so a presenter who changes their mind can press the check and have it back. The pending question is keyed by SLIDE and re-found on accept, because an upload can land while the dialog is open. `note-carousel-slide-contract.test.ts`.
+
 **medium** · `missing-behaviour` · reference byte **1,475,669**
 
 ```
@@ -627,6 +709,8 @@ removeCarouselImage(e){window.bootbox.confirm({message:"Delete this slide?",butt
 > Verified: I could not find either confirmation implemented anywhere in apps/room/src. `removeCarouselSlide` (NoteEditor.svelte:509-512) splices via `.filter()` synchronously and the "Delete slide" button at NoteEditor.svelte:1386-1387 calls it directly — no dialog, no pending state, no request/accept indirection.
 
 ### note-editor-gif-insert-confirm — A GIF is inserted straight from the double-click; the reference confirms with a preview first
+
+**BUILT 2026-08-30 06:52 UTC.** `insertGif` now STAGES the chosen GIF and `confirmGif` is what inserts it, through the `GifConfirmDialog` the chat composer has always used — this row's own verification found that pattern already built for chat and not for notes. The preview is the point: a Giphy result is a thumbnail in a grid, and what lands in the note is `images.original`, a larger image the presenter has not seen at the size it will appear. `this.sendingGif` is transcribed as a REFUSAL rather than a replacement — a second select while one is pending is dropped, because the presenter is looking at a preview of the first and must not confirm a different image than the one on screen. `note-giphy-contract.test.ts`.
 
 **medium** · `missing-behaviour` · reference byte **1,482,885**
 
@@ -640,6 +724,12 @@ sendGif(e,i){this.sendingGif||(this.modalService.dismissAll(),this.sendingGif=!0
 
 ### note-editor-image-popover — The image popover (imageAttributes / resize / float / removeMedia) has no counterpart
 
+**BUILT 2026-08-30 07:25 UTC — three of the four groups.** `resizeFull`/`resizeHalf`/`resizeQuarter`/`resizeNone`, `floatLeft`/`floatRight`/`floatNone` and `removeMedia`, by the names the capture gives, on a strip that appears while an image is selected. Behind them, `note-image.ts` extends `@tiptap/extension-image` with a `width` attribute and a `float` style. **`resizeNone` and `floatNone` clear rather than set** — which is what the names say, and what makes them undo rather than merely change.
+
+**What is evidenced here is the GROUP LIST and nothing else, and the build says so.** Summernote is not in this bundle, so its popover's markup, geometry and icons are unknown; this is a strip above the editor rather than a floating popover, because inventing a popover's geometry to match a capture nobody has is how a component acquires decisions nothing can check. **`imageAttributes` is deliberately NOT built** — a third-party plugin whose dialog is unevidenced twice over, in this bundle and in the reference's own source. It is the one group of four that stays open, and it needs either a capture of that plugin or an owner decision about what the dialog should hold.
+
+**Two divergences with reasons.** The width is an ATTRIBUTE where summernote writes a style, because `safe-html.ts`'s `img` style allow-list admits `width: 100%` and nothing else — `50%` and `25%` would have been stripped on the way back in and the control would have changed nothing. And that allow-list was WIDENED to admit `float: left|right|none`, which is a deliberate change to a deny-by-default control: three enumerated keywords, no URL, no `url()`, no expression, and narrower than the property's real grammar because the extra values are ones this editor cannot produce. `note-image-popover-contract.test.ts` executes the pattern against both the three legal values and five refused ones.
+
 **medium** · `missing-control` · reference byte **1,469,073**
 
 ```
@@ -651,6 +741,8 @@ popover:{image:[["custom",["imageAttributes"]],["image",["resizeFull","resizeHal
 > Verified: I could not find any counterpart and I searched hard. The reference config is confirmed verbatim at the stated offset.
 
 ### note-editor-insert-carousel-silent-noop — insertCarousel with no valid slide fails silently instead of alerting
+
+**BUILT 2026-08-30 06:20 UTC.** `Please add at least one image URL.` — the reference's own string, raised through `BootboxDialog`, with the dialog left OPEN because the presenter is being told to fix the rows in front of them and only the success branch dismisses upstream either. **A missing editor is deliberately NOT this message:** that is a bug in the component, not a mistake by the presenter, and the two conditions were one `||` before this. `note-carousel-guards-contract.test.ts`.
 
 **medium** · `missing-behaviour` · reference byte **1,478,230**
 
@@ -664,6 +756,8 @@ popover:{image:[["custom",["imageAttributes"]],["image",["resizeFull","resizeHal
 
 ### note-editor-version-cap — Version history is unbounded; the reference caps it at 3
 
+**BUILT 2026-08-30 06:20 UTC.** `NOTE_VERSION_LIMIT = 3` (`this.maxVersions = 3`, byte 1,468,359), enforced as a DELETE inside the same transaction as the insert, plus a `LIMIT` on the read. **The delete is the decision and the limit alone would have been the wrong fix:** a capped query leaves the table growing forever with rows nothing can reach, and the count behind `Version History (N)` stops meaning what the reference's means. Pruned on the insert branch only — the coalescing update rewrites the newest row in place, so the count cannot have changed there. Ordered by `version` rather than doing arithmetic on it, because the restore path writes a NEW version rather than rewinding the counter. `notes-repository.test.ts` saves five times and asserts the surplus rows are GONE, not merely unread.
+
 **medium** · `wrong-constant` · reference byte **1,468,359**
 
 ```
@@ -676,6 +770,14 @@ this.maxVersions=3,this.editorDirtyContents=null,this.editorDirty=!1,this.isEdit
 
 ### note-editor-welcome-mat-all-rooms-password — The all-rooms Welcome Mat password prompt is not raised
 
+**BUILT 2026-08-30 08:05 UTC — end to end, and this row's own recorded blocker with it.** `+page.server.ts` carried the gap in its own words: *"the all-rooms variant needs a controller endpoint that enumerates the account's rooms and verifies `allRoomsWelcomeMatPW`."* `internal/room-welcome-mat-auth/[code]` is that endpoint. It answers `required` beside `ok` — the branch `bootbox.prompt` / `bootbox.confirm` swings on — and on a correct password returns the short codes of the rooms the caller's account owns, derived from the room the token already proves them for.
+
+**THE AUTHORITY MOVED, AND THAT IS THE FIX RATHER THAN THE WORKAROUND.** Upstream compares in the browser against `sessData.allRoomsWelcomeMatPW`, which means a member who can read `sessData` can send `setWelcomeMatNoteTab` with any `pw` at all and have it obeyed — the check that mattered never ran on a server. Here the room forwards the typed candidate, holds nothing to compare it against, and the write path re-checks independently of the prompt, so a client that skips the dialog reaches the same gate.
+
+**Three decisions, all recorded at the code.** The room list is on the AUTH call and not a second endpoint, so a `config-read` token alone cannot enumerate an account's rooms — the gate and the data it unlocks are one round trip, and a wrong password returns nothing. `welcomeMatPasswordRequired` fails CLOSED to `required: true`, because a plain confirmation would skip a gate the owner chose to set while a prompt costs one dialog and is re-checked anyway. And "all the rooms' welcome mats" is a COPY PER ROOM, not a shared note: the reference's server is not in the capture, `notes.room_short_code` is the fence every read in that repository scopes by, and a shared note would require removing that scope from the welcome-mat read. Each room's previous mat is demoted, never deleted, so a presenter in that room can put it back.
+
+`welcome-mat-all-rooms-contract.test.ts` (21), `notes-repository.test.ts`'s two behavioural cases with an unnamed fourth room as the control, and the route's entry in both capability registries.
+
 **medium** · `missing-behaviour` · reference byte **1,474,217**
 
 ```
@@ -687,6 +789,8 @@ setAsWelcomeTab(e){e?this.appService.globals.sessData.allRoomsWelcomeMatPW?bootb
 > Verified: I could not refute this. The password branch genuinely does not exist anywhere in apps/room/src, under any name.
 
 ### note-editor-add-slide-scroll — Adding a slide does not scroll the new row into view
+
+**BUILT 2026-08-30 06:20 UTC.** `scrollIntoView({ behavior: 'smooth', block: 'nearest' })` on the last row, byte 1,475,568. The `.carousel-slides-list` scroller this row also named landed with the three-state rebuild an hour earlier, which is what made the missing scroll visible: a presenter with six slides pressed ` Add slide ` and nothing appeared to happen. **Two deliberate divergences:** `tick()` rather than upstream's bare `setTimeout`, so it waits for exactly the render that added the row; and the query is scoped to this dialog's own list rather than `document`, because upstream's selector is scoped only by there being one such modal on the page. `note-carousel-guards-contract.test.ts`.
 
 **low** · `missing-behaviour` · reference byte **1,475,568**
 
@@ -701,6 +805,8 @@ elImage(){this.carouselImages.push({url:"",link:"",pendingUrl:"",uploading:!1}),
 
 ### note-editor-carousel-arrow-hover — Carousel arrow buttons have no hover background change
 
+**BUILT 2026-08-30 06:20 UTC.** Both handlers and both missing calls, byte 1,480,561. The inline style string already declared `transition: background 0.2s` — transcribed with the rest of it — and nothing ever changed the background, so it described an animation that could not happen. `preventDefault` and `stopPropagation` are the half that matters more: a slide may be wrapped in `slide.link` and an arrow sits inside it, so without them paging a linked carousel navigated away from the note. `note-carousel-guards-contract.test.ts`.
+
 **low** · `missing-behaviour` · reference byte **1,480,561**
 
 ```
@@ -712,6 +818,8 @@ W.onmouseenter=()=>W.style.background="rgba(0,0,0,0.75)",W.onmouseleave=()=>W.st
 > Verified: I tried to find the arrow hover implemented under another name and could not. Our carousel arrow factory is `control()` inside `setupCarousel()` at /home/user/trading-room-app/apps/room/src/lib/components/notes/safe-html.ts:241-257.
 
 ### note-editor-carousel-labels — Carousel modal label text differs from the captured strings
+
+**BUILT 2026-08-30 05:52 UTC.** Every string in this row: `Rotation interval (seconds)`, the `Slides` group label, `Link URL ` with its `(optional — clicking the image opens this)` hint span, `Image ` + `span.text-danger` `*`, ` Add slide ` with `fa-plus`, and the icon-only `i.fas.fa-trash` where a text `Delete slide` button was. `note-carousel-slide-contract.test.ts` asserts each, and asserts the three invented ones are gone.
 
 **low** · `wrong-constant` · reference byte **1,463,957**
 
@@ -725,6 +833,8 @@ v(11,"Link URL "),d(12,"span",50),v(13,"(optional — clicking the image opens t
 
 ### note-editor-carousel-modal-chrome — Carousel modal chrome: no Cancel button, no slide index badge, no delete-disabled-at-one
 
+**BUILT 2026-08-30 05:52 UTC.** All three: the footer ` Cancel ` (const 41, `btn btn-outline-dark`), the `#N` badge (const 44, `Ne("#", i+1, "")`), and `disabled={carouselSlides.length === 1}` on the trash. The last REPLACES a behaviour this row described fairly as reaching the same end state by a different route — deleting the last row spliced it out and silently re-added a blank one, so the presenter's row appeared to survive a delete they had just asked for. `note-carousel-slide-contract.test.ts`.
+
 **low** · `missing-control` · reference byte **1,465,110**
 
 ```
@@ -736,6 +846,8 @@ d(21,"button",38),x("click",function(){return D(e),E(g().addCarouselImage())}),T
 > Verified: All three sub-items are genuinely absent from our source, and the reference genuinely has all three (I re-read the bundle bytes at the cited offsets myself). (1) No Cancel button.
 
 ### note-editor-carousel-slide-preview — Filled-slide image preview and ' Change image ' button are missing
+
+**BUILT 2026-08-30 05:52 UTC.** `k0e` at byte 1,463,604 — const 68 `[1,"carousel-img-preview","mb-2"]`, 69 `[1,"carousel-preview-img",3,"src"]`, 70 the button, 71 `fa-times` — and with it the three-state row `O(6, e.uploading ? 6 : e.url ? 8 : 7)` this row said was one flat state here. The two `.carousel-img-preview` rules at byte 1,488,253 now have their consumer. The `<img>` is registered UNSIZEABLE with its reason: upstream bounds it `max-height: 140px; max-width: 100%` with `object-fit: contain` on purpose, because that state exists to show the WHOLE image and a fixed box would letterbox or crop the very thing being checked. `note-carousel-slide-contract.test.ts`.
 
 **low** · `missing-control` · reference byte **1,463,604**
 
@@ -749,6 +861,8 @@ x("click",function(){D(e);const o=g().$index;return E(g(2).clearCarouselImage(o)
 
 ### note-editor-giphy-hint-text — Giphy hint reads "to select it" where app-note reads "to insert it"
 
+**BUILT 2026-08-30 06:52 UTC.** A `hint` prop on `GiphyPicker`, defaulting to `*Double click an image to select it` — the majority string at offsets 1,425,716, 2,197,828 and 2,372,175 — with `app-note`'s `insert it` (1,467,154) passed by `NoteEditor`. **This row filed it fairly as a shared-component compromise and it was one, but it was not a necessary one:** the difference is a prop, the default keeps the three surfaces that were already right untouched, and the words are not interchangeable — everywhere else a double-click selects a GIF that is then confirmed and SENT to a room; in a note it goes into a document. The same fix answers `GifConfirmDialog`'s `post`/`insert` split. `note-giphy-contract.test.ts`.
+
 **low** · `wrong-constant` · reference byte **1,467,154**
 
 ```
@@ -760,6 +874,8 @@ d(5,"div",83)(6,"h6"),v(7,"*Double click an image to insert it")
 > Verified: Could not refute. Our GiphyPicker hardcodes the hint as "*Double click an image to select it" in markup, and its Props interface is only { apiKey, popoverId, onclose, onselect } — there is no hint/label prop, so no consumer can vary the wording.
 
 ### note-editor-giphy-search-button — The Giphy search icon button is missing; only the clear button exists
+
+**BUILT 2026-08-30 06:52 UTC.** The other half of a pair: const 88 `[1,"input-group-text","text-dark",3,"click"]` is used TWICE at byte 1,467,345 — `d(12,"span",88)` with `fa-search`, `d(14,"span",88)` with `fa-times` — and only the clear half was here, so a search could be started only by pressing Enter with a visible affordance beside it that did the opposite. **Two words diverge from the capture and they diverge in the sibling too rather than being introduced here:** `text-white` for `text-dark` and the `fa-2x` on the icon, because this picker is a dark popover where the reference's is a light modal (`btn-close-white` on the header is the same decision). `role="button"` plus a keydown on both spans is ours — the capture puts a click handler on a bare `<span>` that no keyboard can reach. **The reference's modal footer ` Close ` is deliberately NOT added:** ours is a popover with a header `btn-close`, not a modal, and a footer button in a popover would be a control from a different surface. `note-giphy-contract.test.ts`.
 
 **low** · `missing-control` · reference byte **1,467,345**
 
@@ -773,6 +889,10 @@ d(12,"span",88),x("click",function(){return D(e),E(g().searchGiphy())}),T(13,"i"
 
 ### note-editor-height-and-mount — Editor height and the mount element differ from the single .note-view element
 
+**HALF BUILT 2026-08-30 07:25 UTC, and the half this row named.** *"the hidden div is the part worth deleting"* — deleted. `<div id="summernoteEdit-{noteId}" class="note-view" hidden>` was a mount point for a library this app does not use: summernote initialises ON `.note-view` and replaces it, so upstream has one element that is both the rendered note and the editor, while Tiptap mounts into `.note-editor-host` and the read-only note is `NotesPane`'s own element. Hidden, read by nothing, written by nothing. It also put a DUPLICATE id in the document — `NotesPane` renders the same one for the same note, so `getElementById` could return either and which depended on render order.
+
+**The height stays ours and that is the decision.** `height: "100%"` against our `editorHeight` with a drag-resize bar: the reference's editor fills a pane it does not share, ours sits in a column beside the note list and a presenter sizing it is a capability the reference does not have. Recorded as a kept divergence rather than left as an open row.
+
 **low** · `divergence` · reference byte **1,468,553**
 
 ```
@@ -785,6 +905,10 @@ placeholder:"Type your note here and press save",height:"100%",toolbar:[["style"
 
 ### note-editor-iframe-whitelist — protradingroom.com is not in our iframe host allow-list
 
+**OWNER DECISION, NOT BUILT — recorded 2026-08-30 07:25 UTC.** This row says it itself: *"Worth a decision, not a fix by default."* Adding a host to a deny-by-default sanitizer in a multi-tenant fintech application is not a transcription, and three measured facts argue against doing it unasked. The reference's own `codeviewFilter` and `codeviewIframeFilter` are BOTH false at the same offset, so that whitelist is inert there and its contents evidence an intention rather than a behaviour. Our sanitizer is a control the reference does not have at all, so this is not a gap against it. And `.protradingroom.com` with a leading dot is a SUBDOMAIN wildcard — admitting it would admit every subdomain of a domain this deployment may not even serve from.
+
+**What unblocks it:** the owner saying whether notes may embed first-party iframes, and from which exact host. If yes, the entry belongs beside the existing four in `SAFE_IFRAME_HOSTS` with the room's own configured host rather than a literal, so a second deployment does not inherit the first one's domain.
+
 **low** · `divergence` · reference byte **1,469,265**
 
 ```
@@ -796,6 +920,8 @@ codeviewIframeWhitelistSrcBase:["docs.google.com",".protradingroom.com","protrad
 > Verified: I could not refute it. Our note iframe host allow-list exists in two places and neither contains protradingroom.com in any form.
 
 ### note-editor-paste-url-regex — pendingUrl two-step and the image-URL paste auto-confirm are not reproduced
+
+**BUILT 2026-08-30 05:52 UTC.** `pendingUrl`, its check button (const 67, disabled on an empty trim), Enter, and the paste interception with the regex transcribed character for character, `jfif` included. **This row's own reasoning was wrong and is worth saying why:** it recorded the divergence as harmless because "with a directly-bound field the confirm step has nothing left to do". That was true only while our row had ONE state. `url` is what decides which of the three renders, so a directly bound box flips the row into an `<img src="h">` on the first keystroke and takes the box off the screen. The staging field is what lets the row stay an input until there is something worth previewing. The regex's `^https?://` anchor and `(\?.*)?$` tail are also what make running it on a paste safe — no `javascript:` or `data:` payload can match — and the value lands in an `<img src>`. `note-carousel-slide-contract.test.ts`.
 
 **low** · `divergence` · reference byte **1,475,962**
 
@@ -814,6 +940,8 @@ onCarouselUrlPaste(e,i){const o=e.clipboardData?.getData("text")?.trim();o&&/^ht
 17 verified gaps; 50 reference behaviours confirmed present.
 
 ### SC-01 — Session History pane is a hardcoded empty state; its "Load History" button has no handler and there is no Refresh button, no list, and no data source
+
+**BUILT 2026-08-30 04:30 UTC.** Both of upstream's branches (`EDe` and `DDe`), decoded with `app-session-control-modal`'s own consts table — the empty state with `Load History`, the loaded state with `Refresh` and one `<a class="list-group-item …">` per entry carrying `eventName`, `created` through `date:'medium'` and `eventValue`. Behind it: a `session_history` table, `recordSessionEvent`, and `getSessionHistory` as a presenter-gated `query` that takes no argument, so no caller can name another room. **WHICH events is a decision and says so:** the reference's server is not in the capture, so this room records the acts it already has a presenter-gated room-scoped command for — chat-mode change, soft and hard reset, session opened, close message saved/cleared — the same test `room_state` applies. The read is capped at 100 newest where the reference has no cap. `session-history-contract.test.ts` executes every writer, both refusal directions and the room scoping.
 
 **high** · `missing-behaviour` · reference byte **2,146,310**
 
@@ -851,6 +979,8 @@ onAudioDeviceChange(e){console.log("onAudioDeviceChange: "+e),this.appService.gl
 
 ### SC-04 — Enable/Disable Stream Player write a per-user preference `streamingPlayerEnabled` that nothing in the repository reads — the reference sends a room-level admin command
 
+**BLOCKED 2026-08-30 03:30 UTC, and the dead write is gone.** The row's diagnosis is exact and the preference write has been removed — `streamingPlayerEnabled` is retired in `dead-preference-keys.ts` so the copies already in accounts are pruned. Wiring it was MEASURED and refused rather than deferred: the reference gets both the state and the link from its own server (`getPlayerLink()` → `invokeAdminCmd("streamStatus")` → `rc.enablePlayer` / `rc.playerURL`, byte 2,170,505), the client composes neither, and that server is not in the capture. What the feature *is*, from the pane's own blurb, is a public page rendering one room's screenshares to whoever holds a link — which needs an anonymous media grant nobody has designed, and `CLAUDE.md` forbids inventing an authority decision. Both buttons are `disabled` with the reason on screen; `stream-player-blocked-contract.test.ts` keeps them that way. **Unblocked by:** a decision on anonymous playback authorization, plus a MediaMTX host.
+
 **high** · `defect` · reference byte **2,170,728**
 
 ```
@@ -863,6 +993,8 @@ enablePlayer(){var e=this;return I(function*(){let i=yield e.appService.invokeAd
 - `changePlayerStatus` occurs at byte 2170816 only (I enumerated: 1 occurrence).
 
 ### SC-05 — Stream Player pane has no Player Link readout, no Copy button and no border-colour binding (the whole yDe block)
+
+**BLOCKED 2026-08-30 03:30 UTC**, on the same absent value as SC-04: `streamingLinkPlayer` is assigned from `rc.playerURL`, which arrives from a server not in the capture. Composing a link here would mean inventing a public playback endpoint and its authorization. Recorded rather than guessed; see the note on SC-04 for what unblocks it.
 
 **medium** · `missing-control` · reference byte **2,143,225**
 
@@ -1026,6 +1158,8 @@ H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(
 
 ### USM-02 — Alert-tab 'Users join/leave' group (4 checkboxes) missing while its consumers are live
 
+**BUILT 2026-08-30, before this row was written down.** `ViewerAlertPrefsPane.svelte` renders all four with the reference's own ids (`beep-on-user-join`, `popup-on-user-join`, `beep-on-user-leave`, `popup-on-user-leave`) inside the `#appBeepOnUserJoinLeave` block, behind the reference's own gate — `(roomBeepOnUserJoin || roomJoinLeavePopup) && isPresenter`, byte 2,285,369. `ModalHost.svelte:3381` mounts it. Marked here on 2026-08-30 03:20 UTC after grepping the ids, not from memory: the audit was produced against an earlier tree and this row was already stale when it was filed.
+
 **high** · `missing-control` · reference byte **2,269,797**
 
 ```
@@ -1037,6 +1171,8 @@ H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(
 > Verified: I could not find the control under any name. (1) Zero hits in any .svelte file for beep-on-user-join / popup-on-user-join / beep-on-user-leave / popup-on-user-leave, for the preference names beepOnUserJoin/Leave and popupOnUserJoin/Leave, or for label synonyms (Beep, "Beep on user", "Users join", join/leave, "join and leave") — the only .…
 
 ### USM-03 — 'Update Positions' checkbox missing — its consumer defaults to off and can never be turned on
+
+**BUILT 2026-08-30, before this row was written down.** `ViewerAlertPrefsPane.svelte:104` renders `app-positions-update` behind `positionsIframe` (`O(119, sessData.positionsIframe && sessData.positionsIframeUrl ? 119 : -1)`, byte 2,285,255), and `prefs.svelte.ts:154` seeds it `!== false` to match the reference's `updatePositionsIframe:!0` at byte 980,052 — so the `=== true` coercion this row describes is gone as well. Marked 2026-08-30 03:20 UTC by reading the file.
 
 **high** · `missing-control` · reference byte **2,269,626**
 
@@ -1074,6 +1210,8 @@ O(135,o.appService.globals.isPresenter?135:-1)
 
 ### USM-06 — Presenter colour Save writes a per-viewer preference instead of the server admin command
 
+**BUILT 2026-08-30 03:06 UTC.** `presenter-colors.remote.ts` (`savePresenterColors`), `presenter_colors`, a page-load map, the render override in `RoomMessage.svelte` and a `presenterColorsChanged` broadcast. The key is derived on the SERVER from the session rather than accepted from the wire — a deliberate divergence, argued at the command. `presenter-colors-contract.test.ts` holds it.
+
 **high** · `divergence` · reference byte **2,243,435**
 
 ```
@@ -1097,6 +1235,8 @@ savePresenterStyle(){this.appService.sendServerAdminCommand("savePresenterColors
 > Verified: I could not disprove this. Exhaustive search of apps/room/src (node_modules excluded) for `discord` (case-insensitive), the reference DOM ids (`discord-settings`, `discord-settings-tab`), the handler names (`doDiscordAuth`, `checkDiscordAuth`, `revokeDiscord`), and rename-synonyms (`oauth`, `revoke`, `integration`, `linkedAccount`, `third…
 
 ### USM-07 — Presenter colour Reset uses invented constants, never re-seeds from the server, and sends nothing
+
+**BUILT 2026-08-30 03:06 UTC**, with USM-06. Reset sends (`clearPresenterColors`, which DELETES the row where the reference sends the empty pair) and restores the theme pair from `PRESENTER_COLOR_DEFAULTS`, transcribed from `globals.presenterStyle` at byte 980,538. The pickers seed from the stored map on modal open and on a theme switch, as the reference does at bytes 2,241,150 and 2,254,236.
 
 **medium** · `wrong-constant` · reference byte **2,243,661**
 
@@ -1422,6 +1562,8 @@ nPe=(t,n)=>({"push-wrapper":t,"mt-0":n}),qB=t=>({"btn-dark":
 
 ### UIM-02 — Admin Notes tab renders only the password gate — the notes list, per-note delete and Add Note (mTe/fTe) have no counterpart
 
+**BUILT 2026-08-30, before this row was written down.** `UserNotesPane.svelte` renders both halves of upstream's `O(104, allowToManageNotes ? 105 : 104)` — the scrolling list (`mTe`), the per-note row with its 20px `smallAvatarImg` and delete button (`fTe`), and Add Note — against `user_notes`, which is keyed by room AND subject, with `RoomUserNotes` holding the three calls and `userNotesPort` carrying them. The row's own quote of `ModalHost.svelte:203-208` is the stale part: that docblock was rewritten on 2026-08-29 when the schema change landed, and now records that both states exist. Marked 2026-08-30 04:10 UTC after reading the component.
+
 **high** · `missing-control` · reference byte **2,065,327**
 
 ```
@@ -1612,6 +1754,8 @@ o.user.pic||"https://secure.gravatar.com/avatar/"+o.user.emailHash+"?d=mm&s=80",
 14 verified gaps; 61 reference behaviours confirmed present.
 
 ### PAM-01 — alertLabels picker: the per-label checkbox @for and processAlertLabels() hash-prefixing are absent, while the badge renderer that consumes the hashes is built
+
+**BUILT 2026-08-30 04:18 UTC.** Both halves. The picker is `zTe` decoded with `app-post-alert-modal`'s own consts table (35 = `[1,"form-check"]`, 52 = the checkbox, 53 = `[3,"for"]`), drawn behind its gate `O(62, alertLabels && alertLabels.length > 0 ? 62 : -1)` between Non-trade and Linked Room Alerts, with the reference's index-based `alert-trade-label-{i}` id and the question mark after the name. The prefixing is `alertLabelPrefix` in `alert-labels.ts`, a transcription of `processAlertLabels` including the DOUBLE space between labels that each entry's own leading and trailing space produces — my first test asserted a single space and was wrong. It reaches all three places a body is composed, because the two upload paths compose after the modal has closed. **One divergence:** the selection lives in the composer's own `SvelteSet` rather than as `checked` on the room's shared parsed table, which is where the reference keeps it — same observable behaviour, one fewer shared mutable. `alert-label-picker-contract.test.ts`.
 
 **high** · `missing-control` · reference byte **2,119,525**
 
@@ -1871,6 +2015,8 @@ showTokenReport(e){bootbox.alert({title:"Token",message:e})}
 
 ### SRCH-01 — Advanced-search results render as bare <p>{body}</p> instead of the full message row, so trade highlighting and click-to-copy are lost inside this modal
 
+**BUILT 2026-08-30 04:05 UTC.** The results render `RoomMessage` with `kind="alert"` and the room's message chrome, as the reference renders `app-st-message` (byte 2,421,116) — sender, timestamp, day separator computed from the previous row (`prevD`), alert-label badges, trade highlighting and click-to-copy. `searchAlertLog` already selected every field, so nothing is fetched again. **One recorded divergence:** `showMenu={false}`. Upstream's row carries its full kebab; this room has no route from the modal to the message-action command (`ModalHost` is handed `onQaAction` and nothing else), so a full menu would be twelve entries that cannot act. `copyTradeOnClick` — the one binding the reference adds on top of the component, and the behaviour this row says was lost — IS wired, and the handler refuses every other action so a later change fails closed. `search-results-render-contract.test.ts`.
+
 **medium** · `divergence` · reference byte **2,421,116**
 
 ```
@@ -2087,6 +2233,8 @@ this.benzingaUrl=this.sanitizer.bypassSecurityTrustUrl(`https://ptrv3.protrading
 
 ### SV-SP-01 — ScreenPane renders no user-ID watermark overlay; the anti-leak overlay exists only on StreamingView
 
+**BUILT 2026-08-30 03:52 UTC.** `ScreenPane.svelte` draws the same `overlay-userID-container` span, inside `#video-screen-container-{id}` so it fullscreens with the picture rather than being clipped away. The gate — `!isPresenter && overlayUserIdOnScreenshare`, plus the empty-id case — moved to `lib/user-id-watermark.ts` and `PresentationArea` resolves it once for both videos; `StreamingView` lost three props and gained one, because the expression spelled out there was exactly the one `ScreenPane` did not have. `user-id-watermark-contract.test.ts` asserts the nesting structurally rather than by line order. Stated at the module and worth repeating: this is a deterrent, not a control — a span over a video in the viewer's own browser can be removed by anyone with developer tools.
+
 **high** · `missing-control` · reference byte **1,494,134**
 
 ```
@@ -2224,6 +2372,8 @@ z("ngClass",ct(2,$0e,!e.isDetached&&(!e.isConnected||e.isPresentingThisScreen&&!
 11 verified gaps; 69 reference behaviours confirmed present.
 
 ### EMOJI-01 — A reaction is never pushed to other viewers — no realtime channel for reactions
+
+**BUILT 2026-08-30 03:19 UTC**, and the audit found one third of it. Nine commands mutated a rendered row and published nothing — reaction, edit, delete, mark-answered, and the four Q&A commands. All nine announce now, on the reference's own four frame names (`updateChatMsg` / `updateAlertMsg` / `deleteChatMsg` / `deleteAlertMsg`, bytes 1,011,021 / 1,011,303 / 1,021,604 / 1,021,717). `message-mutation-frames.ts` holds them; `message-mutation-broadcast-contract.test.ts` drives all nine through the real hub and asserts on what a SECOND connection received. Ours are triggers where the reference's `update` pair carry the whole row — the row is the authority, and a frame carrying a body would put admin-channel text on a per-room stream.
 
 **high** · `missing-behaviour` · reference byte **1,152,627**
 
@@ -2365,6 +2515,8 @@ handleEmojiLeave(){!this.showPreview||!this.previewRef||(this.animationFrameRequ
 
 ### acA-01 — The inline ALERT ENTRY textarea is not rendered — only the checkbox that is supposed to control it
 
+**BUILT 2026-08-30 04:44 UTC.** The field, its two handlers and both halves of the toggle. The markup is `H2e` decoded with `app-alerts`' own consts (20 = `[1,"w-100","inline-alert-entry-field"]`, 52 = `["id","textAreaAlertHolder",1,"p-1"]`, 53 = the textarea), meeting the captured CSS that was already bridged and waiting for it. **The key rules are NOT the chat composer's** and are pinned in `lib/inline-alert-key.ts`: Enter posts, ALT+Enter is the newline, and SHIFT+Enter does nothing at all — `i.val(i.val())` after `preventDefault` is a no-op. A whitespace box clears without sending, because the clear is outside the guard. The paste routes to the ALERT path through the same pending-paste state and the same confirmation the chat composer uses, which is upstream's own shape — its subscriber is the post-alert modal. The row's second finding is closed too: `showAlertsEntry` is seeded and persisted, where ours was ephemeral. **One divergence:** upstream's subscriber calls the modal's `postAlert()`, so the inline box silently inherits whatever five checkboxes that modal was last left holding; this room posts a plain alert. `inline-alert-entry-contract.test.ts`.
+
 **high** · `missing-control` · reference byte **2,044,139**
 
 ```
@@ -2377,6 +2529,8 @@ function H2e(t,n){if(1&t){const e=Y();d(0,"div",20)(1,"div",52,2)(3,"textarea",5
 
 ### acA-02 — Chat composer has no (paste) handler — a pasted screenshot cannot be posted to chat
 
+**BUILT 2026-08-30 03:43 UTC.** `AlertChatArea.svelte` binds `onpaste` on `#textAreaTxt`, gated on `canPostImages` as the reference is (`if (!this.canPostImages) return !1`), and the confirmation in `RoomOverlays.svelte` reproduces the reference's dialog — preview `<img>`, a `#msg-text` textarea seeded from the composer, and that text posted with the image. The extra chat column deliberately gets none: the reference binds paste on the main composer only and its handler reads `#textAreaTxt` by id. The rule for WHICH image a paste carries moved to `lib/pasted-image.ts`, where it replaced three separate copies — and one of those, `PostAlertModal`'s, had drifted into taking the FIRST image where the reference takes the last, and into abandoning a whole paste on one item `getAsFile()` could not materialise. `chat-paste-image-contract.test.ts` executes the state machine and the filter.
+
 **high** · `missing-behaviour` · reference byte **1,427,208**
 
 ```
@@ -2388,6 +2542,8 @@ function H2e(t,n){if(1&t){const e=Y();d(0,"div",20)(1,"div",52,2)(3,"textarea",5
 > Verified: Could not refute. The chat composer textarea `#textAreaTxt` in AlertChatArea.svelte binds only `{@attach captureComposerElement}`, `bind:value`, `onfocus`, `oninput`, `onblur`, `onkeydown` — there is no `onpaste`.
 
 ### acA-05 — Private-chat button in the main chat column is rendered ungated, while the gate exists and the extra column uses it
+
+**BUILT 2026-08-30, before this row was written down.** `AlertChatArea.svelte:243` takes `showPmButton` and `:791` gates the entry on it; `+page.svelte:1223` feeds it from `gates.showPmButton`, the same source `ExtraChatPane` has always used. Marked 2026-08-30 03:35 UTC by grepping the prop through all three files.
 
 **high** · `missing-control` · reference byte **1,453,980**
 

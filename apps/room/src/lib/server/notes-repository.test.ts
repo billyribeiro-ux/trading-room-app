@@ -7,6 +7,8 @@ import {
   deleteNote,
   getNotes,
   getNoteVersions,
+  NOTE_VERSION_LIMIT,
+  setWelcomeMatNoteEverywhere,
   renameNote,
   restoreNoteVersion,
   saveNote
@@ -27,7 +29,9 @@ const TEST_NAMES = [
   'notes repository historical read test',
   'notes repository restore test',
   'notes repository rename test',
-  'notes repository delete test'
+  'notes repository delete test',
+  'notes repository version cap test',
+  'notes repository all-rooms welcome mat test'
 ];
 
 let primaryUserId = 0;
@@ -154,6 +158,161 @@ describe('notes repository', () => {
     });
 
     expect(getNoteVersions(ROOM, note.id)?.map(({ version }) => version)).toEqual([3, 2, 1]);
+  });
+
+  test('keeps only the newest NOTE_VERSION_LIMIT versions, and DELETES the rest', () => {
+    /*
+      `this.maxVersions = 3` — reference byte 1,468,359, enforced on every save at 1,469,897:
+
+      ```js
+      this.prevVersions.unshift(i),
+      this.prevVersions.length > this.maxVersions &&
+        (this.prevVersions = this.prevVersions.slice(0, this.maxVersions))
+      ```
+
+      There was NO cap on this side. `getNoteVersions` was an unbounded `SELECT`, `NotesPane`
+      reissues it on every three-second autosave, and one row per result is rendered behind
+      `Version History (N)` — so the read path grew without bound on a long-lived note and the
+      count stopped meaning what the reference's means.
+
+      This asserts the DELETE and not only the read. A `LIMIT` alone would leave the table growing
+      forever with rows nothing can reach, so the row count is checked directly rather than through
+      the function that is capped — otherwise the assertion could not tell the two apart.
+
+      Each save is 31 minutes past the last so the 30-second coalescing window never merges two.
+    */
+    const note = createNote({
+      room: ROOM,
+      name: TEST_NAMES[7],
+      now: new Date('2036-07-27T15:00:00.000Z'),
+      userId: primaryUserId
+    });
+
+    for (let n = 1; n <= 5; n += 1) {
+      saveNote({
+        room: ROOM,
+        contentHtml: `<p>save ${n}</p>`,
+        noteId: note.id,
+        now: new Date(Date.UTC(2036, 6, 27, 15 + n, 0, 0)),
+        userId: primaryUserId
+      });
+    }
+
+    expect(getNoteVersions(ROOM, note.id)?.map(({ version }) => version)).toEqual([5, 4, 3]);
+    expect(getNoteVersions(ROOM, note.id)).toHaveLength(NOTE_VERSION_LIMIT);
+
+    /* The rows are GONE, not merely unread — which a LIMIT on the query could not tell you. */
+    const stored = db
+      .select({ version: noteVersions.version })
+      .from(noteVersions)
+      .where(eq(noteVersions.noteId, note.id))
+      .all();
+    expect(stored.map(({ version }) => version).sort((a, b) => b - a)).toEqual([5, 4, 3]);
+  });
+
+  test('replaces the welcome mat in every room named, and only those', () => {
+    /*
+      `note-editor-welcome-mat-all-rooms-password`. The reference's server is not in the capture, so
+      what "replace all the rooms welcome mats" DOES is a decision taken in its absence: a copy per
+      room, because `notes.room_short_code` is the fence that keeps one room's notes out of
+      another's and a shared note would require removing that scope from the welcome-mat read.
+
+      Four rooms here and only three named, so the fourth is the control: a room the account does not
+      own — or one the controller did not return — must be untouched, which is the half a test that
+      only checked the named rooms would pass without measuring.
+    */
+    const OTHER = '4820';
+    const THIRD = '5931';
+    const UNNAMED = '6042';
+    const now = new Date('2036-07-27T16:00:00.000Z');
+
+    const source = createNote({
+      room: ROOM,
+      name: TEST_NAMES[8],
+      now,
+      userId: primaryUserId
+    });
+    saveNote({
+      room: ROOM,
+      contentHtml: '<p>the new mat</p>',
+      noteId: source.id,
+      now,
+      userId: primaryUserId
+    });
+
+    /* Each of the other rooms already greets people with something of its own. */
+    const existing = [OTHER, THIRD, UNNAMED].map((room) => {
+      const note = createNote({ room, name: TEST_NAMES[8], now, userId: primaryUserId });
+      db.update(notes).set({ isWelcomeMat: true }).where(eq(notes.id, note.id)).run();
+      return { room, id: note.id };
+    });
+
+    const returned = setWelcomeMatNoteEverywhere({
+      sourceRoom: ROOM,
+      rooms: [ROOM, OTHER, THIRD],
+      noteId: source.id,
+      now,
+      userId: primaryUserId
+    });
+
+    /* The caller's own room gets the EXISTING row flagged, not a copy of it. */
+    expect(returned?.id).toBe(source.id);
+    expect(returned?.isWelcomeMat).toBe(true);
+    expect(
+      db
+        .select()
+        .from(notes)
+        .where(eq(notes.roomShortCode, ROOM))
+        .all()
+        .filter((r) => r.isWelcomeMat)
+    ).toHaveLength(1);
+
+    for (const { room, id } of existing) {
+      const mats = db
+        .select()
+        .from(notes)
+        .where(eq(notes.roomShortCode, room))
+        .all()
+        .filter((row) => row.isWelcomeMat);
+
+      if (room === UNNAMED) {
+        /* The control. Untouched: still its own note, still the only mat. */
+        expect(
+          mats.map(({ id: matId }) => matId),
+          room
+        ).toEqual([id]);
+        continue;
+      }
+
+      expect(mats, room).toHaveLength(1);
+      expect(mats[0]?.contentHtml, room).toBe('<p>the new mat</p>');
+      /* A COPY: a new row in that room, not the source note reaching across. */
+      expect(mats[0]?.id, room).not.toBe(source.id);
+      /* And the room's previous mat still exists, demoted rather than deleted. */
+      expect(db.select().from(notes).where(eq(notes.id, id)).get()?.isWelcomeMat, room).toBe(false);
+    }
+  });
+
+  test('refuses a note id from another room, before writing anything', () => {
+    /*
+      The fence. `sourceRoom` is the caller's own room, and a note that is not in it is not theirs to
+      broadcast — so the function must return null with NO row written anywhere, not fail partway.
+    */
+    const OTHER = '4820';
+    const now = new Date('2036-07-27T16:30:00.000Z');
+    const foreign = createNote({ room: OTHER, name: TEST_NAMES[8], now, userId: primaryUserId });
+
+    const before = db.select().from(notes).where(eq(notes.roomShortCode, ROOM)).all().length;
+    expect(
+      setWelcomeMatNoteEverywhere({
+        sourceRoom: ROOM,
+        rooms: [ROOM, OTHER],
+        noteId: foreign.id,
+        now,
+        userId: primaryUserId
+      })
+    ).toBeNull();
+    expect(db.select().from(notes).where(eq(notes.roomShortCode, ROOM)).all()).toHaveLength(before);
   });
 
   test('sanitizes historical rows again whenever notes and versions are read', () => {

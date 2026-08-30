@@ -10,6 +10,7 @@ import {
   type RoomEvent,
   type RosterUser
 } from './room-events';
+import { tsCodeOf } from '#lib/source-comments.js';
 
 /*
   A PRIVATE MESSAGE REACHES TWO PEOPLE. IT WAS REACHING THE WHOLE ROOM.
@@ -229,11 +230,48 @@ describe('no route broadcasts a privChat frame', () => {
     ).toEqual([]);
   });
 
-  it('the private message carries a HASH, never the sender’s address', () => {
-    const remote = readFileSync('src/routes/private-chat.remote.ts', 'utf8');
-    expect(remote, 'avt is the avatar key, and it is hashed everywhere else').toContain(
-      'avt: hashEmail(user.email)'
-    );
-    expect(remote, 'the raw address must not come back').not.toContain('avt: user.email');
+  it('EVERY producer of `avt` carries a hash, never an address', () => {
+    /*
+      ## This assertion read ONE FILE, and the other two shipped the address for weeks
+ 
+      It named `private-chat.remote.ts` — the live broadcast — and that is where the leak was found
+      and fixed. `lib/server/private-chat.ts` builds the same field twice more, for the two READ
+      paths: `toMessage` on every page of every thread, and `loadConversations` on the tab strip. Both
+      read `sender.email` / `peer.email` until 2026-08-30, so a member asking for their own history
+      was handed the other participant's raw address, and the tab list carried one per conversation.
+ 
+      Found by reading, while building the gravatar fallback the surface audit's G15 asked for —
+      which would have taken this exact value and put it in an outbound URL to gravatar.com.
+ 
+      So the check is now over the FIELD wherever it is produced, not over one file. A fixed
+      instance is not a fixed class, and the difference here was two files nobody had looked at.
+    */
+    const producers = ['src/routes/private-chat.remote.ts', 'src/lib/server/private-chat.ts'];
+
+    const offenders: string[] = [];
+    for (const file of producers) {
+      /*
+        COMMENTS STRIPPED, and this file learned that the hard way: the paragraph above quotes
+        `avt: user.email` to say what was wrong, and the first run of this sweep reported the
+        explanation as the defect. `dead-export-contract` and `orphan-style-contract` have both been
+        corrected for the same shape — prose voting in a source assertion.
+      */
+      tsCodeOf(readFileSync(file, 'utf8'))
+        .split('\n')
+        .forEach((line, index) => {
+          if (/\bavt:\s*[A-Za-z_$][\w$.]*\.email\b/.test(line)) {
+            offenders.push(`${file}:${index + 1} — ${line.trim()}`);
+          }
+        });
+    }
+    expect(
+      offenders,
+      `${offenders.join('\n')}\n\n\`avt\` is the AVATAR KEY. It must be \`hashEmail(...)\` — gravatar's own md5-of-the-lowercased-address — because the value is handed to the other participant's browser and, since 2026-08-30, forwarded into an image URL at gravatar.com.`
+    ).toEqual([]);
+
+    /* The positive control: each file must actually hash it, or the sweep above passes vacuously. */
+    for (const file of producers) {
+      expect(readFileSync(file, 'utf8'), file).toContain('hashEmail(');
+    }
   });
 });

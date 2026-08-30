@@ -104,6 +104,22 @@ const TAG_STYLE_RULES: Readonly<Record<string, Readonly<Record<string, RegExp>>>
   },
   img: {
     display: /^block$/,
+    /*
+      ADMITTED 2026-08-30, for `note-editor-image-popover`'s `floatLeft` / `floatRight` /
+      `floatNone` group (reference byte 1,469,073). This allow-list is deny-by-default and widening
+      it is a decision, so here is the argument.
+
+      `float` is a layout keyword with three legal values and no others; the pattern below admits
+      exactly those. It cannot carry a URL, a `url()`, an expression, a custom property or anything
+      that resolves at parse time — the three attack shapes a style allow-list exists to refuse. It
+      moves an image inside the note's own text flow and can reach nothing outside it.
+
+      Narrower than the property's real grammar on purpose: CSS also defines `inline-start`,
+      `inline-end` and the global keywords, and none of them is a thing this editor can produce.
+      An allow-list matching the specification rather than the writer is an allow-list that has
+      stopped saying anything.
+    */
+    float: /^(?:left|right|none)$/,
     height: /^100%$/,
     'object-fit': /^contain$/,
     width: /^100%$/
@@ -248,7 +264,34 @@ function setupCarousel(element: HTMLElement): () => void {
       'style',
       `position:absolute;top:50%;transform:translateY(-50%);z-index:10;background:rgba(0,0,0,0.45);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:26px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background 0.2s;${side}:10px;`
     );
-    button.addEventListener('click', () => {
+    /*
+      The hover, and the two calls the click was missing — byte 1,480,561:
+
+      ```js
+      W.onmouseenter = () => W.style.background = "rgba(0,0,0,0.75)",
+      W.onmouseleave = () => W.style.background = "rgba(0,0,0,0.45)",
+      W.onclick = J => { J.preventDefault(), J.stopPropagation(), B(), h() }
+      ```
+
+      The style string above already declares `transition: background 0.2s` — transcribed with the
+      rest of it — and nothing ever changed the background, so the transition described an animation
+      that could not happen. A declared transition with no trigger is the same defect class as a
+      class with no CSS.
+
+      `preventDefault` and `stopPropagation` are the half that matters more. A carousel slide may be
+      wrapped in a link (`slide.link`, "clicking the image opens this"), and an arrow sits INSIDE
+      that link. Without these, paging a linked carousel navigates away from the note.
+
+      Inline styles rather than a stylesheet rule, and `addEventListener` rather than `onmouseenter`:
+      the first is what the reference does and what keeps this factory self-contained inside
+      `setupCarousel`, which builds into rendered note HTML that no component stylesheet scopes; the
+      second is this file's own convention and does not silently replace a handler someone else set.
+    */
+    button.addEventListener('mouseenter', () => (button.style.background = 'rgba(0,0,0,0.75)'));
+    button.addEventListener('mouseleave', () => (button.style.background = 'rgba(0,0,0,0.45)'));
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       select(active + move);
       start();
     });

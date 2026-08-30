@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { SessionImageFile } from '#lib/session-image-files.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import type { NoteVersion, RoomNote } from '#lib/types.js';
   import { onMount } from 'svelte';
@@ -6,11 +7,27 @@
   import NoteEditor from './NoteEditor.svelte';
   import NoteTabContent from './NoteTabContent.svelte';
   import { safeNoteHtml } from './safe-html';
+  import { welcomeMatPasswordRequired } from '../../../routes/welcome-mat.remote';
+
   import { noteVersionRevertMessage } from './version-history';
 
   type PromptState =
     | { kind: 'new'; title: 'New Note name:'; value: '' }
-    | { kind: 'rename'; noteId: number; title: 'Change note name'; value: string };
+    | { kind: 'rename'; noteId: number; title: 'Change note name'; value: string }
+    /*
+      The all-rooms welcome mat's password — `note-editor-welcome-mat-all-rooms-password`.
+
+      The title is the reference's verbatim, at byte 1,474,217. It is a PROMPT and not a confirm
+      because upstream raises a different dialog for each: a password when
+      `allRoomsWelcomeMatPW` is configured and a plain confirmation when it is not. This room cannot
+      see that setting, so `welcomeMatPasswordRequired` asks the controller which one to raise.
+    */
+    | {
+        kind: 'welcome-password';
+        noteId: number;
+        title: 'Please enter the password to replace all the rooms Welcome Mats:';
+        value: '';
+      };
 
   type ConfirmState =
     | { kind: 'delete'; noteId: number; message: 'Are you sure you want to delete this note?' }
@@ -50,8 +67,21 @@
     readonly onRename: (noteId: number, newName: string) => void | Promise<void>;
     readonly onRestoreVersion: (noteId: number, versionId: number) => void | Promise<void>;
     readonly onSave: (noteId: number, contentHtml: string) => void | Promise<void>;
-    readonly onSetWelcomeMat: (noteId: number, allRooms: boolean) => void | Promise<void>;
+    /**
+     * `pw` is the all-rooms password, and it is forwarded rather than compared.
+     *
+     * Empty for the per-room variant and for a room with no `allRoomsWelcomeMatPW` configured. The
+     * comparison happens on the controller — see `welcome-mat.remote.ts` and the endpoint's header
+     * for why this room must never hold the value it would compare against.
+     */
+    readonly onSetWelcomeMat: (
+      noteId: number,
+      allRooms: boolean,
+      pw: string
+    ) => void | Promise<void>;
     readonly onUploadImages: (files: readonly File[]) => Promise<readonly string[]>;
+    /** The room's shared IMAGE files, for the carousel's browser — see `NoteEditor`'s own prop. */
+    readonly sessionImages: readonly SessionImageFile[];
     /** `noteGates.simplifiedEditor` - passed through untouched; the editor draws the toolbar. */
     readonly simplifiedEditor: boolean;
   }
@@ -72,6 +102,7 @@
     onSave,
     onSetWelcomeMat,
     onUploadImages,
+    sessionImages,
     simplifiedEditor
   }: Props = $props();
 
@@ -215,8 +246,40 @@
     };
   }
 
-  function requestWelcome(noteId: number, allRooms: boolean): void {
+  /**
+   * Raise the right dialog for the welcome mat a presenter asked for.
+   *
+   * ```js
+   * setAsWelcomeTab(e) {                                         // reference byte 1,474,217
+   *   e ? this.appService.globals.sessData.allRoomsWelcomeMatPW
+   *         ? bootbox.prompt({ title: "Please enter the password to replace all the rooms Welcome Mats:", … })
+   *         : bootbox.confirm("Are you sure you want to replace all the rooms Welcome Mats with this note?")
+   *     : bootbox.confirm("Are you sure you want to apply this note as Welcome Mat", …)
+   * }
+   * ```
+   *
+   * Three dialogs, two of which already existed here. The third — the password — could not exist
+   * while nothing knew whether one was configured, because `allRoomsWelcomeMatPW` may never reach
+   * this room. `welcomeMatPasswordRequired` is what answers that, and it answers `true` when the
+   * controller is unreachable: a prompt whose answer the write path re-checks costs a presenter one
+   * dialog, where a confirmation would skip a gate the owner chose to set.
+   *
+   * The per-room variant does not ask at all — upstream does not either, and a round trip before a
+   * confirmation nobody gated would be latency for nothing.
+   */
+  async function requestWelcome(noteId: number, allRooms: boolean): Promise<void> {
     openMenuNoteId = null;
+
+    if (allRooms && (await welcomeMatPasswordRequired()).required) {
+      prompt = {
+        kind: 'welcome-password',
+        noteId,
+        title: 'Please enter the password to replace all the rooms Welcome Mats:',
+        value: ''
+      };
+      return;
+    }
+
     confirm = {
       kind: 'welcome',
       noteId,
@@ -245,6 +308,17 @@
           requestedNoteId = created.id;
           editingNoteId = created.id;
         }
+      } else if (current.kind === 'welcome-password') {
+        /*
+          The typed password goes STRAIGHT OUT, uncompared. `trimmed` because the reference trims
+          too (`const o = i.trim()`), and because the controller's own compare trims the candidate
+          and not the stored value — trimming here as well is the same act, not a second one.
+
+          `Wrong password!` comes back as the action's failure message rather than being decided
+          here: this room has nothing to decide it against, which is the whole point.
+        */
+        await onSetWelcomeMat(current.noteId, true, trimmed);
+        requestedNoteId = current.noteId;
       } else {
         await onRename(current.noteId, trimmed);
         requestedNoteId = current.noteId;
@@ -279,7 +353,8 @@
         showVersionHistory = false;
         requestedNoteId = current.noteId;
       } else {
-        await onSetWelcomeMat(current.noteId, current.allRooms);
+        /* No password on this path: either it is the per-room variant, or none is configured. */
+        await onSetWelcomeMat(current.noteId, current.allRooms, '');
         requestedNoteId = current.noteId;
       }
     } catch (error: unknown) {
@@ -359,7 +434,6 @@
         {#if editingNoteId === activeNote.id && canEdit}
           {#key `${activeNote.id}:${activeNote.updatedAt}`}
             <NoteEditor
-              noteId={activeNote.id}
               contentHtml={activeNote.contentHtml ?? ''}
               {giphyApiKey}
               onBringEveryone={() => onBringEveryone(activeNote.id)}
@@ -373,6 +447,7 @@
               onSave={(contentHtml) => onSave(activeNote.id, contentHtml)}
               onSetWelcomeMat={(allRooms) => requestWelcome(activeNote.id, allRooms)}
               {onUploadImages}
+              {sessionImages}
               onVersionHistoryOpenChange={(open) => (showVersionHistory = open)}
               {showVersionHistory}
               {simplifiedEditor}

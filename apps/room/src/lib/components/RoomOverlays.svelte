@@ -12,6 +12,8 @@
   import { playSoundEffect } from '#lib/sound-effects.js';
   import type { ChatMode } from '#lib/chat-mode.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
+  import type { PresenterColorMap } from '#lib/presenter-colors.js';
+  import type { AlertLabel } from '#lib/alert-labels.js';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
@@ -108,6 +110,8 @@
     // Page state this layer renders from. Only these two are written back.
     isPresenter,
     messageChrome,
+    presenterColors,
+    alertLabels,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -170,6 +174,15 @@
      * construction is a second answer to which settings a message reads.
      */
     messageChrome: RoomMessageChrome;
+    /** The room's presenter colour map, forwarded whole to `ModalHost` — see `presenter-colors.ts`. */
+    presenterColors: PresenterColorMap;
+    /**
+     * The room's parsed Alert Labels, forwarded to `ModalHost` for the composer's picker (`PAM-01`).
+     *
+     * The PAGE parses them (`gates.alertLabels`) and the alerts column already receives the same
+     * array, so this is the second consumer of one parse rather than a second parse.
+     */
+    alertLabels: readonly AlertLabel[];
     /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
     alertsDisplayMode: ChatDisplayMode;
     chatLogDisplayMode: ChatDisplayMode;
@@ -613,6 +626,8 @@
   onQuestionSend={messageActions.sendAlertQuestion}
   alertQuestions={data.alertQuestions}
   {messageChrome}
+  {presenterColors}
+  {alertLabels}
   {alertsDisplayMode}
   {chatLogDisplayMode}
   {onDisplayModeChange}
@@ -650,10 +665,61 @@
   followedUsers={userActions.followedUsers}
   targetMessage={messageActions.selected}
 />
+<!--
+    `onImagePaste(event)` on the CHAT composer — byte 1,427,208, whose handler is at 1,445,719.
+
+    The reference's confirmation is a `bootbox.confirm` carrying a preview `<img>` and a textarea
+    seeded with whatever was already in the composer, and the message that textarea holds is what
+    travels with the image. The two alert forms below already have this shape for their own pastes;
+    chat — the surface a member actually uses — had no `paste` binding at all until 2026-08-30
+    (`acA-02`).
+
+    `BootboxDialog` and not `ImageUploadDialog`, deliberately: the file is already chosen, and a
+    dialog whose top half is a drop zone would invite a viewer to replace the thing they just pasted.
+  -->
+{#if composer.pastedImage}
+  {@const chatPastePreviewUrl = composer.pastedImage.previewUrl}
+  <BootboxDialog
+    mode="confirm"
+    message=""
+    onclose={() => composer.cancelImagePaste()}
+    onconfirm={() => void composer.confirmImagePaste()}
+  >
+    <div class="text-center">
+      <h4>Upload this image?</h4>
+      <img
+        src={chatPastePreviewUrl}
+        class="img-fluid"
+        style="max-height: 50vh;"
+        alt="Pasted screenshot"
+      />
+      <div class="w-100 mt-3">
+        <!-- `id="msg-text"`, `rows="2"` and the placeholder are the reference's own, byte 1,445,719. -->
+        <textarea
+          class="form-control w-100"
+          rows="2"
+          id="msg-text"
+          name="msg-text"
+          placeholder="Enter your message"
+          bind:value={composer.pastedImageMessage}></textarea>
+      </div>
+    </div>
+  </BootboxDialog>
+{/if}
 {#if modals.modal === 'image-upload'}
   <ImageUploadDialog
     onclose={() => (modals.modal = null)}
     onupload={(files, message) => void composer.uploadImages(files, message)}
+  />
+{/if}
+<!--
+  `imgUpload()` from the PRIVATE composer — G1, and a third instance for the reason the note below
+  gives: a private image routed through the chat composer's handler would be posted into the ROOM.
+-->
+{#if privateChat.imageUpload}
+  <ImageUploadDialog
+    onclose={() => privateChat.cancelImageUpload()}
+    onupload={(files) => void privateChat.completeImageUpload(files)}
   />
 {/if}
 <!--

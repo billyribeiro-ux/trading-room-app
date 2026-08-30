@@ -38,7 +38,11 @@ import { parseReactions } from '#lib/server/reactions.js';
 // `requestMobilePin` left with `getMyMobilePin` for `mobile-pin.remote.ts`; this file no longer calls it.
 // `writeRoomSetting` and `alertSoundCommandValue` left with `overwriteCashRegisterSound` for
 // `files-pane.remote.ts`; nothing else in this file writes a room setting.
-import { readRoomConfig, requestStreamReadToken } from '#lib/server/room-config-client.js';
+import {
+  checkWelcomeMatPasswordRemotely,
+  readRoomConfig,
+  requestStreamReadToken
+} from '#lib/server/room-config-client.js';
 import { memberDeniedArchives } from '#lib/roster-gates.js';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
@@ -75,7 +79,8 @@ import {
   renameNote,
   restoreNoteVersion,
   saveNote,
-  setWelcomeMatNote
+  setWelcomeMatNote,
+  setWelcomeMatNoteEverywhere
 } from '#lib/server/notes-repository.js';
 import {
   createSwingAlert,
@@ -104,6 +109,7 @@ import { DAY_TRADE_ALERT_INITIAL_DAYS, dayTradeAlertsTabVisible } from '#lib/day
 import {
   capturedItemOverrides,
   chatMutes,
+  presenterColors,
   roomState,
   hiddenRoomItems,
   pollAnswers,
@@ -685,6 +691,30 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         .from(roomState)
         .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
         .get()?.closedMessage ?? '',
+    /*
+      Every presenter's message colours for this room, as a map keyed by the sender's email hash —
+      the shape the renderer looks a message up in, so no per-message query and no per-message
+      allocation. `presenter-colors.ts` holds the feature; the read is here because it is room
+      state, exactly like `chatMode` above, and for the same reason: a client that asserted these
+      would be asserting how OTHER people's messages look.
+
+      Bounded by the number of presenters in the room, not by its history — the composite primary
+      key's leading column is the filter, so this is an index range scan over a handful of rows
+      however long the room has been running. That is the question `CLAUDE.md` asks of a new read
+      path, and it is why this is a table rather than the reference's JSON blob.
+    */
+    presenterColors: Object.fromEntries(
+      db
+        .select({
+          senderEmailHash: presenterColors.senderEmailHash,
+          color: presenterColors.textColor,
+          bgColor: presenterColors.backgroundColor
+        })
+        .from(presenterColors)
+        .where(eq(presenterColors.roomShortCode, requireRoomShortCode(locals)))
+        .all()
+        .map(({ senderEmailHash, color, bgColor }) => [senderEmailHash, { color, bgColor }])
+    ),
     chatMutedTill:
       db
         .select({ expiresAt: chatMutes.expiresAt })
@@ -979,31 +1009,60 @@ export const actions: Actions = {
       cmd: 'setWelcomeMatNoteTab',
       data: {
         noteId: Number(formData.get('noteId')),
-        allRooms: String(formData.get('allRooms')) === 'true'
+        allRooms: String(formData.get('allRooms')) === 'true',
+        pw: String(formData.get('pw') ?? '')
       }
     });
     if (!command.success) return fail(400, { message: 'A valid note is required.' });
 
+    const room = requireRoomShortCode(locals);
+    const now = new Date();
+    const userId = requireUser(locals).id;
+
     /*
-      The captured command carries `allRooms`, and the controller's own help text for
-      `allRoomsWelcomeMatPW` — "Presenters will need to enter the password to replace all the rooms
-      welcome mats" — says what it means: set this note as the welcome mat in EVERY room on the
-      account, behind a password.
+      ── THE ALL-ROOMS BRANCH, BUILT 2026-08-30 ────────────────────────────────────────────────
 
-      Only the per-room half is implemented. The room application does not know which other rooms
-      the account owns; that list lives in the controller, and so does the password that gates the
-      action. Applying it to this room regardless would be the wrong answer in the other direction,
-      so `allRooms: true` currently sets this room's mat and no other.
+      The paragraph that stood here recorded an honest gap: *"the all-rooms variant needs a
+      controller endpoint that enumerates the account's rooms and verifies `allRoomsWelcomeMatPW`."*
+      `internal/room-welcome-mat-auth` is that endpoint, and it answers both halves in one call for a
+      reason its own header gives — a separate list endpoint would let any holder of a `config-read`
+      token enumerate an account's rooms without knowing the password.
 
-      HONEST GAP, recorded in TODO.md: the all-rooms variant needs a controller endpoint that
-      enumerates the account's rooms and verifies `allRoomsWelcomeMatPW`.
+      **THE AUTHORITY IS THE SERVER'S, WHICH THE REFERENCE'S IS NOT.** Upstream compares the typed
+      password in the browser against `sessData.allRoomsWelcomeMatPW`, so a member who can read
+      `sessData` can send this command with any `pw` and have it obeyed. Here the room forwards the
+      candidate and obeys the answer; it never learns the password and cannot be talked out of asking.
+
+      Fails CLOSED. `checkWelcomeMatPasswordRemotely` throws when the controller cannot be reached,
+      and that is not caught into a per-room fallback: applying to this room only would be a quiet,
+      wrong answer to a request that named every room.
     */
-    const note = setWelcomeMatNote({
-      room: requireRoomShortCode(locals),
-      noteId: command.data.data.noteId,
-      now: new Date(),
-      userId: requireUser(locals).id
-    });
+    if (command.data.data.allRooms) {
+      let decision;
+      try {
+        decision = await checkWelcomeMatPasswordRemotely(room, command.data.data.pw);
+      } catch {
+        return fail(503, {
+          message: 'The welcome mat could not be replaced everywhere right now. Try again shortly.'
+        });
+      }
+
+      /* `Wrong password!` is the reference's own string, at byte 1,474,217. */
+      if (!decision.ok) return fail(403, { message: 'Wrong password!' });
+
+      const everywhere = setWelcomeMatNoteEverywhere({
+        sourceRoom: room,
+        rooms: decision.rooms,
+        noteId: command.data.data.noteId,
+        now,
+        userId
+      });
+      return everywhere === null
+        ? fail(404, { message: 'Session note was not found.' })
+        : { success: true, note: everywhere };
+    }
+
+    const note = setWelcomeMatNote({ room, noteId: command.data.data.noteId, now, userId });
     return note === null
       ? fail(404, { message: 'Session note was not found.' })
       : { success: true, note };

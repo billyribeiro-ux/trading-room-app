@@ -512,6 +512,8 @@
     rosterSession: () => rosterSession,
     theme: () => theme,
     chatAlertsDetached: () => chatAlertsDetached,
+    /* G13 — the private composer's `canPost`, which is the same authority the main one renders on. */
+    chatEnabled: () => chatEnabled,
     appHasFocus: () => roomRefresh.appHasFocus,
     mainElement: () => mainElement,
     alertChatElement: () => alertChatElement,
@@ -1200,6 +1202,7 @@
               chatDisplayMode={displayModes.chat}
               {messageChrome}
               followedUsers={userActions.followedUsers}
+              presenterColors={data.presenterColors}
               {captureAlertChatElement}
               {captureAlertsScroller}
               {captureComposerElement}
@@ -1220,6 +1223,11 @@
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
               showPmButton={gates.showPmButton}
+              onpasteimage={(file) => composer.beginImagePaste(file)}
+              oninlinealert={(body) => void composer.postInlineAlert(body)}
+              oninlinealertimage={(file, alertText) =>
+                composer.beginAlertImagePaste(file, alertText)}
+              oninlineentrytoggle={(open) => alertsPane.toggleInlineEntry(open)}
               onexpandcomposer={autoExpandComposer}
               ontyped={(value) => typing.main.typed(value)}
               onstoppedtyping={() => typing.main.stop()}
@@ -1325,6 +1333,7 @@
                 chatTabs={data.chatTabs}
                 displayMode={displayModes.chat}
                 followedUsers={userActions.followedUsers}
+                presenterColors={data.presenterColors}
                 openMenuKey={menus.messageId}
                 onmenutoggle={(key) => menus.openMessageMenu(key)}
                 onaction={(action, message, event) =>
@@ -1399,6 +1408,8 @@
       {mediaTransport}
       {messageActions}
       {messageChrome}
+      presenterColors={data.presenterColors}
+      alertLabels={gates.alertLabels}
       alertsDisplayMode={displayModes.alerts}
       chatLogDisplayMode={displayModes.chat}
       onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}
@@ -1439,6 +1450,21 @@
       open={privateChat.open}
       doNotDisturb={prefs.doNotDisturbOn}
       {isPresenter}
+      pmLogsOnRight={prefs.pmLogsOnRight}
+      {canPostImages}
+      {webinarMode}
+      {giphyApiKey}
+      oncomposerfocus={() => privateChat.composerFocused()}
+      onimageupload={() => privateChat.beginImageUpload()}
+      onselectgif={(_title, url) => {
+        /*
+          `sendGif(o.title, o.images.original.url)` — the double-clicked GIF is SENT, not staged.
+          The title is the alt text upstream keeps for the grid and has no place in the message.
+        */
+        privateChat.draft = url;
+        void privateChat.send();
+      }}
+      onemoji={(glyph) => (privateChat.draft += glyph)}
       peer={userActions.selectedMessageUser}
       tabs={privateChat.tabs}
       currentUserId={privateChat.peerId}
@@ -1447,7 +1473,12 @@
       searchTerm={privateChat.searchTerm}
       bind:draft={privateChat.draft}
       onclosepeer={() => {
-        userActions.clearSelectedMessageUser();
+        /*
+          G8 — `closeTab(uid)` clears `currUser`, and this cleared only the selection. The header
+          tab vanished and the thread and composer stayed: a conversation with nobody's name on it.
+          `closeTab` calls `onCleared`, which is what clears `selectedMessageUser`.
+        */
+        privateChat.closeTab();
         messageActions.clearSelected();
       }}
       ondeletethis={() => privateChat.deleteThread()}
