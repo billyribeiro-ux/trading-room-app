@@ -913,9 +913,42 @@ export const actions: Actions = {
       now: new Date(),
       userId: requireUser(locals).id
     });
-    return note === null
-      ? fail(404, { message: 'Session note was not found.' })
-      : { success: true, note };
+    if (note === null) return fail(404, { message: 'Session note was not found.' });
+
+    /*
+      ── A SAVED NOTE TOLD NOBODY ────────────────────────────────────────────────────────────────
+
+      ```js
+      case "updatedSessionNote":
+        for (let se = 0; se < this.globals.sessionNotes.length; se++) {
+          let _e = this.globals.sessionNotes[se];
+          _e._id == i.tab._id && (this.globals.sessionNotes[se].noteContent = i.tab.noteContent,
+            this.appEventBus.emit("noteTabUpdated", { id: _e._id, name: _e.name })) }
+        break;                                                        // bundle byte 1,022,762
+      ```
+
+      This action wrote the row and returned. Every other viewer's Notes pane kept the previous text
+      until they happened to reload — a presenter edits the room's notes during a session and the
+      room does not see it, which is the whole point of the pane.
+
+      USM-11 is the popup half of this, and it could not exist without the frame.
+
+      THE PAYLOAD IS THE ID AND THE NAME, not the content. `invalidateAll()` re-reads the row, which
+      is the authority — the same argument the four message-mutation frames make. The name rides
+      along because the toast needs it and a note's TAB NAME is already rendered to everyone who can
+      see the pane at all; the note's BODY is not sent, so the frame carries nothing the recipient
+      could not already read.
+    */
+    publishToRoom(requireRoomShortCode(locals), {
+      channel: 'cmds',
+      data: {
+        cmd: 'updatedSessionNote',
+        noteId: note.id,
+        noteName: note.name,
+        actorUserId: requireUser(locals).id
+      }
+    });
+    return { success: true, note };
   },
 
   restoreNoteVersion: async ({ request, locals }) => {

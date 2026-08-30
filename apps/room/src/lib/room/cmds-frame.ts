@@ -37,6 +37,15 @@ export interface CmdsFrame {
   screenId?: string;
   /** `focusOnSessionNote` — the note a presenter pulled the room to. */
   noteId?: number;
+  /**
+   * `updatedSessionNote`'s tab NAME — USM-11, and the one string on this frame that is DISPLAYED.
+   *
+   * Safe to render because it is server-authored and already visible: the frame is published by
+   * `saveSessionNote` in `+page.server.ts`, not relayed from a client, and a note's tab name is
+   * drawn for everyone who can see the pane at all. The note's BODY is deliberately not sent —
+   * `invalidateAll()` re-reads it, which is the authority.
+   */
+  noteName?: string;
   /** `changeChatMode`'s payload — `g`, `p` or `d`. The row in `room_state` is the authority. */
   mode?: string;
   /**

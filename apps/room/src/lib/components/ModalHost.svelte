@@ -949,6 +949,7 @@
     'app-recording-start-sound': true,
     'app-recording-stop-sound': true,
     'app-recording-preview-window': true,
+    'note-update-popup': true,
     'pm-window-layout': false,
     'app-disable-video': true,
     'app-speech-reco-overlay': false,
@@ -1859,6 +1860,9 @@
       /* USM-12. `recPreviewWindowOnChange` at byte 2,250,601 persists `recPreviewWindow`; the id
          was absent from this table and the table has no fallback, so the box wrote nothing at all. */
       'app-recording-preview-window': 'recPreviewWindow',
+      /* USM-11. `noteUpdatePopupOnChange` at byte 2,251,541 persists `noteUpdatePopup`; the
+         consumer is the `updatedSessionNote` frame's handler in `events.svelte.ts`. */
+      'note-update-popup': 'noteUpdatePopup',
       'presenter-push-to-talk': 'pushToTalk',
       'presenter-speech-recognition': 'doSpeechReco',
       'app-speech-reco-overlay': 'showSpeechRecoOverlay',
@@ -3494,6 +3498,36 @@
 
         <ViewerAlertPrefsPane {viewerAlerts} {isPresenter} {onPreferenceChange} />
 
+        <!--
+          USM-11 — `note-update-popup`, `v(3," Note Update Popup ")` at byte 2,269,438.
+
+          Its consumer had to be built first and that was the larger half: `saveSessionNote`
+          published NOTHING, so another viewer's Notes pane kept the old text until they reloaded.
+          `#lib/room/note-update-notice.ts` holds the frame, both byte offsets and the two refusals —
+          including why this control is NOT gated on `sessData.beepOnUserJoin` the way upstream
+          gates it at byte 2,285,196.
+        -->
+        <div class="p-2 text-mode-box">
+          <div id="appNoteUpdatePopup" title="Note Update Popup" class="pb-2">
+            <i class="fas fa-sticky-note"></i>
+            <span class="pl-2">Note Update Popup:</span>
+          </div>
+          <div class="ml-5">
+            <input
+              type="checkbox"
+              name="note-update-popup"
+              value="Do not disturb"
+              id="note-update-popup"
+              class="form-check-input"
+              {@attach setInputChecked(settingChecks['note-update-popup'])}
+              onchange={updateSettingCheck}
+            />
+            <label for="note-update-popup" class="form-check-label"
+              >Note Update Popup
+              <span>{settingChecks['note-update-popup'] ? 'on' : 'off'}</span></label
+            >
+          </div>
+        </div>
         <!--
           USM-15 — `O(132, globals.hasSpeechRecognition ? 132 : -1)`, byte 2,285,653, and its twin
           on the presenter pane below.

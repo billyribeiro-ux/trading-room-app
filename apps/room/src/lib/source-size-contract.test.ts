@@ -773,7 +773,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one thing that cannot live there — the self-skip, and why the actor's id on this frame is not
       authority.
     */
-    max: 971,
+    /*
+      971 -> 983, 2026-08-30, for USM-11: twelve lines, and eleven of them are the CALL — the four
+      dependencies `noteUpdateNotice` takes, each supplied from the room's own state rather than
+      from the frame. The reasoning itself left, to `#lib/room/note-update-notice.ts`, which is the
+      trade this file asks for; what remains is a dispatcher branch, which is what this file is.
+    */
+    max: 983,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -2583,7 +2589,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that has not moved since. A third extraction to absorb twenty lines of citation would be
       churn, and the rule this file states about itself is that prose is never trimmed to fit.
     */
-    max: 6356,
+    /*
+      6,356 -> 6,390, 2026-08-30, for USM-11's checkbox: the control, its `on`/`off` pair, and a
+      six-line pointer at `#lib/room/note-update-notice.ts`, which is where the frame, both byte
+      offsets and both refusals now live.
+
+      Two extractions have already come out of this file today — `RestreamPane.svelte` and
+      `SessionHistoryPane.svelte`, 225 lines — and its reasoning left with the behaviour here rather
+      than sitting beside the markup. What is left is a checkbox.
+    */
+    max: 6390,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2650,7 +2665,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       replaced by the branch it described — and by the argument that the authority is the SERVER's,
       which the reference's client-side compare is not.
     */
-    max: 1680,
+    /*
+      1,680 -> 1,709, 2026-08-30, for USM-11: `saveSessionNote` publishes `updatedSessionNote` now,
+      with the twenty-line citation that says why the frame carries the note's NAME and not its
+      content.
+
+      That paragraph earns its place: this is a server file, the rule it is applying (per-ROOM
+      stream, per-CHANNEL content) is the one `message-mutation-frames.ts` exists for, and the next
+      person to add a field to this frame needs to meet it here rather than three files away.
+    */
+    max: 1709,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*
@@ -3141,7 +3165,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       polarity is the whole point — `!== false`, so an unset preference does not switch a presenter's
       preview off for them.
     */
-    max: 709,
+    /*
+      709 -> 725, 2026-08-30, for USM-11's `noteUpdatePopup`: field, seed, boolean case, getter and
+      the note recording that the preference had no control, no consumer and no EVENT before today.
+    */
+    max: 725,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -3749,6 +3777,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     `RoomFiles.filesHidden` is the recorded precedent for that and it cost a slice to find.
   */
   {
+    file: 'lib/room/note-update-notice.ts',
+    /*
+      USM-11's receiver, extracted from `events.svelte.ts` on 2026-08-30 in the commit that wrote it.
+
+      `source-size-contract` moved it and the module is the better home: that file is a dispatcher,
+      and this is a behaviour with four paragraphs attached — the two byte offsets, why the saver is
+      skipped, why upstream's `alertsService.clear()` is refused, and why the control is NOT gated on
+      `sessData.beepOnUserJoin`. Most of the file is those four.
+    */
+    max: 76,
+    why: 'a note somebody else saved: the refetch, the toast, and the two refusals'
+  },
+  {
     file: 'lib/room/preference-side-effects.ts',
     /*
       The four preference writes that are NOT preferences, extracted from `createRoom` on
@@ -3907,7 +3948,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       compared against the recipient's own, the frame carries no payload for a forged id to unlock,
       and the server applied every rule before publishing. The comment IS the change.
     */
-    max: 68,
+    /*
+      68 -> 77, 2026-08-30, for `noteName` — the ONE string on this frame that is displayed, and
+      nine lines saying why that is safe: the frame is published by `saveSessionNote` on our own
+      server rather than relayed from a client, and a note's tab name is already drawn for anyone
+      who can see the pane. The body is deliberately not sent.
+    */
+    max: 77,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
   },
   {

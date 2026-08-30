@@ -33,6 +33,63 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 16:25 UTC — Saving a session note told nobody
+
+**Runtime impact: YES.** A presenter editing the room's session notes is now visible to everyone in
+it, instead of nobody seeing the change until they happened to reload. Viewers get a toast naming the
+note, behind a preference they can switch off.
+
+**USM-11 built.** Ten of the user-settings modal's seventeen rows are closed.
+
+#### The row named the popup; the defect was one level under it
+
+`saveSessionNote` in `+page.server.ts` wrote its row and **published nothing**. Every other viewer's
+Notes pane kept the previous text until they reloaded — a presenter editing the room's notes during
+a session was invisible to the room, which is the entire point of the pane. The audit row asks for a
+checkbox. The checkbox could not exist without the frame, so the frame was the work.
+
+`updatedSessionNote` is the reference's own name, read at byte **1,022,762**; its receiver emits
+`noteTabUpdated {id, name}` and the toast hangs off that at 1,962,777. That matters because
+`message-mutation-frames.ts` sets the rule for a fifth frame: *"Adding one means finding it in the
+bundle first — an invented frame name is the `alertDisplayMode` defect wearing a wire format."*
+
+**The frame carries the id and the NAME and not the content**, and the contract asserts the absence.
+`invalidateAll()` re-reads the row, which is the authority — the argument the four message-mutation
+frames already make — and this SSE stream is per ROOM while chat is per channel, which is the second
+reason that module gives for trigger-only frames. A note's tab name is already drawn for anyone who
+can see the pane, so the frame carries nothing its recipient could not read anyway.
+
+#### Two divergences, both refusals rather than omissions
+
+Upstream's handler calls `alertsService.clear()` before raising the toast. That wipes **every** toast
+on screen — including the media-outage banner `RoomToasts` deliberately gives `timeOut: 0`, which a
+note being edited must not dismiss. De-duplication is what that call was there for, and `RoomToasts.show`
+already does it.
+
+And upstream renders the checkbox under `z("ngIf", sessData.beepOnUserJoin)` at byte 2,285,196 — the
+**join-beep room setting**, which has nothing to do with session notes, which nothing else in that
+block shares, and which no handler reads alongside it. It reads as a markup slip; reproducing it
+would mean an owner who switches off the join beep silently loses control of note popups.
+
+#### One extraction, so the dispatcher's reasoning went with the behaviour
+
+`note-update-notice.ts` took the receiver out of `events.svelte.ts` — that file is a dispatcher, and
+this is a behaviour with four paragraphs attached. `ModalHost.svelte` keeps a six-line pointer at it
+instead of the citation. Four ceilings move, each argued: `+page.server.ts` 1,680 → 1,709 (the
+publish and its twenty-line reason, which belongs on the server where the rule applies),
+`ModalHost.svelte` 6,356 → 6,390, `prefs.svelte.ts` 709 → 725, `cmds-frame.ts` 68 → 77 (nine lines
+saying why the one displayed string on that frame is safe), `events.svelte.ts` 971 → 983 (the call,
+not the reasoning).
+
+**Verified:** `note-update-broadcast-contract.test.ts` 10/10 (new). **Nine negative controls run and
+seen red** — the publish removed, the note content put on the frame, the publish moved before the
+404 branch, the saver notified too, the toast ignoring the preference, upstream's `clear()`
+reproduced, the mapping row removed, the control gated on the join beep as upstream gates it, and the
+preference default flipped. Full `pnpm run gate` in `apps/room`: **249 files, 4,105 passed, 1
+skipped, `gate-exit=0`**, read from the log it was echoed into. Controller untouched. **Nothing was
+opened in a browser, and the Svelte MCP server has been disconnected for this entire session**, so
+`svelte-autofixer` was not run; `svelte-check` is clean at 1,457 files.
+
 ### 2026-08-30 16:00 UTC — Three settings that wrote a value nothing read, and a theme switch that left the colours behind
 
 **Runtime impact: YES.** The presenter's captions toggle starts and stops recognition the moment it

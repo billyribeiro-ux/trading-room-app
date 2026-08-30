@@ -92,6 +92,7 @@ export class RoomPrefs {
   #alwaysScrollToBottom;
   #recordingStartSound;
   #recPreviewWindow;
+  #noteUpdatePopup;
   #recordingStopSound;
   #enableRTE;
   #extraChatColumn;
@@ -263,6 +264,15 @@ export class RoomPrefs {
      * for somebody who never touched the box.
      */
     this.#recPreviewWindow = $state(loadedSettings.recPreviewWindow !== false);
+
+    /**
+     * `preferences.noteUpdatePopup` — USM-11. Default ON, from `noteUpdatePopup:!0` at byte 979,948.
+     *
+     * It had no preference, no control and no EVENT: saving a session note published nothing at
+     * all, so another viewer's Notes pane kept the old text until they happened to reload. The
+     * popup is the visible half of a broadcast that did not exist.
+     */
+    this.#noteUpdatePopup = $state(loadedSettings.noteUpdatePopup !== false);
 
     /**
      * `preferences.enableRTE` — the presenter's own half of the rich text editor gate.
@@ -526,6 +536,11 @@ export class RoomPrefs {
     return this.#recPreviewWindow;
   }
 
+  /** USM-11 — whether an `updatedSessionNote` frame raises a toast for this viewer. */
+  get noteUpdatePopup() {
+    return this.#noteUpdatePopup;
+  }
+
   get recordingStartSound() {
     return this.#recordingStartSound;
   }
@@ -647,6 +662,7 @@ export class RoomPrefs {
       if (key === 'recordingStartSound') this.#recordingStartSound = value;
       if (key === 'recordingStopSound') this.#recordingStopSound = value;
       if (key === 'recPreviewWindow') this.#recPreviewWindow = value;
+      if (key === 'noteUpdatePopup') this.#noteUpdatePopup = value;
       if (key === 'pushToTalk') this.#pushToTalk = value;
       if (key === 'doSpeechReco') this.#doSpeechReco = value;
       if (key === 'alwaysScrollToBottom') this.#alwaysScrollToBottom = value;

@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**91 open · 133 closed · 224 rows.**
+**90 open · 134 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -1469,6 +1469,14 @@ resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.present
 > Verified: I could not find it. The reference control is real and I read it: the template render function at offset 2232964 emits `d(0,"div",17)(1,"input",157),x("change",function(){return D(e),E(g().reactionsSoundQAOnChange())}),u(),d(2,"label",158),v(3," QA Reactions Sound ")` bound to `e.appService.globals.preferences.qaReactionSoundOn`; its attr…
 
 ### USM-11 — 'Note Update Popup' checkbox missing
+
+**BUILT 2026-08-30 16:19 UTC — and the row named the popup while the defect was one level under it.** `saveSessionNote` in `+page.server.ts` wrote its row and **published nothing**. Every other viewer's Notes pane kept the previous text until they happened to reload, so a presenter editing the room's notes during a session was invisible to the room — which is the entire point of the pane. The checkbox could not exist without the frame, so the frame was the work.
+
+`updatedSessionNote` is the reference's own name, read at byte **1,022,762**, which is what `message-mutation-frames.ts` requires of a fifth frame: *"Adding one means finding it in the bundle first — an invented frame name is the `alertDisplayMode` defect wearing a wire format."* Its receiver emits `noteTabUpdated {id, name}` and the toast hangs off that at byte 1,962,777.
+
+**The frame carries the id and the NAME and not the content.** `invalidateAll()` re-reads the row, which is the authority — the argument the four message-mutation frames already make — and this SSE stream is per ROOM, which is the second reason that module gives for trigger-only frames. A note's tab name is already drawn for anyone who can see the pane at all, so the frame carries nothing its recipient could not read anyway.
+
+**Two divergences, both refusals rather than omissions.** Upstream's handler calls `alertsService.clear()` before the toast; that wipes every toast on screen, and one of them may be the media-outage banner `RoomToasts` deliberately gives `timeOut: 0` — a note being edited must not dismiss it, and `RoomToasts` already de-duplicates, which is what that call was for. And upstream renders this control under `z("ngIf", sessData.beepOnUserJoin)` at byte 2,285,196 — the JOIN-BEEP room setting, which has nothing to do with session notes and which nothing else in that block shares. It reads as a markup slip; reproducing it would mean an owner who switches off the join beep silently loses control of note popups.
 
 **medium** · `missing-control` · reference byte **2,269,438**
 
