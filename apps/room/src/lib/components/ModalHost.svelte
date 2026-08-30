@@ -402,6 +402,16 @@
      */
     hasMic?: boolean;
     /**
+     * `globals.hasSpeechRecognition` — USM-15, the ROOM's captions entitlement.
+     *
+     * `globals.hasSpeechRecognition = !sessData.hasSpeechRecognitionDisabled && !0` at byte
+     * 1,147,900, and `O(132, hasSpeechRecognition ? 132 : -1)` at 2,285,653 is what it draws. Read
+     * off `RoomGates.speechRecognitionAvailable` rather than re-derived here, because that getter
+     * already owns the `!== true` reading — absent means NOT disabled, so a room that never
+     * configured captions has them.
+     */
+    captionsAvailable?: boolean;
+    /**
      * `canEditUsername` — `sessData.allowUsersToChangeUsername`, the member's own rename.
      *
      * The fallback branch of `O(9)`. Different action from the presenter's: `editUsernameByUser`
@@ -536,6 +546,7 @@
     restreamUrl,
     onSaveRestreamUrl,
     hasMic = false,
+    captionsAvailable = true,
     onDoNotDisturbChange,
     onSaveDataChange,
     onPlayYoutube,
@@ -3144,7 +3155,14 @@
           }}>Chat Settings</a
         >
       </li>
-      {#if isPresenter}
+      <!--
+        USM-14 — `O(18, isPresenter && !isLimitedPresenter ? 18 : -1)`, byte 2,283,408, and the pane
+        below carries the same pair at 2,288,469. A limited presenter — somebody handed mic and
+        screen — was getting the whole Presenter Settings tab: the CC toggle, the presenter colours,
+        the recording preview. `giveMicScreen` hands over the ability to SPEAK, and the same
+        narrowing is already applied two tabs away on the user card and on Group Chat Control.
+      -->
+      {#if isPresenter && !isLimitedPresenter}
         <li class="nav-item">
           <a
             id="presenter-settings-tab"
@@ -3455,27 +3473,40 @@
 
         <ViewerAlertPrefsPane {viewerAlerts} {isPresenter} {onPreferenceChange} />
 
-        <div class="p-2 text-mode-box">
-          <div id="appSpeechRecoOverlay" title="Show Speech Recognition Overlay" class="pb-2">
-            <i class="fas fa-closed-captioning"></i>
-            <span class="pl-2">Show Closed Captions Overlay:</span>
+        <!--
+          USM-15 — `O(132, globals.hasSpeechRecognition ? 132 : -1)`, byte 2,285,653, and its twin
+          on the presenter pane below.
+
+          Not a privilege hole and it is worth saying which kind of defect it was: this room already
+          REFUSES at runtime (`RoomRecording.beginSpeechRecognition`, pinned by
+          `speech-reco-entitlement.test.ts`). What it drew was a checkbox that could be ticked, said
+          `Enabled`, and captioned nothing — a control whose only effect is changing its own label,
+          which is the shape `CLAUDE.md` names outright. The room-level entitlement decides whether
+          the control exists at all, exactly as it decides whether the feature runs.
+        -->
+        {#if captionsAvailable}
+          <div class="p-2 text-mode-box">
+            <div id="appSpeechRecoOverlay" title="Show Speech Recognition Overlay" class="pb-2">
+              <i class="fas fa-closed-captioning"></i>
+              <span class="pl-2">Show Closed Captions Overlay:</span>
+            </div>
+            <div class="ml-5">
+              <input
+                type="checkbox"
+                name="app-speech-reco-overlay"
+                value="Show Speech Recognition Overlay"
+                id="app-speech-reco-overlay"
+                class="form-check-input"
+                {@attach setInputChecked(settingChecks['app-speech-reco-overlay'])}
+                onchange={updateSettingCheck}
+              />
+              <label for="app-speech-reco-overlay" class="form-check-label"
+                ><span>{settingChecks['app-speech-reco-overlay'] ? 'Enabled' : 'Disabled'}</span
+                ></label
+              >
+            </div>
           </div>
-          <div class="ml-5">
-            <input
-              type="checkbox"
-              name="app-speech-reco-overlay"
-              value="Show Speech Recognition Overlay"
-              id="app-speech-reco-overlay"
-              class="form-check-input"
-              {@attach setInputChecked(settingChecks['app-speech-reco-overlay'])}
-              onchange={updateSettingCheck}
-            />
-            <label for="app-speech-reco-overlay" class="form-check-label"
-              ><span>{settingChecks['app-speech-reco-overlay'] ? 'Enabled' : 'Disabled'}</span
-              ></label
-            >
-          </div>
-        </div>
+        {/if}
 
         <div class="p-2 text-mode-box">
           <div class="mx-3">
@@ -3932,7 +3963,8 @@
         {/if}
       </div>
 
-      {#if isPresenter}
+      <!-- USM-14, the pane half: `O(292, isPresenter && !isLimitedPresenter ? 292 : -1)`. -->
+      {#if isPresenter && !isLimitedPresenter}
         <div
           id="presenter-settings"
           role="tabpanel"
@@ -3976,28 +4008,35 @@
             </div>
           </div>
 
-          <div class="p-2 text-mode-box">
-            <div id="presenterSpeechRecognition" title="Presenter Speech Recognition" class="pb-2">
-              <i class="fas fa-microphone-alt"></i>
-              <span class="pl-2">Speech Recognition for Closed Captions:</span>
-            </div>
-            <div class="ml-5">
-              <input
-                type="checkbox"
-                name="presenter-speech-recognition"
-                value="Presenter Speech Recognition"
-                id="presenter-speech-recognition"
-                class="form-check-input"
-                {@attach setInputChecked(settingChecks['presenter-speech-recognition'])}
-                onchange={updateSettingCheck}
-              />
-              <label for="presenter-speech-recognition" class="form-check-label"
-                ><span
-                  >{settingChecks['presenter-speech-recognition'] ? 'Enabled' : 'Disabled'}</span
-                ></label
+          <!-- USM-15, the presenter half. Same gate, same reason — see the overlay block above. -->
+          {#if captionsAvailable}
+            <div class="p-2 text-mode-box">
+              <div
+                id="presenterSpeechRecognition"
+                title="Presenter Speech Recognition"
+                class="pb-2"
               >
+                <i class="fas fa-microphone-alt"></i>
+                <span class="pl-2">Speech Recognition for Closed Captions:</span>
+              </div>
+              <div class="ml-5">
+                <input
+                  type="checkbox"
+                  name="presenter-speech-recognition"
+                  value="Presenter Speech Recognition"
+                  id="presenter-speech-recognition"
+                  class="form-check-input"
+                  {@attach setInputChecked(settingChecks['presenter-speech-recognition'])}
+                  onchange={updateSettingCheck}
+                />
+                <label for="presenter-speech-recognition" class="form-check-label"
+                  ><span
+                    >{settingChecks['presenter-speech-recognition'] ? 'Enabled' : 'Disabled'}</span
+                  ></label
+                >
+              </div>
             </div>
-          </div>
+          {/if}
 
           <div class="p-2 text-mode-box">
             <div id="presenterPushToTalk" title="Presenter Push To Talk" class="pb-2">

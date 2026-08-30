@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**100 open · 124 closed · 224 rows.**
+**96 open · 128 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -739,6 +739,18 @@ d(0,"div",43)(1,"div",44)(2,"strong",45),v(3),u(),T(4,"div",46),u(),T(7,"div",47
 
 **Also decoded in passing:** the binding ORDER says which style goes where, and they are not all the body's — div43 and strong45 both take `invertTxtColorToggler(invertTxtColor, "name")` (the NAME inversion, which is `usernameStyle` here and is what the card already puts on the same `d-block username` node), while only div46 takes `styleF`. div47 takes neither and inherits. That asymmetry is the reference's.
 
+## notes/NoteEditor.svelte
+
+18 verified gaps; 50 reference behaviours confirmed present.
+
+> **These eighteen rows sat under `## RoomMessage.svelte` until 2026-08-30**, with this heading
+> below them as an empty stub claiming eighteen gaps and listing none. Nothing was lost — every
+> row was here and every one is closed — but the two sections said the opposite of the truth to
+> anybody reading either: the NoteEditor section looked unstarted and the RoomMessage section
+> looked twice its size. `room-surface-audit-counts.test.ts` now checks each surface heading
+> against the `gaps` column of the table above, so a row filed under the wrong heading fails
+> rather than being found by hand.
+
 ### note-editor-carousel-slide-upload — Per-slide image upload (Upload button, uploading spinner, POST to upload_server) is missing
 
 **BUILT 2026-08-30 05:18 UTC.** A hidden `<input type="file" accept="image/*">` with id `cfi_<index>` under a styled `<label for>` — the reference's own pattern, const 58 `["type","file","accept","image/*",2,"display","none",3,"change","id"]` and 59 `[1,"btn","btn-sm","btn-outline-secondary","mb-0"]` — the ` Upload ` label with `fas fa-upload`, `uploadCarouselImage`, and the `D0e` spinner (const 52 the icon, 53 `[1,"small","mt-1"]`, caption `Uploading...`). Transcribed: the first file only, the input cleared unconditionally so the same file can be chosen twice, the URL written only on success, and the failure raised as a dialog rather than a console line. **Two deliberate divergences:** the POST is NOT transcribed — `onUploadImages` already carries this room's upload (CDN when configured, `composer-image.remote.ts` otherwise) and a second `$.ajax` here would be a second uploader with its own credential handling; and the spinner is keyed by the slide's KEY rather than its index, because upstream mutates a slide object it holds a reference to while ours replaces the array wholesale, so an index captured before the `await` points at a different slide once `removeCarouselSlide` renumbers. `note-image-browser-contract.test.ts`.
@@ -1009,11 +1021,6 @@ onCarouselUrlPaste(e,i){const o=e.clipboardData?.getData("text")?.trim();o&&/^ht
 > Verified: I could not disprove this. The reference behaviour is confirmed present in the bundle, and no counterpart exists anywhere in apps/room/src.
 
 ---
-
-## notes/NoteEditor.svelte
-
-18 verified gaps; 50 reference behaviours confirmed present.
-
 
 ## ModalHost: session-control modal
 
@@ -1355,6 +1362,8 @@ H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(
 
 ### USM-04 — Group Chat Control block is not gated on isPresenter && !isLimitedPresenter
 
+**ALREADY BUILT — verified by reading 2026-08-30 15:36 UTC, not rebuilt.** `ModalHost.svelte` carries `{#if isPresenter && !isLimitedPresenter}` around the whole `#groupChatControl` box, with `O(290, …)` at byte 2,288,249 cited at the gate and the reason for the second term written beside it: `giveMicScreen` makes a member a presenter at runtime, and disabling the room's chat is not part of what that grant hands over. `user-settings-gates-contract.test.ts` pins it now, because a row found already built is a row nothing was watching.
+
 **high** · `missing-control` · reference byte **2,288,249**
 
 ```
@@ -1366,6 +1375,8 @@ O(290,o.appService.globals.isPresenter&&!o.appService.globals.isLimitedPresenter
 > Verified: I could not find the gate anywhere in apps/room/src. The `#groupChatControl` block sits inside the `user-chat-settings` tab pane (opened at ModalHost.svelte:3453, `settingsTab === 'chat'`, whose nav-item at 2927 is NOT inside the `{#if isPresenter}` that wraps the presenter tab at 2942) with no surrounding `{#if}`: scanning lines 3454-371…
 
 ### USM-05 — Presenter-only action buttons (Remove preview windows / Mute all non-admins / Get my token) are rendered for everyone
+
+**ALREADY BUILT — verified by reading 2026-08-30 15:36 UTC, not rebuilt.** The three sit inside `{#if isPresenter}` and **"Edit my Info and Avatar" is deliberately outside it**, which is the half of this row that is easy to over-fix: `O(135, …)` holds exactly three buttons and the const immediately after it is unconditional. Wrapping all four passes any "are they gated" check and takes a control away from every member, so the contract added today asserts the fourth is NOT gated as well.
 
 **high** · `missing-control` · reference byte **2,285,714**
 
@@ -1491,6 +1502,8 @@ speechRecoCCOnChange(){this.appService.globals.preferences.speechRecoCC=!this.ap
 
 ### USM-14 — Presenter Settings tab and pane gated on isPresenter alone, missing !isLimitedPresenter
 
+**BUILT 2026-08-30 15:36 UTC.** Both gates now read `isPresenter && !isLimitedPresenter` — `O(18, …)` at byte 2,283,408 for the tab header and `O(292, …)` at 2,288,469 for the pane, which the reference gates separately and so does this. A limited presenter was getting the whole Presenter Settings pane: the CC toggle, the presenter colours, the recording preview. The row's own observation is what made it small — the prop existed and the same narrowing was already applied twice in this file, so this was the one place the pair had been dropped rather than a missing capability.
+
 **medium** · `divergence` · reference byte **2,283,408**
 
 ```
@@ -1514,6 +1527,10 @@ switchTheme(e){if(this.alertStyle=JSON.parse(window.localStorage.getItem("alertS
 > Verified: I tried hard to find a theme-triggered re-seed and there is none. The full write path is closed and does only one thing: ModalHost.svelte:3054/3066 `onchange={() => onTheme('light'|'dark')}` -> RoomOverlays.svelte:580 `onTheme={(next) => modals.setTheme(next)}` -> modals.svelte.ts:192-195, whose entire body is `this.#setTheme(nextTheme)`…
 
 ### USM-15 — Closed-captions sections are not gated on hasSpeechRecognition
+
+**BUILT 2026-08-30 15:36 UTC, and the row's own reading of the severity is right — this is not a privilege hole, it is a control that could not work.** `O(132, globals.hasSpeechRecognition ? 132 : -1)` at byte 2,285,653, applied to both `#appSpeechRecoOverlay` and `#presenterSpeechRecognition`. The room already refuses at runtime (`RoomRecording.beginSpeechRecognition`, pinned by `speech-reco-entitlement.test.ts`), so what the ungated blocks drew was a checkbox somebody could tick, that then said `Enabled`, and that captioned nothing — **a control whose only effect is changing its own label**, which `CLAUDE.md` names outright.
+
+The value is `RoomGates.speechRecognitionAvailable` passed from the page rather than re-derived in the component, and that is the load-bearing part: `!== true` (absent means NOT disabled) is that getter's rule and it is the same getter the runtime refusal reads. One reading of the setting, two consumers — re-deriving it in a component is how the drawn control and the running feature come to disagree.
 
 **low** · `divergence` · reference byte **2,285,653**
 

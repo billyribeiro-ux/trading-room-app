@@ -614,12 +614,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       sidebar already reads.
     */
     /*
-      1,542 -> 1,543, 2026-08-30, for SC-14: one line, `hasMic={data.user.hasMic === true}` on
+      1,543 -> 1,544, 2026-08-30, for USM-15: one line,
+      `captionsAvailable={gates.speechRecognitionAvailable}`. Resolved here because `gates` is the
+      page's and the rule is that class's; see the matching note on `RoomOverlays.svelte`.
+
+            1,542 -> 1,543, 2026-08-30, for SC-14: one line, `hasMic={data.user.hasMic === true}` on
       `RoomNavbar`. The value has to arrive here as well as at `RoomOverlays` because the navbar is
       rendered by the PAGE and the modal by the overlays — two components, one permission, and no
       shared holder between them that is not the page itself.
     */
-    max: 1543,
+    max: 1544,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1413,7 +1417,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       renders — which is what every other call site in this room passes and must keep getting.
     */
     /*
-      954 -> 955, 2026-08-30, for SC-14: one line, `hasMic={data.user.hasMic === true}`, reaching
+      955 -> 965, 2026-08-30, for USM-15: one prop and its nine-line reason. `captionsAvailable`
+      is resolved on the PAGE from `RoomGates.speechRecognitionAvailable` and only passed through
+      here, unlike the `data.sessData` reads around it — the `!== true` rule (absent means NOT
+      disabled) belongs to the gates class, which is also what `beginSpeechRecognition` refuses on.
+      One reading of the setting, two consumers; re-deriving it here is how the drawn control and
+      the running feature come to disagree.
+
+            954 -> 955, 2026-08-30, for SC-14: one line, `hasMic={data.user.hasMic === true}`, reaching
       `ModalHost`'s non-presenter arm. Read here for the reason this entry gives five times over —
       this component holds `data`.
 
@@ -1427,7 +1438,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       leaving the twenty lines of markup where they were and raising ModalHost instead, which is the
       trade this rule exists to force.
     */
-    max: 955,
+    max: 965,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.

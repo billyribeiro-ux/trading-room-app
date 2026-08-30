@@ -289,6 +289,55 @@ describe('the two-verifier pass states its own arithmetic', () => {
     expect(AUDIT).toContain(`${columnTotal(3)} behaviours were confirmed built`);
   });
 
+  it('files every row under the surface heading that counts it', () => {
+    /*
+      ## The defect this was written for, found 2026-08-30
+
+      The eighteen `note-editor-*` rows sat under `## RoomMessage.svelte`, and
+      `## notes/NoteEditor.svelte` was an empty stub below them claiming eighteen gaps and listing
+      none. Nothing was lost and every one of them was closed — but each section said the opposite
+      of the truth to anybody reading it: NoteEditor looked unstarted, RoomMessage looked twice its
+      size, and "which surface is finished" could not be answered by reading.
+
+      Every OTHER assertion in this file was green throughout, and that is the point: they all count
+      the document as one bag of rows. This is the only one that asks WHERE a row is, and the
+      surfaces table is the statement it is checked against — the same table whose `gaps` column
+      already has to sum to the survivor count, so the two constraints together pin both the total
+      and its distribution.
+
+      RM-25 is the one allowance, and it is a named one rather than a tolerance: it was added after
+      the pass, is recorded as such in the prose above, and is deliberately not in that table.
+    */
+    const surfaces = new Map<string, number>();
+    for (const found of surfaceRows()) {
+      const name = /^\| ([^|]+?) \|/.exec(found[0]);
+      expect(name, `could not read a surface name from ${found[0]}`).not.toBeNull();
+      surfaces.set(name![1].trim(), Number(found[1]));
+    }
+
+    /* Walk the document, attributing each `### ` row to the `## ` heading above it. */
+    const filed = new Map<string, number>();
+    let heading = '';
+    for (const line of lines) {
+      if (line.startsWith('## ')) heading = line.slice(3).trim();
+      else if (line.startsWith('### ')) filed.set(heading, (filed.get(heading) ?? 0) + 1);
+    }
+
+    const wrong: string[] = [];
+    for (const [surface, gaps] of surfaces) {
+      /* RM-25 was added after the pass and is deliberately outside the table. */
+      const allowance = surface === 'RoomMessage.svelte' ? 1 : 0;
+      const actual = filed.get(surface) ?? 0;
+      if (actual !== gaps + allowance) {
+        wrong.push(`${surface}: the table says ${gaps}, ${actual} rows are filed under it`);
+      }
+    }
+    expect(
+      wrong,
+      `${wrong.join('; ')} — a row filed under the wrong heading makes both sections lie about how much of each surface is done.`
+    ).toEqual([]);
+  });
+
   it('and the rows in the document are the survivors plus the ones added afterwards', () => {
     /*
       RM-25 was found while building, after the pass ran, and is deliberately outside the table. So

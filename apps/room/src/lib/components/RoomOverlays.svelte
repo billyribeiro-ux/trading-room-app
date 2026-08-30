@@ -113,6 +113,7 @@
     messageChrome,
     presenterColors,
     alertLabels,
+    captionsAvailable,
     alertsDisplayMode,
     chatLogDisplayMode,
     onDisplayModeChange,
@@ -184,6 +185,14 @@
      * array, so this is the second consumer of one parse rather than a second parse.
      */
     alertLabels: readonly AlertLabel[];
+    /**
+     * `RoomGates.speechRecognitionAvailable` — USM-15, passed straight to `ModalHost`.
+     *
+     * Resolved on the PAGE and not here, unlike the `data.sessData` reads above it: the `!== true`
+     * rule (absent means NOT disabled) belongs to `RoomGates`, which is also what
+     * `RoomRecording.beginSpeechRecognition` refuses on. One reading of the setting, two consumers.
+     */
+    captionsAvailable: boolean;
     /** The two display modes, passed straight through to the settings radios and the Q&A thread. */
     alertsDisplayMode: ChatDisplayMode;
     chatLogDisplayMode: ChatDisplayMode;
@@ -604,6 +613,7 @@
   hideMobileCredentials={Boolean(data.sessData?.hideMobileCredentials)}
   isLimitedPresenter={media.limitedPresenter}
   hasMic={data.user.hasMic === true}
+  {captionsAvailable}
   canEditUsername={Boolean(data.sessData?.allowUsersToChangeUsername)}
   alertSearchFilter={feeds.alertSearchFilter}
   {chatMode}

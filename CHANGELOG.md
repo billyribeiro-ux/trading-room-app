@@ -33,6 +33,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 15:36 UTC — A limited presenter had the whole Presenter Settings pane, and a caption toggle that captioned nothing
+
+**Runtime impact: YES.** A member handed mic and screen no longer gets the Presenter Settings tab —
+the CC toggle, the presenter colours, the recording preview. And in a room with speech recognition
+switched off, the two closed-captions controls are no longer drawn at all instead of being tickable
+and inert.
+
+**USM-14 and USM-15 built; USM-04 and USM-05 verified already built.** Four of the user-settings
+modal's seventeen rows, and they are one block of five gates.
+
+```js
+O(18,  isPresenter && !isLimitedPresenter ? 18  : -1)   // Presenter Settings TAB   byte 2,283,408
+O(292, isPresenter && !isLimitedPresenter ? 292 : -1)   // …and its PANE            byte 2,288,469
+O(132, globals.hasSpeechRecognition ? 132 : -1)         // both captions blocks     byte 2,285,653
+O(290, isPresenter && !isLimitedPresenter ? 290 : -1)   // Group Chat Control       (USM-04)
+O(135, isPresenter ? 135 : -1)                          // three buttons            (USM-05)
+```
+
+#### They are two different kinds of defect
+
+**USM-14 is authority**, and what made it small is the row's own observation: the prop existed and
+the same narrowing was already applied twice in the same file (the user card, and Group Chat
+Control). This was the one place the pair had been dropped, not a missing capability.
+`giveMicScreen` hands over the ability to SPEAK; it does not hand over the room's settings.
+
+**USM-15 is a control that could not work.** The room already refuses at runtime —
+`RoomRecording.beginSpeechRecognition`, pinned by `speech-reco-entitlement.test.ts` — so what the
+ungated blocks drew was a checkbox a member could tick, that then said `Enabled`, and that captioned
+nothing. **A control whose only effect is changing its own label**, which `CLAUDE.md` names outright.
+
+The value is `RoomGates.speechRecognitionAvailable` passed down from the page rather than re-derived
+in the component, and that is the load-bearing part: `!== true` — absent means NOT disabled — is that
+getter's rule, and it is the same getter the runtime refusal reads. One reading of the setting, two
+consumers. Re-deriving it in a component is how the drawn control and the running feature come to
+disagree.
+
+#### USM-05's easy over-fix, asserted rather than trusted
+
+`O(135, …)` holds exactly three buttons and the const immediately after it — "Edit my Info and
+Avatar" — is unconditional. Wrapping all four passes any "are they gated?" check and takes a control
+away from every member, so the new contract asserts the fourth is NOT gated. Both rows were found
+already built by reading the file, and both are pinned now: **a row found already built is a row
+nothing was watching.**
+
+#### And the tracker had filed eighteen rows under the wrong surface
+
+`## notes/NoteEditor.svelte` was an empty stub claiming eighteen gaps and listing none, while its
+eighteen `note-editor-*` rows sat under `## RoomMessage.svelte` above it. Nothing was lost — every
+one of them is closed — but each section said the opposite of the truth to anybody reading it:
+NoteEditor looked unstarted, RoomMessage looked twice its size, and "which surface is finished" could
+not be answered by reading.
+
+Every other assertion in `room-surface-audit-counts.test.ts` was green throughout, and that is the
+point: they all count the document as one bag of rows. It has one that asks WHERE a row is now,
+checked against the per-surface table — the same table whose `gaps` column already has to sum to the
+survivor total, so the two constraints together pin both the total and its distribution.
+
+**Verified:** `user-settings-gates-contract.test.ts` 9/9 (new), `room-surface-audit-counts.test.ts`
+16/16, `source-size-contract.test.ts` 513/513. **Eight negative controls run and seen red** — both
+presenter gates reverted to plain `isPresenter`, each captions block ungated, Group Chat Control
+widened, "Edit my Info" swallowed into the presenter gate, the NoteEditor heading moved back below
+its rows, and a row filed under the wrong surface. Full `pnpm run gate` in `apps/room`: **247 files,
+4,073 passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into. Controller untouched.
+**Nothing was opened in a browser, and the Svelte MCP server has been disconnected for this entire
+session**, so `svelte-autofixer` was not run; `svelte-check` is clean at 1,452 files.
+
 ### 2026-08-30 15:28 UTC — Session Control decides who it is for, and the member with a microphone finally gets in
 
 **Runtime impact: YES.** A member whose membership carries the mic permission now has a **Session

@@ -1448,6 +1448,7 @@
       {messageChrome}
       presenterColors={data.presenterColors}
       alertLabels={gates.alertLabels}
+      captionsAvailable={gates.speechRecognitionAvailable}
       alertsDisplayMode={displayModes.alerts}
       chatLogDisplayMode={displayModes.chat}
       onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}
