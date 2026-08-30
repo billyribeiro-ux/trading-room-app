@@ -80,7 +80,7 @@ guessed.
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,077 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
-| 7 | `lib/components/PresentationArea.svelte` | 987 | no |
+| 7 | `lib/components/PresentationArea.svelte` | 988 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 905 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 824 | no |
@@ -94,7 +94,7 @@ guessed.
 | 18 | `lib/components/FilesPane.svelte` | 556 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
 | 20 | `lib/components/ScreenPane.svelte` | 470 | no |
-| 21 | `lib/components/notes/NotesPane.svelte` | 450 | no |
+| 21 | `lib/components/notes/NotesPane.svelte` | 521 | no |
 | 22 | `lib/components/VideoPlayer.svelte` | 413 | no |
 | 23 | `lib/components/PrivateChatPanel.svelte` | 401 | no |
 | 24 | `lib/components/MainTabStrip.svelte` | 371 | no |
@@ -131,7 +131,7 @@ guessed.
 | 55 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 56 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 
-**2 of 65 surfaces audited · 1,072 of 30,903 lines · 3.5%.**
+**2 of 65 surfaces audited · 1,072 of 30,975 lines · 3.5%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

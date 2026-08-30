@@ -27,6 +27,7 @@ import {
   roomConfigUrl,
   roomEntryUrl,
   roomNotesAuthUrl,
+  roomWelcomeMatAuthUrl,
   roomBanUrl,
   roomMuteUrl,
   roomPermissionsUrl,
@@ -1455,4 +1456,75 @@ export async function checkNotesPasswordRemotely(
     throw new RoomConfigUnavailable('the controller answered an unrecognised notes-auth shape');
   }
   return { required: decision.required, ok: decision.ok };
+}
+
+/** What `internal/room-welcome-mat-auth` answers. */
+export interface WelcomeMatDecision {
+  /** Whether an all-rooms password is configured. False means upstream asks for confirmation only. */
+  readonly required: boolean;
+  /** Whether this attempt may replace every room's welcome mat. */
+  readonly ok: boolean;
+  /** The short codes of the rooms this account owns. Empty unless `ok`. */
+  readonly rooms: readonly string[];
+}
+
+/**
+ * Ask the controller whether the all-rooms welcome mat is gated, whether this password is right, and
+ * which rooms it would apply to.
+ *
+ * ## FAILS CLOSED by throwing, like its two siblings
+ *
+ * A thrown `RoomConfigUnavailable` is the only honest answer when the controller cannot be reached:
+ * the room holds neither `allRoomsWelcomeMatPW` nor the account's room list, so "I could not ask"
+ * must not be mistaken for "yes" — and this action rewrites the welcome mat of every room on the
+ * account, which is the least reversible thing a presenter can do from the notes pane.
+ *
+ * Two calls per interaction, and the first carries an EMPTY candidate — the reference's own first
+ * branch (`allRoomsWelcomeMatPW ? prompt : confirm`) asked of the only machine that can answer it.
+ * `required:false` means raise the plain confirmation, exactly as upstream does.
+ */
+export async function checkWelcomeMatPasswordRemotely(
+  shortCode: string,
+  candidate: string
+): Promise<WelcomeMatDecision> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomWelcomeMatAuthUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ candidate }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the welcome-mat check failed or timed out after ${TIMEOUT_MS}ms`,
+      { cause }
+    );
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+
+  const decision = (await response.json()) as WelcomeMatDecision;
+  /*
+    Validated rather than trusted, for the reason the notes-auth reader gives — a controller mid
+    rollout, or a proxy returning an error page as JSON, would otherwise read as `ok: undefined`.
+    The room list is checked too, and every entry of it: this value becomes a `WHERE` predicate over
+    another room's notes, so a non-string in it is a query built from something nobody validated.
+  */
+  if (typeof decision?.ok !== 'boolean' || typeof decision?.required !== 'boolean') {
+    throw new RoomConfigUnavailable('the controller answered an unrecognised welcome-mat shape');
+  }
+  if (!Array.isArray(decision.rooms) || decision.rooms.some((code) => typeof code !== 'string')) {
+    throw new RoomConfigUnavailable('the controller answered an unrecognised room list');
+  }
+  return { required: decision.required, ok: decision.ok, rooms: decision.rooms };
 }

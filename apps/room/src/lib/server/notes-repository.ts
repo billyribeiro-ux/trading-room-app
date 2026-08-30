@@ -318,6 +318,112 @@ export function setWelcomeMatNote(input: {
   });
 }
 
+/**
+ * Make one note the welcome mat of EVERY room named, by copying its content into each.
+ *
+ * ## What the reference evidences, and what it does not
+ *
+ * `setWelcomeMatNoteTab {id, allRooms, pw}` and the setting's own help text — *"Presenters will need
+ * to enter the password to replace all the rooms welcome mats"* — are the whole of the evidence. The
+ * reference's SERVER is not in the capture, so how it applies one note to many rooms is unknown, and
+ * this is the decision taken in its absence:
+ *
+ * **A COPY PER ROOM, not a shared note.** `notes.room_short_code` is what every read in this file
+ * scopes by, and it is the fence that keeps one room's notes out of another's. Referencing a single
+ * note from many rooms would require removing that scope from the welcome-mat read, which is the one
+ * change nothing here is allowed to make. So each room gets its own note carrying this content, and
+ * the rooms stay independent afterwards: editing the mat in room A does not silently rewrite room B's.
+ *
+ * That is a real behavioural difference from a shared note and it is stated rather than implied. It
+ * is also the safer of the two readings: "replace all the rooms welcome mats" describes a one-time
+ * act, and a shared note would make it a permanent coupling nobody asked for.
+ *
+ * ## The source room is written the same way as the others
+ *
+ * It already holds the note, so its "copy" is the existing row being flagged. Handling it through
+ * the same loop rather than as a special case is what keeps the two paths from drifting — and the
+ * source room may not even be in the list, if the controller's account no longer owns it.
+ *
+ * ## One transaction
+ *
+ * A half-applied welcome mat across an account is worse than none: some rooms would greet members
+ * with the new note and some with the old, and nothing would say which. better-sqlite3 transactions
+ * are synchronous, so this is atomic without any of the interleaving a promise-based one would allow.
+ */
+export function setWelcomeMatNoteEverywhere(input: {
+  sourceRoom: string;
+  rooms: readonly string[];
+  noteId: number;
+  now: Date;
+  userId: number;
+}): RoomNote | null {
+  ensureDatabase();
+  return db.transaction((transaction) => {
+    const source = transaction
+      .select()
+      .from(notes)
+      .where(
+        and(
+          eq(notes.roomShortCode, input.sourceRoom),
+          eq(notes.id, input.noteId),
+          isNull(notes.deletedAt)
+        )
+      )
+      .get();
+    /* Refuses a note id from another room, which is what makes every write below safe. */
+    if (source === undefined) return null;
+
+    for (const room of input.rooms) {
+      /* Demote whatever this room currently greets people with — this room's, and only this room's. */
+      transaction
+        .update(notes)
+        .set({ isWelcomeMat: false })
+        .where(and(eq(notes.roomShortCode, room), isNull(notes.deletedAt)))
+        .run();
+
+      if (room === input.sourceRoom) {
+        transaction
+          .update(notes)
+          .set({ isWelcomeMat: true, updatedAt: input.now, updatedById: input.userId })
+          .where(eq(notes.id, source.id))
+          .run();
+        continue;
+      }
+
+      /*
+        The copy is APPENDED rather than overwriting whatever that room's previous mat was. The
+        previous one is demoted above and keeps existing, so a presenter in that room can put it back
+        — which matters because the person who ran this was not necessarily in their room.
+
+        `position` is the next free one there, read inside the transaction so two accounts doing this
+        at once cannot collide on it.
+      */
+      const highest = transaction
+        .select({ value: max(notes.position) })
+        .from(notes)
+        .where(and(eq(notes.roomShortCode, room), isNull(notes.deletedAt)))
+        .get();
+
+      transaction
+        .insert(notes)
+        .values({
+          roomShortCode: room,
+          name: source.name,
+          contentHtml: source.contentHtml,
+          isWelcomeMat: true,
+          position: (highest?.value ?? 0) + 1,
+          createdAt: input.now,
+          updatedAt: input.now,
+          updatedById: input.userId
+        })
+        .run();
+    }
+
+    const updated = transaction.select().from(notes).where(eq(notes.id, source.id)).get();
+    return updated === undefined ? null : noteDto(updated);
+  });
+}
+
 export function getNoteVersions(room: string, noteId: number): readonly NoteVersion[] | null {
   ensureDatabase();
   /*

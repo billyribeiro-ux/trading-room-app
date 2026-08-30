@@ -1627,7 +1627,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       447 -> 452, 2026-08-30. `sessionImages` forwarded to the editor for the carousel's image
       browser. Five lines: the prop, its type import, and the pass-through.
     */
-    max: 452,
+    /*
+      452 -> 525, 2026-08-30. `note-editor-welcome-mat-all-rooms-password`.
+
+      Seventy-three lines, and about sixty of them are the reason. The reference raises THREE dialogs
+      from one button (byte 1,474,217) — a password prompt when `allRoomsWelcomeMatPW` is configured,
+      a plain confirmation when it is not, and a different confirmation for the per-room variant —
+      and only two existed here. The third could not exist while nothing knew whether a password was
+      set, because that setting is one of the seven that may never reach this room.
+
+      What is written down is why the room asks the controller which dialog to raise, why the typed
+      value goes straight out uncompared, and why an unreachable controller means "prompt" rather
+      than "confirm". None of that is guessable from the code.
+    */
+    max: 525,
     why: 'the note tab strip and the three confirmations; everything else passes through'
   },
   {
@@ -1847,7 +1860,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       upload path invalidates it, so this is a `$derived` over data the page holds rather than a
       second read of it.
     */
-    max: 988,
+    /*
+      988 -> 990, 2026-08-30. One parameter: `pw` forwarded from the notes pane to the action, for
+      `note-editor-welcome-mat-all-rooms-password`. This component only passes it along — it is not
+      where the password is typed and not where it is compared.
+    */
+    max: 990,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -2308,7 +2326,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       recording why it is a table rather than the reference's JSON blob and what bounds it. Room
       state, sitting with `chatMode` and `closedMessage`, which is the shape it belongs to.
     */
-    max: 1642,
+    /*
+      1642 -> 1680, 2026-08-30. The all-rooms welcome mat's branch —
+      `note-editor-welcome-mat-all-rooms-password`.
+
+      This entry's own earlier paragraph is why the file grew: the action carried a recorded HONEST
+      GAP saying the all-rooms variant "needs a controller endpoint that enumerates the account's
+      rooms and verifies `allRoomsWelcomeMatPW`". That endpoint exists now, so the gap paragraph is
+      replaced by the branch it described — and by the argument that the authority is the SERVER's,
+      which the reference's client-side compare is not.
+    */
+    max: 1680,
     why: 'the loader and every form action left; 3,233 before the remote-function conversions began'
   },
   /*

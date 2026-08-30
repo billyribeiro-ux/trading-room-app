@@ -144,7 +144,28 @@ describe('every internal route verifies the credential its job needs', () => {
 
     What both actually assert is that the room may ask this question, not that the answer is free.
   */
-  const READS = ['room-config', 'room-entry', 'room-notes-auth', 'mobile-pin', 'mobile-restore', 'stream-read'];
+  /*
+    `room-welcome-mat-auth` joined 2026-08-30, and it is the first READ that answers with DATA: on a
+    correct `allRoomsWelcomeMatPW` it returns the short codes of the rooms the caller's account owns.
+
+    A READ anyway, and the data is what makes the decision worth writing down rather than assuming.
+    Nothing on the controller changes — every write happens in the ROOM application, against its own
+    database, gated on this answer. And the list is on this call rather than a second one precisely
+    so that a `config-read` token alone cannot enumerate an account's rooms: the gate and the data it
+    unlocks are one round trip, and a wrong password returns `{required, ok:false, rooms:[]}`.
+
+    Had it been split in two, the list endpoint would have been the read that leaks, and this list
+    would have had to say so.
+  */
+  const READS = [
+    'room-config',
+    'room-entry',
+    'room-notes-auth',
+    'room-welcome-mat-auth',
+    'mobile-pin',
+    'mobile-restore',
+    'stream-read'
+  ];
 
   it.each(WRITES)('%s verifies a WRITE capability', async (route) => {
     const source = await sourceOf(route);

@@ -787,10 +787,11 @@
               onSave={async (noteId, contentHtml) => {
                 await notes.submitMutation('saveSessionNote', { noteId, contentHtml });
               }}
-              onSetWelcomeMat={async (noteId, allRooms) => {
+              onSetWelcomeMat={async (noteId, allRooms, pw) => {
                 await notes.submitMutation('setWelcomeMatNoteTab', {
                   noteId,
-                  allRooms
+                  allRooms,
+                  pw
                 });
               }}
               onUploadImages={uploadAlertFiles}

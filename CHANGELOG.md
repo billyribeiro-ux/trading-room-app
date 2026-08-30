@@ -33,6 +33,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 08:05 UTC — The all-rooms Welcome Mat, and an authority that was never on a server
+
+**Runtime impact: YES, on both applications.** A presenter can replace the Welcome Mat of every room
+on the account, behind the password the owner configured for it. Until now `allRooms: true` set this
+room's mat and no other, silently, and the password branch existed nowhere.
+
+**The blocker this row carried was our own, and it is gone.** `+page.server.ts` recorded it in its
+own words: *"the all-rooms variant needs a controller endpoint that enumerates the account's rooms
+and verifies `allRoomsWelcomeMatPW`."* `internal/room-welcome-mat-auth/[code]` is that endpoint —
+the third question-shaped read after `room-entry` and `room-notes-auth`, sharing their constant-time
+comparison and their rule that the credential stays where it was configured and the QUESTION travels.
+
+**THE AUTHORITY MOVED TO A SERVER, WHICH IS WHERE IT NEVER WAS.** Upstream (byte 1,474,217) compares
+the typed password in the browser against `sessData.allRoomsWelcomeMatPW`. That is not merely a place
+this reconstruction cannot copy because the credential may not cross — it is decorative: a member who
+can read `sessData` can send `setWelcomeMatNoteTab` with any `pw` and have it obeyed. So this is the
+fix, not the workaround. The room forwards the candidate, holds nothing to compare it against, and
+the write path re-checks independently of the prompt — a client that skips the dialog entirely
+reaches exactly the same gate.
+
+**Three decisions, each argued at the code.**
+
+1. **The room list rides on the AUTH call.** Two endpoints would have been the obvious shape and it
+   is the wrong one: a separate list endpoint answers to a `config-read` token alone, so any holder
+   of one could enumerate an account's rooms without knowing the password. Here the gate and the data
+   it unlocks are one round trip, and a wrong answer returns `{required, ok:false, rooms:[]}`. There
+   is no account id on the wire either — the request names one short code, the token proves the
+   caller may read that room, and the account is derived from the row, so there is nowhere to ask
+   about somebody else's.
+2. **`welcomeMatPasswordRequired` fails closed to `required: true`.** The two failure modes are not
+   symmetric: reporting `false` raises a plain confirmation for an action the owner chose to gate,
+   while reporting `true` shows a prompt whose answer the write path re-checks against the same
+   controller. An outage costs a presenter one dialog and never opens the gate.
+3. **"All the rooms' welcome mats" is a COPY PER ROOM, not a shared note.** The reference's server is
+   not in the capture, so this is a decision taken in its absence and recorded as one.
+   `notes.room_short_code` is the fence every read in `notes-repository.ts` scopes by, and a shared
+   note would require removing that scope from the welcome-mat read — the one change nothing there is
+   allowed to make. Each room's previous mat is demoted rather than deleted, so a presenter in that
+   room can put it back, which matters because the person who ran this was not necessarily in theirs.
+   One transaction, so no account is left half-greeted.
+
+**The capability registries both refused it first, which is what they are for.**
+`config-write-capability-contract` counted one more `Bearer` header than it had names for; the
+controller's `config-read-cannot-write-contract` found a route directory in neither list. Registered
+in both as a READ, with the reason written down: nothing on the controller changes — every write
+happens in the room application against its own database, gated on this answer — and the data it
+returns is why that decision was worth recording rather than assuming.
+
+**Negative controls, all ten seen RED after the commit, all first time.** Comparing the typed value
+in the pane; asking the controller for the per-room variant too; returning the room list from the
+query; failing OPEN to `required: false`; deleting the action's `Wrong password!` refusal; falling
+back to this-room-only when the controller is unreachable; dropping the source note's room scope
+(caught by the source contract AND by the behavioural test's foreign-note case); deleting each room's
+previous mat instead of demoting it; skipping the per-entry validation of the room list; and minting
+a write token for the read.
+
+**Verified.** `welcome-mat-all-rooms-contract.test.ts` 21 assertions, including that
+`allRoomsWelcomeMatPW` appears in no room source once comments are stripped.
+`notes-repository.test.ts` gained two behavioural cases against a real database: four rooms with only
+three named, so the **fourth is the control** for the half a test that only checked the named rooms
+would pass without measuring; and a note id from another room refused with no row written anywhere.
+**Both gates green** — controller 98 files / 1,038 passed (`gate-exit=0`), room 231 files / 3,780
+passed, 1 skipped (`gate-exit=0`), both read from the logs. `slice-anchor-contract` refused two more
+inline bounds on the way and they were bound; its count is unchanged at 142. `svelte-check` 0 errors,
+0 warnings. **Nothing was opened in a browser**, and the **Svelte MCP has been unavailable for this
+entire session**.
+
+**One flake seen and not chased.** A single full-suite run reported
+`remote-command-harness.test.ts` failing at collect time with five skipped; it passed alone
+immediately after and on every run since, including both gates. Recorded rather than re-run away —
+the room suite shares one database file per worker with `isolate: false`, which is the shape that
+produces this, and there is no reproduction to work from yet.
+
 ### 2026-08-30 07:25 UTC — The image popover, a hidden element deleted, and two rows closed as decisions
 
 **Runtime impact: YES.** An image in a note can be resized to 100/50/25/auto, floated left or right,

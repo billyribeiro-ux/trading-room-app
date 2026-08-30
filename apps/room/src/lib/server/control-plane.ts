@@ -149,6 +149,27 @@ export function roomNotesAuthUrl(shortCode: string): string | null {
 }
 
 /**
+ * `POST {control}/internal/room-welcome-mat-auth/{shortCode}` — the third question-shaped read, and
+ * the only one that answers with data.
+ *
+ * The same shape as the two above: a candidate goes out, a credential the room never sees does the
+ * comparing. What differs is that a YES also returns the short codes of the rooms the caller's
+ * account owns, because "replace ALL the rooms' welcome mats" needs a list the room application does
+ * not have.
+ *
+ * **The list is on this call and not on a second one, deliberately.** A separate list endpoint would
+ * answer to a `config-read` token alone, so any holder of one could enumerate an account's rooms
+ * without knowing the password. Here the gate and the data it unlocks are one round trip, and a
+ * wrong answer returns nothing. The endpoint's own header carries the rest.
+ */
+export function roomWelcomeMatAuthUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin
+    ? `${origin}/internal/room-welcome-mat-auth/${encodeURIComponent(shortCode)}`
+    : null;
+}
+
+/**
  * The one WRITE: `POST {control}/internal/room-setting/{shortCode}`.
  *
  * This module described the room's controller surface as two reads, and for every setting but one

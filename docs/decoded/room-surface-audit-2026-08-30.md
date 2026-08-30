@@ -696,6 +696,14 @@ this.maxVersions=3,this.editorDirtyContents=null,this.editorDirty=!1,this.isEdit
 
 ### note-editor-welcome-mat-all-rooms-password — The all-rooms Welcome Mat password prompt is not raised
 
+**BUILT 2026-08-30 08:05 UTC — end to end, and this row's own recorded blocker with it.** `+page.server.ts` carried the gap in its own words: *"the all-rooms variant needs a controller endpoint that enumerates the account's rooms and verifies `allRoomsWelcomeMatPW`."* `internal/room-welcome-mat-auth/[code]` is that endpoint. It answers `required` beside `ok` — the branch `bootbox.prompt` / `bootbox.confirm` swings on — and on a correct password returns the short codes of the rooms the caller's account owns, derived from the room the token already proves them for.
+
+**THE AUTHORITY MOVED, AND THAT IS THE FIX RATHER THAN THE WORKAROUND.** Upstream compares in the browser against `sessData.allRoomsWelcomeMatPW`, which means a member who can read `sessData` can send `setWelcomeMatNoteTab` with any `pw` at all and have it obeyed — the check that mattered never ran on a server. Here the room forwards the typed candidate, holds nothing to compare it against, and the write path re-checks independently of the prompt, so a client that skips the dialog reaches the same gate.
+
+**Three decisions, all recorded at the code.** The room list is on the AUTH call and not a second endpoint, so a `config-read` token alone cannot enumerate an account's rooms — the gate and the data it unlocks are one round trip, and a wrong password returns nothing. `welcomeMatPasswordRequired` fails CLOSED to `required: true`, because a plain confirmation would skip a gate the owner chose to set while a prompt costs one dialog and is re-checked anyway. And "all the rooms' welcome mats" is a COPY PER ROOM, not a shared note: the reference's server is not in the capture, `notes.room_short_code` is the fence every read in that repository scopes by, and a shared note would require removing that scope from the welcome-mat read. Each room's previous mat is demoted, never deleted, so a presenter in that room can put it back.
+
+`welcome-mat-all-rooms-contract.test.ts` (21), `notes-repository.test.ts`'s two behavioural cases with an unnamed fourth room as the control, and the route's entry in both capability registries.
+
 **medium** · `missing-behaviour` · reference byte **1,474,217**
 
 ```
