@@ -92,8 +92,36 @@ Use the official Svelte MCP workflow for every Svelte/SvelteKit task:
 2. Read them with `get-documentation`. Do not rely on recalled framework
    behavior when official guidance can decide the question.
 3. Run `svelte-autofixer` on every created or modified `.svelte` file, and repeat
-   until it reports no issues or suggestions.
+   until it reports no issues, or until every remaining SUGGESTION is one of the
+   declined ones below.
 4. Do not create a Playground link for code written into this repository.
+
+### The two suggestions this repository declines, and why
+
+Step 3 said "no issues or suggestions" until 2026-08-30, and that is not
+reachable here — two of the autofixer's suggestions are refusals this repository
+has already argued for. Recording them is the difference between a standing
+exception and a rule nobody can satisfy, which is a rule people stop running.
+
+**"Unexpected mustache interpolation with a string literal value."** Flagged on
+`{' Retry '}`, `{' Reconnecting Chat... '}`, `{' Please connect audio devices. '}`
+and about forty siblings. Those braces preserve the reference's own LEADING AND
+TRAILING SPACES — `v(5," Retry ")`, `Ne(" ", e.devicesLoadError, " ")` — which
+plain text loses to Prettier and to HTML whitespace folding. Every capture
+comparison in this repository diffs rendered strings, so the spaces are evidence
+rather than formatting. The idiom predates the suggestion and is repo-wide.
+
+**"Each block should have a key."** Flagged on `{#each segments as segment}` in
+`MessageBody.svelte` and its siblings. Already decided, in the other direction,
+by `src/lib/each-key-contract.test.ts`: those arrays are PARSED from one message
+body and replaced wholesale, so a segment has no identity to key by, and an index
+key produces DOM reuse identical to no key while CLAIMING that reuse is safe. The
+keys were removed deliberately; that file enforces the decision and carries the
+reasoning.
+
+Anything else the autofixer reports is fixed, not added to this list. A third
+entry needs the same treatment: a measurement, a reason, and a test if the
+decision can drift.
 
 Svelte 5 runes, typed props, standard web APIs, SvelteKit server boundaries,
 progressive form actions, semantic accessible HTML. No legacy `$:`,

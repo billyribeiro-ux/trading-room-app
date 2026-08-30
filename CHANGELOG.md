@@ -33,6 +33,67 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 17:15 UTC — The Svelte MCP came back, and the mandatory gate finally ran
+
+**Runtime impact: NO.** No component behaviour changed. `apps/room/AGENTS.md` gains a section; that
+is the whole diff.
+
+**Every CHANGELOG entry today has ended with the same sentence: *"the Svelte MCP server has been
+disconnected for this entire session, so `svelte-autofixer` was not run."*** It reconnected at 17:07.
+`CLAUDE.md` calls that tool "the last gate, every time", so it was run before anything else.
+
+#### What it found on the six components authored today
+
+| component | result |
+| --- | --- |
+| `RestreamPane.svelte` | no issues, no suggestions |
+| `ReactionPrefsPane.svelte` | no issues, no suggestions |
+| `SessionHistoryPane.svelte` | no issues, no suggestions |
+| `ScreenShareMenu.svelte` | clean |
+| `AvDevicePane.svelte` | four suggestions, all one kind |
+| `MessageBody.svelte` | one suggestion, already decided elsewhere |
+
+**No issues at all**, and both recurring suggestions turn out to be refusals this repository has
+already argued for. So they are recorded in `AGENTS.md` rather than either silently ignored or
+"fixed" into a regression:
+
+**"Unexpected mustache interpolation with a string literal value."** `{' Retry '}`,
+`{' Reconnecting Chat... '}`, `{' Please connect audio devices. '}` and about forty siblings. Those
+braces preserve the reference's own **leading and trailing spaces** — `v(5," Retry ")`,
+`Ne(" ", e.devicesLoadError, " ")` — which plain text loses to Prettier and to HTML whitespace
+folding. Every capture comparison here diffs rendered strings, so the spaces are evidence rather than
+formatting. The idiom predates today.
+
+**"Each block should have a key."** Already decided in the other direction, and enforced:
+`each-key-contract.test.ts` records that those segment arrays are parsed from one message body and
+replaced wholesale, so a segment has no identity to key by — and an index key produces DOM reuse
+identical to no key while *claiming* the reuse is safe. The keys were removed deliberately.
+
+Step 3 of the workflow said "repeat until it reports no issues or suggestions", which is not
+reachable here. It now says "no issues, or every remaining suggestion is one of the declined ones
+below" — because **a rule nobody can satisfy is a rule people stop running**, and that is a worse
+outcome than a recorded exception. A third entry needs the same treatment: a measurement, a reason,
+and a test if the decision can drift.
+
+#### What was NOT run, said plainly
+
+The autofixer takes code inline, so it was run **whole** on the six components authored today and on
+none of the ten larger ones modified today — `ModalHost.svelte` alone is 6,482 lines. Passing
+fragments of those would have checked a fragment and reported a component, which is the shape of
+claim this repository refuses. What covers them instead is `svelte-check`, clean at **1,461 files**,
+and the gate, green. Running the autofixer over the large components is real outstanding work and is
+named here rather than implied to be done.
+
+One finding on `ScreenShareMenu.svelte` was an artefact of my own comment-stripped reconstruction
+rather than of the file — the real file's `svelte-ignore` pair is `a11y_click_events_have_key_events`
++ `a11y_no_static_element_interactions`, and I had substituted the wrong second one. Recorded because
+a tool result read against the wrong input is exactly the failure mode this repository keeps finding
+in its own tests.
+
+**Verified:** full `pnpm run gate` in `apps/room` after the documentation change: **251 files, 4,146
+passed, 1 skipped, `gate-exit=0`**, read from the log it was echoed into. Nothing was opened in a
+browser.
+
 ### 2026-08-30 17:01 UTC — A member could run the room's WebRTC test, and four PostAlertModal rows read as open while the code said otherwise
 
 **Runtime impact: YES.** The connectivity troubleshooter is now the reference's shape: a member gets
