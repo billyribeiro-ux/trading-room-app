@@ -3309,24 +3309,32 @@
 
         <div class="p-2 text-mode-box">
           <div class="mx-3">
-            <button
-              class="btn btn-danger btn-sm m-1"
-              onclick={() => onUserAction('remove-preview-windows', targetUser)}
-            >
-              <i class="fas fa-video-slash me-1"></i> Remove webcam/screenpreview windows
-            </button>
-            <button
-              class="btn btn-danger btn-sm m-1"
-              onclick={() => onUserAction('mute-all-non-admins', targetUser)}
-            >
-              <i class="fas fa-microphone-slash me-1"></i> Mute Microphone for all non-admins
-            </button>
-            <button
-              class="btn btn-info btn-sm m-1"
-              onclick={() => onUserAction('get-my-token', targetUser)}
-            >
-              <i class="fas fa-user-tie me-1"></i> Get my token
-            </button>
+            <!--
+              `O(135, isPresenter ? 135 : -1)`, byte 2,285,714 — slot 135 is `ake` and holds exactly
+              these three, while "Edit my Info and Avatar" below is outside it and drawn for
+              everybody. All four sat in one ungated div here. `isPresenter` alone, not the
+              `&& !isLimitedPresenter` the user card uses: transcribed, not tightened.
+            -->
+            {#if isPresenter}
+              <button
+                class="btn btn-danger btn-sm m-1"
+                onclick={() => onUserAction('remove-preview-windows', targetUser)}
+              >
+                <i class="fas fa-video-slash me-1"></i> Remove webcam/screenpreview windows
+              </button>
+              <button
+                class="btn btn-danger btn-sm m-1"
+                onclick={() => onUserAction('mute-all-non-admins', targetUser)}
+              >
+                <i class="fas fa-microphone-slash me-1"></i> Mute Microphone for all non-admins
+              </button>
+              <button
+                class="btn btn-info btn-sm m-1"
+                onclick={() => onUserAction('get-my-token', targetUser)}
+              >
+                <i class="fas fa-user-tie me-1"></i> Get my token
+              </button>
+            {/if}
             <button
               class="btn btn-warning btn-sm m-1"
               onclick={() => onUserAction('edit-my-info', targetUser)}

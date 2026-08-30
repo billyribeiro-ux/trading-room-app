@@ -67,13 +67,21 @@ describe('private chat is offered on the same terms in both columns', () => {
     const text = source();
     expect(text).toContain('showPmButton: boolean;');
     /*
-      Anchored to the control, for the reason the group-chat assertion below records: a bare
-      `toContain` on the gate proves only that the file mentions it somewhere.
+      The two chat columns are separate files, so the tree helper above — which is built over
+      `ModalHost.svelte` — does not serve them. `{#if showPmButton}` is a distinctive string that
+      appears nowhere else in either file, which is checked rather than assumed.
     */
+    expect((text.match(/\{#if showPmButton\}/g) ?? []).length, 'exactly one such gate').toBe(1);
     const control = text.indexOf('Open Private chat');
     expect(control, 'the private-chat entry point').toBeGreaterThan(-1);
-    const gate = text.lastIndexOf('{#if ', control);
-    expect(text.slice(gate, control), 'the gate immediately before it').toContain('showPmButton');
+    expect(
+      text.lastIndexOf('{#if showPmButton}', control),
+      'and it opens before the control'
+    ).toBeGreaterThan(-1);
+    expect(
+      text.indexOf('{/if}', text.lastIndexOf('{#if showPmButton}', control)),
+      'and closes after it'
+    ).toBeGreaterThan(control);
   });
 
   it('feeds both from the same getter', () => {
@@ -150,21 +158,27 @@ describe('the group chat control is presenter-only, and not for a runtime presen
   occurrence of the same string. This is that assertion, anchored the same way.
 */
 /**
- * The `{#if}` that wraps the user card's whole body, found in the TREE rather than by position.
+ * Every `{#if}` in `ModalHost.svelte`, with its condition and its extent, from the compiler's tree.
  *
- * There are three `isPresenter && !isLimitedPresenter` gates in this file and two comments quoting
- * the shape, so the one that matters has to be identified by what it CONTAINS — the tab list — and
- * not by being the first, the last, or the nearest to some string.
+ * ## Why the tree, and not `lastIndexOf('{#if ', marker)`
  *
- * ## The parse is caught, and that is not defensive coding
+ * Three assertions in this file were written that way and TWO of them were hollow. `lastIndexOf`
+ * finds the nearest PRECEDING `{#if}` in the text, which is not the same as the block that contains
+ * the marker: a sibling block that closed before it, or an unrelated gate further up, satisfies a
+ * `toContain` just as well. Both were caught by negative controls that removed the real gate and
+ * watched the test stay green.
  *
- * At module scope an unparseable `ModalHost.svelte` throws during COLLECTION, and vitest then
- * reports this file as having no tests — the one failure shape that reads as absence rather than
- * breakage in a CI log. `package-scripts-contract.test.ts` records the same correction for the same
- * reason; a negative control here produced exactly that output before this was wrapped.
+ * The tree knows which block contains what. `enclosingIf` returns the INNERMOST one, which is the
+ * gate that actually decides whether a marker renders.
+ *
+ * ## The parse is caught
+ *
+ * At module scope an unparseable file throws during COLLECTION, and vitest then reports this file as
+ * having no tests — the shape that reads as absence rather than breakage. A control produced exactly
+ * that before this was wrapped; `package-scripts-contract.test.ts` records the same correction.
  */
-const bodyGate = (() => {
-  const found: { start: number; end: number }[] = [];
+const parsed = (() => {
+  const blocks: { start: number; end: number; test: string }[] = [];
   let parseError: unknown = null;
   try {
     const visit = (node: unknown): void => {
@@ -173,13 +187,13 @@ const bodyGate = (() => {
       if (
         candidate.type === 'IfBlock' &&
         typeof candidate.start === 'number' &&
-        typeof candidate.end === 'number' &&
-        modalHost.slice(candidate.start, candidate.end).includes('id="nav-tab" role="tablist"') &&
-        modalHost
-          .slice(candidate.start, candidate.start + 80)
-          .includes('isPresenter && !isLimitedPresenter')
+        typeof candidate.end === 'number'
       ) {
-        found.push({ start: candidate.start, end: candidate.end });
+        const opener = modalHost.slice(
+          candidate.start,
+          modalHost.indexOf('}', candidate.start) + 1
+        );
+        blocks.push({ start: candidate.start, end: candidate.end, test: opener });
       }
       for (const value of Object.values(node as Record<string, unknown>)) {
         if (Array.isArray(value)) value.forEach(visit);
@@ -190,29 +204,42 @@ const bodyGate = (() => {
   } catch (cause) {
     parseError = cause;
   }
-  return { blocks: found, block: found[0], parseError };
+  return { blocks, parseError };
 })();
 
-/** True only when the gate was found AND the offset falls inside it. Never vacuously true. */
-const isInsideGate = (offset: number) =>
-  bodyGate.block !== undefined && bodyGate.block.start < offset && offset < bodyGate.block.end;
+/** The offset of a marker, asserted to exist so a renamed control fails loudly rather than vacuously. */
+const at = (marker: string) => {
+  const offset = modalHost.indexOf(marker);
+  expect(offset, `\`${marker}\` is not in ModalHost.svelte`).toBeGreaterThan(-1);
+  return offset;
+};
+
+/**
+ * The INNERMOST `{#if}` containing this offset, or undefined when nothing does.
+ *
+ * Innermost, because that is the gate that decides. An outer `{#if isPresenter}` around a block that
+ * also carries an inner `{#if hasThing}` does not make the inner marker presenter-gated in the sense
+ * a reader cares about — but for these assertions the question is the reverse, so both are checked:
+ * `gateChain` gives every enclosing block when a marker's authority comes from an ancestor.
+ */
+const gateChain = (offset: number) =>
+  parsed.blocks
+    .filter((block) => block.start < offset && offset < block.end)
+    .sort((a, b) => b.start - a.start);
+
+const enclosingIf = (offset: number) => gateChain(offset)[0];
 
 describe('the user card shows a member nothing about another member', () => {
-  it('is guarded by exactly one such block, which the tree can find', () => {
-    /* If this is undefined every assertion below would pass vacuously on `undefined < n`. */
-    expect(
-      bodyGate,
-      'no `{#if isPresenter && !isLimitedPresenter}` wraps the tab list'
-    ).toBeDefined();
+  it('parses, so nothing below passes vacuously', () => {
+    expect(parsed.parseError, 'ModalHost.svelte does not parse').toBeNull();
+    expect(parsed.blocks.length, 'no `{#if}` blocks found at all').toBeGreaterThan(20);
   });
 
   it('gates the tab list, and therefore everything in it, on a server-decided presenter', () => {
-    const tabs = modalHost.indexOf('id="nav-tab" role="tablist"');
-    expect(tabs, 'the user card tab list').toBeGreaterThan(-1);
     expect(
-      isInsideGate(tabs),
+      enclosingIf(at('id="nav-tab" role="tablist"'))?.test,
       'a member must not be offered the System, Actions or Admin Notes tabs'
-    ).toBe(true);
+    ).toContain('isPresenter && !isLimitedPresenter');
   });
 
   it.each([
@@ -229,12 +256,10 @@ describe('the user card shows a member nothing about another member', () => {
       `{:else}` belonging to a nested block several levels in. Only the tree knows which `{:else}`
       belongs to which `{#if}`, so this asks the tree, as `state-raw-contract.test.ts` does.
     */
-    const row = modalHost.indexOf(marker);
-    expect(row, `the ${_label} row`).toBeGreaterThan(-1);
     expect(
-      isInsideGate(row),
-      'the row must fall inside the presenter gate, not merely after it'
-    ).toBe(true);
+      gateChain(at(marker)).map((block) => block.test),
+      'no enclosing gate makes this row presenter-only'
+    ).toContainEqual(expect.stringContaining('isPresenter && !isLimitedPresenter'));
   });
 
   it('never receives the two fields at all, which is the half a render gate cannot give', () => {
@@ -246,5 +271,48 @@ describe('the user card shows a member nothing about another member', () => {
     const privacy = read('./server/roster-privacy.test.ts');
     expect(privacy).toContain('locStr');
     expect(privacy).toContain('email');
+  });
+});
+
+/*
+  THE THREE PRESENTER ACTIONS IN THE SETTINGS MODAL — `O(135, isPresenter ? 135 : -1)`, byte 2,285,714.
+
+  Slot 135 is the template function `ake`, and reading it settles exactly which buttons belong inside
+  the gate:
+
+      removePreviewWindows()  "Remove webcam/screenpreview windows"
+      muteAllNonAdmins()      "Mute Microphone for all non-admins"
+      getMyToken()            "Get my token"
+
+  and nothing else. "Edit my Info and Avatar" is the const immediately after the `[1,"mx-3"]` wrapper
+  (byte 2,263,375) and is drawn for everybody. All four sat inside one ungated `<div class="mx-3">`
+  here.
+
+  `isPresenter` ALONE, not the `&& !isLimitedPresenter` the user card uses: a member handed mic and
+  screen by `giveMicScreen` has preview windows to remove and a microphone in the room, so the
+  reference lets them at these. Transcribed rather than tightened — the narrower gate would be a
+  guess about what that grant is for, and this file's job is to record what the reference does.
+*/
+describe('the settings modal’s presenter actions', () => {
+  it.each([
+    ['Remove webcam/screenpreview windows', 'remove-preview-windows'],
+    ['Mute Microphone for all non-admins', 'mute-all-non-admins'],
+    ['Get my token', 'get-my-token']
+  ])('gates %s on being a presenter', (_label, action) => {
+    expect(
+      enclosingIf(at(`onUserAction('${action}', targetUser)`))?.test,
+      'the block that decides whether this button renders'
+    ).toBe('{#if isPresenter}');
+  });
+
+  it('leaves "Edit my Info and Avatar" ungated, as the reference does', () => {
+    /*
+      The other half, and it is the half a careless fix breaks: wrapping the whole `mx-3` div would
+      take a member's own profile editor away with the three presenter actions.
+    */
+    expect(
+      gateChain(at("onUserAction('edit-my-info', targetUser)")).map((block) => block.test),
+      'a member must keep their own profile editor'
+    ).not.toContainEqual('{#if isPresenter}');
   });
 });

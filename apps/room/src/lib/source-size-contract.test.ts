@@ -1957,7 +1957,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rendered without, so every member saw three radios whose only possible effect was a 403.
       Eight lines to stop a room's authority rules looking arbitrary.
     */
-    max: 6014,
+    /*
+      6,014 -> 6,022, 2026-08-30. Eight lines: `{#if isPresenter}` around the three presenter actions
+      in the settings modal — `O(135, isPresenter ? 135 : -1)` at byte 2,285,714, which this file
+      rendered without, so every member was shown "Mute Microphone for all non-admins" and
+      "Get my token". The fourth button in that div stays outside the gate, as the reference has it.
+    */
+    max: 6022,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's

@@ -33,6 +33,85 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:55 UTC — Three presenter actions were drawn for every member, and every gate assertion in this file was rebuilt on the compiler's tree
+
+**Runtime impact: YES.** "Remove webcam/screenpreview windows", "Mute Microphone for all non-admins"
+and "Get my token" are no longer shown to members in the settings modal. "Edit my Info and Avatar"
+stays, as the reference has it.
+
+#### Which three, settled by reading the slot rather than the wrapper
+
+`O(135, isPresenter ? 135 : -1)` at byte 2,285,714. Slot 135 is the template function `ake`, and it
+holds exactly those three buttons and nothing else. "Edit my Info and Avatar" is the const
+immediately after the `[1,"mx-3"]` wrapper (byte 2,263,375) and is unconditional. All four sat inside
+one ungated `<div class="mx-3">` here.
+
+`isPresenter` alone, **not** the `&& !isLimitedPresenter` used on the user card. A member handed mic
+and screen by `giveMicScreen` has preview windows to remove and a microphone in the room, so the
+reference lets them at these. Transcribed rather than tightened: the narrower gate would be a guess
+about what that grant is for.
+
+#### Every gate assertion in this file was hollow, and a control proved it again
+
+The first version of the new assertion used `lastIndexOf('{#if ', button)` and checked the slice
+contained `isPresenter`. **Removing the gate entirely left all three green** — because `lastIndexOf`
+finds the nearest PRECEDING `{#if}` in the text, which is not the block that contains the marker. A
+sibling that closed before it, or an unrelated gate further up, satisfies it just as well.
+
+That is the third time in two days. So the whole file was rebuilt on the Svelte compiler's tree:
+
+```
+parsed.blocks   every {#if} in ModalHost.svelte, with its condition and its extent
+gateChain(o)    every block CONTAINING that offset, innermost first
+enclosingIf(o)  the innermost one — the gate that actually decides
+at(marker)      the offset, asserted to exist so a renamed control fails loudly
+```
+
+Each assertion now names the exact condition it expects — `toBe('{#if isPresenter}')` rather than
+`toContain('isPresenter')` — so a widened gate fails as loudly as a removed one. The two chat
+columns are separate files and are not covered by that tree, so their assertion counts its gate
+instead of assuming it is unique.
+
+#### Negative controls — six, across all four gates
+
+| mutation | result |
+| --- | --- |
+| the three buttons ungated | RED ×3 |
+| **the same, before the rebuild** | **GREEN — the hollow assertion** |
+| the gate widened to `&& !isLimitedPresenter` | RED ×3 |
+| the gate swallowing "Edit my Info" | RED |
+| the group-chat gate losing a term | RED |
+| the user-card body gate widened | RED ×4 |
+| the main column's PM gate removed | RED |
+
+The earlier three gates were re-run against the rebuilt assertions rather than assumed to still
+hold, which is the point of rebuilding them together.
+
+#### Measured and NOT built: the presenter colour Save
+
+`USM-06` reports that the settings modal's presenter colours write
+`onPreferenceChange('presenterStyle', …)`, a per-viewer settings-blob key that **nothing reads** —
+under a heading that says *"These colors will affect how ALL USERS see your messages and alerts"*.
+That heading is false, and the audit is right about it.
+
+Measured before deciding, and it is not a gate fix:
+
+* `savePresenterColors` is already tracked as absent, in `feature-coverage-contract.test.ts`'s
+  `ABSENT_FROM_OUR_SOURCE`.
+* `messages.background_color` / `font_color` exist and `RoomMessage.svelte:225` renders from them —
+  **and no insert path writes either.** Both are unfed columns.
+* So the feature needs a room-scoped per-presenter colour store, a presenter-gated command, a
+  page-load read, a render-precedence decision against the existing `followedStyle` / `chatStyle`
+  chain, and a broadcast so open tabs update.
+
+That is a feature, not a gate, and it is being scoped separately rather than half-shipped. Nothing
+about it is guessed here.
+
+#### Verified
+
+`pnpm run gate` in `apps/room`, exit 0 read directly — 3,512 tests, `svelte-check` 0 errors, eslint
+and prettier clean, build done.
+
 ### 2026-08-30 03:20 UTC — A claimed privacy gap was refuted, and the investigation found the real one: nothing asserted the gate
 
 **Runtime impact: NO.** No behaviour changed. What changed is that the user card's privacy is now
