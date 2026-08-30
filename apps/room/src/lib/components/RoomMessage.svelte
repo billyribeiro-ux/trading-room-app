@@ -20,6 +20,11 @@
   import { type PresenterColors } from '#lib/presenter-colors.js';
   import { resolveMessageStyles } from '#lib/message-styles.js';
   import { hideMessageAvatar, type ChatDisplayMode } from '#lib/chat-display-mode.js';
+  import {
+    alertQaCountText,
+    TRIAL_BADGE_TEXT,
+    usernameRowStyle
+  } from '#lib/message-renderer-differences.js';
 
   type MessageKind = 'alert' | 'chat';
   interface MessageReactionPayload {
@@ -447,10 +452,11 @@
   1,377,512) puts the stamp before the button and the card puts the button before the stamp. A
   snippet keeps the order at the call sites, where it belongs, and the button in one place.
 
-  Every value it reads is this component's, so it takes no parameters — which is the test of whether
-  a snippet is the right tool rather than a component: nothing here would cross a props boundary.
+  Its ONE parameter is `compact`, and RMSG-03 is why: the count span is the single thing the two
+  renderers spell differently. Everything else it reads is this component's — nothing crosses a
+  props boundary, which is the test of whether a snippet is the right tool rather than a component.
 -->
-{#snippet alertQaButton()}
+{#snippet alertQaButton(compact: boolean)}
   {#if !isQaMessage && hasQaOnAlerts}
     <button
       title="Ask a question"
@@ -469,9 +475,13 @@
         The captured button keeps a literal space inside each span - `> (1) <` and `> ✅<` - and that
         space is what separates the checkmark from the icon. Svelte trims whitespace at element
         boundaries, so it has to be written as an expression to survive into the rendered output.
+
+        RMSG-03 — and the two renderers do NOT pad the COUNT the same way: `Ne(" (", n, ") ")` on
+        the card, `Ne("(", n, ")")` in the compact row, with every other part of the button
+        identical. `alertQaCountText`, in `#lib/message-renderer-differences.js`.
       -->
       {#if item.questionCount}
-        <span class="me-1">{' '}({item.questionCount}){' '}</span>
+        <span class="me-1">{alertQaCountText(item.questionCount, compact)}</span>
       {/if}
       <i class="fas fa-question-circle"></i>
       {#if item.questionAnswered}<span>{' '}✅</span>{/if}
@@ -480,14 +490,20 @@
 {/snippet}
 
 <!--
-  The reactions strip — the pills and the add pill — as ONE implementation with two call sites.
+  The reactions strip — the pills and the add pill — as ONE implementation with THREE call sites.
 
   RM-22: the card's two containers are a `span.ms-1` (admin, const 29) and a bare `div` (member,
-  const 6), which is a difference in the WRAPPER and not in what it wraps. A snippet is how that
-  stays one list; the compact host has its own container for the same reason and renders the same
-  contents inline, because its two containers differ from each other in nothing but a class.
+  const 6) — a difference in the WRAPPER and not in what it wraps — and the compact host's two
+  differ from each other in nothing but a class. Four containers, one list; the compact branch kept
+  its own copy until RMSG-06, and the gate it differed by was already implied by its container's.
 -->
 {#snippet reactionStrip()}
+              <!--
+                RMSG-06 — three of the four repeaters gate the pill on `clickedBy.length > 0`; the
+                compact MEMBER one (`m_e`, 1,379,950) does not, so upstream draws `emoji 0` there
+                once a reaction empties. Ours gates all four, and this is now the only strip:
+                `COMPACT_MEMBER_REACTION_GATE_DIVERGENCE`.
+              -->
               {#each reactions as [reactionKey, reaction] (reactionKey)}
                 {#if reaction.clickedBy.length > 0}
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -549,8 +565,14 @@
 -->
 {#snippet dateSeparator()}
   <div class="separator">
+    <!--
+      RMSG-05 — the `<a>` takes `styleF` in BOTH components (const 6 is `[3,"ngStyle"]` in each
+      table), and this room painted it with nothing. `DATE_SEPARATOR_TAKES_BODY_STYLE`.
+    -->
     <!-- svelte-ignore a11y_missing_attribute -->
-    <a>{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}</a>
+    <a style={bodyStyle}
+      >{item.evidenceSeparatorText ?? longDateFormatter.format(item.createdAt)}</a
+    >
   </div>
 {/snippet}
 
@@ -687,7 +709,7 @@
               <span class="created-at mr-2" style={dateStyle}
                 >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
               >
-              {@render alertQaButton()}
+              {@render alertQaButton(true)}
             </span>
           {:else}
             <!--
@@ -744,8 +766,12 @@
             The three MEMBER-ONLY marks. The admin template has no node for any of them, which is
             why they are gated on the layout as well as on their own rule rather than sharing one.
           -->
+          <!--
+            RMSG-04 — the compact Trial badge is `Trial` and the card's is ` Trial `, from the same
+            const; its `New` sibling is unpadded in both. `TRIAL_BADGE_TEXT`.
+          -->
           {#if !reverseMessage && viewerIsPresenter && item.isTrial}
-            <span class="badge bg-danger trial-badge"> Trial </span>
+            <span class="badge bg-danger trial-badge">{TRIAL_BADGE_TEXT.compact}</span>
           {/if}
           {#if !reverseMessage && showNewIndicator && viewerIsPresenter && item.isNew}
             <span class="badge bg-warning new-badge">New</span>
@@ -879,52 +905,20 @@
               ]}
               style={bodyStyle}
             >
-              {#each reactions as [reactionKey, reaction] (reactionKey)}
-                {#if reaction.clickedBy.length > 0}
-                  <!-- svelte-ignore a11y_click_events_have_key_events -->
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <span
-                    class={['badge chat-reaction', { 'chat-reaction-added': reaction.clickedBy.includes(currentUserEmailHash) }]}
-                    onclick={() => runAction('reaction', { key: reactionKey, emoji: reaction.emoji })}
-                  >
-                    {reaction.emoji}
-                    {reaction.clickedBy.length}
-                  </span>
-                {/if}
-              {/each}
               <!--
-                RM-04 — the add-reaction pill, `g_e` at byte 1,380,270.
-
-                ```js
-                O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)
-                function g_e(t,n){ … d(0,"span",52), x("click", () => addReaction()), T(1,"i",37) … }
-                ```
-
-                Both compact reaction containers — `__e` (member, 1,380,430) and `$1e` (admin,
-                1,371,909) — end with it. Ours rendered existing pills only, so in compact mode a
-                reaction could be added ONLY through the kebab menu, and the kebab is the one control
-                a member is least likely to open to do something the card offers in one click.
-
-                The gate is upstream's and is not the card's: chat always, alerts only when the row
-                is a Q&A message. `menuAllows.reaction` is this room's own answer to the same
-                question and already gates the strip, so the two compose rather than duplicate.
+                RM-04 lives in `reactionStrip` now, with the card's, and the DUPLICATE that sat here
+                is gone. Its one difference was redundant: this copy wrapped the add pill in a
+                second gate on the log type, which is `g_e`'s own —
+                `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)` at byte
+                1,380,270 — and that gate is IMPLIED BY THE CONTAINER'S, upstream as well as here.
+                `__e` renders under `O(36, (enableReactions && "chat" === logType ||
+                enableQAReactions && "alerts" === logType && isQAMsg) && checkMsgReactions(msg) ? 36
+                : -1)` (`b_e`, 1,380,680), every disjunct of which entails a disjunct of the inner
+                one. `menuAllows.reaction` is that same expression here (`message-behavior.ts`,
+                `react:`) and already gates this container, so the inner test can never be false
+                where it is evaluated.
               -->
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              {#if kind === 'chat' || (kind === 'alert' && isQaMessage)}
-                <span
-                  class="badge chat-reaction"
-                  aria-describedby={reactionPickerOpen && reactionPickerTrigger === 'pill'
-                    ? `message-reaction-popover-${kind}-${item.id}`
-                    : undefined}
-                  onclick={() => {
-                    reactionPickerOpen = !reactionPickerOpen;
-                    reactionPickerTrigger = reactionPickerOpen ? 'pill' : null;
-                  }}
-                >
-                  <i class="far fa-smile"></i>
-                </span>
-              {/if}
+              {@render reactionStrip()}
             </div>
           {/if}
         </div>
@@ -978,14 +972,19 @@
                   >{item.evidenceTimestampText ?? chatTimeFormatter.format(item.createdAt)}
                 </span>
               {/if}
+              <!-- RMSG-02 — const 58 binds `ngStyle`, const 23 does not; ours gated it on the LOG. -->
               <div
                 class="d-flex align-items-center justify-content-between flex-nowrap"
-                style={kind === 'alert' ? bodyStyle : undefined}
+                style={usernameRowStyle(reverseMessage, bodyStyle)}
               >
+                <!--
+                  RMSG-01 — `text-primary` was ours: `fge` is bound once, on a card whose own gate
+                  makes `msg.isA` false. `CARD_USERNAME_TEXT_PRIMARY_REFUSED`.
+                -->
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <strong
-                  class={['username mx-1', { 'text-primary': kind === 'alert' && isAdminMessage && !item.evidenceKey }]}
+                  class="username mx-1"
                   style={usernameStyle}
                   onclick={() => runAction('mention')}
                   ondblclick={() => runAction('user')}
@@ -1031,7 +1030,7 @@
                   {/each}
                 </div>
                 {#if viewerIsPresenter && item.isTrial}
-                  <span class="badge bg-danger trial-badge"> Trial </span>
+                  <span class="badge bg-danger trial-badge">{TRIAL_BADGE_TEXT.card}</span>
                 {/if}
                 {#if showNewIndicator && viewerIsPresenter && item.isNew}
                   <span class="badge bg-warning new-badge">New</span>
@@ -1048,7 +1047,7 @@
               </div>
               {#if kind === 'alert'}
                 <div>
-                  {@render alertQaButton()}
+                  {@render alertQaButton(false)}
                   <span class="created-at mr-2" style={dateStyle}
                     >{item.evidenceTimestampText ?? alertDateFormatter.format(item.createdAt)}</span
                   >

@@ -1689,6 +1689,57 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
+    file: 'lib/components/SoundCloudMenu.svelte',
+    /*
+      CREATED 2026-08-30 at 121 lines, as NAV-02's half of an extraction the ratchet asked for.
+
+      `RoomNavbar.svelte` was exactly at its ceiling — 1173 of 1173 — and NAV-02 adds a control to
+      it. The rule for that is to extract, and the seam was not free to choose: eight contract tests
+      pin that file's markup by EXACT STRING (`recording-reminder-contract` on the reminder gate,
+      `mechanical-rename-contract` on two sentences inside the recording menu, `screen-volume-contract`
+      across the whole volume dropdown, `benzinga-navbar-contract`, `media-capture-contract`,
+      `session-control-audience-contract`, `dump-contract`, `mobile-restore-contract`). Mapping every
+      needle onto the file left the SoundCloud dropdown as the one region no assertion names, and
+      that is what moved.
+
+      **Worth recording as a property of the navbar rather than of this component**: a file whose
+      markup is pinned by string in eight places cannot be decomposed without touching those eight,
+      so its ceiling and its coverage now pull against each other. The next extraction there is a
+      conversation about the assertions, not about the seam.
+    */
+    max: 121,
+    why: "the presenter's SoundCloud dropdown; slot 22 of the navbar template"
+  },
+  {
+    file: 'lib/components/SoundCloudViewerStop.svelte',
+    /*
+      CREATED 2026-08-30 at 75 lines. NAV-02 itself: the single button a VIEWER gets to stop
+      room-wide music for themselves, which this room had nowhere because the only control that does
+      it lived inside the presenter's dropdown.
+
+      Two files rather than one branch because upstream is two template functions (`i4e`, `o4e`) and
+      because the navbar's presenter block has to stay one contiguous `{#if isPresenter}` — its own
+      docblock carries that argument, and `session-control-audience-contract.test.ts` is what makes
+      it binding.
+    */
+    max: 75,
+    why: 'the viewer-side SoundCloud stop; slot 23 of the navbar template'
+  },
+  {
+    file: 'lib/components/PollSavedList.svelte',
+    /*
+      CREATED 2026-08-30 at 61 lines, to pay for POLL-01 and POLL-02 in `PollPanel.svelte`, which was
+      likewise sitting exactly at its ceiling.
+
+      Same rule, and the same constraint on WHICH slice: the panel's script, its pie geometry and its
+      drag maths are pinned line by line in `poll-panel-contract.test.ts`, so the free seam was the
+      Pre-Canned list — which is also the honest one, since upstream draws it from a tracked template
+      of its own (`PTe`, byte 2,101,467).
+    */
+    max: 61,
+    why: "the Pre-Canned Polls list; the poll panel's saved-poll rows"
+  },
+  {
     file: 'lib/components/ScreenShareMenu.svelte',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
@@ -2221,7 +2272,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reference puts it first. RS-10 swaps Mobile App Info ahead of the tip button, which is the
       reference's own order: the thing the ROOM offers before the thing the PRESENTER asks for.
     */
-    max: 873,
+    max: 872,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
@@ -4425,6 +4476,42 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'save a shown image, with the reference two filename rules that are not cosmetic'
   },
   {
+    file: 'lib/note-palette.ts',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30, in the commit that created it — which is what this file demands
+      of a new module and what four uncapped components in two days cost.
+
+      It came out of `NoteEditor.svelte` because that component hit its 1,700 ceiling and the rule is
+      that a slice leaves rather than the number rising. Ninety of the lines are the four constant
+      tables; the rest says the thing the component could not: NONE of it is in the pinned bundle.
+      The reference's editor is summernote, which the capture does not include, so these are
+      summernote's defaults rather than a transcription — and a row that cites them as captured
+      values is citing something that was searched for and not found.
+
+      If this number climbs, the question is whether a rule has moved in beside the data. It must
+      not: nothing here knows what a note is.
+    */
+    max: 138,
+    why: "the note editor's fonts, sizes, line heights and 64-colour palette, and what evidences them"
+  },
+  {
+    file: 'lib/note-dialogs.ts',
+    /*
+      CAPPED ON ARRIVAL, 2026-08-30. Every prompt and confirmation the notes pane raises, out of
+      `NotesPane.svelte` when rendering a panel per note put it over its 525 ceiling.
+
+      Six captured sentences and one interpolated, with their byte offsets, in one list instead of
+      scattered through a component in the order the handlers were written. The literal types are
+      load-bearing: `'…apply this note as Welcome Mat'` has no full stop and its all-rooms twin has a
+      question mark, which is upstream's asymmetry at byte 1,474,217 and exactly the shape a tidying
+      pass corrects. A changed sentence is a type error at the call site rather than a silent diff.
+
+      A seventh dialog belongs here. A dialog that needs component state does not.
+    */
+    max: 119,
+    why: 'the notes pane six dialogs, their captured sentences, and the types that pin them'
+  },
+  {
     file: 'lib/room/note-update-notice.ts',
     /*
       USM-11's receiver, extracted from `events.svelte.ts` on 2026-08-30 in the commit that wrote it.
@@ -5498,7 +5585,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the room that rolls its own pointer handling — shares the tolerance with the private chat and
       the webcam holders instead of carrying a second copy of 20.
     */
-    max: 896,
+    max: 884,
     why: 'the poll UI - author, vote and results in one captured component'
   },
   {
@@ -5788,7 +5875,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       call sites — are folded into one resolved view type, the split costs three props and stops
       being a trade. **Do that before this number is raised again.**
     */
-    max: 1260,
+    /*
+      1260 -> 1259, 2026-08-30, and the extraction is the whole reason it went DOWN while six audit
+      rows landed in it.
+
+      `RMSG-01` … `RMSG-06` are six places `app-st-message` and `app-st-compactmessage` disagree,
+      four of which are a single text literal or a single binding section. Written out here they came
+      to about 130 lines of argument-about-the-bundle sitting inside markup, which is the shape this
+      ratchet exists to refuse: the only way to ask "what does the compact row do differently?" would
+      have been to render one. They are `lib/message-renderer-differences.ts` now, with their
+      consumers — `alertQaCountText`, `TRIAL_BADGE_TEXT`, `usernameRowStyle` and three measured
+      constants the contract test asserts against — and the markup carries a pointer each.
+
+      What paid for the rest: the compact branch's reaction strip was a SECOND copy of
+      `reactionStrip`, differing only by an inner gate that the container's own gate already implies
+      (in the reference as well as here — `b_e`'s `O(36, …)` entails `g_e`'s `O(3, …)`). One snippet,
+      three call sites.
+    */
+    max: 1259,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {
@@ -5884,7 +5988,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       which ABSORBED the same feature's other 79 lines and still lands at 6,280 against an unchanged
       ceiling of 6,335. **The pair is eighty-five lines smaller than doing neither.**
     */
-    max: 1173,
+    max: 1172,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -6110,6 +6214,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 578,
     why: 'the swing alerts tab'
+  },
+  {
+    file: 'lib/chat-composer-key.ts',
+    max: 136,
+    why: 'ACA-01/ACA-02: what Enter does in the chat composer, measured on both compiled copies, and the one leaf this room diverges on'
+  },
+  {
+    file: 'lib/alert-chat-nav.ts',
+    max: 83,
+    why: 'ACA-03/ACA-04: the poll indicator class map, on the anchor the update block actually selects, and the refused trailing icon'
+  },
+  {
+    file: 'lib/message-renderer-differences.ts',
+    max: 183,
+    why: 'RMSG-01..06: where app-st-message and app-st-compactmessage disagree, with the consumers beside the measurements'
   }
 ];
 

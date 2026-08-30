@@ -33,6 +33,54 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 22:55 UTC — Chat composer keys, two navbar nodes, and six places the two message renderers disagree
+
+**Runtime impact: YES**, on both surfaces. Two components changed — `AlertChatArea.svelte` and
+`RoomMessage.svelte` — plus three new modules and three new contract tests. Audit rows `ACA-01` …
+`ACA-06` and `RMSG-01` … `RMSG-06` in `docs/decoded/room-surface-audit-2026-08-30.md`.
+
+**What a member will notice.** ALT+Enter in the chat composer inserted nothing and POSTED the
+message; it now breaks the line, which is `i.val(i.val() + "\n")` at bundle byte 1,439,821. The
+typing indicator stopped five seconds after a send and now stops at the Enter, which is
+`refreshTypingStatus(!0)` running before the branch. The emoji picker stayed open across a send and
+now closes, which is `showEmojiChooser = !1` on the send branch alone. A presenter's Poll indicator
+painted its blink on the `<li>` and now paints it on the `<a>`, where `Tt` after a bare `m()` puts
+it and where the non-presenter entry beside it already had it. On the alerts card a presenter's
+username was Bootstrap blue and no longer is. A member's chat card gains the font colour the
+reference gives its username row, and an admin's alert card loses one the reference has no node
+for. Compact rows lose two invented spaces in the Q&A count and two more around the Trial badge,
+and the date separator takes the message's own colour in both renderers.
+
+**Every one of the six `RMSG` rows is a single literal or a single binding section**, and four of
+them were found by decoding both consts tables end to end and diffing rather than by looking up the
+const a row named. That is the same lesson `RM-25` recorded and it is the cheaper half of `UIM-03`'s.
+
+**Two claims of this repository's own are corrected, and neither is code.** `inline-alert-key.ts`
+states that the chat composer's Shift+Enter is the newline "one column over" as a fact about the
+REFERENCE; the bundle carries the identical `i.val(i.val())` swallow in both chat components, so
+that sentence describes this room. And `chat-paste-image-contract.test.ts` refuses a paste handler
+on the extra chat column because "the reference binds paste on the main composer only and its
+handler reads `#textAreaTxt` by id" — `app-extra-chat`'s composer const carries `paste`, `cMe`
+binds it at byte 2,373,521, and its own `onImagePaste` at 2,392,023 reads `#textAreaTxtExtra`. Both
+files belong to other agents this session; `ACA-02` and `ACA-05` name the exact lines.
+
+**One refusal and one divergence, each with the measurement at the code.** Both compiled copies end
+the Webinar Mode block with `T(4,"i")` — no const index, no class, no text, and no rule in any of
+the three stylesheets involved — so it is not emitted (`ACA-04`). And the compact MEMBER reaction
+repeater is the only one of four with no `clickedBy` gate, so upstream draws a `🎉 0` pill there
+once a reaction empties; this room gates all four (`RMSG-06`).
+
+**Three new modules, and the ratchet is why two of them exist.** `chat-composer-key.ts` holds the
+Enter rule measured on BOTH compiled copies. `alert-chat-nav.ts` holds the poll class map and the
+refused icon. `message-renderer-differences.ts` holds all six card-vs-compact measurements beside
+their consumers — an argument about the bundle that lives inside markup gets re-wrapped and
+eventually re-summarised until it stops being checkable. `RoomMessage.svelte`'s ceiling went DOWN,
+1260 -> 1259, while taking six rows, and `AlertChatArea.svelte` stayed at its 1496.
+
+Contracts: `chat-composer-key-contract.test.ts`, `alert-chat-nav-contract.test.ts`,
+`message-renderer-differences-contract.test.ts` — 54 assertions, every bundle claim read from the
+pinned v4 file at run time rather than quoted. Eleven negative controls seen red.
+
 ### 2026-08-31 01:10 UTC — The tenancy kernel, proven on a live cluster instead of read
 
 **Runtime impact: NO.** Two trackers. No `src` or `services` file changed — the database built here

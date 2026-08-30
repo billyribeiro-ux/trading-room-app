@@ -12,12 +12,20 @@
     pollDeleteConfirmation
   } from '#lib/poll-behavior.js';
   import { clampAndSnap } from '#lib/panel-drag.js';
+  import PollSavedList from '#lib/components/PollSavedList.svelte';
   import type { ActivePoll, SavedPoll } from '#lib/types.js';
 
   type PollMode = 'setup' | 'answer' | 'results' | 'done';
   type PollTab = 'new' | 'saved';
   type OpenMode = 'setup' | 'auto';
-  type ResizeDirection = 'n' | 'e' | 's' | 'w' | 'ne' | 'se' | 'sw' | 'nw';
+  /**
+   * `handles: "n, e, s, w, ne, se, sw, nw"` — byte 2,108,197, in the reference's own order.
+   *
+   * One list, read by the type and by the markup, so a handle cannot be drawn that `beginResize`
+   * does not understand and none can be typed that is never drawn.
+   */
+  const RESIZE_HANDLES = ['n', 'e', 's', 'w', 'ne', 'se', 'sw', 'nw'] as const;
+  type ResizeDirection = (typeof RESIZE_HANDLES)[number];
 
   interface Props {
     hostElement: HTMLElement | undefined;
@@ -316,12 +324,34 @@
     });
   }
 
+  /**
+   * POLL-02 — the one call in this panel that threw away the verdict it was handed.
+   *
+   * `RoomModals.#mutate` catches, logs and returns `false` precisely so a panel does not claim a
+   * success that did not happen — its own docblock and `polls.remote.ts` both say so in those
+   * words. Every sibling here consumes it: `savePollToStorage`, `sendPoll`, `postResults` and
+   * `closePanel` all act only on a `true`. This one awaited the promise and dropped the boolean, so
+   * a member whose vote the server refused was marked answered, moved to `done` and had the panel
+   * shut, with the reason only in their own console. Argued as POLL-02 in
+   * `docs/decoded/room-surface-audit-2026-08-30.md`.
+   *
+   * `answered` is still raised BEFORE the await — that is the reference's own double-click guard
+   * (`this.answered || (this.answered = !0, …)`, byte 2,110,624) — and lowered again on a refusal,
+   * which leaves the reader in front of the buttons that did not take. No alert: the reference
+   * sends over a socket and can never reach this branch, so any wording would be invented. Refusing
+   * to claim a vote that did not happen is not.
+   */
   async function sendAnswer(index: number) {
-    if (!answered) {
-      answered = true;
-      await onanswer(index);
-      mode = 'done';
+    if (answered) {
+      hidePanel();
+      return;
     }
+    answered = true;
+    if (!(await onanswer(index))) {
+      answered = false;
+      return;
+    }
+    mode = 'done';
     hidePanel();
   }
 
@@ -739,33 +769,7 @@
             id="savedPolls"
             class={['tab-pane', { active: pollTab === 'saved', show: pollTab === 'saved' }]}
           >
-            <p>
-              You can store polls you use often here. Just type the poll on the create poll tab
-              and press "save"
-            </p>
-            <ul class="list-group">
-              {#each savedPolls as poll (poll.id)}
-                <li class="list-group-item">
-                  {poll.q}
-                  <div class="float-right">
-                    <button
-                      type="button"
-                      class="btn btn-default btn-sm mr-2"
-                      onclick={() => deleteSavedPoll(poll)}
-                    >
-                      <i class="fas fa-trash"></i> Delete
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-primary btn-sm"
-                      onclick={() => loadSavedPoll(poll)}
-                    >
-                      Load
-                    </button>
-                  </div>
-                </li>
-              {/each}
-            </ul>
+            <PollSavedList {savedPolls} ondelete={deleteSavedPoll} onload={loadSavedPoll} />
           </div>
         </div>
     </div>
@@ -809,7 +813,23 @@
             style="display: {total > 0 ? 'block' : 'none'}; width: 100%; height: 300px; text-align: center; position: relative;"
           >
             <canvas bind:this={chartCanvas} style="position: absolute; inset: 0;"></canvas>
-            {#each pieData as datum, index (datum.label)}
+            <!--
+              POLL-01 — this was keyed `(datum.label)`, the choice TEXT, and nothing dedupes a
+              choice: `addChoice()` is a bare push upstream (byte 2,110,392) and `addPollChoice` is
+              the same here. So a poll offering "Up" twice produced two identical keys, and Svelte
+              answers a duplicate key by THROWING — `if (length > keys.size) e.each_key_duplicate(…)`
+              at `svelte/src/internal/client/dom/blocks/each.js:355-362`, outside the `DEV` guard, so
+              in production too. `pieData` is `choices.map(...)`, so the panel died on Send rather
+              than on the first vote. Measured and argued as POLL-01 in
+              `docs/decoded/room-surface-audit-2026-08-30.md`.
+
+              Keyed by INDEX now, which here satisfies the rule rather than breaking it, for the
+              reason the two sibling blocks above already carry and `each-key-contract.test.ts`
+              allows this file by name: position IS a choice's identity — `onanswer(index)` is the
+              vote and `totals[index]` is its tally. `datum.label` was a label that is usually
+              unique, which is not the same thing.
+            -->
+            {#each pieData as datum, index (index)}
               {#if datum.data > 0}
                 <div class="flot-pie-label" style={labelStyle(index)}>
                   {datum.label} : {Math.round(datum.data)}%
@@ -844,52 +864,20 @@
   {/if}
 </div>
 {#if dragInitialized}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-n"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 'n')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-e"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 'e')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-s"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 's')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-w"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 'w')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-ne"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 'ne')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se"
-      style="z-index: 90; display: block;"
-      onpointerdown={(event) => beginResize(event, 'se')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-sw"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 'sw')}
-  ></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-      class="ui-resizable-handle ui-resizable-nw"
-      style="z-index: 90;"
-      onpointerdown={(event) => beginResize(event, 'nw')}
-  ></div>
+  <!--
+    The eight handles as an `{#each}` over `RESIZE_HANDLES`, because that list IS the reference's
+    `handles: "n, e, s, w, ne, se, sw, nw"` and this markup is what jQuery UI generates from it
+    rather than a shape chosen here. The `se` extras are the plugin's own — it draws a visible grip
+    only on that corner — and are a per-direction value so the difference cannot be read as a copy.
+    Keyed by DIRECTION, which is the identity these eight have and an index is not.
+  -->
+  {#each RESIZE_HANDLES as direction (direction)}
+    {const extra = $derived(direction === 'se' ? ' ui-icon ui-icon-gripsmall-diagonal-se' : '')}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="ui-resizable-handle ui-resizable-{direction}{extra}"
+      style={direction === 'se' ? 'z-index: 90; display: block;' : 'z-index: 90;'}
+      onpointerdown={(event) => beginResize(event, direction)}
+    ></div>
+  {/each}
 {/if}

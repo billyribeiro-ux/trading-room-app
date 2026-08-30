@@ -61,6 +61,35 @@
  *
  * The audit row states what the owner has to decide if the two boxes are to agree. Until then the
  * divergence is here, in the module the room's own code reads, rather than in a document.
+ *
+ * ## The three side effects on the send path, and who owns each here
+ *
+ * ```js
+ * e.preventDefault();
+ * this.showTyping && this.refreshTypingStatus(!0);                 // ← 1. EVERY Enter
+ * e.shiftKey ? … : e.altKey ? (i.val(i.val()+"\n"), autoExpand)    //   2. the ALT newline
+ *   : (this.showEmojiChooser = !1, this.sendMessage(), autoExpand) //   3. close the emoji panel
+ * ```
+ *
+ * **1 — the typing signal stops at Enter, not five seconds later.** `refreshTypingStatus(!0)` is
+ * the FORCED form — the same call this room already makes from the composer's `blur` — and it runs
+ * BEFORE the branch, so an Alt+Enter newline stops it too. Without it a member kept showing as
+ * typing to everyone in the channel for up to five seconds after their message had already
+ * arrived; `TypingSignal`'s debounce was the only thing that would ever have cleared it, and a
+ * message landing is a better signal than a timer.
+ *
+ * **2 — ALT+Enter was posting the message.** This room sent on any Enter without Shift, so a member
+ * reaching for upstream's newline modifier published instead of breaking the line. The `\n` is
+ * appended to the END of the value rather than inserted at the caret, because that is what
+ * `i.val(i.val() + "\n")` does; guessing a caret insertion would be inventing behaviour, and the
+ * divergence below already covers the caret case.
+ *
+ * **3 — the emoji panel stayed open across a send.** `showEmojiChooser = !1` is on the SEND branch
+ * alone — a newline does not close it — and this room's equivalent is the page-owned `menus`, so
+ * that exactly one panel is open across every column at once.
+ *
+ * The wiring is `AlertChatArea.svelte`'s `handleComposerKey`; it is not restated here, and this is
+ * not restated there.
  */
 
 /**

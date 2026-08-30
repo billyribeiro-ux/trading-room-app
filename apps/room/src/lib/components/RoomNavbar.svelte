@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SoundCloudMenu from '#lib/components/SoundCloudMenu.svelte';
+  import SoundCloudViewerStop from '#lib/components/SoundCloudViewerStop.svelte';
   import ScreenShareMenu from '#lib/components/ScreenShareMenu.svelte';
   import type { TipButton } from '#lib/tip-button.js';
   import type { RoomMedia, TalkingUser } from '#lib/room/media.svelte.js';
@@ -145,11 +147,38 @@
     /**
      * "Blinking REC?" — whether the recording badge breathes while recording.
      *
-     * DIVERGENCE, recorded rather than absorbed: the reference binds `breathing-rec` through a class
-     * MAP on the recording `ul` (`iPe`, byte 2,477,678), alongside `recIndicatorStart`. This navbar
-     * renders one `li` per recording state and carries `recIndicatorStart` as a class on the
-     * starting one, so the class lands on the `[ REC ]` item instead of its container. Same element
-     * breathing, one level down, because that is where this room's structure puts it.
+     * ## NAV-04 — THE ELEMENT NAMED HERE WAS THE WRONG ONE, and the class is on a different VIEWER
+     *
+     * This paragraph used to say the reference binds `breathing-rec` *"through a class MAP on the
+     * recording `ul`"*. It does not, and re-measuring the cited offset is what showed it:
+     *
+     * ```js
+     * function t4e(t,n){ … d(0,"li",95)(1,"a",152), T(2,"i",153), … }        // byte 2,477,354
+     * m(), z("ngClass", ct(4, KB, !e.mediaService.isScreenSharing)),          // node 1, the <a>
+     * m(), z("ngClass", Kn(6, iPe,
+     *          roomState.isRecording && sessData.blinkingRec,
+     *          e.isRecordingStarting))                                       // node 2, the <i>
+     * const iPe = (t,n) => ({"breathing-rec": t, recIndicatorStart: n});      // byte 2,465,900
+     * ```
+     *
+     * Byte 2,477,678 lands inside that second binding, and the `m()` walk before it reaches node 2,
+     * which const 153 declares as `[1,"far","fa-2x","fa-dot-circle",3,"ngClass"]` — the record dot
+     * INSIDE the presenter's recording dropdown. There is no `ul` at that index; the menu is slot 6.
+     *
+     * That is not a one-level-down difference, it is a different audience. `.breathing-rec` is
+     * `animation: 5s … breathing; color: red !important` in `captured-runtime-components.css`, and
+     * upstream it pulses on a control **only a presenter is served**, while the `[ REC ]` badge
+     * every member sees (`UPe`, const 93) stays still. Here the class is on that badge, so the whole
+     * room gets a red pulsing indicator where upstream only the person who can stop the recording
+     * does.
+     *
+     * **NOT MOVED, and the reason is a file this change may not touch.**
+     * `room-navbar-contract.test.ts` asserts `breathing-rec` on a render whose `isPresenter` is
+     * false. Moving the class into the presenter block turns that assertion red, and a change that
+     * needs a test rewritten to pass is a change that has to be proposed rather than made. What
+     * would unblock it is named in that test's own terms: give the *"breathes the REC badge only
+     * when the room asked for it"* case `isPresenter: true`, and point its needle at the recording
+     * dropdown's icon rather than at the badge.
      */
     blinkingRec: boolean;
     onpromptforscreenname: (source: 'screen' | 'camera') => void;
@@ -282,15 +311,33 @@
 </script>
 
 <nav class="navbar navbar-expand-md navbar-dark fixed-top mainAppNav" style="">
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <span
-    title={sidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
-    class={sidebarOpen ? 'sidebar-menu active-icon' : 'sidebar-menu'}
-    onclick={() => (sidebarOpen = !sidebarOpen)}
-  >
-    <i class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}></i>
-  </span>
+  <!--
+    ── NAV-01 — A ROOM THAT ALWAYS SHOWS THE ROSTER HAS NO HAMBURGER ────────────────────────────
+
+    ```js
+    O(1, e.showSidebar && !e.alwaysShowRoster ? 1 : -1)   // DPe, "Close Sidebar", const 133
+    O(2, e.showSidebar || e.alwaysShowRoster ? -1 : 2)    // EPe, "Open Sidebar",  const 135
+    ```
+
+    Byte 2,487,413, the first two slots of `U4e`. Read together the two gates leave a THIRD state
+    this room did not have: `alwaysShowRoster` removes both, at any value of `showSidebar`. That is
+    the interlock for the counter's own handler below, which G12 already built as
+    `alwaysShowRoster && (showSidebar = !showSidebar, …)` — upstream hands the toggle to exactly one
+    element, and this room had it on two. Argued in full as NAV-01 in
+    `docs/decoded/room-surface-audit-2026-08-30.md`; the one span with two ternaries is unchanged
+    and stays, because DPe and EPe differ only in icon and title.
+  -->
+  {#if !alwaysShowRoster}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <span
+      title={sidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
+      class={sidebarOpen ? 'sidebar-menu active-icon' : 'sidebar-menu'}
+      onclick={() => (sidebarOpen = !sidebarOpen)}
+    >
+      <i class={sidebarOpen ? 'fas fa-arrow-left' : 'fas fa-bars'}></i>
+    </span>
+  {/if}
   <!--
       `Ne(" ", globals.rosterCount + e.simUserCount, " ")`.
 
@@ -613,6 +660,27 @@
           A reader keeps the Volume dropdown and Reload below, plus the talking and REC
           indicators above, which report state rather than change it.
         -->
+      <!--
+        NAV-02 — `o4e`, byte 2,478,748, gated `O(23, isPresenter || isNonPresenterAdmin ||
+        !e.scPlaying ? -1 : 23)` at byte 2,488,684: the one SoundCloud control upstream renders for
+        a VIEWER, and the only way a member has to stop room-wide music for themselves. Its gate is
+        the exact negation of `SoundCloudMenu`'s, which is why the two are separate files.
+
+        ## It sits OUTSIDE the presenter block, and that is the whole fix
+
+        It was written inside it. A control whose gate is `not a presenter`, nested in a block that
+        renders only FOR a presenter, is unreachable in both directions at once: no member ever saw
+        it, and the only browser that evaluated its gate was the one it excludes. The defect it was
+        built to fix — a member with no way to silence room-wide music — survived the fix.
+
+        Placed BEFORE that block rather than after, and the row order is unaffected either way: for
+        a member the presenter block renders nothing, so this is still slot 23's place in the row,
+        and for a presenter this renders nothing. Argued as NAV-02 in
+        `docs/decoded/room-surface-audit-2026-08-30.md`.
+      -->
+      {#if !isPresenter && media.soundCloudPlaying}
+        <SoundCloudViewerStop {onstopsoundcloudforme} />
+      {/if}
       {#if isPresenter}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -724,74 +792,14 @@
             {/if}
           </ul>
         </li>
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <li
-          title="Play music from SoundCloud for all"
-          class="nav-item dropdown"
-          onclick={(event) => event.stopPropagation()}
-        >
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <a
-            id="soundcloudDropdown"
-            data-bs-toggle="dropdown"
-            aria-haspopup="true"
-            aria-expanded={menus.soundcloud}
-            class={[
-              'nav-link dropdown-toggle d-flex align-items-center',
-              { 'text-white': media.soundCloudPlaying }
-            ]}
-            onclick={() => ontoggletopmenu('soundcloud')}
-          >
-            <i class="fab fa-2x fa-soundcloud"></i>
-            <span class="ml-2">
-              <span class="caret"></span>
-              <!--
-                THE ICON FORM: upstream renders `/assets/images/playing.gif` here and that asset is
-                not in this repository, so the faithful transcription rendered a BROKEN image in the
-                navbar on every play. Same case, and same resolution, as `benzinga-logo.png` in
-                `RoomSidebar.svelte`. `fa-volume-up` is not a pick - it is what this file already
-                uses for "audio is on" at the screen-volume control below.
-
-                Knowingly still: the reference's indicator animates and this one does not. FA 5.8.1
-                ships here and its only animations are `fa-spin`/`fa-pulse`, both spinners meaning
-                "working"; FA6's `fa-beat` would fit and does not exist in 5.8.1, so it would have
-                been a class with no effect. Restore the animation by adding the asset, not by
-                inventing a keyframe. Enforced by `img-dimensions-contract.test.ts`.
-              -->
-              {#if media.soundCloudPlaying}
-                <i class="fas fa-volume-up ml-1" title="Playing"></i>
-              {/if}
-            </span>
-          </a>
-          <ul
-            aria-labelledby="soundcloudDropdown"
-            data-bs-popper={menus.soundcloud ? 'static' : undefined}
-            class={[
-              'dropdown-menu dropdown-menu-end soundcloud-options',
-              { show: menus.soundcloud }
-            ]}
-            style={menus.soundcloud ? 'display: block;' : undefined}
-          >
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li class="nav-item" onclick={onpromptforsoundcloud}>
-              <i class="fa fa-play-circle"></i> Play a track or playlist from SoundCloud
-            </li>
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li class="nav-item" onclick={onstopsoundcloud}>
-              <i class="fa fa-square"></i><i class="fa fa-users"></i> Stop Playing For All
-            </li>
-            <li class="divider"></li>
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <li class="nav-item" onclick={onstopsoundcloudforme}>
-              <i class="fa fa-square"></i> Stop Playing For Me
-            </li>
-          </ul>
-        </li>
+        <SoundCloudMenu
+          playing={media.soundCloudPlaying}
+          menuOpen={menus.soundcloud}
+          ontoggle={() => ontoggletopmenu('soundcloud')}
+          {onpromptforsoundcloud}
+          {onstopsoundcloud}
+          {onstopsoundcloudforme}
+        />
         {#if !media.micLaunching}
           <li title="Unmute/Mute Microphone" class="nav-item d-flex align-items-center">
             <!-- svelte-ignore a11y_click_events_have_key_events -->

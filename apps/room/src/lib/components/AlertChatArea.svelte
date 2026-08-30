@@ -52,6 +52,7 @@
     inlineAlertPosts
   } from '#lib/inline-alert-key.js';
   import { chatComposerKeyAction, chatComposerKeyPrevents } from '#lib/chat-composer-key.js';
+  import { pollNavAnchorClasses } from '#lib/alert-chat-nav.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
@@ -403,8 +404,8 @@
    * viewer the room does not let post images gets an ordinary paste and no dialog. It is not the
    * authority: `composer-image.remote.ts` re-checks on the server, which is the check that counts.
    *
-   * THE LAST image item wins, not the first, and that is the reference's loop rather than a
-   * simplification of it: a paste carrying both a screenshot and its text URL resolves to the image.
+   * WHICH image a paste carries is `#lib/pasted-image.js`, including why the last one wins and what
+   * had drifted before that rule was one rule. Not restated here.
    *
    * The default is deliberately NOT prevented. A paste of plain text still lands in the textarea;
    * only an image is intercepted, which is what the three alert composers already do.
@@ -478,45 +479,11 @@
   }
 
   /**
-   * ── ACA-01 — WHAT ENTER DOES IN THE CHAT COMPOSER ──────────────────────────────────────────────
-   *
-   * The DECISION is `#lib/chat-composer-key.js`, measured on both compiled copies. What each
-   * outcome DOES is here, because each of the three things upstream's send branch does beside
-   * posting belongs to a different owner in this room, and a module that reached for all three
-   * would be the composer.
-   *
-   * ```js
-   * e.preventDefault();
-   * this.showTyping && this.refreshTypingStatus(!0);              // ← 1. every Enter
-   * e.shiftKey ? … : e.altKey ? (i.val(i.val()+"\n"), autoExpand) //   2. the ALT newline
-   *   : (this.showEmojiChooser = !1, this.sendMessage(), autoExpand)  // 3. close the emoji panel
-   * ```
-   *
-   * **1 — the typing signal stops at Enter, not five seconds later.** `refreshTypingStatus(!0)` is
-   * the FORCED form, which is the same call `onstoppedtyping` already makes on blur; it runs before
-   * the branch, so an Alt+Enter newline stops it too. Without it this member kept showing as typing
-   * to everyone in the channel for up to five seconds after their message had already arrived —
-   * `TypingSignal`'s debounce is the only thing that would eventually have cleared it, and the
-   * message landing is a better signal than a timer.
-   *
-   * **2 — ALT+Enter was posting the message.** Ours sent on any Enter without Shift, so a member
-   * reaching for upstream's newline modifier published instead. The `\n` goes on the END of the
-   * value rather than at the caret, which is `i.val(i.val() + "\n")` transcribed rather than
-   * improved: guessing a caret insertion here would be inventing behaviour, and Shift+Enter already
-   * covers the caret case.
-   *
-   * **3 — the emoji panel stays open across a send.** `menus.set('emoji', false)` is this room's
-   * `showEmojiChooser = !1`, and it is on the SEND branch alone in the reference — a newline does
-   * not close it. The page owns `menus` so only one panel is open across every column at once,
-   * which is why this asks it rather than holding a flag.
-   *
-   * SHIFT+Enter is deliberately NOT upstream's swallow. The measurement and the argument are in the
-   * module; the effect here is that `'ignore'` reaches the browser untouched and the newline lands
-   * at the caret.
+   * `ACA-01` — Enter in the chat composer. The rule, its three side effects and the one divergence
+   * this room keeps are `#lib/chat-composer-key.js`. Only the WIRING is here, because each effect
+   * has a different owner: the typing signal is the page's, the panel is `menus`, the draft `chat`.
    */
-  function handleComposerKey(
-    event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }
-  ): void {
+  function handleComposerKey(event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }): void {
     const action = chatComposerKeyAction(event);
     if (action === 'ignore') return;
     if (chatComposerKeyPrevents(action)) event.preventDefault();
@@ -666,20 +633,16 @@
                 {/if}</a
               >
               <ul class="nav ml-auto">
+                <!-- `ACA-03` — the two poll classes belong to the `<a>`. `#lib/alert-chat-nav.js`. -->
                 {#if isPresenter}
-                  <li
-                    class={[
-                      'nav-item mx-2',
-                      {
-                        'poll-active-blink': pollIsActive && !polls.minimized,
-                        'poll-active-indicator': polls.minimized
-                      }
-                    ]}
-                  >
+                  <li class="nav-item mx-2">
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
                     <!-- svelte-ignore a11y_missing_attribute -->
-                    <a onclick={onopenpoll}><i class="fas fa-question-circle"></i> Poll</a>
+                    <a
+                      class={pollNavAnchorClasses(pollIsActive, polls.minimized)}
+                      onclick={onopenpoll}><i class="fas fa-question-circle"></i> Poll</a
+                    >
                   </li>
                   <li class="nav-item mr-2">
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -1006,7 +969,7 @@
             that was waiting for it.
 
             PRESENTER-ONLY here, and that is ours rather than upstream's: the checkbox is already
-            inside `{#if isPresenter}` in the toolbar, so the field could only ever be opened by a
+            inside the toolbar's own presenter gate, so the field could only ever be opened by a
             presenter — but `inlineEntry` is client state, and a gate that depends on a checkbox
             being unreachable is not a gate. Posting an alert is presenter-only on the server either
             way (`post-alert.remote.ts`).
@@ -1172,6 +1135,9 @@
                       `O(21, o.webinarMode ? 21 : -1)` —
                       `<div class="px-1 webinarMode"> Webinar Mode <span …><i …></i></span><i></i></div>`,
                       with the tooltip verbatim from const 56.
+
+                      `ACA-04` — the fourth node here is REFUSED, not missed:
+                      `WEBINAR_MODE_TRAILING_ICON_REFUSED` in `#lib/alert-chat-nav.js`.
                     -->
           {#if webinarMode}
             <div class="px-1 webinarMode">
