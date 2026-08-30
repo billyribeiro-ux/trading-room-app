@@ -617,7 +617,21 @@
           </div>
         </div>
         {#if emojiOpen}
-          <EmojiPicker onselect={(glyph) => (composer += glyph)} />
+          <!--
+            `EMOJI-10` — the `popoverId` MUST match what the trigger advertises, and here it did not.
+
+            The trigger sets `aria-describedby="ngb-popover-extra"` (see the composer toolbar above);
+            this mounted the picker with no `popoverId`, so the popover element carried the default
+            `ngb-popover-3`. `portalPopover` then runs
+            `document.querySelector('[aria-describedby="ngb-popover-3"]')` and finds either NOTHING —
+            leaving the popover at the hardcoded inline `translate3d(483.5px, -52.5px, 0px)` it ships
+            with, i.e. somewhere arbitrary on screen — or, when the MAIN column's picker is also open,
+            that column's trigger, and positions this popover over the wrong composer.
+
+            `AlertQaModal`, `ModalHost` and `NoteEditor` all pass a matching id. This was the one that
+            did not, which is why the row is a `defect` and not a divergence.
+          -->
+          <EmojiPicker popoverId="ngb-popover-extra" onselect={(glyph) => (composer += glyph)} />
         {/if}
       </div>
     {/if}

@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**44 open · 180 closed · 224 rows.**
+**34 open · 190 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -2711,6 +2711,22 @@ manageChatReactions(e,i,o,s,r=null){this.socketService.send("chatReactions",{msg
 
 ### EMOJI-02 — `reactionDetails` ({n, emoji, remove}) is never computed, so no downstream consumer can exist
 
+**BUILT 2026-08-30, by a different mechanism, and the difference is the point.**
+
+The reference COMPUTES `{n, emoji, remove}` at the clicking browser and puts it on the wire as the
+third argument of `manageChatReactions`. This room DERIVES the same three facts at the receiving
+browser, from the row's own reaction map: `ReactionArrivals.changes(rows)` diffs
+`emoji\u0000emailHash` pairs between passes and reports `{rowId, emoji, emailHash, removed}`.
+
+**Because the frame cannot carry it.** This hub's stream is per ROOM while chat is per CHANNEL, so a
+frame carrying a reaction's text or its author would put admin-channel content on every subscriber's
+wire — the same constraint `publishChatToRoom` records for `isMention`. The mutation frames announce
+that a row changed and the receiver reads the row it is entitled to.
+
+It also fixes a defect upstream's shape has: a reaction added while a viewer's tab was hidden is
+INVISIBLE to a per-event record and is caught by a diff, because the diff compares what is there now
+with what was there last.
+
 **medium** · `missing-behaviour` · reference byte **1,353,655**
 
 ```
@@ -2722,6 +2738,15 @@ i={n:this.appService.globals.user.nick||this.appService.globals.user.name,emoji:
 > Verified: I tried hard to refute this and could not. The `{n, emoji, remove}` record — and the whole feature it feeds — is absent from our source.
 
 ### EMOJI-03 — "Message Reaction" toast (the non-QA chat reaction notification) is absent
+
+**BUILT 2026-08-30.** `chatReactionNotice` in `#lib/room/reaction-notices.ts`, raised from
+`RoomOverlays` over `ReactionArrivals.changes(data.messages)`, gated on `prefs.reactionsPopup` and
+titled `Message Reaction` — the literal at byte 2,509,144, which the audit's own note corrects from
+an earlier stage's "Chat Reaction" (zero occurrences in the bundle).
+
+The reactor's own reaction is skipped, which upstream gets for free by only ever raising the toast
+from an inbound frame and this has to do explicitly, because a diff sees every change including your
+own.
 
 **medium** · `missing-control` · reference byte **2,508,981**
 
@@ -2735,6 +2760,14 @@ this.appService.appEventBus.subscribe("updateChatMsgReaction",i=>{this.appServic
 
 ### EMOJI-04 — "QA Reaction" toast and the QA reaction sound are absent
 
+**BUILT 2026-08-30.** `questionReactionNotice`, the twin of the chat one, over the Q&A rows —
+titled `QA Reaction` (byte 1,410,150), gated on `prefs.reactionsPopupQA`, with the paired
+`prefs.qaReactionSoundOn && qaAlert` sound.
+
+Two preferences and two notices rather than one of each, because that is what the reference has: a
+reader can want reaction toasts on chat and not on the Q&A thread, and the sound is gated separately
+again.
+
 **medium** · `missing-control` · reference byte **1,409,470**
 
 ```
@@ -2746,6 +2779,14 @@ this.appService.globals.preferences.reactionsPopupQA&&l&&c&&this.alertService.in
 > Verified: Could not refute. Zero hits in apps/room/src for reactionsPopupQA, reactionsPopup, qaReactionSoundOn, reactionsSoundOn, qaReactionDetails, updatedQAMsg, or the settings labels "Reactions Response" / "Reactions QA Response".
 
 ### EMOJI-05 — User preferences `reactionsPopup` / `reactionsPopupQA` / `qaReactionSoundOn` and their two settings toggles do not exist
+
+**BUILT 2026-08-30.** All three preferences are on `RoomPrefs` — `reactionsPopup`,
+`reactionsPopupQA` (byte 979,890's object) and `qaReactionSoundOn` (byte 979,369's) — each defaulting
+`!== false`, which is the reference's own three-state reading: absent, null and true all enable.
+
+Both settings switches ship in `ReactionPrefsPane.svelte`, labelled `Reactions Response` and
+`Reactions QA Response` exactly as read at bytes 2,227,101 and 2,227,573. The pane is its own
+component because `ModalHost` was at its ceiling, which is the extraction that file's entry records.
 
 **medium** · `missing-control` · reference byte **979,910**
 
@@ -2759,6 +2800,20 @@ recPreviewWindow:!0,reactionsPopup:!0,reactionsPopupQA:!0,noteUpdatePopup:!0,cha
 
 ### EMOJI-06 — Enter in the search box does not select the first result
 
+**BUILT 2026-08-30.** `onkeyup` on the search field selects `searchResults[0]`.
+
+`keyup` and not `keydown`, which is upstream's own event (`setupKeyupListener`, byte 737,093) and the
+right one for the reason `poll-08` gives: holding Enter repeats `keydown`, and a repeat would insert
+the emoji once per repeat into whatever composer the picker is feeding.
+
+**Upstream's `!this.query` guard is deliberately NOT reproduced, and a negative control is why.** It
+was transcribed at first, on the reading that "the box is empty" and "there are no results" are
+different tests. The control deleting it stayed GREEN, so the reading was checked rather than the
+test strengthened — and it is wrong here: `runSearch` returns `null` for an empty string and `null`
+again for a whitespace-only one, so the result check already covers every case the guard did.
+Upstream's `SEARCH_CATEGORY.emojis` is null only before any search has run, so there the two really
+are different questions. One statement of the fact, with the whitespace case pinned as a test.
+
 **medium** · `missing-behaviour` · reference byte **750,272**
 
 ```
@@ -2770,6 +2825,17 @@ handleEnterKey(e,i){if(!i&&null!==this.SEARCH_CATEGORY.emojis&&this.SEARCH_CATEG
 > Verified: Our emoji picker's search input has no Enter handling at all. apps/room/src/lib/components/EmojiPicker.svelte:515-522 declares the input with exactly one handler — oninput={(event) => handleSearch(event.currentTarget.value)} — plus bind:this, id, class, type and placeholder; there is no onkeydown/onkeyup, and it is not inside a <form>, so…
 
 ### EMOJI-07 — Search input id is hardcoded `emoji-mart-search-2`; the reference derives it from a per-instance counter
+
+**BUILT 2026-08-30.** `$props.id()`, which is Svelte's documented answer for exactly this —
+*"unique to the current component instance"*, and *"when hydrating a server-rendered component, the
+value will be consistent between server and client"*.
+
+A module counter would reproduce `++Qee` more literally and would be wrong: it numbers the server's
+instances and the client's independently, so hydration would find two different ids for one field.
+
+The row's premise is exercised rather than argued — the contract MOUNTS TWO PICKERS and asserts two
+ids and two `<label for>` targets, because a duplicate-id defect is not observable in one instance.
+Control seen red.
 
 **medium** · `wrong-constant` · reference byte **736,424**
 
@@ -2783,6 +2849,22 @@ inputId="emoji-mart-search-"+ ++Qee;destroy$=new Jt;
 
 ### EMOJI-08 — `emoji-mart-dark` is applied unconditionally; the reference computes darkMode from prefers-color-scheme
 
+**BUILT 2026-08-30, and it uncovered a crash that the row did not name.**
+
+`MediaQuery` from `svelte/reactivity` reads `prefers-color-scheme: dark` reactively. Its constructor
+calls `window.matchMedia` IMMEDIATELY — so building one where the API is absent throws, while
+upstream's expression (`"function" != typeof matchMedia || …`, byte 744,873) yields `false` and
+renders the light palette. The guard is transcribed for that reason and is not defensiveness: without
+it this component crashes where the reference degrades. jsdom is such an environment, and every mount
+in the new contract failed with `TypeError: window.matchMedia is not a function` until the guard went
+in.
+
+Honest gap, recorded at the code: the server has no `matchMedia` either, so SSR emits the light
+palette and a dark-scheme machine gains the class on hydration — a one-frame swap on a popover the
+reader has just clicked open. Doing it in CSS as Svelte's docs prefer would mean duplicating a
+captured stylesheet, because both palettes are keyed off `.emoji-mart-dark` in
+`protradingroom-source.css`. Control seen red.
+
 **medium** · `divergence` · reference byte **754,689**
 
 ```
@@ -2794,6 +2876,20 @@ Rh("emoji-mart ",o.darkMode?"emoji-mart-dark":"","")
 > Verified: Our picker hardcodes the dark class; nothing in apps/room/src computes it from the color scheme. Searched (node_modules excluded) for: emoji-mart-dark, emoji-mart, matchMedia, prefers-color-scheme, darkMode/dark_mode, colorScheme/color-scheme, MediaQuery, svelte/reactivity, and "dark" within EmojiPicker.svelte.
 
 ### EMOJI-09 — No staged first render — we mount every emoji cell at once
+
+**BUILT 2026-08-30.** Three categories committed, the last of them capped at sixty cells, with the
+rest arriving on a bare `setTimeout` — `Math.min(categories.length, 3)` and
+`categories[s-1].emojis = r.slice(0, 60)`, byte 747,768.
+
+Capped by INDEX (`stagedCount - 1`) rather than by the literal 2, because that is what `s-1` means: a
+picker with fewer than three categories caps whichever one is last.
+
+**The timer is cleared on teardown, where upstream leaks it.** Closing the picker inside that first
+frame would otherwise leave a callback writing to a destroyed component — harmless in Angular, a
+warning here.
+
+The contract mounts the picker and counts sections and cells across the two passes: exactly three
+category sections with the third at sixty, then all nine with the cap lifted. Two controls seen red.
 
 **medium** · `missing-behaviour` · reference byte **747,768**
 
@@ -2807,6 +2903,18 @@ const s=Math.min(this.categories.length,3);this.setActiveCategories(this.activeC
 
 ### EMOJI-10 — ExtraChatPane mounts the picker with the default popoverId, which no trigger advertises — the popover never positions
 
+**FIXED 2026-08-30.** `<EmojiPicker popoverId="ngb-popover-extra" …>`, matching what the trigger
+five lines up advertises.
+
+The consequence was one of two, both bad: `portalPopover`'s
+`document.querySelector('[aria-describedby="ngb-popover-3"]')` found NOTHING, leaving the popover at
+the hardcoded inline `translate3d(483.5px, -52.5px, 0px)` it ships with — an arbitrary place on
+screen — or, when the main column's picker was also open, it found THAT column's trigger and
+positioned this popover over the wrong composer.
+
+`AlertQaModal`, `ModalHost` and `NoteEditor` all pass a matching id. This was the one that did not,
+which is why the row is a `defect`. Control seen red.
+
 **medium** · `defect` · reference byte **1,359,452**
 
 ```
@@ -2818,6 +2926,15 @@ const s=Math.min(this.categories.length,3);this.setActiveCategories(this.activeC
 > Verified: I could not refute it. ExtraChatPane's emoji trigger advertises `ngb-popover-extra` but the picker it mounts receives no `popoverId`, so the popover element carries the default id `ngb-popover-3`.
 
 ### EMOJI-12 — Preview clears immediately on mouseleave; the reference defers it one animation frame
+
+**BUILT 2026-08-30.** `requestAnimationFrame` on `mouseleave`, `cancelAnimationFrame` on
+`mouseenter`, at both hover sites — the search results and the category grid.
+
+**The pair is the feature, not the deferral.** Sliding across a row fires `mouseleave` on one cell and
+`mouseenter` on the next, in that order, so a synchronous clear flashes the idle preview between
+every pair of cells — nine flashes crossing one line of the grid. Deferring by a frame and cancelling
+on the way in means the preview only returns to idle when the pointer has actually left. Control seen
+red.
 
 **low** · `divergence` · reference byte **750,893**
 
