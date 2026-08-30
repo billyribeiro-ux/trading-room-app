@@ -45,6 +45,7 @@
   import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
+  import { pastedImageFrom } from '#lib/pasted-image.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
@@ -241,6 +242,15 @@
      * other. A prop, not a `gates` read, for the reason `ExtraChatPane`'s own props note gives.
      */
     showPmButton: boolean;
+    /**
+     * A viewer pasted an image into the chat composer — `x("paste", o => onImagePaste(o))`, byte
+     * 1,427,208.
+     *
+     * A callback and not the upload itself, for the reason every other action here is one: the
+     * confirmation dialog, the upload endpoint and the composer's draft all belong to `RoomComposer`,
+     * and this component would have to be handed three more things to do the job in place.
+     */
+    onpasteimage: (file: File) => void;
     onexpandcomposer: (element: HTMLTextAreaElement | undefined) => void;
     /** One keystroke in the main composer — `updateLastTypedTime()`. */
     ontyped: (value: string) => void;
@@ -308,6 +318,7 @@
     onmessageaction,
     onprivatechat,
     showPmButton,
+    onpasteimage,
     onexpandcomposer,
     ontyped,
     onstoppedtyping,
@@ -330,6 +341,25 @@
   /* `| null`, because that is what `bind:this` writes on teardown — proven in
      `dom-reference-contract.svelte.test.ts`, not assumed. */
   let chatScroller = $state<HTMLElement | null>(null);
+
+  /**
+   * The clipboard, filtered down to at most one image.
+   *
+   * `canPostImages` FIRST, matching the reference's own `if (!this.canPostImages) return !1` — a
+   * viewer the room does not let post images gets an ordinary paste and no dialog. It is not the
+   * authority: `composer-image.remote.ts` re-checks on the server, which is the check that counts.
+   *
+   * THE LAST image item wins, not the first, and that is the reference's loop rather than a
+   * simplification of it: a paste carrying both a screenshot and its text URL resolves to the image.
+   *
+   * The default is deliberately NOT prevented. A paste of plain text still lands in the textarea;
+   * only an image is intercepted, which is what the three alert composers already do.
+   */
+  function handleComposerPaste(event: ClipboardEvent): void {
+    if (!canPostImages) return;
+    const image = pastedImageFrom(event.clipboardData?.items);
+    if (image) onpasteimage(image);
+  }
 
   function holdAlertsScroller(node: HTMLElement) {
     alertsScroller = node;
@@ -967,6 +997,7 @@
                       */
                       ontyped(event.currentTarget.value);
                     }}
+                    onpaste={handleComposerPaste}
                     onblur={onstoppedtyping}
                     onkeydown={(event) => {
                       if (event.key === 'Enter' && !event.shiftKey) {

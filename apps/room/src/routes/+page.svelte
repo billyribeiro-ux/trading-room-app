@@ -1221,6 +1221,7 @@
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
               showPmButton={gates.showPmButton}
+              onpasteimage={(file) => composer.beginImagePaste(file)}
               onexpandcomposer={autoExpandComposer}
               ontyped={(value) => typing.main.typed(value)}
               onstoppedtyping={() => typing.main.stop()}

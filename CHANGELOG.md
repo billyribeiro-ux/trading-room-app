@@ -33,6 +33,97 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:43 UTC — A screenshot pasted into chat now goes somewhere, and one copy of that rule had already drifted
+
+**Runtime impact: YES.** Pasting an image into the chat composer opens a confirmation with a preview
+and a message box, and posts the uploaded image with that message. Before this, nothing happened at
+all. `PostAlertModal` also changes which image it picks from a multi-representation paste.
+
+#### `acA-02` — the surface a member actually types in was the one without it
+
+The chat textarea bound `focus`, `input`, `blur` and `keydown` and **no `paste`**. All three ALERT
+composers — the post-alert modal, the swing form, the day-trade form — have had a paste handler since
+they were built. So the room could take a pasted screenshot everywhere except the box most people use.
+
+#### Three things in the reference's handler are load-bearing, and all three are reproduced
+
+```js
+onImagePaste(e) {                                                  // byte 1,445,719
+  const o = (e.clipboardData || e.originalEvent.clipboardData).items;
+  let s = null;
+  for (const r of o) 0 === r.type.indexOf("image") && (s = r.getAsFile());
+  if (s) {
+    if (!this.canPostImages) return !1;
+    const r = URL.createObjectURL(s), a = li("#textAreaTxt").val().trim();
+    bootbox.confirm({ … <img src="'+r+'" /> … <textarea id="msg-text">'+a+'</textarea> …,
+      callback: l => { if (l) { const c = li("#msg-text").val().trim(); i.doImggurUpload(s, c) } } })
+  }
+}
+```
+
+1. **The LAST image wins** — the loop keeps assigning and never breaks, so a paste carrying a
+   screenshot and its text URL resolves to the screenshot.
+2. **The composer's text is carried into the dialog** and is what gets posted with the image.
+3. **The composer is cleared only when a message actually travels** — `i && (…, val(""))` at byte
+   1,443,041. Clearing unconditionally eats a draft that was never sent; not clearing leaves the
+   viewer a second copy to send again.
+
+Ours clears **before** the upload awaits rather than after, which is a decision and not a
+transcription: a viewer who starts typing during a slow upload keeps what they typed.
+
+#### ONE COPY OF THE PICKING RULE HAD ALREADY DRIFTED
+
+Three components each had their own eight-line version of that loop. Two matched. `PostAlertModal`
+did not:
+
+```ts
+for (const item of Array.from(items)) {
+  if (!item.type.startsWith('image')) continue;
+  const file = item.getAsFile();
+  if (!file) return;        // ← one unreadable representation abandoned the whole paste
+  …
+  return;                   // ← FIRST image wins, where the reference takes the LAST
+}
+```
+
+Neither could have been noticed from the outside: both are files, both upload, both post. The rule
+is now `#lib/pasted-image.ts`, called by all four surfaces, and the contract executes it — last image
+wins, an unmaterialisable item is skipped rather than fatal, every `image/*` subtype admitted,
+`null` for a paste with no image and for no clipboard at all — plus an assertion that no surface
+kept a private copy (`not.toContain('.getAsFile()')`).
+
+#### Scope: the MAIN composer only, which is the reference's own boundary
+
+The `paste` binding is on textarea const 64 inside `d0e` (byte 1,427,208) and the handler reads
+`#textAreaTxt` by id. The extra chat column's textarea is `textAreaTxtExtra` and has no paste
+binding upstream — giving it one here would seed the dialog from the *other* column's box.
+
+#### Two more gates fired on the way, both correctly
+
+`img-dimensions-contract` caught the new preview `<img>` with no dimensions; it is registered as
+UNSIZEABLE with the reference's own `max-width:100%; max-height: 50vh` as the reason, and the local
+was renamed `chatPastePreviewUrl` so it cannot be confused with the swing form's `pastePreviewUrl`.
+`slice-anchor-contract` caught my own test slicing on an inlined `indexOf` — the end bound is a local
+with its own assertion now, because a moved marker would have made `slice(at, -1)` run every
+assertion over almost the whole file.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,587 tests passing (1 skipped), build done. Twenty of those are this
+feature's, and the state machine runs against the real `RoomComposer` and `RoomChat` with
+`createObjectURL`/`revokeObjectURL` stubbed so the LEAK is under test as well: a second paste while
+a confirmation is open must revoke the first's preview.
+
+**Seven negative controls, each run and each seen RED**, on the committed tree and reverted after:
+the picker taking the FIRST image again; an unmaterialisable item abandoning the paste again; the
+composer no longer cleared; the clear moved to AFTER the upload's `await` (the case that proves the
+in-flight draft is kept); a second paste no longer revoking the first preview; the `canPostImages`
+refusal removed; and the `onpaste` binding removed.
+
+**Not verified:** nothing was opened in a browser, so no real `ClipboardEvent` was produced — the
+clipboard items are constructed. The `canPostImages` refusal is the one assertion read from source
+rather than run, because that gate is a page-level value the composer class is not given; the server
+re-checks it in `composer-image.remote.ts` either way.
+
 ### 2026-08-30 03:30 UTC — The Stream Player buttons stop lying, and two gates that were reading prose as code
 
 **Runtime impact: YES.** Enable / Disable Stream Player no longer write a preference nobody reads.

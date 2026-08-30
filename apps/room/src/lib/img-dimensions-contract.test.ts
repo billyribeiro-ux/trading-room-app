@@ -211,6 +211,10 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
     }
   },
   'lib/components/RoomOverlays.svelte': {
+    '{chatPastePreviewUrl}': {
+      count: 1,
+      why: 'a pasted CHAT screenshot, bounded by `.img-fluid` plus an inline `max-height: 50vh` — the reference sets both on this one (`max-width:100%; max-height: 50vh`, byte 1,445,719) because the chat dialog is the only paste confirmation that also carries a message box beneath the picture.'
+    },
     '{pastePreviewUrl}': {
       count: 1,
       why: 'a pasted swing-alert screenshot, bounded by `.img-fluid`.'

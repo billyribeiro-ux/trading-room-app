@@ -561,7 +561,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `RoomOverlays`. The map itself is read by the load and the lookup happens at the leaf, so the
       page's share of the presenter-colour feature is exactly this pass-through.
     */
-    max: 1477,
+    /*
+      1477 -> 1478, 2026-08-30. One line: `onpasteimage={(file) => composer.beginImagePaste(file)}`
+      on `AlertChatArea`. The chat composer had no `paste` binding at all — `acA-02` — while all
+      three ALERT composers have had one since they were built.
+    */
+    max: 1478,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1296,7 +1301,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       unrelated halves of one feature: the Q&A thread renders messages, and the settings modal's
       colour pickers seed from this presenter's own entry.
     */
-    max: 855,
+    /*
+      855 -> 896, 2026-08-30. The chat paste confirmation.
+
+      The reference's is a `bootbox.confirm` carrying a preview `<img>` and a textarea seeded from
+      the composer (byte 1,445,719), and the two alert forms below already have that shape for their
+      own pastes — so this block sits with them rather than in a component of its own. Most of the
+      addition is the markup those three lines of dialog need plus the note saying why it is
+      `BootboxDialog` and not `ImageUploadDialog`: the file is already chosen, and a dialog whose top
+      half is a drop zone invites replacing the thing that was just pasted.
+    */
+    max: 896,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2685,7 +2700,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       owns a rich message and then refuses their save, so fewer people reach the editor here and
       everyone who reaches it can finish. `chat-rte-gate-contract.test.ts` executes that claim.
     */
-    max: 573,
+    /*
+      573 -> 687, 2026-08-30, and it is the largest raise this entry has taken. The pasted-image
+      state machine, of which roughly ninety lines are the transcription and the argument.
+
+      Three of its behaviours are decisions rather than transcription and each has its paragraph:
+      the composer is cleared BEFORE the upload awaits (so a draft typed during a slow upload
+      survives) and only when a message actually travels (the reference's own `i && (…, val(""))`
+      at byte 1,443,041); and a second paste while a confirmation is open revokes the first's object
+      URL, without which every corrected mis-paste pins its bytes for the life of the tab.
+
+      If this climbs again the extraction is the pasted-image trio — `beginImagePaste`,
+      `cancelImagePaste`, `confirmImagePaste` and their two fields — which is already the shape
+      `RoomTradeAlerts` uses for the same feature.
+    */
+    max: 687,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -3664,7 +3693,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `followedUsers` lookup it sits with, because they are the same kind of thing. The map is
       shared by every message; the lookup is per message, so neither belongs on the chrome.
     */
-    max: 1211,
+    /*
+      1211 -> 1242, 2026-08-30. The composer's `paste` handler and its prop.
+
+      The filter itself is three lines because the RULE moved to `#lib/pasted-image.ts` — where it
+      replaced three separate copies, one of which had drifted into taking the FIRST image instead
+      of the reference's last. What stayed here is the one thing that cannot: `canPostImages` is a
+      page gate, so the refusal has nowhere else to live.
+    */
+    max: 1242,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {

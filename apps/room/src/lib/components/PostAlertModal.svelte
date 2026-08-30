@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pastedImageFrom } from '#lib/pasted-image.js';
   import { onDestroy } from 'svelte';
   import type { AlertTab } from '#lib/types.js';
   import {
@@ -134,18 +135,17 @@
   }
 
   function selectPastedImage(event: ClipboardEvent) {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-
-    for (const item of Array.from(items)) {
-      if (!item.type.startsWith('image')) continue;
-      const file = item.getAsFile();
-      if (!file) return;
-      const preview = URL.createObjectURL(file);
-      if (pastedImage) URL.revokeObjectURL(pastedImage.preview);
-      pastedImage = { file, preview };
-      return;
-    }
+    /*
+      THIS LOOP HAD DRIFTED, and the drift was invisible: it returned on the FIRST image where the
+      reference keeps assigning and takes the LAST (byte 1,445,719), and `if (!file) return`
+      abandoned the whole paste on one item the platform could not materialise. Both are fixed by
+      the rule living in one place — `#lib/pasted-image.ts` carries the transcription.
+    */
+    const file = pastedImageFrom(event.clipboardData?.items);
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    if (pastedImage) URL.revokeObjectURL(pastedImage.preview);
+    pastedImage = { file, preview };
   }
 
   function closePastedImageConfirm() {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pastedImageFrom } from '#lib/pasted-image.js';
   import type { DayTradeAlertDraft } from './draft';
 
   /**
@@ -69,14 +70,7 @@
    * "Paste Image Link" works.
    */
   function handlePaste(event: ClipboardEvent): void {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-    let image: File | null = null;
-    for (const item of items) {
-      if (!item.type.startsWith('image')) continue;
-      const file = item.getAsFile();
-      if (file) image = file;
-    }
+    const image = pastedImageFrom(event.clipboardData?.items);
     if (image) onPasteImage(image);
   }
 </script>

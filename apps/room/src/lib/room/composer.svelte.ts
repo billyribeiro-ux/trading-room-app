@@ -89,6 +89,8 @@ export class RoomComposer {
   #tweetWindow: Window | null;
   #sendingGif;
   #pendingGifUrl;
+  #pastedImage;
+  #pastedImageMessage;
   #rteDraft;
   #rteIsEditing;
   #rteEditTarget: MessageActionItem | null;
@@ -135,6 +137,21 @@ export class RoomComposer {
     this.#sendingGif = $state(false);
 
     this.#pendingGifUrl = $state<string | null>(null);
+    /*
+      The image a viewer PASTED into the chat composer, awaiting its confirmation.
+
+      `$state.raw`: it is replaced wholesale or cleared, never mutated, so a deep proxy over a `File`
+      and a string would be overhead on every read — the same call `#rteEditTarget` below makes.
+    */
+    this.#pastedImage = $state.raw<{ file: File; previewUrl: string } | null>(null);
+    /*
+      The message that will travel with it, seeded from the composer and then OWNED by the dialog.
+
+      Plain `$state` and not `.raw`, because `bind:value` writes it per keystroke. Separate from
+      `#pastedImage` because the two have different lifetimes: the file is replaced wholesale, the
+      text is edited in place.
+    */
+    this.#pastedImageMessage = $state('');
 
     /** The message being composed in the editor, as HTML. */
     this.#rteDraft = $state('');
@@ -201,6 +218,103 @@ export class RoomComposer {
 
   get pendingGifUrl(): string | null {
     return this.#pendingGifUrl;
+  }
+
+  get pastedImage(): { file: File; previewUrl: string } | null {
+    return this.#pastedImage;
+  }
+
+  get pastedImageMessage(): string {
+    return this.#pastedImageMessage;
+  }
+
+  set pastedImageMessage(next: string) {
+    this.#pastedImageMessage = next;
+  }
+
+  /**
+   * A viewer pasted an image into the CHAT composer — `x("paste", o => onImagePaste(o))`, byte
+   * 1,427,208.
+   *
+   * ## What was missing
+   *
+   * The chat textarea bound `focus`, `input`, `blur` and `keydown` and no `paste`, so a pasted
+   * screenshot went nowhere: the three ALERT composers have had this since they were built, and
+   * chat — the surface a member actually uses — did not. `acA-02` in the surface audit.
+   *
+   * ## The reference's handler, read rather than recalled (byte 1,445,719)
+   *
+   * ```js
+   * onImagePaste(e) {
+   *   const o = (e.clipboardData || e.originalEvent.clipboardData).items;
+   *   let s = null;
+   *   for (const r of o) 0 === r.type.indexOf("image") && (s = r.getAsFile());
+   *   if (s) {
+   *     if (!this.canPostImages) return !1;
+   *     const r = URL.createObjectURL(s), a = li("#textAreaTxt").val().trim();
+   *     bootbox.confirm({ message: '…<h4>Upload this image?</h4><img src="' + r + '" />…
+   *                       <textarea id="msg-text" …>' + a + '</textarea>…',
+   *       callback: l => { if (l) { const c = li("#msg-text").val().trim(); i.doImggurUpload(s, c) } } })
+   *   }
+   * }
+   * ```
+   *
+   * Three things in there are load-bearing and all three are reproduced:
+   *
+   * **The LAST image item wins**, not the first — the loop keeps assigning. A paste carrying both a
+   * screenshot and its text URL therefore resolves to the image, which is the whole reason the loop
+   * is written that way.
+   *
+   * **The composer's current text is carried into the dialog** and becomes the message posted with
+   * the image, rather than being left behind in a box the viewer has stopped looking at.
+   *
+   * **The default is NOT prevented.** A paste of plain text still lands in the textarea; only an
+   * image is intercepted. The three alert composers say the same thing in their own handlers.
+   *
+   * The authority check is the CALLER's, because `canPostImages` is a page-level gate this class is
+   * not given — and it is not the real one either way: `composer-image.remote.ts` re-checks on the
+   * server, which is where it counts.
+   */
+  beginImagePaste(file: File): void {
+    /*
+      A second paste while a confirmation is open replaces the first, and the first's object URL is
+      revoked on the way — otherwise every discarded paste pins its image bytes for the life of the
+      tab.
+    */
+    this.cancelImagePaste();
+    this.#pastedImage = { file, previewUrl: URL.createObjectURL(file) };
+    this.#pastedImageMessage = this.#chat.composer.trim();
+  }
+
+  /** Discard the pending paste, releasing its preview. Safe to call when there is none. */
+  cancelImagePaste(): void {
+    const pending = this.#pastedImage;
+    this.#pastedImage = null;
+    this.#pastedImageMessage = '';
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+  }
+
+  /**
+   * Upload the pasted image and post it, with whatever text the dialog was left holding.
+   *
+   * The composer is cleared FIRST and only when a message is actually travelling, which is the
+   * reference's own condition — `i && (imggurUploadTxt += " " + i, li("#textAreaTxt").val(""))` at
+   * byte 1,443,041. Clearing unconditionally would eat a draft that was never sent; not clearing at
+   * all would post the text with the image and leave a copy of it in the box for the viewer to send
+   * a second time.
+   *
+   * Before the upload rather than after, because `uploadImages` awaits the network: a viewer who
+   * starts typing during a slow upload must not have that new draft wiped when it lands.
+   */
+  async confirmImagePaste(): Promise<void> {
+    const pending = this.#pastedImage;
+    if (!pending) return;
+    const message = this.#pastedImageMessage.trim();
+    this.#pastedImage = null;
+    this.#pastedImageMessage = '';
+    URL.revokeObjectURL(pending.previewUrl);
+    if (message) this.#chat.clear('textAreaTxt');
+    await this.uploadImages([pending.file], message);
   }
 
   get rteDraft(): string {

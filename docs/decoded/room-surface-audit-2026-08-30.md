@@ -2391,6 +2391,8 @@ function H2e(t,n){if(1&t){const e=Y();d(0,"div",20)(1,"div",52,2)(3,"textarea",5
 
 ### acA-02 — Chat composer has no (paste) handler — a pasted screenshot cannot be posted to chat
 
+**BUILT 2026-08-30 03:43 UTC.** `AlertChatArea.svelte` binds `onpaste` on `#textAreaTxt`, gated on `canPostImages` as the reference is (`if (!this.canPostImages) return !1`), and the confirmation in `RoomOverlays.svelte` reproduces the reference's dialog — preview `<img>`, a `#msg-text` textarea seeded from the composer, and that text posted with the image. The extra chat column deliberately gets none: the reference binds paste on the main composer only and its handler reads `#textAreaTxt` by id. The rule for WHICH image a paste carries moved to `lib/pasted-image.ts`, where it replaced three separate copies — and one of those, `PostAlertModal`'s, had drifted into taking the FIRST image where the reference takes the last, and into abandoning a whole paste on one item `getAsFile()` could not materialise. `chat-paste-image-contract.test.ts` executes the state machine and the filter.
+
 **high** · `missing-behaviour` · reference byte **1,427,208**
 
 ```
