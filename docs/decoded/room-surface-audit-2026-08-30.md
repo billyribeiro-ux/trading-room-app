@@ -1026,6 +1026,8 @@ H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(
 
 ### USM-02 — Alert-tab 'Users join/leave' group (4 checkboxes) missing while its consumers are live
 
+**BUILT 2026-08-30, before this row was written down.** `ViewerAlertPrefsPane.svelte` renders all four with the reference's own ids (`beep-on-user-join`, `popup-on-user-join`, `beep-on-user-leave`, `popup-on-user-leave`) inside the `#appBeepOnUserJoinLeave` block, behind the reference's own gate — `(roomBeepOnUserJoin || roomJoinLeavePopup) && isPresenter`, byte 2,285,369. `ModalHost.svelte:3381` mounts it. Marked here on 2026-08-30 03:20 UTC after grepping the ids, not from memory: the audit was produced against an earlier tree and this row was already stale when it was filed.
+
 **high** · `missing-control` · reference byte **2,269,797**
 
 ```
@@ -1037,6 +1039,8 @@ H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(
 > Verified: I could not find the control under any name. (1) Zero hits in any .svelte file for beep-on-user-join / popup-on-user-join / beep-on-user-leave / popup-on-user-leave, for the preference names beepOnUserJoin/Leave and popupOnUserJoin/Leave, or for label synonyms (Beep, "Beep on user", "Users join", join/leave, "join and leave") — the only .…
 
 ### USM-03 — 'Update Positions' checkbox missing — its consumer defaults to off and can never be turned on
+
+**BUILT 2026-08-30, before this row was written down.** `ViewerAlertPrefsPane.svelte:104` renders `app-positions-update` behind `positionsIframe` (`O(119, sessData.positionsIframe && sessData.positionsIframeUrl ? 119 : -1)`, byte 2,285,255), and `prefs.svelte.ts:154` seeds it `!== false` to match the reference's `updatePositionsIframe:!0` at byte 980,052 — so the `=== true` coercion this row describes is gone as well. Marked 2026-08-30 03:20 UTC by reading the file.
 
 **high** · `missing-control` · reference byte **2,269,626**
 
