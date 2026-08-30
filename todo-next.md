@@ -132,6 +132,18 @@ guessed.
 
 **2 of 62 surfaces audited · 1,059 of 28,687 lines · 3.7%.**
 
+> **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
+> **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
+> behaviours confirmed present. **It does not re-score the table above, deliberately.** That list is
+> 62 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
+> entries are slices of `ModalHost.svelte` alone. Marking rows audited from a differently-shaped list
+> is how a coverage number stops meaning anything, so the counts here are untouched and this row
+> stays 2 of 62 until a surface is read whole against a file in this table.
+>
+> Its own headline number to keep is the **19% false-claim rate**: of 274 differences claimed by the
+> readers, 51 were refuted on verification — 32 already built here under another name, 19 resting on
+> reference code that is dead or unreachable.
+
 | 56 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 57 | `routes/logout/+page.svelte` | 31 | no |
 | 58 | `routes/+layout.svelte` | 27 | no |

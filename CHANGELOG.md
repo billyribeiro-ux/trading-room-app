@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 00:35 UTC — Eighteen room surfaces read against the pinned bundle; 223 gaps survived adversarial verification, 51 did not
+
+**Runtime impact: NO.** This is evidence, not code. `docs/decoded/room-surface-audit-2026-08-30.md`.
+
+#### What it is
+
+`todo-next.md`'s own header states the honest number for surface coverage: **2 of 62**. This reads
+eighteen more. One reader per surface read the reference component end to end at verified boundaries
+and listed every difference; each claimed difference then went to **two independent verifiers** —
+one asking *"is this already built here under another name?"*, one asking *"is the quoted evidence
+actually at that offset, and does it mean what the claim says?"*
+
+| | |
+| --- | ---: |
+| surfaces read | 18 |
+| differences claimed | 274 |
+| **survived** | **223** |
+| refuted | 51 |
+| reference behaviours confirmed PRESENT | 965 |
+
+#### The 19% false-claim rate is the number worth keeping
+
+Nearly one claimed gap in five was wrong: **32 already built here** under a name the reader had not
+searched for, **19 resting on reference code that does not do what the offset appeared to say** —
+dead handlers, unreachable branches. One refutation is worth quoting because it is the whole
+argument for the second pass: a reader claimed the room-wide media-outage alert was missing, citing
+`webRTCServerDisconnected`. That string occurs **once** in the 2,891,205-byte bundle, as a
+`subscribe`, and nothing anywhere emits it — it is dead code upstream. The event that actually fires
+is `mediaServerDisconnected`, and our alert is built on it.
+
+A single-pass list would have carried all 51 as work to do, with no way to tell which. They are kept
+in the register rather than deleted, so the next reader who re-derives one finds it already answered.
+
+#### Two entries spot-checked by hand before committing the register
+
+Not trusted wholesale — a document is only evidence if somebody read some of it.
+
+* **G01**, the Archives → "Recording" item: `RoomSidebar.svelte:437-439` is an anchor with no
+  handler and no href, inside the correct `{#if isPresenter || !session?.hideRecs}` gate, while its
+  three siblings in the same dropdown all carry `onclick`. Confirmed exactly as claimed.
+* **SC-02**, the A/V pane: `ModalHost.svelte:731-747` seeds `audioDevices` and `videoDevices` with
+  `Studio Display Microphone (05ac:1118)` and a 64-character device id — **somebody's actual
+  hardware, hardcoded**, shown to every viewer as their own device until Refresh is pressed. That is
+  the invented-value shape this repository refuses by name, and it is shipping.
+
+#### What the register is not
+
+Not a plan — nothing in it is scheduled or costed, and some entries will turn out to be divergences
+this repository already argued for in a comment the reader did not reach. Not complete — eighteen of
+sixty-two. Not a substitute for reading the bytes: every entry carries its offset into the SHA-256
+pinned v4 bundle so the next person re-reads rather than trusts.
+
+The verifiers' transcripts run to about a megabyte and are **not** carried into the repository; the
+register would stop being readable. Each entry carries the verdict sentence instead. That is a real
+loss and is recorded as one: the reasoning is reproducible from the offset, which is the point of
+quoting one, but it is not on disk.
+
+#### `todo-next.md` is NOT re-scored by this
+
+Its inventory is 62 FILES; these are 18 SURFACES, and the two partitions do not line up — four of
+them are slices of `ModalHost.svelte` alone. Marking rows audited from a differently-shaped list is
+how a coverage number stops meaning anything. A pointer was added and the counts left alone.
+
 ### 2026-08-30 00:20 UTC — The user card's Last Login cell had no producer at all, and Email had one that only worked from the roster
 
 **Runtime impact: YES.** A presenter opening a member's card now sees when that member last logged
