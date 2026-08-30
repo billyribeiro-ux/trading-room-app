@@ -38,9 +38,18 @@ sqlx = { version = "0.9.0", default-features = false, features = [
 rust_decimal = "1.42.1"
 ipnetwork = "0.21"
 
-argon2 = { version = "0.5.3", features = ["std"] }
-password-hash = { version = "0.5", features = ["std"] }
-rand = "0.9"
+# argon2 and password-hash move together and cannot be split: argon2 0.6.0's crates.io dependency
+# metadata (read 2026-08-30) declares `password-hash ^0.6`. Holding password-hash at 0.5 against
+# argon2 0.6 would put two incompatible copies of the `PasswordHasher` traits in the tree.
+#
+# The `std` feature both crates carried at 0.5 no longer exists at 0.6 — argon2 0.6.0 exposes
+# alloc/getrandom/kdf/parallel/password-hash/rand_core/zeroize and password-hash 0.6.1 exposes
+# alloc/getrandom/rand_core (crates.io feature metadata, read 2026-08-30). `rand_core` is the one
+# that matters here: `auth/password.rs` builds its salt with `SaltString::generate(&mut OsRng)`
+# taken from `password_hash::rand_core`, deliberately not from the top-level `rand` crate.
+argon2 = { version = "0.6.0", features = ["alloc"] }
+password-hash = { version = "0.6", features = ["alloc", "getrandom", "phc"] }
+rand = "0.10"
 subtle = "2.6"
 
 # Only for `StreamExt`/`SinkExt` on the split WebSocket. axum re-exports neither.

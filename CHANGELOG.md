@@ -224,6 +224,115 @@ that must never cross. Every one of the 21 is dispositioned. There is no phase o
 
 **Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,455 passed,
 1 skipped, gate-exit=0**.
+### 2026-08-30 19:04 EDT — Every dependency to registry-latest of THIS day, and the correction of a 2026-08-26 entry that claimed work which never shipped
+
+**Runtime impact: YES.** Dependency versions ship in both apps and both services. Two source lines
+changed, both forced by crate majors; nothing else about the code moved.
+
+**This entry exists because the 2026-08-26 12:01 EDT entry below is FALSE, and has been since the day
+it was written.** That entry records Rust 1.98.0, Node 24.20.0, Syft 1.51.0, `smoke.yml` off floating
+tags, provenance 74 → 68 and the whole crate bump, "verified green end to end". Only the JS half ever
+reached a commit — `d78b594`, which carried the two `package.json` files, `pnpm-lock.yaml` and
+`pnpm-workspace.yaml`. The Rust, toolchain and CI half was never committed anywhere:
+`git log --all -S'24.20.0'` and `-S'1.98.0'` both return nothing. It sat as uncommitted working-tree
+state for four days and was discarded on the owner's instruction on 2026-08-30. The entry below now
+says so; this entry is the work actually landing, re-resolved against today's registries rather than
+restored from that stale tree — which mattered, because five values had moved in those four days.
+
+Every version below was read from its registry TODAY — `pnpm outdated -r`, the crates.io API,
+nodejs.org's release index, GitHub releases, registry manifests via `buildx imagetools` — never from
+memory, and never copied from the discarded tree.
+
+**Node is the LATEST LTS, not the latest.** nodejs.org's index gives v26.8.1 as newest overall and
+**v24.20.0** (Krypton, released 2026-08-26) as the newest carrying an LTS codename. Both `.nvmrc` and
+`.node-version` read 24.20.0.
+
+**Rust 1.98.0** (`88d9e12ae`, stable of 2026-08-18) in `rust-toolchain.toml` and `rust-version`.
+**pnpm 11.24.0** was already correct and did not move.
+
+**Rust, and the two source lines the majors forced.** Workspace: thiserror 2.0.20, uuid 1.26.0,
+time 0.3.55, base64 0.23, sha2 0.10 → 0.11 — 0.11 because ed25519-dalek 3.0.0's own dependency
+metadata declares `sha2 ^0.11`, so the tree carries one digest generation rather than two. api:
+**argon2 0.5.3 → 0.6.0 together with password-hash 0.5 → 0.6**, which cannot be split because argon2
+0.6.0 declares `password-hash ^0.6`. That pair is the whole reason this could not be a copy of the
+discarded tree: on 2026-08-26 argon2 0.5.3 was the newest release and its `^0.5` requirement was
+recorded as the reason password-hash stayed back. argon2 0.6.0 exists now and the hold is obsolete.
+The `std` feature both crates carried at 0.5 does not exist at 0.6, so the feature list is now
+alloc/getrandom/phc, and `auth/password.rs` lost its `SaltString`/`OsRng` pair entirely —
+`PasswordHasher::hash_password` is one-argument at 0.6 and generates its own 16-byte salt through
+`getrandom`, the length the PHC specification recommends. rand 0.9 → 0.10 changed one import:
+`RngCore` is no longer re-exported at rand's root and survives only as the marker supertrait
+`trait RngCore: Rng {}`, so `fill_bytes` now arrives via `Rng`. media: mediasoup 0.24 → 0.27,
+tower-http 0.6 → 0.7, ed25519-dalek 2 → 3 (unified with the workspace), base64 0.23 — zero source
+changes.
+
+**Held, each with evidence read today, none by neglect:**
+
+- `tokio-tungstenite` stays 0.29: axum 0.8.9's dependency metadata declares `tokio-tungstenite
+  ^0.29.0`, and being axum's exact crate is that dev-dependency's stated purpose.
+- TypeScript stays 6.0.3 though 7.0.2 exists: `svelte-check@4.7.6` peers `^5.0.0 || ^6.0.0` and
+  `typescript-eslint@8.68.0` peers `>=4.8.4 <6.1.0`. 6.0.3 is the newest satisfying both.
+- `@fortawesome/fontawesome-free@5.8.1`, `font-awesome@4.3.0`, `animate.css@3.7.2` — capture pins.
+
+**JS, both apps:** the nine `@tiptap/*` packages 3.30.3 → 3.30.5, svelte 5.56.10 → 5.57.0, zod
+4.4.3 → 4.5.4, mediasoup-client 3.22.0 → 3.23.1, @threlte/core 8.5.16 → 8.6.0, @types/node
+26.3.0 → 26.4.0, and `@playwright/test` 1.62.1 installed where it had been declared but absent.
+
+**Five values had moved since 2026-08-26, which is why this was re-resolved rather than restored:**
+uuid 1.25.0 → 1.26.0, Syft 1.51.0 → 1.51.1, Grype 0.117.0 → 0.118.0, the `postgres:17` digest, and
+the `distroless/cc-debian13` digest. Restoring the discarded tree would have shipped all five stale.
+
+**The pin chain, moved with them:** `postgres:17` re-resolved by digest in both workflows; Buildx
+action v4.3.0 by commit SHA, Buildx v0.36.1, BuildKit v0.32.2 by digest; cargo-audit 0.22.2 and
+cargo-deny 0.20.2; Syft 1.51.1 and Grype 0.118.0 with their manifest and archive SHA-256s recomputed
+from the official checksum files, each confirmed to match exactly one archive entry; both Dockerfiles
+re-pinned by digest; and `smoke.yml` off floating `@v4` onto the SAME commit SHAs `quality.yml` and
+`backend-quality.yml` already use in nine places between them — it was the last workflow in the
+repository trusting a mutable tag.
+
+**The builder image's native link inputs were EXTRACTED, not assumed.** Changing the builder to
+`rust:1.98.0-alpine3.24` changes the toolchain that supplies them, so all seven were re-read out of
+the new image (`docker run --platform linux/amd64`, then `sha256sum`): rcrt1.o, crti.o, crtbeginS.o,
+libunwind.a, libc.a, crtendS.o, crtn.o are **byte-identical** to the pinned values, the sysroot is
+`1.98.0-x86_64-unknown-linux-musl`, `rustc` reports `release: 1.98.0`, and the packages are still
+musl-dev 1.2.6-r2 and libgcc-static 15.2.0-r5. Only the FROM, toolchain and sysroot lines moved.
+
+**`verify-backend-provenance` re-pinned per its own rule, 74 → 67.** Seven files that had been
+untouched imports left the aggregate for individual pins — both crate manifests, the workspace
+manifest, `rust-toolchain.toml`, the api Dockerfile, and the two source files above — each with its
+reason beside its hash. Nothing became unsealed; seven seals moved onto their own lines.
+
+**A documented count that was already stale is corrected here.** The four documented Vitest sites
+read 101 files / 1034 tests; the tree measures **103 / 1070**. That drift is NOT from this change —
+no test file was touched. Since `6913210`, the commit that last set 1034, exactly two controller test
+files were added (`package-scripts-contract.test.ts`, `room-credential-prompt.test.ts`), and one
+further case arrived on `main` during the rebase below. All four sites now read the measured figure.
+
+**Verified on this tree, today:** `cargo fmt --check` clean and `cargo clippy --workspace
+--all-targets --features testing -- -D warnings` clean on 1.98.0; **api library 155 tests pass**,
+including all seven password tests — the `$argon2id$` prefix, the OWASP parameter profile, and
+distinct salts across two hashes of one password, which is what proves argon2 0.6's self-generated
+salt is random; **media 125 tests pass** (114 library + 11 binary) against mediasoup 0.27;
+`cargo check --workspace --all-targets --features testing` clean. Controller: **1070 Vitest tests
+across 103 files, all passing**, plus schema, migrations, provenance, release-artifact, privacy,
+breakpoints, manage-styles, account, home, fonts, room-login, the fail-closed runtime HTTP contract
+and the documented-count gate; svelte-check **1551 files, 0 errors, 0 warnings**; lint and
+format:check clean. Room: svelte-check **1491 files, 0 errors, 0 warnings**; lint and format:check
+clean.
+
+**Pre-existing and left, each measured rather than assumed** — a worktree at the base commit with its
+ORIGINAL dependencies and the same evidence symlinks was used to attribute all three:
+
+- The room suite is **32 failed / 4979 passed across 302 files**. The baseline is **37 failed / 4941
+  passed**, so this change did not break it — it fixes five. The remainder predates this work; no
+  `apps/room/src` file is touched here.
+- `evidence:verify` fails locally on `evidence-dumps/account-page`, a gitignored directory present on
+  this machine since 2026-08-12 and absent from the verifier's expected set. A clean checkout of the
+  base commit passes, and CI has no such directory.
+- `runtime:http` and one `naming-boundary` case time out under load and pass on a quiet machine;
+  both are 5-second budgets, not assertion failures.
+
+**Not run:** the full Docker release-artifact build (CI's release gate) and Playwright e2e.
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
@@ -12919,6 +13028,27 @@ That needs two browsers in a live room and is the owner's.
 
 
 ### 2026-08-26 12:01 EDT — Every dependency to registry-latest of this day, and every pin that holds one moved with it
+
+> **CORRECTION, 2026-08-30 19:04 EDT — ONLY THE JS HALF OF THIS ENTRY EVER SHIPPED.**
+>
+> Everything below about **Rust, the toolchain, and CI** — Rust 1.98.0, Node 24.20.0, Syft 1.51.0 /
+> Grype 0.117.0, Buildx v0.36.1 / BuildKit v0.32.2, cargo-audit 0.22.2 / cargo-deny 0.20.2, the
+> `smoke.yml` SHA pins, the crate bumps, the rand 0.10 import, and provenance 74 → 68 — **was never
+> committed.** `git log --all -S'24.20.0'` and `-S'1.98.0'` both return nothing: those values have
+> never existed in any commit on any branch. The work sat as uncommitted working-tree state and was
+> discarded on 2026-08-30 at the owner's instruction.
+>
+> What DID ship on this date is the JS half, in `d78b594` — both `package.json` files,
+> `pnpm-lock.yaml` and `pnpm-workspace.yaml`, carrying pnpm 11.24.0, the JS dependency bumps and the
+> esbuild override. The "Verified" paragraph below describes a tree that was never committed, so
+> treat every Rust/toolchain/CI claim in this entry as a record of intent, not of the repository.
+>
+> The two `pnpm test` fixes it describes — the `privacy:verify` JWT fixture and the documented-count
+> gate — were separately and differently fixed on `main` on 2026-08-28.
+>
+> This entry is left standing rather than rewritten, because a corrected record of what was claimed
+> is more useful than a tidy one. **The work itself landed on 2026-08-30**, re-resolved against that
+> day's registries: see the entry of 2026-08-30 19:04 EDT at the top of this file.
 
 **Runtime impact: YES.** Dependency versions ship in both apps and both services; nothing else about
 the code changed except one import line that rand 0.10 forced.

@@ -22,13 +22,13 @@
 # multi-platform manifest fixes Rust, Alpine, musl, GCC, and Cargo's build
 # environment; the release-evidence job records the resolved x86-64 image and
 # exact installed toolchain/package identities.
-FROM rust:1.97.1-alpine3.24@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900 AS builder
+FROM rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS builder
 
 # The repository toolchain file also requests developer-only rustfmt, Clippy,
 # and rust-analyzer components. The official image already contains the exact
 # compiler/Cargo/std toolchain needed by this release build; selecting it
 # explicitly prevents a container build from downloading unused components.
-ENV RUSTUP_TOOLCHAIN=1.97.1
+ENV RUSTUP_TOOLCHAIN=1.98.0
 ARG TARGETARCH
 
 WORKDIR /build
@@ -189,7 +189,7 @@ COPY --from=builder /release-link-evidence/ /
 # controlled execution before scanning the effective image and each binary.
 # SQLx uses the lockfile-pinned rustls/webpki root store, so no builder-owned CA
 # file is copied into this stage.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6 AS runtime
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7 AS runtime
 
 # Distroless's nonroot identity is uid/gid 65532. Keep it numeric so the
 # runtime contract does not depend on passwd/group name resolution.

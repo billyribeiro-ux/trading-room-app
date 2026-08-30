@@ -262,10 +262,10 @@ jobs:
     # `playwright.config.ts`: see the note there and `TODO.md` row 7.
     services:
       postgres:
-        # The SAME pinned digest `backend-quality.yml` resolved on 2026-08-02, reused rather than
+        # The SAME pinned digest `backend-quality.yml` resolved on 2026-08-30, reused rather than
         # re-resolved: two jobs drifting onto different PostgreSQL builds is a difference nobody
         # would attribute correctly.
-        image: postgres:17@sha256:a426e44bac0b759c95894d68e1a0ac03ecc20b619f498a91aae373bf06d8508d
+        image: postgres:17@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675
         env:
           POSTGRES_USER: proroom_e2e
           # Ephemeral, and deliberately in plain sight. This cluster lives for the length of one job,

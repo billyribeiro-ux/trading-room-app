@@ -17,7 +17,7 @@
 # with an error about the environment rather than about mediasoup. A venv sidesteps it properly;
 # `PYTHON` is the variable `build.rs` reads to find the interpreter.
 
-FROM rust:1-bookworm@sha256:77fac8b98f9f46062bb680b6d25d5bcaabfc400143952ebc572e924bcbedc3fa AS builder
+FROM rust:1-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922 AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential \
@@ -76,7 +76,7 @@ RUN printf '%s\n' 'use std::{io::{Read,Write},net::{SocketAddr,TcpStream},proces
     && rustc -O -o /usr/local/bin/media-healthcheck /tmp/media-healthcheck.rs
 
 
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:d97bc0a941b8d4be647dc0ee75b264ddbb772f1ac5ba690a4309c00723b23775 AS runtime
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:c31ff9abcb1910f3ab25c7957bdaf0bfe12a01eb546e8df2282f1c8f682b606c AS runtime
 
 # Distroless has no shell or package manager and its named nonroot identity is uid 65532.
 USER 65532:65532
