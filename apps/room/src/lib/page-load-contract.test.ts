@@ -96,8 +96,27 @@ let locals: App.Locals;
 beforeAll(() => {
   ensureDatabase();
 
-  // A real row: `load` joins settings and reads `user.id`, so a stub object would exercise a
-  // different path than production does.
+  /*
+    A real row: `load` joins settings and reads `user.id`, so a stub object would exercise a
+    different path than production does.
+
+    ## `onConflictDoUpdate` and not a bare INSERT, and this was a MEASURED flake
+
+    On 2026-08-30 one full-suite run failed here with `SqliteError: UNIQUE constraint failed:
+    users.email`, and the same tree passed on the next run. `vitest.setup.ts` keys the database file
+    by PROCESS ID with `isolate: false`, so several test files share one worker, one already-imported
+    db module and one file — and this `beforeAll` was the only fixture in the suite that inserted a
+    fixed address with no idempotence at all. Every other one goes through a `select`-then-`insert`
+    helper.
+
+    A conditional insert would still be a TOCTOU; one atomic upsert is the shape this repository
+    applies everywhere else, and it makes a second evaluation in the same worker a no-op instead of a
+    crash that skips the whole file. The `.returning().get()` answer is the row either way, which is
+    what the rest of this fixture needs.
+
+    Recorded rather than re-run away: "flake" is not a root cause, and the root cause here is a
+    fixture that assumed a database nobody had guaranteed was empty.
+  */
   const user = db
     .insert(users)
     .values({
@@ -106,6 +125,10 @@ beforeAll(() => {
       role: 'staff',
       passwordHash: 'scrypt$00$00',
       createdAt: new Date()
+    })
+    .onConflictDoUpdate({
+      target: users.email,
+      set: { displayName: 'Contract Probe', role: 'staff' }
     })
     .returning()
     .get();

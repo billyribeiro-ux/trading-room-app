@@ -1883,6 +1883,8 @@ showTokenReport(e){bootbox.alert({title:"Token",message:e})}
 
 ### SRCH-01 — Advanced-search results render as bare <p>{body}</p> instead of the full message row, so trade highlighting and click-to-copy are lost inside this modal
 
+**BUILT 2026-08-30 04:05 UTC.** The results render `RoomMessage` with `kind="alert"` and the room's message chrome, as the reference renders `app-st-message` (byte 2,421,116) — sender, timestamp, day separator computed from the previous row (`prevD`), alert-label badges, trade highlighting and click-to-copy. `searchAlertLog` already selected every field, so nothing is fetched again. **One recorded divergence:** `showMenu={false}`. Upstream's row carries its full kebab; this room has no route from the modal to the message-action command (`ModalHost` is handed `onQaAction` and nothing else), so a full menu would be twelve entries that cannot act. `copyTradeOnClick` — the one binding the reference adds on top of the component, and the behaviour this row says was lost — IS wired, and the handler refuses every other action so a later change fails closed. `search-results-render-contract.test.ts`.
+
 **medium** · `divergence` · reference byte **2,421,116**
 
 ```

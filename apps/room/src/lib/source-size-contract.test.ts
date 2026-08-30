@@ -2056,7 +2056,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       person will look for it. That is the trade this ratchet's header describes: an extraction
       invented to satisfy a number would move the paragraph away from the code it explains.
     */
-    max: 6129,
+    /*
+      6129 -> 6218, 2026-08-30. The advanced search's results became MESSAGES.
+
+      They were `<p>{result.body}</p>` — escaped plain text with no sender, no timestamp, no day
+      separator and, the part `SRCH-01` names, no trade highlighting and no click-to-copy, so an
+      order found by searching could not be copied from the place it was found. They render
+      `RoomMessage` now, as the reference does (`app-st-message`, byte 2,421,116).
+
+      Two of the additions are the reason rather than the markup: why `showMenu={false}` is a
+      recorded DIVERGENCE (this modal has no route to the message-action command, so a full kebab
+      would be twelve entries that cannot act), and why the action handler refuses everything but
+      `copy-trade` even though nothing can currently emit anything else — it fails closed against a
+      later change that draws more controls.
+    */
+    max: 6218,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3953,7 +3967,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       The extraction, if this climbs again, is still `bodySegments` and its four parse functions.
     */
-    max: 1061,
+    /*
+      1061 -> 1078, 2026-08-30. `showMenu`, and the paragraph saying what `false` costs.
+
+      One caller passes it and forty do not, so it defaults TRUE and the contract asserts the
+      default before it asserts the suppression — a prop that defaulted the other way would strip
+      the kebab from the whole room silently.
+    */
+    max: 1078,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

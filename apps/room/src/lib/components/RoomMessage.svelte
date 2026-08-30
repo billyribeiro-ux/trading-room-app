@@ -67,6 +67,18 @@
      * `followedStyle`, which is the viewer's explicit decision about one particular person.
      */
     presenterStyle?: PresenterColors;
+    /**
+     * Whether the kebab menu is drawn at all. Default TRUE — every log draws it.
+     *
+     * FALSE has exactly one caller: the advanced-alert-search modal, and it is a recorded divergence
+     * rather than a preference. The reference renders `app-st-message` there with its full menu
+     * (byte 2,421,116) and binds ONE handler of its own, `copyTradeOnClick`. This room has no route
+     * from that modal to the message-action command — `ModalHost` is handed `onQaAction` and nothing
+     * else — so drawing the menu here would draw twelve entries that cannot act, which is the
+     * dead-control defect this repository spends most of its time removing. Drawing the row without
+     * a kebab is the honest half of the reference's behaviour; the other half is named in the audit.
+     */
+    showMenu?: boolean;
     chatStyle?: FollowChatStyle;
     allowDeleteOwnMessage?: boolean;
     usersPublicReply?: boolean;
@@ -137,6 +149,7 @@
     alertLabels = [],
     followedStyle,
     presenterStyle,
+    showMenu = true,
     chatStyle,
     allowDeleteOwnMessage = false,
     usersPublicReply = false,
@@ -656,25 +669,27 @@
             { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }
           ]}
         >
+          {#if showMenu}
           <MessageMenu
-            allows={menuAllows}
-            variant={reverseMessage ? 'compactAdmin' : 'compactMember'}
-            {menuOpen}
-            style={usernameStyle}
-            reactionPopoverId={reactionPickerOpen && reactionPickerTrigger === 'menu'
-              ? `message-reaction-popover-${kind}-${item.id}`
-              : undefined}
-            onaction={(action, event) => runAction(action, event)}
-            ontoggle={() => {
-              reactionPickerOpen = false;
-              reactionPickerTrigger = null;
-              ontoggle(item.id);
-            }}
-            onreactiontoggle={() => {
-              reactionPickerOpen = !reactionPickerOpen;
-              reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
-            }}
-          />
+              allows={menuAllows}
+              variant={reverseMessage ? 'compactAdmin' : 'compactMember'}
+              {menuOpen}
+              style={usernameStyle}
+              reactionPopoverId={reactionPickerOpen && reactionPickerTrigger === 'menu'
+                ? `message-reaction-popover-${kind}-${item.id}`
+                : undefined}
+              onaction={(action, event) => runAction(action, event)}
+              ontoggle={() => {
+                reactionPickerOpen = false;
+                reactionPickerTrigger = null;
+                ontoggle(item.id);
+              }}
+              onreactiontoggle={() => {
+                reactionPickerOpen = !reactionPickerOpen;
+                reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
+              }}
+            />
+          {/if}
           {#if !hideAvatar}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -801,6 +816,7 @@
       <div {...{ clas: 'd-flex flex-column  align-items-center w-100 ' } as Record<string, string>}>
         <div class={messageRowClass}>
           <div class={avatarRowClass}>
+            {#if showMenu}
             <MessageMenu
               allows={menuAllows}
               variant="regular"
@@ -820,6 +836,7 @@
                 reactionPickerTrigger = reactionPickerOpen ? 'menu' : null;
               }}
             />
+            {/if}
             {#if !hideAvatar}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <!-- svelte-ignore a11y_no_static_element_interactions -->

@@ -32,11 +32,14 @@
     MessageReactions,
     ModalName,
     ModalTargetUser,
+    RoomMessageItem,
     SavedPoll,
     SettingsTab,
     Theme,
     TradeCopyPayload
   } from '#lib/types.js';
+  import RoomMessage from '#lib/components/RoomMessage.svelte';
+  import { sameCalendarDay } from '#lib/message-formatters.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import {
     PRESENTER_COLOR_DEFAULTS,
@@ -584,6 +587,52 @@
    */
   let advancedSearch = $state(emptySearch());
   let advancedSearchResults = $state.raw<SearchableAlert[]>([]);
+
+  /**
+   * One search hit, in the shape `RoomMessage` renders.
+   *
+   * `searchAlertLog` already selects every field this needs — it joins `users` for the name, avatar,
+   * role and status and hashes the address — so nothing is invented here and nothing is fetched
+   * again. The cast is a WIDENING at the type level only: `SearchableAlert` is deliberately the
+   * narrow shape the pure filter needs (`alerts-advanced-search.ts` says so), and the rows this
+   * modal actually holds are the wide ones the remote query returned.
+   *
+   * `reactions` are passed through because the row carries them and the log renders them; nothing
+   * here can toggle one, which is what `showMenu={false}` and the refusing action handler below
+   * make true rather than merely unlikely.
+   */
+  const searchResultItem = (result: SearchableAlert): RoomMessageItem => {
+    const row = result as SearchableAlert & Partial<RoomMessageItem>;
+    return {
+      ...row,
+      id: row.id,
+      senderId: row.senderId ?? 0,
+      senderName: row.senderName ?? '',
+      senderEmailHash: row.senderEmailHash,
+      senderAvatarUrl: row.senderAvatarUrl ?? '',
+      body: row.body,
+      createdAt: new Date(result.createdAt)
+    };
+  };
+
+  /**
+   * The ONE thing a search result can do — `copyTradeOnClick`, the reference's own extra binding.
+   *
+   * Everything else is refused rather than forwarded, and the refusal is silent because nothing can
+   * reach it: the kebab is not drawn (`showMenu={false}`), so `copy-trade` is the only action the
+   * row emits. The `if` is here so that a later change which draws more controls fails closed
+   * instead of quietly routing a delete through this modal.
+   */
+  function runSearchResultAction(
+    action: MessageAction,
+    _item: RoomMessageItem,
+    payload?: unknown
+  ): void {
+    if (action !== 'copy-trade') return;
+    const text = (payload as { text?: string } | undefined)?.text ?? '';
+    if (!text || typeof navigator === 'undefined') return;
+    void navigator.clipboard.writeText(text);
+  }
   let advancedSearchLoading = $state(false);
   /* The search reached `ALERT_SEARCH_LIMIT`, so the list is the newest matches and not all of them.
      Rendered, because a cap the reader cannot see is the defect this change removed. */
@@ -5541,9 +5590,49 @@
               ones.
             </p>
           {/if}
+          <!--
+            ── THE RESULTS ARE MESSAGES, and until 2026-08-30 they were escaped plain text ──────────
+
+            This was `<p>{result.body}</p>`: no sender, no timestamp, no day separator, no session
+            name, no alert-label badge, and — the part `SRCH-01` names — no trade highlighting and no
+            click-to-copy, so an order found by searching could not be copied from the place it was
+            found.
+
+            The reference renders the same component the alerts log does, `app-st-message`, byte
+            2,421,116:
+
+              d(0, "app-st-message", 46), x("click", o => copyTradeOnClick(o, "id_" + s._id)),
+              z("msg", e)("logType", "alerts")("prevD", i > 0 ? msgs[i-1].t : 0)
+               ("sessName", e?.sessName || null)
+
+            `prevD` is the previous row's timestamp, which is what draws the day separator — so the
+            separator is computed here exactly as `AlertChatArea` computes it, from the row before.
+
+            ## `showMenu={false}` is a DIVERGENCE and is recorded as one
+
+            Upstream's row carries its full kebab. This room has no route from this modal to the
+            message-action command — `ModalHost` is handed `onQaAction` and nothing else — so drawing
+            twelve entries that cannot act would be the dead-control defect this repository exists to
+            remove. The one binding the reference adds ON TOP of the component, `copyTradeOnClick`,
+            IS wired: it is the only action a search result can take here, and it is the one the
+            audit says was lost.
+          -->
           <div class="log-messages">
-            {#each advancedSearchResults as result (result.id)}
-              <p>{result.body}</p>
+            {#each advancedSearchResults as result, index (result.id)}
+              <RoomMessage
+                item={searchResultItem(result)}
+                kind="alert"
+                {...messageChrome}
+                showMenu={false}
+                menuOpen={false}
+                showDateSeparator={index === 0 ||
+                  !sameCalendarDay(
+                    new Date(result.createdAt),
+                    new Date(advancedSearchResults[index - 1].createdAt)
+                  )}
+                ontoggle={() => {}}
+                onaction={runSearchResultAction}
+              />
             {/each}
           </div>
         {:else}

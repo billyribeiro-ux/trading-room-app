@@ -33,6 +33,74 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 04:05 UTC — Alert search results were escaped plain text, and a fixture that assumed an empty database
+
+**Runtime impact: YES.** The advanced alert search draws real message rows — sender, timestamp, day
+separator, alert-label badges, trade highlighting and click-to-copy — where it used to draw
+`<p>{body}</p>`.
+
+#### `SRCH-01`
+
+```svelte
+<div class="log-messages">
+  {#each advancedSearchResults as result (result.id)}
+    <p>{result.body}</p>
+  {/each}
+</div>
+```
+
+No sender, no timestamp, no day separator, no session name, no label badge — and no trade
+highlighting, so an order found by searching could not be copied from the place it was found, while
+the identical order in the alerts log could.
+
+The reference renders the same component the log does (`app-st-message`, byte 2,421,116) and binds
+one handler of its own on top of it, `copyTradeOnClick`. `prevD` is the previous row's timestamp,
+which is what draws the day separator — computed here from `advancedSearchResults[index - 1]`.
+
+Nothing is fetched again: `searchAlertLog` already joins `users` and selects the name, avatar, role,
+status, colours, question counts and reactions. The rows were always wide enough; only the renderer
+was narrow.
+
+#### `showMenu={false}` is a divergence and says so
+
+Upstream's row carries its full kebab. This room has no route from that modal to the message-action
+command — `ModalHost` is handed `onQaAction` and nothing else — so drawing twelve entries that cannot
+act would be the dead-control defect this repository spends its time removing.
+
+`RoomMessage` gains `showMenu`, defaulting **true**: one caller passes `false` and forty do not, so
+the contract asserts the default before it asserts the suppression. The action handler refuses
+everything but `copy-trade` even though nothing can currently emit anything else, which is the point
+— it fails closed against a later change that draws more controls.
+
+#### A FLAKE, root-caused rather than re-run away
+
+One full-suite run failed with `SqliteError: UNIQUE constraint failed: users.email` in
+`page-load-contract.test.ts`, and the same tree passed on the next run. `vitest.setup.ts` keys the
+database file by process id with `isolate: false`, so several test files share one worker, one
+already-imported db module and one file — and that `beforeAll` was the only fixture in the suite
+inserting a fixed address with no idempotence at all. Every other one goes through a
+`select`-then-`insert` helper.
+
+It is one atomic `onConflictDoUpdate` now, which is the shape this repository applies everywhere
+else and makes a second evaluation in the same worker a no-op instead of a crash that skips the whole
+file. "Flake" is not a root cause; the root cause was a fixture assuming a database nobody had
+guaranteed was empty.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,607 tests passing (1 skipped), build done. The `showMenu` half is
+EXECUTED: `RoomMessage` is rendered with and without it and the kebab markup is asserted absent, and
+the trade marker is asserted in both directions — split when the room's `copyTrades` is on, left as
+literal punctuation when it is not, because only the pair distinguishes "wired" from "always on".
+
+**Five negative controls, each run and each seen RED**, on the committed tree and reverted after:
+`showMenu` defaulting FALSE (the case where the whole room silently loses its kebab); `{#if showMenu}`
+replaced by `{#if true}`; the search modal no longer passing it; the action handler no longer refusing
+everything but `copy-trade`; and the day separator reading its own row instead of the previous one.
+
+**Not verified:** nothing was opened in a browser. The refusing action handler is read from source
+rather than run, because it is a component-local function; what makes that adequate is that the
+kebab it guards is asserted absent by a rendered test.
+
 ### 2026-08-30 03:52 UTC — The anti-leak watermark was missing from the surface it is named for
 
 **Runtime impact: YES.** In a room with `overlayUserIdOnScreenshare` on, a member now sees their own
