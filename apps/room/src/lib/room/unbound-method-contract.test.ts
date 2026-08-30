@@ -27,6 +27,7 @@ import { RoomWebcams } from './webcams';
 import { RoomWindowHandlers } from './window-handlers';
 import { RoomScreens } from './screens.svelte';
 import { RoomChatMute } from './chat-mute';
+import { CaptionStaleness } from './caption-staleness';
 import { RoomChatSearch } from './chat-search.svelte';
 import { RoomKicks } from './kicks';
 import { RoomPeerHistory } from './peer-history.svelte';
@@ -125,6 +126,13 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
     uncovered by a move that changed no behaviour at all. That is exactly the blind spot this map
     exists for, and exactly how it was found.
   */
+  /*
+    Added 2026-08-30 with `PA-01`, and the completeness check asked for it rather than anybody
+    remembering — the third time in three days. Its `stop` is the one to watch: the overlay's X
+    calls `captionStaleness.stop()`, and a `onclose={captionStaleness.stop}` would lose `this` and
+    leave a timer running with nothing to clear.
+  */
+  captionStaleness: CaptionStaleness,
   peerHistory: RoomPeerHistory,
   profilePicture: RoomProfilePicture,
   userDetail: RoomUserDetail,

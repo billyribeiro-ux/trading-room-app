@@ -112,6 +112,15 @@
     // ── the speech-reco overlay ────────────────────────────────────────────────
     /** This viewer's `showSpeechRecoOverlay` preference. BINDABLE: the overlay's X clears it. */
     subtitles: boolean;
+    /**
+     * `PA-02` — the overlay's X, which is five statements and not one field write.
+     *
+     * A callback rather than a `$bindable`, because dismissing it PERSISTS a preference, clears the
+     * caption, stops the staleness checker and resets history mode — four writes to state this
+     * component does not own. It used to assign `subtitles = false` through a binding, which landed
+     * on a bare field write with no `save()`, so the dismissal was forgotten on reload.
+     */
+    onhidespeechreco: () => void;
     currentCaption: Caption | null;
     captionHistory: Caption[];
     /** BINDABLE: the overlay's own history toggle writes it. */
@@ -294,7 +303,8 @@
     viewerOnlyMode,
     doNotDisturbOn,
     mainTab = $bindable('screens'),
-    subtitles = $bindable(true),
+    subtitles,
+    onhidespeechreco,
     currentCaption,
     captionHistory,
     speechRecoHistoryMode = $bindable(false),
@@ -425,6 +435,33 @@
     static `app-presenter-cams` the template appears to hold, and why the ids carry the presenter
     suffix — went WITH the markup they explain.
   -->
+  <!--
+    `PA-05` and `PA-06` — WHERE the strip goes, and whether it goes at all.
+
+    ```js
+    function q4e(t,n){ … d(0,"as-split-area",208), T(1,"app-webcam-holder"),
+      H(2,$4e,7,1,"div",213)(3,z4e,1,0,"app-positions-container"),
+      T(4,"app-presentationarea",214), H(5,W4e,3,2,"button",215), u()) }     // byte 2,492,999
+
+    function Z4e(t,n){ … d(0,"as-split-area",225), H(1,Y4e,7,1,"div",213)(2,Q4e,…),
+      T(3,"app-presentationarea",214), H(4,J4e,3,2,"button",215), u()) }     // byte 2,495,149
+    ```
+
+    Two hosts. The DESKTOP one puts the strip first, above the moderator bar and the positions
+    iframe; the PHONE one has four children and no strip at all. This file emitted it third, in both.
+
+    `PA-05` is the one with a cost: a phone's presentation column is short and the reference
+    deliberately keeps its whole height for the presentation. `previewWindowsVisible` is a
+    presenter-facing hide-all switch and never a viewport gate, so nothing here was standing in for
+    the missing one.
+  -->
+  {#if !split.isMobileScreen}
+    <WebcamStrip
+      visible={previewWindowsVisible}
+      presenters={mediaTransport.webcamPresenters}
+      {webcams}
+    />
+  {/if}
   <!-- `$4e`, rendered inside this same split area before `app-presentationarea` (byte 2,493,284). -->
   <ModeratorMessage message={modMessage} {isPresenter} />
   <!--
@@ -441,33 +478,8 @@
       bind:this={positionsPanel}
     />
   {/if}
-  <WebcamStrip
-    visible={previewWindowsVisible}
-    presenters={mediaTransport.webcamPresenters}
-    {webcams}
-  />
   <app-presentationarea>
     <div class="mainPresentationAreaHolder">
-      <!--
-                  `.speech-reco-overlay` is `position: absolute` pinned to the bottom of its
-                  containing block, so it belongs inside `.mainPresentationAreaHolder` - the
-                  presentation area is what it captions.
-
-                  Two gates, and both must be open: `subtitles` is this viewer's
-                  `presentation-subtitles` / `showSpeechRecoOverlay` preference, and a caption only
-                  exists at all while session-level `doSpeechReco` is running recognition.
-                -->
-      {#if subtitles}
-        <SpeechRecoOverlay
-          current={currentCaption}
-          history={captionHistory}
-          historyMode={speechRecoHistoryMode}
-          {archivesAvailable}
-          onclose={() => (subtitles = false)}
-          ontogglehistory={() => (speechRecoHistoryMode = !speechRecoHistoryMode)}
-          ontranscript={openTranscriptPage}
-        />
-      {/if}
       <!--
         `ul#mainTabs` is `MainTabStrip.svelte` since 2026-08-28 — 282 lines, the debt this file's
         own ceiling note recorded when it was raised for the `hideNotes` gate.
@@ -756,7 +768,42 @@
           aria-labelledby="notes-tab"
           hidden={hideNotes}
         >
-          {#if noteGates.surfaceVisible}
+          <!--
+            `PA-04` — THE EMPTY STATE, which is a SLOT of its own upstream and not a branch inside
+            the pane.
+
+            ```js
+            function LSe(t,n){ if(1&t){ const e=Y();
+              d(0,"div")(1,"h3"), v(2,"No Notes to display..."), u(),
+              d(3,"button",119), x("click", () => g().newNote()),
+              v(4," New Note "), u()() } }                                    // byte 1,927,385
+
+            d(43,"div",24), H(44,LSe,5,0,"div")(45,zSe,6,0), u()              // byte 2,015,227
+            O(44, o.appService.globals.sessionNotes ? 45 : 44)                // byte 2,017,521
+            ```
+
+            119 is `[1,"btn","btn-small","btn-primary",3,"click"]`. `btn-small` is Bootstrap 3's
+            spelling and does nothing under the Bootstrap this room ships — it is the capture's and
+            is reproduced rather than corrected to `btn-sm`, because a class list is evidence.
+
+            The room previously rendered the pane and nothing else, so a room with no notes showed an
+            empty `<ul>` and an empty `<div>`: no heading, and no way to make the first note without
+            finding the strip's cog. `sessionNotes` upstream is unset until `getSessionNotes` returns
+            data; here the list arrives with the page, so the equivalent condition is that it is
+            empty.
+          -->
+          {#if noteGates.surfaceVisible && data.notes.length === 0}
+            <div>
+              <h3>No Notes to display...</h3>
+              <button
+                type="button"
+                class="btn btn-small btn-primary"
+                onclick={() => notes.requestNewNote()}
+              >
+                New Note
+              </button>
+            </div>
+          {:else if noteGates.surfaceVisible}
             <NotesPane
               canEdit={noteGates.editorMounted}
               simplifiedEditor={noteGates.simplifiedEditor}
@@ -798,6 +845,45 @@
             />
           {/if}
         </div>
+        <!--
+          `PA-08` — the VIDEOPLAYER PANE COMES FIRST of the three, and it did not.
+
+          ```js
+          O(47, o.hideVideoPlayer && !o.isP || o.isP ? 47 : -1),
+          m(), O(48, o.hasSwingTradeAlerts ? 48 : -1),
+          m(), O(49, o.hasDayTradeAlerts ? 49 : -1)                          // byte 2,017,654
+          ```
+
+          Slot order in `#mainTabsContent` is screens, streams, notes, recordings, VIDEOPLAYER,
+          swing, day-trade, files. This file had the videoplayer after both alert panes, so the
+          content order disagreed with `MainTabStrip`'s — which does keep the reference's order — and
+          the two were ordered differently from each other.
+
+          Only one pane carries `show active` at a time, so nothing was visibly misplaced. What it
+          costs is tab and reading order for anyone using the keyboard, and it is what makes a
+          slot-by-slot diff against the reference stop lining up.
+        -->
+        <!-- Slot 47 carries the same gate as the tab above. -->
+        {#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}
+          <div
+            id="videoplayer"
+            class={mainTab === 'videoplayer'
+              ? 'tab-pane position-relative h-100 active show'
+              : 'tab-pane position-relative h-100'}
+            role="tabpanel"
+            aria-labelledby="videoplayer-tab"
+          >
+            <VideoPlayer
+              sessionId={data.sessionHandle}
+              {isPresenter}
+              videoPlayerUrl={broadcasts.videoPlayerUrl}
+              scheduledVideo={broadcasts.scheduledVideoForAll}
+              onplaynow={(url) => void broadcasts.playVideoForAll(url)}
+              onschedule={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
+              onstopforall={() => void broadcasts.stopVideoForAll()}
+            />
+          </div>
+        {/if}
         <!--
                     The `#swingAlerts` pane — `vwe`, slot 48, carrying the SAME gate as the nav
                     item above (`O(48, o.hasSwingTradeAlerts ? 48 : -1)`). Both, because either one
@@ -884,27 +970,6 @@
             />
           </div>
         {/if}
-        <!-- Slot 47 carries the same gate as the tab above. -->
-        {#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}
-          <div
-            id="videoplayer"
-            class={mainTab === 'videoplayer'
-              ? 'tab-pane position-relative h-100 active show'
-              : 'tab-pane position-relative h-100'}
-            role="tabpanel"
-            aria-labelledby="videoplayer-tab"
-          >
-            <VideoPlayer
-              sessionId={data.sessionHandle}
-              {isPresenter}
-              videoPlayerUrl={broadcasts.videoPlayerUrl}
-              scheduledVideo={broadcasts.scheduledVideoForAll}
-              onplaynow={(url) => void broadcasts.playVideoForAll(url)}
-              onschedule={(url, whenLocal) => broadcasts.scheduleVideoForAll(url, whenLocal)}
-              onstopforall={() => void broadcasts.stopVideoForAll()}
-            />
-          </div>
-        {/if}
         <!--
                     The second half of the `hideFiles` gate - `z('hidden', o.hideFiles)` at
                     full.js:5410-5413. `#files.active` sets `display: block`, which the UA rule for
@@ -970,6 +1035,41 @@
         id="mp3player"
         src={broadcasts.mp3Url ?? ''}
       ></audio>
+      <!--
+                  `.speech-reco-overlay` is `position: absolute` pinned to the bottom of its
+                  containing block, so it belongs inside `.mainPresentationAreaHolder` - the
+                  presentation area is what it captions.
+
+                  Two gates, and both must be open: `subtitles` is this viewer's
+                  `presentation-subtitles` / `showSpeechRecoOverlay` preference, and a caption only
+                  exists at all while session-level `doSpeechReco` is running recognition.
+
+                  `PA-07` — and it goes LAST, which the paragraph above argued correctly and did not
+                  say. The reference's create block ends
+
+                  ```js
+                  H(86,n2e,1,2,"app-ytplayer",49)(87,i2e,1,1,"app-scplayer",50),
+                  T(88,"audio",51), H(89,u2e,9,7,"div",52), u())              // byte 2,016,249
+                  ```
+
+                  and that `u()` closes the holder, so the overlay is its final child — after the two
+                  players and the `<audio>`. It was FIRST here, which paint order does not care about
+                  (`z-index: 9999`) and the keyboard does: the overlay's three `z-index: 10000`
+                  buttons — transcript, history, close — came before the whole tab strip in tab
+                  order, so a viewer tabbing into the presentation column met the caption controls
+                  before anything they were there to use.
+                -->
+      {#if subtitles}
+        <SpeechRecoOverlay
+          current={currentCaption}
+          history={captionHistory}
+          historyMode={speechRecoHistoryMode}
+          {archivesAvailable}
+          onclose={onhidespeechreco}
+          ontogglehistory={() => (speechRecoHistoryMode = !speechRecoHistoryMode)}
+          ontranscript={openTranscriptPage}
+        />
+      {/if}
     </div>
   </app-presentationarea>
   <!--

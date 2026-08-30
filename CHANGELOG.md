@@ -33,6 +33,109 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 19:07 UTC — The presentation column: a caption that never went away, a dismissal that was forgotten, and four things in the wrong order
+
+**Runtime impact: YES.** A caption clears seven seconds after the room falls silent instead of
+staying pinned over the presentation area for the rest of the session. Dismissing the caption overlay
+is remembered across a reload. A viewer sees "Connecting to …" while a screenshare consumer is being
+built and "… started screen sharing" when it lands. A room with no notes shows a heading and a New
+Note button instead of two empty boxes. A phone no longer spends part of its short presentation
+column on the webcam strip. And four things move into the reference's order.
+
+Eight rows off `docs/decoded/room-surface-audit-2026-08-30.md` — `PA-01` through `PA-08` — which
+closes the `PresentationArea` surface. **51 open · 173 closed · 224 rows.**
+
+#### `PA-01` — the port's own TYPE was half the defect
+
+`setCurrentCaption: (caption: Caption) => void` **cannot express "the room went quiet"**, so nothing
+in this application could ever clear a caption. The last line anybody spoke stayed over the
+presentation area indefinitely: the room falls silent, the presenter moves on, and a sentence from
+twenty minutes ago is still captioning whatever is on screen now.
+
+`caption-staleness.ts` is `startSpeechChecker` transcribed. Two details are worth the lines. The
+interval EQUALS the window — 7,000 ms both — so a caption survives between 7 and 14 seconds of
+silence; that is upstream's shape and improving on it is not this row's decision. And it stops itself
+from inside the stale branch, so a silent room holds no timer at all rather than one waking up every
+seven seconds for the life of the page.
+
+#### `PA-02` — two paths to one setting, and one of them was not a setting
+
+The overlay's X wrote `subtitles = false` through a `$bindable`, which lands on a bare private-field
+write in `RoomPrefs` with **no `save()`** — so the dismissal was forgotten on reload, while the
+navbar checkbox for the same preference persisted correctly. It goes through `prefs.save` now, and
+`subtitles` is a plain prop with an `onhidespeechreco` callback beside it, because dismissing writes
+four pieces of state the component does not own.
+
+The other three statements are the ones an implementation drops because nothing visible depends on
+them at the moment you press the button: the caption goes, the checker stops, and history mode
+resets so re-enabling the overlay later does not reopen it in the transcript view.
+
+#### `PA-03` — where the two toasts go is the whole row
+
+"Connecting to …" goes BEFORE `consume()`, which is what makes it a connecting notice rather than a
+second arrival notice: building the consumer is a round trip to the SFU, and this is the only
+feedback a viewer gets while it happens. "… started screen sharing" goes INSIDE `if (remote)`,
+because a null `remote` is the dedupe path the server's at-least-once `newProducer` requires — a
+toast outside it fires once per `getProducers` snapshot.
+
+`screenLoading` and its three companions are **not** built. Their markup is quoted nowhere in the
+row or in the bytes it cites, and a spinner invented rather than read is not something this
+repository ships. Recorded at the disposition rather than half-built.
+
+#### `PA-04` — an empty state, and the gate that belongs in a method
+
+The reference has two SLOTS decided by the host — the empty state and the pane — not a branch inside
+the pane, so that is what this builds. `btn-small` is Bootstrap 3's spelling and does nothing under
+the Bootstrap this room ships; it is the capture's and a class list is evidence, so it stays.
+
+The button goes through a new `RoomNotes.requestNewNote()` rather than writing `newNoteOpen =
+noteGates.editorMounted` in markup, and the gate is why: a viewer who may READ notes but not edit
+them must not be handed an editor, and at one of two call sites in markup that rule is one refactor
+from being dropped. `mountNewNoteLink` calls the same method now.
+
+#### `PA-05` through `PA-08` — four orderings, and why they need tests
+
+Only one tab pane is `show active` at a time. The caption overlay is `z-index: 9999` wherever it
+sits. The four children of the presentation split area are block-level in a flex column. So **nothing
+about the rendered page looks wrong either way**, which is exactly why an order fix is one refactor
+from being silently undone — every one of these is pinned by position against a marker that cannot
+appear twice.
+
+What they actually cost: tab order for a keyboard user (the overlay's three `z-index: 10000` buttons
+came before the whole tab strip, so tabbing into the column met the caption controls first), a
+slot-by-slot diff against the reference that stopped lining up two thirds of the way down, and — in
+`MainTabStrip`'s case — a strip and a content area **ordered differently from each other**, because
+the strip had kept the reference's order all along.
+
+`PA-05` is the one with a runtime cost, and it was measured on both hosts rather than inferred from
+one: the reference's mobile host has four children and no `app-webcam-holder`, while the desktop host
+has five and puts it first. A phone's presentation column is short.
+
+#### What the gate found
+
+`unbound-method-contract` refused the new class until it was registered — the third time in three
+days that its completeness check has asked rather than anybody remembering. Its note now records the
+specific risk: `onclose={captionStaleness.stop}` would lose `this` and leave a timer running with
+nothing to clear.
+
+#### Verification
+
+`pnpm run gate` in `apps/room` — exit 0 from a logged exit code. **257 test files, 4,257 tests, 1
+skipped.** `svelte-check` clean at 1,470 files. **Ten negative controls, each seen red**, and each
+mutation checked to have landed: the checker never armed; the non-persisting write; the checker left
+running; the arrival toast outside the dedupe; the strip back on mobile; the strip back to third;
+no empty state; the new-note rule restated in markup; the overlay back to first; and the videoplayer
+back after the alert panes.
+
+One test bug found by a control and fixed rather than worked around: `const remote = await
+session.consume(info);` occurs FOUR times in `media-transport.svelte.ts`, so the ordering assertion
+was comparing the connecting toast against the WEBCAM consumer 3,800 characters earlier. It is scoped
+to `addRemoteScreen` now — the same wrong-occurrence trap `gatesAround` hit earlier the same day.
+
+Svelte MCP: `svelte-autofixer` returns no issues and no suggestions for the changed region of
+`PresentationArea.svelte`. Five size ceilings raised with their arguments, plus one new module
+declared. **Nothing was opened in a browser.**
+
 ### 2026-08-30 18:46 UTC — The poll panel: a sound with no caller, a panel that outlived its poll, and labels on the wrong curve
 
 **Runtime impact: YES.** A poll arriving now makes a sound (unless you are on do-not-disturb). A poll

@@ -260,6 +260,35 @@
     { timestamp: number; sender: string; text: string; live?: boolean }[]
   >([]);
   let speechRecoHistoryMode = $state(false);
+
+  /**
+   * `hideSpeechRecognition` — the overlay's X, all five statements of it.
+   *
+   * ```js
+   * hideSpeechRecognition(e) { e.preventDefault(), e.stopPropagation(),
+   *   this.appService.globals.preferences.showSpeechRecoOverlay = !1,
+   *   this.appService.setPreference("showSpeechRecoOverlay", !1),
+   *   this.showSpeechRecognition = !1, this.currentSpeechReco = null,
+   *   this.lastSpeechRecoEvent = 0, this.stopSpeechChecker(),
+   *   this.speechRecoHistoryMode = !1 }                                      // byte 1,957,245
+   * ```
+   *
+   * `PA-02`. This was `subtitles = false`, which lands on a bare private-field write in
+   * `RoomPrefs` — no `save()`, so **dismissing the overlay was forgotten on reload**, while the
+   * navbar checkbox for the same preference persisted correctly. `prefs.save` is the one path that
+   * writes the field, the checkbox and the server together.
+   *
+   * The other three statements are the ones an implementation drops because nothing visible depends
+   * on them the moment you press the button: the caption goes, the checker stops (or a timer keeps
+   * waking up to clear something nobody is being shown), and history mode resets, so re-enabling the
+   * overlay later does not reopen it in the transcript view the reader left it in.
+   */
+  function hideSpeechRecognition(): void {
+    prefs.save('showSpeechRecoOverlay', false);
+    currentCaption = null;
+    speechRecoHistoryMode = false;
+    captionStaleness.stop();
+  }
   /**
    * How many finalised lines the transcript keeps.
    *
@@ -485,6 +514,7 @@
     media,
     split,
     polls,
+    captionStaleness,
     alerts,
     menus,
     dialogs,
@@ -1361,7 +1391,8 @@
               viewerOnlyMode={gates.viewerOnlyMode}
               doNotDisturbOn={prefs.doNotDisturbOn}
               bind:mainTab
-              bind:subtitles={prefs.subtitles}
+              subtitles={prefs.subtitles}
+              onhidespeechreco={hideSpeechRecognition}
               {currentCaption}
               {captionHistory}
               bind:speechRecoHistoryMode

@@ -662,7 +662,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       showing, because `closeActive()` closes whatever is open and a poll ending must not shut
       somebody's settings modal.
     */
-    max: 1684,
+    /*
+      1684 -> 1715, 2026-08-30, for `PA-02` — `hideSpeechRecognition`, which was one field write and
+      is five statements.
+
+      The lines are the transcription and the sentence that says what was actually wrong: `subtitles
+      = false` landed on a bare private-field write in `RoomPrefs` with no `save()`, so **dismissing
+      the caption overlay was forgotten on reload** while the navbar checkbox for the same preference
+      persisted correctly. Two paths to one setting, one of them silently not a setting at all.
+    */
+    max: 1715,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -978,7 +987,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       alternative on offer was an extraction invented to satisfy a number, which is the thing
       this file exists to prevent.
     */
-    max: 203,
+    /*
+      203 -> 219, 2026-08-30, for `PA-04`. `requestNewNote()` exists because the empty pane's button
+      is a SECOND caller of `newNoteOpen = noteGates().editorMounted`, and the gate is the interesting
+      half: a viewer who may read notes but not edit them must not be handed an editor. In markup at
+      one of two call sites, that rule is one refactor from being dropped.
+    */
+    max: 219,
     why: 'the notes tab - four actions, one flag, and the two link mounts that belong to them'
   },
   {
@@ -1118,7 +1133,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       clears whatever else the member was reading. One dialog is raised here and its callback retries
       every blocked element, because one gesture satisfies all of them.
     */
-    max: 1429,
+    /*
+      1429 -> 1465, 2026-08-30, for `PA-03`'s two toasts.
+
+      Two `info()` calls and thirty lines of where they go: "Connecting to …" BEFORE `consume()`,
+      which is what makes it a connecting notice rather than a second arrival notice, and "… started
+      screen sharing" INSIDE the `if (remote)`, because a null `remote` is the dedupe path for the
+      server's at-least-once `newProducer` and a toast outside it fires once per snapshot.
+
+      It also records what was NOT built with them — `screenLoading` and its three companions — and
+      why: their markup is not quoted anywhere in the evidence, and a spinner invented rather than
+      read is not something this repository ships.
+    */
+    max: 1465,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -2248,7 +2275,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `note-editor-welcome-mat-all-rooms-password`. This component only passes it along — it is not
       where the password is typed and not where it is compared.
     */
-    max: 990,
+    /*
+      990 -> 1089, 2026-08-30, for `PA-04` through `PA-08` — five rows, four of which are ORDER.
+
+      Order is the kind of finding that gets fixed and then silently undone, because nothing about
+      the rendered page looks wrong either way: only one tab pane is `show active` at a time, and the
+      caption overlay is `z-index: 9999` wherever it sits. So each move carries the bytes that decide
+      it and the consequence that is not visual — tab order for a keyboard user, and a slot-by-slot
+      diff against the reference that stops lining up.
+
+      `PA-05` is the one with a runtime cost, and it is a phone: the reference's mobile host has four
+      children and no `app-webcam-holder` at all, because a phone's presentation column is short.
+    */
+    max: 1089,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -2878,6 +2917,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 178,
     why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
+  },
+  {
+    file: 'lib/room/caption-staleness.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a module to this list.
+
+      `PA-01` — `startSpeechChecker`, and the reason a caption that stops arriving stops being shown.
+      A timestamp, a timer handle and two methods; the rest is the transcription, the note that the
+      interval EQUALS the window (so a caption survives between 7 and 14 seconds of silence, which is
+      upstream's shape and not a bug to improve on here), and the note that it stops itself so a
+      silent room holds no timer at all.
+
+      A plain `.ts`: nothing renders from it. It reports staleness through an injected callback to
+      whoever owns the caption, which is the same decision-versus-effect split `arrivals.ts` records.
+    */
+    max: 100,
+    why: 'the 7-second caption window; a plain .ts because the caption belongs to the page'
   },
   {
     file: 'lib/room/chat-tab-unread.ts',
@@ -4635,7 +4691,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       for `acA-08`, and the note that the COLLAPSE half of the question is the split's own and is
       deliberately not passed.
     */
-    max: 1393,
+    /*
+      1393 -> 1421, 2026-08-30, for `PA-01`. Two of the lines are executable — the checker's
+      construction and the `seen()` beside `setCurrentCaption` — and the rest is the port type.
+
+      `setCurrentCaption: (caption: Caption) => void` **could not express the room falling silent**,
+      so the last line anybody spoke stayed pinned over the presentation area for the rest of the
+      session. The widening to `Caption | null` is the fix and reads like a loosening, which is why
+      it says so where it is declared.
+    */
+    max: 1421,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

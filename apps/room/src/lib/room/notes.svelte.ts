@@ -115,6 +115,22 @@ export class RoomNotes {
     this.#newNoteOpen = next;
   }
 
+  /**
+   * "New Note", asked for from wherever.
+   *
+   * ```js
+   * newNote() { this.newNoteName = "", this.showNewNoteModal = !0 }
+   * ```
+   *
+   * `PA-04` gave this a SECOND caller — the empty pane's own button — and two call sites writing
+   * `newNoteOpen = noteGates().editorMounted` is one too many, because the gate is the interesting
+   * half: a viewer who may READ notes but not edit them must not be handed an editor, and that rule
+   * would have been in markup at one of the two.
+   */
+  requestNewNote(): void {
+    this.#newNoteOpen = this.#noteGates().editorMounted;
+  }
+
   mountNewNoteLink(menu: HTMLUListElement) {
     const item = document.createElement('li');
     const link = document.createElement('a');
@@ -128,7 +144,7 @@ export class RoomNotes {
       event.preventDefault();
       this.#menus.set('notes', false);
       this.#showNotesTab();
-      this.#newNoteOpen = this.#noteGates().editorMounted;
+      this.requestNewNote();
     });
     item.append(link);
     menu.append(item);

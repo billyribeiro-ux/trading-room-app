@@ -55,7 +55,7 @@ byte offsets make the second reading the tempting one.
 
 ## Where the work stands
 
-**59 open · 165 closed · 224 rows.**
+**51 open · 173 closed · 224 rows.**
 
 Those two numbers are checked rather than asserted: `apps/room/src/lib/room-surface-audit-counts.test.ts`
 parses this document and fails if either is wrong. It exists because the answer to "how many are
@@ -3044,6 +3044,20 @@ d(11,"li",12),x("click",function(){return D(s),E(o.toggleAlertsToolbarSearchOnly
 
 ### PA-01 — No speech-reco staleness checker — a caption never clears after the room falls silent
 
+**BUILT 2026-08-30.** `#lib/room/caption-staleness.ts` — `startSpeechChecker` transcribed, with
+the interval and the window both at the reference's 7,000 ms, so a caption survives between 7 and 14
+seconds of silence. `onCaption` arms it; going stale sends the null.
+
+**The port's own TYPE was half the defect.** `setCurrentCaption: (caption: Caption) => void` cannot
+express "the room went quiet", so nothing in this application could ever clear a caption and the last
+line anybody spoke stayed pinned over the presentation area for the rest of the session. It is
+`Caption | null` now, and the widening says so where it is declared.
+
+The checker stops itself from inside the stale branch, which is upstream's own shape and is
+load-bearing: a silent room holds no timer at all, in every room, presenting or not. Ten behavioural
+tests in `room/caption-staleness.test.ts` drive a fake clock; two source assertions pin the two ends.
+One control seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,956,753**
 
 ```
@@ -3057,6 +3071,20 @@ startSpeechChecker(){this.speechRecoInterval||(this.speechRecoInterval=setInterv
 
 ### PA-02 — The overlay's close button does not persist `showSpeechRecoOverlay` and does not reset history mode
 
+**BUILT 2026-08-30.** `hideSpeechRecognition()` on the page, all five statements: persist through
+`prefs.save('showSpeechRecoOverlay', false)`, clear the caption, reset history mode, stop the checker.
+
+**Two paths to one setting, and one of them was not a setting.** The X wrote `subtitles = false`
+through a `$bindable`, which lands on a bare private-field write in `RoomPrefs` with no `save()` —
+so dismissing the overlay was forgotten on reload, while the navbar checkbox for the SAME preference
+persisted correctly. `subtitles` is a plain prop now with an `onhidespeechreco` callback beside it,
+because the dismissal writes four pieces of state the component does not own.
+
+The three statements that are easy to drop, because nothing visible depends on them at the moment
+you press the button, are the ones recorded at the code: the caption goes, the checker stops (or a
+timer keeps waking to clear a box nobody is shown), and history mode resets so re-enabling the
+overlay later does not reopen it in the transcript view. Two controls seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,957,245**
 
 ```
@@ -3068,6 +3096,24 @@ hideSpeechRecognition(e){e.preventDefault(),e.stopPropagation(),this.appService.
 > Verified: I could not find the behaviour anywhere in apps/room/src under any name. The overlay's X calls only `onclose={() => (subtitles = false)}` (PresentationArea.svelte:437), which lands on `set subtitles(next) { this.#subtitles = next; }` (prefs.svelte.ts:508-510) — a bare private-field write with no `save()`/`persist()`.
 
 ### PA-03 — The two screenshare info toasts are absent — "… started screen sharing" and "Connecting to …"
+
+**HALF BUILT 2026-08-30 — both toasts built, the loading state refused with the reason.**
+
+Both `info()` calls are in `addRemoteScreen`, and WHERE is the whole of it. "Connecting to …" goes
+BEFORE `consume()`, which is what makes it a connecting notice rather than a second arrival notice:
+building the consumer is a round trip to the SFU and this is the only feedback a viewer gets while it
+happens. "… started screen sharing" goes INSIDE `if (remote)`, because a null `remote` is the dedupe
+path the server's at-least-once `newProducer` requires — outside it, the toast fires once per
+`getProducers` snapshot.
+
+Upstream's `e.uid != globals.user.id` guard is already spent here: `addRemoteScreen` returns above
+for this peer's own producer, for the stronger reason that consuming yourself is a server refusal.
+
+**`screenLoading` / `callingScreenName` / `screenPresenter` / `screenPresenterAvatar` are NOT built.**
+They drive a loading placeholder whose markup is quoted nowhere in this row or in the bytes it cites,
+and a spinner invented rather than read is not something this repository ships. That is a separate
+row when somebody reads `app-presentationarea`'s loading branch, not something to guess at now.
+Contract: `presentation-area-contract.test.ts`, one control seen red.
 
 **medium** · `missing-behaviour` · reference byte **1,960,202**
 
@@ -3081,6 +3127,19 @@ appEventBus.subscribe("addScreenStream",e=>{"screen"==e.mode&&this.alertsService
 
 ### PA-04 — `#notes` has no empty state — the "No Notes to display…" heading and its " New Note " button are absent from the pane
 
+**BUILT 2026-08-30.** `LSe` transcribed — the `<h3>No Notes to display...</h3>` and the
+`btn btn-small btn-primary` button — as a SLOT of the host beside the pane, which is what the
+reference has (`H(44,LSe,5,0,"div")(45,zSe,6,0)` at byte 2,015,227, gated `O(44, sessionNotes ? 45 :
+44)`) rather than a branch inside `NotesPane`.
+
+`btn-small` is Bootstrap 3's spelling and does nothing under the Bootstrap this room ships. It is the
+capture's, and a class list is evidence, so it is reproduced rather than corrected to `btn-sm`.
+
+The button goes through a new `RoomNotes.requestNewNote()` rather than writing the gate in markup,
+because the gate is the interesting half: a viewer who may READ notes but not edit them must not be
+handed an editor, and at one of two call sites in markup that rule is one refactor from being
+dropped. `mountNewNoteLink` now calls the same method. Two controls seen red.
+
 **medium** · `missing-behaviour` · reference byte **1,927,385**
 
 ```
@@ -3092,6 +3151,16 @@ function LSe(t,n){if(1&t){const e=Y();d(0,"div")(1,"h3"),v(2,"No Notes to displa
 > Verified: I could not refute it. The reference pair is real and I re-read all three anchors myself: `LSe` at byte 1927385 renders `div > h3 "No Notes to display..."` plus `button[119]` labelled " New Note " wired to `g().newNote()`; the container declaration at byte 2015227 reads `d(43,"div",24),H(44,LSe,5,0,"div")(45,zSe,6,0),u()` (so slot 44 is t…
 
 ### PA-05 — `app-webcam-holder` is rendered on mobile, where the reference host omits it entirely
+
+**BUILT 2026-08-30.** `{#if !split.isMobileScreen}` around the strip.
+
+Measured on both hosts rather than inferred from one: the mobile host `Z4e` (byte 2,495,149) has four
+children and none is `app-webcam-holder`, while the desktop host `q4e` (2,492,999) has five and puts
+it first. A phone's presentation column is short and the reference keeps its height for the
+presentation.
+
+`previewWindowsVisible` was never standing in for this — it is a presenter-facing hide-all switch,
+which is why the gap survived. Control seen red.
 
 **medium** · `divergence` · reference byte **2,495,149**
 
@@ -3105,6 +3174,14 @@ function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),H(1,Y4e,7,1,"div",213)(2,Q4e
 
 ### PA-06 — Host child order: `app-webcam-holder` is node 1 in the reference, third in ours
 
+**FIXED 2026-08-30.** The strip is the first child of the split area, before the moderator bar and
+the positions iframe, which is node 1 in `q4e`. Contract pins all four siblings in order, so the next
+component added between them cannot quietly reorder the three.
+
+Visual and reading order only, as the row says — the four siblings are block-level in a flex column.
+That is exactly why it needs a test: nothing about the rendered page looks wrong either way, so the
+fix is one refactor from being silently undone. Control seen red.
+
 **low** · `divergence` · reference byte **2,492,999**
 
 ```
@@ -3117,6 +3194,16 @@ function q4e(t,n){if(1&t&&(d(0,"as-split-area",208),T(1,"app-webcam-holder"),H(2
 
 ### PA-07 — The speech-reco overlay is the LAST child of `.mainPresentationAreaHolder` in the reference, the first in ours
 
+**FIXED 2026-08-30.** The overlay is the holder's final child, after the tab strip, the panes, the
+two players and the `<audio>` — which is where `H(89,u2e,9,7,"div",52),u())` puts it at byte
+2,016,249.
+
+Paint order never cared (`z-index: 9999`). **Tab order did**: the overlay's three `z-index: 10000`
+buttons — transcript, history, close — came before the whole tab strip in the DOM, so a viewer
+tabbing into the presentation column met the caption controls before anything they were there to use.
+The file's own comment argued correctly for putting the overlay INSIDE the holder and never said
+where in it; both facts are recorded together now. Control seen red.
+
 **low** · `divergence` · reference byte **2,016,249**
 
 ```
@@ -3128,6 +3215,14 @@ H(86,n2e,1,2,"app-ytplayer",49)(87,i2e,1,1,"app-scplayer",50),T(88,"audio",51),H
 > Verified: Verified on both sides. In the reference the caption overlay is the LAST child of the holder: at byte 2016327 the create block ends `H(89,u2e,9,7,"div",52),u())`, immediately after `H(86,n2e,...,"app-ytplayer",49)(87,i2e,...,"app-scplayer",50),T(88,"audio",51)` (read at 2016100-2016500), and `u2e` is the overlay (defined at byte 1952943:…
 
 ### PA-08 — Pane order inside `#mainTabsContent`: videoplayer sits after the two trade-alert panes in ours, before them in the reference
+
+**FIXED 2026-08-30.** Videoplayer, then swing, then day-trade, then files — slots 47/48/49/50.
+
+The row's sharpest observation is the one that makes this worth doing: `MainTabStrip` already kept
+the reference's order, so **the strip and the content were ordered differently from each other**. Only
+one pane carries `show active` at a time, so nothing was visibly misplaced; what it cost was tab and
+reading order, and a slot-by-slot diff against the reference that stopped lining up two thirds of the
+way down. Control seen red.
 
 **low** · `divergence` · reference byte **2,017,654**
 

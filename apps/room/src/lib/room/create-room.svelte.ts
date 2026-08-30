@@ -56,6 +56,7 @@ import type { SplitPair } from '#lib/room/split.svelte.js';
 
 import { RoomMenus } from '#lib/room/menus.svelte.js';
 import { RoomPolls } from '#lib/room/polls.svelte.js';
+import { CaptionStaleness } from '#lib/room/caption-staleness.js';
 import { page } from '$app/state';
 import { invalidate, invalidateAll } from '$app/navigation';
 import { muteChat, muteChatIndefinitely, unmuteChat } from '../../routes/chat-mute.remote';
@@ -199,7 +200,14 @@ export interface RoomDeps {
   setMainTab: (tab: MainTab) => void;
   setChatAlertsDetached: (next: boolean) => void;
   mergeGlobalChatStyle: (patch: Partial<FollowChatStyle>) => void;
-  setCurrentCaption: (caption: Caption) => void;
+  /**
+   * `PA-01` — `Caption | null`, and the null is the fix rather than a widening.
+   *
+   * This was `(caption: Caption) => void`, a type that CANNOT express "the room went quiet", so the
+   * last line anybody spoke stayed pinned over the presentation area for the rest of the session.
+   * The staleness checker below is what sends the null.
+   */
+  setCurrentCaption: (caption: Caption | null) => void;
   pushCaptionHistory: (caption: Caption) => void;
   chatMissedWhileHidden: () => void;
   hidePreviewWindows: () => void;
@@ -751,6 +759,18 @@ export function createRoom(deps: RoomDeps) {
     enabled: () => data.sessData?.alertsOverlayOnScreenshare === true
   });
 
+  /*
+    `PA-01` — the caption staleness checker, in `#lib/room/caption-staleness.ts`.
+
+    Constructed HERE, above the transport, because the transport is what reports a caption and this
+    is what un-reports one: `onCaption` below calls `seen()`, and the checker calls back with the
+    null that nothing in this room could previously send. The module carries the transcription, the
+    reason the interval equals the window, and the reason it stops itself.
+  */
+  const captionStaleness = new CaptionStaleness({
+    onStale: () => deps.setCurrentCaption(null)
+  });
+
   const mediaTransport: RoomMediaTransport = new RoomMediaTransport({
     dialogs,
     toasts,
@@ -778,6 +798,12 @@ export function createRoom(deps: RoomDeps) {
     */
     onCaption: (caption, isFinal) => {
       deps.setCurrentCaption(caption);
+      /*
+        `PA-01` — every caption restarts the 7-second window. `CaptionStaleness.seen()` is idempotent
+        for the same reason upstream's `this.speechRecoInterval || (…)` is: a second line inside the
+        window records its time and does not start a second timer.
+      */
+      captionStaleness.seen();
       if (isFinal) deps.pushCaptionHistory(caption);
     }
   });
@@ -1334,6 +1360,8 @@ export function createRoom(deps: RoomDeps) {
     media,
     split,
     polls,
+    /** `PA-01`/`PA-02` — the caption checker, so the overlay's X can stop it. */
+    captionStaleness,
     alerts,
     menus,
     dialogs,
