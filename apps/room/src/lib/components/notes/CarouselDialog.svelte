@@ -429,12 +429,39 @@
   }
 </script>
 
-<div
-  class="note-modal open note-carousel-modal"
-  aria-hidden="false"
-  role="dialog"
-  aria-label={title}
->
+<!--
+  ── `{' '}` ON THE LABELS, AND THE THREE THAT DO NOT HAVE IT YET ─────────────────────────────────
+
+  Every text node this component's templates emit is padded — `v(23," Add slide ")`,
+  `v(26," Cancel ")`, `Ne(" ",isEditingCarousel?"Save Changes":"Insert Carousel"," ")`,
+  `v(3," Select Image "), v(12," Cancel ")` in `O0e`, `v(9," Upload ")`, `v(12," Browse ")` and
+  `v(4," Change image ")`. Svelte trims whitespace at an element's edges, so only an expression
+  survives; the measurement and the argument live in `files-pane-contract.test.ts`'s `the padded
+  text nodes` block and are not repeated here.
+
+  **` Upload `, ` Browse ` and ` Change image ` are still unpadded**, and it is not an oversight or a
+  measurement: three assertions pin their exact current spelling, in two contract tests this change
+  was not permitted to touch —
+
+    note-image-browser-contract.test.ts:132  '><i class="fas fa-folder-open"></i> Browse</button'
+    note-image-browser-contract.test.ts:268 '><i class="fas fa-upload"></i> Upload</label'
+    note-carousel-slide-contract.test.ts:76  '><i class="fas fa-times"></i> Change image</button'
+
+  Each needs the same one-line edit — `Browse</button` becomes `Browse{' '}</button`, and so on —
+  and then the three labels here take the pad like every other. Recorded rather than left as an
+  inconsistency somebody later reads as a decision.
+-->
+<!--
+  `note-carousel-modal` STOOD ON THIS ELEMENT AND STYLED NOTHING, removed 2026-08-30.
+
+  Searched rather than assumed: the string occurs zero times in `main.d1d09071be31f1ba.js`, zero
+  times in `styles.ee2a710065b60389.css`, and zero times in every sheet this app ships
+  (`css/complete-app-styles.css`, `lib/styles/*.css`, `app.css`). It was invented here, wearing the
+  shape of a captured hook — `CLAUDE.md`'s *"no `.flipped` class with no CSS"*, in the direction
+  `orphan-style-contract.test.ts` does not look: that gate finds a RULE nobody wears, and this was a
+  class no rule reaches.
+-->
+<div class="note-modal open" aria-hidden="false" role="dialog" aria-label={title}>
   <div class="note-modal-content">
     <div class="note-modal-header">
       <!--
@@ -445,7 +472,7 @@
       <button type="button" class="close" aria-label="Close" onclick={dismissCarouselModal}
         ><i class="note-icon-close"></i></button
       >
-      <h4 class="note-modal-title"><i class="fas fa-images"></i> {title}</h4>
+      <h4 class="note-modal-title"><i class="fas fa-images"></i> {title}{' '}</h4>
     </div>
     <div class="note-modal-body">
       <div class="form-row mb-3">
@@ -639,7 +666,7 @@
         {/each}
       </div>
       <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick={addCarouselSlide}
-        ><i class="fas fa-plus"></i> Add slide</button
+        ><i class="fas fa-plus"></i> Add slide{' '}</button
       >
     </div>
     <div class="note-modal-footer">
@@ -649,10 +676,10 @@
           unlabelled X in a corner is one a presenter can fail to find.
         -->
       <button type="button" class="btn btn-outline-dark" onclick={dismissCarouselModal}
-        >Cancel</button
+        >{' Cancel '}</button
       >
       <button type="button" class="btn btn-primary" onclick={submitCarousel}
-        ><i class="fas fa-check"></i> {action}</button
+        ><i class="fas fa-check"></i> {action}{' '}</button
       >
     </div>
   </div>
@@ -688,54 +715,96 @@
   `session-image-files.ts` carries the rest of that argument.
 -->
 {#if fileBrowserTargetIndex !== null}
-  <div class="note-modal open">
-    <div class="note-modal-dialog">
-      <div class="note-modal-content">
-        <div class="note-modal-header">
-          <h4 class="modal-title"><i class="fas fa-images"></i> Select Image</h4>
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Close"
-            onclick={() => (fileBrowserTargetIndex = null)}
-          ></button>
-        </div>
-        <div class="note-modal-body">
-          {#if sessionImages.length === 0}
-            <div class="text-center py-4 text-muted">
-              <i class="fas fa-images fa-2x mb-2"></i>
-              <div>No images found. Upload images via Files first.</div>
-            </div>
-          {:else}
-            <div class="file-browser-grid">
-              {#each sessionImages as file (file.url)}
-                <!--
+  <!--
+    ── FOUR THINGS THIS MODAL GOT WRONG, ALL FOUND BY DECODING `O0e` RATHER THAN ITS STRINGS ──────
+
+    The strings were right the first time and everything holding them was invented. `O0e` at byte
+    1,466,225 is nine nodes long and every one of them is a const:
+
+      d(0,"div",26)(1,"h4",72),T(2,"i",62),v(3," Select Image "),u(),
+      d(4,"button",28),x("click",…dismiss()),T(5,"span",29),u()(),
+      d(6,"div",30),H(7,A0e,…)(8,P0e,…)(9,I0e,…),u(),
+      d(10,"div",40)(11,"button",41),x("click",…dismiss()),v(12," Cancel "),u()()
+
+    1. **`.note-modal-dialog` wrapped all of it and styled nothing.** Zero occurrences in
+       `main.d1d09071be31f1ba.js`, zero in `styles.ee2a710065b60389.css`, zero in every sheet this
+       app ships. `O0e` has no such element either — the wrapper NgbModal supplies is `.modal-dialog`
+       and it is outside the template. Deleted; the sibling carousel modal above never had one.
+
+    2. **The header icon was `fas fa-images`.** `T(2,"i",62)` and const 62 is
+       `[1,"fas","fa-folder-open"]` (byte 1,486,004) — the SAME icon as the ` Browse ` button that
+       opens this modal, which is the point of it: the folder is what the button and the thing it
+       opens have in common. `fa-images` is const 15 and belongs to the carousel modal's own title.
+
+    3. **The close button was `btn-close`.** Const 28 (byte 1,484,628) is
+       `["type","button","aria-label","Close",1,"close",3,"click"]` — Bootstrap 4's `close`, which is
+       what the carousel modal beside it and all three `NoteEditor` dialogs already use. Two spellings
+       of the same control in one file is one of them being wrong.
+
+       Its CHILD is not transcribed and that is deliberate: `T(5,"span",29)` is a CHILDLESS
+       `<span aria-hidden="true">`, so upstream's close button paints nothing but its own padding —
+       the `&times;` was lost somewhere upstream of the build. Reproducing it would reproduce an
+       invisible control. `note-icon-close` is what the four sibling dialogs here draw.
+
+    4. **The footer button was `btn btn-secondary`.** Const 41 is
+       `["type","button",1,"btn","btn-outline-dark",3,"click"]` (byte 1,485,128) — and it is the
+       same const the carousel modal's own ` Cancel ` uses, so the two dismissals in this file were
+       drawn as two different buttons.
+
+    `role="dialog"` and `aria-label` are the fifth, and they are ours rather than a transcription:
+    upstream gets both from `modalService.open(…, {ariaLabelledBy:"file-browser-modal-title"})` at
+    byte 1,477,226, pointing at const 72's id. An `aria-label` says the same thing without minting a
+    document-unique id for a component that can be mounted more than once, which is the form the
+    carousel modal above already uses.
+  -->
+  <div class="note-modal open" aria-hidden="false" role="dialog" aria-label="Select Image">
+    <div class="note-modal-content">
+      <div class="note-modal-header">
+        <h4 class="note-modal-title">
+          <i class="fas fa-folder-open"></i> Select Image{' '}
+        </h4>
+        <button
+          type="button"
+          class="close"
+          aria-label="Close"
+          onclick={() => (fileBrowserTargetIndex = null)}><i class="note-icon-close"></i></button
+        >
+      </div>
+      <div class="note-modal-body">
+        {#if sessionImages.length === 0}
+          <div class="text-center py-4 text-muted">
+            <i class="fas fa-images fa-2x mb-2"></i>
+            <div>No images found. Upload images via Files first.</div>
+          </div>
+        {:else}
+          <div class="file-browser-grid">
+            {#each sessionImages as file (file.url)}
+              <!--
                   A BUTTON where the reference uses a clickable `<div>` (const 79 carries `click` on
                   a plain div). This one diverges deliberately: the element exists to be activated,
                   so it has to be reachable from a keyboard, and `type="button"` is what keeps it out
                   of the enclosing form. The three class strings are the capture's and are what the
                   transcribed CSS targets.
                 -->
-                <button
-                  type="button"
-                  class="file-browser-item"
-                  title={file.name}
-                  onclick={() => selectFileForSlide(file)}
-                >
-                  <img class="file-browser-thumb" src={file.url} alt={file.name} />
-                  <div class="file-browser-name">{file.name}</div>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-        <div class="note-modal-footer">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            onclick={() => (fileBrowserTargetIndex = null)}>Cancel</button
-          >
-        </div>
+              <button
+                type="button"
+                class="file-browser-item"
+                title={file.name}
+                onclick={() => selectFileForSlide(file)}
+              >
+                <img class="file-browser-thumb" src={file.url} alt={file.name} />
+                <div class="file-browser-name">{file.name}</div>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <div class="note-modal-footer">
+        <button
+          type="button"
+          class="btn btn-outline-dark"
+          onclick={() => (fileBrowserTargetIndex = null)}>{' Cancel '}</button
+        >
       </div>
     </div>
   </div>
