@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 01:10 UTC — The tenancy kernel, proven on a live cluster instead of read
+
+**Runtime impact: NO.** Two trackers. No `src` or `services` file changed — the database built here
+is a local scratch cluster, not anything this repository ships.
+
+`apps/room/TODO.md` entry 1 has carried the `ptr_clone` → `tradingroom` rename since 2026-08-03, and
+it was blocked twice over. **Neither blocker survived being re-measured.**
+
+**Blocker one: *"`services/**` is a mirror, so do it at the source repository."*** False, and this
+repository already records it as false. `verify-backend-provenance.mjs:122-128` searched `scripts`,
+`ops`, every per-app scripts directory, `.github` and the root manifest for a sync **in either
+direction**, found none, and notes the owner confirming on 2026-08-12 that the siblings are reference
+only. `CLAUDE.md` carries the same correction and says the old rule *"was false and cost real time"*.
+The entry also routed the remaining work to root `TODO.md` item **P**, which no longer exists.
+Entry 2, which entry 1 names as blocking it, rests on the same retired premise: with no sync there is
+no drift mechanism.
+
+**Blocker two: *"every one of those assertions is a runtime check needing a provisioned cluster to
+verify."*** That was true and is no longer. This container has PostgreSQL 16.13 installed — the exact
+version the entry says the migration was proven against — with a data directory and no server
+running. Started it, built a database from nothing, and ran the chain.
+
+**What was inherited from a document is now measured:**
+
+| | result |
+| --- | --- |
+| `0001` → `0009` on a fresh database, each in a transaction | **all nine applied** |
+| `0009` re-run against the same database | clean, and it prints its own proof: *"parity verified: 87 relation, 26 column, 22 policy facts mirrored to tradingroom_app"* |
+| table privileges held by each role | **87 each — exact parity** |
+| RLS policies naming `tradingroom_app` | **22**; policies naming `ptr_clone_app`: **zero** |
+
+Then the part worth starting a database for. Two tenants, one room each, the same `SELECT` under
+three identities:
+
+| identity | tenant GUC | rows visible |
+| --- | --- | --- |
+| `tradingroom_app` | tenant A | **A's room only** |
+| `tradingroom_app` | tenant B | **B's room only** |
+| `tradingroom_app` | **unset** | **0 — it fails closed** |
+| `ptr_clone_app` | a valid tenant | **0** |
+
+The last row is `0009`'s own security claim in its own words — *"after this runs, `ptr_clone_app`
+holds object privileges but is named by no policy, so under FORCE ROW LEVEL SECURITY it reads zero
+rows from every tenant table"* — and it is a measurement now rather than a reading. The third row is
+the one a multi-tenant fintech application lives or dies on: **an unset tenant shows nothing**, not
+everything.
+
+**What this changes about the remaining work.** Retiring `ptr_clone_app` was the plan's largest
+backend item and it is smaller than it looked: the role is *already* inert with respect to tenant
+data. What is left is revoking the 87 object privileges it holds — a forward-only migration, and a
+question of sequencing rather than of design.
+
+**Two corrections to `0009`'s reputation, both in its favour.** Its policy handling REPLACES rather
+than appends, and that reads like a weakening until you find the reason at the code: an earlier draft
+appended, and `postgres-release-attestation` caught it on CI — *"public.room_events must have exactly
+the reviewed tenant policy targeted only to the runtime role"*. And the whole thing is convergent
+because **policies are per-database objects while roles are cluster-global**: on every new database
+`0001` re-creates each policy naming the baseline role and `0009` retargets it, reaching the same end
+state every time. That distinction is exactly what the withdrawn `ALTER ROLE … RENAME` got wrong.
+
+**Method, so this can be re-run:** `pg_ctl -D /var/lib/postgresql/16/main -o "-c
+config_file=/etc/postgresql/16/main/postgresql.conf -c unix_socket_directories=/tmp" start`, roles
+provisioned exactly as `services/docker/postgres/10-provision-roles.sh` does, then each migration via
+`psql --single-transaction`. Isolation was exercised with `SET ROLE` rather than by loosening
+`pg_hba.conf`, which is sound because RLS is evaluated against `current_user` and neither role is a
+superuser or carries `BYPASSRLS` — both were checked.
+
+**Also closed here, and each verified before it was moved** — `apps/room/TODO.md` entries **3b**,
+**3c** and **7**, into `apps/room/docs/RESOLVED-ARCHIVE.md` under that file's own convention. 3b's
+subject does not exist: `find services -name Cargo.lock` returns exactly one path. 3c made three
+claims and all three are now false — both apps declare `gate`, `package-scripts-contract` asserts
+*"room gate runs CI's steps, in CI's order"*, `verify-backend-provenance.mjs` runs in
+`backend-quality.yml:316`, and at least five contracts verify numbers in documents. 7 had been marked
+RESOLVED for twenty days while sitting in the open register; its three cited tests exist and pass.
+
+**Not run:** the full gate — three sub-agents have work in flight in this tree.
+
 ### 2026-08-31 00:20 UTC — The room register's last two remainders, and a blocker that was never true
 
 **Runtime impact: NO.** Tests and a tracker. No `src` module changed — the three source files touched

@@ -178,3 +178,121 @@ next to the outcome.
 
 | #   | Missing | Where I already looked | Blocks |
 | --- | ------- | ---------------------- | ------ |
+
+---
+
+## Entries 3b, 3c and 7, closed and moved 2026-08-31
+
+Moved out of `apps/room/TODO.md` under the convention this file's own header states. Each was
+verified before it was moved — none was taken on its own word, and two of the three had already been
+true for weeks while the register went on listing them as open.
+
+**3b was resolved by the file simply not existing.** The entry says a second Cargo lock sits at
+`services/media/Cargo.lock` in violation of the SSOT's "sole workspace lock". `find services -name
+Cargo.lock` returns exactly one path, `services/Cargo.lock`, and `git ls-files` agrees. Its stated
+blocker is worth reading as a lesson rather than as history: *"`services/**` is a mirror, so it must
+be resolved at the source and re-synced rather than deleted here."* **That premise is false and
+`CLAUDE.md` records it as false** — "the rule that used to sit on this line was **false and cost
+real time**", contradicted by `verify-backend-provenance.mjs`, which searched for a sync in either
+direction and found none. The entry was blocked on a rule that had already been retracted.
+
+**3c made three claims and all three are false today**, each measured rather than argued:
+
+| its claim | measured 2026-08-31 |
+| --- | --- |
+| "no `quality` script and no CI parity" | both apps declare `gate`, and `package-scripts-contract.test.ts` asserts *"room gate runs CI's steps, in CI's order"* and the same for the controller — parity is not merely present, it is enforced |
+| "the drift check in `services/SYNC-PROVENANCE.md` is manual, so it can rot" | `verify-backend-provenance.mjs` runs in `.github/workflows/backend-quality.yml:316` |
+| "no gate verifies any number in `docs/*.md`" | at least five do: `evidence-gap-register-counts`, `room-surface-audit-counts`, `todo-next-coverage-contract`, `setting-coverage-contract`, `feature-coverage-contract` — and `missing-command-census-contract`, which recomputes a triage table on every run and fails in either direction |
+
+The entry's own closing sentence asked for exactly what now exists. It stayed open because nobody
+re-read it after building the thing it asked for, which is the failure this archive exists to stop.
+
+**7 was already marked RESOLVED 2026-08-11** and had been sitting in the open register for twenty
+days. Verified before moving: its three cited tests exist in `page-load-contract.test.ts` and pass —
+*"returns an empty list to anyone who is not a presenter"*, *"gates on the membership predicate, not
+on the account role"*, and *"does not even run the query for a member"* — which are precisely the
+three claims it makes.
+
+
+## 3b. `services/media/Cargo.lock` violates a named authority
+
+**Status:** open, one-line fix, needs the sibling's agreement.
+
+`new-room-control/docs/ENGINEERING-SSOT.md` §1 names "the sole workspace lock
+`services/Cargo.lock`". A second lock exists here at `services/media/Cargo.lock`,
+beneath a workspace member. It is one of only two files distinguishing this
+`services/` copy from the sealed upstream tree, and it is not permitted by the
+authority table.
+
+It was previously written off as "harmless" in `services/SYNC-PROVENANCE.md`.
+That was wrong; corrected there.
+
+Removing it is trivial, but `services/**` is a mirror, so it must be resolved at
+the source and re-synced rather than deleted here.
+
+---
+
+---
+
+## 3c. This repository has no enforced gates for its own documentation
+
+**Status:** open.
+
+`new-room-control` has `AGENTS.md`, `CONTRIBUTING.md`, a normative SSOT, an
+executable `services/**` seal, and `scripts/verify-documented-test-counts.mjs`
+wired into its test chain so a stale documented number fails the build.
+
+This repository has none of that beyond the `AGENTS.md` added on 2026-08-03.
+Concretely:
+
+- no `quality` script and no CI parity;
+- the drift check in `services/SYNC-PROVENANCE.md` is manual, so it can rot;
+- no gate verifies any number in `docs/*.md` — the test count, table count and
+  route count will silently go stale.
+
+This is not hypothetical. `docs/REPOSITORY-STATE-2026-07-30.md` was materially
+wrong for three days and nothing caught it, and the `services/` divergence went
+undetected for a day.
+
+**2026-08-05:** partially addressed in kind rather than by a gate. Claims that used to live only
+in prose are now executable — `comment-safety-contract.test.ts`, `webcam-contract.test.ts`,
+`alerts-background-contract.test.ts`, `alerts-toolbar-contract.test.ts`,
+`screen-tab-bar-contract.test.ts`, `const-table-parser.test.ts` — and the state document
+(`docs/ROOM-STATE-2026-08-06.md`) records the runtime measurement behind every "fixed" row. There
+is still no gate over the NUMBERS in `docs/*.md`, so treat any count as true only for its date.
+
+Entry 2 (consolidation) resolves most of this by putting both halves under one
+set of gates. Until then, treat every documented number as true only for its
+stated date.
+
+---
+
+---
+
+## 7. Pre-Canned polls no longer reach a member's browser — RESOLVED 2026-08-11
+
+**Status:** closed. The loader returns `[]` to anyone who is not a presenter, and does not run the
+query at all for them.
+
+It selected `savedPolls` and returned them to EVERY role. A member never opens the poll panel, so
+they never SAW the list — but their browser was handed **every unsent draft a presenter had
+written**, in the SSR HTML and in `__sveltekit` data, on every page load. Invisible is not private:
+it reaches the browser, any cache in front of it, and any HAR attached to a support ticket. Same
+class as the `password_hash` spread into the page payload on 2026-08-04.
+
+Gated on `connectedUser.isP` — the membership's own answer, the same predicate the poll panel
+renders from — rather than on `role`, which gets it wrong in both directions: a Participant granted
+presenter rights in the controller would be refused, and a Presenter who had them withheld served.
+
+**It also pre-empts entry 5.** `GET /api/v1/rooms/{id}/saved-polls` refuses non-staff with 403, so
+the cutover would have started failing member page loads. An empty list here is what that route
+already agrees with — the concern this entry was originally written to record.
+
+Pinned by three tests in `page-load-contract.test.ts`, including that the empty list is the
+ternary's FIRST branch, so a member's load makes no database read for polls at all. Negative
+control: removing the gate fails two of them.
+
+The two writes needed no change: `savePoll` and `deleteSavedPoll` were already
+`role === 'staff' || role === 'admin'`, which is what `require_staff` enforces.
+
+---
