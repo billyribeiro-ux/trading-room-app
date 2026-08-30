@@ -1499,7 +1499,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       image dialog — which `orphan-component-contract.test.ts` measured on 2026-08-29 and which the
       first draft of this feature's contract walked straight into.
     */
-    max: 1740,
+    /*
+      1740 -> 1855, 2026-08-30. The per-slide UPLOAD — the other half of the same `E0e` row.
+
+      The browser above can only offer what is already in the room. `uploadCarouselImage` (byte
+      1,476,460) is how an image GETS there from inside the carousel dialog, and without it a
+      presenter had to leave the modal to upload — which loses every slide they had already typed,
+      because this modal holds them in component state.
+
+      A hidden file input under a styled `<label for>` (the reference's own pattern, const 58/59),
+      the ` Browse ` button's corrected label and icon (const 61/62 — it shipped this morning as the
+      invented `Select Image`, which is the MODAL's title), and the `D0e` spinner. The spinner is
+      keyed by the slide's KEY and not its index, and that divergence is most of the added prose:
+      upstream mutates a slide object it holds a reference to, ours replaces the array wholesale, so
+      an index captured before the `await` points at a different slide once `removeCarouselSlide`
+      renumbers.
+
+      The toolbar extraction named above is still the answer to this file's size and is still not
+      bundled with a feature.
+    */
+    max: 1855,
     why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
   },
   {

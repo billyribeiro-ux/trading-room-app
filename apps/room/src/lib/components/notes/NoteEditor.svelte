@@ -211,6 +211,79 @@
    */
   let fileBrowserTargetIndex = $state<number | null>(null);
 
+  /**
+   * Which slide is mid-upload, by its KEY rather than its index.
+   *
+   * `r.uploading` upstream is a flag on the slide object itself, and an index would be the same
+   * thing badly: `removeCarouselSlide` renumbers every row after the one it drops, so an upload in
+   * flight would light up the wrong spinner the moment a presenter deletes a slide above it. The key
+   * is already the identity this list is keyed by.
+   *
+   * One at a time, because the upload is one `await` — a second `Upload` click on another row while
+   * the first is running simply moves the spinner, which is what upstream's per-slide flag would do
+   * anyway with two flags set and one visible.
+   */
+  let uploadingSlideKey = $state<number | null>(null);
+
+  /**
+   * `uploadCarouselImage(e, i)` — byte 1,476,460.
+   *
+   * ```js
+   * uploadCarouselImage(e, i) {
+   *   const o = e.target, s = o.files?.[0];
+   *   if (!s) return;
+   *   const r = this.carouselImages[i];
+   *   r.uploading = !0;
+   *   … POST FormData{image, name} to `${upload_server}/image/${sessionID}` …
+   *   success: h => { r.url = h.data.link, r.uploading = !1 },
+   *   error:   h => { r.uploading = !1, bootbox.alert("Image upload failed.") }
+   *   o.value = ""
+   * }
+   * ```
+   *
+   * Four things are transcribed and one is not.
+   *
+   * **The FIRST file only** — `o.files?.[0]`, even though the input is not `multiple`. Upstream is
+   * defensive about a browser handing it more; so is this.
+   *
+   * **The input is cleared unconditionally**, at the END rather than in either callback — so
+   * choosing the same file twice in a row fires `change` again. Without it the second attempt after
+   * a failure is silent.
+   *
+   * **The failure is a dialog**, not a console line: `bootbox.alert("Image upload failed.")`. This
+   * component's own `errorMessage` raises the same primitive every other failure here uses.
+   *
+   * **The URL lands in the slide, and only on success.** A failed upload leaves whatever was there.
+   *
+   * What is NOT transcribed is the POST. `onUploadImages` already carries this room's upload — CDN
+   * when configured, `composer-image.remote.ts` otherwise — and it is the prop the Insert Image
+   * dialog has always used. Reproducing the reference's `$.ajax` here would be a second uploader
+   * with its own credential handling.
+   */
+  async function uploadCarouselImage(event: Event, index: number) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    /* Cleared unconditionally and FIRST here rather than last: the `await` below means a `return`
+       inside it would otherwise leave the input holding a file it has already consumed. */
+    input.value = '';
+    if (!file) return;
+
+    const slide = carouselSlides[index];
+    if (!slide) return;
+    uploadingSlideKey = slide.key;
+    try {
+      const [url] = await onUploadImages([file]);
+      /* Addressed by KEY on the way back, because a slide may have been deleted while this ran. */
+      const at = carouselSlides.findIndex((entry) => entry.key === slide.key);
+      if (url && at !== -1) updateCarouselSlide(at, 'url', url);
+      else if (!url) errorMessage = 'Image upload failed.';
+    } catch {
+      errorMessage = 'Image upload failed.';
+    } finally {
+      uploadingSlideKey = null;
+    }
+  }
+
   /** `openFileBrowser(e)` — byte 1,477,053, minus the fetch. See `session-image-files.ts`. */
   function openFileBrowser(index: number) {
     fileBrowserTargetIndex = index;
@@ -1424,20 +1497,58 @@
               oninput={(event) => updateCarouselSlide(index, 'link', event.currentTarget.value)}
             />
             <!--
-              `openFileBrowser($index)` — the reference's per-slide entry point into the image
-              browser. Without it a presenter who has already uploaded an image through Files has no
-              way to reach it from a slide: the row offers a bare URL box and nothing else
-              (`note-editor-file-browser-modal`).
+              ── THE TWO WAYS TO FILL A SLIDE, `E0e` at byte 1,462,300 ─────────────────────────────
+
+              Decoded with this component's consts (58 the hidden file input, 59 the Upload label,
+              60/62 the two icons, 61 the Browse button, 63 the separator):
+
+                <input type="file" accept="image/*" style="display:none" id="cfi_{i}"
+                       (change)="uploadCarouselImage($event, i)">
+                <label class="btn btn-sm btn-outline-secondary mb-0" for="cfi_{i}">
+                  <i class="fas fa-upload"></i> Upload</label>
+                <button type="button" class="btn btn-sm btn-outline-info mb-0 ml-1"
+                        (click)="openFileBrowser(i)"><i class="fas fa-folder-open"></i> Browse</button>
+                <span class="text-muted small mx-2">or paste a URL:</span>
+
+              The label-for-hidden-input pattern is the reference's own and is what gives the file
+              picker a styled trigger; `cfi_{index}` is its id and the `for` that reaches it.
+
+              **THE BROWSE BUTTON WAS LABELLED "Select Image" WHEN IT SHIPPED EARLIER TODAY**, which
+              was wrong: that string is the MODAL's title (` Select Image `, byte 1,466,205) and the
+              button's is ` Browse `. Corrected here with its classes and icon, which were invented
+              too.
             -->
+            <input
+              type="file"
+              accept="image/*"
+              style="display: none"
+              id="cfi_{index}"
+              onchange={(event) => uploadCarouselImage(event, index)}
+            />
+            <label class="btn btn-sm btn-outline-secondary mb-0" for="cfi_{index}"
+              ><i class="fas fa-upload"></i> Upload</label
+            >
             <button
               type="button"
-              class="btn btn-secondary"
+              class="btn btn-sm btn-outline-info mb-0 ml-1"
               onclick={() => openFileBrowser(index)}
               disabled={sessionImages.length === 0}
               title={sessionImages.length === 0
                 ? 'No images have been uploaded to this room yet.'
-                : 'Choose an image already uploaded to this room'}>Select Image</button
+                : 'Choose an image already uploaded to this room'}
+              ><i class="fas fa-folder-open"></i> Browse</button
             >
+            <!--
+              `D0e` — the per-slide spinner, byte 1,462,280. Const 52 is the icon and 53 the caption.
+              It replaces nothing: the reference shows it beside the row while `r.uploading` is set,
+              which is what tells a presenter that a slow upload is still running rather than lost.
+            -->
+            {#if uploadingSlideKey === slide.key}
+              <span class="mx-2"
+                ><i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+                <span class="small mt-1">Uploading...</span></span
+              >
+            {/if}
             <button type="button" class="btn btn-danger" onclick={() => removeCarouselSlide(index)}
               >Delete slide</button
             >

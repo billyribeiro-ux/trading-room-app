@@ -33,6 +33,76 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 05:18 UTC — The note carousel's per-slide upload, and the label I invented three hours earlier
+
+**Runtime impact: YES.** A presenter building a note carousel can upload an image directly from a
+slide row, instead of leaving the modal — which lost every slide they had already typed, because the
+modal holds them in component state.
+
+**What was missing.** `note-editor-carousel-slide-upload`, an open high row of the 2026-08-30 surface
+audit. `uploadCarouselImage(e, i)` at reference byte 1,476,460, its `E0e` slide-row markup at
+1,462,300 and the `D0e` spinner at 1,462,280. The browser built at 05:02 can only offer what is
+already in the room; this is how an image gets there without leaving the dialog.
+
+**What was transcribed, decoded from this component's own consts table:** const 58
+`["type","file","accept","image/*",2,"display","none",3,"change","id"]` — a hidden file input whose
+id is `cfi_<index>`; const 59 `[1,"btn","btn-sm","btn-outline-secondary","mb-0"]` with const 60
+`fa-upload`, the styled `<label for>` that triggers it; const 52/53 and the caption `Uploading...`,
+the per-slide spinner. From the handler: the first file only (upstream is defensive about a browser
+handing it more, though the input is not `multiple`), the input cleared unconditionally so choosing
+the same file twice fires `change` again, the URL written into the slide **only on success**, and the
+failure raised as a dialog rather than a console line.
+
+**Two deliberate divergences, both recorded at the code.**
+
+1. **The POST is not transcribed.** `onUploadImages` already carries this room's upload — CDN when
+   configured, `composer-image.remote.ts` otherwise — and it is the prop the Insert Image dialog has
+   always used. Reproducing the reference's `$.ajax` with its `Authorization: Client-ID` header would
+   be a second uploader with its own credential handling, which is the shape the 2026-08-07
+   escalation came out of.
+2. **The spinner is keyed by the slide's KEY, never its index.** Upstream holds a reference to the
+   slide object (`const r = this.carouselImages[i]`) and mutates it, so a deletion during an upload
+   writes into a detached object and is harmlessly lost. Ours is `$state.raw` and replaces the array
+   wholesale, so an index captured before the `await` points at a **different slide** once
+   `removeCarouselSlide` renumbers. Re-finding by key on the way back is what makes the two behave
+   the same. The input is also cleared FIRST rather than last for the same reason the await
+   introduces: an early `return` after the await point would otherwise leave the input holding a file
+   it had already consumed.
+
+**A correction to `1b93d65`, three hours old.** That commit shipped the browser's trigger button
+labelled `Select Image` with classes I had invented — and its contract test asserted the same wrong
+string, because I wrote both from the same memory. ` Select Image ` is the MODAL's title (byte
+1,466,205). The button is ` Browse `, `fas fa-folder-open`, `btn btn-sm btn-outline-info mb-0 ml-1`
+(const 61/62, byte 1,462,300). Corrected in the component, in the test — which now also asserts the
+invented label is **gone** — and in the audit row, which said it too. This is the failure mode the
+repository's transcribe-consts-by-value rule exists to prevent, and it got through because the test
+was written from the implementation rather than from the capture.
+
+**A third gate caught the test itself.** The first full run went red on `slice-anchor-contract`:
+the new block took `editorCode.slice(at, editorCode.indexOf('\\n  }', at))` with the second bound
+written inline, and its inlined-slice count rose 142 → 144. That gate's whole argument is that an
+inline `indexOf` returning -1 makes `slice(-1)` — a well-defined one-character string every
+`toContain` below would fail against and every `not.toContain` would *pass* against. Both bounds are
+locals now and both are asserted, the count is back at 142, and the number was not raised.
+
+**Negative controls, all six seen RED after the commit** — a contract test that cannot fail is worse
+than no test, so each of the seven new assertions was earned by mutating the thing it guards:
+keying the spinner by `index` instead of `slide.key`; deleting the `input.value = ''`; writing the
+URL whether or not the upload returned one; dropping the `for="cfi_{index}"` that is the only thing
+connecting the styled label to the hidden input; putting `Select Image` back on the button; and
+removing the `finally` that clears the spinner on a throw. Every one went `1 failed | 19 passed`.
+
+**Verified.** `note-image-browser-contract.test.ts` 20 passed (7 new for the upload);
+`note-editor-render`, `simplified-note-editor-contract`, `note-version-history`,
+`orphaned-comment-contract`, `each-key-contract` — 333 passed; `source-size-contract` 468 passed
+after raising this file's ceiling 1,740 → 1,855 with the reason at the entry;
+`todo-next-coverage-contract` 10 passed after moving its inventory row to 1,850 and the total to
+30,066. `svelte-check` 1,418 files, 0 errors, 0 warnings. Full `pnpm run gate` green — 226 files, 3,687
+passed, 1 skipped, `gate-exit=0` echoed into the log and read from there rather than from the
+harness, which has reported "exit code 0" for a genuinely failed run twice today. **Nothing was opened in a browser**, and the
+**Svelte MCP has been unavailable for this entire session** — the official-docs step this repository
+requires on every `.svelte` change could not be run, and is not claimed.
+
 ### 2026-08-30 05:02 UTC — The note carousel's image browser, and a comment stripper that was right in one file and wrong in eighty-two
 
 **Runtime impact: YES.** A presenter building a note carousel can pick an image already uploaded to
