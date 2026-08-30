@@ -43,6 +43,14 @@ const controller = { settings: { enableQAReactions: true } as Record<string, unk
 
 vi.mock('#lib/server/room-config-client.js', () => ({
   RoomConfigUnavailable: class RoomConfigUnavailable extends Error {},
+  /*
+    The `deleteAlertPW` door, added 2026-08-30 with the gate it feeds. `{required:false}` is what the
+    controller answers for a room that has NOT configured an alert-delete password, so every
+    assertion in this file stays about the BROADCAST rather than about the password — and the file
+    now fails loudly if the gate is ever moved somewhere this mock does not cover, which is exactly
+    how this line came to be written.
+  */
+  checkAlertDeletePasswordRemotely: async () => ({ required: false, ok: true }),
   readRoomConfig: async (_request: unknown, shortCode: string, email?: string) => ({
     room: {
       shortCode,

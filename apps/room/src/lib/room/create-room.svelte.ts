@@ -96,15 +96,10 @@ import {
 import { removeProfilePicture, uploadProfilePicture } from '../../routes/profile-picture.remote';
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
-import { replyMessage, sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
-import {
-  askQuestion,
-  deleteQuestion,
-  editQuestion,
-  reactToQuestion
-} from '../../routes/alert-questions.remote';
+import { sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
 import { postAlert as postAlertCommand } from '../../routes/post-alert.remote';
-import { messageAction } from '../../routes/message-actions.remote';
+/* The message menu's SEVEN wires, in one frozen object — see `message-actions-port.ts` for why. */
+import { messageActionsPort } from './message-actions-port';
 
 import { PUBLIC_PTR_CDN_UPLOAD_KEY, PUBLIC_PTR_UPLOAD_SERVER } from '$app/env/public';
 
@@ -878,12 +873,7 @@ export function createRoom(deps: RoomDeps) {
     chat,
     composer,
     session: () => data,
-    sendOperation: (payload) => messageAction(payload),
-    askQuestion: (payload) => askQuestion(payload),
-    reactToQuestion: (payload) => reactToQuestion(payload),
-    deleteQuestion: (payload) => deleteQuestion(payload),
-    editQuestion: (payload) => editQuestion(payload),
-    replyMessage: (payload) => replyMessage(payload),
+    ...messageActionsPort,
     openModal: (name) => modals.open(name),
     closeMessageMenu: () => menus.openMessageMenu(null),
     selectUser: (user) => (userActions.selectedMessageUser = user),

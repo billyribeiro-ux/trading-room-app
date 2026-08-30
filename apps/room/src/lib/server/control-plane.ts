@@ -149,6 +149,26 @@ export function roomNotesAuthUrl(shortCode: string): string | null {
 }
 
 /**
+ * `POST {control}/internal/room-alert-delete-auth/{shortCode}` — the FOURTH question-shaped read.
+ *
+ * A sibling of `roomNotesAuthUrl` directly above, and deliberately a separate URL rather than a
+ * `credential` parameter on it. One endpoint taking a credential NAME would be an oracle: any holder
+ * of a `config-read` token could ask "is this string the value of `obsStreamKey`" and walk all seven
+ * credential-shaped settings a guess at a time. So each question gets its own door, each door names
+ * its own setting in its own source, and the body carries nothing but the candidate.
+ *
+ * It exists because `deleteAlertPW` is one of those seven and the reference compares it in the
+ * browser — `archiveChatDate` at bundle byte 2,048,641, and four more sites — because its `sessData`
+ * already holds it. See the endpoint's own header for the transcription and the offsets.
+ */
+export function roomAlertDeleteAuthUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin
+    ? `${origin}/internal/room-alert-delete-auth/${encodeURIComponent(shortCode)}`
+    : null;
+}
+
+/**
  * `POST {control}/internal/room-welcome-mat-auth/{shortCode}` — the third question-shaped read, and
  * the only one that answers with data.
  *
