@@ -48,7 +48,8 @@
     "test:db": "vitest run --config vitest.db.config.ts",
     "manage:styles": "node scripts/verify-manage-styles.mjs",
     "api-post-routes:extract": "node scripts/extract-api-post-routes.mjs",
-    "emoji:extract": "node scripts/extract-emoji-picker.mjs"
+    "emoji:extract": "node scripts/extract-emoji-picker.mjs",
+    "gate": "pnpm run format:check && pnpm run lint && pnpm run check && pnpm run test:gates && pnpm run test:unit && pnpm run build"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.8.1",

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { captureSettingsFrom } from '#lib/capture-settings.js';
 import { flushSync } from 'svelte';
 import { describe, expect, it } from 'vitest';
 
@@ -83,7 +84,17 @@ const make = () => {
     showScreensTab: () => {},
     checkPermissionState: async () => 'granted',
     closeScreenMenu: () => {},
-    videoDeviceId: () => undefined
+    /*
+      A REAL `CaptureSettings`, and the cast below is why this line matters more than it looks.
+
+      `as unknown as ConstructorParameters<…>` means `svelte-check` says nothing when the class gains
+      a required option — so when `videoDeviceId` became `capture` on 2026-08-30, this harness kept
+      compiling and handed the class `undefined`. Every webcam path then threw on `this.#capture()`,
+      and the ONLY thing that noticed was the webcam-reactivity test below going from
+      `[null, 'cam']` to `[null]`. That is what the cast costs, recorded here rather than removed:
+      the option list is long and mostly irrelevant to what this file asserts.
+    */
+    capture: () => captureSettingsFrom({})
   } as unknown as ConstructorParameters<typeof RoomMediaTransport>[0]);
 
   return { transport, screens, toasts };

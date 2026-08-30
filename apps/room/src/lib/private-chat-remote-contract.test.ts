@@ -278,9 +278,17 @@ describe('both parties are told', () => {
 
 describe('the client’s own half', () => {
   it('replaces on page 0 or a search, and prepends older history otherwise', () => {
-    // Page 0 is the current state of the thread; a later page is older and belongs in front.
+    /*
+      Page 0 is the current state of the thread; a later page is older and belongs in front.
+
+      The prepend was a bare spread until 2026-08-30 and is now `mergeOlderMessagesBy`, which drops
+      rows already held. Offset paging over a live tail hands the boundary row back twice whenever a
+      message arrives between two requests — the same reason the main feeds have used that fold
+      since they were written. `#lib/chat-paging.ts` carries it, keyed here on `_id`.
+    */
+    expect(privateChatModule).toContain('page === 0 || searchTerm');
     expect(privateChatModule).toContain(
-      'page === 0 || searchTerm ? incoming : [...incoming, ...(this.#threads[peerId] ?? [])]'
+      'mergeOlderMessagesBy(incoming, this.#threads[peerId] ?? [], (message) => message._id)'
     );
   });
 

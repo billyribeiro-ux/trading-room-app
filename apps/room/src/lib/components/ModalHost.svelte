@@ -1,7 +1,11 @@
 <script lang="ts">
+  import AvDevicePane from '#lib/components/AvDevicePane.svelte';
+  import ViewerAlertPrefsPane from '#lib/components/ViewerAlertPrefsPane.svelte';
+  import type { ViewerAlertPrefs } from '#lib/viewer-alert-prefs.js';
+  import type { RoomPeerHistory } from '#lib/room/peer-history.svelte.js';
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
-  import type { PrivateChatMessage } from '#lib/room/private-chat.svelte.js';
+  import { shortWhen } from '#lib/short-when.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
@@ -16,6 +20,7 @@
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { onMount, untrack } from 'svelte';
+  import type { CaptureSettings } from '#lib/capture-settings.js';
   import type {
     AlertTab,
     ActivePoll,
@@ -34,6 +39,7 @@
   } from '#lib/types.js';
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
+  import type { MessageBadge } from '#lib/types.js';
   import AlertQaModal from './AlertQaModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
@@ -234,6 +240,14 @@
       open(subjectUserId: number): void;
     };
     /**
+     * The target member's badges, resolved by `RoomFeeds.badgesFor` on the page.
+     *
+     * A prop rather than a resolver callback because every other fact about the target arrives that
+     * way, and because the resolution needs the page's badge map and the theme — both of which the
+     * page has and this component does not.
+     */
+    targetBadges: readonly MessageBadge[];
+    /**
      * Save the five permission checkboxes — the one control here that carries a PAYLOAD.
      *
      * `onUserAction` takes a name and a target and nothing else, so the ticked boxes had no way out
@@ -255,6 +269,19 @@
      * populated.
      */
     streamingType: string;
+    /**
+     * Every device and processing flag the A/V pane saves, as saved. See `#lib/capture-settings.ts`.
+     *
+     * ONE prop rather than five, and the same value the capture itself reads. It seeds this pane's
+     * controls so a reopened modal shows what is actually in force — they were `$state(false)` and
+     * two fabricated device ids until 2026-08-30, and neither told the truth.
+     */
+    capture: CaptureSettings;
+    /**
+     * The alerts tab's five gated viewer preferences — five controls the reference has, this room
+     * did not, and every one of them sat over a live consumer. See `#lib/viewer-alert-prefs.ts`.
+     */
+    viewerAlerts: ViewerAlertPrefs;
     onManagedUserRemoval: (list: 'mutedUsers' | 'followedUsers', user: ManagedChatUser) => void;
     onManagedUserInfo: (user: ManagedChatUser) => void;
     /**
@@ -268,14 +295,13 @@
     privateMessageHistoryEnabled: boolean;
     /** Opens the all-user private-message modal for one peer. */
     onShowPrivateMessages: (user: ModalTargetUser) => void;
-    /** What that modal is showing, and why it is not. All three owned by `RoomPrivateChat`. */
-    peerHistory: {
-      readonly nick: string;
-      readonly messages: readonly PrivateChatMessage[];
-      readonly truncated: boolean;
-    } | null;
-    peerHistoryLoading: boolean;
-    peerHistoryError: string | null;
+    /**
+     * What that modal is showing, why it is not, and whether it is still asking.
+     *
+     * ONE collaborator rather than the three parallel props this used to be — see the getter it
+     * comes from. Three props that are one idea is the shape this session corrected twice.
+     */
+    peerHistory: RoomPeerHistory;
     currentUser: {
       id: number;
       email: string;
@@ -479,16 +505,17 @@
     onFollowStyleChange,
     onMuteToggle,
     onUserAction,
+    targetBadges,
     userNotes,
     onSavePermissions,
     streamingType,
+    capture,
+    viewerAlerts,
     onManagedUserRemoval,
     onManagedUserInfo,
     privateMessageHistoryEnabled,
     onShowPrivateMessages,
     peerHistory,
-    peerHistoryLoading,
-    peerHistoryError,
     currentUser,
     mobilePin = 'N/A',
     mobileAppAvailable = false,
@@ -714,29 +741,6 @@
     could show "Group Chat" in a room whose chat was disabled.
   */
   const groupChatMode = $derived(chatMode);
-  let echoCancellation = $state(false);
-  let noiseSuppression = $state(false);
-  let autoGainControl = $state(false);
-  let audioDevices = $state.raw([
-    {
-      deviceId: '953f11aeca98147407fe5afe290dc18b384306c979179ce7a96ec4b92148ab5b',
-      label: 'Studio Display Microphone (05ac:1118)'
-    }
-  ]);
-  let videoDevices = $state.raw([
-    {
-      deviceId: '2da3a3313185023c68e57b8bd07c010fe3975db1a2962584c0b6b493aa5c708a',
-      label: 'Studio Display Camera (15bc:0000)'
-    }
-  ]);
-  let currentAudioDevice = $state(
-    '953f11aeca98147407fe5afe290dc18b384306c979179ce7a96ec4b92148ab5b'
-  );
-  let currentVideoDevice = $state(
-    '2da3a3313185023c68e57b8bd07c010fe3975db1a2962584c0b6b493aa5c708a'
-  );
-  let devicesLoading = $state(false);
-  let devicesLoadError = $state('');
   const fileUploadInputId = 'fupload';
   let streamPlayerEnabled = $state(false);
   /*
@@ -1900,88 +1904,6 @@
     void getNewToken();
   });
 
-  async function loadDevices() {
-    if (!navigator.mediaDevices?.enumerateDevices) {
-      devicesLoadError =
-        'Your browser does not support device enumeration. Please use a modern browser.';
-      return;
-    }
-
-    devicesLoading = true;
-    devicesLoadError = '';
-    const streams: MediaStream[] = [];
-    try {
-      try {
-        streams.push(await navigator.mediaDevices.getUserMedia({ audio: true }));
-      } catch {
-        // The compiled client continues and enumerates devices without labels.
-      }
-      try {
-        streams.push(await navigator.mediaDevices.getUserMedia({ video: true }));
-      } catch {
-        // The compiled client continues and enumerates devices without labels.
-      }
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const isDuplicateDefault = (device: MediaDeviceInfo) => {
-        const label = device.label;
-        if (device.deviceId === 'default' || device.deviceId === 'communications') return true;
-        if (!label.toLowerCase().startsWith('default - ')) return false;
-        const physicalLabel = label.slice(10);
-        return devices.some(
-          (candidate) =>
-            candidate.kind === device.kind &&
-            candidate.label === physicalLabel &&
-            candidate.deviceId !== device.deviceId
-        );
-      };
-      const toOption = (device: MediaDeviceInfo) => ({
-        deviceId: device.deviceId,
-        label:
-          device.label ||
-          `${device.kind} (${device.deviceId ? `${device.deviceId.slice(0, 8)}...` : 'unknown'})`
-      });
-
-      const nextAudio = devices
-        .filter((device) => device.kind === 'audioinput' && !isDuplicateDefault(device))
-        .map(toOption);
-      const nextVideo = devices
-        .filter((device) => device.kind === 'videoinput' && !isDuplicateDefault(device))
-        .map(toOption);
-      if (nextAudio.length) {
-        audioDevices = nextAudio;
-        if (!nextAudio.some((device) => device.deviceId === currentAudioDevice)) {
-          currentAudioDevice = nextAudio[0].deviceId;
-        }
-      }
-      if (nextVideo.length) {
-        videoDevices = nextVideo;
-        if (!nextVideo.some((device) => device.deviceId === currentVideoDevice)) {
-          currentVideoDevice = nextVideo[0].deviceId;
-        }
-      }
-      if (!nextAudio.length && !nextVideo.length) {
-        devicesLoadError =
-          'No audio or video devices detected. Please ensure devices are connected and permissions are granted.';
-      }
-    } catch (error) {
-      const deviceError = error as DOMException;
-      devicesLoadError =
-        deviceError.name === 'NotFoundError'
-          ? 'No audio or video devices found. Please connect a microphone and/or camera.'
-          : deviceError.name === 'NotAllowedError'
-            ? 'Permission denied. Please allow access to your microphone and camera in your browser settings.'
-            : deviceError.name === 'SecurityError'
-              ? 'Security error. Please ensure the page is loaded over HTTPS.'
-              : `Error loading devices: ${deviceError.message || 'Unknown error'}`;
-    } finally {
-      for (const stream of streams) {
-        for (const track of stream.getTracks()) track.stop();
-      }
-      devicesLoading = false;
-    }
-  }
-
   onMount(() => {
     try {
       const savedVideos: unknown = JSON.parse(localStorage.getItem('ytVideoList') ?? '[]');
@@ -2193,6 +2115,11 @@
       cleanupMicTest();
     };
   });
+
+  /** `e.user.loggedIn | date:'short'`, `$derived` because `targetUser` re-resolves on every access. */
+  const lastLogin = $derived(
+    targetUser.loggedIn ? shortWhen.format(new Date(targetUser.loggedIn)) : 'n/a'
+  );
 </script>
 
 <app-user-info-modal>
@@ -2332,7 +2259,7 @@
                     <tr>
                       <th scope="row">Last Login:</th>
                       <td>
-                        {targetUser.loggedIn ? String(targetUser.loggedIn) : 'n/a'}
+                        {lastLogin}
                         {#if targetUser.status === 'offline'}
                           <span class="badge badge-danger">Offline</span>
                         {/if}
@@ -2349,7 +2276,31 @@
                     <tr>
                       <th scope="row">Badges:</th>
                       <td>
-                        <div class="d-inline-block align-baseline mr-1"></div>
+                        <!--
+                          THE CELL WAS EMPTY while the supply was already in the browser. Upstream
+                          binds `innerHTML` here (bytes 2,060,329-2,060,802); these are ELEMENTS
+                          because `badge.text` is controller data, and UNGATED because upstream's
+                          binding carries no `O()`. See `user-badges-contract.test.ts`.
+                        -->
+                        <div class="d-inline-block align-baseline mr-1">
+                          {#each targetBadges as badge, badgeIndex (`${targetUser.id}-${badgeIndex}`)}
+                            {#if badge.imageUrl}
+                              <img
+                                class="user-badge-img"
+                                src={badge.imageUrl}
+                                alt={badge.text ?? 'Badge'}
+                                width="16"
+                                height="16"
+                              />
+                            {:else}
+                              <span
+                                class="badge px-1 mx-1 user-badge"
+                                style="background-color: {badge.backgroundColor}; color: {badge.color};"
+                                >{badge.text}</span
+                              >
+                            {/if}
+                          {/each}
+                        </div>
                         <!--
                           `O(20, sessData.isNewIndicatorOn && isPresenter && user.isNew ? 20 : -1)`
                           — bundle byte 2,060,925, and this gate had ONE of its three terms.
@@ -3331,6 +3282,8 @@
             >
           </div>
         </div>
+
+        <ViewerAlertPrefsPane {viewerAlerts} {isPresenter} {onPreferenceChange} />
 
         <div class="p-2 text-mode-box">
           <div id="appSpeechRecoOverlay" title="Show Speech Recognition Overlay" class="pb-2">
@@ -4416,102 +4369,7 @@
           }
         ]}
       >
-        <div class="d-flex justify-content-end align-items-center mt-2 mb-3">
-          <button
-            type="button"
-            title="Refresh device list"
-            class="btn btn-sm btn-outline-primary"
-            onclick={() => void loadDevices()}
-          >
-            <i class="fas fa-sync-alt"></i> Refresh Devices
-          </button>
-        </div>
-        {#if devicesLoading}
-          <div class="text-center my-3">
-            <i class="fas fa-spinner fa-spin"></i> Loading devices...
-          </div>
-        {/if}
-        {#if devicesLoadError}
-          <div class="alert alert-danger">{devicesLoadError}</div>
-        {/if}
-        <div class="mt-2">
-          <div class="form-group">
-            <label for="audio-deviceList">Audio device (input):</label>
-            <select
-              id="audio-deviceList"
-              aria-label="Audio device (input)"
-              class="form-select"
-              bind:value={currentAudioDevice}
-              onchange={() => onPreferenceChange('audioDeviceID', currentAudioDevice)}
-            >
-              {#each audioDevices as device (device.deviceId)}
-                <option value={device.deviceId}>{device.label}</option>
-              {/each}
-            </select>
-            <small class="text-white mt-1 d-block">
-              <i class="fas fa-check-circle text-success"></i>
-              Selected: {audioDevices.find((device) => device.deviceId === currentAudioDevice)
-                ?.label ?? 'Unknown Device'}
-            </small>
-          </div>
-          <div class="form-group">
-            <label for="video-deviceList">Video device (input):</label>
-            <select
-              id="video-deviceList"
-              aria-label="Video device (input)"
-              class="form-select"
-              bind:value={currentVideoDevice}
-              onchange={() => onPreferenceChange('videoDeviceID', currentVideoDevice)}
-            >
-              {#each videoDevices as device (device.deviceId)}
-                <option value={device.deviceId}>{device.label}</option>
-              {/each}
-            </select>
-            <small class="text-white mt-1 d-block">
-              <i class="fas fa-check-circle text-success"></i>
-              Selected: {videoDevices.find((device) => device.deviceId === currentVideoDevice)
-                ?.label ?? 'Unknown Device'}
-            </small>
-          </div>
-        </div>
-        <div class="mt-4">
-          <div class="ml-4">
-            <input
-              type="checkbox"
-              name="echo-cancellation"
-              value="Echo Cancellation"
-              id="echo-cancellation"
-              class="form-check-input"
-              bind:checked={echoCancellation}
-              onchange={() => onPreferenceChange('echoCancellation', echoCancellation)}
-            />
-            <label for="echo-cancellation" class="form-check-label"> Echo Cancellation </label>
-          </div>
-          <div class="ml-4">
-            <input
-              type="checkbox"
-              name="noise-suppression"
-              value="Noise Suppression"
-              id="noise-suppression"
-              class="form-check-input"
-              bind:checked={noiseSuppression}
-              onchange={() => onPreferenceChange('noiseSuppression', noiseSuppression)}
-            />
-            <label for="noise-suppression" class="form-check-label"> Noise Suppression </label>
-          </div>
-          <div class="ml-4">
-            <input
-              type="checkbox"
-              name="auto-gain-control"
-              value="Auto Gain Control"
-              id="auto-gain-control"
-              class="form-check-input"
-              bind:checked={autoGainControl}
-              onchange={() => onPreferenceChange('autoGainControl', autoGainControl)}
-            />
-            <label for="auto-gain-control" class="form-check-label"> Auto Gain </label>
-          </div>
-        </div>
+        <AvDevicePane {capture} {onPreferenceChange} />
       </div>
       <div
         id="streaming-selection"
@@ -5273,7 +5131,7 @@
     {#snippet header()}
       <h5>
         All private messages:
-        {#if peerHistory?.nick}<strong>{peerHistory.nick}</strong>{/if}
+        {#if peerHistory.history?.nick}<strong>{peerHistory.history.nick}</strong>{/if}
       </h5>
     {/snippet}
     <!--
@@ -5282,28 +5140,28 @@
       was the spinner ALONE and nothing opened the modal: a permanent "Loading..." with no fetch
       behind it, which is why `enablePrivateMessageHistory` was mis-filed as a one-line WIRE.
     -->
-    {#if peerHistoryLoading}
+    {#if peerHistory.loading}
       <div class="text-center my-4">
         <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
       </div>
-    {:else if peerHistoryError}
+    {:else if peerHistory.error}
       <!--
         NOT in the capture: upstream has no failure branch here, because its fetch cannot refuse.
         Ours can — the server checks the role AND the room setting before it reads a row — and a
         refusal that rendered as "No logs." would tell a presenter the member has no private
         messages, which is a different and worse answer than "you may not read them".
       -->
-      <div class="mt-3 text-center text-warning">{peerHistoryError}</div>
+      <div class="mt-3 text-center text-warning">{peerHistory.error}</div>
     {:else}
       <div class="w-100">
         <div class="log-body">
-          {#if peerHistory && peerHistory.messages.length > 0}
+          {#if peerHistory.history && peerHistory.history.messages.length > 0}
             <div class="log-messages">
-              {#each peerHistory.messages as message (message._id)}
+              {#each peerHistory.history.messages as message (message._id)}
                 <CompactMessageRow {message} />
               {/each}
             </div>
-            {#if peerHistory.truncated}
+            {#if peerHistory.history.truncated}
               <!--
                 ALSO NOT in the capture, and for the same reason: the reference asks for everything
                 and gets everything. `loadPeerHistory` caps at `MAX_PEER_HISTORY` because this read

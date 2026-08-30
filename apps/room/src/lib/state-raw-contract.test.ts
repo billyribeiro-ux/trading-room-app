@@ -54,7 +54,7 @@ import { describe, expect, it } from 'vitest';
 
   * `captionHistory` in `+page.svelte` — 500 entries, replaced wholesale up to twice a second.
   * `globalChatStyle` in `+page.svelte` — read by `messageChrome`, i.e. on every rendered message.
-  * `advancedSearchResults`, `audioDevices`, `videoDevices` in `ModalHost.svelte`.
+  * `advancedSearchResults` in `ModalHost.svelte`; `audioDevices` / `videoDevices` in `AvDevicePane`.
 
   This is the same failure shape `source-size-contract.test.ts` and `unbound-method-contract.test.ts`
   each record paying for once: a guard whose corpus is narrower than the rule it enforces reads as
@@ -411,8 +411,9 @@ describe('replace-only objects use $state.raw', () => {
     expect(rawByName('ModalHost.svelte', 'advancedSearchResults')).toBe(true);
     expect(rawByName('ModalHost.svelte', 'uploadQueue')).toBe(true);
     expect(rawByName('ModalHost.svelte', 'micDevices')).toBe(true);
-    expect(rawByName('ModalHost.svelte', 'audioDevices')).toBe(true);
-    expect(rawByName('ModalHost.svelte', 'videoDevices')).toBe(true);
+    /* Moved to `AvDevicePane.svelte` on 2026-08-30 with the rest of the A/V pane, still raw. */
+    expect(rawByName('AvDevicePane.svelte', 'audioDevices')).toBe(true);
+    expect(rawByName('AvDevicePane.svelte', 'videoDevices')).toBe(true);
     expect(rawByName('EmojiPicker.svelte', 'searchResults')).toBe(true);
 
     // And the three that must NOT be, because `bind:` writes their members.

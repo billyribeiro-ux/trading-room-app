@@ -23,7 +23,8 @@
     "test": "pnpm privacy:verify && pnpm schema:verify && vitest run",
     "privacy:verify": "node gate/verify-privacy-boundary.mjs",
     "lint": "eslint .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "gate": "pnpm run format:check && pnpm run lint && pnpm run check && pnpm run test && pnpm run build"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.8.1",

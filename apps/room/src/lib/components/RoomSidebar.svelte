@@ -114,9 +114,8 @@
     tip: TipButton;
     canOpenRosterPrivateChat: (entry: Entry) => boolean;
     mobileAppAvailable: boolean;
-    benzingaVisible: boolean;
-    benzingaUrl: string | null;
-    benzingaLogoUrl: string | null | undefined;
+    /** The three Benzinga settings as one value — see `gates.benzinga` for why they travel together. */
+    benzinga: { visible: boolean; url: string | null; logoUrl: string | null };
     /** `DUMP_CONTRACT.version`, shown in the footer. */
     dumpVersion: string;
 
@@ -163,9 +162,7 @@
     tip,
     canOpenRosterPrivateChat,
     mobileAppAvailable,
-    benzingaVisible,
-    benzingaUrl,
-    benzingaLogoUrl,
+    benzinga,
     dumpVersion,
     onopenmodal,
     onopenrosteruserinfo,
@@ -384,19 +381,19 @@
             </a>
           </li>
         {/if}
-        {#if benzingaVisible}
+        {#if benzinga.visible}
           <li class="nav-item py-0">
             <a
-              href={benzingaUrl}
+              href={benzinga.url}
               target="_blank"
               rel="noopener noreferrer"
               title="Benzinga News"
               class="nav-link sidebar-item ps-1"
             >
-              {#if benzingaLogoUrl}
+              {#if benzinga.logoUrl}
                 <img
                   class="benzinga-logo-alt"
-                  src={benzingaLogoUrl}
+                  src={benzinga.logoUrl}
                   alt="Benzinga News"
                   width="120"
                   height="24"

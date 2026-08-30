@@ -1521,17 +1521,17 @@ export const actions: Actions = {
         .run();
     }
 
-    return { success: true };
     /*
-      `handleServerCmdAdmin` is one line and this is the only command it carries:
-        handleServerCmdAdmin(e, i) { "gotPollAnswer" === e && emit("gotPollAnswer", i) }
-      It rides `/cmdsAdmin/`, so only presenters are subscribed to it - a member answering a poll
-      must not tell every other member how they voted.
+      `handleServerCmdAdmin(e, i) { "gotPollAnswer" === e && emit("gotPollAnswer", i) }` — one
+      command, on presenter-only `/cmdsAdmin/`, which is also why the frame carries no payload. IT
+      SAT AFTER THE `return` UNTIL 2026-08-30; see `poll-actions-contract.test.ts`.
     */
     publishToRoom(requireRoomShortCode(locals), {
       channel: 'cmdsAdmin',
       data: { cmd: 'gotPollAnswer' }
     });
+
+    return { success: true };
   },
 
   pollDone: async ({ locals }) => {

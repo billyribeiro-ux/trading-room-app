@@ -237,6 +237,19 @@ export function createSessionFor(
       .insert(sessions)
       .values({ id: sessionId, userId, roomShortCode, createdAt: now, lastSeenAt: now })
       .run();
+    /*
+      `users.last_login_at` — the durable half, and it is IN this transaction rather than after it.
+
+      The row it stamps is the only record that survives the two deletes above: this function
+      removes every prior session, and `logout` removes the last one, so a login that stamped the
+      column outside the transaction could roll back the session while leaving a login recorded that
+      never happened. Same instant as the session's `createdAt`, from the same `now`, because they
+      are one event described twice.
+
+      An UPDATE of one row by primary key, once per login. See `server/user-detail.ts` for the only
+      thing that reads it.
+    */
+    transaction.update(users).set({ lastLoginAt: now }).where(eq(users.id, userId)).run();
   });
   setSessionCookie(cookies, sessionId, remember);
   return sessionId;

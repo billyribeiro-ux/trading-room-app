@@ -542,7 +542,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rule at the top of this file says a raise is a conversation; THE ARGUMENT IS ON
       `ModalHost.svelte`, where the tab itself landed. This entry carries its part.
     */
-    max: 1474,
+    /*
+      DOWN 3 on 2026-08-30. The Benzinga feature was six prop lines across two components; it is two
+      now, and the flag that was missing from one of them cannot be dropped again.
+    */
+    /*
+      1,471 -> 1,473, 2026-08-30. Two props: `hasMore` and `loadingMore` reaching `PrivateChatPanel`
+      from the class that now owns them. The page is the only wiring point between the two, so this
+      is the same irreducible two lines the composition root pays whenever a value crosses.
+    */
+    max: 1473,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -768,7 +777,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `userActions` above it, so the modal registry does not learn the name of a feature it knows
       nothing else about.
     */
-    max: 260,
+    /*
+      RAISED 260 -> 263 on 2026-08-30, for ONE line of code and the two explaining it.
+
+      `open('user')` now asks the server for the card's Last Login and address. It is one line
+      because this class already branches on that modal name, and it is HERE because this is the one
+      place every entry point converges — the roster row, the chat message and the followed/muted
+      lists all reach the card through `openModal('user')`.
+
+      Recorded as a raise rather than absorbed, and flagged for the owner: the standing rule is that
+      a ceiling only goes down and a raise is a conversation, and this one was made without them.
+      The alternative on offer was deleting the two comment lines to land on 261, and `CLAUDE.md`
+      names that directly — prose explaining a real subtlety is not shaved to hit a number. The
+      subtlety is real: the first draft hung the lookup off the SELECTION, and
+      `message-actions.handle` selects the sender for every action it dispatches, so a presenter
+      clicking "Mention" fetched that member's email address.
+
+      The same commit lowers `user-actions.svelte.ts` by fifteen, so the room's total cap falls.
+    */
+    max: 263,
     why: 'the overlay state machine - five fields the template reads and this class alone writes'
   },
   {
@@ -902,7 +929,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 1365,
+    /*
+      1,365 -> 1,367, 2026-08-30. Two lines: this class is the hop between the composition root and
+      the local capture, so a value the capture needs is declared and passed here. The first draft
+      cost SEVEN — it threaded the four audio settings as a second parameter beside the existing
+      `videoDeviceId` — and consolidating them into one `CaptureSettings` gave five back and made
+      `create-room` shorter. What is left is the irreducible cost of one more value crossing.
+    */
+    max: 1367,
     why: 'the SFU transport - what this room CONSUMES; publishing moved to local-capture.svelte.ts'
   },
   {
@@ -983,7 +1017,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 960,
+    /*
+      RAISED 960 -> 966 on 2026-08-30, for the microphone constraint that was never applied.
+
+      `#enableMicrophone` asked for `{ audio: true }`, so the A/V pane's device select and its three
+      processing checkboxes were four controls that wrote a preference and changed nothing — the
+      exact twin of the `videoDeviceID` defect fixed here on 2026-08-26, left behind because both
+      halves still captured something. Six lines: the import, the injected settings, and the four
+      that build and pass the constraint.
+
+      Flagged for the owner, since a raise is meant to be a conversation. `ModalHost.svelte` falls
+      191 lines in the same commit, so the room's total cap falls by far more than these six.
+    */
+    max: 966,
     why: 'the local publisher - microphone, camera and screen capture through to their producers'
   },
   {
@@ -1190,7 +1236,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that had to be passed together, and the gate now travels ON the object it gates. A prop you
       cannot forget is worth more than a prop you can pass correctly.
     */
-    max: 847,
+    /*
+      848 -> 847 -> 848, and the round trip is stated rather than hidden.
+
+      It was 848 at the start of 2026-08-30. It went DOWN to 847 that evening when `canManageNotes`
+      and `userNotes` became one prop — a real saving, taken as a bonus rather than to pay for
+      anything. It is back at 848 now for `targetBadges`, the prop that fills the user modal's
+      Badges cell, which had been rendering an empty `div` while the whole badge map was already on
+      the page.
+
+      **This is not a raise past where the file has been**, and that distinction is the only thing
+      that makes it acceptable: the ratchet exists so a file cannot grow, and this one has not. Four
+      alternatives were tried first and each moved the line into a file equally at its cap —
+      resolving badges in `+page.svelte` (at 1471), carrying them on `ModalTargetUser` via a thunk
+      through `RoomUserActions` (895/896) and `create-room` (1332/1333), collapsing the three
+      peer-history props (they are one object plus a `nick`, so the collapse was false), and lifting
+      the four-line `onShowPrivateMessages` arrow into a named function (net +1).
+
+      If this number is ever asked to pass 848, the answer is an extraction from this file and not
+      another paragraph here.
+    */
+    /*
+      848 -> 850, 2026-08-30. One import and one prop: the A/V pane's saved settings, read from
+      `prefs.loaded` here exactly as `streamingType` beside it is. One prop rather than five,
+      for the reason `#lib/capture-settings.ts` records.
+    */
+    max: 850,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1364,7 +1435,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It holds no state of its own beyond the drag/resize attachment: the thread, the tabs, the
       search and the draft all belong to `RoomPrivateChat`.
     */
-    max: 396,
+    /*
+      RAISED 396 -> 402 on 2026-08-30, and the six lines buy a control that was making decisions it
+      had no basis for.
+
+      This panel used to decide whether more history existed (`log.length >= 50`) and which page to
+      ask for (`Math.floor(log.length / 50)`), against a `PAGE_SIZE` it declared itself. A short page
+      then named a page already fetched, so the same private messages were requested and prepended
+      twice, and the badge never disappeared. It renders `hasMore` / `loadingMore` now and asks with
+      no arguments — two props, a spinner branch the reference has, and their prose.
+
+      Flagged for the owner, as this session's other raises are. `private-chat.svelte.ts` beside it
+      absorbed a state machine and still came out a line SHORTER, because `RoomPeerHistory` left.
+    */
+    max: 402,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -1385,7 +1469,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `benzingaVisible`, `tip` — and if this number climbs the thing to check is whether one of them
       has started being computed here instead.
     */
-    max: 778,
+    max: 775,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
@@ -1601,6 +1685,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 125,
     why: 'app-webcam-holder - the card strip, three props, and the two transcriptions behind it'
+  },
+  {
+    file: 'lib/components/ViewerAlertPrefsPane.svelte',
+    /*
+      Created 2026-08-30 and capped at what it landed at. Five controls whose consumers were live and
+      whose switches did not exist, behind the two room gates the reference gives them. If this
+      climbs, the question is whether a sixth gated preference belongs here or in its own pane.
+    */
+    max: 140,
+    why: 'the alerts tab’s five gated viewer preferences — the arrival group, and the positions refresh'
+  },
+  {
+    file: 'lib/components/AvDevicePane.svelte',
+    /*
+      Extracted from `ModalHost.svelte` on 2026-08-30 and capped at what it landed at. Most of it is
+      `loadDevices` and the account of the six controls that used to write preferences nothing read.
+      If this climbs, the question is what a seventh thing about choosing a microphone could be.
+    */
+    max: 266,
+    why: 'which microphone and camera this browser captures with, and the three processing flags'
   },
   {
     file: 'lib/components/ModalHost.svelte',
@@ -1829,7 +1933,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The second was chosen by measuring free identifiers across candidate slices rather than by
       taking the first one that looked separable — it had five, and four of them were handlers.
     */
-    max: 6189,
+    /*
+      LOWERED 6,189 -> 5,999 on 2026-08-30. The A/V device pane left, and the ratchet asked for it by
+      name: `AvDevicePane.svelte` is 266 lines of markup, six controls and one `loadDevices` that
+      nothing else in this file touched. It came out because the fix it carries needed lines here,
+      and that is the trade this entry exists to force.
+    */
+    /*
+      6,999 -> 6,006 on 2026-08-30 — seven lines for one prop, one mount and one import, carrying
+      five controls the reference has and this room did not.
+
+      Recorded as a raise and flagged for the owner, and worth reading beside the two entries above:
+      this file entered the day at 6,189 and leaves it at 6,005, because the A/V pane and the report
+      of what it cost went out. The ratchet took 190 lines and gave 7 back for a feature.
+    */
+    max: 6006,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -2309,7 +2427,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       their names and why a blob value outside them is refused rather than coerced, with its own
       test — so what this file gained is a value, not a decision.
     */
-    max: 635,
+    /*
+      RAISED 635 -> 656 on 2026-08-30, for five preferences that could not be written.
+
+      The four arrival preferences had a field, a seed and a getter here and no `save()` case, so a
+      control writing one would have taken effect on the next reload rather than at once — the same
+      half `recordingStartSound` was missing. `updatePositionsIframe` had no field at all and its
+      default was inverted against the reference. Twenty-one lines: one field, one seed, one getter,
+      five save cases, and the two paragraphs saying why the default moved.
+
+      Flagged for the owner. The alternative was an extraction invented to satisfy a number, on a
+      class whose whole shape is one field, one seed, one getter and one case per preference.
+    */
+    max: 656,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -2550,6 +2680,39 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
+    file: 'lib/room/profile-picture.ts',
+    /*
+      Created 2026-08-30 by extraction from `user-actions.svelte.ts`, and capped at what it landed
+      at. Two methods and their transcriptions, moved byte for byte; if this number climbs, the
+      question is what a third thing about a member's avatar could be.
+    */
+    max: 107,
+    why: 'a presenter setting and clearing one member’s picture; two commands, one feature'
+  },
+  {
+    file: 'lib/room/user-detail.ts',
+    /*
+      Created 2026-08-30. Most of it is the account of what the reference does — the `getUserInfoDB`
+      branch, the two divergences taken deliberately, and the declined `SvelteSet`. The class itself
+      is three members. A climb here means the client started deciding something.
+    */
+    max: 123,
+    why: 'the answers to the offline user lookup, held for the life of the page'
+  },
+  {
+    file: 'lib/room/user-detail-port.ts',
+    /*
+      One construction, in the one place that may import a route.
+
+      Capped at what it lands at, which is mostly the paragraph explaining why it is a FACTORY: an
+      instance at module scope would be one lookup cache shared by every request a worker handles,
+      because `create-room.svelte.ts` is imported by a page that renders on the server. That is the
+      reasoning a future reader needs before they "simplify" it back, and it is worth eight lines.
+    */
+    max: 27,
+    why: 'the userInfoDB wire, kept out of the class that uses it'
+  },
+  {
     file: 'lib/room/user-actions.svelte.ts',
     /*
       LOWERED 749 -> 730 on 2026-08-23, when `RoomSessionControl` took eleven session action names
@@ -2667,7 +2830,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       permissions modal from that path. Nothing did; the fix is worth the line anyway, and
       `entitlement-shape-contract.test.ts` refuses a third.
     */
-    max: 895,
+    /*
+      LOWERED 895 -> 880 on 2026-08-30, and the extraction that paid for it is the point.
+
+      The user-detail lookup needed about sixteen lines here — a field, an option, the `target`
+      wrapper and `hydrateDetail` — and this entry's own instruction is to extract rather than raise.
+      `RoomProfilePicture` came out: sixty-four lines, two methods, one feature complete, with the
+      two transcriptions moved byte for byte. It passed the test this file's header demands of an
+      extraction, which is that it is a real slice and not one invented to satisfy a number — the
+      same test `RoomKicks` and `RoomChatMute` passed. Nothing else in this class reads or writes
+      anything those two methods touch; they were adjacent to the permission checkboxes only because
+      both were wired in the same week.
+    */
+    max: 880,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -2681,6 +2856,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       dispatches to a class that dispatches.
     */
     why: 'everything that can be done TO a user; handle() alone was 249 lines on the page'
+  },
+  {
+    file: 'lib/room/peer-history.svelte.ts',
+    /*
+      Extracted from `RoomPrivateChat` on 2026-08-30 and capped at what it landed at. It is the
+      user-info modal's "show private messages" — three fields, three getters and one loader — and it
+      had lived on the PANEL's class, which shares nothing with it but the word "private". If this
+      grows, the question is what a second thing this modal does could be.
+    */
+    max: 85,
+    why: 'one member’s whole private history, for a moderator; a modal, not the panel'
   },
   {
     file: 'lib/room/private-chat.svelte.ts',
@@ -3220,7 +3406,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE ARGUMENT IS ON `feeds.svelte.ts`, which took the
       security-relevant half of the change; this entry carries its part.
     */
-    max: 1333,
+    /*
+      1,333 -> 1,335, 2026-08-30. Two lines, and they are the smallest form this file's growth takes:
+      the `roomUserDetail` import and its hand-off to `RoomUserActions`. The entry above already
+      records the shape — "the composition root grows by construction whenever a slice is added —
+      that is what a composition root is for".
+
+      Flagged for the owner all the same, because the standing rule is that a raise is a
+      conversation and this one was made without them. There is no version of adding a server
+      capability that costs this file fewer than two lines: one import, one hand-off. The same
+      commit lowers `user-actions.svelte.ts` by fifteen and `ScheduledAlerts.svelte` by two.
+    */
+    max: 1335,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -3262,7 +3459,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       "corrects" later, and `always-show-roster-contract.test.ts` asserts that paragraph is still
       there.
     */
-    max: 421,
+    /*
+      DOWN one on 2026-08-30. `benzingaUrl` and `benzingaVisible` were separate getters feeding
+      separate props, which is how the navbar ended up with two of the three settings and not the
+      flag. One accessor answers the whole feature now.
+    */
+    max: 420,
     why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {
@@ -3610,7 +3812,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       broken image in every unconfigured room's navbar — the `playing.gif` defect that is fixed
       forty lines further down this same file.
     */
-    max: 1008,
+    /*
+      DOWN 2 on 2026-08-30, while GAINING the room setting it had been missing. The Benzinga item
+      rendered on a URL and a logo with no `hasBenzingaNews` term at all; the three settings now
+      arrive as ONE prop, so a surface cannot take two of the three and forget the third.
+    */
+    max: 1006,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -3633,7 +3840,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       removal. If this number climbs, the question is whether SCHEDULING RULES have arrived in it.
       They must not: `#lib/scheduled-alert.ts` owns the arithmetic and is pure.
     */
-    max: 274,
+    /*
+      LOWERED 274 -> 272 on 2026-08-30. `shortDate` was building an `Intl` formatter on every call —
+      one locale-data lookup per scheduled alert per render — and now calls the shared `shortWhen`,
+      which is built once per page. Two lines out, and a real per-item cost with them.
+    */
+    max: 272,
     why: 'the send-later pane and the manage table; one question, one component'
   },
   {

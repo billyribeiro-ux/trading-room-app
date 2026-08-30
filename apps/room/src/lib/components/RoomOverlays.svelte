@@ -4,6 +4,8 @@
   import type { SvelteSet } from 'svelte/reactivity';
 
   import { alertPassesFilter, type AlertFilterFor } from '#lib/alert-filter.js';
+  import { captureSettingsFrom } from '#lib/capture-settings.js';
+  import { viewerAlertPrefsFrom } from '#lib/viewer-alert-prefs.js';
   import { resolveAlertDelivery } from '#lib/alert-delivery.js';
   import { isMentionOf } from '#lib/mention.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
@@ -628,9 +630,12 @@
   userNotes={userActions.userNotes}
   onSavePermissions={(user, granted) => userActions.savePermissions(user, granted)}
   streamingType={typeof prefs.loaded.streamingType === 'string' ? prefs.loaded.streamingType : ''}
+  capture={captureSettingsFrom(prefs.loaded)}
+  viewerAlerts={viewerAlertPrefsFrom(data.sessData, prefs)}
   onManagedUserRemoval={(list, user) => userActions.requestManagedRemoval(list, user)}
   onManagedUserInfo={(user) => userActions.openManagedInfo(user)}
   currentUser={data.user}
+  targetBadges={feeds.badgesFor(userActions.target.emailHash)}
   targetUser={userActions.target}
   debugLog={debugLog.received}
   onUploadProfilePicture={(user, file) => userActions.uploadProfilePicture(user, file)}
@@ -638,11 +643,9 @@
   privateMessageHistoryEnabled={data.sessData?.enablePrivateMessageHistory === true}
   onShowPrivateMessages={(user) => {
     modals.open('all-private');
-    void privateChat.showPeerHistory(user.id);
+    void privateChat.peerHistory.show(user.id);
   }}
   peerHistory={privateChat.peerHistory}
-  peerHistoryLoading={privateChat.peerHistoryLoading}
-  peerHistoryError={privateChat.peerHistoryError}
   mutedUsers={userActions.mutedUsers}
   followedUsers={userActions.followedUsers}
   targetMessage={messageActions.selected}

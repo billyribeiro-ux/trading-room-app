@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ChatArchiveView } from '#lib/server/chat-archive.js';
+  import { shortWhen } from '#lib/short-when.js';
 
   /**
    * The chat archives browser — `app-chat-logs-modal`, and the four-button dialog beside it.
@@ -63,11 +64,7 @@
 
   let olderThan = $state('');
 
-  /**
-   * Built once rather than per row, for the reason the notes list records: a formatter inside the
-   * `{#each}` is one allocation and one locale-data lookup per archive.
-   */
-  const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  /** The date half alone — `shortWhen` carries the pair, and nothing else needs this one. */
   const day = new Intl.DateTimeFormat(undefined, { dateStyle: 'short' });
 </script>
 
@@ -129,7 +126,7 @@
             and older &middot; {archive.messageCount} message{archive.messageCount === 1 ? '' : 's'}
             &middot; {archive.channel}
             <small class="d-block text-muted"
-              >archived {when.format(new Date(archive.archivedAt))}</small
+              >archived {shortWhen.format(new Date(archive.archivedAt))}</small
             >
           </span>
           <button

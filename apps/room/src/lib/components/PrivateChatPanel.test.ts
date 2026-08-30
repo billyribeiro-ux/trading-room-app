@@ -41,7 +41,7 @@ const row = (over: Partial<PrivateChatRow> & { _id: string }): PrivateChatRow =>
   ...over
 });
 
-/** Fifty rows is the page size, which is what makes Load More appear. */
+/** A full page as the server used to send it. Nothing derives a page number from it now. */
 const fullPage = () => Array.from({ length: 50 }, (_, index) => row({ _id: `m${index}` }));
 
 let target: HTMLElement | undefined;
@@ -63,7 +63,7 @@ interface Calls {
   donotdisturb: number;
   download: number;
   switchuser: number[];
-  loadmore: [number, number][];
+  loadmore: number;
   send: number;
 }
 
@@ -76,7 +76,7 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
     donotdisturb: 0,
     download: 0,
     switchuser: [],
-    loadmore: [],
+    loadmore: 0,
     send: 0
   };
 
@@ -96,6 +96,8 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
       searching: false,
       searchTerm: '',
       draft: '',
+      hasMore: false,
+      loadingMore: false,
       onclosepeer: () => (calls.closepeer += 1),
       ondeletethis: () => (calls.deletethis += 1),
       onclose: () => (calls.close += 1),
@@ -103,7 +105,7 @@ const render = (props: Partial<Record<string, unknown>> = {}) => {
       ondonotdisturb: () => (calls.donotdisturb += 1),
       ondownload: () => (calls.download += 1),
       onswitchuser: (uid: number) => calls.switchuser.push(uid),
-      onloadmore: (uid: number, page: number) => calls.loadmore.push([uid, page]),
+      onloadmore: () => (calls.loadmore += 1),
       onsend: () => (calls.send += 1),
       ...props
     }
@@ -232,17 +234,39 @@ describe('the conversation', () => {
   });
 });
 
-describe('Load More, and the rule that a filtered log is not a paged one', () => {
-  it('appears once the log reaches a full page', () => {
-    const { root } = render({ tabs: [tab({ uid: 1 })], currentUserId: 1, log: fullPage() });
-    expect(root.querySelector('.badge-warning')?.textContent?.trim()).toBe('Load More');
-  });
+/*
+  REWRITTEN 2026-08-30, and the tests that stood here are worth naming because they PINNED the defect.
 
-  it('does NOT appear below a full page, because there is nothing older to ask for', () => {
+  The panel used to decide for itself whether there was more history — `log.length >= 50` — and which
+  page to ask for — `Math.floor(log.length / 50)` — against a `PAGE_SIZE` it declared. Three tests
+  asserted exactly that arithmetic, including one titled *"asks for the page AFTER the one it is
+  showing"* whose comment spelled out `floor(length / 50)`. They passed, and the behaviour they
+  protected was: a page that came back short named a page already fetched, so the same private
+  messages were requested and prepended twice, and the badge never disappeared.
+
+  `#lib/chat-paging.ts` carries the reference's own four-field state machine and what this cost. The
+  panel now RENDERS a decision rather than making one, so these assert what it draws and what it
+  reports — never how many rows it happens to be holding.
+*/
+describe('Load More, and the rule that a filtered log is not a paged one', () => {
+  it('appears while the server still has history, whatever the log length', () => {
+    /* Two rows and more to come is a real state: the previous version could not express it. */
     const { root } = render({
       tabs: [tab({ uid: 1 })],
       currentUserId: 1,
-      log: fullPage().slice(0, 49)
+      log: fullPage().slice(0, 2),
+      hasMore: true
+    });
+    expect(root.querySelector('.badge-warning')?.textContent?.trim()).toBe('Load More');
+  });
+
+  it('disappears once a page comes back empty, however full the log is', () => {
+    /* A full page held and nothing older left — the state that used to leave the badge forever. */
+    const { root } = render({
+      tabs: [tab({ uid: 1 })],
+      currentUserId: 1,
+      log: fullPage(),
+      hasMore: false
     });
     expect(root.querySelector('.badge-warning')).toBeNull();
   });
@@ -256,17 +280,35 @@ describe('Load More, and the rule that a filtered log is not a paged one', () =>
       tabs: [tab({ uid: 1 })],
       currentUserId: 1,
       log: fullPage(),
+      hasMore: true,
       searching: true
     });
     expect(root.querySelector('.badge-warning')).toBeNull();
   });
 
-  it('asks for the page AFTER the one it is showing', () => {
-    // 50 rows held is page 0; the next request is page 1. `floor(length / 50)`.
-    const { root, calls } = render({ tabs: [tab({ uid: 9 })], currentUserId: 9, log: fullPage() });
+  it('asks, and names no page — the counter belongs to whoever makes the requests', () => {
+    const { root, calls } = render({
+      tabs: [tab({ uid: 9 })],
+      currentUserId: 9,
+      log: fullPage(),
+      hasMore: true
+    });
     root.querySelector<HTMLElement>('.badge-warning')?.click();
     flushSync();
-    expect(calls.loadmore).toEqual([[9, 1]]);
+    expect(calls.loadmore).toBe(1);
+  });
+
+  it('becomes a spinner while the request is in flight, and cannot be clicked again', () => {
+    // `O(2, hasMoreData && !searchTerm ? 2 : -1)` then `O(3, isLoadingMore ? 3 : -1)` — exclusive.
+    const { root } = render({
+      tabs: [tab({ uid: 1 })],
+      currentUserId: 1,
+      log: fullPage(),
+      hasMore: false,
+      loadingMore: true
+    });
+    expect(root.querySelector('.badge-warning')?.textContent?.trim()).toBe('');
+    expect(root.querySelector('.fa-spinner'), 'the spinner branch').not.toBeNull();
   });
 });
 

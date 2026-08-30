@@ -1,0 +1,2937 @@
+# The room surfaces, audited against the pinned v4 bundle — 2026-08-30
+
+**223 verified gaps across 18 surfaces.** Every entry names a byte offset in
+`apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, what this room does instead, and
+the file and line where it does it.
+
+## How this was produced, and what that buys
+
+One reader per surface read the reference component end to end at verified boundaries and listed
+every difference. **Each claimed difference then went to two independent verifiers** — one asking
+*"is this already built here under another name?"*, one asking *"is the quoted evidence actually at
+that offset, and does it mean what the claim says?"* A claim survived only if neither could refute
+it.
+
+| | |
+| --- | ---: |
+| surfaces read | 18 |
+| reference components not found in the bundle | 0 |
+| differences claimed | 274 |
+| **survived verification** | **223** |
+| refuted | 51 |
+| false-claim rate | 19% |
+
+**The 19% false-claim rate is the number to keep.** Nearly one claimed gap in five was wrong —
+thirty-two already built here under a name the reader did not search for, nineteen resting on
+reference code that does not do what the offset appeared to say (dead handlers, unreachable
+branches). Without the second pass this document would carry fifty-one items of work that does not
+need doing, and no way to tell which fifty-one. That is why the refuted list is kept below rather
+than discarded.
+
+Also recorded per surface: how many reference behaviours were confirmed **present** here. A list of
+only gaps reads as though nothing works, and 965 behaviours were confirmed built.
+
+## What this document is NOT
+
+* **Not a plan.** Nothing here is scheduled, scoped or costed, and some entries will turn out to be
+  deliberate divergences this repository already argued for in a comment the reader did not reach.
+  Read the code before acting on a row.
+* **Not a substitute for reading the bytes.** Every entry carries its offset so the next person
+  re-reads rather than trusts. The v4 bundle is SHA-256 pinned, so an offset stays valid.
+* **Not complete.** Eighteen surfaces of sixty-two; `todo-next.md` holds the inventory.
+
+The verifiers' transcripts are not carried into the repository — they run to about a megabyte and
+the register would stop being readable. Each entry carries the verdict sentence, and the reasoning
+behind it is reproducible by re-reading the offset, which is the point of quoting one.
+
+## Severity, as the readers used it
+
+| | meaning |
+| --- | --- |
+| **high** | a control the reference has that does nothing here, or a value invented rather than read |
+| **medium** | a behaviour that differs in a way a user would notice |
+| **low** | a constant, a wording, or an ordering that differs |
+
+| kind | count | | severity | count |
+| --- | ---: | --- | --- | ---: |
+| `missing-behaviour` | 81 | | high | 29 |
+| `missing-control` | 62 | | medium | 110 |
+| `divergence` | 45 | | low | 84 |
+| `wrong-constant` | 20 | |  |  |
+| `defect` | 9 | |  |  |
+| `invented-value` | 6 | |  |  |
+
+## The surfaces
+
+| surface | gaps | of which high | reference behaviours confirmed present |
+| --- | ---: | ---: | ---: |
+| PrivateChatPanel.svelte | 21 | 4 | 48 |
+| RoomMessage.svelte | 19 | 0 | 41 |
+| notes/NoteEditor.svelte | 18 | 2 | 50 |
+| ModalHost: session-control modal | 17 | 4 | 50 |
+| ModalHost: user-settings modal | 17 | 5 | 35 |
+| routes/+page.svelte (room shell) | 15 | 1 | 65 |
+| ModalHost: user-info / moderation modal | 14 | 3 | 48 |
+| PostAlertModal.svelte | 14 | 1 | 61 |
+| ModalHost: report / advanced-search modal | 12 | 3 | 49 |
+| RoomSidebar.svelte | 12 | 0 | 52 |
+| StreamingView + ScreenPane + ScreenTabs | 11 | 1 | 59 |
+| EmojiPicker + reactions | 11 | 1 | 69 |
+| AlertChatArea.svelte | 9 | 3 | 42 |
+| PresentationArea.svelte | 8 | 0 | 56 |
+| PollPanel.svelte | 8 | 0 | 56 |
+| FilesPane.svelte | 7 | 0 | 51 |
+| ModalHost: connectivity / AV test modal | 5 | 1 | 61 |
+| day-trade-alerts + swing-alerts panes | 5 | 0 | 72 |
+
+---
+
+## PrivateChatPanel.svelte
+
+21 verified gaps; 48 reference behaviours confirmed present.
+
+### G1 — The whole composer button column is absent: emoji picker, image upload, GIF picker
+
+**high** · `missing-control` · reference byte **2,198,563**
+
+```
+function pEe(t,n){if(1&t){const e=Y();d(0,"div",50)(1,"div",52),H(2,lEe,5,0,"div",53),d(3,"div",54)(4,"textarea",55),x("keyup",function(o){return D(e),E(g(2).onKey(o))})("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus",function(){return D(e),E(g(2).onTextareaFocus())}),u()(),d(5,"div",56)(6,"span",57),x("click",function(){return D(e),E(g(2).toggleEmojiPanel())}),T(7,"i",58),u(),H(8,cEe,2,0,"span",59)(9,hEe,6,1,"span",60),u()()()}if(2&t){g();const e=It(3),i=g();m(2),O(2,i.webinarMode?2:-1),m(4),z("ngbPopover",e),m(2),O(8,i.canPostImages?8:-1),m(),O(9,i.canPostImages?9:-1)}}
+```
+
+**Ours:** PrivateChatPanel.svelte:369-385 renders `#textAreaHolderPM` containing ONLY the textarea. There is no `textAreaBtnsCol` column, no `span.textAreaBtns` emoji button, no `cEe` image-upload span, no `hEe` GIF span. Grepping apps/room/src for `toggleEmojiPanel` returns 0 hits; `GiphyPicker.svelte` exists but is imported only by `notes/NoteEditor.svelte:15`, and `imgUpload`/`onImagePaste` exist only for the swing/day-trade alert forms (RoomOverlays.svelte:633,647,664,679). None is wired to the private-chat composer.
+
+> Verified: Confirmed on both sides. Reference: the `pEe` render function at offset 2198563 belongs to `app-privchat` (selector block at offset 2214530: `selectors:[["app-privchat"]],decls:19,vars:9`), and that component's consts array (read at offset 2217534) carries the full composer button column — `textAreaBtnsCol`, a `textAreaBtns` span with `["…
+
+### G2 — `.pc-messages` has no CSS rule anywhere, so the private-chat log cannot scroll
+
+**high** · `missing-behaviour` · reference byte **2,194,497**
+
+```
+dependencies:[uf],styles:[".pc-messages[_ngcontent-%COMP%]{height:calc(100% - 50px);overflow:hidden auto}"]
+```
+
+**Ours:** PrivateChatPanel.svelte:345 renders `<div class="pc-messages">`, and `private-chat.svelte.ts:385` scrolls `document.querySelector('.pc-messages')`, but `grep -rn "pc-messages" --include=*.css` over the whole repository returns ZERO rules. The reference's rule lives in the SCROLLER's own component styles, not in app-privchat's, so it was missed when app-privchat's styles were transcribed into captured-runtime-components.css:6482-6600. The container therefore has no height and no `overflow`, and `scrollTop = scrollHeight` on a non-scrolling box is a no-op.
+
+> Verified: I could not refute this. `.pc-messages` is rendered (PrivateChatPanel.svelte:345) and scrolled by script (private-chat.svelte.ts:385-386) but has NO CSS rule anywhere in our source.
+
+### G3 — `PAGE_SIZE = 50` and `Math.floor(log.length / 50)` replace the scroller's component-owned page counter, and re-request the same page
+
+**high** · `invented-value` · reference byte **2,193,442**
+
+```
+loadMore(){this.loadMoreLastID="pcm-"+this.msgs[0]._id,this.appService.guiEventBus.emit("PCLoadMore",{page:++this.currPage}),this.isLoadingMore=!0}
+```
+
+**Ours:** PrivateChatPanel.svelte:149 declares `const PAGE_SIZE = 50` (described as "the page size getAllPCLogs answers with") and :346/:354 gate on `log.length >= PAGE_SIZE && !searching` while computing `Math.floor(log.length / PAGE_SIZE)`. The reference has no client-side page size at all — `loadPClogForUID(e,i=0)` (@2207000-region, read at 2205022ff) sends only `{page, peerID}` and the counter is `++this.currPage` held on the scroller, reset to 0 on `PCswitchChatToUser`. Consequence: if a page comes back with fewer than 50 rows (e.g. 30), `log.length` becomes 80 and `Math.floor(80/50)` is 1 — the SAME page is requested again and `private-chat.svelte.ts:417-421` prepends it a second time with no de-duplication.
+
+> Verified: I tried to find a component-owned page counter for private chat and it is genuinely absent. What I found instead confirms the claim and sharpens it: this repo DOES have the reference's counter machinery, extracted and named `RoomLogPages` (`lib/room/log-pages.svelte.ts`) — `#page` documented as "`this.currPage`, per log" (:62), `#hasMore`…
+
+### G4 — `hasMoreData` is never modelled, so Load More never disappears when the history runs out
+
+**high** · `missing-behaviour` · reference byte **2,194,388**
+
+```
+2&i&&(m(2),O(2,o.hasMoreData&&!o.searchTerm?2:-1),m(),O(3,o.isLoadingMore?3:-1),m(),pt(o.msgs))
+```
+
+**Ours:** PrivateChatPanel.svelte:346 gates only on `log.length >= PAGE_SIZE && !searching`. The reference sets `0==e.length&&(this.hasMoreData=!1,this.loadMoreLastID="")` in the scroller's `getPCLog` subscriber (read at 2191700-region inside the class body at 2191427). Ours: an empty response leaves `log.length` unchanged, so the badge stays and every further click re-fetches the same empty page forever. `#lib/chat-paging.ts` and `#lib/room/log-pages.svelte.ts` DO model `hasMoreData` for the main chat/alert feeds, but the private-chat panel is not wired to either.
+
+> Verified: I could not refute it. PrivateChatPanel.svelte:346 gates Load More solely on `log.length >= PAGE_SIZE && !searching` (PAGE_SIZE=50 at :149).
+
+### G11 — `autoExpand` is not applied to the private-chat textarea, so `.pc-messages` is never resized either
+
+**medium** · `missing-behaviour` · reference byte **2,203,228**
+
+```
+autoExpand(e){P("autoExpand:"),e.style.height="0";const i=window.getComputedStyle(e),o=e.scrollHeight+2+"px";i.getPropertyValue("height")!==o&&(e.style.height=o,this.elementRef.nativeElement.querySelector(".pc-messages").style.height=`calc(100% - ${o} - 15px)`),""===e.value.trim()&&(e.style.height="23px",this.elementRef.nativeElement.querySelector(".pc-messages").style.height="calc(100% - 50px)")}
+```
+
+**Ours:** PrivateChatPanel.svelte:370-384 attaches no expand handler. `+page.svelte:853-870` has `autoExpandComposer`, but it is the MAIN chat composer's variant (it sets only the textarea height, never `.pc-messages`) and is passed only to the main composer at +page.svelte:1187 (`onexpandcomposer`). The private-chat panel receives no such prop.
+
+> Verified: I could not refute it. The private-chat textarea in our source has no expand wiring of any kind, and nothing in apps/room/src ever writes a height onto `.pc-messages`.
+
+### G12 — No incoming-PM toast or desktop notification ("Message from <name>")
+
+**medium** · `missing-behaviour` · reference byte **2,205,471**
+
+```
+!this.appService.globals.preferences.doNotDisturbOn&&this.appService.globals.preferences.chatPopup&&(this.alertService.info(e.txt,"Message from "+e.n,{enableHtml:!0}),window.Notification)&&new Notification("Message from "+e.n,{body:e.txt,icon:e.pic||"https://secure.gravatar.com/avatar/"+e.avt+"?d=mm&s=50"})
+```
+
+**Ours:** private-chat.svelte.ts:373 fires only the sound: `if (!doNotDisturbOn && !isMine && chatSoundOn) playSound('pling')`. `RoomToasts.notify` exists (toasts.svelte.ts:150-170) and correctly reproduces the `?d=mm&s=50` gravatar fallback, but its only two call sites are alert delivery and the @-mention popup (RoomOverlays.svelte:300, :349). Grepping apps/room/src for "Message from " returns no private-chat use.
+
+> Verified: Confirmed absent from our source after an exhaustive search. `RoomPrivateChat.ingest()` fires only the sound (private-chat.svelte.ts:373) and there is no toast or OS notification on the incoming-PM path.
+
+### G13 — `canPost` refusal ("Sorry, you can't post to this channel") is not modelled
+
+**medium** · `missing-behaviour` · reference byte **2,208,062**
+
+```
+sendMessage(){if(!this.canPost)return void bootbox.alert("Sorry, you can't post to this channel");let e=Ao("#textAreaTxtPM").val().toString().trim();e&&(this.appService.sendPrivChat(this.currUser,e,this.recvdUser),Ao("#textAreaTxtPM").val(""),this.appService.guiEventBus.emit("scrollChatLogToBottomPM",{force:!0,repeat:!1}))}
+```
+
+**Ours:** private-chat.svelte.ts:425-439 `send()` trims and posts with no `canPost` gate; the string "you can't post to this channel" returns 0 hits across apps/room/src. The panel also has no `canPost`/`chatEnabled`/`isConnected` props (Props at PrivateChatPanel.svelte:91-116), so the reference's composer gate `O(4,e.isConnected&&e.chatEnabled?4:-1)` (fEe @2199159) has no counterpart — the composer is always rendered.
+
+> Verified: The refusal is UNREACHABLE DEAD CODE in the reference's own private-chat component, so there is no behaviour to model — and the one real refusal path that exists IS built here. 1.
+
+### G14 — Load More loses the reader's position — no `pcm-` anchor scroll-restore and no `-20` nudge
+
+**medium** · `missing-behaviour` · reference byte **2,191,427**
+
+```
+this.appService.appEventBus.subscribe("getPCLog",e=>{this.isLoadingMore=!1,0==e.length&&(this.hasMoreData=!1,this.loadMoreLastID=""),this.loadMoreLastID&&(document.getElementById(this.loadMoreLastID).scrollIntoView(!0),this.scrollRef.nativeElement.parentElement.scrollTop=this.scrollRef.nativeElement.parentElement.scrollTop-20)})
+```
+
+**Ours:** private-chat.svelte.ts:408-422 `loadLog` prepends the older page and returns; nothing records the previously-first row's id or restores the scroll position. `CompactMessageRow.svelte:51` does emit the right anchor (`id="pcm-{message._id}"`), so the anchor exists but nothing scrolls to it. Grep for `loadMoreLastID` across apps/room/src returns 0 hits.
+
+> Verified: I could not find any anchor-based scroll restore for the private-chat Load More anywhere in apps/room/src. `scrollIntoView` has ZERO occurrences in the entire src tree (case-insensitive), and `loadMoreLastID` / `loadMoreLast` / `lastID` / `anchorId` / `restoreScroll` / `scrollAnchor` / `preserveScroll` all return zero hits.
+
+### G15 — Avatar `src` has no gravatar fallback, so an empty `avatarUrl` renders a broken image
+
+**medium** · `missing-behaviour` · reference byte **2,196,189**
+
+```
+z("src",e.pic||"https://secure.gravatar.com/avatar/"+e.avt+"?d=mm&s=32",Mt)
+```
+
+**Ours:** PrivateChatPanel.svelte:326 `<img alt="t.avt" class="avatarImg" src={tab.pic} />` and :193 `src={peer.pic}` (reference header tab uses `?d=mm&s=25`, eEe @2194806). `lib/server/private-chat.ts:236` fills `pic: peer.avatarUrl` with no fallback, and the `avt` field is carried on `PrivateChatTab` (PrivateChatPanel.svelte:64) but read by nothing.
+
+> Verified: I could not refute it. Both private-chat avatar images bind `pic` directly with no `||` fallback, and no fallback is applied at any upstream hop.
+
+### G16 — Tab online status is hard-coded false for every server-supplied conversation
+
+**medium** · `missing-behaviour` · reference byte **2,203,228**
+
+```
+checkUserOnlineStatus(){if(this.privChatVisible&&this.appService.globals.roster&&this.chatTabs)for(const e of this.appService.globals.roster)for(const i of this.chatTabs)i.uid===e.userXrefID&&(i.online=!0)}
+```
+
+**Ours:** private-chat.svelte.ts:268-278 builds every server tab with `online: false` and nothing later consults the roster; only a peer created locally by `ingest` (:357) gets `online: true`. The reference recomputes it on `getRoster`, `onUserJoin` and `onUserLeave` (subscribers read in the ngOnInit block starting at 2200160). Consequence: the `bg-success` dot at PrivateChatPanel.svelte:325 is permanently grey for anyone on the loaded tab strip.
+
+> Verified: I could not refute it. The `tabs` getter hard-codes `online: false` for every server-supplied conversation and the class has no access to the roster at all — `RoomPrivateChat`'s constructor options inject only `selectRosterUser` (a click handler), never a roster thunk, so no roster frame can reach the tab strip.
+
+### G17 — The clear-search button does not clear the input when the typed term was never submitted
+
+**medium** · `defect` · reference byte **2,195,340**
+
+```
+d(7,"span",34),x("click",function(){D(e);const o=It(6),s=g();return o.value="",E(s.onEnterSearchChat(""))})
+```
+
+**Ours:** PrivateChatPanel.svelte:281 `onclick={() => onsearch('')}` — it never writes the input's own value. `searchTerm` is `$bindable()` (:127) but +page.svelte:1403 passes it UNBOUND (`searchTerm={privateChat.searchTerm}`), so the local value only resets when the parent's value changes. Type "abc" without pressing Enter, then click clear: `RoomPrivateChat.search('')` (private-chat.svelte.ts:562-568) sets `#searchTerm` from '' to '' — no prop change — and the input still reads "abc". The reference sets `o.value=""` explicitly for exactly this case.
+
+> Verified: I tried to refute this and could not. The clear button at PrivateChatPanel.svelte:281 is `onclick={() => onsearch('')}` and nothing else — there is no `$effect` anywhere in PrivateChatPanel.svelte (grep for `$effect` in that file returns zero lines), no element ref, and no write to the input's own `.value`.
+
+### G18 — The whole body is gated on `tabs.length > 0`; the reference gates only the LIST column on it
+
+**medium** · `divergence` · reference byte **2,219,468**
+
+```
+m(),O(16,o.chatTabs&&o.chatTabs.length>0?16:-1),m(),O(17,""!==o.currUser?17:18))
+```
+
+**Ours:** PrivateChatPanel.svelte:307 wraps BOTH the `.pc-list` column and the `.pc-logs` column in `{#if tabs.length > 0}`, with a single "No active chat" in the `{:else}` at :389. In the reference the two regions are independent: with zero tabs but a selected `currUser` — the window between `openFromRoster` and `getAllPCLogs` returning — the conversation and composer still render. Ours shows "No active chat" and no composer in that state.
+
+> Verified: I could not find it built anywhere. In the reference the two regions are siblings with independent gates: at offset 2219390 `d(15,"div",19),H(16,rEe,4,1,"div",20)(17,fEe,5,3,"div",21)(18,_Ee,3,1),u()()` and at offset 2219743 `O(16,o.chatTabs&&o.chatTabs.length>0?16:-1),m(),O(17,""!==o.currUser?17:18))`.
+
+### G5 — `pmLogsOnRight` side-swap (`flex-row-reverse` on `.pc-body`) is not applied
+
+**medium** · `missing-control` · reference byte **2,219,468**
+
+```
+z("ngClass",ct(7,YDe,o.appService.globals.preferences.pmLogsOnRight))
+```
+
+**Ours:** PrivateChatPanel.svelte:306 renders `<div class="d-flex h-100 pc-body">` with no conditional class and no `pmLogsOnRight` prop. `YDe=t=>({"flex-row-reverse":t})` is at offset 2194594. The preference IS written by the settings modal (ModalHost.svelte:1611 `onPreferenceChange('pmLogsOnRight', !previous)`) and is explicitly NOT in `dead-preference-keys.ts:43`, so the toggle currently has no reader — a control whose only effect is changing its own state.
+
+> Verified: The `pmLogsOnRight` preference is written but never read anywhere in apps/room/src. PrivateChatPanel.svelte:306 renders `<div class="d-flex h-100 pc-body">` as a static class string; the component's props list (PrivateChatPanel.svelte:118-138, 19 props) has no layout/side prop, and the render site at +page.svelte:1440-1463 passes none.
+
+### G6 — Tab list is rendered in the wrong order — the reference reverses it so the most recent conversation is first
+
+**medium** · `missing-behaviour` · reference byte **2,196,816**
+
+```
+function rEe(t,n){if(1&t&&(d(0,"div",20),ht(1,oEe,8,9,"button",39,qDe),H(3,sEe,5,0,"div",40),u()),2&t){const e=g();m(),pt(e.chatTabs.slice().reverse()),m(2),O(3,e.getAllPCLogsLoading?3:-1)}}
+```
+
+**Ours:** PrivateChatPanel.svelte:314 renders `{#each tabs as tab (tab.uid)}` in the order the getter produces, and `private-chat.svelte.ts:287-289` sorts ASCENDING by last activity ("the most recent sits last", matching the reference's `chatTabs.push(o)` in `newMessage` @2205471). The reference then reverses for display, so the newest conversation is at the TOP of `.pc-list`; ours puts it at the bottom.
+
+> Verified: Could not refute. The reference builds `chatTabs` most-recent-LAST (splice-then-push in `newMessage`, observed at offset 2205766: `o=this.chatTabs.splice(a,1)[0]` ...
+
+### G7 — No `getAllPCLogsLoading` state — neither the tab-strip loader nor the "Loading private chats" empty pane exists
+
+**medium** · `missing-behaviour` · reference byte **2,196,694**
+
+```
+function sEe(t,n){1&t&&(d(0,"div",40)(1,"div",47),v(2,"Loading all private chats."),u(),d(3,"div",47),v(4,"Please wait..."),u()())}
+```
+
+**Ours:** PrivateChatPanel.svelte:389 and :337 both render the same static `<div class="flex-fill p-3 text-center">No active chat</div>`. The reference's `_Ee` (@2199521) picks between `mEe` " Loading private chats. Please wait... " (@2199404) and `gEe` " No active chat " on `getAllPCLogsLoading`, and `rEe` appends `sEe` inside the tab column while loading. Grepping apps/room/src for "Loading all private chats" and "Loading private chats" returns 0 hits.
+
+> Verified: I could not refute it: the loader is genuinely absent from apps/room/src. PrivateChatPanel.svelte:337 and :389 both render the static "No active chat" div with no loading branch, and RoomPrivateChat has only #peerHistoryLoading (the moderator peer-history modal, private-chat.svelte.ts:156/238/492) — nothing for the tab list.
+
+### G8 — Header tab close (`closeTab`) does not deselect the open thread
+
+**medium** · `missing-behaviour` · reference byte **2,205,022**
+
+```
+closeTab(e){this.user=null,this.recvdUser=null,this.currUser="",console.log("closeTab with uid: ",e)}
+```
+
+**Ours:** +page.svelte:1405-1408 wires `onclosepeer` to `userActions.clearSelectedMessageUser(); messageActions.clearSelected();` only. `privateChat.peerId` is untouched, so PrivateChatPanel.svelte:336 still takes the `currentUserId !== null` branch: the header tab vanishes but the thread and composer remain. The reference clears `currUser`, which by the update block `O(17,""!==o.currUser?17:18)` (@2219468) falls back to the empty pane. Note `RoomPrivateChat.close()` (private-chat.svelte.ts:552-559) DOES clear it for the X button — the gap is only on the tab close.
+
+> Verified: Confirmed not implemented. The header tab's × is wired at +page.svelte:1451-1454 to `userActions.clearSelectedMessageUser(); messageActions.clearSelected();` only.
+
+### G19 — No "Loading..." spinner badge while a page is in flight
+
+**low** · `missing-behaviour` · reference byte **2,191,172**
+
+```
+function zDe(t,n){1&t&&(d(0,"div",2)(1,"span",5),T(2,"i",6),v(3," Loading..."),u()())}
+```
+
+**Ours:** PrivateChatPanel.svelte:346-359 renders the Load More badge and nothing else; there is no `isLoadingMore` prop or state and no `badge badge-warning` + `fas fa-spinner fa-spin` variant. `RoomPrivateChat.loadLog` (private-chat.svelte.ts:408) tracks no in-flight flag, so a second click during a slow fetch fires a duplicate request.
+
+> Verified: The reference's app-privchatscroller renders TWO independent branches inside .pc-messages: the clickable "Load More" badge ($De, gated on hasMoreData && !searchTerm) and a separate non-clickable spinner badge (zDe, gated on isLoadingMore) whose consts are [1,"badge","badge-warning"] plus [1,"fas","fa-spinner","fa-spin"] with the text " Lo…
+
+### G21 — Composer textarea: placeholder has two dots not three, and `name`/`spellcheck`/`form-control` are missing
+
+**low** · `wrong-constant` · reference byte **2,217,341**
+
+```
+["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true","placeholder","Type your message here...",1,"txt-area","form-control",3,"keyup","paste","focus"]
+```
+
+**Ours:** PrivateChatPanel.svelte:370-374: `class="txt-area w-100"`, `placeholder="Type your message here.."` (two dots), no `name="txt-area"`, no `spellcheck="true"`. Related: the holder at :369 carries `class="d-flex align-items-center textSendDiv"` where the reference const is `["id","textAreaHolderPM",1,"textSendDiv"]` with an inner `div.d-flex.mx-0` (read in the consts tail at 2217285-region) — the flex row is on the wrong element.
+
+> Verified: I could not refute this. Our PrivateChatPanel composer genuinely lacks the attributes and the wrapper structure, and nothing elsewhere in apps/room/src supplies them.
+
+### G23 — Delayed re-scroll fires at 60 ms; the reference uses 500 ms
+
+**low** · `wrong-constant` · reference byte **2,191,427**
+
+```
+scrollToBottom(e=!1,i=!1){try{P("scrollPCLogToBottom called on log....force:"+e+". parent:",this.scrollRef.nativeElement.parentElement),this.scrollRef.nativeElement.scrollTop=this.scrollRef.nativeElement.scrollHeight;const o=this;setTimeout(()=>{P("scrolling delayed.... SH:"+o.scrollRef.nativeElement.scrollHeight),o.scrollRef.nativeElement.scrollTop=o.scrollRef.nativeElement.scrollHeight,P("scrolling delayed.... ST:"+o.scrollRef.nativeElement.scrollTop)},500)}catch{}}
+```
+
+**Ours:** private-chat.svelte.ts:383-390 `scrollToBottom()` runs immediately then `setTimeout(run, 60)`. The 500 ms is what lets late-loading avatars and wrapped rows re-flow before the second scroll; 60 ms fires before that.
+
+> Verified: I could not refute this. Our private-chat re-scroll delay is a bare literal 60 and it is the only delay in the private-chat scroll path; nothing anywhere in apps/room/src schedules a 500 ms private-chat re-scroll.
+
+### G25 — Clearing the search refetches from the server; the reference restores the cached log locally
+
+**low** · `divergence` · reference byte **2,209,001**
+
+```
+clearSearchTerm(){this.pmSearchTerm="",this.appService.guiEventBus.emit("setSearchTermPC",{searchTerm:this.pmSearchTerm,uid:this.currUser}),this.appService.globals.privChatSearchResults=[],this.msgs=this.appService.globals.privChatLog[this.currUser],this.appService.appEventBus.emit("scrollPCLogToBottom",{force:!0,repeat:!0})}
+```
+
+**Ours:** private-chat.svelte.ts:562-568 `search(term)` always calls `loadLog(peerId, 0, term.trim())`, so clearing a search costs a round trip and discards any pages the reader had already loaded. The reference keeps search results in a SEPARATE bucket (`privChatSearchResults`) and swaps `msgs` back to the untouched `privChatLog[currUser]`; ours overwrites the one thread array with the search results at :417-421 (`page === 0 || searchTerm ? incoming : …`).
+
+> Verified: Could not refute. Our private-chat search has no separate results bucket and no local restore: `search(term)` at private-chat.svelte.ts:562-568 unconditionally awaits `loadLog(this.#peerId, 0, term.trim())`, so clearing the box costs a server round trip; and loadLog at :418-421 writes the answer into the single `#threads[peerId]` array (`…
+
+### G27 — Title-flash notification interval is absent (recorded elsewhere as a known gap)
+
+**low** · `missing-behaviour` · reference byte **2,205,471**
+
+```
+(!Ao("#textAreaTxtPM").is(":focus")||!window.onfocus)&&!e.isMine&&(this.notificationInterval=setInterval(()=>{document.title=this.appService.globals.sessionName===document.title?`${e.n} messaged you - ${this.appService.globals.sessionName}`:this.appService.globals.sessionName},2e3))
+```
+
+**Ours:** Not implemented, and deliberately so: `moderator-message-contract.test.ts:112` asserts `expect(pageCode).not.toContain('messaged you -')`, with the comment at :103-110 naming it as one of two recorded consumers still missing and pointing at `docs/decoded/missing-settings-triage.md`. `private-chat.svelte.ts:542-545` quotes the `closePanel` half (clearInterval + restore title) inside a comment with no code behind it. Listed here for completeness of the two-sided audit, not as an unrecorded gap.
+
+> Verified: I could not find the title-flash notification interval implemented anywhere in apps/room/src, under this or any other name, and the repository's own contract test actively asserts its absence. What I searched (all under apps/room/src, node_modules excluded): `messaged you` (3 hits, all prose/assertions — none executable), `document.title`…
+
+---
+
+## RoomMessage.svelte
+
+19 verified gaps; 41 reference behaviours confirmed present.
+
+### RM-01 — app-st-compactmessage has its own component stylesheet; our compact branch renders inside the app-st-message host and inherits the CARD styles
+
+**medium** · `missing-behaviour` · reference byte **1,400,248**
+
+```
+.msg-box[_ngcontent-%COMP%]{font-weight:100;font-size:14px
+```
+
+**Ours:** RoomMessage.svelte:578 opens `<app-st-message>` for BOTH modes and the compact branch is nested inside it (RoomMessage.svelte:585-744), so compact rows are styled by `app-st-message .msg-box` (16px), `app-st-message .avatar img` (35px) and `app-st-message .username` (font-weight 900). The reference's compact block pins 14px / 25px / font-weight 800 (verified at 1400248, 1401045, 1401137) and also carries `.nowrap{white-space:nowrap;display:table}` (1404334), `.reactions-container{margin-left:20px}` (1404652), `.uploaded-img{max-width:150px;max-height:150px}` (1403092) and `.presenter-reactions-right{margin:0 0 0 -50px}`. `grep -c app-st-compactmessage src/lib/styles/captured-runtime-components.css` returns 0 — the whole scoped section is absent from our transcription, and our compact markup uses `nowrap` (RoomMessage.svelte:659) and `reactions-container` (RoomMessage.svelte:726), neither of which any rule in our tree defines.
+
+> Verified: I could not refute it; the claim is accurate on every point I checked, and our own CHANGELOG corroborates it. (1) MARKUP: RoomMessage.svelte:578 opens <app-st-message> unconditionally and the compact branch {#if displayMode === 'c'} runs 585-744 nested inside it, with no app-st-compactmessage host of its own (line 587 is a comment).
+
+### RM-02 — Compact ALERT row has no "Ask a question" button and no `short` timestamp — our compact branch renders the bracketed chat time for every kind
+
+**medium** · `missing-control` · reference byte **1,377,704**
+
+```
+Ze(Ct(3,3,e.msg.t,"short")),m(2),O(4,!e.isQAMsg&&e.appService.globals.sessData.hasQAOnAlerts?4:-1)
+```
+
+**Ours:** The reference's compact member row branches `O(26,"alerts"===e.logType?26:27)` (in b_e at 1380680): `r_e` (1377512) is the ALERTS row — a `short` date plus the `alert-qa` button `s_e` (1377129) gated `!isQAMsg && hasQAOnAlerts` — and `a_e` (1377804) is the chat row. The compact consts array carries the button verbatim at 1401207-region (`["title","Ask a question",1,"btn","btn-sm","btn-secondary","me-1","alert-qa",3,"click","ngClass","ngStyle"]`, offset 1399478). Our compact branch has no `alert-qa` node at all and always renders `[{compactTimeFormatter}]` (RoomMessage.svelte:655-664). An alerts log switched to compact mode therefore loses the Q&A entry point and the unread-QA `btn-danger animated flash` marker entirely.
+
+> Verified: Our compact branch has no alert-qa node and no per-kind timestamp branch. RoomMessage.svelte:585 opens `{#if displayMode === 'c'}` and it runs to the `{:else}` at line 744; within 584-744 the only kind/alert references are the reaction-popover id (612), the tooltip formatter (657), the stars gate (694) and the answered-check (705) — there…
+
+### RM-03 — Compact body drops mentionColor / questionColor
+
+**medium** · `missing-behaviour` · reference byte **1,378,659**
+
+```
+Kn(13,Ew,e.msg.isMention&&!e.hasCustomFollowedUserColors,e.msg.txt.includes("?")&&!e.hasCustomFollowedUserColors)
+```
+
+**Ours:** `Ew=(t,n)=>({mentionColor:t,questionColor:n})` is defined at 1366821 and applied by the compact member body `p_e` (1378508) and reply body `f_e` (1378951); the compact admin body const 25 likewise carries `ngClass`. Our compact body divs (RoomMessage.svelte:700-724) carry only layout classes — `messageBodyClass`, which is where our mention/question colours live (RoomMessage.svelte:276-278), is used ONLY by the card branch (RoomMessage.svelte:878, 881, 887). A member mentioned in compact mode gets no highlight.
+
+> Verified: Confirmed, not refuted. In the reference both compact branches of `app-st-compactmessage` bind the mention/question ngClass: member body `p_e` and member reply body `f_e` use `Ew=(t,n)=>({mentionColor:t,questionColor:n})`, and the admin body `B1e` (const 25) uses `b1e=(t,n,e)=>({mentionColor:t,questionColor:n,"presenter-msg-right flex-fil…
+
+### RM-04 — Compact reaction strip has no add-reaction pill
+
+**medium** · `missing-control` · reference byte **1,380,270**
+
+```
+function g_e(t,n){if(1&t){const e=Y();d(0,"span",52),x("click",function(){return D(e),E(g(3).addReaction())}),T(1,"i",37),u()}
+```
+
+**Ours:** The compact reactions containers `__e` (1380430, member) and `$1e` (1371909, admin) both end with `O(3,"chat"===e.logType||"alerts"===e.logType&&e.isQAMsg?3:-1)` selecting the add-reaction pill (`g_e` / `H1e`, const 52 = `placement auto … badge chat-reaction … ngbPopover`). Our compact reaction strip (RoomMessage.svelte:725-741) renders existing pills only; the trailing add pill exists solely in the card branch (RoomMessage.svelte:981-992). In compact mode a reaction can only be added through the kebab menu.
+
+> Verified: I tried hard to refute this and could not. Reference side confirmed by reading bytes, not by search-and-assume: the compact component's consts array (parsed from `consts:` at offset 1395760) has entry 65 = `[1,"reactions-container",3,"ngStyle"]` (member) and entry 26 = `[1,"reactions-container",3,"ngClass","ngStyle"]` (admin), entry 52 =…
+
+### RM-05 — Card admin/member branch: the reference compares against `"alert"` (singular), which is never a logType, so an ADMIN ALERT takes the reversed admin card
+
+**medium** · `divergence` · reference byte **1,361,597**
+
+```
+o.msg.isA&&"alert"!=o.logType?3:4
+```
+
+**Ours:** The reference's logType values are `chat` / `alerts` / `pc` (see doMsgDelete at 1352430-region), so `"alert" != logType` is always true and the card gate reduces to `msg.isA` — an admin-authored ALERT renders through `Bge` (`mr-1 d-flex flex-row-reverse`, const 8) rather than `f1e` (`mr-1 d-flex flex-row`, const 56). Ours: `reverseMessage = kind === 'chat' && isAdminMessage` (RoomMessage.svelte:201-205), so an admin alert always renders as the member/forward card unless `item.evidenceDirection` overrides it. Flagged as a candidate rather than a certainty: the captured DOM (via `evidenceDirection`) may be the better authority on what actually shipped, and I could not check it — the capture roots are absent from this checkout.
+
+> Verified: Not implemented anywhere in apps/room/src. The reference card gate is `o.msg.isA&&"alert"!=o.logType?3:4`; I enumerated every logType literal in the bundle and "alert" (singular) is never assigned — only "alerts", "chat" and (by comparison) "pc" — so the term is unconditionally true and the gate reduces to `msg.isA`.
+
+### RM-06 — parseStock's preceding-character guard is not reproduced — a ticker glued to a non-space character is left uncoloured upstream
+
+**medium** · `missing-behaviour` · reference byte **1,327,300**
+
+```
+if(!(a>0&&" "!=e.charAt(a)))
+```
+
+**Ours:** `parseStock` (1327180-region) computes `var a=e.indexOf(r)` for each regex match and SKIPS the substitution when `a>0 && " "!=e.charAt(a)`. So `foo$AAPL` renders as plain text upstream while ` $AAPL` and a leading `$AAPL` are coloured. Our `parseTickersAndLinks` (RoomMessage.svelte:418-444) splits on the same regex and emits a `stock` segment for every match with no positional guard, so `foo$AAPL` is coloured here.
+
+> Verified: I read the reference bytes and confirmed the guard, then searched apps/room/src exhaustively for any counterpart and found none. REFERENCE (read, not searched): at byte offset 1327300 of apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js the bytes are `if(!(a>0&&" "!=e.charAt(a)))`, inside `parseStock(e,i,o){var s=e.match(new Re…
+
+### RM-07 — questionColor is gated on `kind === 'chat'` here; the reference applies it on alerts too
+
+**medium** · `divergence` · reference byte **1,331,638**
+
+```
+e.msg.txt.includes("?")&&!e.hasCustomFollowedUserColors
+```
+
+**Ours:** The reference's question term has no logType factor in any of the four body templates (card 1331638, compact 1378659). Ours: `isQuestion = item.evidenceQuestion ?? (kind === 'chat' && item.body.includes('?') && followedStyle === undefined)` (RoomMessage.svelte:272-275), so an alert containing `?` never gets `questionColor`.
+
+> Verified: I could not refute it. Ours emits `questionColor` from exactly one place, RoomMessage.svelte:277, driven by `isQuestion` at :272-275, which requires `kind === 'chat'`.
+
+### RM-08 — Compact menu labels differ from the card's and we render one label set for all three variants
+
+**low** · `wrong-constant` · reference byte **1,368,194**
+
+```
+\xa0\xa0Show Send Report
+```
+
+**Ours:** Both compact templates use `\xa0\xa0Show Send Report ` (1368194, 1375577), `\xa0\xa0Show message to all ` WITH a trailing space (1368006, 1375390) and `\xa0\xa0Reply ` WITH a trailing space (1368367, 1375751), against the card's `\xa0\xa0Alert Send Report ` (1329857), `\xa0\xa0Show message to all` (1329670) and `\xa0\xa0Reply` (1330031). `MessageMenu.svelte` renders one set for all three variants — `Alert Send Report` at :229, `Show message to all` at :217, `Reply` at :240 — and `MESSAGE_MENU_LABEL` (message-behavior.ts:3-16) has one string per entry.
+
+> Verified: I could not refute it. Reference side confirmed by direct read: the card family (app-st-message) uses "\xa0\xa0Show message to all" (no trailing space), "\xa0\xa0Alert Send Report " and "\xa0\xa0Reply" (no trailing space), while BOTH compact template branches (app-st-compactmessage) use "\xa0\xa0Show message to all ", "\xa0\xa0Show Send R…
+
+### RM-10 — Compact ADMIN timestamp is " [h:mm a] " with surrounding spaces; ours emits the member form for both rows
+
+**low** · `wrong-constant` · reference byte **1,374,160**
+
+```
+Ne(" [",Ct(29,27,e.msg.t,"h:mm a"),"] ")
+```
+
+**Ours:** `z1e` (compact admin, 1372234) renders the stamp with a leading and trailing space; `a_e` (compact member, 1377804) renders `Ne("[",Ct(3,6,e.msg.t,"h:mm a"),"]")` with none. Ours emits `[{…}]` unconditionally at RoomMessage.svelte:663.
+
+> Verified: I could not find the compact-ADMIN spaced stamp anywhere in apps/room/src. `compactTimeFormatter` has exactly one call site — RoomMessage.svelte:663 — inside the SHARED compact branch, emitting `[{…}]` with no surrounding spaces for both rows; `reverseMessage` is used there only for the enclosing span's class ternary (lines 658-660), neve…
+
+### RM-11 — Compact inner row applies `flex-row-reverse` on presenterMsgsOnTheRight; ours applies `presenter-msg-right`
+
+**low** · `wrong-constant` · reference byte **1,373,250**
+
+```
+z("ngClass",ct(30,g1e,e.appService.globals.sessData.presenterMsgsOnTheRight))
+```
+
+**Ours:** `g1e=t=>({"flex-row-reverse":t})` is defined at 1366648 and bound to compact const 8 (`w-100 d-inline-flex align-items-center`) by `z1e`. Ours: `class={['w-100 d-inline-flex align-items-center', { 'presenter-msg-right': reverseMessage && presenterMessagesOnTheRight }]}` (RoomMessage.svelte:600-605) — a different class with a different effect (text-align/margin instead of flex direction).
+
+> Verified: I tried to refute this and could not. Both halves of the claim check out against bytes I actually read.
+
+### RM-12 — Compact ADMIN reaction container drops `presenter-reactions-right`
+
+**low** · `missing-behaviour` · reference byte **1,371,980**
+
+```
+z("ngClass",ct(6,y1e,e.appService.globals.sessData.presenterMsgsOnTheRight))("ngStyle",e.styleF)
+```
+
+**Ours:** `$1e` (1371909) binds `y1e=t=>({"presenter-reactions-right":t})` (1366866) to compact const 26 `[1,"reactions-container",3,"ngClass","ngStyle"]`; the member container (const 65) has no ngClass. Ours renders `<span class="reactions-container" style={bodyStyle}>` with no conditional class at RoomMessage.svelte:726, so a presenter's compact reactions never right-align.
+
+> Verified: Confirmed against both sides. In the reference, app-st-compactmessage (selector at offset 1395475) has TWO reaction containers in one consts array (span 1395767-1399985): index 26 = [1,"reactions-container",3,"ngClass","ngStyle"] used by the ADMIN compact template z1e (offset 1372234, root div const 4 = "msg-box msg-box-adm", slot 35 rend…
+
+### RM-13 — `chat-reaction-hover` is applied by our add-reaction pill but by NO reference template — it only exists in the card stylesheet, so the reference pill is always visible
+
+**low** · `invented-value` · reference byte **1,360,390**
+
+```
+["placement","auto","container","body","autoClose","outside","popoverClass","popOverDiv",1,"badge","chat-reaction",3,"click","ngbPopover"]
+```
+
+**Ours:** The card add pill `h1e` (1342094) uses const 55, quoted above — classes `badge chat-reaction` only. The string `chat-reaction-hover` occurs exactly twice in the whole bundle, at 1366479 and 1366540, and both are CSS rules inside app-st-message's styles (`.msg-box:hover .chat-reaction-hover{display:inline-block}` / `.chat-reaction-hover{display:none}`); no consts array and no template node carries it. Ours puts it on the pill at RoomMessage.svelte:982, and our own transcription of those rules (captured-runtime-components.css:8151-8156) then hides the control until the row is hovered.
+
+> Verified: I could not refute the claim; both halves check out. Our add-reaction pill really does carry `chat-reaction-hover` (RoomMessage.svelte:982) and our transcribed rules really do hide it until the row is hovered (captured-runtime-components.css:8151-8156), and the rule is live for us because `msg-box` is a genuine ancestor (RoomMessage.svelt…
+
+### RM-14 — `answered-check` class is ours; the reference's ✅ div carries `ms-1 private-reply`
+
+**low** · `invented-value` · reference byte **1,359,087**
+
+```
+[1,"ms-1","private-reply"]
+```
+
+**Ours:** The card's `a1e` and the compact `h_e` (1378451) both render `d(0,"div",<27|24>),v(1,"✅")`, and const 27 (card, 1359087) / const 24 (compact) is `[1,"ms-1","private-reply"]`. `answered-check` returns ZERO hits in the bundle. Ours: `<div class="answered-check">✅</div>` at RoomMessage.svelte:706 (compact) and a bare `<div>✅</div>` at :868 (card); grep shows `answered-check` is styled by nothing in our tree either.
+
+> Verified: I tried to refute this and could not. The reference's answered-checkmark div genuinely carries class="ms-1 private-reply"; ours carries an invented "answered-check" in the compact branch and no class at all in the card branch.
+
+### RM-16 — gif placeholder id ignores the extra-chat-column variant
+
+**low** · `divergence` · reference byte **1,326,195**
+
+```
+const c=s?`gifExtra_${o}`:`gif_${o}`
+```
+
+**Ours:** `urlwrapImg`'s fourth argument is `extraChatMsg`, and it switches the placeholder id to `gifExtra_<msgId>`. `RoomMessage.svelte` has no `extraChatMsg` prop and always emits `id="gif_{item.id}"` (RoomMessage.svelte:560), so the same message rendered in both the main log and the extra chat column produces two elements with the same DOM id. (Our own comment at :312-323 notes nothing resolves through the id here, which contains the damage but does not remove the duplicate.)
+
+> Verified: I could not refute this. The reference's `urlwrapImg(e,i,o,s)` selects `gifExtra_${o}` vs `gif_${o}` on its fourth argument, and our RoomMessage.svelte emits `id="gif_{item.id}"` unconditionally with no column-aware input under any name: a case-insensitive grep for "extra" across the whole 1,007-line RoomMessage.svelte returns zero hits,…
+
+### RM-19 — copyMessage mutates msg.txt upstream before writing to the clipboard
+
+**low** · `divergence` · reference byte **1,355,969**
+
+```
+copyMessage(){this.msg.txt=sf(this.msg.txt).result,console.log("copyMessage: ",this.msg.txt),navigator.clipboard.writeText(this.msg.txt),this.alertsService.info("Copied to clipboard.")}
+```
+
+**Ours:** Ours strips markup into a local `plainText` and leaves `item.body` untouched (message-actions.svelte.ts:485-492), so the rendered message does not change when it is copied. Almost certainly the right call — recorded as a divergence rather than a match, per the previous stage's note.
+
+> Verified: I could not refute this. Both sides verified by reading.
+
+### RM-20 — doUserInfo's extra-chat-column companion event is not routed
+
+**low** · `missing-behaviour` · reference byte **1,352,030**
+
+```
+doUserInfo(e,i){this.appService.getUserInfo(e,i),this.appService.guiEventBus.emit("doUserInfo",e),this.appService.globals.preferences.extraChatColumn&&(this.extraChatMsg||"textAreaTxtExtra"===this.appService.globals.chatInputFocus)&&this.appService.guiEventBus.emit("doUserInfoExtra",this.extraChatMsg)
+```
+
+**Ours:** The `doUserInfoExtra` emit sits at 1352313. Ours dispatches `if (action === 'user') this.#openModal('user')` with no extra-column term (message-actions.svelte.ts:375); the `fromExtraColumn` flag it is handed is consumed by `mention` alone (message-actions.svelte.ts:376-378). `grep -rn doUserInfoExtra src` returns zero hits.
+
+> Verified: Not built. Upstream `doUserInfoExtra` exists solely to carry the clicked row's `extraChatMsg` into the user-info modal (`this.extraChatMsg = e`, the ONLY subscriber, bundle 2074490), where the modal's own footer button reads it: `doUserMention(e){$("#user-modal").modal("hide"), emit(preferences.extraChatColumn && (this.extraChatMsg || "te…
+
+### RM-21 — Alerts-log ticker colour comes from localStorage `alertStyle` upstream; ours has no alert-side ticker style
+
+**low** · `missing-behaviour` · reference byte **1,327,851**
+
+```
+if("alerts"===i){const l=window.localStorage.getItem("alertStyle")
+```
+
+**Ours:** `parseStock` reads `followedUsers[avt].followChatStyle.tickerColor` else `chatStyle.tickerColor` for chat (1327332), and `alertStyle.tickerColor` for alerts (1327851), falling through to a bare `<span class="stockColor">` when neither is stored. Ours: `stockStyle = effectiveStyle ? 'color: …tickerColor;' : undefined` (RoomMessage.svelte:264) where `effectiveStyle` for an alert is `followedStyle` only — `chatStyle` is gated on `kind === 'chat'` (RoomMessage.svelte:216-220) and no `alertStyle` prop exists. The bare-span fallback IS correct; the alert-side colour source is missing.
+
+> Verified: No alert-side ticker style source exists in apps/room/src. RoomMessage.svelte:216-220 gates the room style on `kind === 'chat'` (`followedStyle ??
+
+### RM-22 — Card admin body row's `justify-content-end` and the badge/reply wrapper class lists
+
+**low** · `wrong-constant` · reference byte **1,328,315**
+
+```
+dge=t=>({"justify-content-end":t})
+```
+
+**Ours:** `dge` is bound to card const 26 `[1,"d-flex",3,"ngClass"]` on the ADMIN card only (the member card's node 36 uses const 65, a plain `[1,"d-flex"]`). Ours renders `<div class="d-flex">` for both (RoomMessage.svelte:866). Same family of small class-list divergences on the card: the badges wrapper is const 25 `d-inline-block flex-shrink-1` with `overflow:hidden` upstream and we render badges bare (RoomMessage.svelte:803-813); the reply body is const 43 `msg-left text-formated preText ml-2 mr-2 p-0 pe-3 w-100` and we reuse `messageBodyClass` without `pe-3 w-100` (RoomMessage.svelte:878); the member reactions container is const 6 (ngStyle only) and the admin one is const 29 `[1,"ms-1",…]`, while ours emits neither base class (RoomMessage.svelte:961).
+
+> Verified: I could not find any of the four class-list details implemented anywhere in apps/room/src. (1) justify-content-end: the reference binds it on the admin card's body-row div (const 26 = [1,"d-flex",3,"ngClass"], node 34 of Bge) via dge/presenterMsgsOnTheRight; the member card (f1e node 36) uses const 65 = plain [1,"d-flex"].
+
+### RM-24 — `title="Copy order"` on the trade span has no reference counterpart
+
+**low** · `invented-value` · reference byte **1,414,968**
+
+```
+o.txt.replace("[{(",'<span class="tradeColor" id="id_'+o._id+'">')
+```
+
+**Ours:** The reference's trade span carries `class` and `id` and nothing else; role/tabindex/title/keydown are ours (RoomMessage.svelte:531-546), and `"Copy order"` returns ZERO hits in the bundle. Deliberate and documented a11y additions — recorded so the inventory is complete, not as a defect.
+
+> Verified: I could not refute this one, and the reference half of the claim is confirmed exhaustively rather than assumed. REFERENCE SIDE — absence verified four ways.
+
+---
+
+## notes/NoteEditor.svelte
+
+18 verified gaps; 50 reference behaviours confirmed present.
+
+### note-editor-carousel-slide-upload — Per-slide image upload (Upload button, uploading spinner, POST to upload_server) is missing
+
+**high** · `missing-control` · reference byte **1,476,460**
+
+```
+uploadCarouselImage(e,i){const o=e.target,s=o.files?.[0];if(!s)return;const r=this.carouselImages[i];r.uploading=!0;const a=new FormData;a.append("image",s),a.append("name",s.name),$.ajax({...url:`${this.appService.globals.upload_server}/image/${this.appService.globals.sessionID}`,method:"POST",...headers:{Authorization:"Client-ID "+this.appService.globals.cdn_upload_key},...success:h=>{r.url=h.data.link,r.uploading=!1},error:h=>{console.error(h),r.uploading=!1,window.bootbox.alert("Image upload failed.")}}),o.value=""}
+```
+
+**Ours:** Absent from the carousel dialog. NoteEditor.svelte:1366-1389 renders only two `type="url"` text inputs per slide; there is no `<input type="file" accept="image/*">` with id `cfi_<index>` (reference template at 1462533), no ' Upload ' label-button (reference `v(9," Upload ")` at 1462593), and no per-slide 'Uploading...' spinner state (reference D0e, `v(3,"Uploading...")` at 1462307). The `onUploadImages` prop does exist (NoteEditor.svelte:53) but is wired only to the Insert Image dialog (insertImages, NoteEditor.svelte:473-490). Net effect: a carousel slide can only be filled by someone who already has an image URL in hand.
+
+> Verified: I could not refute this. The carousel dialog is the only one of its kind in our source (NoteEditor.svelte:1338-1417, the `{:else if dialog === 'carousel'}` branch) and its per-slide row renders exactly four controls: `type="url"` Image URL (:1368-1376), `type="url"` Link/URL (:1377-1385), a "Delete slide" button (:1386-1387), then the sha…
+
+### note-editor-file-browser-modal — The whole file-browser modal ("Select Image" / getSessionFiles) has no counterpart
+
+**high** · `missing-control` · reference byte **1,477,053**
+
+```
+openFileBrowser(e){this.fileBrowserTargetIndex=e,this.fileBrowserImages=[],this.fileBrowserLoading=!0,this.fileBrowserModalRef=this.modalService.open(this.fileBrowserModal,{ariaLabelledBy:"file-browser-modal-title",size:"lg"}),this.httpClient.post(`${this.appService.globals.apiROOT}/sessions/v2/cmd`,{tok:...,cmd:"getSessionFiles",uploadType:"files"}).subscribe({next:o=>{this.fileBrowserLoading=!1,o?.success&&o.files&&(this.fileBrowserImages=o.files.filter(s=>s.contentType?.includes("image/")))}
+```
+
+**Ours:** Absent. The carousel dialog in NoteEditor.svelte:1340-1422 offers a bare url input per slide and nothing else. grep over apps/room/src for `getSessionFiles`, `fileBrowser`, `file-browser`, `selectFileForSlide`, `Select Image`, `No images found` returns zero hits in any .svelte/.ts file (only unrelated FilesPane/ModalHost comments). The reference's third @ViewChild ng-template (fileBrowserModal, selector anchor at 1483267) and its whole template — loading state 'Loading images...', empty state 'No images found. Upload images via Files first.' at offset 1465769, .file-browser-grid of file.vidPath thumbnails, selectFileForSlide, and the ' Cancel ' footer — is unimplemented. A presenter who already uploaded an image via Files has no way to reach it from a carousel slide.
+
+> Verified: I could not find any counterpart in apps/room/src. Our carousel dialog (NoteEditor.svelte:1340 `{:else if dialog === 'carousel'}`, rows at :1367, "Add slide" at :1391) gives each slide exactly two text inputs — "Image URL" and "Link / URL" — plus a Delete-slide button, then Interval/Height and the Save/Insert footer.
+
+### note-editor-carousel-destructive-confirms — Deleting a slide and replacing a slide image happen with no confirmation
+
+**medium** · `missing-behaviour` · reference byte **1,475,669**
+
+```
+removeCarouselImage(e){window.bootbox.confirm({message:"Delete this slide?",buttons:{confirm:{label:"Delete",className:"btn-danger"},cancel:{label:"Cancel",className:"btn-default"}},callback:i=>{i&&this.carouselImages.splice(e,1)}})}
+```
+
+**Ours:** NoteEditor.svelte:509-512 `removeCarouselSlide` splices the row out immediately with no dialog, and there is no 'Change this image?' path at all (reference clearCarouselImage at 1476242, `message:"Change this image?"` with confirm label 'Change'/btn-warning). Every other destructive note action in this repository is raised through BootboxDialog from NotesPane (delete note, revert version, welcome mat — NotesPane.svelte:195-228), so this is the one that skipped the house pattern.
+
+> Verified: I could not find either confirmation implemented anywhere in apps/room/src. `removeCarouselSlide` (NoteEditor.svelte:509-512) splices via `.filter()` synchronously and the "Delete slide" button at NoteEditor.svelte:1386-1387 calls it directly — no dialog, no pending state, no request/accept indirection.
+
+### note-editor-gif-insert-confirm — A GIF is inserted straight from the double-click; the reference confirms with a preview first
+
+**medium** · `missing-behaviour` · reference byte **1,482,885**
+
+```
+sendGif(e,i){this.sendingGif||(this.modalService.dismissAll(),this.sendingGif=!0,bootbox.confirm(`You sure you want to insert this image:<br/><img src='${i}' style='width: 100%;'>`,o=>{this.sendingGif=!1,o&&$("#summernoteEdit-"+this.tab._id).summernote("insertImage",i,e)}))}
+```
+
+**Ours:** GiphyPicker.svelte:145 fires `onselect(result.title, result.images.original.url)` on `ondblclick`, and NoteEditor.svelte:552-557 `insertGif` inserts the image immediately. There is no full-width preview confirmation and no `sendingGif` re-entrancy guard, so a double-click that registers twice can insert two copies. The picker does close on select (giphyOpen = false), which is the `modalService.dismissAll()` half.
+
+> Verified: The claim survives. I hunted specifically for a note-side confirm and found the pattern IS built in this repo — but exclusively for the CHAT composer, not for the note editor.
+
+### note-editor-image-popover — The image popover (imageAttributes / resize / float / removeMedia) has no counterpart
+
+**medium** · `missing-control` · reference byte **1,469,073**
+
+```
+popover:{image:[["custom",["imageAttributes"]],["image",["resizeFull","resizeHalf","resizeQuarter","resizeNone"]],["float",["floatLeft","floatRight","floatNone"]],["remove",["removeMedia"]]]}
+```
+
+**Ours:** Absent. grep over apps/room/src for `resizeFull`, `floatLeft`, `removeMedia`, `imageAttributes` returns zero hits in any .svelte/.ts file. Our editor configures `Image.configure({ allowBase64: false })` (NoteEditor.svelte:245) and nothing else, so once an image is in a note there is no UI to resize it to 100/50/25%, float it, edit its attributes, or remove it — only a raw text delete. Caveat, stated as absence: summernote itself is NOT in this bundle, so the popover's exact markup and the imageAttributes plugin behaviour are unevidenced; the fact that these four groups are configured is what is evidenced.
+
+> Verified: I could not find any counterpart and I searched hard. The reference config is confirmed verbatim at the stated offset.
+
+### note-editor-insert-carousel-silent-noop — insertCarousel with no valid slide fails silently instead of alerting
+
+**medium** · `missing-behaviour` · reference byte **1,478,230**
+
+```
+...this.carouselInNote=!0)):window.bootbox.alert("Please add at least one image URL.")}editCarousel(){
+```
+
+**Ours:** NoteEditor.svelte:514-517 — `const slides = carouselSlides.filter(({ url }) => url.trim().startsWith('https://')); if (slides.length === 0 || instance === null) return;`. The primary button is always enabled, so pressing 'Insert Carousel' with an empty or non-https slide list closes nothing, inserts nothing and says nothing. CLAUDE.md's fail-loud rule and the reference agree here.
+
+> Verified: The reference alerts on the empty case; ours returns silently, and I found no implementation of that alert anywhere in apps/room/src. Reference at observed offset 1478231: `insertCarousel(){const e=this.generateCarouselHtml();e?(...):window.bootbox.alert("Please add at least one image URL.")}`, with `generateCarouselHtml()` at observed of…
+
+### note-editor-version-cap — Version history is unbounded; the reference caps it at 3
+
+**medium** · `wrong-constant` · reference byte **1,468,359**
+
+```
+this.maxVersions=3,this.editorDirtyContents=null,this.editorDirty=!1,this.isEditing=!1
+```
+
+**Ours:** No cap anywhere on our side. `getNoteVersions` (src/lib/server/notes-repository.ts:282-289) is `select().from(noteVersions).where(eq(noteVersions.noteId, noteId)).orderBy(desc(version)).all()` with no LIMIT, NotesPane.svelte:139-161 refetches it on every `updatedAt` change (i.e. every 3-second autosave), and NoteEditor.svelte:611-618 renders one row per result behind 'Version History (N)'. So N grows without bound on a long-lived note, the panel becomes an unbounded read path, and the button's count no longer means what the reference's means. The reference also snapshots only on a real change (`saveCurrentVersion` at 1469897 returns early when `prevVersions[0].content === e`); ours coalesces by author+time window (notes-repository.ts:114-144), which is a defensible divergence, but the missing cap is not.
+
+> Verified: I could not find any 3-version cap in apps/room/src. Searched (case-insensitively, across .ts/.svelte/.md) for: maxVersions, MAX_VERSIONS, MAX_NOTE_VERSIONS, VERSION_LIMIT, versionCap, prevVersions, "max versions", "cap ...
+
+### note-editor-welcome-mat-all-rooms-password — The all-rooms Welcome Mat password prompt is not raised
+
+**medium** · `missing-behaviour` · reference byte **1,474,217**
+
+```
+setAsWelcomeTab(e){e?this.appService.globals.sessData.allRoomsWelcomeMatPW?bootbox.prompt({title:"Please enter the password to replace all the rooms Welcome Mats:",value:"",callback:i=>{if(i){const o=i.trim();o===this.appService.globals.sessData.allRoomsWelcomeMatPW?this.appService.sendServerAdminCommand("setWelcomeMatNoteTab",{id:this.tab._id,allRooms:e,pw:o}):bootbox.alert("Wrong password!")}}}):bootbox.confirm("Are you sure you want to replace all the rooms Welcome Mats with this note?"
+```
+
+**Ours:** NoteEditor.svelte:583-588 raises `onSetWelcomeMat(true)`, which NotesPane.svelte:218-228 turns into the plain confirm only — the password branch is never taken, and `pw` is never sent. This is ALREADY recorded as an honest gap in src/routes/+page.server.ts:987-1000 ("the all-rooms variant needs a controller endpoint that enumerates the account's rooms and verifies allRoomsWelcomeMatPW"), so it is a known open item rather than a new discovery. Listed because the two non-password confirm strings match the reference exactly and this third branch is the only one that does not.
+
+> Verified: I could not refute this. The password branch genuinely does not exist anywhere in apps/room/src, under any name.
+
+### note-editor-add-slide-scroll — Adding a slide does not scroll the new row into view
+
+**low** · `missing-behaviour` · reference byte **1,475,568**
+
+```
+elImage(){this.carouselImages.push({url:"",link:"",pendingUrl:"",uploading:!1}),setTimeout(()=>{const e=document.querySelectorAll(".carousel-slide-row");e[e.length-1]?.scrollIntoView({behavior:"smooth",block:"nearest"})})}
+```
+
+**Ours:** NoteEditor.svelte:499-501 `addCarouselSlide` appends and stops. Our modal body has no `max-height: 50vh; overflow-y: auto` scroller either (the reference's `.carousel-slides-list` rule), so with many slides the new row lands below the fold of a `max-height: calc(100vh - 40px)` dialog (NoteEditor.svelte:1495-1499) with nothing to bring it back.
+
+> Verified: I could not find the behaviour anywhere in apps/room/src, and I confirmed the reference counterpart by reading the bundle bytes myself. OUR SOURCE — what is actually there:
+- /home/user/trading-room-app/apps/room/src/lib/components/notes/NoteEditor.svelte:499-501 is the whole handler: `function addCarouselSlide(): void { carouselSlides =…
+
+### note-editor-carousel-arrow-hover — Carousel arrow buttons have no hover background change
+
+**low** · `missing-behaviour` · reference byte **1,480,561**
+
+```
+W.onmouseenter=()=>W.style.background="rgba(0,0,0,0.75)",W.onmouseleave=()=>W.style.background="rgba(0,0,0,0.45)",W.onclick=J=>{J.preventDefault(),J.stopPropagation(),B(),h()}
+```
+
+**Ours:** src/lib/components/notes/safe-html.ts:245-256 `control()` sets the identical inline style string including `transition:background 0.2s;` but attaches no mouseenter/mouseleave handlers, so the declared transition never fires and the arrow never lightens. The click handler (:250-253) also omits `preventDefault()`/`stopPropagation()`, which in the reference stops an arrow click inside a linked slide from following the link.
+
+> Verified: I tried to find the arrow hover implemented under another name and could not. Our carousel arrow factory is `control()` inside `setupCarousel()` at /home/user/trading-room-app/apps/room/src/lib/components/notes/safe-html.ts:241-257.
+
+### note-editor-carousel-labels — Carousel modal label text differs from the captured strings
+
+**low** · `wrong-constant` · reference byte **1,463,957**
+
+```
+v(11,"Link URL "),d(12,"span",50),v(13,"(optional — clicking the image opens this)")
+```
+
+**Ours:** NoteEditor.svelte:1377 says 'Link / URL' with no hint span; :1368 says 'Image URL' where the reference's empty state says 'Image ' + `span.text-danger` '*' (offset 1462400); :1393 says 'Interval (seconds)' where the reference says 'Rotation interval (seconds)' (offset 1464581); :1386 says 'Delete slide' where the reference uses an icon-only `i.fas.fa-trash`; and the 'Slides' group label (offset 1465067 region, `v(17,"Slides")`) has no counterpart. The two titles that ARE swung on edit-mode ('Edit/Insert Image Carousel', 'Save Changes/Insert Carousel') match exactly.
+
+> Verified: Our carousel modal really does use different label text from the captured bundle, and no renamed/extracted counterpart exists. Our NoteEditor.svelte:1368 renders 'Image URL', :1377 'Link / URL' with no hint span, :1387 a text button 'Delete slide', :1393 'Interval (seconds)'; there is no 'Slides' group label, no per-slide '#N' index, and…
+
+### note-editor-carousel-modal-chrome — Carousel modal chrome: no Cancel button, no slide index badge, no delete-disabled-at-one
+
+**low** · `missing-control` · reference byte **1,465,110**
+
+```
+d(21,"button",38),x("click",function(){return D(e),E(g().addCarouselImage())}),T(22,"i",39),v(23," Add slide "),u()(),d(24,"div",40)(25,"button",41),x("click",function(){return E(D(e).$implicit.dismiss())}),v(26," Cancel ")
+```
+
+**Ours:** NoteEditor.svelte:1414-1420 — the footer holds one primary button only; dismissal is the header X at NoteEditor.svelte:1354-1362. The per-slide `span.badge.badge-secondary.mr-2` showing `#{{index+1}}` (reference `Ne("#",i+1,"")` at 1464222) is absent, as is the delete button's `[disabled]=carouselImages.length===1` (reference `z("disabled",1===o.carouselImages.length)` at 1464241) — NoteEditor.svelte:509-512 instead deletes the last row and silently re-adds a blank one, which reaches the same end state by a different route.
+
+> Verified: All three sub-items are genuinely absent from our source, and the reference genuinely has all three (I re-read the bundle bytes at the cited offsets myself). (1) No Cancel button.
+
+### note-editor-carousel-slide-preview — Filled-slide image preview and ' Change image ' button are missing
+
+**low** · `missing-control` · reference byte **1,463,604**
+
+```
+x("click",function(){D(e);const o=g().$index;return E(g(2).clearCarouselImage(o))}),T(3,"i",71),v(4," Change image ")
+```
+
+**Ours:** NoteEditor.svelte:1366-1389 renders the same two url inputs whether a slide is empty or filled — there is no `div.carousel-img-preview` with `img.carousel-preview-img[src]=slide.url`, and no ' Change image ' button. The three-state slide row the reference drives with `O(6,e.uploading?6:e.url?8:7)` (offset 1464280) is one flat state here. The component's own stylesheet rules for `.carousel-img-preview` / `.carousel-preview-img` (bundle offset 1488513) therefore have no consumer in our source either.
+
+> Verified: I could not refute it. NoteEditor.svelte renders one flat carousel slide row — "Image URL" input, "Link / URL" input, "Delete slide" button — regardless of whether the slide has a url.
+
+### note-editor-giphy-hint-text — Giphy hint reads "to select it" where app-note reads "to insert it"
+
+**low** · `wrong-constant` · reference byte **1,467,154**
+
+```
+d(5,"div",83)(6,"h6"),v(7,"*Double click an image to insert it")
+```
+
+**Ours:** GiphyPicker.svelte:106 renders '*Double click an image to select it'. Stated fairly: 'select it' is the correct string for the OTHER three giphy surfaces in the bundle — verified at offsets 1425716, 2197828 and 2372175 — and app-note at 1467154 is the only one that says 'insert it'. Our GiphyPicker is one shared component serving all of them, so this is a shared-component compromise, not a transcription error; it costs the note surface one word.
+
+> Verified: Could not refute. Our GiphyPicker hardcodes the hint as "*Double click an image to select it" in markup, and its Props interface is only { apiKey, popoverId, onclose, onselect } — there is no hint/label prop, so no consumer can vary the wording.
+
+### note-editor-giphy-search-button — The Giphy search icon button is missing; only the clear button exists
+
+**low** · `missing-control` · reference byte **1,467,345**
+
+```
+d(12,"span",88),x("click",function(){return D(e),E(g().searchGiphy())}),T(13,"i",89),u(),d(14,"span",88),x("click",function(){return D(e),E(g().clearSearchGiphy())}),T(15,"i",90)
+```
+
+**Ours:** GiphyPicker.svelte:124-135 renders a single `span.input-group-text` carrying `i.fa.fa-times` wired to `clearSearch`. The sibling `span.input-group-text.text-dark` with `i.fa.fa-search` wired to `searchGiphy()` has no counterpart, so a search can only be started with Enter on the form (GiphyPicker.svelte:107-112). The reference's modal footer ' Close ' button is likewise absent — ours closes via the header `btn-close` at :98-103.
+
+> Verified: Our only Giphy search UI is GiphyPicker.svelte, which renders exactly one input-group affordance — a clear (fa-times) span — and NoteEditor.svelte mounts that popover for its GIFs toolbar button. There is no fa-search span, no searchGiphy-equivalent control, and no ' Close ' footer button anywhere in apps/room/src; the search can only be…
+
+### note-editor-height-and-mount — Editor height and the mount element differ from the single .note-view element
+
+**low** · `divergence` · reference byte **1,468,553**
+
+```
+placeholder:"Type your note here and press save",height:"100%",toolbar:[["style",["style"]],["view",["fullscreen","codeview"]],["misc",["und
+```
+
+**Ours:** NoteEditor.svelte:186 `editorHeight = $state(360)` with a drag-resize bar (:559-572, :1185-1199) instead of `height: "100%"`. Separately, NoteEditor.svelte:676 keeps an empty `div#summernoteEdit-{noteId}.note-view` with `hidden` beside the live editor frame, where the reference has ONE element serving as both the rendered note and the mount point. Ours is a hidden element nothing reads or writes — which is exactly the 'nothing exists without a consumer' rule in CLAUDE.md — while NotesPane.svelte:383-387 renders the real read-only `.note-view#summernoteEdit-{id}` in the non-editing branch. Flagged low, and the hidden div is the part worth deleting.
+
+> Verified: I could not refute either half. (1) HEIGHT: the reference config is height:"100%" and the component's own styles are [_nghost]{display:block;height:100%} / .note-view{height:100%}, i.e.
+
+### note-editor-iframe-whitelist — protradingroom.com is not in our iframe host allow-list
+
+**low** · `divergence` · reference byte **1,469,265**
+
+```
+codeviewIframeWhitelistSrcBase:["docs.google.com",".protradingroom.com","protradingroom.com"],codeviewFilter:!1,codeviewIframeFilter:!1
+```
+
+**Ours:** safe-html.ts:61-66 `SAFE_IFRAME_HOSTS` = docs.google.com, player.vimeo.com, www.youtube-nocookie.com, www.youtube.com — enforced at safe-html.ts:183. A note imported from the reference that embeds a first-party protradingroom.com iframe loses it silently. Recorded as a divergence, not a defect: the reference's own `codeviewFilter` and `codeviewIframeFilter` are BOTH false at this same offset, so that whitelist is inert there, and our sanitizer is a deny-by-default control the reference does not have at all. Worth a decision, not a fix by default.
+
+> Verified: I could not refute it. Our note iframe host allow-list exists in two places and neither contains protradingroom.com in any form.
+
+### note-editor-paste-url-regex — pendingUrl two-step and the image-URL paste auto-confirm are not reproduced
+
+**low** · `divergence` · reference byte **1,475,962**
+
+```
+onCarouselUrlPaste(e,i){const o=e.clipboardData?.getData("text")?.trim();o&&/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|jfif|svg)(\?.*)?$/i.test(o)&&(e.preventDefault(),this.carouselImages[i].pendingUrl=o,this.confirmCarouselImageUrl(i))}
+```
+
+**Ours:** NoteEditor.svelte:1369-1376 binds the typed value straight to `slide.url` via `updateCarouselSlide(index, 'url', …)`, so there is no `pendingUrl` staging field, no check-button to confirm it, no keyup.enter handler and no paste interception. Recorded as a divergence rather than a defect: with a directly-bound field the confirm step has nothing left to do. The one behaviour genuinely lost is that pasting a non-image URL is indistinguishable from pasting an image one.
+
+> Verified: I could not disprove this. The reference behaviour is confirmed present in the bundle, and no counterpart exists anywhere in apps/room/src.
+
+---
+
+## ModalHost: session-control modal
+
+17 verified gaps; 50 reference behaviours confirmed present.
+
+### SC-01 — Session History pane is a hardcoded empty state; its "Load History" button has no handler and there is no Refresh button, no list, and no data source
+
+**high** · `missing-behaviour` · reference byte **2,146,310**
+
+```
+function DDe(t,n){if(1&t){const e=Y();d(0,"div",119)(1,"div",120)(2,"button",121),x("click",function(){return D(e),E(g(3).appService.fetchSessionHistory())}),T(3,"i",122),v(4," Refresh "),u()(),ht(5,TDe,9,6,"a",123,sDe),u()}if(2&t){const e=g(3);m(5),pt(e.appService.globals.sessionHistory)}}function EDe(t,n){if(1&t){const e=Y();d(0,"div",120),v(1,"No session history."),u(),d(2,"div",120)(3,"button",121),x("click",function(){return D(e),E(g(3).appService.fetchSessionHistory())}),T(4,"i",122),v(5," Load History "),u()()}}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4719-4721 renders `No session history.` unconditionally, followed by `<button class="btn btn-primary"><i class="fas fa fa-sync"></i> Load History </button>` with NO onclick, no type="button", and no `Refresh`/list branch. Grepping all of apps/room/src for `sessionHistory`, `fetchSessionHistory`, `session_history`, `eventName` returns nothing outside this literal text — no remote function, no table, no loader. This is exactly the shape CLAUDE.md forbids: a control whose only effect is nothing.
+
+> Verified: I could not find any implementation in apps/room/src. Searched (excluding node_modules) for sessionHistory, session_history, session-history, getSessionHistory, fetchSessionHistory, "Load History"/loadHistory, Refresh, eventName/event_name/eventValue/event_value, and case-insensitive "History" across the whole tree, plus every *.remote.ts…
+
+### SC-02 — A/V pane opens on two FABRICATED device entries and never enumerates on open — loadDevices() runs only from the Refresh button
+
+**high** · `defect` · reference byte **2,159,387**
+
+```
+ngAfterViewInit(){var e=this;this.appService.globals.isPresenter&&!this.appService.globals.chatOnlyMode&&(this.loadDevices(),I(function*(){let i=yield e.appService.invokeAdminCmd("getStreamServers");e.serverArr=i.servers,P("streamServers: ",e.serverArr),e.handleStreaming()})())}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:652-668 seeds `audioDevices`/`videoDevices` with invented literals — deviceId `953f11aeca98147407fe5afe290dc18b384306c979179ce7a96ec4b92148ab5b` / label `Studio Display Microphone (05ac:1118)` and `2da3a3313185023c68e57b8bd07c010fe3975db1a2962584c0b6b493aa5c708a` / `Studio Display Camera (15bc:0000)` — and `currentAudioDevice`/`currentVideoDevice` are seeded to those same invented ids, not from the saved `audioDeviceID`/`videoDeviceID` preference. `loadDevices` (ModalHost.svelte:1708) has exactly ONE call site, the Refresh button at ModalHost.svelte:4311; no `$effect` runs it when the modal or the A/V tab opens (the only session-scoped effect is ModalHost.svelte:1965-1968, which just restores the tab). So the presenter is shown two devices that do not exist on their machine, pre-selected, until they press Refresh.
+
+> Verified: Could not refute. All three parts of the claim verified.
+
+### SC-03 — The chosen audio input device is inert — `audioDeviceID` is written by the select and read by nothing; mic capture calls getUserMedia({audio:true})
+
+**high** · `defect` · reference byte **2,160,736**
+
+```
+onAudioDeviceChange(e){console.log("onAudioDeviceChange: "+e),this.appService.globals.audioDeviceID!==e&&(this.appService.globals.audioDeviceID=e,this.appService.localstorage.set("audioDeviceID",e))}onVideoDeviceChange(e){this.appService.globals.videoDeviceID!==e&&(this.appService.globals.videoDeviceID=e,this.appService.localstorage.set("videoDeviceID",e))}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4332 writes `onPreferenceChange('audioDeviceID', currentAudioDevice)`. A repo-wide grep for `audioDeviceID` / `audioDeviceId` outside that one line returns nothing — no consumer. The microphone path is apps/room/src/lib/room/local-capture.svelte.ts:340, `navigator.mediaDevices.getUserMedia({ audio: true })`, with no `deviceId` constraint anywhere in the file. The VIDEO half is wired (create-room.svelte.ts:675 reads `prefs.loaded.videoDeviceID`, consumed at local-capture.svelte.ts:508/633 and media-transport.svelte.ts:937), which is what makes the audio half's absence a defect rather than a design.
+
+> Verified: Could not refute. `audioDeviceID` is written at ModalHost.svelte:4332 and read nowhere: a grep across all of apps/ (excluding node_modules, .vercel/, build/, .svelte-kit/, docs/source) returns that single line.
+
+### SC-04 — Enable/Disable Stream Player write a per-user preference `streamingPlayerEnabled` that nothing in the repository reads — the reference sends a room-level admin command
+
+**high** · `defect` · reference byte **2,170,728**
+
+```
+enablePlayer(){var e=this;return I(function*(){let i=yield e.appService.invokeAdminCmd("changePlayerStatus",{enablePlayer:!0});console.log("enablePlayer rc:",i),e.getPlayerLink()})()}disablePlayer(){var e=this;return I(function*(){let i=yie
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4458-4476 flips local `streamPlayerEnabled` and calls `onPreferenceChange('streamingPlayerEnabled', true|false)`. That key is written on those two lines and NOWHERE else in the whole repository (grep across apps/** and services/** for `streamingPlayerEnabled` returns only ModalHost.svelte:4462 and :4471). `prefs.save` (prefs.svelte.ts:532-614) persists it as this VIEWER's preference and mirrors it to localStorage; no server command is sent and no viewer-facing player is enabled. This is the identical defect class already recorded for `chatMode` in apps/room/src/lib/chat-mode.ts — a room-level presenter act modelled as a per-user preference.
+
+> Verified: I could not find any implementation and the search strengthened the claim rather than refuting it. WHAT I READ IN THE REFERENCE (offsets observed, not reused):
+- `changePlayerStatus` occurs at byte 2170816 only (I enumerated: 1 occurrence).
+
+### SC-05 — Stream Player pane has no Player Link readout, no Copy button and no border-colour binding (the whole yDe block)
+
+**medium** · `missing-control` · reference byte **2,143,225**
+
+```
+function yDe(t,n){if(1&t){const e=Y();d(0,"div")(1,"div",105)(2,"label",106),v(3," Player Link (give this to viewers to be able to see your broadcast, each time you enabled the player this link changes): "),u(),d(4,"button",83),x("click",function(){return D(e),E(g(2).copyToClipboardPlayer())}),T(5,"i",107),v(6," Copy "),u()(),T(7,"textarea",108),u()}if(2&t){const e=g(2);m(7),Lo("border-color",e.streamingPlayerEnabled?"green":"red"),z("value",e.streamingLinkPlayer)}}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4438-4477 renders only the blurb, the status span and the two buttons. There is no `textarea#streaming-link-playyer`, no `copyToClipboardPlayer` equivalent, and no `streamingLinkPlayer` state — grep for `streamingLinkPlayer`, `streaming-link-playyer` and `Player Link` across apps/room/src returns zero. The presenter can toggle the player but can never obtain the link the toggle exists to produce.
+
+> Verified: I could not find the Player Link readout anywhere in apps/room/src, under its own name, its label text, its handler name, or any synonym. Our Stream Player pane (ModalHost.svelte:4436-4477) is exactly three things: the explanatory paragraph, the "Stream Player enabled:" status span colour-bound to `streamPlayerEnabled`, and the Enable/Dis…
+
+### SC-06 — Stream player state is never seeded from the server (`streamStatus` / getPlayerLink), so the readout always says false on open
+
+**medium** · `missing-behaviour` · reference byte **2,170,505**
+
+```
+getPlayerLink(){var e=this;return I(function*(){let i=yield e.appService.invokeAdminCmd("streamStatus");console.log("getPlayerLink rc:",i),e.streamingPlayerEnabled=i.rc.enablePlayer,e.streamingLinkPlayer=i.rc.playerURL})()}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:673 `let streamPlayerEnabled = $state(false);` — seeded to a constant and only ever written by the two buttons at :4460 and :4469. Nothing calls a status endpoint. A presenter who enabled the player in a previous session reopens the pane and is told `Stream Player enabled: false`.
+
+> Verified: I could not refute this. In our source the Stream Player readout is fed by exactly one variable, `streamPlayerEnabled`, declared as a literal `$state(false)` and written only by the two buttons in the same pane; nothing in the repository reads any server-side player status.
+
+### SC-07 — "Swap Primary and Backup Media Servers" button absent, with its password gate and confirm
+
+**medium** · `missing-control` · reference byte **2,140,720**
+
+```
+function lDe(t,n){if(1&t){const e=Y();d(0,"button",89),x("click",function(){return D(e),E(g(2).switchToBackup())}),v(1," Swap Primary and Backup Media Servers "),u()}}
+```
+
+**Ours:** Not built. The reset pane at apps/room/src/lib/components/ModalHost.svelte:4139-4192 goes straight from Soft Reset (:4162) to Hard Reset (:4176) with no swap control. Repo-wide case-insensitive grep for `swapBackup`, `switchToBackup`, `backup cluster`, `Swap Primary` across apps/room/src returns nothing; `backupClusterID` exists only as an unwired controller setting (apps/controller/src/lib/room-settings-schema.ts). The reference gates it on `sessData.backupClusterID` (`O(36,e.appService.globals.sessData.backupClusterID?36:-1)` at 2154613), so it is conditional there too — but a room with a backup cluster has no way to swap here.
+
+> Verified: I could not find the control in apps/room/src under any name. The session-control reset pane in ModalHost.svelte runs Reload Session Config -> Refresh Roster & Count -> Soft Reset Session (:4169) -> Hard Reset/All Reload (:4182) -> Hard Reset and Revoke Tokens (:4193) with no swap control between them; the only occurrence of "backup" anyw…
+
+### SC-08 — "Admin Dashboard Login" button (and its preceding <hr>) absent
+
+**medium** · `missing-control` · reference byte **2,140,887**
+
+```
+function cDe(t,n){if(1&t){const e=Y();T(0,"hr"),d(1,"button",90),x("click",function(){return D(e),E(g(2).adminLogin())}),v(2," Admin Dashboard Login "),u()}}
+```
+
+**Ours:** Not built. Grep of apps/room/src for `adminLogin`, `Admin Dashboard`, `admin panel` returns nothing. Its gate, `modAdminLoginList`, exists in this repo only as an unwired controller setting (apps/controller/src/lib/room-settings-schema.ts:221, `wired: false`) and as a name in apps/room/src/lib/setting-coverage-contract.test.ts:176. The confirm string "Are you sure you want to login to the Admin Dashboard?" (bundle 2175167) has no counterpart here.
+
+> Verified: I could not find any counterpart in apps/room/src, and I searched hard for one. Searches run over apps/room/src (and, excluding the pinned bundle, the whole repo): `adminLogin`, `doAdminLogin`, `admin_login`, `admin-login`, `adminDashboard`, `admin dashboard`, `admin panel`, `adminPanel`, `admin-panel`, `admin area`, `control panel`, `das…
+
+### SC-09 — A/V error alert has no icon and no "Retry" button — the retry control is missing entirely
+
+**medium** · `missing-control` · reference byte **2,141,127**
+
+```
+function uDe(t,n){if(1&t){const e=Y();d(0,"div",50),T(1,"i",92),v(2),d(3,"button",93),x("click",function(){return D(e),E(g(2).loadDevices())}),T(4,"i",94),v(5," Retry "),u()()}if(2&t){const e=g(2);m(2),Ne(" ",e.devicesLoadError," ")}}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4321-4323 renders `<div class="alert alert-danger">{devicesLoadError}</div>` and nothing else — no `i.fas.fa-exclamation-triangle`, no `button.btn-sm.btn-outline-secondary.ml-2` with `i.fas.fa-redo` and label " Retry ". After a permission denial the only way back is the Refresh button further up the pane.
+
+> Verified: I could not refute this. Our A/V device-selection error render is literally `{#if devicesLoadError}<div class="alert alert-danger">{devicesLoadError}</div>{/if}` (ModalHost.svelte:4321-4323) with no child elements at all — no `i.fas.fa-exclamation-triangle` and no Retry button.
+
+### SC-10 — No "Please connect audio/video devices." fallbacks — the empty select renders instead
+
+**medium** · `missing-behaviour` · reference byte **2,142,196**
+
+```
+function mDe(t,n){1&t&&(d(0,"div",100),T(1,"i",101),v(2," Please connect audio devices. "),u())}
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4325-4362 renders both `<select>`s unconditionally with an `{#each}` that produces zero `<option>`s when the list is empty, plus a `Selected: Unknown Device` line. The reference switches on `O(99,e.audioDevicesList&&e.audioDevicesList.length>0?99:e.devicesLoading||e.devicesLoadError?-1:100)` (bundle 2154772) and renders `mDe`/`vDe` — `i.fas.fa-microphone-slash` / `i.fas.fa-video-slash` with those two sentences — instead. Grep of apps/room/src for `Please connect audio devices` / `Please connect video devices` returns zero.
+
+> Verified: I could not refute this. The session-control modal's av-device-selection tab renders both <select>s unconditionally with no empty-list guard.
+
+### SC-11 — The three audio-constraint checkboxes are seeded to `false` rather than from the saved preferences, so they always open unchecked
+
+**medium** · `defect` · reference byte **2,155,032**
+
+```
+preferences.echoCancellation),m(4),z("checked",e.appService.globals.preferences.noiseSuppression),m(4),z("checked",e.appService.globals.preferences.autoGainControl)
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:649-651 — `let echoCancellation = $state(false); let noiseSuppression = $state(false); let autoGainControl = $state(false);` — local state seeded to a constant, bound with `bind:checked` at :4372, :4384, :4396 and written back via `onPreferenceChange`. No prop and no read of `prefs.loaded.*` for any of the three, so a presenter who turned Echo Cancellation on last week reopens the pane and sees it off. (The reference's own handlers at 2169493 flip `globals.preferences.echoCancellation` and `setPreference` it; the template reads that same object back.)
+
+> Verified: I could not refute it; the claim holds, and the reference comparison makes it slightly worse than stated. WHAT I SEARCHED (all under /home/user/trading-room-app/apps/room): exact tokens `echoCancellation`, `noiseSuppression`, `autoGainControl` across all of `src/` — exactly 9 hits, ALL in `ModalHost.svelte` (the three `$state(false)` decl…
+
+### SC-12 — Restream textarea is never seeded from the room's stored restream URL
+
+**medium** · `missing-behaviour` · reference byte **2,160,049**
+
+```
+e.restreamLink=e.appService.globals.sessData.restreamToURL?e.appService.globals.sessData.restreamToURL:"",e.streamKey=e.appService.globals.mtxToken,e.streamingLink=`http://${e.appService.globals.streamServerMTX}:8889/room__${e.appService.gl
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:682 `let restreamLink = $state('');` — a constant, with no prop and no read of the room config. The Restream pane (ModalHost.svelte:4726-4747 region, textarea `#restream-link` bound with `bind:value`) therefore opens empty even when a restream destination is already configured, so "Set Restream URL" on an unmodified pane would clear it.
+
+> Verified: I could not refute it. `restreamLink` has exactly five references in all of apps/room/src, every one in ModalHost.svelte: the declaration `let restreamLink = $state('');` (691), the two reads in saveRestreamLink (1626-1627), the reset in clearRestreamLink (1634), and `bind:value` on the textarea (4719).
+
+### SC-13 — Set/Clear Restream URL write a per-user preference `restreamToURL` that nothing reads, instead of the room-level `setRestreamURL` command
+
+**medium** · `defect` · reference byte **2,174,659**
+
+```
+startRestream(e=!1){if(e)return this.appService.invokeAdminCmd("setRestreamURL",{restreamToURL:""}),void(this.restreamLink="");this.restreamLink.startsWith("rtmp://")&&!this.restreamLink.includes(" ")?this.appService.invokeAdminCmd("setRest
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:1616-1627 — `saveRestreamLink()` calls `onPreferenceChange('restreamToURL', restreamLink)` and `clearRestreamLink()` calls `onPreferenceChange('restreamToURL', '')`. Those two lines are the only occurrences of `restreamToURL` in apps/room/src outside a contract-test name list; nothing in the room or in services/** consumes it, and `prefs.save` stores it as this viewer's preference. The VALIDATION half is faithful (startsWith('rtmp://') && !includes(' '), with the verbatim alert at apps/room/src/lib/room/user-actions.svelte.ts:511) — it is the write path that is at the wrong level.
+
+> Verified: I could not find a room-level write path anywhere in our source. `saveRestreamLink()` / `clearRestreamLink()` call `onPreferenceChange('restreamToURL', ...)`, which is bound at RoomOverlays.svelte:581 to `prefs.save(key, value)`; `prefs.save` (prefs.svelte.ts:532) mirrors into the decoded snapshot, offers the key to `#hooks.onSideEffect`…
+
+### SC-14 — Non-presenter (hasMic) body — the ngForm device-change flow — is not built, and there is no other working device picker for a non-presenter
+
+**medium** · `missing-control` · reference byte **2,156,909**
+
+```
+function LDe(t,n){if(1&t){const e=Y();d(0,"form",131,0),x("ngSubmit",function(){D(e);const o=It(1);return E(g().submitNewDevices(o))}),H(2,PDe,6,1,"div",52)(3,RDe,2,0)(4,ODe,6,1,"div",52)(5,NDe,2,0),d(6,"button",132),v(7," Change Devices "),u()()
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4092-4765 renders ONE body for everyone; there is no `!isPresenter && user.hasMic` branch, no `<form>` with named `audioID`/`videoID` controls and no submit-time `submitNewDevices` equivalent (grep for `submitNewDevices` and `audioID` returns zero). The only entry points to this modal, RoomNavbar.svelte:548 (mic gear) and :661 (Session Control), both sit inside `{#if isPresenter}` (opened at RoomNavbar.svelte:348, closed at :669), so a non-presenter with a mic cannot reach any device picker at all — the `Change Devices` button at ModalHost.svelte:3973 belongs to `app-av-settings-modal` and is itself a stub with two empty `<select>`s and no handler.
+
+> Verified: The claim's core holds, with one correction. The device picker ITSELF is built: ModalHost.svelte:4316-4420 is the `av-device-selection` tab of the session-control modal, with `<select id="audio-deviceList" aria-label="Audio device (input)">` bound to `currentAudioDevice` (:4348-4358), `<select id="video-deviceList" aria-label="Video devic…
+
+### SC-15 — Refresh Devices button has neither the `disabled` binding nor the spinner/sync icon swap
+
+**low** · `missing-behaviour` · reference byte **2,154,613**
+
+```
+z("disabled",e.devicesLoading),m(),z("ngClass",e.devicesLoading?"fa-spinner fa-spin":"fa-sync-alt")
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4306-4314 — the button has `title="Refresh device list"` and the right classes but no `disabled={devicesLoading}`, and its icon is a static `<i class="fas fa-sync-alt">`. The consts entry at bundle 2178854 confirms the reference declares both bindings on this element: `["type","button","title","Refresh device list",1,"btn","btn-sm","btn-outline-primary",3,"click","disabled"],[1,"fas",3,"ngClass"]`. A presenter can queue several enumerations by clicking repeatedly.
+
+> Verified: I could not refute this. The button exists but genuinely carries neither binding, and no module, action or wrapper supplies them.
+
+### SC-16 — Loading-devices indicator uses the wrong container class
+
+**low** · `wrong-constant` · reference byte **2,178,854**
+
+```
+[1,"alert","alert-info"],[1,"alert","alert-danger"]
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4316-4319 renders `<div class="text-center my-3"><i class="fas fa-spinner fa-spin"></i> Loading devices...</div>`. The reference's `dDe` uses const 49, `alert alert-info` (the error alert, const 50 `alert alert-danger`, IS matched at :4322). Cosmetic only — the sentence and the icon are right.
+
+> Verified: I could not refute it. Reference: at offset 2141078 the bundle reads `function dDe(t,n){1&t&&(d(0,"div",49),T(1,"i",91),v(2," Loading devices...
+
+### SC-17 — Body is not gated on isPresenter inside the component — the presenter body is the only body and renders for whoever opens the modal
+
+**low** · `divergence` · reference byte **2,184,295**
+
+```
+H(8,MDe,165,32)(9,LDe,21,5),u(),d(10,"div",8)(11,"button",9),x("click",function(){return o.done()}),v(12," Done "),u()()()()()),2&i&&(m(8),O(8,o.appService.globals.isPresenter?8:-1),m(),O(9,!o.appService.globals.isPresenter&&o.appService.globals.user.hasMic?9:-1))
+```
+
+**Ours:** apps/room/src/lib/components/ModalHost.svelte:4092-4765 has no `isPresenter` condition anywhere — not on the body, not on the `Session History` / `Webinar Tools` tabs that the reference gates with `rDe`/`aDe` (`O(16,…isPresenter?16:-1)`, `O(17,…isPresenter?17:-1)` at 2154613). Today the only entry points are presenter-gated in RoomNavbar.svelte:348, so nothing is exposed in practice; it is one navbar edit away from rendering Hard Reset and Lock Session to a member. Every one of those buttons is server-authorised, so this is defence-in-depth rather than an escalation.
+
+> Verified: I could not refute it. The session-control modal in ModalHost.svelte (lines 4114-4787) contains no `isPresenter`, `hasMic` or role condition anywhere: an awk scan of that exact range finds only six `{#if}`s, all of them device/streaming state (devicesLoading, devicesLoadError, streamingProtocol RTMP/WHIP, streamingLinkRTMP, ingestError),…
+
+---
+
+## ModalHost: user-settings modal
+
+17 verified gaps; 35 reference behaviours confirmed present.
+
+### USM-02 — Alert-tab 'Users join/leave' group (4 checkboxes) missing while its consumers are live
+
+**high** · `missing-control` · reference byte **2,269,797**
+
+```
+["id","appBeepOnUserJoinLeave","title","Beep on user",1,"pb-2"],[1,"fas","fa-user"],["type","checkbox","name","beep-on-user-join","value","Do not disturb","id","beep-on-user-join",1,"form-check-input",3,"change","checked"]
+```
+
+**Ours:** Zero hits in src/**/*.svelte for beep-on-user-join / popup-on-user-join / beep-on-user-leave / popup-on-user-leave or their preference names. The PREFERENCES exist and are read: prefs.svelte.ts:428-442 exposes popupOnUserJoin/popupOnUserLeave/beepOnUserJoin/beepOnUserLeave and src/lib/arrival-announcement.ts:30-59 consumes all four. So four live viewer preferences have no control anywhere in the room — the viewer cannot silence join/leave beeps or popups. Reference gate is `O(120,(o.appService.globals.sessData.beepOnUserJoin||o.appService.globals.sessData.userJoinAndLeavePopup)&&o.appService.globals.isPresenter?120:-1)` at offset 2285369.
+
+> Verified: I could not find the control under any name. (1) Zero hits in any .svelte file for beep-on-user-join / popup-on-user-join / beep-on-user-leave / popup-on-user-leave, for the preference names beepOnUserJoin/Leave and popupOnUserJoin/Leave, or for label synonyms (Beep, "Beep on user", "Users join", join/leave, "join and leave") — the only .…
+
+### USM-03 — 'Update Positions' checkbox missing — its consumer defaults to off and can never be turned on
+
+**high** · `missing-control` · reference byte **2,269,626**
+
+```
+"app-positions-update","value","Do not disturb","id","app-positions-update",1,"form-check-input",3,"change","checked"
+```
+
+**Ours:** No `app-positions-update` / `updatePositionsIframe` control in ModalHost.svelte. The consumer is live: src/routes/+page.svelte:1238 passes `positionsAutoRefresh={prefs.loaded.updatePositionsIframe === true}` into PresentationArea.svelte:411 -> PositionsContainer.svelte:62 (`positionsRefreshRunning`). Nothing ever writes `updatePositionsIframe`, and the `=== true` coercion makes the absent key false, so the positions iframe auto-refresh is permanently off; the reference default is `updatePositionsIframe:!0` (read at offset 980052). Reference render gate: `O(119,o.appService.globals.sessData.positionsIframe` at offset 2285255.
+
+> Verified: I could not find the control anywhere in apps/room/src. Searched: `app-positions-update`, `positions-update`, `positionsUpdate`, `updatePositionsIframe`, `positionsAutoRefresh`, `positionsRefreshRunning`, `positionsIframe`, the label text "Update Positions", and the synonyms "auto refresh"/"autoRefresh".
+
+### USM-04 — Group Chat Control block is not gated on isPresenter && !isLimitedPresenter
+
+**high** · `missing-control` · reference byte **2,288,249**
+
+```
+O(290,o.appService.globals.isPresenter&&!o.appService.globals.isLimitedPresenter?290:-1)
+```
+
+**Ours:** ModalHost.svelte:3599-3648 renders the `#groupChatControl` block — the three radios that fire `requestSettingsChatMode` -> `onChatModeChange` (an admin-level chat-mode change) — with NO surrounding `{#if}`. Between lines 2827 and 3844 the only `{#if isPresenter}` guards are at 2883 (presenter tab header) and 3652 (presenter pane). Every regular member therefore sees 'Regular Group Chat / Webinar Mode / Disable Group Chat' and gets the bootbox-equivalent confirm; the room's own rule is that authority controls fail closed.
+
+> Verified: I could not find the gate anywhere in apps/room/src. The `#groupChatControl` block sits inside the `user-chat-settings` tab pane (opened at ModalHost.svelte:3453, `settingsTab === 'chat'`, whose nav-item at 2927 is NOT inside the `{#if isPresenter}` that wraps the presenter tab at 2942) with no surrounding `{#if}`: scanning lines 3454-371…
+
+### USM-05 — Presenter-only action buttons (Remove preview windows / Mute all non-admins / Get my token) are rendered for everyone
+
+**high** · `missing-control` · reference byte **2,285,714**
+
+```
+O(135,o.appService.globals.isPresenter?135:-1)
+```
+
+**Ours:** ModalHost.svelte:3214-3240 puts all four buttons inside one ungated `<div class="mx-3">`. In the reference only the last one is unconditional: the `[1,"mx-3"]` wrapper const (offset 2263375) carries the three presenter buttons under index 135 gated on `globals.isPresenter`, and the const immediately after it — `[1,"btn","btn-warning","btn-sm","m-1",3,"click"]` — is the always-rendered 'Edit my Info and Avatar'. A non-presenter in our room can click 'Mute Microphone for all non-admins' and 'Get my token'.
+
+> Verified: I could not find the presenter gate anywhere in our source, and I verified the reference myself. CONFIRMED IN THE REFERENCE (I read the bytes, not a comment): slice [2285450,2286100) of main.d1d09071be31f1ba.js contains `O(135,o.appService.globals.isPresenter?135:-1)`, sitting between `O(132,...hasSpeechRecognition?132:-1)` and the alerts…
+
+### USM-06 — Presenter colour Save writes a per-viewer preference instead of the server admin command
+
+**high** · `divergence` · reference byte **2,243,435**
+
+```
+savePresenterStyle(){this.appService.sendServerAdminCommand("savePresenterColors",{key:this.appService.hashEmail(this.appService.globals.user.email),val:{bkgColor:this.presenterStyle.bgColor,color:this.presenterStyle.color}})}
+```
+
+**Ours:** ModalHost.svelte:3826-3833 calls `onPreferenceChange('presenterStyle', {color, bkgColor})`, which is RoomOverlays.svelte:571 -> `prefs.save(key, value)` (prefs.svelte.ts:532) — a per-viewer settings-blob write. `grep -rn presenterStyle src/` finds exactly ONE hit outside that call site, so nothing reads the key: no server round-trip, no `savePresenterColors`, no `hashEmail` keying. The section's own heading (ModalHost.svelte:3789 'These colors will affect how ALL USERS see your messages and alerts') is therefore false — other viewers never see the change. `savePresenterColors` appears in our tree only as a string in feature-coverage-contract.test.ts:79.
+
+> Verified: I could not refute it; the divergence is real, and the reference's Reset half is missing too. Reference (read at observed offset 2243496): `savePresenterStyle(){this.appService.sendServerAdminCommand("savePresenterColors",{key:this.appService.hashEmail(this.appService.globals.user.email),val:{bkgColor:...,color:...}})}`, with a second adm…
+
+### USM-01 — Discord tab, pane and its three handlers are absent entirely
+
+**medium** · `missing-control` · reference byte **2,268,143**
+
+```
+["id","discord-settings","role","tabpanel","aria-labelledby","discord-settings-tab",1,"tab-pane","fade"]
+```
+
+**Ours:** No Discord surface anywhere: `grep -rn -i discord src/` returns hits only in src/lib/setting-coverage-contract.test.ts:103 and :162, where `enableDiscord` is listed in REFERENCE_READS_AND_WE_DO_NOT and called 'the LAST buildable row... which needs an application registration that does not exist'. ModalHost.svelte:2837-2896 renders four tab headers (App/Alert/Chat/Presenter) and no fifth. The component methods I read at offset 2256837 (`doDiscordAuth(){P("Discord auth initiated"),window.open(`${this.appService.globals.apiROOT}/discord/v2/auth/start?token=${this.appService.globals.sesionToken}`,"_blank")...`), plus revokeDiscord/checkDiscordStatus in the same run, have no counterpart in our tree. Known and documented, not an oversight.
+
+> Verified: I could not disprove this. Exhaustive search of apps/room/src (node_modules excluded) for `discord` (case-insensitive), the reference DOM ids (`discord-settings`, `discord-settings-tab`), the handler names (`doDiscordAuth`, `checkDiscordAuth`, `revokeDiscord`), and rename-synonyms (`oauth`, `revoke`, `integration`, `linkedAccount`, `third…
+
+### USM-07 — Presenter colour Reset uses invented constants, never re-seeds from the server, and sends nothing
+
+**medium** · `wrong-constant` · reference byte **2,243,661**
+
+```
+resetPresenterStyle(){this.presenterStyle={color:this.appService.globals.presenterStyle[this.appService.globals.preferences.theme].color,bgColor:this.appService.globals.presenterStyle[this.appService.globals.preferences.theme].bgColor},this.appService.sendServerAdminCommand("savePresenterColors",{key:this.appService.hashEmail(this.appService.globals.user.email),val:{bkgColor:"",color:""}})}
+```
+
+**Ours:** ModalHost.svelte:3820-3823 resets to hardcoded `presenterTextColor = '#f7fd37'; presenterBackgroundColor = '#000000'` and sends nothing. The reference restores the THEME's presenter defaults and clears the stored pair server-side with `val:{bkgColor:"",color:""}`. Its documented fallback pair is `{color:"#1a1a1a",bgColor:"#e8e8e8"}`, which I read inside switchTheme at offset 2253925. Our initial values (ModalHost.svelte:732-733) are likewise hardcoded and never seeded from `sessData.presenterSettings[hashEmail(email)]`, so a presenter who saved colours sees the wrong swatches on reopen.
+
+> Verified: Not refutable. Our presenter colour pair is initialised to two literals at ModalHost.svelte:749-750 and never seeded from anything server-owned; the Reset button (ModalHost.svelte:3910-3913) only re-assigns those same two literals and issues no command; Save (ModalHost.svelte:3919-3921) writes the generic preference key 'presenterStyle' t…
+
+### USM-08 — 'Reactions Response' popup checkbox missing (gated on sessData.enableReactions)
+
+**medium** · `missing-control` · reference byte **2,269,041**
+
+```
+"app-reactions-popup","value","Do not disturb","id","app-reactions-popup",1,"form-check-input",3,"change","checked"
+```
+
+**Ours:** No `app-reactions-popup` id and no `reactionsPopup` preference anywhere in src/ (zero grep hits). The room DOES implement reactions (`enableReactions` is read in src/lib/components/RoomMessage.svelte, AlertQaModal.svelte, ExtraChatPane.svelte and server/room-config-client.ts), so the feature exists with no way for a viewer to silence its response popup. Reference gate `O(116,o.appService.globals.sessData.enableReactions?116:-1)` at offset 2285066; reference default `reactionsPopup:!0` at offset 979910.
+
+> Verified: I could not refute it. Exhaustive case-insensitive search of apps/room/src for reactionsPopup, reactionsPopupQA, app-reactions-popup, reaction-popup, reactionsResponse, "Reactions Response", reactionsSoundOn, qaReactionSoundOn, updateChatMsgReaction and "Message Reaction" returned zero hits.
+
+### USM-09 — 'Reactions QA Response' popup checkbox missing (gated on sessData.enableQAReactions)
+
+**medium** · `missing-control` · reference byte **2,269,235**
+
+```
+"app-reactions-popup-qa","value","Do not disturb","id","app-reactions-popup-qa",1,"form-check-input",3,"change","checked"
+```
+
+**Ours:** No `app-reactions-popup-qa` id and no `reactionsPopupQA` preference in src/ (zero grep hits), although `enableQAReactions` is a room setting we read (src/lib/server/room-config-client.ts:634) and the Q&A reaction feature is built (qa-thread-contract.test.ts). Reference gate `O(117,o.appService.globals.sessData.enableQAReactions?117:-1)` at offset 2285130.
+
+> Verified: I could not refute it. Exhaustive search of apps/room/src for `app-reactions-popup-qa`, `app-reactions-popup`, `reactions-popup`, `reactionsPopup`, `reactionPopup`, `showReactions`, `popupQA`, `qaReaction`/`QAReaction` (case-insensitive), and the reference's neighbouring sibling ids `note-update-popup` and `app-positions-update` returns Z…
+
+### USM-10 — 'QA Reactions Sound' checkbox missing from the Alert tab
+
+**medium** · `missing-control` · reference byte **2,271,175**
+
+```
+"app-reactions-sound-qa","value","Do not disturb","id","app-reactions-sound-qa",1,"form-check-input",3,"change","checked"
+```
+
+**Ours:** Our Alert tab (ModalHost.svelte:3245-3396) has Alert/QA Popup, Alert sound, QA sound, Non-trade alert sound and Longer alert popup, but no `app-reactions-sound-qa`; `qaReactionSoundOn` has zero hits in src/. Reference default is `qaReactionSoundOn:!0` (read at offset 979369).
+
+> Verified: I could not find it. The reference control is real and I read it: the template render function at offset 2232964 emits `d(0,"div",17)(1,"input",157),x("change",function(){return D(e),E(g().reactionsSoundQAOnChange())}),u(),d(2,"label",158),v(3," QA Reactions Sound ")` bound to `e.appService.globals.preferences.qaReactionSoundOn`; its attr…
+
+### USM-11 — 'Note Update Popup' checkbox missing
+
+**medium** · `missing-control` · reference byte **2,269,438**
+
+```
+"note-update-popup","value","Do not disturb","id","note-update-popup",1,"form-check-input",3,"change","checked"
+```
+
+**Ours:** No `note-update-popup` id and no `noteUpdatePopup` preference in src/ (zero grep hits), although notes are implemented (src/lib/room/notes.svelte.ts, notes-access.svelte.ts). Reference renders it under `z("ngIf",o.appService.globals.sessData.beepOnUserJoin)` (offset 2285196) and defaults `noteUpdatePopup:!0` (offset 979948).
+
+> Verified: Neither the control nor its preference nor its consumer exists in apps/room/src. I searched the whole tree case-insensitively for note-update, noteUpdate, note_update, notesUpdate, "note update", "note popup", "Update Popup", sessionNoteUpdated, 'Note "' and reactionsPopup — all zero hits.
+
+### USM-12 — 'Recording Preview' checkbox persists nothing, has no disable side-effect, and is not gated on isPresenter
+
+**medium** · `defect` · reference byte **2,285,015**
+
+```
+O(115,o.appService.globals.isPresenter?115:-1)
+```
+
+**Ours:** ModalHost.svelte:3153-3167 renders `#app-recording-preview-window` for every viewer and routes it to `updateSettingCheck`, but `app-recording-preview-window` is absent from the `preferenceKeyByInputId` table at ModalHost.svelte:1520-1557, and the table has NO fallback (comment at :1558-1571), so the toggle writes nothing and is forgotten on reload. `recPreviewWindow` as a preference has zero hits in prefs.svelte.ts; the only matches are the private `#recPreviewWindow` window handle in src/lib/room/recording.ts:53-348. The reference handler `recPreviewWindowOnChange(){...setPreference("recPreviewWindow",...)` (read at offset 2250252) also emits `closeRecPreviewWindow` when switching off; ours closes nothing.
+
+> Verified: I could not find it built anywhere in apps/room/src. All three limbs verified against our source and the reference bundle.
+
+### USM-13 — Presenter CC toggle does not start or stop speech recognition immediately
+
+**medium** · `missing-behaviour` · reference byte **2,246,212**
+
+```
+speechRecoCCOnChange(){this.appService.globals.preferences.speechRecoCC=!this.appService.globals.preferences.speechRecoCC,this.appService.globals.preferences.doSpeechReco=this.appService.globals.preferences.speechRecoCC,this.appService.setPreference("speechRecoCC",this.appService.globals.preferences.speechRecoCC),this.appService.setPreference("doSpeechReco",this.appService.globals.preferences.doSpeechReco),this.appService.globals.preferences.speechRecoCC?this.mediaSoupService.micProducer&&!this.mediaSoupService.micMuted&&this.mediaSoupService.startSpeechRecognition():this.mediaSoup
+```
+
+**Ours:** ModalHost.svelte:1530 maps `presenter-speech-recognition` -> `doSpeechReco` only (the `speechRecoCC` half is a documented deliberate drop, ModalHost.svelte:1511-1516), and prefs.svelte.ts:589 stores the flag. Nothing acts on the write: the only callers of `beginSpeechRecognition` are src/lib/room/create-room.svelte.ts:678 and src/lib/room/local-capture.svelte.ts:377 (mic START), so turning captions on mid-session does nothing until the microphone is re-started, and turning them off does not stop an in-flight recognition.
+
+> Verified: The presenter CC toggle in our room only persists the preference; nothing starts or stops recognition when it changes. Traced the full path: ModalHost.svelte:3803-3812 (checkbox id `presenter-speech-recognition`) -> updateSettingCheck maps it at :1603 to `doSpeechReco` -> :1645 onPreferenceChange -> RoomOverlays.svelte:581 -> prefs.save,…
+
+### USM-14 — Presenter Settings tab and pane gated on isPresenter alone, missing !isLimitedPresenter
+
+**medium** · `divergence` · reference byte **2,283,408**
+
+```
+O(18,o.appService.globals.isPresenter&&!o.appService.globals.isLimitedPresenter?18:-1)
+```
+
+**Ours:** ModalHost.svelte:2883 (`{#if isPresenter}` around the tab header) and :3652 (`{#if isPresenter}` around `#presenter-settings`). The prop exists and is used elsewhere in the same file for exactly this narrowing (ModalHost.svelte:276 declares `isLimitedPresenter`, :2012 and :2049 apply `isPresenter && !isLimitedPresenter`), so a limited presenter — someone handed mic and screen — currently gets the whole presenter settings pane. The reference applies the same pair to the pane too: `O(292,...isPresenter&&!...isLimitedPresenter?292:-1)` at offset 2288469.
+
+> Verified: Could not refute. Both gates on the user-settings modal's Presenter Settings tab and pane read `{#if isPresenter}` with no `!isLimitedPresenter` term, while the reference applies the pair to both.
+
+### USM-17 — Switching theme does not reset the chat style or re-seed presenter colours
+
+**medium** · `missing-behaviour` · reference byte **2,253,925**
+
+```
+switchTheme(e){if(this.alertStyle=JSON.parse(window.localStorage.getItem("alertStyle"))||this.appService.globals.alertStyle[e],this.chatStyle=JSON.parse(window.localStorage.getItem("chatStyle"))||this.appService.globals.chatStyle[e],this.appService.globals.isPresenter){const i=this.appService.globals.sessData.presenterSettings&&this.appService.globals.sessData.presenterSettings[this.appService.hashEmail(this.appService.globals.user.email)];this.presenterStyle={color:"#1a1a1a",bgColor:"#e8e8e8"}
+```
+
+**Ours:** ModalHost.svelte:2922/2934 call `onTheme('light'|'dark')` -> RoomOverlays.svelte:570 -> `modals.setTheme` -> +page.svelte:518 `setTheme: (next) => (theme = next)`. That is the whole path: the theme flips, but the chat-style swatches keep the previous theme's colours until the viewer presses Reset (ModalHost.svelte:1924-1927 `resetChatStyle`, which the reference's switchTheme calls itself), and the presenter swatches are never re-seeded. Our chat style living in server preferences rather than localStorage 'chatStyle'/'alertStyle' is a deliberate architectural divergence and is NOT part of this gap.
+
+> Verified: I tried hard to find a theme-triggered re-seed and there is none. The full write path is closed and does only one thing: ModalHost.svelte:3054/3066 `onchange={() => onTheme('light'|'dark')}` -> RoomOverlays.svelte:580 `onTheme={(next) => modals.setTheme(next)}` -> modals.svelte.ts:192-195, whose entire body is `this.#setTheme(nextTheme)`…
+
+### USM-15 — Closed-captions sections are not gated on hasSpeechRecognition
+
+**low** · `divergence` · reference byte **2,285,653**
+
+```
+O(132,o.appService.globals.hasSpeechRecognition?132:-1)
+```
+
+**Ours:** ModalHost.svelte:3192-3212 (`#appSpeechRecoOverlay`) and :3696-3717 (`#presenterSpeechRecognition`) render unconditionally. Our room does enforce the entitlement at RUNTIME — src/lib/room/recording.ts:376 `beginSpeechRecognition` refuses, per src/lib/room/speech-reco-entitlement.test.ts:18-22 — so the effect is a visible control that silently cannot work in a room with speech recognition disabled, not a privilege hole.
+
+> Verified: Both closed-captions sections in our user-settings modal render with no entitlement condition, while the reference gates each on globals.hasSpeechRecognition. In ModalHost.svelte the #appSpeechRecoOverlay block (currently :3324-3344, +33 from the claim's line numbers because the working tree has uncommitted edits) has NO enclosing {#if} a…
+
+### USM-18 — 'Smaller image preview' label has no on/off span and its checked term drops defaultImagePreview
+
+**low** · `divergence` · reference byte **2,286,816**
+
+```
+z("checked",o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview),m(3),O(219,o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview?219:-1)
+```
+
+**Ours:** ModalHost.svelte:3435-3446: checked comes from the local `settingChecks['small-image-preview']` and the label is plain text with no `<span>on/off</span>`. The persistence half is a DELIBERATE, evidenced closure — src/lib/settings-preference-wiring-contract.test.ts:427-462 proves the class it drives (`chat-uploaded-img-sm`) has no rule in any of the 52 stylesheets and asserts the id stays out of the mapping table. Only the missing label span and the dropped `defaultImagePreview` conjunct are unaccounted for; both are cosmetic.
+
+> Verified: I could not refute it. ModalHost.svelte:3578 is the ONLY render site of this control in all of src/ (verified by grepping `Smaller image`, `chatImagePreview`, `small-image-preview`, `smallImagePreview`, and by listing every file containing `form-check-label`), and its label is plain text: `<label for="small-image-preview" class="form-chec…
+
+---
+
+## routes/+page.svelte (room shell)
+
+15 verified gaps; 65 reference behaviours confirmed present.
+
+### G01 — Archives → "Recording" menu item is inert: no `launchRecordings()`
+
+**high** · `missing-behaviour` · reference byte **2,467,840**
+
+```
+E(g(3).launchRecordings())}),T(1,"i",51),d(2,"span",22),v(3,"Recording")
+```
+
+**Ours:** The same item is rendered with NO handler at all: `apps/room/src/lib/components/RoomSidebar.svelte:439-442` is `<a class="dropdown-item small"><i class="fas fa-circle"></i><span class="pl-2">Recording</span></a>`. The neighbouring Alert Logs / Chat Logs items in the same dropdown DO carry onclick. Grepped apps/room/src for `launchRecordings`, `archives/recordings`, `openRecordings` — zero hits. The reference body, read at byte 2522147, is `launchRecordings(){window.open(`${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${sesionToken}`,"_blank")}`.
+
+> Verified: Could not refute. The Archives dropdown's "Recording" item in our source is rendered with no handler and no href at apps/room/src/lib/components/RoomSidebar.svelte:439-442, inside the correct `{#if isPresenter || !session?.hideRecs}` gate (:438) — while its three siblings in the same dropdown all carry onclick (Alert Logs :452, Chat Logs…
+
+### G02 — Presenter entry warning when the session is locked (bootbox "Session Locked" with a "Session Control" button)
+
+**medium** · `missing-control` · reference byte **2,500,222**
+
+```
+title:"Session Locked",message:"Session is locked, no users are allowed in the room.<br><br>To unlock: Go to Session Control, then Lock Session tab, then click on Unlock Session.",buttons:{confirm:{label:"Session Control",className:"btn-primary"},cancel:{label:"Close",className:"btn-secondary"}}
+```
+
+**Ours:** Absent. Guarded upstream by `sessData.isLocked && globals.user.isPresenter` (the bytes immediately before the quote, read at 2500150-2500600), with a confirm callback that does `un("#session-control-modal").modal("show")`. `apps/room/src/lib/room/session-lock-writes.ts:28-42` has only the two post-action acknowledgements ('Session Locked' / 'Session Unlocked') a presenter sees AFTER locking. Grepped apps/room/src for `Session is locked` (zero hits) and `isLocked` (one hit, server-side entry admission at `apps/room/src/routes/session/+page.server.ts:351`). A presenter entering an already-locked room is told nothing.
+
+> Verified: I could not refute this. The reference behaviour is real and our source has no counterpart under any name.
+
+### G03 — Room-level `.notConnectedOverlay` "Reconnecting Chat..." (template node 7, gated on `socketConnected`)
+
+**medium** · `missing-control` · reference byte **2,496,906**
+
+```
+function iRe(t,n){1&t&&(d(0,"div",9),T(1,"i",37),v(2," Reconnecting Chat... "),u())}
+```
+
+**Ours:** Only the SUCCESS half exists: `apps/room/src/lib/components/RoomOverlays.svelte:502-508` renders one div that merges const 10 (`id="connectedMsg"`, the 3s "Conected" flash) and reuses the const-9 class list. The const-9 element itself — the overlay shown while the socket is DOWN, `O(7,o.appService.globals.socketConnected?-1:7)` which I read at byte 2548267 — has no counterpart; grepped for `notConnectedOverlay` (one hit, the connectedMsg div) and `socketConnected` (zero hits). The driving state already exists as `roomEventsConnected` (used at `RoomSidebar.svelte:276-280`), so only the overlay is missing.
+
+> Verified: The reference has TWO distinct "Reconnecting Chat..." nodes and our source implements only one of them. The sidebar node (reference `lPe`, a `<p>` with `fa-cog fa-spin`, paired with `cPe`/`dPe`/`uPe`) IS built at RoomSidebar.svelte:270-281, driven by `roomEventsConnected` — so the driving state and the label text both exist.
+
+### G04 — Talking-user names in the navbar are not clickable — `muteTalkingUserDialog(e)` absent
+
+**medium** · `missing-control` · reference byte **2,473,449**
+
+```
+E(g(3).muteTalkingUserDialog(o))})
+```
+
+**Ours:** `apps/room/src/lib/components/RoomNavbar.svelte:285-290` renders each speaker as a bare `<span>{talkingUser.mediaValue.name}</span>` with no handler. The method body, read at byte 2529373, is presenter-only `bootbox.prompt("Would you like to force stop "+e.mediaValue.name+" from talking? (forces a remote mute for all). type: yes to proceed", …)` then `sendServerCommand('muteTalkingUser', e)`. Grepped for `muteTalkingUserDialog`, `force stop`, `muteTalkingUser` — the only hits are prose at `apps/room/src/lib/room/user-actions.svelte.ts:400` and `apps/room/src/lib/mute-all-non-admins.ts:20`. The per-peer mechanism this needs (`remotePresCommand`/`mutemic`) is already built and used by `muteAllNonAdmins` (`user-actions.svelte.ts:408-429`), so what is missing is the click target and its prompt.
+
+> Verified: I could not refute it. In our source the talking-user names are rendered as a bare, inert <span> inside the navbar's talkingIndicator: RoomNavbar.svelte:284-291 loops `{#each media.talking as talkingUser, index (talkingUser.userID)}` emitting `<span>{index > 0 ?
+
+### G05 — Screenshare menu: " OBS / RTMP / Stream / Restream " item + `openStreamingTab()` (gated on `sessData.useMediaMTX`)
+
+**medium** · `missing-control` · reference byte **2,479,514**
+
+```
+E(g(3).openStreamingTab())}),d(2,"a",158),v(3," OBS / RTMP / Stream / Restream "
+```
+
+**Ours:** Our screenshare dropdown (`apps/room/src/lib/components/RoomNavbar.svelte:596-641`) carries only two of the three enumerated titles — `title="(Regular Bandwidth) ** RECOMMENDED"` (:607) and `title="OBS"` (:604) — plus "Stop Sharing All Screens". The third item, its `New` badge (const `[1,"badge","text-bg-danger","ms-1"]`) and the handler are absent; grepped for `openStreamingTab` and `OBS / RTMP` — zero hits. The reference handler, read at byte 2531675, chains `#session-control-modal` → `#streaming-selection-tab` → `#obs-streaming-tab`; all three ids already exist in `apps/room/src/lib/components/ModalHost.svelte:4406,4481`, so only the entry point is missing.
+
+> Verified: I tried hard to find this built under another name and could not. Our screenshare dropdown (`apps/room/src/lib/components/RoomNavbar.svelte:594-607`) contains exactly two entry items — `title="(Regular Bandwidth) ** RECOMMENDED"` → `onpromptforscreenname('screen')` (:594-600) and `title="OBS"` → `onpromptforscreenname('camera')` (:604-607…
+
+### G06 — Screenshare menu: " Reopen Screenshare Preview" item → `reopenPreviewWindow()`
+
+**medium** · `missing-control` · reference byte **2,479,924**
+
+```
+E(g(3).reopenPreviewWindow())}),v(2," Reopen Screenshare Preview")
+```
+
+**Ours:** Absent from `apps/room/src/lib/components/RoomNavbar.svelte`. Grepped apps/room/src for `reopenPreviewWindow`, `Reopen Screenshare Preview`, `Reopen Webcam` — zero hits (`reopenRecPreviewWindow` IS built, at `apps/room/src/lib/room/recording.ts:307-338`). The item is gated `O(15, isScreenSharing ? 15 : -1)` in the block I read at byte 2480728, and the method body at byte 2519083 is `if(!mediaService.isScreenSharing)return!1;emit("reopenPreviewWindow")`. Related: `previewWindowsVisible` (`apps/room/src/routes/+page.svelte:219`) is only ever written false (`:527`, via `user-actions.svelte.ts:565`) and never back true, so a presenter who hides the preview windows cannot restore them.
+
+> Verified: I could not find any implementation of the "Reopen Screenshare Preview" control in our source under any name. The screenshare dropdown in `RoomNavbar.svelte` (the `<ul class="screen-options-start-screen …">` opened at :583 and closed at :630) contains exactly three items: Share Screen (:594-599, `onpromptforscreenname('screen')`), the OBS…
+
+### G07 — Screenshare menu: per-screen "Stop Sharing {screenName}" repeater (d4e over `screenProducers`)
+
+**medium** · `missing-control` · reference byte **2,480,060**
+
+```
+function d4e(t,n){if(1&t){const e=Y();d(0,"li")(1,"a",163),x("click",function(){const o=D(e).$implicit;return E(g(3).mediaService.stopSharingProducer(o.key))}),v(2),u()()}if(2&t){const e=n.$implicit;m(2),Ne(" Stop Sharing ",e.value.appData.screenName,"")}}
+```
+
+**Ours:** Our menu offers only the all-or-nothing "Stop Sharing All Screens" (`apps/room/src/lib/components/RoomNavbar.svelte:626-634`, gated on `media.screenSharing`). Grepped for `stopSharingProducer` (zero hits) and `Stop Sharing ` (only the all-screens label, `apps/room/src/lib/navbar-labels.ts:39`). A presenter sharing two screens cannot stop one of them.
+
+> Verified: The navbar screenshare menu genuinely has no per-producer repeater: RoomNavbar.svelte's dropdown ends at the all-screens item gated on media.screenSharing, its only {#each} in the file is over media.talking (line 285), and its props carry no screen list. Grep found zero hits for stopSharingProducer/screenProducers-as-state and no per-scre…
+
+### G08 — Talking indicator never shows the idle image: `#nolevelsImg` / notalking.png branch absent
+
+**medium** · `missing-behaviour` · reference byte **2,542,272**
+
+```
+["id","nolevelsImg","src","/assets/images/notalking.png",1,"talkingWaveform","animated","fadeIn"]
+```
+
+**Ours:** `apps/room/src/lib/components/RoomNavbar.svelte:292-301` renders `#talkingLevelsImg` (`/assets/images/talking.gif`) unconditionally. The reference switches between the two on `O(8,e.mediaService.presenterTalking?8:9)`, which I read at byte 2473901. Grepped apps/room/src for `nolevelsImg` and `notalking` — zero hits, yet `apps/room/static/assets/images/notalking.png` IS shipped in this repo: an asset with no consumer, which is the inverse of the usual gap and strong evidence the branch was dropped rather than never transcribed.
+
+> Verified: I could not find the idle-image branch anywhere in our source. RoomNavbar.svelte:293-300 renders `#talkingLevelsImg` with a literal `src="/assets/images/talking.gif"` and no conditional; the `{:else}` at :303-307 is a DIFFERENT switch — it is the reference's `LPe` block (" ( No one is speaking )", our `NO_SPEAKER_TEXT` at navbar-labels.ts…
+
+### G09 — Blocked audio autoplay is only logged, never surfaced — no "Your browser needs your OK" dialog
+
+**medium** · `missing-behaviour` · reference byte **2,515,092**
+
+```
+bootbox.alert("Your browser needs your OK to play the room's audio",()=>{P("Autoplay after UI, pressing play()..."),o.play(),i.appService.guiEventBus.emit("resizeScrollviewChatEnd")})
+```
+
+**Ours:** `apps/room/src/lib/room/media-transport.svelte.ts:1274-1277` catches the rejected `play()` and does `console.warn('[media] remote audio ${producerId} could not play', error)` and nothing else. Grepped apps/room/src for `needs your OK` — zero hits. Chrome blocks audible autoplay without a gesture, so a viewer whose browser refuses hears nothing with no way to recover; the reference's dialog OK is the gesture that retries `play()`. (The reference has this twice — `attachAudioStream` here, and a 3× retry-then-alert in the mediasoup consumer at byte 1094188.)
+
+> Verified: I could not refute this. Both reference sites are real and I read them: byte 2515120 (`attachAudioStream` -> `bootbox.hideAll(); bootbox.alert("Your browser needs your OK to play the room's audio", () => { o.play(), guiEventBus.emit("resizeScrollviewChatEnd") })`) and byte 1094188 (the mediasoup consumer's `h=(f=3,_=300)=>{c.play().then(.…
+
+### G11 — `audioServerDisableMic` — no `micDisabled` state and no microphone-troubleshooting dialog
+
+**medium** · `missing-behaviour` · reference byte **2,503,109**
+
+```
+this.appService.appEventBus.subscribe("audioServerDisableMic",()=>{this.micDisabled=!0,this.recordingReminder=!1,bootbox.alert("There is an issue with your microphone, make sure you allowed its use on the browser. Also, if this is a USB microphone, try to unplug it and plug it back in, then reload the page and it shoul
+```
+
+**Ours:** Absent. Grepped apps/room/src for `audioServerDisableMic` (zero hits) and `micDisabled` (one hit, and it is prose: `apps/room/src/lib/room/gates.ts:393` records that the recording banner's `!micDisabled` term "this room does not model"). `this.micDisabled=!1` is one of the class-field initialisers I read at byte 2497326, and the handler also clears `recordingReminder`; neither the flag nor the dialog exists here.
+
+> Verified: Not implemented anywhere in apps/room/src under any name. I grepped for the event name (audioServerDisableMic, disableMic/disable_mic/disable-mic, audioServer), the flag and every synonym I could think of (micDisabled, micBlocked, micBroken, micUnavailable, micFault, micError, micIssue, audioDisabled, noMic, micPermission), and the dialog…
+
+### G12 — Navbar users counter has neither of its two handlers: click → `toggleSideBarUsersCount()`, dblclick → `hideCount` toggle
+
+**medium** · `missing-control` · reference byte **2,484,941**
+
+```
+x("click",function(){return D(e),E(g().toggleSideBarUsersCount())})("dblclick",function(){D(e);const o=g();return E(o.hideCount=!o.hideCount)})
+```
+
+**Ours:** `apps/room/src/lib/components/RoomNavbar.svelte:228-230` is a plain `<span title="Users Connected" class="users ml-1 mr-1 d-flex align-items-center">` with no `onclick` and no `ondblclick`. Grepped apps/room/src for `toggleSideBarUsersCount` (only prose, `apps/room/src/lib/always-show-roster-contract.test.ts:31`) and `hideCount` (zero hits). Method body read at byte 2515444: `toggleSideBarUsersCount(){this.alwaysShowRoster&&(this.showSidebar=!this.showSidebar,this.showSidebar&&this.appService.loadRoster())}`. NOTE the enumeration mislabels this — the alwaysShowRoster flip is on CLICK; DBLCLICK toggles the separate `hideCount` field.
+
+> Verified: Both handlers are genuinely absent from our source, and so is the visibility field the dblclick toggles. WHAT I READ IN OUR SOURCE.
+
+### G13 — Navbar roster count is shown to everyone — the `hideCount || (!rosterCountVisibleToViewers && !isPresenter)` gate is not applied
+
+**medium** · `missing-control` · reference byte **2,487,511**
+
+```
+O(5,e.hideCount||!e.appService.globals.sessData.rosterCountVisibleToViewers&&!e.appService.globals.isPresenter?-1:5)
+```
+
+**Ours:** `apps/room/src/lib/components/RoomNavbar.svelte:228-230` renders `{roster.connectedCount}` unconditionally. We DO implement the sibling gate for the SIDEBAR badge — `rosterCountVisibleTo()` at `apps/room/src/lib/roster-gates.ts:81-84`, cited to `O(6, rosterCountVisibleToViewers || isPresenter ? 6 : -1)` and used at `RoomSidebar.svelte:545` — so an owner who turns the count off for viewers still has it leaked in the navbar. The gated node is `kPe` (read at byte 2472519), which renders `globals.rosterCount + simUserCount`, i.e. exactly our `roster.connectedCount`.
+
+> Verified: Confirmed not built. The navbar count span in apps/room/src/lib/components/RoomNavbar.svelte:228-230 renders `{roster.connectedCount}` with no enclosing conditional (lines 210-230 of that file contain no `{#if}` between `<nav>` and the span).
+
+### G14 — `simUserCount` is not clamped to [0, 5000]
+
+**low** · `missing-behaviour` · reference byte **2,499,409**
+
+```
+this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this.simUserCount=0)
+```
+
+**Ours:** `apps/room/src/lib/room/create-room.svelte.ts:299` is `simUserCount: () => data.sessData?.simUserCount ?? 0`, passed into `RoomRoster` and added to the badge at `apps/room/src/lib/room/roster.svelte.ts:163`. No clamp on the client and none server-side — `apps/room/src/lib/server/room-config-client.ts:111` types it as a bare `simUserCount?: number`. An owner value of 50000 or -5 renders verbatim.
+
+> Verified: No clamp exists anywhere in our source, on the client or the server. The value flows raw from the controller payload to the badge: room-config-client.ts:111 types it as a bare `simUserCount?: number` and fetchRoomConfig (same file, 799-832) validates only that the payload is an object with a `settings` object — no per-field checks; create…
+
+### G16 — `visibilitychange` is armed immediately, not after the reference's 10 000 ms delay, and it does not unload/reload the roster
+
+**low** · `divergence` · reference byte **2,511,416**
+
+```
+appVisibilityChange(e){console.log("appVisibilityChange enabled: ",e),e?this.visibilityChangeTimer=setTimeout(()=>{document.addEventListener("visibilitychange",()=>{
+```
+
+**Ours:** `apps/room/src/routes/+page.svelte:931` binds `<svelte:document onvisibilitychange={() => roomRefresh.visibilityChanged(document.hidden)} />` unconditionally at mount, and `apps/room/src/lib/room/refresh.svelte.ts:94-108` sets `appHasFocus`, stops/starts the 5 s poll and does one catch-up `invalidateAll()`. Two reference behaviours have no counterpart: the 10 s arming delay (the `},1e4)` at the end of that setTimeout) and the hidden-branch `appService.unloadRoster()` / show-branch `showSidebar && loadRoster()`. Probably deliberate — our roster arrives with the page load — but unlike the sibling 500 ms `alwaysShowRoster` timer, whose refusal IS recorded at `always-show-roster-contract.test.ts:17-21`, this one is nowhere written down.
+
+> Verified: The claim is COMPOUND and only ONE of its two limbs survives. It must be split before it is acted on.
+
+### G17 — `videoOnlyMode` (the `r` query parameter) is missing from both ngClass maps and from the `hideChatAlerts` gate
+
+**low** · `divergence` · reference byte **2,465,818**
+
+```
+nPe=(t,n)=>({"push-wrapper":t,"mt-0":n}),qB=t=>({"btn-dark":
+```
+
+**Ours:** `apps/room/src/routes/+page.svelte:982` binds `'mt-0': chatOnlyMode || gates.viewerOnlyMode` and `apps/room/src/lib/components/RoomShell.svelte:177` binds `'vh-100': chatOnlyMode || viewerOnlyMode` — two of the reference's three terms. The reference update block, which I read at byte 2548267, is `videoOnlyMode||chatOnlyMode||viewerOnlyMode` in both places. This is an ALREADY-DECLARED gap (`+page.svelte:978-979`, `RoomShell.svelte:168-170`, `gates.ts:258`) rather than an unnoticed one — listed only so the enumeration is answered in full.
+
+> Verified: Could not refute. The reference's three-term expression is confirmed by direct read at three sites, and our source implements only two terms at all three consumers.
+
+---
+
+## ModalHost: user-info / moderation modal
+
+14 verified gaps; 48 reference behaviours confirmed present.
+
+### UIM-02 — Admin Notes tab renders only the password gate — the notes list, per-note delete and Add Note (mTe/fTe) have no counterpart
+
+**high** · `missing-control` · reference byte **2,065,327**
+
+```
+function mTe(t,n){if(1&t){const e=Y();d(0,"div",38)(1,"div",93),ht(2,fTe,7,8,"div",94,z2e),u()(),T(4,"hr"),d(5,"div",38)(6,"div",39)(7,"button",95),x("click",function(){return D(e),E(g(2).addNote())}),T(8,"i",96),v(9," Add Note "),u()()()}if(2&t){const e=g(2);m(2),pt(e.user.notes)}}
+```
+
+**Ours:** ModalHost.svelte:2547 renders `{#if !canManageNotes}` and nothing else — the pTe branch only; there is no `{:else}`. grep over apps/room/src returns ZERO hits for "Add Note", "addNote", "deleteNode", "delUserNote", "addUserNote", "smallAvatarImg" markup use, or the reference's triple-`d-flex` note row (consts[94] = [1,"d-flex","d-flex","justify-content-between","d-flex","align-items-stretch"], read in the consts array at 2087748). fTe (read at 2064890) is the per-note row with the 20px avatar, ' [date|short] name: note ' and `deleteNode(note,$index)`. This is already documented as a deliberate scope-out at ModalHost.svelte:203-208 ("`notes` is room-scoped, keyed by room_short_code with no member column"), so it is a known gap, not an unnoticed one — but it is still the whole feature.
+
+> Verified: Could not refute. The #nav-notes tabpanel in ModalHost.svelte contains exactly one branch — {#if !canManageNotes} with the password paragraph and "Enter Password" button (upstream's pTe) — closing at line 2689 with no {:else}; the reference's mTe list container, per-row fTe (20px avatar, " [date|short] name: note ", deleteNode(note,$index…
+
+### UIM-03 — `user.hidePrivateInfo` — the three privacy gates that suppress the extra tabs, the Last Login/Email/Badges/Location rows and the Permissions row — does not exist anywhere in our source
+
+**high** · `missing-control` · reference byte **2,068,025**
+
+```
+O(5,e.user.hidePrivateInfo?-1:5),m(11),Ze(e.user.nick),m(),O(17,e.user.hidePrivateInfo?-1:17),m(5),Ze(e.user.privData.uaStr||"n/a"),m(),O(23,e.user.hidePrivateInfo?-1:23)
+```
+
+**Ours:** grep for "hidePrivateInfo" over the whole of apps/room/src returns ZERO hits (source and tests). Slot 5 is J2e, the System/Actions/Admin Notes tab list (read at 2059391); slot 17 is oTe, the Last Login / Email / Badges / Location rows (read at 2060099); slot 23 is lTe, the Permissions row (read at 2062977). We render all three unconditionally: ModalHost.svelte:2053 emits all four tabs from one `{#each}`, :2091 the Last Login row, :2165 the Permissions row. In a multi-tenant fintech room this flag is the one that keeps a member's email, IP, UA and permissions out of the modal, and we have no equivalent.
+
+> Verified: I could not refute this. `hidePrivateInfo` — and every synonym I could construct for it — is absent from apps/room/src.
+
+### UIM-09 — System tab, Location, Last Login, Trial/New and Temporary Access Only have no data supply — every value resolves to 'n/a' or false
+
+**high** · `missing-behaviour` · reference byte **2,068,096**
+
+```
+O(5,e.user.hidePrivateInfo?-1:5),m(11),Ze(e.user.nick),m(),O(17,e.user.hidePrivateInfo?-1:17),m(5),Ze(e.user.privData.uaStr||"n/a"),m(),O(23,e.user.hidePrivateInfo?-1:23),m(10),Ze(e.user.data.cver||"n/a"),m(6),Ze(e.user.privData.ip||"n/a"),m(),O(40,e.user.privData.ip?40:-1)
+```
+
+**Ours:** The markup is all there (ModalHost.svelte:2325 App Version, :2331 IP, :2341 System, :2345 Stream Server, :2356 Socket Server, :2360 UserID, :2091 Last Login, :2148 Location) but `ModalTargetUser` is built in only two places — `RoomUserActions.target` (src/lib/room/user-actions.svelte.ts:276-300) and `.targetFor` (:303-328) — and NEITHER sets `loggedIn`, `location`, `ip`, `userAgent`, `appVersion`, `streamServer`, `serverId`, `isTrial`, `isNew`, `years` or `temporaryAccessOnly`. grep for `appVersion:` / `streamServer:` / `serverId:` / `userAgent:` / `loggedIn:` / `temporaryAccessOnly:` as object keys over apps/room/src (excluding tests) returns no producer. So the whole System tab is a table of 'n/a', the '(click to lookup)' and '(test it)' links can never render, and the Temporary Access Only checkbox always initialises unticked regardless of the stored value — which matters because Save writes every key it is given (see the docblock at src/lib/room/user-actions.svelte.ts:313-322 about exactly this class of silent revocation).
+
+> Verified: I tried to refute this and could not. The reference text is real: I read the bundle and `e.user.privData.uaStr` occurs at observed offset 2068127 (slice printed from 2068000), with `e.user.data.streamServer` at 2063568 — the compiled row list is App Version (`data.cver`), IP (`privData.ip`), System (`privData.uaStr`), Stream Server (`data…
+
+### UIM-01 — Avatar edit dropdown (Setup Gravatar / Or upload a picture / Remove profile picture) is entirely absent
+
+**medium** · `missing-control` · reference byte **2,058,852**
+
+```
+function K2e(t,n){if(1&t&&(d(0,"div",6)(1,"span",16),T(2,"i",17),u(),d(3,"ul",18),H(4,W2e,9,0)(5,q2e,4,0),u()()),2&t){const e=g();m(4),O(4,e.appService.globals.preferences.profilePic?5:4)}}
+```
+
+**Ours:** ModalHost.svelte:1991 renders `<div class="edit-user-avatar">` containing only the `<img>`. Root template gates the dropdown on `O(6, o.user.userXrefID===o.appService.globals.user.userXrefID?6:-1)` (read at 2095583); we render no dropdown at all. grep over apps/room/src returns ZERO hits for "Setup Gravatar", "Or upload a picture", "Remove profile picture", "clearProfilePic", "setupProfilePic", "edit-user-avatar-options". The CSS is already ported and is therefore dead: src/app.css:1913 `.edit-user-avatar-options`, :1926 `:hover`, :1930 `.dropdown-toggle::after`, plus src/lib/styles/captured-runtime-components.css:4825/4837/4841. The reference strings "Are your sure you want to remove your profile picture?" and "Profile Image Upload" also have zero hits in apps/room/src.
+
+> Verified: I could not refute it. The reference's self-service avatar dropdown is genuinely unbuilt here, and our own repository already declares it unbuilt in a contract test.
+
+### UIM-04 — Footer 'Private Chat' is not gated on `canPM` — only on `checkIsMe()`
+
+**medium** · `missing-control` · reference byte **2,096,067**
+
+```
+O(18,o.canPM&&o.checkIsMe()?18:-1),m(),O(19,o.checkIsMe()?19:-1))
+```
+
+**Ours:** ModalHost.svelte:2692 opens a single `{#if !isTargetCurrentUser}` that wraps @Mention, Private Chat, Follow and Mute together, so Private Chat (:2711) gets only the checkIsMe half. The reference's canPM is `(isPresenter||sessData.userPM||sessData.userToPresenterPM&&("a"===this.user.perms||this.user.hasAdminChat))&&!(globals.user.isFT&&sessData.disablePMForTrials)` (read at 2073550). The transcription EXISTS in this repo as `canShowRosterPrivateChat()` in src/lib/roster-private-chat.ts:26 — but ModalHost neither imports it nor takes a prop for it, so the modal's button is unconditional for any non-self target.
+
+> Verified: The reference gates the user-info modal's Private Chat button on TWO conditions — `O(18,o.canPM&&o.checkIsMe()?18:-1)` — while @Mention (17) and Follow/Mute (19) get only `checkIsMe()` (which returns true when the target is NOT me, verified at offset 2087485). Our ModalHost opens a single `{#if !isTargetCurrentUser}` at ModalHost.svelte:2…
+
+### UIM-05 — Follow-chat 'Reset' resets local state only; the reference resets AND persists to followedUsers
+
+**medium** · `missing-behaviour` · reference byte **2,075,493**
+
+```
+resetFollowChatStyle(e){this.followChatStyle=this.loadDefaultFollowChatStyle(),this.appService.updateUserInList({emailHash:e,followChatStyle:this.followChatStyle},"followedUsers")}
+```
+
+**Ours:** ModalHost.svelte:2677 — `onclick={() => (followChatStyle = defaultFollowStyle())}`. No call to `onFollowStyleChange`, so pressing Reset and closing the modal leaves the saved style untouched; the reference writes the defaults through `updateUserInList` immediately, exactly as `saveFollowChatStyle` does (2075673, which our 'Save changes' at :2683 does match).
+
+> Verified: Could not refute. Our follow-chat 'Reset' at ModalHost.svelte:2809 is `onclick={() => (followChatStyle = defaultFollowStyle())}` — it assigns local $state only.
+
+### UIM-06 — Clicking the 'Admin Notes' tab does not invoke manageAdminNotes() — the password prompt is reachable only from the Enter Password button
+
+**medium** · `missing-behaviour` · reference byte **2,059,546**
+
+```
+manageAdminNotes())}),v(5," Admin Notes "),u()}}function Z2e(t,n){1&t&&(d(0,"span",9),v(1,"Offline"),u())}
+```
+
+**Ours:** ModalHost.svelte:2053-2066 builds all four tabs from one `{#each}` whose onclick does `event.preventDefault(); userInfoTab = tabId` and nothing else. consts[56] for that tab carries `3,"click"` (read in the consts array at 2087748) precisely because the reference binds manageAdminNotes there. We do have the handler — `RoomNotesAccess.manageAdminNotes()` in src/lib/room/notes-access.svelte.ts:78, reached from ModalHost.svelte:2551 via `onUserAction('admin-notes-password', …)` — it is just not wired to the tab.
+
+> Verified: I could not refute it. In our source the Admin Notes tab anchor does nothing but switch panes, and the notes-password door has exactly one caller.
+
+### UIM-07 — The 'Badges:' cell renders an empty div — no parseBadges, no innerHTML supply
+
+**medium** · `missing-behaviour` · reference byte **2,060,779**
+
+```
+z("innerHTML",Ct(18,14,e.badges,"html"),wn),m(2),O(19,e.appService.globals.isPresenter&&e.user.isFT?19:
+```
+
+**Ours:** ModalHost.svelte:2110 — `<div class="d-inline-block align-baseline mr-1"></div>`, permanently empty. The class list matches reference consts[57] = [1,"d-inline-block","align-baseline","mr-1",3,"innerHTML"] but the binding does not exist. grep for "parseBadges" over apps/room/src returns ZERO hits. We DO render badges elsewhere from a structured array (RoomMessage.svelte:673/676 with the reference's own `user-badge-img` / `badge px-1 mx-1 user-badge` markup), so the renderer exists under another shape — the modal is simply not fed it.
+
+> Verified: I could not refute it. The 'Badges:' cell in our user-info modal is an empty div with no supply, and nothing anywhere in apps/room/src feeds a badge list for a MODAL TARGET user.
+
+### UIM-08 — Stars/years gate drops two of its three terms — `disableStarYears` and `user.isP`
+
+**medium** · `missing-control` · reference byte **2,061,001**
+
+```
+O(21,e.appService.globals.sessData.disableStarYears||e.user.isP||!e.user.data.years?-1:21),m(5),Ne(" ",e.user.privData.locStr||"n/a"," \xa0\xa0 ")
+```
+
+**Ours:** ModalHost.svelte:2138 — `{#if targetUser.years}` only. `disableStarYears` is a real, supplied setting in this repo (declared src/lib/server/room-config-client.ts:81, consumed at RoomMessage.svelte:694 and :820, documented at src/lib/room/gates.ts:109), so a room that switched star-years off would still see them in this modal. `user.isP` has no counterpart in apps/room/src.
+
+> Verified: The reference gate is three-term: O(21, sessData.disableStarYears || user.isP || !user.data.years ? -1 : 21).
+
+### UIM-13 — Our own source cites the wrong bundle offset for giveMicScreen — twice
+
+**medium** · `defect` · reference byte **2,077,604**
+
+```
+giveMicScreen(e){if(this.user.userXrefID==this.appService.globals.user.userXrefID)return bootbox.alert(`Can't ${e?"give":"take"} 'Mic/Screenshare' to yourself.`),!1;this.appService.sendServerAdminCommand("giveMicScreen",{user:this.user._id,give:e})
+```
+
+**Ours:** ModalHost.svelte:1419 says "Transcribed from the bundle at offset 2075481" and ModalHost.svelte:2230 repeats "transcribed byte-for-byte (bundle offset 2075481)". I read s[2075481:2075600] and it is `aySound:!0}}resetFollowChatStyle(e){this.followChatStyle=this.loadDefaultFollowChatStyle(),this.appService.updateUserIn` — the tail of loadDefaultFollowChatStyle and the head of resetFollowChatStyle, not giveMicScreen. The real definition site is 2077604. The transcribed BODY quoted in that docblock is correct byte-for-byte; only the citation is wrong. Two comments now point a future reader at the wrong function.
+
+> Verified: I could not refute this; the defect is real and is broader than claimed. The BEHAVIOUR is fully built (ModalHost.svelte:1514 `async function giveMicScreen(give: boolean)`, buttons at :2351/:2357, command import at :47, tests at roster-gates.test.ts:598), and the body quoted in the docblock is byte-for-byte correct — but the offset citatio…
+
+### UIM-10 — Trial and New badge classes diverge from the reference (and from our own RoomMessage.svelte)
+
+**low** · `wrong-constant` · reference byte **2,090,982**
+
+```
+[1,"badge","bg-danger","trial-badge"],[1,"badge","bg-warning","new-badge"],[1,"stars-container"],[1,"fas","fa-star","stars-icon"]
+```
+
+**Ours:** ModalHost.svelte:2132 uses `class="badge badge-danger"` for Trial and :2135 uses `class="badge badge-info"` for New. Our own sibling already has it right — RoomMessage.svelte:689 `badge bg-danger trial-badge` and :692 `badge bg-warning new-badge` — so the two surfaces render the same badge two different ways, and any CSS hung on `.trial-badge` / `.new-badge` misses the modal.
+
+> Verified: I could not refute this. Our user-info modal renders the Trial/New badges with Bootstrap-4 contextual badge classes and no per-badge hook, while the reference's const array for that same modal uses the utility+hook form that our own RoomMessage.svelte already matches.
+
+### UIM-11 — 'Restart Screens' second icon is fa-play-circle in ours, fa-sync in the reference
+
+**low** · `wrong-constant` · reference byte **2,064,155**
+
+```
+T(13,"i",71),v(14,"\xa0"),T(15,"i",41),v(16," Restart Screens "),u(),d(17,"button",40),x("click",functio
+```
+
+**Ours:** ModalHost.svelte:2407 — `<i class="icon fa fa-desktop"></i>&nbsp;<i class="icon fa fa-play-circle"></i> Restart Screens`. consts[71] = [1,"icon","fa","fa-desktop"] matches, but consts[41] = [1,"icon","fa","fa-sync"] (read at 2089781) does not — we render play-circle. The consequence is the one local-capture.svelte.ts:797 already warns about in prose: Restart Screens and Stop Screens must not look alike, and now Restart Screens and Start Rec do instead.
+
+> Verified: Confirmed by reading both sides. The reference's peer-command menu renders Restart Screens as consts[71] + consts[41] = fa-desktop + fa-sync; our only render site uses fa-desktop + fa-play-circle.
+
+### UIM-12 — 'Start Rec' icon `fa-record-vinyl` appears nowhere in the reference bundle
+
+**low** · `invented-value` · reference byte **2,064,315**
+
+```
+T(18,"i",89),v(19," Start Rec "),u(),d(20,"button",40),x("click",functio
+```
+
+**Ours:** ModalHost.svelte:2414 — `<i class="icon fa fa-record-vinyl"></i> Start Rec`. consts[89] = [1,"icon","fa","fa-play-circle"] (read at 2092492). A full-file search of main.d1d09071be31f1ba.js for the literal `fa-record-vinyl` returns -1 — it occurs nowhere in the 2,891,205-byte bundle, so this class name was invented here.
+
+> Verified: The control is built, but the claimed VALUE is not. The button, its " Start Rec " label and the start-recording intent all exist in our source (ModalHost.svelte:2517-2521, with the captured wire counterpart remotePresCommand("startRec") documented at user-action-intent.ts:177), so this is not a missing surface.
+
+### UIM-16 — Header avatar has no `user.pic ||` gravatar fallback, and the follow-chat preview's <strong> loses its fw-bold class
+
+**low** · `wrong-constant` · reference byte **2,095,583**
+
+```
+o.user.pic||"https://secure.gravatar.com/avatar/"+o.user.emailHash+"?d=mm&s=80",Mt),m(),O(6,o.user.userXrefID===o.appService.globals.user.u
+```
+
+**Ours:** ModalHost.svelte:1896 `gravatarAtSize(targetUser.pic, 80)` rewrites `s=` to 80 on an existing gravatar URL and otherwise returns the input verbatim (:1885-1893) — so an empty `avatarUrl` yields `<img src="">` where the reference builds the gravatar from emailHash. Our own ModalHost:4933 and :4980 do use the `user.pic || https://secure.gravatar.com/avatar/${user.emailHash}?d=mm&s=30` form, so the pattern exists two hundred lines away. Separately, reference consts[120] = [1,"fw-bold"] on the preview's `<strong>` (read at 2070269: `"strong",120),v(37,"Username:")`); ModalHost.svelte:2650 renders a bare `<strong>Username:</strong>`.
+
+> Verified: Composite gap; only the second half survives. HALF 1 (gravatar fallback) is REFUTED — the claim's premise "an empty avatarUrl yields <img src=''>" is false.
+
+---
+
+## PostAlertModal.svelte
+
+14 verified gaps; 61 reference behaviours confirmed present.
+
+### PAM-01 — alertLabels picker: the per-label checkbox @for and processAlertLabels() hash-prefixing are absent, while the badge renderer that consumes the hashes is built
+
+**high** · `missing-control` · reference byte **2,119,525**
+
+```
+function GTe(t,n){1&t&&ht(0,zTe,4,6,"div",35,Yx),2&t&&pt(g().appService.globals.alertLabels)}
+```
+
+**Ours:** PostAlertModal.svelte:414-502 renders exactly five footer checkboxes (keepOpenChk, postOnXChk, alert-push-label, alert-non-trade-label, alert-legal-disclosure-label) and no repeat over alertLabels; the id "alert-trade-label-" appears nowhere in apps/room/src. The SETTING is wired (apps/room/src/lib/room/gates.ts:381-383 parses sessData.alertLabels) and CONSUMED for rendering (apps/room/src/lib/components/RoomMessage.svelte:407-408 -> splitAlertLabels), so a presenter can only produce a badge by typing '#hash' by hand. apps/room/src/lib/alert-labels.ts:20-25 documents `checked` as "the selection state of the post-alert composer's label picker … never rendered in the capture we hold", and apps/room/src/lib/direct-evidence-contract.ts:112-118 pins 'alertLabels' as a hiddenCapabilityBranch. The paired behaviour is also absent: processAlertLabels (byte 2,131,232) prefixes ' #'+hash per checked label with ' ' between and '\n' after the last, PREPENDED to txt, then unchecks all; doCloseModal and clearInputFields also unchecked them. apps/room/src/lib/post-alert-behavior.ts:73-107 has no label pass at all.
+
+> Verified: I could not find the alertLabels picker or its hash-prefixing anywhere in apps/room/src. PostAlertModal.svelte's Props interface (lines 14-51) has no alertLabels prop at all, so the component cannot see the configured labels; its footer (lines 413-466) renders exactly five static .form-check blocks (keepOpenChk, postOnXChk, alert-push-lab…
+
+### PAM-02 — sendText checkbox "Text this out?" (gated on sessData.twillioApiSID) is absent
+
+**medium** · `missing-control` · reference byte **2,118,228**
+
+```
+function VTe(t,n){if(1&t){const e=Y();d(0,"div",35)(1,"input",46),Ve("ngModelChange",function(o){D(e);const s=g();return He(s.sendText,o)||(s.sendText=o),E(o)}),u(),d(2,"label",47),v(3,"Text this out?"),u()()}
+```
+
+**Ours:** No checkbox and no `sendText` state in PostAlertModal.svelte (footer block 414-502). The only hits for 'sendText'/'Text this out' in apps/room/src are apps/room/src/lib/direct-evidence-contract.ts:113 (listing it as a hiddenCapabilityBranch) and the refusal docblock at apps/room/src/routes/scheduled-alerts.remote.ts:59-63. The gate expression itself, re-read at byte 2,138,971 as O(59,o.appService.globals.sessData.twillioApiSID?59:-1), cannot be reproduced: `twillioApiSID` is on the never-wire credential list at apps/room/src/lib/setting-coverage-contract.test.ts:221.
+
+> Verified: I could not refute it. The "Text this out?" / sendText checkbox is genuinely not implemented anywhere in apps/room/src, and its absence is deliberate and documented rather than accidental.
+
+### PAM-03 — dontCrossPost checkbox "Don't cross post to linked alert rooms" (gated on sessData.linkedRoomAlerts) is absent
+
+**medium** · `missing-control` · reference byte **2,119,618**
+
+```
+function WTe(t,n){if(1&t){const e=Y();d(0,"div",35)(1,"input",54),Ve("ngModelChange",function(o){D(e);const s=g();return He(s.dontCrossPost,o)||(s.dontCrossPost=o),E(o)}),u(),d(2,"label",55),v(3,"Don't cross post to linked alert rooms"),u()()}
+```
+
+**Ours:** No checkbox and no `dontCrossPost` state in PostAlertModal.svelte:414-502; the id "alert-dont-cross-post-label" appears nowhere in apps/room/src. The field is documented as deliberately not stored at apps/room/src/lib/server/db/schema.ts:162-165 and refused at the boundary at apps/room/src/routes/scheduled-alerts.remote.ts:59-63. Its gate `linkedRoomAlerts` is on the not-wired settings list at apps/room/src/lib/setting-coverage-contract.test.ts:175. Reference gate re-read at byte 2,139,200: O(63,o.appService.globals.sessData.linkedRoomAlerts?63:-1).
+
+> Verified: I could not refute this. Searched apps/room/src exhaustively for dontCrossPost, dont-cross, crossPost/cross_post/crosspost/cross-post/"Cross Post", the id alert-dont-cross-post-label, alert-cross, linkedRoomAlerts/linkedRoom*/linkedAlert/otherRooms/toLinked, and behavioural synonyms (fanout, fan-out, syndicate, relayAlert, mirrorAlert, pr…
+
+### PAM-04 — The two inline-entry event-bus subscriptions (inlineAlertEntry / inlineAlertEntryImage) have no counterpart, and the toggle that feeds them has no consumer
+
+**medium** · `missing-behaviour` · reference byte **2,125,143**
+
+```
+this.appService.appEventBus.subscribe("inlineAlertEntry",i=>{this.selectedTab="text",this.alertTxt=i,this.postAlert()}),this.appService.appEventBus.subscribe("inlineAlertEntryImage",i=>{this.selectedTab="text",this.alertTxt=i.alertTxt&&i.alertTxt.length>0?i.alertTxt:"",this.onImagePaste(i.event)})
+```
+
+**Ours:** `inlineAlertEntry` returns zero hits across apps/room/src. The emitter side exists half-built: apps/room/src/lib/components/AlertChatArea.svelte:517-528 renders the presenter-only checkbox id="inline-alert-entry" / "Show inline alert entry" bound to `alerts.inlineEntry`, whose accessor pair at apps/room/src/lib/room/alerts.svelte.ts:134-140 has no other reader — no inline textarea (#textAreaAlertTxt in the reference, byte 2,047,730) is rendered, so ticking the box changes nothing and PostAlertModal has nothing to receive.
+
+> Verified: I could not refute this. In our source `inlineEntry` has exactly six occurrences repo-wide and every one of them is the toggle itself: the private field + accessor pair in `alerts.svelte.ts` and the `bind:checked` on the presenter-only checkbox in `AlertChatArea.svelte`.
+
+### PAM-05 — "Send Later?" / "Cancel" toggle pair, and the mutual exclusion between "Post Alert" and "Send Later", are absent
+
+**low** · `missing-control` · reference byte **2,122,278**
+
+```
+function JTe(t,n){if(1&t){const e=Y();d(0,"button",76),x("click",function(){return D(e),E(g().showSendLater=!0)}),T(1,"i",75),v(2," Send Later? "),u()}}function ZTe(t,n){if(1&t){const e=Y();d(0,"button",77),x("click",function(){return D(e),E(g().showSendLater=!1)}),v(1," Cancel "),u()}}
+```
+
+**Ours:** apps/room/src/lib/components/PostAlertModal.svelte:487-496 renders <ScheduledAlerts> inline and unconditionally whenever `schedulerAvailable`, with no `showSendLater` state; line 499 always renders the "Post Alert" button. The reference gates, re-read in the update block ending at byte 2,139,400, are O(69,!o.showSendLater&&o.hasAlertScheduler?69:-1), O(70,o.showSendLater?70:-1), O(71,o.showSendLater?-1:71), O(72,o.showSendLater?72:-1) — the scheduler pane REPLACES the post button rather than sitting beside it. There is also no separate "Send Later" submit button; ScheduledAlerts.svelte:160-162 labels it "Schedule alert".
+
+> Verified: I searched apps/room/src exhaustively and could not find the control under any name. `grep -rn "showSendLater" src/` returns 0 hits.
+
+### PAM-07 — Repeat select option TEXT is "Off" / "Daily" / "Weekly" in the reference; ours renders the raw lowercase mode strings
+
+**low** · `wrong-constant` · reference byte **2,120,818**
+
+```
+d(14,"select",65),Ve("ngModelChange",function(o){D(e);const s=g();return He(s.repeatScheduledAlert,o)||(s.repeatScheduledAlert=o),E(o)}),d(15,"option",66),v(16,"Off"),u(),d(17,"option",67),v(18,"Daily"),u(),d(19,"option",68),v(20,"Weekly"),u()
+```
+
+**Ours:** apps/room/src/lib/components/ScheduledAlerts.svelte:144-148 renders `{mode || 'off'}` over REPEAT_MODES, producing the option labels "off", "daily", "weekly". The select also lacks aria-label="Repeat Scheduled Alert" and the form-select form-select-sm classes (consts row 65, inside the consts table that begins at byte 2,131,663).
+
+> Verified: I could not refute it. Reference verified by reading bytes: at offset 2,121,217 the compiled template renders `"Repeat:"`, `d(14,"select",65)` bound to `repeatScheduledAlert`, then `d(15,"option",66),v(16,"Off"),u(),d(17,"option",67),v(18,"Daily"),u(),d(19,"option",68),v(20,"Weekly")`.
+
+### PAM-08 — Ignore-weekends label text differs: "Ignore weekends?" vs our "Skip weekends"
+
+**low** · `wrong-constant` · reference byte **2,120,631**
+
+```
+function YTe(t,n){if(1&t){const e=Y();d(0,"div",69)(1,"input",72),Ve("ngModelChange",function(o){D(e);const s=g(2);return He(s.ignoreWeekends,o)||(s.ignoreWeekends=o),E(o)}),u(),d(2,"label",73),v(3,"Ignore weekends?"),u()()}
+```
+
+**Ours:** apps/room/src/lib/components/ScheduledAlerts.svelte:151-156 renders <span>Skip weekends</span> on an unlabelled checkbox with no id="ignoreWeekendsChk" and no "form-check mb-2" wrapper. The GATE matches: `weekendsApply = repeat === 'daily'` (ScheduledAlerts.svelte:79) reproduces the reference's 'daily'===o.repeatScheduledAlert.
+
+> Verified: I could not refute it. The string "Ignore weekends" appears ZERO times anywhere under apps/room/src (case-insensitive grep across .svelte/.ts/.test.ts, plus targeted greps of src/lib/*.ts and src/lib/room/*.ts for a label-text or i18n constant module).
+
+### PAM-09 — The send-later timezone NOTE and the two field labels ("Send on this date & time:", "Repeat:") are absent
+
+**low** · `missing-control` · reference byte **2,120,860**
+
+```
+d(2,"form")(3,"div",21)(4,"label",59),v(5,"NOTE: All times should be on "),d(6,"span",60),v(7,"your local time zone"),u()(),d(8,"label",61),v(9,"Send on this date & time:"),u()
+```
+
+**Ours:** apps/room/src/lib/components/ScheduledAlerts.svelte:136-149 uses bare "Send on" and "Repeat" spans and renders no timezone note and no underlined span. The behaviour the note describes IS honoured — ScheduledAlerts.svelte:46-53 documents that the datetime-local value is parsed as local time — but the sentence that tells the presenter so is not on screen. The <hr> and <form> wrapper of QTe are also absent.
+
+> Verified: I could not find the timezone NOTE or either colon-terminated label anywhere in apps/room/src. Exhaustive grep for the exact strings ("NOTE: All times", "All times should", "Send on this date", "Repeat:") returned zero hits repo-wide; searches for synonyms and concept words (local time zone, local time, timezone, time zone, zone, tz, loca…
+
+### PAM-10 — sendLaterAsEmail / sendLaterAsNick inputs and their "Send as email:" / "Send as Name:" labels are absent (deliberate security refusal)
+
+**low** · `missing-control` · reference byte **2,124,312**
+
+```
+this.sendLaterAsEmail=this.appService.globals.user.email,this.sendLaterAsNick=this.appService.globals.user.name
+```
+
+**Ours:** No such inputs in ScheduledAlerts.svelte; apps/room/src/routes/scheduled-alerts.remote.ts:63-70 refuses them by name with the reasoning "it is the client naming who an alert is from … the sender is taken from the session, server-side", and scheduleAlertLater uses user.displayName (scheduled-alerts.remote.ts:99-101). Recorded as a divergence rather than a defect: reintroducing the fields would be the 2026-08-07 privilege escalation.
+
+> Verified: Could not refute. The reference genuinely renders both controls — I re-read the bundle and found the compiled template at byte offset 2121637 (NOT 2124312 as the record states; I did not verify that offset and it should be corrected or dropped): label "Send as email:" bound to s.sendLaterAsEmail and label "Send as Name:" bound to s.sendLa…
+
+### PAM-11 — postAlertLater's confirm and success dialogs are absent
+
+**low** · `missing-behaviour` · reference byte **2,130,310**
+
+```
+bootbox.confirm("Send this alert on: "+o.toString()+". send as: "+this.sendLaterAsNick+" ("+this.sendLaterAsEmail+") ?"
+```
+
+**Ours:** apps/room/src/lib/components/ScheduledAlerts.svelte:90-118 schedules with no confirmation step and reports only failures (`problem`, line 114); there is no "Alert scheduled OK." acknowledgement (reference byte 2,130,970). The past-date refusal IS present, moved server-side: apps/room/src/routes/scheduled-alerts.remote.ts:110 errors 400 with the reference's own sentence "Please select a date in the future." (reference byte 2,130,241).
+
+> Verified: I could not refute this. The reference's `postAlertLater()` has a four-branch shape: (1) past date -> bootbox.alert("Please select a date in the future"), (2) no text/url -> bootbox.alert("Please enter some alert text..."), (3) otherwise bootbox.confirm("Send this alert on: "+o.toString()+".
+
+### PAM-12 — onImagePaste selects the LAST image clipboard item in the reference (no break); ours selects the first
+
+**low** · `divergence` · reference byte **2,125,403**
+
+```
+onImagePaste(e){const i=this,o=(e.clipboardData||e.originalEvent.clipboardData).items;let s=null;for(const r of o)0===r.type.indexOf("image")&&(s=r.getAsFile());if(s){const r=URL.createObjectURL(s);
+```
+
+**Ours:** apps/room/src/lib/components/PostAlertModal.svelte:140-148 breaks on the FIRST item whose type startsWith('image') and returns. The reference enumeration I was given states "takes the first item" — the loop has no break, so it takes the LAST. Everything else in the paste path matches: the bootbox confirm markup (PostAlertModal.svelte:512-519) and the composed body at apps/room/src/lib/post-alert-behavior.ts:120-128 (`alertText ? alertText+"\n"+url : url`, then disclosure) against byte 2,126,900's txt:""!==s.alertTxt&&s.alertTxt.length>0?s.alertTxt+"\n"+F:F.
+
+> Verified: The reference's onImagePaste loops over all clipboard items with no break and reassigns unconditionally, so it keeps the LAST image item. Our PostAlertModal.selectPastedImage returns on the FIRST item whose type startsWith('image'), so it keeps the first.
+
+### PAM-13 — img tab with no URL: the reference dispatches an upload whenever the module-level fc array EXISTS (even when empty); ours requires at least one file
+
+**low** · `divergence` · reference byte **2,128,708**
+
+```
+if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\n"),!this.alertUrl)return fc?void this.doImagurFileListUpload(e):void 0;e.txt+=this.alertUrl+" "}
+```
+
+**Ours:** apps/room/src/lib/post-alert-behavior.ts:91-95 returns {status:'upload'} only when draft.fileCount > 0, otherwise {status:'noop', reason:'empty-media'}. `fc` is undefined before the first selection and [] after fc.splice(0,o) (byte 2,125,960), so the reference's second-and-later empty press runs a zero-file upload loop and sends nothing while ours no-ops. Equivalent on screen; recorded because it is a real branch difference.
+
+> Verified: I could not refute this one. Our media-tab empty-press path is implemented in exactly one place and it gates on file COUNT, not on the existence of a file list: `composePostAlert` (src/lib/post-alert-behavior.ts:88-98) returns `{status:'upload'}` only when `draft.fileCount > 0` and otherwise `{status:'noop', reason:'empty-media'}`, and th…
+
+### PAM-14 — Element ids and name attributes added on the six text inputs/textareas that the reference leaves unnamed
+
+**low** · `divergence` · reference byte **2,131,663**
+
+```
+["rows","10","placeholder","Alert Text...","aria-label","Alert Text...",1,"form-control",3,"ngModelChange","paste","ngModel"]
+```
+
+**Ours:** PostAlertModal.svelte:291-292 (alert-text-body/alertTextBody), 315-316 (alert-url/alertUrl), 327-328 (alert-url-text/alertUrlText), 350-351 (alert-media-url/alertMediaUrl), 403-404 (alert-media-text/alertMediaText), 470-471 (alert-legal-disclosure-text/legalDisclosureText). I searched the bundle for each literal and every one returned -1: the reference consts rows carry rows/placeholder/aria-label/class only. Ours are additions, not a mismatch of a reference value.
+
+> Verified: I could not refute it; both halves of the claim verify. Our six controls carry id+name at exactly the cited lines, and the reference's app-post-alert-modal consts array — which I read in full, not sampled — carries neither on any of the six.
+
+### PAM-17 — The alertMsg payload's sendTxt / sendEmail / sendTweet / dontCrossPost / dontPush fields are refused by our server rather than sent
+
+**low** · `divergence` · reference byte **2,128,708**
+
+```
+postAlert(){let e={txt:this.alertTxt,n:this.appService.globals.user.name,sendTxt:this.sendText,sendEmail:this.sendEmail,sendTweet:this.sendTweet,dontPush:this.dontPush,nonTradeAlert:this.nonTradeAlert,dontCrossPost:this.dontCrossPost};
+```
+
+**Ours:** apps/room/src/routes/post-alert.remote.ts:46-56 accepts a z.strictObject of {kind, body, targetUrl, nonTradeAlert} only; `dontPush` is computed by the composer and explicitly dropped at apps/room/src/lib/room/composer.svelte.ts:480-483 with the reasoning that accepting a field nothing reads implies something does; `n` (the sender name) is taken from the session server-side rather than from the client. The dontPush CHECKBOX is present (PostAlertModal.svelte:437-446) — only its downstream is absent.
+
+> Verified: I could not refute it: the claim's statement about our source is accurate in every particular, and I found no implementation under any other name. What I DID establish is that this is a recorded, test-enforced boundary decision rather than an oversight, and that four of the five fields carry no reachable behaviour in the reference either…
+
+---
+
+## ModalHost: report / advanced-search modal
+
+12 verified gaps; 49 reference behaviours confirmed present.
+
+### RPT-01 — Report modal never fetches a report — no getAlertReport call, no resp.queue, no error state
+
+**high** · `missing-behaviour` · reference byte **2,413,317**
+
+```
+showTokenReport(e){bootbox.alert({title:"Token",message:e})}loadReports(){var e=this;I(function*(){try{console.log("this.alertID: ",e.alertID);let i=yield e.appService.invokeAdminCmd("getAlertReport",{alertID:e.alertID});console.log("resp: ",i),e.reports=i?.queue,e.loading=!1,e.reports&&e.reports.length>0&&e.calcPieData(e.reports)}catch{e.loadingError="There was an error loading the report."}})()
+```
+
+**Ours:** ModalHost.svelte:1955-1961 is the whole of our 'load': `if (name !== 'report') return; reportLoading = true; setTimeout(() => reportLoading = false, 500)`. No request is made, `reports` does not exist as state, and there is no `loadingError` anywhere. grep over apps/room/src for getAlertReport / invokeAdminCmd("getAlertReport") / 'There was an error loading the report.' returns zero hits.
+
+> Verified: Our report modal has no fetch of any kind — only a cosmetic 500 ms timer. `apps/room/src/lib/components/ModalHost.svelte:2095-2102` is the entire "load": `$effect(() => { if (name !== 'report') return; reportLoading = true; const timer = window.setTimeout(() => { reportLoading = false; }, 500); return () => window.clearTimeout(timer); });…
+
+### RPT-02 — reportLoading is driven by a hard-coded 500 ms timer that describes no work
+
+**high** · `invented-value` · reference byte **2,412,261**
+
+```
+this.appService.guiEventBus.subscribe("doAlertSendReportModal",e=>{this.alertID=e,this.loading=!0,this.loadingError="",this.clearInput(),this.loadReports()})
+```
+
+**Ours:** ModalHost.svelte:715 `let reportLoading = $state(true)` and ModalHost.svelte:1955-1961 flip it false after `window.setTimeout(..., 500)`. The 500 is not in the reference and corresponds to nothing; the spinner is a decoration in front of a permanently empty list, and the modal always settles on the hard-coded 'No Reports.' at ModalHost.svelte:5139.
+
+> Verified: Could not refute. Our report modal has no data source at all: `getAlertReport` returns zero hits across the whole apps/ tree, there is no `reports` array, no fetch, and no report endpoint under src/routes/api.
+
+### RPT-03 — Report rows (list-group, per-status colours, name/email, sent time + latency, failure reason, token click) are entirely absent
+
+**high** · `missing-control` · reference byte **2,410,281**
+
+```
+function xMe(t,n){if(1&t){const e=Y();d(0,"div",30)(1,"div",31),x("click",function(){const o=D(e).$implicit;return E(g(3).showTokenReport(o.token))}),d(2,"strong",32),v(3),u(),d(4,"i"),v(5),u(),H(6,EMe,7,5,"div",33)(7,kMe,3,1,"div",34),u()()}if(2&t){const e=n.$implicit;z("ngClass",$a(5,FMe,"sent"===e.status,"failed"===e.status,"queued"===e.status)),m(3),Ne("",e.name,"\xa0"),m(2),Ne("(",e.email,")")
+```
+
+**Ours:** ModalHost.svelte:5125-5147 renders only: title, spinner, `<div class="mt-3 text-center">No Reports.</div>`, footer Close. No `.list-group`, no `.list-group-item`, no `text-success`/`text-danger`/`text-warning` mapping, no `.sent-time` / 'Latency: N secs' (reference literal at offset 2409857), no `.failed-reason`. The captured CSS for all of these IS present at src/lib/styles/captured-runtime-components.css:5747-5805 with no markup consuming it.
+
+> Verified: The report modal in our source is a stub: ModalHost.svelte:5334-5356 renders only the title, a spinner driven by a cosmetic 500ms timer (ModalHost.svelte:736 `let reportLoading = $state(true)` and the $effect at ModalHost.svelte:2095-2102, which has no fetch behind it), the literal `<div class="mt-3 text-center">No Reports.</div>`, and a…
+
+### RPT-04 — Report search box, clear addon, search addon and the searchReports pipe are absent
+
+**medium** · `missing-control` · reference byte **2,409,220**
+
+```
+ɵpipe=Rn({name:"searchReports",type:t,pure:!0})
+```
+
+**Ours:** No search UI at all in ModalHost.svelte:5125-5147. grep over apps/room/src for searchReports / search-term / clear-search-addon / search-addon / inputTxt / searchTxt returns zero hits for this modal. Reference pipe body (offset 2409241): status equality filter then `s.email.toLowerCase().includes(searchTxt)`; handlers `searchReports()` / `onInputChange()` at offset 2412183 and `clearInput()` at 2412406.
+
+> Verified: Our alert-send-report modal has no search apparatus of any kind, under any name. ModalHost.svelte:5334-5356 is the complete modal: a spinner branch and a literal "No Reports." branch, with no input, no clear addon, no search addon and no status select.
+
+### RPT-05 — Report status <select> (All / Sent / Queued / Failed) and onSelectChange are absent
+
+**medium** · `missing-control` · reference byte **2,414,516**
+
+```
+["id","search-select-addon",1,"input-group-text"],["aria-label","Search select",1,"form-select",3,"change"],["selected","","value",""],["value","sent"],["value","queued"],["value","failed"]
+```
+
+**Ours:** Absent from ModalHost.svelte:5125-5147; `searchStatus` / `onSelectChange` / the strings 'Queued' and 'Search select' appear nowhere in apps/room/src for this modal. The captured rule `#search-select-addon{padding:0;border:0;margin:0}` is nevertheless shipped at src/lib/styles/captured-runtime-components.css:5779.
+
+> Verified: I could not disprove the claim. Our `app-alert-send-report-modal` (apps/room/src/lib/components/ModalHost.svelte:5334-5356) renders ONLY a loading spinner and the literal fallback `<div class="mt-3 text-center">No Reports.</div>`; there is no `<select>`, no input-group, no report body at all.
+
+### RPT-06 — Pie chart (calcPieData + flot #pie-container) is absent
+
+**medium** · `missing-behaviour` · reference byte **2,412,738**
+
+```
+(const c of a)"sent"===c&&r.push({data:Number(i/l*100),label:c,color:"#00bc8c"}),"failed"===c&&r.push({data:Number(o/l*100),label:c,color:"#E74C3C"}),"queued"===c&&r.push({data:Number(s/l*100),label:c,color:"#ffc107"});setTimeout(()=>{$.plot("#pie-container",r,{series:{pie:{show:!0,radius:1,tilt:.5,label:{show:!0,radius:1,formatter:
+```
+
+**Ours:** No `#pie-container` element and no percentage computation in ModalHost.svelte. The only pie in apps/room/src is PollPanel.svelte:411 `drawPieChart` for polls (`#pollPieChart`), which is a different surface. The captured `#pie-container{left:0;top:0;width:600px;height:192px;margin-bottom:8px}` is shipped at src/lib/styles/captured-runtime-components.css:5800 with nothing to paint into it.
+
+> Verified: I could not refute this. Our alert-send-report modal is a stub with no data path at all, let alone a pie: apps/room/src/lib/components/ModalHost.svelte:5334-5356 renders `<app-alert-send-report-modal>` whose whole body is `{#if reportLoading}` a spinner `{:else}` the literal text `No Reports.`, and the only thing that drives it is a fake…
+
+### RPT-07 — showTokenReport() — clicking a report row opens a bootbox titled 'Token'
+
+**medium** · `missing-control` · reference byte **2,413,317**
+
+```
+showTokenReport(e){bootbox.alert({title:"Token",message:e})}
+```
+
+**Ours:** No rows exist to click (see RPT-03), and grep over apps/room/src for showTokenReport / title: 'Token' returns zero hits. Our BootboxDialog primitive exists and is used elsewhere in ModalHost (e.g. the syncRooms confirm at ModalHost.svelte:5480-5495), so the primitive is not the blocker.
+
+> Verified: Not built, and not built under another name. The reference handler is confirmed by direct read: at byte offset 2413317 of main.d1d09071be31f1ba.js the bundle reads `showTokenReport(e){bootbox.alert({title:"Token",message:e})}`, immediately followed by `loadReports()` which calls `invokeAdminCmd("getAlertReport",{alertID:e.alertID})`; its…
+
+### SRCH-01 — Advanced-search results render as bare <p>{body}</p> instead of the full message row, so trade highlighting and click-to-copy are lost inside this modal
+
+**medium** · `divergence` · reference byte **2,421,116**
+
+```
+function iAe(t,n){if(1&t){const e=Y();d(0,"app-st-message",46),x("click",function(o){const s=D(e).$implicit;return E(g(3).copyTradeOnClick(o,"id_"+s._id))}),u()}if(2&t){const e=n.$implicit,i=n.$index,o=g(3);z("msg",e)("logType","alerts")("prevD",i>0?o.msgs[i-1].t:0)("sessName",(null==e?null:e.sessName)||null)}}
+```
+
+**Ours:** ModalHost.svelte:5449-5453 renders `<div class="log-messages">{#each advancedSearchResults as result (result.id)}<p>{result.body}</p>{/each}</div>`. The reference also rewrites `[{(`/`)}]` into `<span class="tradeColor" id="id_<_id>">` inside this component's success handler (offset 2424330) and binds copyTradeOnClick per row (implementation at offset 1415143). We DO implement that rewrite and the copy for the main chat (copy-trades.ts:56-110, RoomMessage.svelte:523-534, message-actions.svelte.ts:496-510) — it is simply not reached from the search results, which are plain text with no sender, no timestamp, no prevD day separator and no sessName. CompactMessageRow.svelte is already imported in this same file (ModalHost.svelte:2, used at 5190).
+
+> Verified: I could not refute it. Our advanced-search results really do render as bare escaped text: ModalHost.svelte:5658-5662 is `<div class="log-messages">{#each advancedSearchResults as result (result.id)}<p>{result.body}</p>{/each}</div>`, with no `{@html}` anywhere in ModalHost.svelte (0 hits), so no trade-marker rewrite could survive even if…
+
+### SRCH-02 — A failed search shows no message — the reference raises bootbox.alert(msg); ours has no catch at all
+
+**medium** · `missing-behaviour` · reference byte **2,424,060**
+
+```
+this.appService.appEventBus.subscribe("getAlertsAdvancedSearchFailed",i=>{this.msgs=[],this.loading=!1,bootbox.alert(i.msg)})
+```
+
+**Ours:** ModalHost.svelte:552-570 `runAdvancedSearch()` wraps the query in `try { … } finally { advancedSearchLoading = false }` with NO catch, so a refused or failed `searchAlerts()` rejects out of the click handler and the modal falls through to the empty state 'No logs to display. Please, change the input fields.' (ModalHost.svelte:5455-5457) — the same thing it shows for a search that legitimately matched nothing. The reference's failure copy 'There was an error searching for alerts, please try again or contact support' (offset 1150222) appears nowhere in apps/room/src.
+
+> Verified: I could not find any failure handling for the advanced alert search in apps/room/src. `runAdvancedSearch()` in ModalHost.svelte:573-591 wraps the `searchAlerts()` call in `try { … } finally { advancedSearchLoading = false }` with no `catch` — the only failure behaviour is clearing the spinner (the comment at :588 says exactly that and not…
+
+### SRCH-03 — Room dropdown is a single hard-coded room; no userSessions localStorage, no getAllSTRoomsForUser, and rooms are never sent
+
+**medium** · `divergence` · reference byte **2,423,600**
+
+```
+ngOnInit(){this.clearInput();const e=this.appService.localstorage.getObject("userSessions");e&&Object.keys(e).length>0?(console.log("getUserSessions: ",e),this.userSessions=e):(console.log("getUserSessions getAllSTRoomsForUser(): "),this.appService.getAllSTRoomsForUser()),this.appService.appEventBus.subscribe("getAllSTRoomsForUserSuccess",i=>{this.userSessions=i.userSessions,this.appService.localstorage.setObject("userSessions",this.userSessions)})
+```
+
+**Ours:** ModalHost.svelte:5326-5348 iterates nothing — it renders one literal `<li>` toggling `'mastering-the-trade' / 'Mastering The Trade'`. There is no `userSessions` state, no localStorage key, and no rooms endpoint (grep for userSessions / getAllSTRoomsForUser in apps/room/src hits only the explanatory comments at ModalHost.svelte:585,591). syncRooms() confirms with the captured text (SYNC_ROOMS_CONFIRM, alerts-advanced-search.ts:199) and then shows our own SYNC_ROOMS_UNAVAILABLE notice (ModalHost.svelte:593-596). Deliberate and documented for a single-room app, but the hard-coded room name/key is invented — it is not in the bundle.
+
+> Verified: Not implemented anywhere in apps/room/src. The room dropdown at ModalHost.svelte:5538-5560 is a single hard-coded <li> calling toggleKey(advancedSearch.rooms,'mastering-the-trade','Mastering The Trade') with no {#each} and no data source; the reference compiles the same control as an iteration over {key,value} pairs (ZMe -> toggleSess(o.k…
+
+### RPT-08 — Entry-point guard: a message with no id must raise bootbox 'No reports found.' instead of opening the modal
+
+**low** · `missing-behaviour` · reference byte **1,349,868**
+
+```
+openAlertSendReport(e){e?this.appService.guiEventBus.emit("doAlertSendReportModal",e):bootbox.alert("No reports found.")}
+```
+
+**Ours:** MessageMenu.svelte:220-231 always calls `onaction('report')` with no id check; message-actions.svelte.ts:380 `if (action === 'report') this.#openModal('report')` likewise. ModalHost.svelte:5130 then titles the dialog `Alert Sent Report. AlertID: ${targetMessage?.id ?? ''}` — an empty AlertID rather than the reference's refusal dialog. The string 'No reports found.' does not appear in apps/room/src.
+
+> Verified: The reference's entry-point refusal is genuinely absent from our source. Reference, bytes read at observed offset 1349819 of main.d1d09071be31f1ba.js: `openAlertSendReport(e){e?this.appService.guiEventBus.emit("doAlertSendReportModal",e):bootbox.alert("No reports found.")}` — the modal opens only when the message argument is truthy, other…
+
+### SRCH-05 — advancedSearchTruncated / 'Showing the newest 500 matches' has no reference counterpart
+
+**low** · `divergence` · reference byte **2,424,205**
+
+```
+this.appService.appEventBus.subscribe("getAlertsAdvancedSearchSuccess",i=>{console.log("getAlertsAdvancedSearchSuccess got data: ",i),i&&(this.msgs=i.alerts,
+```
+
+**Ours:** ModalHost.svelte:479, 555, 565, 5443-5448 add a truncation flag and a 'Showing the newest {ALERT_SEARCH_LIMIT} matches' line (ALERT_SEARCH_LIMIT = 500, alert-search-limit.ts:13). I re-ran the search myself: the substring 'truncated' occurs exactly ONCE in the whole 2,891,205-byte bundle, at offset 1643312, inside hls.js ('last AAC PES packet truncated,might overlap between fragments'). The success handler reads only `i.alerts`. This is our addition and the comment at ModalHost.svelte:5437-5442 says so; keeping it is defensible (a silent cap is the worse failure), but it is a divergence from the reference and belongs on the record.
+
+> Verified: Could not refute — but note the KIND: this is a divergence (something extra in OURS), not missing work, so nothing needs building. Both halves check out.
+
+---
+
+## RoomSidebar.svelte
+
+12 verified gaps; 52 reference behaviours confirmed present.
+
+### RS-01 — Roster row: the presenter-only "Trial" badge is not rendered, though the data to render it is already on the wire
+
+**medium** · `missing-behaviour` · reference byte **2,034,640**
+
+```
+O(1,i.showUserAvatar(e.isP)?1:-1),m(4),Ze(e.nick),m(),O(6,e.data.badges?6:-1),m(),O(7,i.appService.globals.isPresenter&&e.isFT?7:-1),m(),O(8,i.appService.globals.sessData.isNewIndi
+```
+
+**Ours:** RoomSidebar.svelte:687-696 renders .media-body > .nickName with the name span, an empty badges div and the kebab, and nothing else. `trial-badge` occurs nowhere in the roster path — grep over apps/room/src finds it only in /home/user/trading-room-app/apps/room/src/lib/components/RoomMessage.svelte (the chat row). The CSS is present and unused at /home/user/trading-room-app/apps/room/src/lib/styles/captured-runtime-components.css. The gate's two inputs both exist here: the viewer's `isPresenter` is already a prop (RoomSidebar.svelte:51) and `isFT` is carried per entry (/home/user/trading-room-app/apps/room/src/lib/server/room-events.ts:322, `isFT: boolean`).
+
+> Verified: I could not refute it. The reference roster row really does render a presenter-only "Trial" badge, and our only roster row render does not.
+
+### RS-02 — Roster row: the badges div is rendered ALWAYS and EMPTY — the reference gates it on e.data.badges and fills it via parseBadges
+
+**medium** · `missing-behaviour` · reference byte **2,034,694**
+
+```
+O(6,e.data.badges?6:-1),m(),O(7,i.appService.globals.isPresenter&&e.isFT?7:-1),m(),O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPresenter&&e.isNew?8:-
+```
+
+**Ours:** RoomSidebar.svelte:696 emits `<div class="d-inline-block align-baseline mr-1"></div>` unconditionally with no content and no gate — const 8 is `[1,"d-inline-block","align-baseline","mr-1",3,"innerHTML"]`, i.e. the element exists FOR the innerHTML binding it does not have here. `parseBadges` returns zero hits across apps/room/src, and `RosterUser` (/home/user/trading-room-app/apps/room/src/lib/server/room-events.ts:288-382) carries no `badges` field, so the producer is missing too. This is markup with no consumer, which is separately forbidden by the repo standard.
+
+> Verified: The roster-row badges div is genuinely unimplemented in our source. RoomSidebar.svelte:696 emits `<div class="d-inline-block align-baseline mr-1"></div>` unconditionally, with no gate, no content, and no innerHTML/{@html} anywhere in the file (the file's only other "badge" token is the roster COUNT badge at :551).
+
+### RS-05 — Roster avatar has no hideAvatars gate — a room that hides avatars still shows them in the roster
+
+**medium** · `missing-control` · reference byte **2,036,617**
+
+```
+showUserAvatar(e){return!this.appService.globals.sessData.hideAvatars||!!e}
+```
+
+**Ours:** RoomSidebar.svelte:681-686 renders `<img class="rosterImg mr-3" ...>` unconditionally inside the full-row branch; the reference wraps it in `H(1,_2e,1,2,"img",4)` gated by `O(1,i.showUserAvatar(e.isP)?1:-1)` (byte 2034640). `showUserAvatar` returns zero hits across apps/room/src, and `hideAvatars` is read only by the CHAT path (/home/user/trading-room-app/apps/room/src/lib/chat-display-mode.ts, /home/user/trading-room-app/apps/room/src/lib/room-message-chrome.ts), never by roster-gates.ts. Note the reference's exemption: a presenter's avatar shows even when hideAvatars is on.
+
+> Verified: The roster avatar is rendered with no hideAvatars gate anywhere in our source. RoomSidebar.svelte:681-686 emits `<img class="rosterImg mr-3" alt={user.displayName} src={user.avatarUrl} ...>` with the only enclosing branch being `{#if !rowIsFull(user)} ...
+
+### RS-06 — Archives ▸ "Recording" renders with no handler at all
+
+**medium** · `missing-behaviour` · reference byte **2,467,757**
+
+```
+function gPe(t,n){if(1&t){const e=Y();d(0,"a",50),x("click",function(){return D(e),E(g(3).launchRecordings())}),T(1,"i",51),d(2,"span",22),v(3,"Recording"),u()()}}
+```
+
+**Ours:** RoomSidebar.svelte:440-442 renders `<a class="dropdown-item small"><i class="fas fa-circle"></i><span class="pl-2">Recording</span></a>` with no onclick — const 50 is `[1,"dropdown-item","small",3,"click"]`, so the click binding is part of the const the item is built from. The reference handler is `launchRecordings(){window.open(`${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${sesionToken}`,"_blank")}` at byte 2522147; `launchRecordings` and `archives/recordings` return zero hits in apps/room/src. The blocker is recorded (no archive tables — TODO.md:617, :448), but the item still renders and does nothing, which is the inert-control shape the repo standard forbids.
+
+> Verified: Could not refute. The Archives dropdown's "Recording" item in our source is a bare anchor with no onclick, no href and no data-bs-target, while its three siblings in the same dropdown (Alert Logs, Chat Logs, Transcript History) all carry onclick handlers — so this is not a delegation pattern; I checked RoomSidebar.svelte and src/routes/+p…
+
+### RS-07 — "Only select from Trials?" is a Yes/No question answered by OK/Cancel buttons
+
+**medium** · `wrong-constant` · reference byte **2,516,822**
+
+```
+getRandomUser(){const e=this;bootbox.confirm({message:"Only select from Trials?",buttons:{confirm:{label:"Yes",className:"btn-success"},cancel:{label:"No",className:"btn-danger"}}
+```
+
+**Ours:** The message text is exact (/home/user/trading-room-app/apps/room/src/routes/+page.svelte:353-364) and the dismiss semantics are right, but the labels are not carried: dialogs.confirmation has only `message`/`className`/`onconfirm`/`ondismiss` (rendered at /home/user/trading-room-app/apps/room/src/lib/components/RoomOverlays.svelte:702-713), and BootboxDialog's confirm footer is hard-coded to `Cancel` (btn-secondary btn-default) and `OK` (btn-primary) at /home/user/trading-room-app/apps/room/src/lib/components/BootboxDialog.svelte:115-124. Reference is "No"/btn-danger and "Yes"/btn-success.
+
+> Verified: The message text and dismiss semantics are built, but the reference's button labels/classes are genuinely absent. `getRandomUser()` (routes/+page.svelte:353-364) sets `dialogs.confirmation = {message:'Only select from Trials?', onconfirm, ondismiss}`; the `RoomConfirmation` interface (lib/room/dialogs.svelte.ts:33-43) has only `message`/`…
+
+### RS-09 — The second tip-me control lives in our SIDEBAR; the reference renders it in the navbar and our navbar has none
+
+**medium** · `divergence` · reference byte **2,485,267**
+
+```
+APe,5,2,"li",89)(15,PPe,3,2,"li",90)(16,NPe,10,1,"li",91)
+```
+
+**Ours:** RoomSidebar.svelte:375-386 renders a second `<li class="nav-item" title={tip.label}>` tip control after General Settings and before Benzinga. In the reference TPe (byte 2470562, read through 2472300) index 14 is `T(14,"hr")` — there is no tip li in the sidebar at all; APe's only call site is the one quoted, inside the mainAppNav template U4e with placeholder const 89. Our /home/user/trading-room-app/apps/room/src/lib/components/RoomNavbar.svelte contains no tip control (grep for `tip` matches only `recordingTooltip`). So the control exists once in the room, in the wrong region. The sidebar's FIRST tip site (the `<p>`+button at RoomSidebar.svelte:231-242, reference aPe node 13) is correct and stays.
+
+> Verified: The tip feature's LOGIC is built (lib/tip-button.ts + tip-button-contract.test.ts) and the FIRST render site is correct, but the second render site is in the wrong region and I could not find any navbar implementation. Reference: the consts table at bundle byte 2533190 gives index 6 = [1,"room-sidebar"] and index 7 = [1,"navbar","navbar-e…
+
+### RS-03 — Roster row: the stars / years indicator (stars-container) is absent, and its CSS ships with no producer
+
+**low** · `missing-behaviour` · reference byte **2,034,694**
+
+```
+O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPresenter&&e.isNew?8:-1),m(),O(9,i.appService.globals.sessData.disableStarYears||e.isP||!e.data.years?-1:9)
+```
+
+**Ours:** No `stars-container`, `stars-icon` or `stars-num` anywhere in RoomSidebar.svelte; grep finds them only in RoomMessage.svelte, ModalHost.svelte and app.css. The roster-scoped rules `app-room-roster .stars-container` / `.stars-icon` / `.stars-num` exist in /home/user/trading-room-app/apps/room/src/lib/styles/captured-runtime-components.css with nothing that emits them. `RosterUser` carries no `years`, so the field is also absent from the payload.
+
+> Verified: The roster star/years indicator is genuinely absent from our roster row, and the near-miss refutation is a component conflation. Reference: the gate at bundle byte 2,034,694 is confirmed verbatim, its slot-9 body `F2e` at byte 2,033,362 renders `span const 11 > i const 20 > span const 21` with `Ze(e.data.years)`, and the const table at by…
+
+### RS-04 — Roster row: the "New" badge is absent
+
+**low** · `missing-behaviour` · reference byte **2,034,694**
+
+```
+O(8,i.appService.globals.sessData.isNewIndicatorOn&&i.appService.globals.isPresenter&&e.isNew?8:-
+```
+
+**Ours:** No `new-badge` in RoomSidebar.svelte (grep finds it only in RoomMessage.svelte). `isNewIndicatorOn` is modelled elsewhere (ModalHost.svelte, setting-coverage-contract.test.ts) but the per-entry `isNew` flag is not on `RosterUser` (/home/user/trading-room-app/apps/room/src/lib/server/room-events.ts:288-382), so the row cannot currently answer the gate.
+
+> Verified: I could not disprove it. The reference roster row (update block `w2e`) draws four badge slots after the nick: badges innerHTML (slot 6), Trial (slot 7), New (slot 8), years star (slot 9).
+
+### RS-08 — simUserCount is added to the headcount unclamped — the reference clamps it to 0…5000
+
+**low** · `missing-control` · reference byte **2,499,381**
+
+```
+this.simUserCount=Number(e),this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this.simUserCount=0)
+```
+
+**Ours:** /home/user/trading-room-app/apps/room/src/lib/room/create-room.svelte.ts:299 passes `simUserCount: () => data.sessData?.simUserCount ?? 0` straight through, and /home/user/trading-room-app/apps/room/src/lib/room/roster.svelte.ts:163 computes `(this.#count ?? this.#users.length) + this.#simUserCount()` with no bound. `5e3`/`5000` appears nowhere near simUserCount in apps/room/src (grep for `simUserCount` returns 14 hits, none clamping). A negative or absurd configured value publishes a nonsense headcount to every member.
+
+> Verified: I could not refute this. The reference clamp is real and I read the bytes: at offset 2499381 (ngOnInit of the desktop room component) the bundle reads `const e=this.appService.globals.sessData.simUserCount` (offset 2498511) and then `e&&(this.simUserCount=Number(e),this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this…
+
+### RS-10 — Mobile App Info and the tip <p> are in the opposite order to the reference
+
+**low** · `divergence` · reference byte **2,470,612**
+
+```
+H(12,rPe,2,1,"p")(13,aPe,5,2,"p"),T(14,"hr"
+```
+
+**Ours:** RoomSidebar.svelte renders the tip `<p>` first (231-242) and the Mobile App Info `<p>` second (243-255), then the `<hr>` (256). The reference's node order inside li.nav-item.text-center is 12 = rPe (Mobile App Info, gated hideAppInfo), 13 = aPe (tip, gated isTipEnabled), 14 = hr. Both gates and both bodies are otherwise correct; only the vertical order differs.
+
+> Verified: Confirmed by direct byte reads, not inference. In the reference, inside li.nav-item.text-center the creation order is slot 12 = rPe = the Mobile App Info <p>, slot 13 = aPe = the tip <p>, then T(14,"hr").
+
+### RS-11 — The connection lines have a different element shape and the opposite order
+
+**low** · `divergence` · reference byte **2,470,790**
+
+```
+"),T(14,"hr"),H(15,lPe,3,0,"p")(16,cPe,3,0,"p"),d(17,"p"),H(18,dPe,3,0,"span")(19,uPe,3,0,"span"),u()()
+```
+
+**Ours:** RoomSidebar.svelte:268-283 renders TWO `<p>` elements, each carrying both the connected and the reconnecting state, Media first then Chat, and puts the Media tick BEFORE its label (`<i class="fas fa-check"></i> Media`) while the reference's dPe/uPe are both "label then tick". The reference shape is: p15 = " Reconnecting Chat...", p16 = " Reconnecting Media... " (both `-1` when connected), then ONE p17 holding span18 "Chat "+tick and span19 "Media "+tick. The gates themselves are right — `O(15,socketConnected?-1:15)`, `O(16,mediaSoupService.connected?-1:16)`, `O(18,socketConnected?18:-1)`, `O(19,mediaSoupService.connected?19:-1)` — and our two booleans map to them correctly.
+
+> Verified: I could not refute it; the divergence is real on all three counts, and there is no second implementation anywhere in apps/room/src. (a) ORDER: the reference emits the Chat slot first in BOTH states — H(15,lPe)="Reconnecting Chat...", H(16,cPe)="Reconnecting Media...
+
+### RS-12 — Benzinga: the default URL is not reproduced, so the item hides unless altBenzingaLinkURL is set
+
+**low** · `divergence` · reference byte **2,499,501**
+
+```
+this.benzingaUrl=this.sanitizer.bypassSecurityTrustUrl(`https://ptrv3.protradingroom.com/public/bz/index.html?sessID=${this.appService.globals.sessionID}&id=${this.appService.globa
+```
+
+**Ours:** /home/user/trading-room-app/apps/room/src/lib/room/gates.ts:328-334: `benzingaUrl` returns `sessData.altBenzingaLinkURL?.trim() || null` and `benzingaVisible` additionally requires that URL to be non-null, so a room with `hasBenzingaNews` but no override gets no item — the reference gates only on `hasBenzingaNews` (byte 2471195, `O(31,e.appService.globals.sessData.hasBenzingaNews?31:-1)`). The divergence is argued in place (the default needs `sessionID`, a `sessData.uuid` absent from the 268-key schema, and `sesionToken`, which is httpOnly here) and is recorded in TODO.md. Listing it so the audit is two-sided, not because it should be built as written.
+
+> Verified: I could not refute it. The reference's default Benzinga URL is genuinely not reproduced anywhere in apps/room/src, and our visibility gate is strictly narrower than the reference's.
+
+---
+
+## StreamingView + ScreenPane + ScreenTabs
+
+11 verified gaps; 59 reference behaviours confirmed present.
+
+### SV-SP-01 — ScreenPane renders no user-ID watermark overlay; the anti-leak overlay exists only on StreamingView
+
+**high** · `missing-control` · reference byte **1,494,134**
+
+```
+function Q0e(t,n){if(1&t&&(d(0,"span",9),v(1),u()),2&t){const e=g();m(),Ne(" ",e.appService.globals.user.userXrefID," ")}}
+```
+
+**Ours:** The gate that mounts it, re-read at offset 1502175, is `O(10,!o.appService.globals.isPresenter&&o.appService.globals.sessData.overlayUserIdOnScreenshare?10:-1)` — const 9 of app-screenshare-view is `[1,"overlay-userID-container"]`, i.e. the SAME watermark span StreamingView carries, on the screenshare pane. Our ScreenPane.svelte has no `overlay-userID-container` anywhere (grep over apps/room/src returns exactly one hit, StreamingView.svelte:396), and PresentationArea.svelte:708 passes `overlayUserIdOnScreenshare` only into StreamingView — the `<ScreenPane>` instantiation at PresentationArea.svelte:607-624 does not receive it and ScreenPane.svelte:50-96 declares no such prop. So a room that has turned on `sessData.overlayUserIdOnScreenshare` gets the viewer's `userXrefID` burned over MTX streams and NOT over screenshares, which is the surface the setting is named for.
+
+> Verified: I could not find any screenshare-pane watermark in apps/room/src under any name. Exhaustive greps over the whole room source for `overlay-userID`, `overlayUserId`, `overlayUserID`, `userXrefID`, `watermark`/`Watermark`, and `anti-leak|antileak|burn|idOverlay|userIdOverlay` return the watermark markup exactly once, in StreamingView.svelte:…
+
+### SV-SP-02 — No detached state on the source pane: the reference blanks the original pane and offers 'click here to re-attach'
+
+**medium** · `missing-behaviour` · reference byte **1,492,849**
+
+```
+return D(e),E(g().reAttachScren())}),v(1," Screen Detached.. Click here to re-attach "),u()}}
+```
+
+**Ours:** Three re-read pieces make this one control: the h3 above (sub-template z0e), its gate `O(1,o.isDetached?1:-1)` at offset 1501523, and the subscription at offset 1495283 — `subscribe("detachScreenShare",i=>{this.muser._id==i&&this.detachScreen()})` / `subscribe("reatachScreenShare",i=>{this.muser._id==i&&this.reAttachScren()})` — with `reAttachScren(){this.isDetached=!1,…}detachScreen(){this.isDetached=!0,this.stopWatchScreenOf(this.muser._id),…}` at offset 1499638. Our RoomScreens.detach (screens.svelte.ts:266-300) opens the popout window and registers a beforeunload that re-selects the tab, but nothing sets an `isDetached` flag on the source pane: ScreenPane.svelte has only `detached` (line 107), which is the POPOUT's own `isDetachedCtrl`, read from the query string via screens.svelte.ts:213-217. So after detaching, the original window keeps rendering the same screen (ScreenPane.svelte:336-342) — two live decoders on one producer — and there is no re-attach affordance at all.
+
+> Verified: I could not find it. Our detach path opens the popout but never marks the SOURCE pane detached, never stops watching the producer, and offers no re-attach control.
+
+### SV-SP-03 — No 'Connecting To Screen of …' state — an un-arrived screen shows an empty pane with no feedback
+
+**medium** · `missing-behaviour` · reference byte **1,493,278**
+
+```
+function q0e(t,n){if(1&t&&(d(0,"h3",3),T(1,"i",12),v(2),u()),2&t){const e=g();m(2),ns(" Connecting To Screen of ",e.muser.mediaValue.name,"-",e.muser.mediaValue.screenName," ")}}
+```
+
+**Ours:** Const 3 is `[1,"text-center","mt-4","animated","fadeIn",2,"color","#fff"]` and const 12 is `[1,"fas","fa-spinner","fa-pulse"]`, and the gate re-read at offset 1501699 is `O(4,o.isConnected||o.isPresentingThisScreen||o.isDetached?-1:4)` — i.e. shown exactly while not yet connected. Our ScreenPane.svelte:336-342 hides the `<video>` via `{ hidden: stream === null || saveData }` and renders nothing in its place; there is no spinner, no message, and no `isConnected` notion (grep for 'Connecting To Screen' over apps/room/src returns nothing). StreamingView has its counterpart (`Loading Stream...`, StreamingView.svelte:374-378); ScreenPane does not.
+
+> Verified: I could not find any "Connecting To Screen" state, or any renamed equivalent, in apps/room/src. ScreenPane.svelte has exactly two template conditionals — `{#if saveData}` at :333 (the `Video Disabled` h3) and `{#if detached}` at :351 (the popout zoom cluster); when the stream has not arrived the pane renders nothing, because the `<video>`…
+
+### SV-SP-04 — No too-small-video retry: a screen consumer that comes up 0x0 is never re-requested
+
+**medium** · `missing-behaviour` · reference byte **1,499,022**
+
+```
+if(clearTimeout(i.screenConnectChecker),P("------webcam playing event fired....w:"+s+". h:"+r),(s<10||r<10)&&i.tooSmallRetries<3&&!i.mediaService.is_firefox&&!i.mediaService.is_edge)return P("------webcam playing event TOO small? retry..."),i.tooSmallRetries++,void setTimeout(()=>{i.mediaService.callScreenOfUserWEBRTC(this.muser)},3e3);i.tooSmallRetries=0
+```
+
+**Ours:** The offset is where `i.tooSmallRetries<3` begins; the quote is the surrounding one-time 'playing' listener installed by `startWatchScreenOf`. Our attach path is ScreenPane.svelte:219-241 (`attachStream`), which assigns srcObject, plays, logs a blocked autoplay and returns a teardown — it never inspects `videoWidth`/`videoHeight` and never re-requests. `grep -rn videoWidth apps/room/src` finds it only in screen-zoom.ts (the screenshot) and alert-overlay-compositor.ts; nothing in the screen-consume path (media-transport.svelte.ts:1144). The Firefox/Edge exclusion and the 3-attempt, 3000 ms cap are likewise absent.
+
+> Verified: I could not refute this. Our screen attach path is ScreenPane.svelte:219-241 (`attachStream`), read in full: it assigns `srcObject`, sets volume/muted, calls `node.play()` with a `console.warn` on rejection, and returns a teardown that pauses and nulls `srcObject`.
+
+### SV-SP-05 — Screen tabs do not start/stop watching: every shared screen is consumed on arrival, not only the selected one
+
+**medium** · `divergence` · reference byte **1,968,584**
+
+```
+onScreenShareTabChange(e,i=!0){P(`onScreenShareTabChange tab: ${e}. selectedScreenShareTab: ${this.selectedScreenShareTab}`),this.selectedScreenShareTab!=e&&this.appService.guiEventBus.emit("stopWatchScreenOf",this.selectedScreenShareTab),this.selectedScreenShareTab=e,this.appService.guiEventBus.emit("startWatchScreenOf",this.selectedScreenShareTab),this.appService.globals.currScreenID=this.selectedScreenShareTab
+```
+
+**Ours:** Our RoomScreens.selectTab (screens.svelte.ts:329-332) sets `#selectedScreenTab` and applies the `makeUsersFollowMyScreens` clause, but emits no stop/start-watch pair, because media-transport.svelte.ts:1091-1148 (`addRemoteScreen`) consumes EVERY remote screen producer the moment it is announced and holds the stream in `#screenStreams`. The divergence is recorded in save-data-gate-contract.test.ts:145-148 and room-mtx.svelte.ts:50-58 and is architectural rather than accidental — but it is a real shape difference with a cost the reference does not pay: at N screens shared, this room pulls N video consumers where the reference pulls 1. Filed as a divergence to be decided on, not as a defect.
+
+> Verified: I could not refute it. The reference behaviour is real and the claim about us is accurate in every detail I could check, though its COST argument is overstated because a renamed counterpart exists.
+
+### SV-SP-06 — ScreenTabs renders no locked-screen badge, so a locked screen has no indicator and no one-click unlock
+
+**medium** · `missing-control` · reference byte **1,918,843**
+
+```
+function oSe(t,n){if(1&t){const e=Y();d(0,"span",82),x("click",function(){D(e);const o=g().$implicit;return E(g(3).toggleLockScreen(o._id))}),T(1,"i",83),u()}}
+```
+
+**Ours:** Const 82 is `["placement","bottom","tooltip","Unlock this screen?",1,"mr-2",3,"click"]` and const 83 is `["aria-hidden","true",1,"fas","fa-lock"]`; the gate, re-read at offset 1920343, is `O(3,i.appService.globals.lockedScreenID===e._id?3:-1)` inside lSe's update block, immediately after the forced-screen eye badge at `O(2,i.forcedScreenID==e._id?2:-1)`. Our ScreenTabs.svelte renders the eye badge (lines 170-177) and then goes straight to the avatar at line 178 — no lock badge. `lockedScreenId` (ScreenTabs.svelte:49, 243) is used ONLY to flip the dropdown item's label. The asymmetry is the tell: StreamTabs.svelte:201-212 does render this badge, from the same const, on the bar where upstream it can never appear.
+
+> Verified: I could not refute this. The reference claim checks out and our ScreenTabs genuinely has no lock badge.
+
+### SV-SP-08 — globals.currScreenID is never written, so the presenter-unmutes-refocus path has nothing to read
+
+**low** · `missing-behaviour` · reference byte **1,968,960**
+
+```
+this.appService.globals.currScreenID=this.selectedScreenShareTab
+```
+
+**Ours:** Written by onScreenShareTabChange on every tab change, and its consumer — re-read at offset 1141836 — is `subscribe("presUnmuted",e=>{…this.globals.isScreenSharing&&this.sendServerAdminCommand("focusOnScreen",{id:this.globals.currScreenID})})`, i.e. a presenter who unmutes while sharing pulls the room to whichever screen they last selected. Our screens.svelte.ts keeps `#selectedScreenTab` (line 54) but nothing outside the component tree reads it, and grep over apps/room/src finds no `currScreenID` and no presUnmuted-to-focusOnScreen path. Low because the consumer lives on the talking/mic surface rather than this one, and the write is only half the feature.
+
+> Verified: I could not find the behaviour in our source, and I am reporting that absence rather than inventing a counterpart. WHAT IS ACTUALLY MISSING — the CONSUMER, not the write.
+
+### SV-SP-09 — No presenter self-preview deferral: our own screen always renders full video instead of the 'click here for larger preview' line
+
+**low** · `missing-behaviour` · reference byte **1,493,170**
+
+```
+Ne(" (You are sharing your screen as ",e.muser.mediaValue.screenName," click here for larger preview) ")
+```
+
+**Ours:** The p is const 2 with a click bound to `largePreview()`, gated at offset 1501588 as `O(3,o.mediaService.isScreenSharing&&o.mediaService.localSharingStreams[o.muser._id]&&!o.localpreview?3:-1)`, and `largePreview(){this.localpreview=!0;…i.srcObject=e.localStream;…}` sits at offset 1499849. Our ScreenPane.svelte:301-309 states the term is false by construction here because `addLocalScreen` renders our own screens from the local capture, i.e. we always local-preview. That is a coherent decision, but it is a divergence, not an equivalence: the reference deliberately does NOT decode the presenter's own screen until they ask for it.
+
+> Verified: I could not find any implementation or renamed equivalent in apps/room/src. Searched: 'largePreview', 'large preview', 'larger preview' (zero hits across all of apps/** in .ts/.svelte/.md); the label text 'You are sharing' and 'sharing your screen as' (zero hits in any template); 'localpreview'/'localPreview' (hits ONLY inside comments qu…
+
+### SV-SP-10 — The screenshare <video> is statically muted upstream; ours binds volume and muted from the room master
+
+**low** · `divergence` · reference byte **1,500,765**
+
+```
+["autoplay","autoplay","data-ng-dblclick","fullScreen()","playsinline","","muted","true",1,"webcamScreen",3,"click","controls","ngClass","id"]
+```
+
+**Ours:** Const 8 carries `muted="true"` as a STATIC attribute — `volume` is not in its binding list at all — and `newScreenStream` re-asserts it twice (`i.muted=!0` before assigning srcObject, and again in the play() catch; read at offset 1497239). Our ScreenPane.svelte:225-226 sets `node.volume = volume/100` and `node.muted = muted`, and PresentationArea.svelte:615-616 passes `{volume}` / `muted={volume === 0}`. Harmless today because media-transport.svelte.ts:1093 refuses any producer whose `kind !== 'video'`, so the consumed screen stream carries no audio track — but it is a live path to playing screenshare audio through an element the reference guarantees is silent.
+
+> Verified: I could not find the reference's guaranteed-silent screenshare video anywhere in our source. The reference mutes it three independent ways: the const at byte 1500691 carries `"muted","true"` in the STATIC attribute run (before the `1` marker), with the binding run after `3` holding only `click`,`controls`,`ngClass`,`id` — no `volume`; `ne…
+
+### SV-SP-13 — Fullscreen keeps only the standard API; the reference carries moz/webkit/ms fallbacks on both fullscreen paths
+
+**low** · `missing-behaviour` · reference byte **1,491,771**
+
+```
+onDoubleClicked(){try{let e=null;e=document.querySelector(`#video-screen-container-${this.id}`),document.fullscreenElement?document.exitFullscreen?document.exitFullscreen():document.mozCancelFullScreen?document.mozCancelFullScreen():document.webkitExitFullscreen?document.webkitExitFullscreen():document.msExitFullscreen&&document.msExitFullscreen():e.requestFullscreen?e.requestFullscreen():e.mozRequestFullScreen?e.moz
+```
+
+**Ours:** This is the appDoubleClick directive, whose vendor chain continues at offset 1492211 (`e.webkitRequestFullscreen?e.webkitRequestFullscreen():e.msRequestFullscreen&&e.msRequestFullscreen()`). Our ScreenPane.svelte:198-208 reproduces the `#video-screen-container-{id}` target and the standard pair only; StreamingView's own `toggleFullscreen()` has the same three-way fallback upstream and StreamingView.svelte:348-356 likewise keeps the standard pair. Cosmetic/compat only on any browser from the last several years.
+
+> Verified: Could not refute. Both of our fullscreen call sites use the standard API only, with no vendor fallbacks anywhere in apps/room/src.
+
+### SV-SP-14 — The detached zoom cluster has no hidden binding, so it paints over a pane that has no picture
+
+**low** · `missing-behaviour` · reference byte **1,493,686**
+
+```
+z("ngClass",ct(2,$0e,!e.isDetached&&(!e.isConnected||e.isPresentingThisScreen&&!e.localpreview||e.mediaService.saveData))),m(5),O(5,e.showZoomCtrlDetached?5:-1)
+```
+
+**Ours:** The offset is the start of `function Y0e`; the quote is its update block. `$0e = t => ({hidden: t})`, so the whole `zoom-controls-container-detached` collapses under exactly the conditions that hide the `<video>`. Our ScreenPane.svelte:351-363 renders the container whenever `detached` is true, with no hidden class — so in a popout whose stream has not arrived, or with saveData on, the magnifier/camera cluster floats over an empty box. The inner `showZoomCtrlDetached` gate IS reproduced (ScreenPane.svelte:144-151, ScreenZoomControls.svelte:231-235).
+
+> Verified: I tried hard to refute this and could not. The binding is genuinely absent from our source, and the one place we already reasoned about it reaches its "equivalent" conclusion by conflating two DISTINCT fields in the reference component.
+
+---
+
+## EmojiPicker + reactions
+
+11 verified gaps; 69 reference behaviours confirmed present.
+
+### EMOJI-01 — A reaction is never pushed to other viewers — no realtime channel for reactions
+
+**high** · `missing-behaviour` · reference byte **1,152,627**
+
+```
+manageChatReactions(e,i,o,s,r=null){this.socketService.send("chatReactions",{msgID:e,reactions:i,reactionDetails:o,type:s,msgIndex:r})}
+```
+
+**Ours:** apps/room/src/routes/message-actions.remote.ts:281-325 toggles `reactionsJson` in SQLite and returns; there is no `publishToRoom` on the reaction branch (grep for publishToRoom in that file: 0 hits) and the `RoomEvent` union at apps/room/src/lib/server/room-events.ts:45-140 has channels alerts/chat/typing/cmds and no reaction channel. The only refresh is the clicker's own `invalidateAll()` (apps/room/src/lib/room/message-actions.svelte.ts:247-266). The reference's return leg is the inbound `updateChatMsg` frame at offset 1011052, which I read verbatim: 'case"updateChatMsg":let a=i.msg,l=i.reactionDetails||null;l&&l.msgUID===this.globals.user.userXrefID&&this.appEventBus.emit("updateChatMsgReaction",l)'. A second viewer in our room sees a reaction only after a page load.
+
+> Verified: I could not find any realtime fan-out for a reaction anywhere in apps/room/src, under this or any other name. What I verified by reading:
+
+1.
+
+### EMOJI-02 — `reactionDetails` ({n, emoji, remove}) is never computed, so no downstream consumer can exist
+
+**medium** · `missing-behaviour` · reference byte **1,353,655**
+
+```
+i={n:this.appService.globals.user.nick||this.appService.globals.user.name,emoji:this.selectedEmoji[e].emoji,remove:!0}
+```
+
+**Ours:** Neither apps/room/src/lib/reaction-toggle.ts:28-45 nor apps/room/src/routes/message-actions.remote.ts:281-325 produces a who/what/removed record. `toggleReaction` returns only the new map; the client sends only `{reactionKey, reactionEmoji}` (apps/room/src/lib/room/message-actions.svelte.ts:255-259). Grep for `reactionDetails` across apps/room/src: 0 hits. The reference builds the same object in selectEmoji too and passes it as the 3rd argument of manageChatReactions (read at 1355000-1355100).
+
+> Verified: I tried hard to refute this and could not. The `{n, emoji, remove}` record — and the whole feature it feeds — is absent from our source.
+
+### EMOJI-03 — "Message Reaction" toast (the non-QA chat reaction notification) is absent
+
+**medium** · `missing-control` · reference byte **2,508,981**
+
+```
+this.appService.appEventBus.subscribe("updateChatMsgReaction",i=>{this.appService.globals.preferences.reactionsPopup&&this.alertsService.info(`${i.n}: ${i.remove?"removed":""} ${i.emoji} on "${i.txt}"`,"Message Reaction",{enableHtml:!0})})
+```
+
+**Ours:** No such toast. `grep -rn "Message Reaction" apps/room/src` returns 0 hits; apps/room/src/lib/room/toasts.svelte.ts has no reaction path. NOTE: the previous stage reported it could not find a non-QA reaction toast — it exists and its title is "Message Reaction" (the literal `"Message Reaction"` is at offset 2509144), not "Chat Reaction" (0 occurrences of "Chat Reaction" in the bundle).
+
+> Verified: The non-QA "Message Reaction" toast is genuinely absent from apps/room/src. Our source implements the reaction FEATURE (toggle rules in lib/reaction-toggle.ts, optimistic UI + server call in lib/room/message-actions.svelte.ts:592-625, persistence in routes/message-actions.remote.ts:281-315), but raises no toast on the reaction path — the…
+
+### EMOJI-04 — "QA Reaction" toast and the QA reaction sound are absent
+
+**medium** · `missing-control` · reference byte **1,409,470**
+
+```
+this.appService.globals.preferences.reactionsPopupQA&&l&&c&&this.alertService.info(`${c.n}: ${c.remove?"removed":""} ${c.emoji} on "${c.txt}"`,"QA Reaction",{enableHtml:!0})
+```
+
+**Ours:** Absent. `grep -rn "QA Reaction" apps/room/src` matches only prose comments about the room SETTING "Enable QA Reactions?" (apps/room/src/lib/room-message-chrome.ts:82, apps/room/src/lib/server/room-config-client.ts:627) — a different control. The paired sound gate `preferences.qaReactionSoundOn && soundEffectsService.qaAlert.play()` (I read `qaReactionSoundOn` occurrences at 979369, 1409156, 1409764, 1410280) has no counterpart either; apps/room/src/lib/room/prefs.svelte.ts carries `qaSoundOn` but no `qaReactionSoundOn`.
+
+> Verified: Could not refute. Zero hits in apps/room/src for reactionsPopupQA, reactionsPopup, qaReactionSoundOn, reactionsSoundOn, qaReactionDetails, updatedQAMsg, or the settings labels "Reactions Response" / "Reactions QA Response".
+
+### EMOJI-05 — User preferences `reactionsPopup` / `reactionsPopupQA` / `qaReactionSoundOn` and their two settings toggles do not exist
+
+**medium** · `missing-control` · reference byte **979,910**
+
+```
+recPreviewWindow:!0,reactionsPopup:!0,reactionsPopupQA:!0,noteUpdatePopup:!0,chatGif:!0,chatBadges:!0
+```
+
+**Ours:** apps/room/src/lib/room/prefs.svelte.ts defines popupOnUserJoin/popupOnUserLeave/chatPopup/alertPopup/longerAlertPopup/qaSoundOn but none of the three reaction flags (grep for `reactionsPopup` across apps/room/src and apps/controller/src: 0 hits). The reference also ships their two settings-modal switches, which I read verbatim: `v(3," Reactions Response ")` at offset 2227101 bound to `preferences.reactionsPopup`, and `v(3," Reactions QA Response ")` at offset 2227573 bound to `preferences.reactionsPopupQA`. Neither label appears anywhere in our tree.
+
+> Verified: I could not refute this. The three preference flags and both settings switches are genuinely absent from our tree.
+
+### EMOJI-06 — Enter in the search box does not select the first result
+
+**medium** · `missing-behaviour` · reference byte **750,272**
+
+```
+handleEnterKey(e,i){if(!i&&null!==this.SEARCH_CATEGORY.emojis&&this.SEARCH_CATEGORY.emojis.length){if(!(i=this.SEARCH_CATEGORY.emojis[0]))return;wC(this.emojiSelect,this.ngZone,{$event:e,emoji:i})}
+```
+
+**Ours:** apps/room/src/lib/components/EmojiPicker.svelte:513-522 binds only `oninput={(event) => handleSearch(event.currentTarget.value)}` on the search input; there is no keydown/keyup handler and no path that picks `searchResults[0]`. The reference wires it with `setupKeyupListener()`, which I read at offset 737093: `setupKeyupListener(){this.ngZone.runOutsideAngular(()=>ji(this.inputRef.nativeElement,"keyup")...subscribe(e=>{!this.query||"Enter"!==e.key||(this.enterKeyOutsideAngular.emit(e),e.preventDefault())}))}`, feeding emoji-mart's handleEnterKey.
+
+> Verified: Our emoji picker's search input has no Enter handling at all. apps/room/src/lib/components/EmojiPicker.svelte:515-522 declares the input with exactly one handler — oninput={(event) => handleSearch(event.currentTarget.value)} — plus bind:this, id, class, type and placeholder; there is no onkeydown/onkeyup, and it is not inside a <form>, so…
+
+### EMOJI-07 — Search input id is hardcoded `emoji-mart-search-2`; the reference derives it from a per-instance counter
+
+**medium** · `wrong-constant` · reference byte **736,424**
+
+```
+inputId="emoji-mart-search-"+ ++Qee;destroy$=new Jt;
+```
+
+**Ours:** apps/room/src/lib/components/EmojiPicker.svelte:516 emits `id="emoji-mart-search-2"` and :523 `<label class="emoji-mart-sr-only" for="emoji-mart-search-2">`, the same literal for every instance. The counter's initialiser `Qee=0` is at offset 736204, so the reference's first picker is `emoji-mart-search-1` and each later one increments. Two pickers can be mounted at once in our tree (e.g. AlertChatArea.svelte:1077 and ExtraChatPane.svelte:549, or two open message pickers, since `reactionPickerOpen` is per-RoomMessage at RoomMessage.svelte:155), which produces duplicate DOM ids and a `for=` that binds to whichever input is first in document order.
+
+> Verified: I could not refute this. The search input id in our picker is a bare literal in both places and nothing derives it.
+
+### EMOJI-08 — `emoji-mart-dark` is applied unconditionally; the reference computes darkMode from prefers-color-scheme
+
+**medium** · `divergence` · reference byte **754,689**
+
+```
+Rh("emoji-mart ",o.darkMode?"emoji-mart-dark":"","")
+```
+
+**Ours:** apps/room/src/lib/components/EmojiPicker.svelte:475 hardcodes `class="emoji-mart emoji-mart-dark"`. The reference's class field (read at 744873) is `darkMode=!("function"!=typeof matchMedia||!matchMedia("(prefers-color-scheme: dark)").matches)` and the app leaves it at that default, so on a light-scheme machine the reference picker renders the light palette (`.emoji-mart{color:#222427;background:#fff}`) while ours is always dark. Both palettes are present in our imported CSS (apps/room/src/lib/styles/protradingroom-source.css carries `.emoji-mart-dark{`), so only the class decision differs.
+
+> Verified: Our picker hardcodes the dark class; nothing in apps/room/src computes it from the color scheme. Searched (node_modules excluded) for: emoji-mart-dark, emoji-mart, matchMedia, prefers-color-scheme, darkMode/dark_mode, colorScheme/color-scheme, MediaQuery, svelte/reactivity, and "dark" within EmojiPicker.svelte.
+
+### EMOJI-09 — No staged first render — we mount every emoji cell at once
+
+**medium** · `missing-behaviour` · reference byte **747,768**
+
+```
+const s=Math.min(this.categories.length,3);this.setActiveCategories(this.activeCategories=this.categories.slice(0,s));const r=this.categories[s-1].emojis.slice();this.categories[s-1].emojis=r.slice(0,60),setTimeout(()=>{this.categories[s-1].emojis=r,this.setActiveCategories(this.categories),this.ref.detectChanges()
+```
+
+**Ours:** apps/room/src/lib/components/EmojiPicker.svelte:597-630 renders `{#each EMOJI_DUMP_DATA.categories ...}` with every category and every entry on mount. apps/room/src/lib/emoji-data.ts contains 1821 `spritePosition` entries, so opening the picker creates ~1821 `ngx-emoji` spans plus their sprite style strings synchronously, where the reference commits 3 categories with the third capped at 60 cells (`this.categories[s-1].emojis=r.slice(0,60)` read at offset 747930) and expands the rest on a `setTimeout` + `requestAnimationFrame`.
+
+> Verified: I tried to find a staged/deferred first render in our picker and there is none. `EmojiPicker.svelte:603` iterates `EMOJI_DUMP_DATA.categories` with no cap — no `activeCategories` window, no `Math.min(..., 3)` — and `:614` iterates `entriesFor(categoryIndex)`, which at `:331-336` returns `frequentEntries` for index 0 and `EMOJI_DUMP_DATA.c…
+
+### EMOJI-10 — ExtraChatPane mounts the picker with the default popoverId, which no trigger advertises — the popover never positions
+
+**medium** · `defect` · reference byte **1,359,452**
+
+```
+["container","body","autoClose","outside","popoverClass","popOverDiv",1,"dropdown-item",3,"click","shown","hidden","ngbPopover"]
+```
+
+**Ours:** apps/room/src/lib/components/ExtraChatPane.svelte:462 sets `aria-describedby={emojiOpen ? 'ngb-popover-extra' : undefined}` on the trigger, but :549 renders `<EmojiPicker onselect={(glyph) => (composer += glyph)} />` with no `popoverId`, so the popover element gets the default id `ngb-popover-3` (EmojiPicker.svelte:10). `portalPopover` then runs `document.querySelector('[aria-describedby="ngb-popover-3"]')` (EmojiPicker.svelte:428, and again at :445) and finds either nothing — leaving the popover at its hardcoded inline `translate3d(483.5px, -52.5px, 0px)` (EmojiPicker.svelte:466) — or, if the alert-chat composer picker is also open, AlertChatArea.svelte:954's trigger, which is the wrong element. AlertQaModal.svelte:331, ModalHost.svelte:4874 and NoteEditor.svelte:1134 all pass a matching id; ExtraChatPane is the one that does not.
+
+> Verified: I could not refute it. ExtraChatPane's emoji trigger advertises `ngb-popover-extra` but the picker it mounts receives no `popoverId`, so the popover element carries the default id `ngb-popover-3`.
+
+### EMOJI-12 — Preview clears immediately on mouseleave; the reference defers it one animation frame
+
+**low** · `divergence` · reference byte **750,893**
+
+```
+handleEmojiLeave(){!this.showPreview||!this.previewRef||(this.animationFrameRequestId=requestAnimationFrame(()=>{this.previewEmoji=null,this.ref.detectChanges()}))}
+```
+
+**Ours:** apps/room/src/lib/components/EmojiPicker.svelte:566 and :615 both set `onmouseleave={() => (hovered = null)}` synchronously. The reference's rAF (paired with `cancelAnimationFrame()` in handleEmojiOver, read in the same slice) exists so sliding across a row does not flash the idle preview between cells.
+
+> Verified: The rAF deferral is genuinely absent from our source. EmojiPicker.svelte is the only emoji picker in apps/room/src, and both of its hover sites clear the preview synchronously in the event handler: `onmouseleave={() => (hovered = null)}` at lines 570 and 622 (the claim's 566/615 are off by a few lines; actual lines verified).
+
+---
+
+## AlertChatArea.svelte
+
+9 verified gaps; 42 reference behaviours confirmed present.
+
+### acA-01 — The inline ALERT ENTRY textarea is not rendered — only the checkbox that is supposed to control it
+
+**high** · `missing-control` · reference byte **2,044,139**
+
+```
+function H2e(t,n){if(1&t){const e=Y();d(0,"div",20)(1,"div",52,2)(3,"textarea",53),x("keyup",function(o){return D(e),E(g().onKey(o))})("paste",function(o){return D(e),E(g().onImagePaste(o))}),u()()()}}
+```
+
+**Ours:** AlertChatArea.svelte:516-529 renders the "Show inline alert entry" checkbox with bind:checked={alerts.inlineEntry}; alerts.svelte.ts:62/134-140 hold #inlineEntry. `grep -rn inlineEntry apps/room/src` returns exactly one reader outside alerts.svelte.ts and it is that bind — nothing renders the field. The consts are read at 2055637 (["id","textAreaAlertHolder",1,"p-1"]) and 2055712 (["name","txt-area-alert","id","textAreaAlertTxt","rows","1","spellcheck","true","placeholder","Type your alert here..",1,"txt-area-alert","form-control","border-0",3,"keyup","paste"]) and the wrapper class at 2053309 ([1,"w-100","inline-alert-entry-field"]); the gate is O(20,o.showAlertsEntry?20:-1) at 2056748. The scoped CSS for all three (#textAreaAlertHolder, .txt-area-alert, .inline-alert-entry-field) is emitted in the same styles block at ~2056900. Also: the reference persists showAlertsEntry (localStorage object key); ours is ephemeral $state with no persistence anywhere in apps/room/src.
+
+> Verified: I could not find the inline ALERT ENTRY textarea anywhere in apps/room/src, under its own name or any rename. Searches run: `inlineEntry`, `inline-alert-entry`, `textAreaAlert`, `textAreaAlertHolder`, `textAreaAlertTxt`, `txt-area-alert`, `inline-alert-entry-field`, `showAlertsEntry`, `alertComposer`, `alertDraft`, `alertEntry`, `alertHol…
+
+### acA-02 — Chat composer has no (paste) handler — a pasted screenshot cannot be posted to chat
+
+**high** · `missing-behaviour` · reference byte **1,427,208**
+
+```
+("paste",function(o){return D(e),E(g().onImagePaste(o))})
+```
+
+**Ours:** The composer textarea at AlertChatArea.svelte:904-929 binds onfocus/oninput/onblur/onkeydown and NO onpaste. `grep -rn "onpaste|onImagePaste|clipboardData" apps/room/src` finds paste handling only in PostAlertModal.svelte:298, swing-alerts/SwingAlertForm.svelte:189 and day-trade-alerts/DayTradeAlertForm.svelte:205 — never on #textAreaTxt. The reference binds it on textarea const 64 inside d0e at 1427062.
+
+> Verified: Could not refute. The chat composer textarea `#textAreaTxt` in AlertChatArea.svelte binds only `{@attach captureComposerElement}`, `bind:value`, `onfocus`, `oninput`, `onblur`, `onkeydown` — there is no `onpaste`.
+
+### acA-05 — Private-chat button in the main chat column is rendered ungated, while the gate exists and the extra column uses it
+
+**high** · `missing-control` · reference byte **1,453,980**
+
+```
+O(9,o.showPMBtn?9:-1)
+```
+
+**Ours:** AlertChatArea.svelte:760-768 renders the "Open Private chat" <li> unconditionally — it takes no showPmButton prop (props list :189-233 has none) and +page.svelte:1140-1195 passes none. The gate IS built: gates.ts:362-370 `showPmButton` = (isPresenter || sessData.userPM || sessData.userToPresenterPM) && !(user.isFT && sessData.disablePMForTrials), and ExtraChatPane.svelte:320 gates on it with the comment quoting this exact O(9,…) line, fed from +page.svelte:1284. So a free-trial member in a room with disablePMForTrials sees the PM entry point in the main column and not in the extra one.
+
+> Verified: I could not refute it. The gate exists (`gates.ts:362-370` `showPmButton`) but has exactly one consumer: ExtraChatPane.
+
+### acA-04 — "Mod Only" chat filter checkbox has no counterpart anywhere in apps/room/src
+
+**medium** · `missing-control` · reference byte **1,423,104**
+
+```
+function X_e(t,n){if(1&t){const e=Y();d(0,"div",43)(1,"input",44),Ve("ngModelChange",function(o){D(e);const s=g(2);return He(s.appService.globals.filterChatMsgs.modOnly,o)||(s.appService.globals.filterChatMsgs.modOnly=o),E(o)}),x("change",function(){return D(e),E(g(2).toggleModOnlyFilter())}),u(),d(2,"label",45),v(3," Mod Only "),u()()
+```
+
+**Ours:** `grep -rn "modOnly|Mod Only|mod-only" apps/room/src` returns ZERO hits. Neither the control (id="mod-only") nor the filter state (filterChatMsgs.modOnly) nor the handler (toggleModOnlyFilter) exists; feeds.visibleChat is not filtered by sender role.
+
+> Verified: I could not refute the claim. Reference verified by reading bytes: `function X_e` begins at exactly offset 1423104 in main.d1d09071be31f1ba.js and renders `input,44` two-way bound to `appService.globals.filterChatMsgs.modOnly` with a change handler `toggleModOnlyFilter()` and label text " Mod Only "; it belongs to component `app-chat` (se…
+
+### acA-06 — Chat tab unread-count badge and presenter-only mention count are not rendered
+
+**medium** · `missing-control` · reference byte **1,420,987**
+
+```
+function $_e(t,n){if(1&t&&(d(0,"span",28),v(1),H(2,H_e,2,1,"span",29),u()),2&t){const e=g().$implicit,i=g(2);m(),Ne("",i.unreadMsgs[e.name]," "),m(),O(2,i.appService.globals.isPresenter&&i.unreadMentions[e.name]?2:-1)}}
+```
+
+**Ours:** ChatTabStrip.svelte:38-55 renders only `{chatTabLabel(tab)}` inside each anchor; its `tabs` prop is `readonly string[]` (:32) so no per-tab count can reach it, and `counterBadge` has zero occurrences in apps/room/src. The consts are read at 1448969 ([1,"badge","badge-pill","badge-warning","ml-1","counterBadge"]) and immediately after ([1,"text-danger"]); H_e (the " (n)" mention span) is at 1420857; the per-<li> gate O(3,i.unreadMsgs[e.name]||i.unreadMentions[e.name]?3:-1) is inside z_e at 1421206.
+
+> Verified: I could not refute it. The channel strip is rendered in exactly one place, ChatTabStrip.svelte, and its anchor body is `{chatTabLabel(tab)}` with no badge span; its `tabs` prop is `readonly string[]` (line 32), so no per-tab count can structurally reach it.
+
+### acA-07 — The alerts archive control drops the !isLimitedPresenter half of its gate — and the file's own comment states the full gate
+
+**medium** · `missing-control` · reference byte **2,043,456**
+
+```
+O(2,e.appService.globals.isPresenter&&!e.appService.globals.isLimitedPresenter?2:-1)
+```
+
+**Ours:** AlertChatArea.svelte:667 is `{#if isPresenter}` around #addon-chat-messages-archive, while the comment directly above it at :652-655 says "the archive control gated again on `isPresenter && !media.limitedPresenter`". The component receives only `isPresenter`, and +page.svelte:296 derives it as `data.user.role === 'staff' || data.user.role === 'admin'` with no limited-presenter term. `media.limitedPresenter` exists and is reactive (media.svelte.ts:122, 305-318) and is already threaded elsewhere (create-room.svelte.ts:342). A member handed mic+screen therefore gets an Archive Alerts button the reference withholds.
+
+> Verified: I could not refute it. The `!limitedPresenter` half of the gate is applied nowhere on the alerts-archive path, under any name.
+
+### acA-08 — Extra chat column: wrong container class, no roomSplitDir gate, and the desktop ttb/btt placement inside the inner split is not modelled
+
+**medium** · `divergence` · reference byte **2,490,857**
+
+```
+function j4e(t,n){if(1&t){const e=Y();d(0,"as-split-area",211)(1,"app-extra-chat",212),x("openPrivateChat",function(o){return D(e),E(g(3).showPrivateChat(o))}),u()()}2&t&&z("size",g(3).chatSize)
+```
+
+**Ours:** The reference has TWO sites: j4e is a FOURTH as-split-area INSIDE the inner alert-chat split (const 211 = .chat-box), gated in V4e's update block at 2491052 by `O(6,!e.appService.globals.preferences.extraChatColumn||"ttb"!==…roomSplitDir&&"btt"!==…roomSplitDir?-1:6)`; and H4e is a top-level third area of the OUTER split carrying const 207 `["minSize","0",1,"alert-chat-box","alert-chat-box-extra-column",3,"size","order"]` (read at 2545788), gated in K4e at 2493526 by `O(2,e.hideChatAlerts||!…extraChatColumn||"ltr"!==…roomSplitDir&&"rtl"!==…roomSplitDir?-1:2)`. Ours has only the top-level form: RoomShell.svelte:231 and :234 render it in both branches on `!hideChatAlerts && extraChatColumnVisible`, +page.svelte:560 defines extraChatColumnVisible as `prefs.extraChatColumn && !split.chatCollapsed` with NO roomSplitDir term, and +page.svelte:1273 gives the area `class="alert-chat-box as-split-area"` — the string `alert-chat-box-extra-column` has zero occurrences in apps/room/src. So in a top/bottom room the column lands beside the presentation area instead of below the chat pane, and the extra-column class hook never ships.
+
+> Verified: I could not refute any of the three sub-claims. (1) roomSplitDir gate: our only gate is `+page.svelte:562` `const extraChatColumnVisible = $derived(prefs.extraChatColumn && !split.chatCollapsed)`, consumed at `RoomShell.svelte:231` and `:234` as `{#if !hideChatAlerts && extraChatColumnVisible}` — no direction term anywhere.
+
+### acA-11 — The empty-tabs " Chat" brand label and the tab-strip <ul> presence gate are both absent
+
+**low** · `missing-control` · reference byte **1,420,732**
+
+```
+function j_e(t,n){1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}
+```
+
+**Ours:** The chat brand at AlertChatArea.svelte:753-758 is the icon plus the DND badge and never the label, so with no channels configured the header shows a bare comment glyph. Reference gate O(5,0==o.chatTabs.length?5:-1) read at 1453850. Separately O(7,o.chatTabs.length?7:-1) at 1453947 suppresses the whole <ul> when there are no tabs, while ChatTabStrip.svelte:38 emits the `nav nav-tabs … chatTabs` list unconditionally (an empty styled <ul> in the header).
+
+> Verified: Both controls are genuinely absent from our markup, but the gap is unreachable in practice and that must be stated with it. (1) The empty-tabs brand label: AlertChatArea.svelte:763-770 renders navbar-brand as `<i class="fas fa-comment">` plus the conditional DND badge only — no `&nbsp;Chat` span and no gate.
+
+### acA-12 — Search and gear clicks are bound to the <a> in ours and to the <li> in the reference
+
+**low** · `divergence` · reference byte **2,055,851**
+
+```
+d(11,"li",12),x("click",function(){return D(s),E(o.toggleAlertsToolbarSearchOnly())}),d(12,"a",13),T(13,"i",14),u()(),d(14,"li",15),x("click",function(){return D(s),E(o.toggleAlertsToolbar())})
+```
+
+**Ours:** AlertChatArea.svelte:474-495 puts onclick on the anchors (:478 ontogglealertssearch, :491 ontogglealertstoolbar) inside plain <li>s, and the chat column does the same at :769-790. In the reference const 12 is `[1,"nav-item","mx-1",3,"click"]` and const 13 is `["title","Search",1,"nav-link","p-0"]` with no click — i.e. the whole nav-item including its mx-1 margin is the hit target, and the same shape repeats for the chat column at 1453244+ (d(10,"li",15) … d(13,"li",18)). Our hit area is smaller by the li padding. The private-chat button is bound on the <a> in BOTH (W_e at 1421660), so this is specific to the two toolbar toggles.
+
+> Verified: I could not find the reference's binding shape anywhere in apps/room/src. In all three of our toolbars the click sits on the anchor inside a plain <li>, never on the <li>: AlertChatArea.svelte:484-491 (<li class="nav-item mx-1"> with the handler on <a title="Search" class="nav-link p-0" onclick={ontogglealertssearch}> at :488) and :492-50…
+
+---
+
+## PresentationArea.svelte
+
+8 verified gaps; 56 reference behaviours confirmed present.
+
+### PA-01 — No speech-reco staleness checker — a caption never clears after the room falls silent
+
+**medium** · `missing-behaviour` · reference byte **1,956,753**
+
+```
+startSpeechChecker(){this.speechRecoInterval||(this.speechRecoInterval=setInterval(()=>{this.lastSpeechRecoEvent+7e3<Date.now()?(this.currentSpeechReco=null,this.showSpeechRecognition=!1,this.stopSpeechChecker(),console.log("speech checker NOT active.. stopping checker and hiding box")):console.log("speech checker running.. still active...")},7e3))}
+```
+
+**Ours:** Nothing in apps/room/src implements the 7000 ms window, `lastSpeechRecoEvent`, `speechRecoInterval`, `startSpeechChecker` or `stopSpeechChecker` — a grep of the whole of src for `7000`, `7e3`, `speechChecker` and `lastSpeechRecoEvent` returns only unrelated hits in lib/user-action-intent.ts:305,316. `currentCaption` is WRITTEN at routes/+page.svelte:522 (`setCurrentCaption: (caption) => (currentCaption = caption)`) and is never written back to null anywhere: the port's own type at lib/room/create-room.svelte.ts:176 is `setCurrentCaption: (caption: Caption) => void`, which cannot express null, and lib/room/create-room.svelte.ts:693-695 only ever forwards a caption. So the last line spoken stays pinned over the presentation area for the rest of the session. SpeechRecoOverlay.svelte:86 (`historyMode ? history.length > 0 : Boolean(current)`) reproduces the second half of `hasSpeechRecognitionEntries()` correctly and therefore keeps rendering it.
+
+> Verified: The reference behaviour is genuinely absent from apps/room/src, and I confirmed both halves of the claim by reading rather than assuming. WHAT I SEARCHED (all under /home/user/trading-room-app/apps/room/src, .ts + .svelte, non-test and test):
+- literals and names: `7000`, `7e3`, `= 7000`, `7_000`, `speechChecker`/`speech checker`, `startS…
+
+### PA-02 — The overlay's close button does not persist `showSpeechRecoOverlay` and does not reset history mode
+
+**medium** · `missing-behaviour` · reference byte **1,957,245**
+
+```
+hideSpeechRecognition(e){e.preventDefault(),e.stopPropagation(),this.appService.globals.preferences.showSpeechRecoOverlay=!1,this.appService.setPreference("showSpeechRecoOverlay",!1),this.showSpeechRecognition=!1,this.currentSpeechReco=null,this.lastSpeechRecoEvent=0,this.stopSpeechChecker(),this.speechRecoHistoryMode=!1}
+```
+
+**Ours:** PresentationArea.svelte:437 wires `onclose={() => (subtitles = false)}`, and `subtitles` is bound to `prefs.subtitles` at routes/+page.svelte:1223. The setter at lib/room/prefs.svelte.ts:508-510 is `set subtitles(next) { this.#subtitles = next; }` — a bare field write with no `save()` / `persist()` call, unlike the navbar checkbox path which does persist (lib/room/prefs.svelte.ts:629 maps `presentation-subtitles` -> `showSpeechRecoOverlay` and calls `this.save(...)` at :637). So dismissing the overlay with its X is forgotten on reload, and `speechRecoHistoryMode` is also left set (PresentationArea.svelte:438 only toggles it from the history button).
+
+> Verified: I could not find the behaviour anywhere in apps/room/src under any name. The overlay's X calls only `onclose={() => (subtitles = false)}` (PresentationArea.svelte:437), which lands on `set subtitles(next) { this.#subtitles = next; }` (prefs.svelte.ts:508-510) — a bare private-field write with no `save()`/`persist()`.
+
+### PA-03 — The two screenshare info toasts are absent — "… started screen sharing" and "Connecting to …"
+
+**medium** · `missing-behaviour` · reference byte **1,960,202**
+
+```
+appEventBus.subscribe("addScreenStream",e=>{"screen"==e.mode&&this.alertsService.info(e.userName+" started screen sharing")}),this.appService.appEventBus.subscribe("callingScreenStart",e=>{e.uid!=this.appService.globals.user.id&&this.alertsService.info("Connecting to "+e.nick+"..."),this.screenLoading=!0,this.screenPresenter=this.callingScreenName=e.nick,this.screenPresenterAvatar=e.avt||e.pic})
+```
+
+**Ours:** A grep of the whole of apps/room/src for the literals `started screen sharing` and `Connecting to ` returns nothing, and for `screenLoading`, `callingScreen`, `callingScreenStart` and `addScreenStream` returns nothing. Four of the reference's constructor fields therefore have no counterpart — `screenLoading`, `callingScreenName`, `screenPresenter`, `screenPresenterAvatar` (defaults read at 1954419) — and neither toast is raised: a viewer gets no notice that a screen arrived and no "connecting" feedback while the consumer is being built. Our ScreenPane.svelte and lib/room/media-transport.svelte.ts carry no equivalent loading state.
+
+> Verified: I tried hard to find a renamed counterpart and could not. Searches over apps/room/src (all .ts/.svelte, including tests and comment prose): the literals `started screen sharing`, `Connecting to `, `Connecting` (only hits are the session-login button label at routes/session/+page.svelte:483 and its contract test); the reference field names…
+
+### PA-04 — `#notes` has no empty state — the "No Notes to display…" heading and its " New Note " button are absent from the pane
+
+**medium** · `missing-behaviour` · reference byte **1,927,385**
+
+```
+function LSe(t,n){if(1&t){const e=Y();d(0,"div")(1,"h3"),v(2,"No Notes to display..."),u(),d(3,"button",119),x("click",function(){return D(e),E(g().newNote())}),v(4," New Note "),u()()}}
+```
+
+**Ours:** The gate exists in the reference as `O(44, o.appService.globals.sessionNotes ? 45 : 44)` (read at byte 2017944 inside the update block), i.e. slot 44 is `LSe` and slot 45 is the real pane. PresentationArea.svelte:724-770 renders `div#notes` with a single `{#if noteGates.surfaceVisible}<NotesPane …/>{/if}` and no `{:else}`, and NotesPane.svelte:304-352 renders `ul#notesTabs` with `{#each notes …}` and `div#notesTabsContent` with `{#if activeNote !== null}` — so a room whose notes have not loaded (or that has none) shows an empty `<ul>` and an empty `<div>`, with no heading and no in-pane creation affordance. A grep of the whole of src for `No Notes to display` returns nothing. The strip's cog dropdown still offers New Note (MainTabStrip.svelte:185-187 via `notes.mountNewNoteLink`), so this is a missing empty state rather than a lost capability.
+
+> Verified: I could not refute it. The reference pair is real and I re-read all three anchors myself: `LSe` at byte 1927385 renders `div > h3 "No Notes to display..."` plus `button[119]` labelled " New Note " wired to `g().newNote()`; the container declaration at byte 2015227 reads `d(43,"div",24),H(44,LSe,5,0,"div")(45,zSe,6,0),u()` (so slot 44 is t…
+
+### PA-05 — `app-webcam-holder` is rendered on mobile, where the reference host omits it entirely
+
+**medium** · `divergence` · reference byte **2,495,149**
+
+```
+function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),H(1,Y4e,7,1,"div",213)(2,Q4e,1,0,"app-positions-container"),T(3,"app-presentationarea",214),H(4,J4e,3,2,"button",215),u()),2&t){const e=g(2);z("size",e.presAreaSizeMobile),m(),O(1,e.modMessage&&e.appService.globals.isPresenter?1:-1)
+```
+
+**Ours:** The mobile host has four children and no `app-webcam-holder`; the desktop host `q4e` (2492999) has five and puts it first. Ours renders one component for both: PresentationArea.svelte:415-419 renders `<WebcamStrip …/>` unconditionally, and RoomShell.svelte:227-235 renders the SAME `presentationPane` snippet in both the `{#if split.isMobileScreen}` branch and the desktop branch, so there is no path that drops the strip. `previewWindowsVisible` (routes/+page.svelte:219, default true) is a presenter-facing hide-all switch, not a viewport gate. On a phone this costs the strip's vertical space in a column the reference deliberately keeps for the presentation.
+
+> Verified: I could not refute this. There is no viewport gate on the webcam strip anywhere in apps/room/src, in markup, in props, or in CSS.
+
+### PA-06 — Host child order: `app-webcam-holder` is node 1 in the reference, third in ours
+
+**low** · `divergence` · reference byte **2,492,999**
+
+```
+function q4e(t,n){if(1&t&&(d(0,"as-split-area",208),T(1,"app-webcam-holder"),H(2,$4e,7,1,"div",213)(3,z4e,1,0,"app-positions-container"),T(4,"app-presentationarea",214),H(5,W4e,3,2,"button",215),u())
+```
+
+**Ours:** PresentationArea.svelte emits, in source order inside `<as-split-area class="presentation-box">`: ModeratorMessage at :400, PositionsContainer at :408-414, WebcamStrip at :415-419, `<app-presentationarea>` at :420, PositionsControls at :951-957. So the reference's 1/2/3 becomes 2/3/1 — the camera strip lands under the moderator bar and the positions iframe instead of above them. The component's own comment at :399 cites `$4e` as being rendered "before app-presentationarea", which is true but does not settle the webcam strip's slot. Visual and reading order only; the four siblings are block-level in a flex column, so nothing else changes.
+
+> Verified: The literal sibling order divergence is REAL and I could not find it built anywhere. `WebcamStrip` is imported once (PresentationArea.svelte:53) and rendered once (PresentationArea.svelte:415), third among the five children of `<as-split-area class="presentation-box as-split-area">` (opens :382, closes :958): ModeratorMessage :400, Positi…
+
+### PA-07 — The speech-reco overlay is the LAST child of `.mainPresentationAreaHolder` in the reference, the first in ours
+
+**low** · `divergence` · reference byte **2,016,249**
+
+```
+H(86,n2e,1,2,"app-ytplayer",49)(87,i2e,1,1,"app-scplayer",50),T(88,"audio",51),H(89,u2e,9,7,"div",52),u())
+```
+
+**Ours:** The `u()` immediately after node 89 closes `.mainPresentationAreaHolder`, so the overlay is its final child, after ytplayer/scplayer/audio; its gate is `O(89,o.hasSpeechRecognitionEntries()&&o.showSpeechRecognition&&o.appService.globals.hasSpeechRecognition?89:-1)` at byte 2018393. PresentationArea.svelte:431-441 renders `<SpeechRecoOverlay>` FIRST inside `.mainPresentationAreaHolder`, before MainTabStrip (:455). Paint order is unaffected (`.speech-reco-overlay` is `position:absolute; z-index:9999`, component styles at 2018622), but the overlay's two `z-index:10000` buttons — transcript, history, close — now come before the whole tab strip in DOM and tab order. The file's own comment at :422-430 argues for placement inside the holder, correctly, but does not record that the reference puts it last.
+
+> Verified: Verified on both sides. In the reference the caption overlay is the LAST child of the holder: at byte 2016327 the create block ends `H(89,u2e,9,7,"div",52),u())`, immediately after `H(86,n2e,...,"app-ytplayer",49)(87,i2e,...,"app-scplayer",50),T(88,"audio",51)` (read at 2016100-2016500), and `u2e` is the overlay (defined at byte 1952943:…
+
+### PA-08 — Pane order inside `#mainTabsContent`: videoplayer sits after the two trade-alert panes in ours, before them in the reference
+
+**low** · `divergence` · reference byte **2,017,654**
+
+```
+O(47,o.hideVideoPlayer&&!o.isP||o.isP?47:-1),m(),O(48,o.hasSwingTradeAlerts?48:-1),m(),O(49,o.hasDayTradeAlerts?49:-1),m(),z("ngClass",ct(61,Hr,"presAreaTabs-files"==o.selectedMain
+```
+
+**Ours:** Reference pane order in `div#mainTabsContent` is screens(37), streams(40), notes(43), recordings(46), videoplayer(47), swingAlerts(48), dayTradeAlerts(49), files(50). Ours (PresentationArea.svelte) is screens(:469), streams(:647), notes(:724), swingAlerts(:781), dayTradeAlerts(:823), videoplayer(:858), files(:885) — videoplayer moved after the two alert panes. Only one pane carries `show active` at a time so nothing is visibly misplaced; it matters for tab/reading order and for anyone diffing the two templates by slot. Note the tab STRIP does keep the reference order (MainTabStrip.svelte:214 videoplayer, then swing, then day trades), so the strip and the content are ordered differently from each other.
+
+> Verified: Confirmed in both directions; I could not refute it. Reference creation block puts videoplayer (slot 47, factory `owe`) BEFORE swingAlerts (48, `vwe`) and dayTradeAlerts (49, `Iwe`), immediately followed by the files div at slot 50.
+
+---
+
+## PollPanel.svelte
+
+8 verified gaps; 56 reference behaviours confirmed present.
+
+### poll-01 — No sound is played when a poll arrives for answering
+
+**medium** · `missing-behaviour` · reference byte **2,507,038**
+
+```
+Service.appEventBus.subscribe("gotPoll",i=>{this.appService.globals.preferences.doNotDisturbOn||this.soundEffectsService.fileShare.play(),this.appService.guiEventBus.emit("doPollModal",{mode:"answer",
+```
+
+**Ours:** apps/room/src/routes/+page.svelte:621 is the whole of our poll-arrival path — `if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';` — and it plays nothing. `fileShare` is DECLARED in apps/room/src/lib/sound-effects.ts:8 and mapped to '/assets/sound/fileShare.mp3' at :27 (and the file exists at apps/room/static/assets/sound/fileShare.mp3), but `grep -rn fileShare apps/room/src` outside sound-effects.ts returns nothing: no caller anywhere. The doNotDisturb gate our siblings use (RoomOverlays.svelte:442 for qaAlert) has no poll counterpart.
+
+> Verified: I tried to find a poll-arrival sound under any name and could not. Our entire poll-arrival path is the effect at /home/user/trading-room-app/apps/room/src/routes/+page.svelte:623 — `if (polls.deliver(data.activePoll, data.user.id)) modals.modal = 'poll';` — and the decision it delegates to, `RoomPolls.deliver` (/home/user/trading-room-app…
+
+### poll-02 — A poll ending elsewhere does not close an open panel
+
+**medium** · `missing-behaviour` · reference byte **2,106,987**
+
+```
+pollChoicesTotals),this.calcPieData()}}),this.appService.appEventBus.subscribe("pollDone",()=>{this.hidePanel()})),this.showPanel()})
+```
+
+**Ours:** When the presenter ends the poll our server clears it and `data.activePoll` becomes null. apps/room/src/routes/+page.svelte:621 only calls `polls.deliver(null, id)`, which (apps/room/src/lib/room/polls.svelte.ts:99-103) clears `#deliveredId` and `#minimized` and returns false — it never sets `modals.modal = null`. `modals.closeActive()` (modals.svelte.ts:146-155) is reached only from the user's own close button. PollPanel's `mode`, `pollQuestion` and `pollChoices` are local `$state` assigned once in `resetModeForOpen` (PollPanel.svelte:139-158) and are not recomputed from `activePoll`, so an answerer who has not yet voted keeps a fully interactive panel for a poll that no longer exists; `sendAnswer` (:280-287) would then POST `sendPollAnswer` against it.
+
+> Verified: I could not find any counterpart in apps/room/src. The only path from `data.activePoll` to the modal layer is the `$effect` at src/routes/+page.svelte:620-624, which can only SET `modals.modal = 'poll'`; the null branch of `RoomPolls.deliver` (src/lib/room/polls.svelte.ts:99-103) clears `#deliveredId` and `#minimized` and returns false, s…
+
+### poll-03 — Pie-slice labels are placed on a container-relative ellipse, not at 0.8 of the pie radius
+
+**low** · `wrong-constant` · reference byte **2,104,707**
+
+```
+const EB={series:{pie:{show:!0,innerRadius:0,label:{show:!0,radius:.8,color:"#FAFAFA",formatter
+```
+
+**Ours:** apps/room/src/lib/components/PollPanel.svelte:446-454 (`labelStyle`) positions each label at `left = 50 + cos(angle) * 32` percent and `top = 50 + sin(angle) * 32` percent of the #pollPieChart box. The box is 100% wide by a fixed 300px tall, so 32% is ~173px horizontally and ~96px vertically — an ellipse — whereas the reference's `radius: .8` places labels on a CIRCLE at 0.8 x the pie radius (our own pie radius at PollPanel.svelte:427 is `min(width,height)/2 - 10`, so 0.8 x that = ~112px in both axes). The percentage 32 appears nowhere in the reference; I searched the bundle for `radius:.8` (found only at 2104767, inside EB) and for the literal `32` in that object (absent).
+
+> Verified: Our label placement is genuinely container-percentage based and unrelated to the pie radius. PollPanel.svelte:446-454 computes `left = 50 + cos(angle)*32` and `top = 50 + sin(angle)*32` and emits them as `%` of #pollPieChart, whose box is declared `width: 100%; height: 300px` at PollPanel.svelte:736-739 — so the label ring is an ellipse (…
+
+### poll-07 — Dragging does not snap (jQuery UI snap:true)
+
+**low** · `missing-behaviour` · reference byte **2,108,197**
+
+```
+initDrag(){$("#pollModalCompHolder").draggable({appendTo:"body",containment:".wrapper",handle:"#pollPanelTitlebar",cursor:"move",scroll:!1,snap:!0,cancel:"input, textarea, button, select, .poll-panel-controls"})
+```
+
+**Ours:** apps/room/src/lib/components/PollPanel.svelte:341-364 (`movePointer`, drag branch) clamps the panel to the wrapper rectangle — that is `containment: ".wrapper"` — but there is no snapping to other `.ui-draggable` elements at all. `grep -rn snap apps/room/src/lib/components/PollPanel.svelte` returns nothing. `handle`, `cursor:"move"` (via the .poll-panel-titlebar CSS), `scroll:!1` (pointer events, no scroll) and the full `cancel` list (:257 DRAG_CANCEL) are all present.
+
+> Verified: I could not refute this. PollPanel.svelte's drag branch clamps only — `panelLeft = Math.min(bounds.left + bounds.width - panelWidth, Math.max(bounds.left, pointerState.left + dx))` and the matching `panelTop` — with no tolerance band and no snap of any kind.
+
+### poll-08 — Choice input commits on keydown, reference on keyup
+
+**low** · `divergence` · reference byte **2,113,811**
+
+```
+.e. Up, Down, Sideways)",1,"form-control",3,"ngModelChange","keyup.enter","ngModel"]
+```
+
+**Ours:** apps/room/src/lib/components/PollPanel.svelte:586-589 binds `onkeydown={(event) => { if (event.key === 'Enter') addChoice(); }}`. The reference binds `(keyup.enter)`. Observable difference is one frame plus behaviour under key-repeat: holding Enter on ours adds a choice per repeat, on the reference only on release.
+
+> Verified: Our PollPanel binds the choice-commit to keydown; the reference const table binds keyup.enter, and nothing in our tree supplies keyup timing for this control. Searched exhaustively: `grep -rn "keyup"` over apps/room/src returns only RoomSidebar.svelte:643 (onkeyup={onusersearchkey}) and ModalHost.svelte:5620 — nothing in PollPanel; `pollC…
+
+### poll-09 — No localStorage "savedPolls" legacy migration
+
+**low** · `missing-behaviour` · reference byte **2,111,310**
+
+```
+Polls",{savedSessionPolls:JSON.stringify(e)}),this.savedPolls=e,this.appService.localstorage.deleteKey("savedPolls")
+```
+
+**Ours:** Saved polls are a server table in this app: apps/room/src/lib/server/db/schema.ts:382 (`saved_polls`), loaded at apps/room/src/routes/+page.server.ts:629-635 and written by the `savePoll` / `deleteSavedPoll` form actions (:1408, :1432); the panel receives them as the `savedPolls` prop (PollPanel.svelte:30). There is no `localStorage` read of the key "savedPolls" anywhere — `grep -rn "'savedPolls'" apps/room/src` hits only the tab id at PollPanel.svelte:549 and :668. Deliberate: the reference's one-shot LS→server migration has no legacy data to migrate here, and deleteSavedPoll is by row id rather than array index + full JSON resend.
+
+> Verified: The reference behaviour is real and I read it: at offset 2111003 the bundle defines `loadPollsFromLS(){try{return JSON.parse(this.appService.localstorage.get("savedPolls",[]))}catch{return[]}}`, and `loadPollsFromStorage()` immediately after promotes a non-empty legacy list to the server (`sendServerCommand("savedSessionPolls",{savedSessi…
+
+### poll-10 — savePollResults() has a formatter but no Blob/saveAs download
+
+**low** · `divergence` · reference byte **2,112,115**
+
+```
+var s="Poll Results ",r=new Blob([e],{type:"text/plain"});s+=(new Date).toDateString(),kTe.saveAs(r,s+".txt",!0)
+```
+
+**Ours:** apps/room/src/lib/poll-behavior.ts:114-125 (`formatPollResultsDownload`) reproduces the exact payload — results text + "\n\nUser Responses:\n" + archive rows in the `n: [nick - xref ]: choice` form (:100-112) — but nothing constructs a Blob or calls saveAs: `grep -rn "saveAs|file-saver" apps/room/src` returns nothing, and the function's only importer is apps/room/src/lib/poll-behavior.test.ts:12. This matches the reference's own reachability: I read all nine template functions (ATe/PTe/RTe/ITe/OTe/NTe/LTe/BTe/UTe, 2101231-2104700) and none binds savePollResults; consts entry 48 (2115154 region) is a click-less duplicate of entry 52 used only as the ɵɵconditional placeholder. Recorded as a divergence, not a missing user-facing control.
+
+> Verified: I could not find any Blob/saveAs download of poll results anywhere in apps/room/src, and the claim as written is accurate. What I searched (all under /home/user/trading-room-app/apps/room/src unless noted):
+1.
+
+### poll-11 — Responses textarea has no trailing newline; redraw is rAF not a 100 ms timer
+
+**low** · `divergence` · reference byte **2,106,688**
+
+```
+nses+=this.total+": ["+i.senderNick+" - "+i.x+" ]: "+s+"\n",$("#responsesTxt").append(this.total+": ["+i.senderNick+"]: "+s+"\n")
+```
+
+**Ours:** Two small timing/format divergences in one row. (a) apps/room/src/lib/poll-behavior.ts:88-98 (`formatVisiblePollResponses`) builds the ON-SCREEN rows in exactly the reference's short form `${index+1}: [${senderNick}]: ${choice}` — correctly NOT the longer archive form — but `.join('\n')` omits the trailing newline the reference's per-row append leaves. (b) The reference re-plots with `setTimeout(()=>this.calcPieData(),100)` after restore and after maximize when mode=="results" && total>0 (read at 2109067); ours has no such call in `restorePanel` (PollPanel.svelte:184-198) or `toggleMaximize` (:211-231) — the redraw comes from the `$effect` at PollPanel.svelte:474-497 which subscribes to panelWidth/panelHeight/pieData and schedules `requestAnimationFrame(drawPieChart)` (:495). A maximize changes panelWidth so it does redraw, one frame earlier; a plain restore-from-minimize changes neither dimension and does not redraw, which is safe for us (a canvas keeps its bitmap across display:none) where flot needed the re-measure.
+
+> Verified: I could not refute this row; I confirmed both reference quotes by reading the bytes and then failed to find either behaviour anywhere in apps/room/src. (a) TRAILING NEWLINE — genuinely absent, and pinned absent.
+
+---
+
+## FilesPane.svelte
+
+7 verified gaps; 51 reference behaviours confirmed present.
+
+### FP-01 — Opening the Files MAIN tab does not refetch the file list
+
+**low** · `missing-behaviour` · reference byte **1,968,369**
+
+```
+"presAreaTabs-files"==this.selectedMainTab&&this.getSessionFiles()
+```
+
+**Ours:** Read at 1968369 in `onMainTabChange(e)` — selecting the Files main tab re-runs `getSessionFiles()` (and the videoplayer tab re-runs `loadVideos()`). Our main tab strip only assigns the tab: `onclick={() => (mainTab = 'files')}` at src/lib/components/MainTabStrip.svelte:331 (and :348 / :354 for the dropdown paths); grep for `getSessionFiles`, `invalidate`, `refresh` across MainTabStrip.svelte returns nothing. The list is only refreshed by the 5s `invalidate('room:data')` poll and by the Refresh button (FilesPane.svelte:253), so a viewer who opens the pane sees data up to 5s stale rather than a fetch on open. Functionally covered by the poll, which is why this is not high.
+
+> Verified: Opening the Files main tab genuinely does not trigger a file-list refetch in our source. MainTabStrip.svelte's Files handlers assign `mainTab` (and toggle the cog dropdown) and nothing else; FilesPane.svelte contains zero `$effect`, zero `onMount` and zero `{@attach}`, so becoming visible runs no code; `mainTab` is a plain `$state` in +pa…
+
+### FP-03 — Active pane class string is emitted in a different order than the reference helper produces
+
+**low** · `divergence` · reference byte **1,916,418**
+
+```
+Hr=t=>({"show active":t})
+```
+
+**Ours:** Read at 1916418; the pane binds it at 2017799 (`z("ngClass",ct(61,Hr,"presAreaTabs-files"==o.selectedMainTab))`), and const 29's static class is `tab-pane fade`, so the rendered attribute is `tab-pane fade show active`. src/lib/components/FilesPane.svelte:84 emits `'tab-pane fade active show'`. Same class set, different attribute text — a byte-for-byte DOM diff against a capture reports it.
+
+> Verified: I could NOT refute this: FilesPane.svelte:84 really does emit 'tab-pane fade active show', and I found no helper, no test and no doc anywhere in apps/room/src that emits the reference-helper order for this pane. Searched for showActive/SHOW_ACTIVE/paneClass/tabPaneClass (no hits), read files-pane-contract.test.ts (its only #files-root ass…
+
+### FP-05 — Tab click handler is duplicated on both the <li> and the <a>; the reference has it on the <li> only
+
+**low** · `divergence` · reference byte **2,015,447**
+
+```
+d(53,"a",32)(54,"span"),v(55,"Files")
+```
+
+**Ours:** Read the whole strip at 2015380-2015900: the listener is `x("click",...)` attached after `d(52,"li",31)` etc., and const 32/34/35 (read at 1996545) carry only `ngClass` — the anchors have NO click and NO keydown. FilesPane.svelte:96 puts `onclick` on the `<li>` (correct) AND FilesPane.svelte:108/135/162 put the same `onclick` on the `<a>`, plus an `onkeydown` at :109/:136/:163. The anchor click bubbles to the li, so the handler runs twice per anchor click; the assignment is idempotent so nothing observable breaks. The keydown is a deliberate keyboard-operability addition (the reference's anchors are not keyboard operable).
+
+> Verified: I tried to refute this and could not. Our source really does carry the same tab-select click on BOTH the `<li>` and the `<a>`, three times over, and nothing anywhere in apps/room/src removes, extracts or justifies the anchor half.
+
+### FP-06 — onFileTabChange's console.log side effect is not reproduced
+
+**low** · `missing-behaviour` · reference byte **1,960,015**
+
+```
+onFileTabChange(e){console.log("tab",e),this.selectedFileTab=e}
+```
+
+**Ours:** Read verbatim at 1960015. Ours assigns straight through the setter — FilesPane.svelte:96/123/150 write `files.fileTab = …`, and the setter is src/lib/room/files.svelte.ts:175-177 with no logging. A debug `console.log` left in a shipped bundle; recorded for completeness, not something to add.
+
+> Verified: Could not refute. I read the reference bytes myself: at offset 1960015 the bundle reads verbatim `onFileTabChange(e){console.log("tab",e),this.selectedFileTab=e}ngAfter` (token occurs 4x; this is the first).
+
+### FP-09 — Search term is trimmed here and is not trimmed in the reference's filter pipe
+
+**low** · `divergence` · reference byte **1,914,488**
+
+```
+transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>{let s=!1;return"string"==typeof o?o.toLowerCase().indexOf(i)>=0:(Object.keys(o).forEach(r=>{let a=o[r];"string"==typeof a&&a.toLowerCase().includes(i)&&(s=!0)}),s)})):e:[]}
+```
+
+**Ours:** Read verbatim at 1914488 (registered `name:"filter"` at 1914797). It lower-cases the term and does NOT trim it, so typing a single space filters to rows whose text contains a space. src/lib/room/files.svelte.ts:259 does `this.#fileSearch.trim().toLowerCase()`, so a whitespace-only query matches everything instead. Everything else matches: any string-valued own property, case-insensitive substring, empty term returns the list unchanged.
+
+> Verified: Confirmed divergence; I could not find any implementation in our source that omits the trim. The reference `filter` pipe (read verbatim at offset 1914488, registered `name:"filter"` at offset 1914797, composed into the files table at offset 1951092 as `pt(rg(16,9,Ct(15,6,e.sessionFiles,e.filesSearch),e.fileSortField,e.fileSortDir))`) does…
+
+### FP-12 — In-file comments cite const numbers that do not match THIS bundle
+
+**low** · `wrong-constant` · reference byte **1,946,166**
+
+```
+function Lwe(t,n){if(1&t){const e=Y();d(0,"button",241),x("click",function(){return D(e),E(g().stopMp3ForAll())}),T(1,"i",157),v(2,"Stop Playing For All "),u()}}
+```
+
+**Ours:** Read verbatim at 1946166: the Stop-Playing-For-All icon is const 157, and `[1,"fa","fa-play-circle","mr-2"]` sits at 2004368. Our comment at FilesPane.svelte:276 says 'its const 158'. Likewise FilesPane.svelte:507 says the two alert-sound buttons are 'consts 261/262/263'; in this bundle they are 260/261 (no-click) and 267/269 (with click), with 268 the bell icon — read in the row views at 1947897 (`d(0,"button",267)...T(1,"i",268)`) and 1948105 (`d(0,"button",269)...T(1,"i",144)`). Every transcribed VALUE is correct; only the index citations are stale, consistent with those comments citing the absent `app-presentationarea.full.js` capture rather than this bundle. The same class of staleness applies to the `full.js:NNNN` line numbers throughout the file and to `docs/decoded/files-sort-bar.md`, neither of which exists in this checkout and neither of which I could verify.
+
+> Verified: I could not refute it. The const-index citations in FilesPane.svelte's comments genuinely do not match this bundle, and I confirmed it by reading both bundles rather than trusting the claim.
+
+### FP-13 — Row/tab classification reads a stored `kind` column, not contentType at render time
+
+**low** · `divergence` · reference byte **1,949,656**
+
+```
+function e2e(t,n){if(1&t&&(d(0,"tr"),H(1,Zwe,24,17),u()),2&t){const e=n.$implicit,i=g(2);m(),O(1,"files"==i.selectedFileTab&&e.hasOwnProperty("contentType")&&-1==e.contentType.indexOf("image/")&&-1==e.contentType.indexOf("audio/")||"images"==i.selectedFileTab&&e.hasOwnProperty("contentType")&&e.contentType.indexOf("image/")>=0||"sounds"==i.selectedFileTab&&e.hasOwnProperty("contentType")&&e.contentType.indexOf("audio/")>=0?1:-1)}}
+```
+
+**Ours:** Read verbatim at 1949656. The reference discriminates at render from `contentType` with `indexOf(...)>=0` (substring anywhere) and additionally guards `hasOwnProperty('contentType')`. Ours stores the decision once at upload — `kindForContentType` uses `startsWith` (src/lib/server/file-storage.ts:38-41), written into `shared_files.kind` (src/routes/files-pane.remote.ts:246) — and the template/gates read `item.kind` (FilesPane.svelte:395 via `matchesFileTab`, files.svelte.ts:235-237; and :431, :452, :481, :495). Identical for well-formed content types; they part company only for a value like `application/x-image/foo`, and a row whose contentType changes after upload is not reclassified. The one place we kept the reference's own test is `alertSoundButtonFor`, which still uses `contentType.indexOf('audio/') < 0` (src/lib/files-gates.ts:82) — so the pane mixes the two predicates.
+
+> Verified: Could not refute. I searched apps/room/src exhaustively for any render-time contentType classification (grep for `contentType`, `indexOf(`, `image/`, `audio/`, `startsWith`, `hasOwnProperty`, `matchesFileTab`, `countFiles`, `kindForContentType`, `sharedFiles`) and the claim holds line for line.
+
+---
+
+## ModalHost: connectivity / AV test modal
+
+5 verified gaps; 61 reference behaviours confirmed present.
+
+### CONN-01 — The entire "Mobile App" tab is absent: tab button, body, and the `restoreMobileAppTokens` server command
+
+**high** · `missing-control` · reference byte **2,445,023**
+
+```
+onTabChange(e){e!==this.activeTab&&("mic"===this.activeTab&&this.cleanupMicTest(),this.activeTab=e)}restoreMobileAppTokens(){this.appService.sendServerCommand("restoreMobileAppTokens",{}),bootbox.alert("Command sent successfully, check your mobile device for a test notification")}
+```
+
+**Ours:** ModalHost.svelte:775 declares `let activeConnectivityTab = $state<'network' | 'mic'>('network')` — there is no third tab in the union. ModalHost.svelte:5635-5658 renders exactly two `<li class="nav-item">` entries (Network Test, Mic Test). ModalHost.svelte:5660/5714 branch on those two only. Grep over apps/room/src for `restoreMobileAppTokens`, `mobile-app-container`, `Restore Connectivity` and `fa-mobile-alt` returns ZERO hits (the only 'Mobile App' matches are the unrelated sidebar 'Mobile App Info' PIN item at RoomSidebar.svelte:251 and the navbar 'Launch in Mobile App' at RoomNavbar.svelte:243). The reference body is one blurb plus one `btn btn-primary` labelled ' Restore Connectivity ' (icon `fas fa-sync-alt me-1`, container `.mobile-app-container`, consts at offsets 2453564/2453625, click handler at 2438516). Note: apps/room/docs/source-v4-2026-08-15/README.md:69 already records `mobile-app-container · mobile · restoreMobileAppTokens · fa-mobile-alt` as strings ADDED in v4, so this is a v4 feature we never transcribed. Also note it is a push-token restore action, not a connectivity test.
+
+> Verified: I could not find any implementation of the Mobile App tab in apps/room/src, under its own name or any rename. ModalHost.svelte:795 declares `let activeConnectivityTab = $state<'network' | 'mic'>('network')` and ModalHost.svelte:859 `onConnectivityTabChange(tab: 'network' | 'mic')` — a two-member union with no third member; the tablist at…
+
+### CONN-02 — For a non-presenter the reference modal has NO tab we render — Mobile App is its only tab and its default; ours shows them the Network tab instead
+
+**medium** · `missing-behaviour` · reference byte **2,456,395**
+
+```
+2&i&&(m(5),O(5,o.appService.globals.isPresenter?5:6),m(4),z("ngIf",o.appService.globals.isPresenter),m(2),Tt("active","mobile"===o.activeTab),m(3),z("ngIf",o.appService.globals.isPresenter)
+```
+
+**Ours:** Read at offset 2456395 (update block) together with the create block at 2456100: `H(9,hAe,4,2,"li",8)` (Network Test tab) and `H(14,pAe,4,2,"li",8)` (Mic Test tab) are BOTH behind `ngIf isPresenter`; only the inline `d(10,"li",9)` Mobile App tab is unconditional. Ours inverts the first of those: ModalHost.svelte:5636-5646 renders the Network Test tab unconditionally and only ModalHost.svelte:5645-5657 (`{#if isPresenter}`) gates the Mic Test tab. A non-presenter in our build therefore sees and can run the WebRTC test, which the reference never exposes to them.
+
+> Verified: I could not find a presenter gate on the Network Test tab anywhere in apps/room/src. The reference gates BOTH the Network Test tab and the Mic Test tab behind ngIf isPresenter and leaves only the Mobile App tab unconditional; our ModalHost renders the Network Test tab unconditionally, has no Mobile App tab in this modal at all, and applie…
+
+### CONN-03 — Initial-tab rule is not conditional on isPresenter
+
+**medium** · `missing-behaviour` · reference byte **2,444,097**
+
+```
+this.isPlayingBack=!1,this.playbackAudio=null,this.activeTab=this.appService.globals.isPresenter?"network":"mobile"}ngOnInit(){this.setupModalResetListene
+```
+
+**Ours:** ModalHost.svelte:775 `let activeConnectivityTab = $state<'network' | 'mic'>('network')` — a constant initial value with no presenter branch, and the `$effect` that runs when the modal opens (ModalHost.svelte:1969-1978) resets test state but never sets the tab. Downstream of CONN-01: with no 'mobile' tab there is nothing for a non-presenter to default to.
+
+> Verified: Not built, and I could not find it under any other name. Our initial tab is a bare literal: ModalHost.svelte:796 `let activeConnectivityTab = $state<'network' | 'mic'>('network')`, with no presenter term anywhere in its lifetime.
+
+### CONN-04 — Modal title is hard-coded; the reference swaps it on isPresenter
+
+**medium** · `missing-behaviour` · reference byte **2,433,777**
+
+```
+function dAe(t,n){1&t&&v(0," Connectivity/Mic Troubleshooter ")}function uAe(t,n){1&t&&v(0," Connectivity Troubleshooter ")}function hAe(t,n){if(1&t){const e=Y();d(0,"li"
+```
+
+**Ours:** ModalHost.svelte:5628 `title="Connectivity/Mic Troubleshooter"` — one literal. The reference selects between the two template fns with `O(5,o.appService.globals.isPresenter?5:6)` (read at offset 2456395), so a non-presenter is shown ' Connectivity Troubleshooter ' — no '/Mic' — which is consistent with them having no Mic tab. Ours promises a mic troubleshooter to a viewer who (correctly, per ModalHost.svelte:5645) cannot see one.
+
+> Verified: I could not disprove it. Our connectivity modal passes a single string literal `title="Connectivity/Mic Troubleshooter"` to `Modal`, and `Modal.svelte` renders `{title}` verbatim (line 128) — the `header` snippet that could override it is NOT passed by the connectivity modal (it passes only `title`, `titleClass`, `titleTag`, `beforeBody`,…
+
+### CONN-07 — Second sidebar label variant 'Connectivity/Mic Check' is not rendered anywhere
+
+**low** · `missing-behaviour` · reference byte **2,576,810**
+
+```
+d(36,"li",26)(37,"a",27),T(38,"i",28),d(39,"span",29),v(40,"Connectivity/Mic Check"),u()()(),d(41,"li",26)(42,"a",30),T(43,"i",31),d(44,"span",29),v(45,"General Settings"),u()()(),
+```
+
+**Ours:** RoomSidebar.svelte:290-297 renders `title="Connectivity Check"`, icon `fas fa-network-wired`, `<span class="pl-2">Connectivity Check</span>` — matching the reference's OTHER shell (label at offset 2470954, consts at 2534049 and 2572801). The bundle carries two shells with different labels for the same target; we implement one. Grep for 'Connectivity/Mic Check' across apps/room/src returns zero. Cosmetic, and only relevant if the second shell is a surface we are meant to build.
+
+> Verified: I could not refute it: the literal 'Connectivity/Mic Check' is genuinely absent from our source. Searched apps/room (not just src) for the exact literal, 'Connectivity/Mic', case-insensitive 'mic check'/'miccheck'/'mic-check', '/Mic' and 'Mic/', plus the shell that owns it ('app-closed-session-page', 'closed-session', 'closedSession', 'se…
+
+---
+
+## day-trade-alerts + swing-alerts panes
+
+5 verified gaps; 72 reference behaviours confirmed present.
+
+### dta-01 — Edit button does not flash the composer form (`animated flash`, 500 ms) in either pane
+
+**medium** · `missing-behaviour` · reference byte **1,988,722**
+
+```
+ii(".day-trade-alert-form").addClass("animated flash");const s=setTimeout(()=>{ii(".day-trade-alert-form").removeClass("animated flash"),clearTimeout(s)},500)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:135-137 — `requestEdit(row)` only does `draft = dayTradeAlertDraftFrom(row)`; the swing twin does the same at apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte (same `requestEdit` shape). `grep -rn "animated flash" apps/room/src` returns exactly one hit, apps/room/src/lib/components/RoomNavbar.svelte:327 (the recording indicator) — nothing in either pane, either form, or any .ts module. Neither pane's comments record the flash as a deliberate omission, so it is unrecorded rather than declined. The swing half of the same behaviour is at bundle byte 1,984,526 (`ii(".swing-alert-form").addClass`, read this session). Consequence: the form sits ABOVE a table that can be scrolled; clicking Edit on row 30 fills a composer with no visible acknowledgement.
+
+> Verified: The Edit-button flash is genuinely absent from both panes. `requestEdit` in each pane sets the composer draft and does nothing else, and no flash exists anywhere else in the chain: no `use:` action on either form, no scrollIntoView/focus, no helper (`flashElement`/`addClass(`), no `*FLASH*` constant other than the unrelated SSE `RECONNECT…
+
+### dta-02 — Image-preview lightbox has no `Download Image` button in either pane
+
+**medium** · `missing-control` · reference byte **1,992,730**
+
+```
+showImagePreview(e,i=""){e&&bootbox.dialog({title:i,message:`…<img src="${e}" class="img-fluid" alt="${e}" />…`,size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download Image',className:"btn-primary btn-sm m-auto",callback:()=>(fetch(e).then(o=>o.blob()).then(o=>{const s=document.createElement("a");s.href=URL.createObjectURL(o);let r=e.split("/").pop()||"image.jpg";r=r.replace(/^[^_]+_/,"").replace(/_[^_]+(\.[^.]+)$/,"$1"),s.download=r,…
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:446-451 (and SwingAlertsPane.svelte:420-425) render `<BootboxDialog mode="alert" message="">` wrapping only `<div class="text-center"><img class="img-fluid" …/></div>` — the dialog's only control is the default OK. The reference dialog's ONLY button is the download one. The capability already exists in this repo and is simply not routed to from these panes: `modals.downloadImage(url)` at apps/room/src/lib/room/modals.svelte.ts:219-238 reproduces the same filename derivation (`replace(/^[^_]+_/, '').replace(/_[^_]+(\.[^.]+)$/, '$1')`) and apps/room/src/lib/components/RoomOverlays.svelte:812-816 renders the `<i class="fa fa-download"></i> Download Image` button for the chat/imgur preview. Both panes' own comments (DayTradeAlertsPane.svelte:440-445, SwingAlertsPane.svelte:415-419) transcribe the message markup and the empty title but omit the `buttons` block entirely, so the omission is unrecorded.
+
+> Verified: I tried to refute this and could not. In apps/room/src the string "Download Image" occurs EXACTLY ONCE in the entire tree (RoomOverlays.svelte:840), and that button is wired to `modals.selectedImageUrl` / `modals.downloadImage(...)` — the imgur/chat lightbox at RoomOverlays.svelte:806-845 — not to the alert panes.
+
+### dta-04 — Paste-to-upload confirm has no `Upload this image?` question in either pane
+
+**medium** · `missing-behaviour` · reference byte **1,992,250**
+
+```
+onImagePaste(e,i){…bootbox.confirm({message:'<div class="text-center"><h4>Upload this image?</h4><img style="max-width:100%; max-height: 50vh;" src="'+a+'" /> </div>',callback:l=>I(function*(){l?(yield o.doImggurUpload(r,i),…
+```
+
+**Ours:** apps/room/src/lib/components/RoomOverlays.svelte:682-694 (day trade) and 650-662 (swing) render `<BootboxDialog mode="confirm" message="">` whose whole body is `<div class="text-center"><img src={previewUrl} class="img-fluid" alt="Pasted screenshot" /></div>` — no `<h4>Upload this image?</h4>`, so the presenter sees an unlabelled OK/Cancel over a picture. (Secondary, cosmetic: the reference sizes that preview inline at `max-height:50vh`, ours inherits `.img-fluid`'s 70vh.) The paste detection itself matches — DayTradeAlertForm.svelte:71-81 keeps the LAST clipboard item whose type starts with `image`, exactly as `0===a.type.indexOf("image")` does, and does not preventDefault.
+
+> Verified: I could not refute this. The `<h4>Upload this image?</h4>` heading exists in our source in exactly ONE place — `apps/room/src/lib/components/PostAlertModal.svelte:513`, the composer's own paste confirm — and nowhere else.
+
+### dta-03 — Image-preview lightbox is not opened at `size:"large"`
+
+**low** · `missing-behaviour` · reference byte **1,992,730**
+
+```
+size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download Image'
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:447 and SwingAlertsPane.svelte:421 call `<BootboxDialog mode="alert" …>` with no `className`; BootboxDialog accepts a `className` prop (apps/room/src/lib/components/BootboxDialog.svelte:11 and 24-33) and `modal-lg` is what the repo uses for a bootbox `size:"large"` elsewhere (apps/room/src/lib/components/ModalHost.svelte:3993 and 4100, apps/room/src/lib/components/RoomOverlays.svelte:792). So the alert screenshot opens in a default-width modal where the reference opens a large one. Cosmetic only — `.img-fluid {max-height:70vh}` still bounds the image.
+
+> Verified: I could not find the large-size image lightbox implemented anywhere for these two panes. The reference's showImagePreview opens bootbox with size:"large" (bootbox puts modal-lg on the .modal-dialog element).
+
+### dta-05 — Linked-room log override (`linkedRoom${e}AlertsOther`) is deliberately not carried
+
+**low** · `divergence` · reference byte **1,993,565**
+
+```
+let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),this.appService.sendServerCommand(`get${e}AlertsLog`,{sessionID:s||this.appService.globals.sessionID,days:i})
+```
+
+**Ours:** apps/room/src/routes/api/day-trade-alerts/+server.ts:20-31 documents the omission and takes the room from the session row instead of the request; the twin note is at apps/room/src/routes/api/swing-alerts/+server.ts:21-25 and the setting is explicitly excluded from the room config in apps/room/src/lib/server/room-config-client.ts:452 and :480. `apps/room/src/lib/room/trade-alerts.svelte.ts:219-223` fetches `${endpoint}?days=…` with no session parameter. A room configured upstream to mirror another room's alert log will show its own log here. Recorded as a deliberate, security-motivated divergence rather than an oversight (the same offset 1,010,164 initial-load path is likewise not carried).
+
+> Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
+
+---
+
+## The fifty-one refuted claims
+
+Kept, not deleted. A future reader who re-derives one of these from the same offset should find it
+here first.
+
+| # | claim | verdict | why |
+| --- | --- | --- | --- |
+| G10 | Room-wide media outage is silent — no "Reconecting audio/video..." alert on `webRTCServerDisconnected` | `already-built` | The room-wide media-outage alert is built, under the reference's own live event name. The claimed handler `webRTCServerDisconnected` is DEAD CODE in the reference: I read the bytes at the cited offset and then searched the entire bundle — the string occurs exactly once (as a `subscribe`), and `emit("webRTC…")` yields o… |
+| G15 | `.alert-chat-box` hover does not hide the main tab strip | `not-in-reference` | The quoted string IS at offset 2499976 verbatim — the claim is not fabricated. But the evidence does not support the behaviour claimed, because the handler is dead code on both ends. |
+| G18 | The room-reset dialog uses a different sentence from `resetSession` | `already-built` | The claimed divergence does not exist. Our room-reset dialog is a VERBATIM transcription of the reference sentence belonging to the command it implements, and the byte citation the claim calls "a different component's string" is in fact exact. |
+| USM-16 | Theme radios use a simplified checked expression | `already-built` | This is not an unnoticed simplification — it is a pre-existing, fully documented, deliberate divergence, and the two settings the claim says are "unmodelled" are in fact modelled end-to-end. 1. |
+| UIM-14 | 'Give Mic/Screenshare' and 'Take away' buttons are invented — the reference binds giveMicScreen from no template chunk of this component | `already-built` | Not actionable — the affordance is implemented AND the divergence it flags is already declared in-source, in the same words, at the exact lines. I must be plain about one thing first: I did NOT refute the reference-side half of the claim, I CONFIRMED it. |
+| UIM-15 | 'Upload Profile Picture' is an inert button — the whole admin upload dialog is absent | `already-built` | Built end-to-end on 2026-08-29 and the claim's core premise is factually wrong. The button does NOT dispatch onUserAction('upload-profile-picture', ...) — that action string has ZERO hits anywhere in apps/room/src (grep -rn "'upload-profile-picture'" src/ returns nothing), because the control was deliberately given its… |
+| CONN-05 | ICE server set replaced, plus an added `unconfigured` TURN state and an `ice-source` provenance line — deliberate, documented, and test-pinned | `already-built` | All three parts of the claimed divergence are present in our source, implemented, documented and test-pinned; the claim's own cited line numbers are stale by ~200 lines but every element is there under the same names. (1) ICE-server replacement: `ModalHost.svelte:939-947` sets `const usingDeploymentServers = mediaIceSe… |
+| CONN-06 | loadMicDevices is not called at component init, only when the modal opens | `already-built` | The claim's factual description of both sides is correct, but its conclusion ("plausibly deliberate, but I found no comment in our source claiming it — worth confirming rather than silently keeping") is refuted. This is not an undocumented drift; it is a decided, written-down, test-enforced repository contract, so ther… |
+| SRCH-04 | Search payload omits traders, rooms and isArchived; the reference sends all seven fields and substitutes userSessions for empty rooms | `already-built` | The gap is stated as "payload omits traders, rooms and isArchived", but two of the three are built here under another name/location, and the third has nothing to filter. (1) TRADERS is fully implemented — `filterAlerts` applies exactly the reference's trader predicate (`Object.keys(search.traders)` matched against `sen… |
+| SRCH-06 | Advanced Search toolbar button is rendered unconditionally; the reference gates it on sessData.advancedSearchAlerts | `not-in-reference` | The offset is genuine — at byte 2043065 the bundle really does contain the quoted text — but the evidence does not support the claim as stated. The claim says the reference gates the button on `sessData.advancedSearchAlerts`; the actual gate is a CONJUNCTION: `O(6, e.appService.globals.sessData.advancedSearchAlerts &&… |
+| note-editor-dropdown-open-class | No counterpart to the note-dropdown-open positioning fix | `not-in-reference` | The quoted bytes ARE at the offset — I read them and they match verbatim — but they do not support the gap, because the handler is dead on the path it claims to fix. What is actually at 1471155-1471700 (app-note component, ngAfterViewInit): `const e=Array.from(document.querySelectorAll("#notes .dropdown-toggle"));for(l… |
+| acA-03 | The whole chat toolbar (.chatToolbar) has no counterpart: chat search form, save, archive, Mod Only, Detach Chat | `already-built` | The claim's factual premises are false at the exact lines it cites. (1) "AlertChatArea.svelte has no .chatToolbar element at all" — it does: AlertChatArea.svelte:819 renders `<div class="shadow p-2 w-100 chatToolbar" style="margin-top: 0px;">`, byte-for-byte the reference's const 21 `[1,"shadow","p-2","w-100","chatTool… |
+| acA-09 | "Advanced Search" is rendered unconditionally where the reference gates it on advancedSearchAlerts | `not-in-reference` | Refuted on two independent grounds. (1) The cited offset is wrong: the quoted expression does not begin at 2042677; s.find() places it at 2043008 (bare token `advancedSearchAlerts` at 2043042, its single occurrence in the bundle). |
+| acA-10 | No mouseenter/mouseleave on .alert-chat-box hiding the main tab strip's nav-tabs | `not-in-reference` | The quoted string IS present verbatim at the claimed offset — the offset is not fabricated — but it is DEAD CODE, so it does not support the claim that the reference hides the main tab strip's nav-tabs on hover. The hide/show target `.mainTabset ul.nav-tabs` is a descendant selector that matches zero elements: `mainTab… |
+| acA-13 | The composer/Chat-Disabled switch drops the isConnected term | `not-in-reference` | The quoted text IS at the offset verbatim, but it does not support the claim: the `isConnected` term is a branch that can never be false. On the chat component the field is initialised `this.isConnected=!0` (byte 1428863) and is written ONLY by two event-bus subscriptions, `subscribe("socketDisconnected",...=!1)` and `… |
+| RM-09 | Compact Trial badge text is "Trial" with no padding spaces; only the card uses " Trial " | `already-built` | The claim is refuted because it reasons from our SOURCE text rather than our RENDERED output, and the Svelte compiler strips element-boundary whitespace. WHAT THE REFERENCE ACTUALLY SAYS (I read the bytes, not a search summary): - offset 1338742: `function Jge(t,n){1&t&&(d(0,"span",61),v(1," Trial "),u())}` — I resolve… |
+| RM-15 | "click to hide" placeholder label has no reference counterpart | `already-built` | The claim is a false gap caused by searching only the JS bundle. `"click to hide"` is genuinely absent from main.d1d09071be31f1ba.js, but so is the FUNCTION that would carry it: I searched the whole 2,891,205-byte bundle for `showChatGif` and found exactly ONE occurrence, at offset 1326281, and that occurrence is insid… |
+| RM-17 | openAlertSendReport's empty branch — bootbox.alert('No reports found.') | `already-built` | The reference's falsy branch fires on exactly one condition: `openAlertSendReport(this.msg._id)` called with no `_id`. I traced which rows can reach it. |
+| RM-18 | invertTxtColorToggler's early `return {}` guard is not reproduced | `not-in-reference` | The offset is genuine — the quoted bytes are exactly there — but the evidence does not support the claim, because the `return {}` branch is UNREACHABLE DEAD CODE in the reference. The guard fires only when `e.fontSize` string-equals a COLOUR: `e.fontSize===globals.chatStyle[theme].color \|\| e.fontSize===globals.presente… |
+| RM-23 | isMention: this component's own rule is a bare case-sensitive includes with no trailing space and no @all | `already-built` | The claim rests on an evidence caveat that the permitted file itself refutes. It says our `isMentionOf` rule (lowercase both sides, required trailing space, `@all ` from an admin) was "transcribed from a DIFFERENT bundle build (`main.d6d3c112b59b7d0d.js`) which is not readable in this checkout, so I cannot confirm whic… |
+| PA-09 | `.presentation-box` drops the `!important` on `overflow: hidden` | `already-built` | The `!important` is NOT dropped. The claim inspected only the second, additive `.presentation-box` rule in app.css and missed the imported capture sheet. |
+| poll-04 | flot label container colour #FAFAFA has no counterpart | `not-in-reference` | The literal exists but the claimed offset is wrong and, more importantly, the evidence does not support a missing visual property — #FAFAFA is unobservable dead config. OFFSET: the quoted run `label:{show:!0,radius:.8,color:"#FAFAFA",formatter:...` begins at byte 2104752, and `color:"#FAFAFA"` at 2104777. |
+| poll-05 | Loading GIF path rewritten from ../../assets to /assets | `already-built` | The control exists in our source and the divergence is deliberate, correct, and non-behavioural. I read the reference bytes at the cited offset and they match verbatim; I then read our counterpart and it renders the same loading GIF in the same place with the same siblings. |
+| poll-06 | #pollPieChart carries an extra position:relative | `not-in-reference` | The offset is exact and the quoted literal is real — but the evidence does not support the claim of a divergence. WHAT IS ACTUALLY AT 2115007 (read, not inferred): `["id","pollPieChart",2,"display","none","width","100%","height","300px","text-align","center"],` — byte-exact match for the claimed array, `s.find('["id","… |
+| RS-13 | "Powered by" credits and links to a different company than the reference | `already-built` | The "Powered by" credits control is fully implemented in RoomSidebar.svelte, not missing. Ours reproduces the reference's entire structure for TPe's first list item — sidebar-wrapper > navbar w-100 h-100 > navbar-nav small w-100 h-100 > li.nav-item text-center > <p>Powered by: <a …></p> followed by the sibling <p>Versi… |
+| RS-14 | Sort/Trials state is local to RoomRoster; the reference broadcasts it on guiEventBus and the child applies pipes | `already-built` | The behaviour is fully implemented; the guiEventBus emit is Angular plumbing, not a feature, and has no observable effect our source lacks. I read the bundle: the emitter lives on two separate top-level page components (selectors `app-room` at 2517337 and `app-closed-session-page` at 2570514), while the pipes live on a… |
+| RS-15 | Roster rows are unmounted while the rail is collapsed; the reference keeps them mounted and only toggles a class | `not-in-reference` | The quoted string does exist in the bundle (exact start offset 2547994, not 2548034 — 2548034 lands 40 bytes into it), but it does not support the claim, and in fact contradicts it on every axis. (1) WRONG COMPONENT. |
+| RS-16 | Five reference elements that are pure Bootstrap triggers carry explicit onclick handlers here | `already-built` | The reference half of the claim is correct — I read the const table at offset 2572865 and consts 20/23 are ["title","Connectivity Check","data-bs-toggle","modal","data-bs-target","#webrtc-troubleshooter-modal",1,"nav-link","sidebar-item"] and the "General Settings" twin, neither carrying 3,"click", while the adjacent M… |
+| FP-02 | Empty-state <h4>No room files found.</h4> is not rendered at all | `not-in-reference` | The quoted bytes are real and the offset is exact, but they do not support the claim. The h4 is NOT an empty-state message in the reference: its gate, read verbatim in the same component's update block, is `O(84,o.sessionFiles?-1:84)` — it renders only when `sessionFiles` is FALSY (never fetched). |
+| FP-04 | aria-selected is a static attribute in the reference and a live binding in ours | `already-built` | Both halves of the claim are factually correct, but it is not a gap. The reference genuinely hardcodes aria-selected (verified at offset 1996545), and ours genuinely binds it (FilesPane.svelte:107,134,161) — and the claim's own remedy, that the divergence "should stay recorded as deliberate," is ALREADY recorded. |
+| FP-07 | Row selection is real state here; the reference has no selection state and reads the DOM back | `already-built` | Row selection feeding "Delete Selected" is fully implemented in our source, and the state-vs-DOM difference is a recorded, tested implementation decision rather than a missing or divergent behaviour. The reference reading in the claim is accurate — I re-read it rather than trusting it. |
+| FP-08 | calculateFiles does not reset the three totals when the list is empty; ours recomputes to zero | `already-built` | The reference text is transcribed correctly (I re-read the bytes myself), but the item is not a gap in our source — the correct behaviour it describes is already present, and structurally so. Reference: `calculateFiles(e){return e&&e.length>0&&(this.soundsTotal=0,...)}` caches three counters on the component and only r… |
+| FP-10 | playMp3ForMe uses a prefixed element id and adds an 'ended' listener the reference does not have | `already-built` | The behaviour is fully implemented, and both "differences" are deliberate, documented-in-place, and held by their own negative-controllable tests — so this is a recorded divergence, not a gap. `playMp3ForMe` exists at apps/room/src/lib/room/files.svelte.ts:341-369 and is wired to the Play/Stop button at apps/room/src/l… |
+| FP-11 | Refresh re-runs the page load instead of posting the getSessionFiles command | `already-built` | The Refresh control is fully built, ungated, byte-matched to the reference's attributes, and its handler DOES refetch the file list from the server. The only difference is transport, and it is a deliberate, documented, contract-tested choice — not a missing behaviour. |
+| PAM-06 | "See Scheduled Alerts" button, its #scheduledAlertsModal target and its scheduledAlerts.length>0 gate are absent | `already-built` | The control is not missing — it is built under a deliberate, documented rename, and the modal id the claim calls absent is literally present in our source. WHAT I VERIFIED IN THE REFERENCE (read, not assumed). |
+| PAM-15 | aria-selected and the `active` class are computed from the current tab; the reference hard-codes them (and hard-codes "true" on two tabs at once) | `already-built` | Nothing is missing — the described behaviour is fully implemented in our source and pinned by a contract test, and the reference reading is accurate, so this is a completed, deliberate divergence rather than outstanding work. Ours: PostAlertModal.svelte binds all three attributes off the `tab` state on every tab anchor… |
+| PAM-16 | Tab identifiers renamed: reference "text"/"link"/"img", ours 'text'/'url'/'media' | `already-built` | Refuted. This is a governed internal rename with zero observable divergence, and I verified both sides. |
+| G9 | Enter+Shift appends a newline; the reference appends one only for Alt | `already-built` | The claim reads the reference's `onKey` as if it were a keydown handler. It is not — the PM textarea binds exactly three listeners, `keyup`, `paste`, `focus`, and no keydown at all. |
+| G10 | Composer binds `keydown`, the reference binds `keyup` (and also `paste` and `focus`) | `not-in-reference` | The quoted array is real but it is NOT the main composer, and the claim's premise is refuted by the reference itself. (1) OFFSET CORRECTION. |
+| G20 | The gear does not re-scroll the log when the toolbar opens or closes | `not-in-reference` | The offset is real and the quote is verbatim, but the evidence does NOT support the claim: the gear's scroll emit is dead code that fires into a bus with no subscriber, so the reference does not re-scroll the log when the toolbar toggles either. 1. |
+| G22 | Unread badge is missing `bg-light` | `not-in-reference` | The citation is exact — byte 2217027 really is `[1,"badge","bg-light","privchatUnread"],`, consumed at offset 2196123 as `d(0,"span",46)` inside the unread-badge template `iEe`, so the reference span genuinely carries `bg-light` and ours (PrivateChatPanel.svelte:330, `class="badge privchatUnread"`) does not. The claim… |
+| G24 | Scroller has no `scroll` handler, so `isScrollingUp` and its threshold are unmodelled | `not-in-reference` | Two independent refutations. (1) The claimed offset is wrong. |
+| G26 | Header peer tab is driven by `selectedMessageUser` and its `active` class is hard-coded | `not-in-reference` | The offset and quote are genuine — `function eEe(` starts at exactly byte 2194806 and the quoted text is verbatim — but the evidence does not support either half of the claim. (1) "active class is hard-coded" is not a divergence. |
+| SV-SP-07 | 'Stop This Screen' on a remote screen only drops the local tab; the reference also sends forceStopScreen after 2s | `already-built` | Every factual premise of the claim is stale. `RoomScreens.stop` no longer ends at "drop the tab"; the comment quoted in the claim ("Stopping their producer is not ours to do") is gone from the file, replaced by the opposite one. |
+| SV-SP-11 | ScreenPane omits the video click that toggles native controls (dead upstream by the component's own stylesheet) | `not-in-reference` | The quoted code is genuinely present (exact start byte 1501400; the claimed 1501442 falls inside that run, on `o.showControls=!o.showControls`), but it is provably dead code upstream, so it does not support a gap. The component is `app-screenshare-view` (`selectors:[["app-screenshare-view"]]` at byte 1500253). |
+| SV-SP-12 | StreamingView omits detachScreen / reAttachScreen and the three no-op stubs | `not-in-reference` | The bytes at 1908109 are exactly as quoted and do belong to app-streaming-view, but they are unreachable dead code, so they do not support a gap. (1) reAttachScreen occurs exactly ONCE in the whole 2,891,205-byte bundle — offset 1908154, the definition — with zero callers anywhere. |
+| dta-06 | Day-trade Cancel's forced `dayTradeAlertsLog` array-identity reassign is not reproduced (and the swing twin never had it) | `already-built` | Not a gap — the divergence is already implemented and documented in our source with the correct byte offset, and every claim in that note verifies independently. Reference read at 1987900-1988600: the Day-trade cancel confirm callback is `i&&(this.clearDayTradeAlertFields(),this.appService.globals.dayTradeAlertsLog=[..… |
+| dta-07 | CSV export revokes the object URL; the reference leaks it | `already-built` | Nothing is missing. The CSV export is fully implemented on both panes, and the revoke the "gap" describes is already present with its reason recorded in-file — DayTradeAlertsPane.svelte:241 and SwingAlertsPane.svelte:222 both call window.URL.revokeObjectURL(url) after link.click()/link.remove(), and the comment at DayT… |
+| EMOJI-11 | Anchor-click scroll target differs: reference pins the first category to 0 and adds 1 elsewhere | `already-built` | Both halves of the claimed divergence are already implemented, one of them under a different mechanism. (1) The scroll TARGET matches exactly: the reference's category `top` is defined at offset 726648 as `this.top=i-s+e.scrollTop` (containerRect.top - scrollerRect.top + scrollTop), and EmojiPicker.svelte:231 `emojiScr… |
+| EMOJI-13 | Stored skin tone is read with Number() + a 1..6 clamp rather than JSON.parse | `already-built` | The behaviour is implemented, and it is observably identical to the reference across the entire domain of values the reference itself can produce. WHAT I READ IN OUR SOURCE - apps/room/src/lib/components/EmojiPicker.svelte:421-422 — the restore-on-open read: `const storedSkin = Number(storage()?.getItem(`${NAMESPACE}.s… |
+| EMOJI-14 | Reaction chip text omits the reference's trailing space | `not-in-reference` | The quoted bytes exist but do not support a gap. Two findings. |
+

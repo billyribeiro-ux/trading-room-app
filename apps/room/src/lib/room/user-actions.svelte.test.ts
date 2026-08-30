@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TalkingEntry } from '#lib/mute-all-non-admins.js';
 import type { ModalTargetUser } from '#lib/types.js';
+import { RoomUserDetail } from './user-detail';
 import { MISSING_SCHEME_ALERT, TOAST_ONLY_ACTIONS } from '#lib/user-action-intent.js';
 
 import { RoomDialogs } from './dialogs.svelte';
@@ -104,9 +105,26 @@ const make = (
   /** Which member ids the notes list was fetched for, in order. */
   const notesListed: number[] = [];
 
+  /** Which member ids the `userInfoDB` lookup was asked about, in order. */
+  const detailAsked: number[] = [];
+
   const actions = new RoomUserActions<User>({
     dialogs,
     toasts,
+    /*
+      A REAL `RoomUserDetail` over a recording fetch, not a stub of the class.
+
+      What the tests below assert is that every path which opens the user card asks ONCE — which is
+      a property of the funnel through `set selectedMessageUser`, and of `RoomUserDetail`'s own
+      `#asked` set. Substituting the class would assert that this file calls a method, which is the
+      thing that was already true when the field had no producer at all.
+    */
+    userDetail: new RoomUserDetail({
+      fetch: (userId: number) => {
+        detailAsked.push(userId);
+        return Promise.resolve(null);
+      }
+    }),
     /*
       The door AND the list behind it. The list is recorded rather than stubbed silently, because
       one of this class's branches now loads it: clearing the password must load the notes in the
@@ -210,6 +228,7 @@ const make = (
     actions,
     dialogs,
     toasts,
+    detailAsked,
     notesAsked,
     notesListed,
     setNotesAnswers: (answers: ({ required: boolean; ok: boolean } | null)[]) => {
@@ -293,6 +312,112 @@ describe('who is selected, and the two writers that must agree', () => {
     actions.mentionFromRoster(ROW({ id: 3, displayName: 'Cy' }));
     expect(mentioned).toEqual(['Cy']);
     expect(actions.target.nick).toBe('Cy');
+  });
+
+  /*
+    `hydrateDetail` asks about WHOEVER IS SELECTED, from whichever path selected them.
+
+    `RoomModals.open` calls it once, in the branch it already has for `'user'`, and
+    `modals.svelte.test.ts` asserts that it is called for that modal and no other. What this asserts
+    is the other half: that by the time it runs, `target` has resolved to the member whose card is
+    about to be drawn — which is a different question for each of the three entry points, and the
+    reason the placeholder guard in `RoomUserDetail` exists.
+
+    The first draft hung the lookup off `set selectedMessageUser` instead, and this test is what
+    would have hidden it: `message-actions.handle` selects the sender for EVERY action, so a
+    presenter clicking "Mention" fetched that member's email address. The selection is not the card.
+  */
+  it('asks about whoever the card is about, from every path, once', () => {
+    const { actions, detailAsked } = make();
+
+    // The chat-message path: `message-actions` assigns through this setter, then opens the modal.
+    actions.selectedMessageUser = TARGET;
+    expect(detailAsked, 'selecting alone must ask nothing').toEqual([]);
+    actions.hydrateDetail();
+    expect(detailAsked).toEqual([5]);
+
+    // The roster path.
+    actions.openInfoFor(ROW({ id: 3, displayName: 'Cy' }));
+    actions.hydrateDetail();
+    expect(detailAsked).toEqual([5, 3]);
+
+    // The followed/muted lists.
+    actions.openManagedInfo({
+      nick: 'Di',
+      emailHash: 'hash-di',
+      pic: '/d.png',
+      userXrefID: '9',
+      _id: '9'
+    });
+    actions.hydrateDetail();
+    expect(detailAsked).toEqual([5, 3, 9]);
+
+    // And reopening the first card asks nothing further.
+    actions.selectedMessageUser = TARGET;
+    actions.hydrateDetail();
+    expect(detailAsked).toEqual([5, 3, 9]);
+  });
+
+  it('asks nothing about the placeholder', () => {
+    /*
+      With nothing selected, `target` is the `{ id: 0, … }` placeholder — a card open over nobody.
+      Asking about it would be a guaranteed refusal, and `id` is what the request is keyed on.
+    */
+    const { actions, detailAsked } = make();
+    actions.clearSelectedMessageUser();
+    actions.hydrateDetail();
+    expect(detailAsked).toEqual([]);
+  });
+});
+
+/*
+  THE AVATAR PAIR, and this block exists because a negative control found nothing to fail.
+
+  `profilePicturesSent` and `profilePicturesRemoved` were recorded by the harness above and asserted
+  by NOTHING. Gutting `uploadProfilePicture` to a no-op on 2026-08-30 left every test in this file
+  and in `profile-picture-contract.test.ts` green — the contract file reads the TRANSCRIPTIONS out
+  of the source and cannot see whether anything calls them, and the disposition contract only checks
+  that the control is not declared inert.
+
+  It was a hole before the extraction too: the methods were inline here and equally unasserted. What
+  the extraction changed is that there is now a LINK to break, so the hole is worth closing rather
+  than noting.
+*/
+describe('a presenter setting a member’s picture', () => {
+  it('sends the file, and says what the reference says on success', async () => {
+    const { actions, dialogs, profilePicturesSent } = make();
+    actions.uploadProfilePicture(TARGET, new File(['x'], 'face.png', { type: 'image/png' }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(profilePicturesSent.map((sent) => sent.targetUserId)).toEqual([5]);
+    expect(profilePicturesSent[0]?.file.name).toBe('face.png');
+    // Byte 2,086,100, and it names the MEMBER rather than the file.
+    expect(dialogs.alert).toBe('Profile picture uploaded successfully for Bo');
+  });
+
+  it('prefers the server’s refusal over the transcribed one', async () => {
+    const { actions, dialogs, failProfilePicture } = make();
+    failProfilePicture();
+    actions.uploadProfilePicture(TARGET, new File(['x'], 'face.png', { type: 'image/png' }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(dialogs.alert, 'a specific reason beats "Upload Failed..."').not.toBe(
+      'Upload Failed...'
+    );
+  });
+
+  it('clears a picture silently, with no confirm', () => {
+    /*
+      The reference's button raises no confirm and no success alert: the avatar changing IS the
+      confirmation, and the act is reversible by the upload beside it.
+    */
+    const { actions, dialogs, profilePicturesRemoved } = make();
+    actions.removeProfilePicture(TARGET);
+    expect(profilePicturesRemoved).toEqual([5]);
+    expect(dialogs.confirmation).toBeNull();
+    expect(dialogs.alert).toBeNull();
   });
 });
 

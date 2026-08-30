@@ -29,11 +29,16 @@ const make = () => {
   const managed: true[] = [];
   const themes: string[] = [];
   const debugLogsCleared: true[] = [];
+  /** Which modal openings asked the server about the card's subject. */
+  const detailsAsked: true[] = [];
   const modals = new RoomModals({
     menus: { closeForModal: () => {}, set: () => {}, closeFloating: () => {} } as never,
     polls: {} as never,
     messageActions: { clearSelected: () => {}, selected: null },
-    userActions: { loadManaged: () => managed.push(true) },
+    userActions: {
+      loadManaged: () => managed.push(true),
+      hydrateDetail: () => detailsAsked.push(true)
+    },
     unreadQaAlertIds: { clear: () => {}, delete: () => true },
     setTheme: (next) => themes.push(next),
     debugLog: {
@@ -42,8 +47,25 @@ const make = () => {
       }
     }
   });
-  return { modals, managed, themes, debugLogsCleared };
+  return { modals, managed, themes, debugLogsCleared, detailsAsked };
 };
+
+/*
+  The user card's server lookup is asked for HERE and nowhere else, because this is the one place
+  every entry point converges — see `RoomUserActions.hydrateDetail` for why hanging it off the
+  selection instead was wrong rather than merely different.
+*/
+describe('opening the user card asks the server about its subject', () => {
+  it('asks for the user modal and for no other', () => {
+    const { modals, detailsAsked } = make();
+    modals.open('muted');
+    modals.open('followed');
+    modals.open('report');
+    expect(detailsAsked, 'the managed lists show no card').toEqual([]);
+    modals.open('user');
+    expect(detailsAsked).toEqual([true]);
+  });
+});
 
 /** Read inside an effect root, mutate inside it, assert on the result outside. */
 const observe = <T>(read: () => T, mutate: () => void): T[] => {

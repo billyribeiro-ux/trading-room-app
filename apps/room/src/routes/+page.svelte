@@ -1041,8 +1041,7 @@
           individualVolumeControls={gates.individualVolumeControls}
           recordingReminderAllowed={gates.recordingReminderAllowed}
           recordingTooltip={gates.recordingTooltip}
-          benzingaUrl={gates.benzingaUrl}
-          benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
+          benzinga={gates.benzinga}
           mobileAppAvailable={gates.mobileAppAvailable}
           tawkAvailable={gates.tawkAvailable}
           doNotDisturbOn={prefs.doNotDisturbOn}
@@ -1135,9 +1134,7 @@
           tip={tipButtonFor(data.sessData)}
           canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
           mobileAppAvailable={gates.mobileAppAvailable}
-          benzingaVisible={gates.benzingaVisible}
-          benzingaUrl={gates.benzingaUrl}
-          benzingaLogoUrl={data.sessData?.altBenzingaLogoURL}
+          benzinga={gates.benzinga}
           dumpVersion={DUMP_CONTRACT.version}
           onopenmodal={(name) => modals.open(name)}
           onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}
@@ -1273,7 +1270,7 @@
               positionsAvailable={data.sessData?.positionsIframe === true &&
                 String(data.sessData?.positionsIframeUrl ?? '').trim().length > 0}
               positionsIframeUrl={data.sessData?.positionsIframeUrl}
-              positionsAutoRefresh={prefs.loaded.updatePositionsIframe === true}
+              positionsAutoRefresh={prefs.updatePositionsIframe}
               hideStreams={gates.streamsHidden}
               modMessage={data.sessData?.modMessage ?? ''}
               bufferSizeLevel={prefs.bufferSizeLevel}
@@ -1458,7 +1455,9 @@
       ondonotdisturb={setDND}
       ondownload={() => privateChat.downloadLog()}
       onswitchuser={(uid) => void privateChat.switchToUser(uid)}
-      onloadmore={(uid, page) => void privateChat.loadLog(uid, page)}
+      onloadmore={() => void privateChat.loadMore()}
+      hasMore={privateChat.hasMore}
+      loadingMore={privateChat.loadingMore}
       onsend={() => void privateChat.send()}
     />
   </app-room>

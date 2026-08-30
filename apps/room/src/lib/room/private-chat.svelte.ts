@@ -1,5 +1,14 @@
 import { isHttpError } from '@sveltejs/kit';
 
+import {
+  mergeOlderMessagesBy,
+  newLoadMorePaging,
+  settleLoadMore,
+  startLoadMore
+} from '#lib/chat-paging.js';
+
+import { RoomPeerHistory } from './peer-history.svelte';
+
 import { formatCompactTime } from '#lib/compact-message-time.js';
 
 import {
@@ -82,13 +91,6 @@ export interface PrivateChatCommands {
   }) => Promise<{ nick: string; messages: PrivateChatMessage[]; truncated: boolean }>;
 }
 
-/** What the all-user private-message modal is showing, or why it is not. */
-export type PeerHistory = {
-  readonly nick: string;
-  readonly messages: readonly PrivateChatMessage[];
-  readonly truncated: boolean;
-};
-
 /** The two preferences the arrival sound reads. */
 export interface PrivateChatPrefs {
   readonly doNotDisturbOn: boolean;
@@ -152,9 +154,10 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   #peerProfiles: PrivateChatTab[];
   #peerId: number | null;
   #draft;
-  #peerHistory: PeerHistory | null;
-  #peerHistoryLoading;
-  #peerHistoryError: string | null;
+  /** The user-info modal's history, which shares nothing with this panel. See `RoomPeerHistory`. */
+  readonly #peerHistory: RoomPeerHistory;
+  /** The Load More counter and its guards; `$state.raw` because it is only ever replaced whole. */
+  #paging;
 
   constructor(options: {
     dialogs: RoomDialogs;
@@ -234,9 +237,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
       asked yet" and "asked again", and a moderator would see the last member's messages under a
       spinner labelled with the new one.
     */
-    this.#peerHistory = $state.raw<PeerHistory | null>(null);
-    this.#peerHistoryLoading = $state(false);
-    this.#peerHistoryError = $state<string | null>(null);
+    this.#peerHistory = new RoomPeerHistory(options.commands.loadPeerHistory);
+    this.#paging = $state.raw(newLoadMorePaging());
   }
 
   get open() {
@@ -400,6 +402,8 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#searchTerm = '';
     if (!this.#threads[peerId]) this.#threads = { ...this.#threads, [peerId]: [] };
     this.#unreadByPeer = { ...this.#unreadByPeer, [peerId]: 0 };
+    // `PCswitchChatToUser`: currPage = 0, hasMoreData = !0, isLoadingMore = !1, loadMoreLastID = "".
+    this.#paging = newLoadMorePaging();
     await this.loadLog(peerId, 0);
     this.scrollToBottom();
   }
@@ -413,12 +417,44 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
       return; // Non-fatal: the held log stays as it was. See `private-chat.remote.ts`.
     }
 
-    // Page 0 replaces; a later page is older history and goes in front of what is already there.
+    // `getPCLog`. Settled BEFORE the merge: the merge can drop rows as duplicates, and a page that
+    // arrived is not an empty page.
+    this.#paging = settleLoadMore(this.#paging, incoming.length);
+
+    // Page 0 replaces; a later page is older history and goes in front, deduped on `_id` because
+    // offset paging over a live tail hands the boundary row back twice.
     this.#threads = {
       ...this.#threads,
       [peerId]:
-        page === 0 || searchTerm ? incoming : [...incoming, ...(this.#threads[peerId] ?? [])]
+        page === 0 || searchTerm
+          ? incoming
+          : mergeOlderMessagesBy(incoming, this.#threads[peerId] ?? [], (message) => message._id)
     };
+  }
+
+  /**
+   * `loadMore()` — the badge above the thread, which the panel used to derive from `log.length`.
+   *
+   * The page is a COUNT OF REQUESTS, held here as `++this.currPage` is held on the reference's
+   * scroller; `#lib/chat-paging.ts` records what deriving it from the row count cost. Guarded on
+   * both flags, because a second click in flight would take the counter past a page nobody asked for.
+   */
+  async loadMore(): Promise<void> {
+    const peerId = this.#peerId;
+    if (peerId === null || this.#paging.loadingMore || !this.#paging.hasMoreData) return;
+    const next = startLoadMore(this.#paging);
+    this.#paging = next;
+    await this.loadLog(peerId, next.page);
+  }
+
+  /** `hasMoreData && !searchTerm` — the badge's gate, which is the server's answer and not a count. */
+  get hasMore(): boolean {
+    return this.#paging.hasMoreData && !this.#searchTerm;
+  }
+
+  /** `isLoadingMore` — the badge becomes a spinner rather than staying clickable. */
+  get loadingMore(): boolean {
+    return this.#paging.loadingMore;
   }
 
   /** `sendMessage()` - `sendPrivChat(currUser, text, recvdUser)`. Empty text sends nothing. */
@@ -485,52 +521,15 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#open = true;
   }
 
-  get peerHistory(): PeerHistory | null {
-    return this.#peerHistory;
-  }
-
-  get peerHistoryLoading() {
-    return this.#peerHistoryLoading;
-  }
-
-  get peerHistoryError(): string | null {
-    return this.#peerHistoryError;
-  }
-
   /**
-   * `showPrivateMessages()` - the user-info modal's button, gated on the room setting.
+   * The user-info modal's history, as ONE value rather than three parallel accessors.
    *
-   * Upstream this emits `doUserPMModal` on the GUI event bus and a separate component subscribes,
-   * clears, and fetches (bundle bytes 2,087,336 and 2,417,900). There is no bus here and there does
-   * not need to be: the modal and the fetch are both this class's, so the event is a method call.
-   * What IS reproduced is the ORDER - clear first, then load - because the alternative shows the
-   * previous member's private messages under the new member's name while the request is in flight.
-   *
-   * The entitlement is NOT checked here. `loadPeerPrivateMessageHistory` refuses on the server from
-   * the control plane, which is the only check that means anything; the button that calls this is
-   * already gated so a member never sees it, and re-deciding it here would be a third copy of a rule
-   * whose authoritative copy is the one on the server.
+   * It was three getters here feeding three props on `ModalHost`, which is the shape this session
+   * already corrected once for the capture settings: three parameters that are one idea, threaded
+   * through every hop between them. One collaborator crosses instead, and both files got shorter.
    */
-  async showPeerHistory(peerId: number): Promise<void> {
-    this.#peerHistory = null;
-    this.#peerHistoryError = null;
-    this.#peerHistoryLoading = true;
-    try {
-      const answer = await this.#commands.loadPeerHistory({ peerId });
-      this.#peerHistory = answer;
-    } catch (cause) {
-      /*
-        The server's own message when it has one - `isHttpError` is how every other refusal in this
-        file is surfaced, and the two that can arrive here ("Presenters only." and the room not
-        having the setting) are both worth reading rather than replacing with a generic failure.
-      */
-      this.#peerHistoryError = isHttpError(cause)
-        ? cause.body.message
-        : 'Could not load private messages.';
-    } finally {
-      // `finally`, so a refusal cannot leave the modal spinning forever.
-      this.#peerHistoryLoading = false;
-    }
+  get peerHistory(): RoomPeerHistory {
+    return this.#peerHistory;
   }
 
   /**

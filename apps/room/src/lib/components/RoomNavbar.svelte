@@ -61,9 +61,9 @@
      * The two are NOT the same markup and neither is a copy of the other — see the note at the
      * element for the one branch this one does not have.
      */
-    benzingaUrl: string | null;
-    benzingaLogoUrl: string | null | undefined;
     mobileAppAvailable: boolean;
+    /** The Benzinga item's three settings as one — see `gates.benzinga` and its contract test. */
+    benzinga: { visible: boolean; url: string | null; logoUrl: string | null };
     tawkAvailable: boolean;
     /** The viewer's own do-not-disturb, which greys the sound checks. */
     doNotDisturbOn: boolean;
@@ -177,8 +177,7 @@
     individualVolumeControls,
     recordingReminderAllowed,
     recordingTooltip,
-    benzingaUrl,
-    benzingaLogoUrl,
+    benzinga,
     mobileAppAvailable,
     tawkAvailable,
     doNotDisturbOn,
@@ -321,10 +320,10 @@
         supplies a logo and is absent otherwise. A room in that state still gets the sidebar item,
         so the feature is reachable either way. Restore the second copy by adding the asset.
       -->
-      {#if benzingaUrl && benzingaLogoUrl}
+      {#if benzinga.visible && benzinga.logoUrl}
         <li class="nav-item animated fadeIn benzinga-li">
           <a
-            href={benzingaUrl}
+            href={benzinga.url}
             target="_blank"
             rel="noopener noreferrer"
             title="Benzinga News"
@@ -339,7 +338,7 @@
             -->
             <img
               class="benzinga-logo animated fadeIn"
-              src={benzingaLogoUrl}
+              src={benzinga.logoUrl}
               alt="Benzinga News"
               width="120"
               height="25"

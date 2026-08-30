@@ -116,13 +116,18 @@ describe('the navbar item wears the const table it was read from', () => {
 });
 
 describe('it never renders a broken image', () => {
-  it('requires a logo as well as a url', () => {
+  it('requires a logo as well as the room setting', () => {
     /*
       THE ASSERTION THIS FILE EXISTS FOR. Upstream renders the item on `hasBenzingaNews` alone and
       falls back to a bundled asset. That asset is absent here, so the fallback would be a broken
       `<img>` in the navbar of every unconfigured room.
+
+      **The first term was `benzingaUrl` until 2026-08-30, and that was the defect**: a URL is not
+      the feature's switch. `benzingaVisible` is — it folds `hasBenzingaNews` together with the URL
+      being present — so it replaces that half rather than joining it. The logo term stays for the
+      reason above, which is ours and not upstream's.
     */
-    expect(NAVBAR_MARKUP).toContain('{#if benzingaUrl && benzingaLogoUrl}');
+    expect(NAVBAR_MARKUP).toContain('{#if benzinga.visible && benzinga.logoUrl}');
   });
 
   it('names no asset this repository does not have', () => {
@@ -160,5 +165,43 @@ describe('the two copies stay distinct', () => {
     const gates = readFileSync(`${ROOT}lib/room/gates.ts`, 'utf8');
     expect(gates).toContain('hasBenzingaNews');
     expect((markupOf(gates).match(/hasBenzingaNews/g) ?? []).length).toBe(1);
+  });
+
+  it('DELIVERS that gate to both surfaces, which is the half this file was not checking', () => {
+    /*
+      ## THE ASSERTION ABOVE IS TRUE AND THE NAVBAR WAS UNGATED ANYWAY
+
+      Its comment names the failure exactly — *"how one of them keeps showing the item after an owner
+      turns it off"* — and it could not catch it, because it measures `gates.ts` and the defect was
+      one file over. `hasBenzingaNews` WAS read once, into `benzingaVisible`; that value was passed
+      to the sidebar and **not to the navbar**, which rendered on `benzingaUrl && benzingaLogoUrl`.
+
+      The three settings are independent on the controller — `room-config.ts` allow-lists
+      `hasBenzingaNews`, `altBenzingaLinkURL` and `altBenzingaLogoURL` as three entries, and the
+      schema exposes three controls — so an owner who unticked "BZ News" and left the URLs populated
+      lost the sidebar item and kept the navbar logo. Upstream gates both:
+      `O(15, sessData.hasBenzingaNews ? 15 : -1)` at bundle byte 2,487,962.
+
+      A gate that is DERIVED correctly and then not DELIVERED is invisible to any check that stops at
+      the derivation. This asserts the delivery: both call sites, by name, in the page that owns them.
+    */
+    const page = readFileSync(`${ROOT}routes/+page.svelte`, 'utf8');
+    const navbar = readFileSync(`${ROOT}lib/components/RoomNavbar.svelte`, 'utf8');
+
+    /*
+      THE FIX IS STRUCTURAL, so this asserts the structure. The three settings travel as ONE value —
+      `gates.benzinga` — because three props were three chances to forget one, and forgetting the
+      flag is exactly what happened. A surface either has the feature's state or it does not.
+    */
+    expect(page, 'the navbar must be handed the whole feature').toContain(
+      'benzinga={gates.benzinga}'
+    );
+    expect(
+      page,
+      'no surface may take the pieces apart again — that is how the flag was dropped'
+    ).not.toMatch(/benzingaUrl=\{|benzingaLogoUrl=\{/);
+
+    /* And the navbar must GATE on the flag, not merely receive it. */
+    expect(navbar).toContain('{#if benzinga.visible && benzinga.logoUrl}');
   });
 });

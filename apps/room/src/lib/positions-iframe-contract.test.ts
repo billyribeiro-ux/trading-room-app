@@ -166,9 +166,21 @@ describe('the wire', () => {
   /*
     The timer's gate has to reach the container, or a member with the preference off gets a
     thirty-second fetch loop they never asked for.
+
+    READ FROM THE GETTER since 2026-08-30, not from `prefs.loaded` — and the change is a defect
+    repair, not a style choice. `prefs.loaded.updatePositionsIframe === true` reads the decoded
+    settings blob, where an absent key is not `true`, so the refresh was OFF for every viewer who
+    had never set it — which was every viewer, because until that day nothing in the room could set
+    it. The reference defaults it ON (`updatePositionsIframe:!0`, byte 980,052), which `RoomPrefs`
+    now matches with `!== false`; and reading the getter is also what makes the new switch take
+    effect at once rather than on the next load.
   */
-  it('carries the viewer’s refresh preference down', () => {
-    expect(page).toContain('positionsAutoRefresh={prefs.loaded.updatePositionsIframe === true}');
+  it('carries the viewer’s refresh preference down, from the seeded preference', () => {
+    expect(page).toContain('positionsAutoRefresh={prefs.updatePositionsIframe}');
+    expect(
+      page,
+      'the decoded blob defaults an absent key to false, which is the wrong way round'
+    ).not.toContain('prefs.loaded.updatePositionsIframe');
     expect(codeOf(area)).toContain('autoRefresh={positionsAutoRefresh}');
     expect(codeOf(container)).toContain('positionsRefreshRunning({');
   });

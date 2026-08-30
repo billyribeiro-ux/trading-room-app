@@ -308,29 +308,28 @@ export class RoomGates {
   }
 
   /**
-   * Benzinga.
+   * The Benzinga item's THREE settings as one value, because they are one feature.
    *
-   * ```js
-   * benzingaUrl = `https://ptrv3.protradingroom.com/public/bz/index.html
-   *                ?sessID=${globals.sessionID}&id=${sessData.uuid}&tok=${globals.sesionToken}`;
-   * "" != sessData.altBenzingaLinkURL && (benzingaUrl = sessData.altBenzingaLinkURL)
-   * ```
+   * They were three separate getters feeding three props, and on 2026-08-30 the navbar was found
+   * rendering without the flag: it received the url and the logo and never `hasBenzingaNews`, so an
+   * owner who unticked "BZ News" and left the URL fields populated lost the sidebar item and kept
+   * the navbar logo. Upstream gates both on the same flag — `O(15, hasBenzingaNews ? 15 : -1)`,
+   * bundle byte 2,487,962. See `benzinga-navbar-contract.test.ts` for the whole finding.
    *
-   * The default is built from three values this room does not have: the reference's own
-   * `sessionID`, a `sessData.uuid` that is not in the 268-key schema at all, and `sesionToken`
-   * (the capture's spelling), which is the controller's session credential and has no business
-   * crossing into a page. So the default is NOT reproduced - a link built from three blanks is a
-   * broken link wearing a logo.
+   * The controller ships the three independently and nothing can infer one from another; what CAN
+   * be fixed is that a consumer takes two of the three and forgets the third. One accessor, one
+   * prop, and a surface either has the feature's state or it does not.
    *
-   * `altBenzingaLinkURL` is reproduced exactly, and a room that sets it gets a working item.
-   * Without it the item does not render, and `TODO.md` records why.
+   * `visible` folds the flag together with a usable URL — a blank link cannot render — so it is the
+   * whole switch and not half of one.
    */
-  get benzingaUrl() {
-    return this.#session().sessData?.altBenzingaLinkURL?.trim() || null;
-  }
-
-  get benzingaVisible() {
-    return Boolean(this.#session().sessData?.hasBenzingaNews) && this.benzingaUrl !== null;
+  get benzinga(): { visible: boolean; url: string | null; logoUrl: string | null } {
+    const url = this.#session().sessData?.altBenzingaLinkURL?.trim() || null;
+    return {
+      visible: Boolean(this.#session().sessData?.hasBenzingaNews) && url !== null,
+      url,
+      logoUrl: this.#session().sessData?.altBenzingaLogoURL?.trim() || null
+    };
   }
 
   /** `O(32, e.archivesAvailableTo() ? 32 : -1)` */
