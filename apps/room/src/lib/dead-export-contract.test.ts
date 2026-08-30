@@ -207,9 +207,35 @@ const MODULES = globSync('**/*.ts', { cwd: ROOT }).filter(
  * read, and excluding the whole suite would condemn every constant a contract test pins.
  */
 const SELF = 'lib/dead-export-contract.test.ts';
+
+/**
+ * COMMENTS ARE STRIPPED, and this file was wrong without it.
+ *
+ * `isDeadPreferenceKey` is catalogued below as unread, correctly — nothing calls it. On 2026-08-30 a
+ * new contract test mentioned it **in a comment**, explaining why it deliberately asserted through
+ * the exported LIST instead, and this file went red demanding the entry be deleted: prose about not
+ * using a symbol was counted as using it.
+ *
+ * That is the third time a gate here has let prose vote. `evidence-gap-register-counts.test.ts` was
+ * corrected for counting matches across a whole table row rather than its status cell, and
+ * `presenter-colors-contract.test.ts` strips comments before every source assertion for exactly this
+ * reason. The rule is the same one each time: **a comment is not code, and a reference in one is not
+ * a reader.**
+ *
+ * The strip is deliberately crude — block comments, line comments and HTML comments — because it
+ * only has to be sound in one direction. A construct it mangles (a `//` inside a string literal, a
+ * regex containing a slash) can only ever REMOVE a candidate reader, which makes an export look
+ * unread and fails the catalog check loudly. It cannot invent one.
+ */
+const withoutComments = (source: string) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
 const CORPUS = [...globSync('**/*.ts', { cwd: ROOT }), ...globSync('**/*.svelte', { cwd: ROOT })]
   .filter((file) => file !== SELF)
-  .map((file) => [file, readFileSync(`${ROOT}${file}`, 'utf8')] as const);
+  .map((file) => [file, withoutComments(readFileSync(`${ROOT}${file}`, 'utf8'))] as const);
 
 function readersOf(name: string, ownModule: string): number {
   const pattern = new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`);
@@ -327,11 +353,40 @@ describe('every export has a reader, or says why it has none', () => {
         importedOnlyByTests.push(module);
     }
 
-    expect(importedByNothing, 'nothing imports these modules at all').toEqual([]);
+    /*
+      ── ONE MODULE IS ALLOWED TO HAVE NO IMPORTER, and finding it was an accident ─────────────────
+
+      This assertion was `toEqual([])` and passed — because the corpus it searched still had its
+      COMMENTS in it, and `env.ts` mentions `lib/server/tradingroom-api.ts` twice in prose. Strip the
+      comments (2026-08-30, see `withoutComments`) and the truth appears: nothing imports that module
+      at all.
+
+      It is the v5 API client. `applyCookies` is already catalogued in UNREAD above with the reason —
+      blocked on an account cleared for v5 by the vendor, `NEW-TODO.md` Part 3 — and the module-level
+      fact is the same fact one level up, so it is named here rather than pretended away. When v5 is
+      unblocked and something imports it, this list must shrink, exactly as the UNREAD entries must.
+
+      Named individually and not by a pattern: an allow-list with a wildcard in it stops being an
+      allow-list.
+    */
+    expect(importedByNothing, 'nothing imports these modules at all').toEqual([
+      'lib/server/tradingroom-api.ts'
+    ]);
     expect(
       importedOnlyByTests,
       'only tests import these. A probe is legitimate; a module whose only reader is the test ' +
         'written to justify it is not'
-    ).toEqual(['lib/room/derived-return-probe.svelte.ts']);
+    ).toEqual([
+      /*
+        A TEST HARNESS, and it appeared here for the same reason the module above did: with comments
+        in the corpus, the several `.remote.ts` docblocks that mention it by name read as importers.
+        They are not. It exists so a test can EXECUTE a remote `command`, whose wrapper throws
+        outside a request — its own header carries the four SvelteKit files that were read to build
+        it. "Only tests import it" is the correct and only possible state for it, so it is named
+        rather than hidden.
+      */
+      'lib/server/remote-command-harness.ts',
+      'lib/room/derived-return-probe.svelte.ts'
+    ]);
   });
 });

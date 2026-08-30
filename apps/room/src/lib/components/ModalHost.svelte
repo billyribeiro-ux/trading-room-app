@@ -758,7 +758,6 @@
   */
   const groupChatMode = $derived(chatMode);
   const fileUploadInputId = 'fupload';
-  let streamPlayerEnabled = $state(false);
   /*
     Seeded from the saved preference, then owned locally.
 
@@ -4524,27 +4523,50 @@
             </p>
             <p>
               Stream Player enabled:
-              <span style:color={streamPlayerEnabled ? 'green' : 'red'}>{streamPlayerEnabled}</span>
+              <span style:color="red">false</span>
             </p>
+            <!--
+              ── THESE TWO BUTTONS ARE INERT, AND SAYING SO IS THE FIX ────────────────────────────
+
+              They used to flip a local `streamPlayerEnabled` and write
+              `onPreferenceChange('streamingPlayerEnabled', true | false)` — a key in THIS
+              presenter's own settings blob, read by nothing anywhere in the repository. A
+              room-level presenter act modelled as a per-user preference, which is the same defect
+              `chat-mode.ts` and `presenter-colors.ts` each record; the label went green and
+              nothing else in the world changed.
+
+              Wiring them was measured and REFUSED rather than attempted, because what the
+              reference does cannot be reproduced from anything held here:
+
+                getPlayerLink() { let i = yield invokeAdminCmd("streamStatus");
+                                  this.streamingPlayerEnabled = i.rc.enablePlayer;
+                                  this.streamingLinkPlayer = i.rc.playerURL }   (byte 2,170,505)
+
+              `playerURL` arrives FROM THE SERVER. The client composes nothing, and that server is
+              not in the capture. So the feature is a public, unauthenticated page that renders one
+              room's screenshares to whoever holds a link — which needs an anonymous media grant,
+              and minting one is an authorization decision this repository's own standard forbids
+              inventing: every authority decision is made on the server from data the server owns,
+              and there is no such data here yet.
+
+              Disabled with the reason on screen, rather than removed: the reference draws this
+              pane, and a presenter who has been told the tool is unavailable is better served than
+              one who cannot find where it went. The blocker is recorded in `TODO.md` and against
+              `SC-04` / `SC-05` in the surface audit. `streamingPlayerEnabled` joins
+              `dead-preference-keys.ts` so the copies already written are pruned.
+            -->
             <div class="mt-4">
-              <button
-                class="btn btn-outline-primary btn-sm m-1"
-                onclick={() => {
-                  streamPlayerEnabled = true;
-                  onPreferenceChange('streamingPlayerEnabled', true);
-                }}
-              >
+              <button class="btn btn-outline-primary btn-sm m-1" disabled>
                 <i class="fas fa-desktop"></i> Enable Stream Player
               </button>
-              <button
-                class="btn btn-outline-danger btn-sm m-1"
-                onclick={() => {
-                  streamPlayerEnabled = false;
-                  onPreferenceChange('streamingPlayerEnabled', false);
-                }}
-              >
+              <button class="btn btn-outline-danger btn-sm m-1" disabled>
                 <i class="fas fa-stop"></i> Disable Stream Player
               </button>
+            </div>
+            <div class="alert alert-info m-2">
+              The stream player is not available in this deployment: it needs a public playback
+              page, and there is no server here that issues one. The buttons above are shown because
+              the tool exists upstream, and are disabled because pressing them would change nothing.
             </div>
           </div>
           <div

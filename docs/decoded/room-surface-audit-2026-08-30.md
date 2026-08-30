@@ -851,6 +851,8 @@ onAudioDeviceChange(e){console.log("onAudioDeviceChange: "+e),this.appService.gl
 
 ### SC-04 — Enable/Disable Stream Player write a per-user preference `streamingPlayerEnabled` that nothing in the repository reads — the reference sends a room-level admin command
 
+**BLOCKED 2026-08-30 03:30 UTC, and the dead write is gone.** The row's diagnosis is exact and the preference write has been removed — `streamingPlayerEnabled` is retired in `dead-preference-keys.ts` so the copies already in accounts are pruned. Wiring it was MEASURED and refused rather than deferred: the reference gets both the state and the link from its own server (`getPlayerLink()` → `invokeAdminCmd("streamStatus")` → `rc.enablePlayer` / `rc.playerURL`, byte 2,170,505), the client composes neither, and that server is not in the capture. What the feature *is*, from the pane's own blurb, is a public page rendering one room's screenshares to whoever holds a link — which needs an anonymous media grant nobody has designed, and `CLAUDE.md` forbids inventing an authority decision. Both buttons are `disabled` with the reason on screen; `stream-player-blocked-contract.test.ts` keeps them that way. **Unblocked by:** a decision on anonymous playback authorization, plus a MediaMTX host.
+
 **high** · `defect` · reference byte **2,170,728**
 
 ```
@@ -863,6 +865,8 @@ enablePlayer(){var e=this;return I(function*(){let i=yield e.appService.invokeAd
 - `changePlayerStatus` occurs at byte 2170816 only (I enumerated: 1 occurrence).
 
 ### SC-05 — Stream Player pane has no Player Link readout, no Copy button and no border-colour binding (the whole yDe block)
+
+**BLOCKED 2026-08-30 03:30 UTC**, on the same absent value as SC-04: `streamingLinkPlayer` is assigned from `rc.playerURL`, which arrives from a server not in the capture. Composing a link here would mean inventing a public playback endpoint and its authorization. Recorded rather than guessed; see the note on SC-04 for what unblocks it.
 
 **medium** · `missing-control` · reference byte **2,143,225**
 
@@ -2398,6 +2402,8 @@ function H2e(t,n){if(1&t){const e=Y();d(0,"div",20)(1,"div",52,2)(3,"textarea",5
 > Verified: Could not refute. The chat composer textarea `#textAreaTxt` in AlertChatArea.svelte binds only `{@attach captureComposerElement}`, `bind:value`, `onfocus`, `oninput`, `onblur`, `onkeydown` — there is no `onpaste`.
 
 ### acA-05 — Private-chat button in the main chat column is rendered ungated, while the gate exists and the extra column uses it
+
+**BUILT 2026-08-30, before this row was written down.** `AlertChatArea.svelte:243` takes `showPmButton` and `:791` gates the entry on it; `+page.svelte:1223` feeds it from `gates.showPmButton`, the same source `ExtraChatPane` has always used. Marked 2026-08-30 03:35 UTC by grepping the prop through all three files.
 
 **high** · `missing-control` · reference byte **1,453,980**
 

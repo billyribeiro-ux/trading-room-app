@@ -98,7 +98,22 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
     `<input type="color">` with `bind:value`, so they never reached `updateSettingCheck` and never
     persisted under their ids.
   */
-  'presenterStyle'
+  'presenterStyle',
+  /*
+    A FOURTH, added 2026-08-30 with the Stream Player pane.
+
+    Enable / Disable Stream Player wrote `streamingPlayerEnabled` into this presenter's own settings
+    blob and nothing anywhere read it. Same level error as the three above — a room-level presenter
+    act modelled as a per-user preference — with one difference that is worth the paragraph: the
+    other three were fixed by wiring the control, and this one could not be.
+
+    The reference gets the player's state and its URL from ITS server (`invokeAdminCmd("streamStatus")`
+    -> `rc.enablePlayer`, `rc.playerURL`, byte 2,170,505). The client composes neither, and that
+    server is not in the capture. The feature is a public page that renders one room's screenshares
+    to whoever holds a link, which needs an anonymous media grant nobody has designed. So the buttons
+    are disabled with the reason on screen and the key is retired here.
+  */
+  'streamingPlayerEnabled'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);

@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 03:30 UTC — The Stream Player buttons stop lying, and two gates that were reading prose as code
+
+**Runtime impact: YES.** Enable / Disable Stream Player no longer write a preference nobody reads.
+Both buttons are disabled with the reason on screen. No other behaviour changes.
+
+#### `SC-04`, and the half of it that could be closed
+
+The two buttons flipped a local flag and wrote `onPreferenceChange('streamingPlayerEnabled', …)` —
+a key in that presenter's own settings blob, read by nothing anywhere in the repository. The status
+line went green and nothing else in the world changed. The fourth control found this week modelled
+at the wrong LEVEL: a room act as a per-user preference, after the chat-mode radio, the two Text
+Mode radios and the presenter colour pickers.
+
+The write is gone and `streamingPlayerEnabled` joins `dead-preference-keys.ts`, so the copies
+already in accounts are pruned on the next preference change of any kind.
+
+#### Wiring it was MEASURED and refused, not deferred
+
+```js
+getPlayerLink() {                                                    // byte 2,170,505
+  let i = yield this.appService.invokeAdminCmd("streamStatus");
+  this.streamingPlayerEnabled = i.rc.enablePlayer;
+  this.streamingLinkPlayer    = i.rc.playerURL
+}
+```
+
+`playerURL` arrives **from the reference's server**. The client composes neither half, and that
+server is not in the capture — the same shape as `closedTxt`'s storage, which this repository also
+recorded as unknowable rather than guessed.
+
+And what the feature *is* settles it. From the pane's own blurb: a link you share so that people
+**not logged into the trading room** can watch your screenshare. Building that means minting a media
+grant for an anonymous viewer of a multi-tenant fintech room. That is an authority decision, and
+`CLAUDE.md`'s rule is that those are made on the server from data the server owns. There is no such
+data here, so there is nothing to reproduce.
+
+The buttons are disabled rather than removed — the reference draws this pane, and a presenter told
+the tool is unavailable is better served than one who cannot find where it went — with the reason in
+an `alert alert-info` beneath them. `TODO.md` gains row **SP** with what unblocks it. `SC-05` (the
+Player Link readout and its Copy button) is blocked on the same absent value.
+
+#### TWO GATES WERE COUNTING COMMENTS AS CODE, and the second one was hiding real findings
+
+`dead-export-contract.test.ts` searched a corpus of raw file text. The new contract above mentions
+`isDeadPreferenceKey` **in a comment** — explaining why it deliberately asserts through the exported
+list instead — and the gate went red demanding that export's UNREAD entry be deleted. Prose about
+not using a symbol counted as using it.
+
+That is the third time a gate here has let prose vote (`evidence-gap-register-counts` counted matches
+across a whole table row rather than its status cell; `presenter-colors-contract` strips comments for
+the same reason). The corpus is stripped now, and the strip is deliberately crude because it only has
+to be sound in one direction: anything it mangles can remove a candidate reader, never invent one, so
+the failure is loud.
+
+**Stripping it immediately surfaced two things the raw corpus had been hiding**, both in the sibling
+assertion that no module is unimported:
+
+- `lib/server/tradingroom-api.ts` — the v5 API client — is imported by **nothing**. It looked
+  imported because `env.ts` names the file twice in prose. Its `applyCookies` export was already
+  catalogued as unread and blocked on the vendor; the module-level fact is the same fact one level
+  up, and is now named there too.
+- `lib/server/remote-command-harness.ts` is imported **only by tests**, which is the correct and only
+  possible state for a harness that exists so a test can execute a remote `command`. It looked
+  otherwise because several `.remote.ts` docblocks mention it by name.
+
+Neither is a new defect; both are facts the gate was reporting as false.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,565 tests passing (1 skipped), build done. `todo-next.md`'s
+`ModalHost.svelte` row and its line total were recomputed.
+
+**Five negative controls, each run and each seen RED**, on the committed tree and reverted after: the
+Enable button's `disabled` removed; the on-screen reason reworded away; the dead preference write put
+back on the Disable button (two tests); `streamingPlayerEnabled` taken off the dead-key list; and the
+comment strip turned off, which took two of `dead-export-contract`'s own assertions down — the
+control that proves the strip is load-bearing rather than cosmetic.
+
+**Not verified:** nothing was opened in a browser; the disabled buttons are asserted from the
+component's markup, reading backwards from each label to the `<button>` that opens it so the
+assertion is about that element's own attributes rather than a `disabled` that happens to sit nearby.
+
 ### 2026-08-30 03:19 UTC — Nine commands changed a message and told nobody
 
 **Runtime impact: YES.** A reaction, an edit, a deletion, a mark-answered and every Q&A change now

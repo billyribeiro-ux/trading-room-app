@@ -2018,7 +2018,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this number climbs again, the settings modal is still the extraction — it is the largest
       contiguous region left in this file and its state is almost entirely its own.
     */
-    max: 6107,
+    /*
+      6107 -> 6129, 2026-08-30, and the CONTROLS shrank while the file grew — the second time today.
+
+      The Stream Player pane's two buttons flipped a local flag and wrote a preference key nothing
+      read. They are `disabled` now, with the reason on the screen beneath them, because the feature
+      cannot be built from anything held here: the reference gets both the state and the link from
+      ITS server (`invokeAdminCmd("streamStatus")` -> `rc.enablePlayer` / `rc.playerURL`, byte
+      2,170,505), and what it serves is a public page rendering one room's screenshares to whoever
+      holds a link — an anonymous media grant nobody has designed.
+
+      So twenty-two of these lines are the argument for NOT building it, sitting where the next
+      person will look for it. That is the trade this ratchet's header describes: an extraction
+      invented to satisfy a number would move the paragraph away from the code it explains.
+    */
+    max: 6129,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's

@@ -267,7 +267,12 @@ describe('the wire has no silent break points', () => {
     const elementIds = DEAD_PREFERENCE_KEYS.filter((key) => key.includes('-'));
     const inventedNames = DEAD_PREFERENCE_KEYS.filter((key) => !key.includes('-'));
     expect(elementIds).toHaveLength(reaching - 1 - 6);
-    expect(inventedNames).toEqual(['alertDisplayMode', 'chatDisplayMode', 'presenterStyle']);
+    expect(inventedNames).toEqual([
+      'alertDisplayMode',
+      'chatDisplayMode',
+      'presenterStyle',
+      'streamingPlayerEnabled'
+    ]);
   });
 
   it('every dead key is gone from both stores, and pm-window-layout is not mistaken for one', () => {
@@ -281,7 +286,7 @@ describe('the wire has no silent break points', () => {
     */
     expect(DEAD_PREFERENCE_KEYS).not.toContain('pm-window-layout');
     expect(DEAD_PREFERENCE_KEYS).toContain('app-disable-video');
-    expect(DEAD_PREFERENCE_KEYS).toHaveLength(22);
+    expect(DEAD_PREFERENCE_KEYS).toHaveLength(23);
 
     /*
       The server half moved to `user-settings.remote.ts` with `savePreference`. Re-pointed at the
