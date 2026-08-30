@@ -604,6 +604,8 @@ uploadCarouselImage(e,i){const o=e.target,s=o.files?.[0];if(!s)return;const r=th
 
 ### note-editor-file-browser-modal — The whole file-browser modal ("Select Image" / getSessionFiles) has no counterpart
 
+**BUILT 2026-08-30 05:02 UTC.** The modal, a `Select Image` button per carousel slide, `selectFileForSlide`, and the four CSS rules — decoded with this component's own consts table (77 `file-browser-grid`, 79 `file-browser-item`, 80 `file-browser-thumb`, 81 `file-browser-name`) and the reference's scoped style block at byte 1,486,651, with the strings verbatim. The filter is `lib/session-image-files.ts`, transcribing `s.contentType?.includes("image/")` — `includes`, not `startsWith`. **Two deliberate divergences:** this room does not fetch on open (the page load already carries the same rows and every upload path invalidates it), so upstream's `Loading images...` branch is not drawn — a branch that can never render can never be checked; and the grid item is a `<button>` where the capture uses a clickable `<div>`, because it exists to be activated. `note-image-browser-contract.test.ts`.
+
 **high** · `missing-control` · reference byte **1,477,053**
 
 ```

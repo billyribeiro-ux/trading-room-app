@@ -75,11 +75,11 @@ guessed.
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,333 | no |
-| 2 | `lib/components/notes/NoteEditor.svelte` | 1,545 | no |
+| 2 | `lib/components/notes/NoteEditor.svelte` | 1,739 | no |
 | 3 | `routes/+page.svelte` | 1,482 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,393 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,077 | no |
-| 6 | `lib/components/PresentationArea.svelte` | 974 | no |
+| 6 | `lib/components/PresentationArea.svelte` | 987 | no |
 | 7 | `lib/components/RoomNavbar.svelte` | 1,005 | no |
 | 8 | `lib/components/PollPanel.svelte` | 824 | no |
 | 9 | `lib/components/RoomOverlays.svelte` | 905 | no |
@@ -92,7 +92,7 @@ guessed.
 | 16 | `lib/components/ExtraChatPane.svelte` | 595 | no |
 | 17 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 537 | no |
 | 18 | `lib/components/PostAlertModal.svelte` | 608 | no |
-| 19 | `lib/components/notes/NotesPane.svelte` | 446 | no |
+| 19 | `lib/components/notes/NotesPane.svelte` | 451 | no |
 | 20 | `lib/components/ScreenPane.svelte` | 470 | no |
 | 21 | `lib/components/VideoPlayer.svelte` | 413 | no |
 | 22 | `lib/components/PrivateChatPanel.svelte` | 401 | no |
@@ -130,7 +130,7 @@ guessed.
 | 54 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 55 | `lib/components/GifConfirmDialog.svelte` | 49 | no |
 
-**2 of 64 surfaces audited · 1,072 of 29,743 lines · 3.6%.**
+**2 of 64 surfaces audited · 1,072 of 29,955 lines · 3.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

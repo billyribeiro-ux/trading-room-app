@@ -49,6 +49,8 @@ function editor(props: {
       onVersionHistoryOpenChange: () => undefined,
       showVersionHistory: props.showVersionHistory ?? false,
       simplifiedEditor: false,
+      /* The carousel's image browser reads this; an empty room offers none. */
+      sessionImages: [],
       versions: props.versions ?? []
     }
   }).body;

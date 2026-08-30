@@ -2,6 +2,8 @@ import { globSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { svelteCodeOf, tsCodeOf } from './source-comments.js';
+
 /**
  * EVERY COMPONENT IS REACHED BY SOMETHING THE PRODUCT RENDERS.
  *
@@ -90,46 +92,16 @@ const sources = new Map(paths.map((path) => [path, readFileSync(`${ROOT}/${path}
  * and the docblocks here name almost every component in the tree. A file that merely discusses
  * `<ToggleRow>` must not thereby render it.
  */
-const tsCodeOf = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
-/**
- * A `.svelte` file with its comments removed — and NOT by running the `.ts` stripper over it.
- *
- * ## The bug this shape exists to avoid, measured on this repository
- *
- * The obvious implementation runs `/\*[\s\S]*?\*\//` over the whole file. In a Svelte file that is
- * wrong, because the TEMPLATE is not JavaScript and `/*` there is usually not a comment at all:
- *
- *     <input accept="image/*" ... />          NoteEditor.svelte:1278
- *
- * That `/` and `*` open a "comment" the regex then closes at the next real `*&#47;` — **7,002
- * characters later** — and everything between is deleted, including
- * `<BootboxDialog mode="alert" … />` on line 1430. The naive stripper removed **10,374 of this
- * file's 54,609 characters**, and a walk over the result would have reported a live component as
- * rendered by nobody.
- *
- * It did not, only because `BootboxDialog` is rendered from seven other files as well. That is luck,
- * not correctness. **Four of the 58 `.svelte` files here carry a `/*` glued to a preceding
- * character** — `NoteEditor`, `ImageUploadDialog`, `PostAlertModal` and `RoomOverlays` — so the next
- * component that happens to be rendered only inside one of those windows would be reported orphaned,
- * and whoever met that report would delete working code.
- *
- * ## The rule, which is about where the syntax is in force
- *
- * `/* … *&#47;` and `//` are JavaScript and CSS comment syntax. In a Svelte file that syntax exists
- * only inside `<script>` and `<style>`; the template's comments are `<!-- -->` and nothing else. So
- * markup comments are removed everywhere, and JS-style comments are removed **only within those two
- * blocks**. An `accept="image/*"` in the template is then what it actually is: an attribute value.
- */
-const svelteCodeOf = (source: string) =>
-  source
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(
-      /(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2>)/g,
-      (_match, open, _tag, body, close) => open + tsCodeOf(body) + close
-    );
+/*
+  `tsCodeOf` and `svelteCodeOf` MOVED to `#lib/source-comments.ts` on 2026-08-30, with the whole of
+  the argument that used to stand here.
 
+  They were correct and they were LOCAL, while eighty-two other contract tests carried the naive
+  two-liner — and one written that day lost half of `NoteEditor.svelte` to it before the loud half of
+  the failure caught it. A rule that is right in one file and wrong in eighty-two is a rule in the
+  wrong place. The tripwire below still lives here, because what it guards is this corpus.
+*/
 const isRoute = (path: string) => /(^|\/)\+(page|layout|error)\.svelte$/.test(path);
 
 /** Component name → the file(s) that define it. A list, because two directories may share a name. */

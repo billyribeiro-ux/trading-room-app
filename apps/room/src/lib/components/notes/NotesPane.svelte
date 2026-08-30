@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { SessionImageFile } from '#lib/session-image-files.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import type { NoteVersion, RoomNote } from '#lib/types.js';
   import { onMount } from 'svelte';
@@ -52,6 +53,8 @@
     readonly onSave: (noteId: number, contentHtml: string) => void | Promise<void>;
     readonly onSetWelcomeMat: (noteId: number, allRooms: boolean) => void | Promise<void>;
     readonly onUploadImages: (files: readonly File[]) => Promise<readonly string[]>;
+    /** The room's shared IMAGE files, for the carousel's browser — see `NoteEditor`'s own prop. */
+    readonly sessionImages: readonly SessionImageFile[];
     /** `noteGates.simplifiedEditor` - passed through untouched; the editor draws the toolbar. */
     readonly simplifiedEditor: boolean;
   }
@@ -72,6 +75,7 @@
     onSave,
     onSetWelcomeMat,
     onUploadImages,
+    sessionImages,
     simplifiedEditor
   }: Props = $props();
 
@@ -373,6 +377,7 @@
               onSave={(contentHtml) => onSave(activeNote.id, contentHtml)}
               onSetWelcomeMat={(allRooms) => requestWelcome(activeNote.id, allRooms)}
               {onUploadImages}
+              {sessionImages}
               onVersionHistoryOpenChange={(open) => (showVersionHistory = open)}
               {showVersionHistory}
               {simplifiedEditor}

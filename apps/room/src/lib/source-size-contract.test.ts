@@ -1482,7 +1482,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It should not: `simplifiedEditor` arrives already resolved, and `resolveNoteSurfaceGates` is
       where that kind of question is answered.
     */
-    max: 1546,
+    /*
+      1546 -> 1740, 2026-08-30. The carousel's image browser — `note-editor-file-browser-modal`.
+
+      A presenter who had already uploaded an image through Files had no way to reach it from a
+      slide: the row offered a bare URL box and nothing else. The modal, its per-slide button, the
+      handler and four transcribed CSS rules are here, decoded with this component's own consts
+      table (77/79/80/81) and the reference's scoped style block at byte 1,486,651.
+
+      Two paragraphs of the addition are decisions rather than markup: why the `Loading images...`
+      branch is NOT drawn (this room's list arrives with the page load, so it can never render — and
+      a branch that can never render can never be checked), and why the grid item is a `<button>`
+      where the capture uses a clickable `<div>`.
+
+      This file is also the one where a naive comment strip deletes code — `accept="image/*"` at its
+      image dialog — which `orphan-component-contract.test.ts` measured on 2026-08-29 and which the
+      first draft of this feature's contract walked straight into.
+    */
+    max: 1740,
     why: 'the note editor and its transcribed toolbar; the toolbar is the extraction target'
   },
   {
@@ -1495,7 +1512,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       untouched, `simplifiedEditor` included. If this number climbs, the thing to check is whether a
       prop has started being transformed on the way through rather than forwarded.
     */
-    max: 447,
+    /*
+      447 -> 452, 2026-08-30. `sessionImages` forwarded to the editor for the carousel's image
+      browser. Five lines: the prop, its type import, and the pass-through.
+    */
+    max: 452,
     why: 'the note tab strip and the three confirmations; everything else passes through'
   },
   {
@@ -1709,7 +1730,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `#lib/user-id-watermark.ts`; what is here is one `$derived` and the paragraph saying why the
       answer is computed at this level rather than at each of the two components.
     */
-    max: 975,
+    /*
+      975 -> 988, 2026-08-30. The room's shared IMAGE files, filtered once for the note carousel's
+      browser. The reference fetches that list on every open; `data.files` is already here and every
+      upload path invalidates it, so this is a `$derived` over data the page holds rather than a
+      second read of it.
+    */
+    max: 988,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {

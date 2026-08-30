@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sessionImageFiles } from '#lib/session-image-files.js';
   import { userIdWatermark as resolveUserIdWatermark } from '#lib/user-id-watermark.js';
   /*
     `app-webcam-holder` + `app-presentationarea` — the fifth and last of the plan's template
@@ -333,6 +334,16 @@
   }: Props = $props();
 
   /**
+   * The room's shared IMAGE files, for the note carousel's "Select Image" browser.
+   *
+   * Filtered HERE rather than in the editor, for the reason every other room fact reaches a
+   * component already decided — and once rather than per open, because `data.sharedFiles` is the
+   * same array the Files pane renders. `#lib/session-image-files.ts` carries the reference's own
+   * filter and why this room does not fetch on open.
+   */
+  const carouselImages = $derived(sessionImageFiles(data.files));
+
+  /**
    * The anti-leak watermark this viewer sees, resolved ONCE for both videos.
    *
    * `StreamingView` has carried this overlay since it was built and `ScreenPane` never had it, so a
@@ -340,6 +351,7 @@
    * SCREENSHARE the setting is named for (`SV-SP-01`). Two components render a video this setting
    * covers; the rule lives in `#lib/user-id-watermark.ts` and each of them receives the answer.
    */
+
   const userIdWatermark = $derived(
     resolveUserIdWatermark({
       viewerIsPresenter: isPresenter,
@@ -752,6 +764,7 @@
               onBringEveryone={(noteId) => notes.bringEveryoneTo(noteId)}
               {giphyApiKey}
               notes={data.notes}
+              sessionImages={carouselImages}
               newNoteOpen={notes.newNoteOpen}
               onCreate={async (name) => {
                 const result = await notes.submitMutation<{

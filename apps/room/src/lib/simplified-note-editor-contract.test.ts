@@ -43,6 +43,8 @@ const editor = (simplifiedEditor: boolean) =>
       onRequestRestore: () => undefined,
       onSave: () => undefined,
       onSetWelcomeMat: () => undefined,
+      /* The carousel's image browser reads this; an empty room offers none. */
+      sessionImages: [],
       onUploadImages: async () => [],
       onVersionHistoryOpenChange: () => undefined,
       showVersionHistory: false,

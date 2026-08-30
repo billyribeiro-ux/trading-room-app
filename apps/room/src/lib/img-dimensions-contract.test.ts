@@ -65,11 +65,26 @@ const SHEETS = [
   'app.css'
 ] as const;
 
+/**
+ * Components whose OWN `<style>` block carries a sizing rule.
+ *
+ * A separate list rather than a fifth entry above, because these are not shipped sheets and are not
+ * read the same way — the verifier extracts the `<style>` element before parsing. Kept narrow and
+ * explicit for the reason `SHEETS` is: a union of everything would let a typo name a file that has
+ * no stylesheet at all, and the failure would be a rule "not found" rather than a path that is
+ * wrong.
+ *
+ * `NoteEditor` is here because the reference's own rules for its image browser are component-scoped
+ * (`[_ngcontent-%COMP%]`), which is exactly what a Svelte `<style>` gives — so they are transcribed
+ * beside the markup they scope to rather than moved into a shared sheet to satisfy this verifier.
+ */
+const SCOPED_SHEETS = ['lib/components/notes/NoteEditor.svelte'] as const;
+
 interface SizedEntry {
   /** How many images in this file share this `src` and this disposition. The count IS the assertion. */
   count: number;
   /** Which shipped sheet carries the rule. */
-  sheet: (typeof SHEETS)[number];
+  sheet: (typeof SHEETS)[number] | (typeof SCOPED_SHEETS)[number];
   /** The rule's selector, verbatim. Located by selector, never by line - lines do not survive edits. */
   selector: string;
   /** The declarations that make the box. Both, always: one alone leaves an axis free to shift. */
@@ -106,6 +121,17 @@ const SIZED_BY_CSS: Record<string, Record<string, SizedEntry>> = {
       height: '32px',
       requiresAncestor: 'app-privchat',
       why: 'the per-tab avatar in the private-chat tab strip.'
+    }
+  },
+  'lib/components/notes/NoteEditor.svelte': {
+    '{file.url}': {
+      count: 1,
+      /* This component's OWN `<style>` block — see the extraction note in the verifier below. */
+      sheet: 'lib/components/notes/NoteEditor.svelte',
+      selector: '.file-browser-thumb',
+      width: '100%',
+      height: '100px',
+      why: "the carousel image browser's thumbnail. A fixed 100px row height with `object-fit: cover` is what keeps a grid of differently-shaped uploads from reflowing as each one lands — transcribed from the reference at byte 1,486,651."
     }
   },
   'lib/components/RoomSidebar.svelte': {
@@ -419,7 +445,31 @@ describe('every <img> has a box before its bytes arrive', () => {
   it('proves every SIZED_BY_CSS rule still exists, still sizes, and still reaches its image', () => {
     for (const [file, entries] of Object.entries(SIZED_BY_CSS)) {
       for (const [src, entry] of Object.entries(entries)) {
-        const sheet = readFileSync(`${ROOT}${entry.sheet}`, 'utf8');
+        /*
+          A `.svelte` sheet is that component's OWN `<style>` block, extracted before parsing.
+          Added 2026-08-30 for the note editor's image browser, whose four rules are transcribed from
+          the reference's component-scoped block (`[_ngcontent-%COMP%]`) into the Svelte `<style>`
+          that gives the same scoping — which is where this component already keeps its other
+          transcribed rules. Registering those in a shared sheet instead would have moved them away
+          from the markup they scope to, purely to satisfy a verifier that had never met one.
+        */
+        const raw = readFileSync(`${ROOT}${entry.sheet}`, 'utf8');
+        /*
+          Membership in `SCOPED_SHEETS`, not the file EXTENSION. The first version tested
+          `.endsWith('.svelte')`, which works and leaves that constant used only as a type — so a
+          path added to the list without being handled here, or handled here without being listed,
+          would both compile. One test, one source of truth.
+        */
+        const sheet = (SCOPED_SHEETS as readonly string[]).includes(entry.sheet)
+          ? /*
+              Anchored at column zero, which is where Svelte's single `<style>` block lives — and it
+              has to be: the first draft matched the first `<style>` ANYWHERE and found one inside a
+              comment that quotes the tag, so postcss was handed the component's markup and threw on
+              `file.name`. A component may have only one style element, so the anchored match is
+              exact rather than merely luckier.
+            */
+            (/^<style>\n([\s\S]*)\n<\/style>/m.exec(raw)?.[1] ?? '')
+          : raw;
         const declarations = new Map<string, string>();
         let seen = false;
 

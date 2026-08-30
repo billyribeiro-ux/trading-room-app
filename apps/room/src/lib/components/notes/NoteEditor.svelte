@@ -14,6 +14,7 @@
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
   import type { NoteVersion } from '#lib/types.js';
+  import type { SessionImageFile } from '#lib/session-image-files.js';
   import {
     PtrCarousel,
     findCarousel,
@@ -65,6 +66,15 @@
       transcription, what the capture does and does not evidence, and the one decision taken beyond
       it; this component only draws the two shapes.
     */
+    /**
+     * The room's shared IMAGE files, already filtered — the carousel's "Select Image" browser.
+     *
+     * Filtered by the page rather than here (`#lib/session-image-files.ts`), for the reason every
+     * other room fact reaches this component already decided. The reference fetches this list on
+     * every open (`getSessionFiles`, byte 1,477,053); the page load already carries the same rows
+     * and every upload path invalidates it, so the browser reads what the Files pane reads.
+     */
+    readonly sessionImages: readonly SessionImageFile[];
     readonly simplifiedEditor: boolean;
     readonly versions: readonly NoteVersion[];
   }
@@ -82,6 +92,7 @@
     onUploadImages,
     onVersionHistoryOpenChange,
     showVersionHistory,
+    sessionImages,
     simplifiedEditor,
     versions
   }: Props = $props();
@@ -191,6 +202,35 @@
   let imageUrl = $state('');
   let imageFiles = $state.raw<readonly File[]>([]);
   let videoUrl = $state('');
+  /**
+   * Which carousel slide the image browser is filling, or `null` when it is closed.
+   *
+   * `fileBrowserTargetIndex` upstream, set by `openFileBrowser(e)` and read by `selectFileForSlide`.
+   * An INDEX and not a slide key, because that is what `updateCarouselSlide` already addresses a row
+   * by — and because the browser is closed before the list can change under it.
+   */
+  let fileBrowserTargetIndex = $state<number | null>(null);
+
+  /** `openFileBrowser(e)` — byte 1,477,053, minus the fetch. See `session-image-files.ts`. */
+  function openFileBrowser(index: number) {
+    fileBrowserTargetIndex = index;
+  }
+
+  /**
+   * `selectFileForSlide(file)` — put the chosen image in the slide and close the browser.
+   *
+   * The URL goes in the slide's `url`, never its `link`: the reference's own binding is
+   * `z("src", e.vidPath)` on the thumbnail and the slide's image field is what it fills. A presenter
+   * who wants the slide to link somewhere types that separately, which is why the row has two
+   * inputs.
+   */
+  function selectFileForSlide(file: SessionImageFile) {
+    const index = fileBrowserTargetIndex;
+    fileBrowserTargetIndex = null;
+    if (index === null) return;
+    updateCarouselSlide(index, 'url', file.url);
+  }
+
   let carouselSlideKey = 1;
   let carouselSlides = $state.raw<readonly EditorCarouselSlide[]>([newCarouselSlide()]);
   let carouselInterval = $state(5);
@@ -1383,6 +1423,21 @@
               value={slide.link}
               oninput={(event) => updateCarouselSlide(index, 'link', event.currentTarget.value)}
             />
+            <!--
+              `openFileBrowser($index)` — the reference's per-slide entry point into the image
+              browser. Without it a presenter who has already uploaded an image through Files has no
+              way to reach it from a slide: the row offers a bare URL box and nothing else
+              (`note-editor-file-browser-modal`).
+            -->
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onclick={() => openFileBrowser(index)}
+              disabled={sessionImages.length === 0}
+              title={sessionImages.length === 0
+                ? 'No images have been uploaded to this room yet.'
+                : 'Choose an image already uploaded to this room'}>Select Image</button
+            >
             <button type="button" class="btn btn-danger" onclick={() => removeCarouselSlide(index)}
               >Delete slide</button
             >
@@ -1417,6 +1472,89 @@
           class="btn btn-primary note-btn note-btn-primary"
           onclick={insertCarousel}>{carouselDialogAction}</button
         >
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!--
+  ── THE IMAGE BROWSER — `O0e`, byte 1,466,205 ────────────────────────────────────────────────────
+
+  A presenter who had already uploaded an image through Files had no way to reach it from a carousel
+  slide: the row offered a bare URL box and nothing else (`note-editor-file-browser-modal`).
+
+  Decoded with this component's own consts table:
+
+    73  [1,"text-center","py-4"]                            the loading state's wrapper
+    75  [1,"text-center","py-4","text-muted"]               the empty state's
+    76  [1,"fas","fa-images","fa-2x","mb-2"]                its icon
+    77  [1,"file-browser-grid"]
+    79  [1,"file-browser-item",3,"click","title"]
+    80  [1,"file-browser-thumb",3,"src","alt"]
+    81  [1,"file-browser-name"]
+
+  and the strings verbatim: ` Select Image `, `No images found. Upload images via Files first.`,
+  ` Cancel `. The four CSS rules are in this component's `<style>` below, transcribed from the
+  reference's own scoped block at byte 1,486,651.
+
+  ## THE LOADING STATE IS NOT DRAWN, and that is a measured omission
+
+  Upstream's switch is `O(7, fileBrowserLoading ? 7 : 0 === fileBrowserImages.length ? 8 : 9)` —
+  three branches, because it POSTs `getSessionFiles` every time the browser opens. This room's list
+  arrives with the page load and is invalidated by every upload path, so there is no moment at which
+  it is loading. Drawing `Loading images...` here would be a branch that can never render, which is a
+  branch that can never be checked — the dead-control shape this repository removes rather than adds.
+  `session-image-files.ts` carries the rest of that argument.
+-->
+{#if fileBrowserTargetIndex !== null}
+  <div class="note-modal open">
+    <div class="note-modal-dialog">
+      <div class="note-modal-content">
+        <div class="note-modal-header">
+          <h4 class="modal-title"><i class="fas fa-images"></i> Select Image</h4>
+          <button
+            type="button"
+            class="btn-close"
+            aria-label="Close"
+            onclick={() => (fileBrowserTargetIndex = null)}
+          ></button>
+        </div>
+        <div class="note-modal-body">
+          {#if sessionImages.length === 0}
+            <div class="text-center py-4 text-muted">
+              <i class="fas fa-images fa-2x mb-2"></i>
+              <div>No images found. Upload images via Files first.</div>
+            </div>
+          {:else}
+            <div class="file-browser-grid">
+              {#each sessionImages as file (file.url)}
+                <!--
+                  A BUTTON where the reference uses a clickable `<div>` (const 79 carries `click` on
+                  a plain div). This one diverges deliberately: the element exists to be activated,
+                  so it has to be reachable from a keyboard, and `type="button"` is what keeps it out
+                  of the enclosing form. The three class strings are the capture's and are what the
+                  transcribed CSS targets.
+                -->
+                <button
+                  type="button"
+                  class="file-browser-item"
+                  title={file.name}
+                  onclick={() => selectFileForSlide(file)}
+                >
+                  <img class="file-browser-thumb" src={file.url} alt={file.name} />
+                  <div class="file-browser-name">{file.name}</div>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        <div class="note-modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick={() => (fileBrowserTargetIndex = null)}>Cancel</button
+          >
+        </div>
       </div>
     </div>
   </div>
@@ -1496,6 +1634,62 @@
     max-height: calc(100vh - 40px);
     margin: 20px auto;
     overflow: auto;
+  }
+
+  /*
+    The image browser's four rules, transcribed value for value from the reference's own scoped block
+    at byte 1,486,651 with the `[_ngcontent-%COMP%]` attribute selectors dropped — Svelte's `<style>`
+    gives this component the same scoping Angular's attribute did.
+
+    `object-fit: cover` on the thumb and the three ellipsis properties on the name are what make a
+    grid of differently-shaped uploads read as a grid; `minmax(130px, 1fr)` with `auto-fill` is what
+    makes it reflow instead of scrolling sideways.
+  */
+  .file-browser-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .file-browser-item {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    overflow: hidden;
+    text-align: center;
+    padding: 4px;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+    /* OURS: the element is a `<button>` here rather than the capture's clickable `<div>`, so the
+       three properties a button brings and a div does not are reset to the div's. */
+    background: none;
+    width: 100%;
+    display: block;
+  }
+
+  .file-browser-item:hover {
+    border-color: #0d6efd;
+    background: #f0f6ff;
+  }
+
+  .file-browser-thumb {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+    display: block;
+  }
+
+  .file-browser-name {
+    font-size: 0.72rem;
+    color: #555;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .carousel-slide-row {

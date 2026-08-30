@@ -20,6 +20,8 @@ describe('NoteEditor evidence contract', () => {
         showVersionHistory: false,
         // The full colour control; `simplified-note-editor-contract.test.ts` covers the other shape.
         simplifiedEditor: false,
+        /* The carousel's image browser reads this; an empty room offers none. */
+        sessionImages: [],
         versions: []
       }
     }).body;

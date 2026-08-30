@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 05:02 UTC — The note carousel's image browser, and a comment stripper that was right in one file and wrong in eighty-two
+
+**Runtime impact: YES.** A presenter building a note carousel can pick an image already uploaded to
+the room instead of having to know its URL.
+
+#### `note-editor-file-browser-modal`
+
+The carousel dialog offered a bare URL box per slide and nothing else. A presenter who had already
+uploaded an image through Files had **no way to reach it**.
+
+Decoded with this component's own consts table — 77 `file-browser-grid`, 79 `file-browser-item`,
+80 `file-browser-thumb`, 81 `file-browser-name` — and the reference's scoped style block at byte
+1,486,651, with the strings verbatim: ` Select Image `, `No images found. Upload images via Files
+first.`, ` Cancel `. The filter is `s.contentType?.includes("image/")` — **`includes`, not
+`startsWith`**, which reads like a mistake and is the shipped behaviour; narrowing it would silently
+drop a file the reference shows.
+
+**Two deliberate divergences.** This room does not fetch on open: `data.files` already carries the
+same rows the Files pane renders and every upload path invalidates it, so upstream's third branch —
+`Loading images...` — can never render here and is therefore not drawn. A branch that can never
+render is a branch that can never be checked. And the grid item is a `<button>` where the capture
+uses a clickable `<div>`, because the element exists to be activated and has to be reachable from a
+keyboard; the three class strings are the capture's and are what the transcribed CSS targets.
+
+#### A RE-DISCOVERY, and the correction is where it lives rather than what it is
+
+The first draft of this feature's contract stripped comments the way eighty-two other contract tests
+do:
+
+```ts
+source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ')
+```
+
+Half of `NoteEditor.svelte` vanished. `accept="image/*"` is an ordinary HTML attribute whose `/*`
+opens a "comment" the regex closes thousands of characters later.
+
+**This repository already knew.** `orphan-component-contract.test.ts` measured it on 2026-08-29 — it
+names the four `.svelte` files that carry such a `/*`, states that the naive stripper removed 10,374
+of `NoteEditor`'s 54,609 characters, and carries a tripwire so a fifth cannot appear unnoticed. It
+also owned the correct implementation, `svelteCodeOf`, which strips JS comments **only inside
+`<script>` and `<style>`**, because that is the only place that syntax is in force.
+
+What was wrong was that the correct rule was local to the test that found it. It is
+`#lib/source-comments.ts` now, with that file's own prose moved rather than restated, and the orphan
+test imports it. The other eighty-two are deliberately not rewritten, and the reason is measured
+rather than assumed: across every source file in `src/`, `NoteEditor.svelte` is the **only** one
+where the naive strip removes code. The tripwire stays where it is, because what it guards is that
+corpus.
+
+`img-dimensions-contract` also learned to read a component's own `<style>` block, so the thumbnail's
+box could be registered beside the markup it scopes rather than moved into a shared sheet to satisfy
+a verifier that had never met one. Its first attempt matched the first `<style>` anywhere and found
+one inside a comment quoting the tag; the match is anchored at column zero now, where Svelte's single
+style element lives.
+
+That change also cost two gate runs, and both are worth recording because the failure mode is the
+one this repository has a rule about. `svelte-check` refused the new register entry — `sheet` is a
+union of the four shipped stylesheets — and then eslint refused the `SCOPED_SHEETS` constant added to
+widen it, because it was used only as a TYPE. The verifier now branches on membership in that list
+rather than on the `.svelte` extension, which makes the constant load-bearing: a path added to the
+list without being handled, or handled without being listed, would previously both have compiled.
+
+**And the harness reported "exit code 0" for both of those failed runs.** The gate's own
+`gate-exit=1` is what said otherwise. That is the same trap recorded earlier in this session — a
+piped or wrapped command's status is not the gate's — and it is why every gate here is run with its
+exit code echoed into the log rather than read from the tool result.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code 0 read directly — prettier and eslint clean,
+`svelte-check` 0 errors, 3,678 tests passing (1 skipped), build done. The filter's four rules are
+EXECUTED, including the `includes`-not-`startsWith` case and the missing-content-type case.
+
+**Five negative controls, each run and each seen RED**, on the committed tree and reverted after: the
+filter tightened to `startsWith`; the chosen image landing in the slide's LINK field instead of its
+image field; the thumbnail losing its fixed height; the `Select Image` button losing its handler; and
+`svelteCodeOf` reverted to stripping JS comments across the whole file — which took **four** tests
+down, including the orphan test's own tripwire, and is the control proving the shared rule is the
+correct one rather than a tidier one.
+
+**Not verified:** nothing was opened in a browser, so no thumbnail was clicked. The modal's markup,
+its two divergences and the slide write are read from source with their bounds asserted.
+
 ### 2026-08-30 04:44 UTC — The inline alert entry: a checkbox that controlled nothing, and a stylesheet with no markup
 
 **Runtime impact: YES.** A presenter can post an alert from the alerts column without opening the

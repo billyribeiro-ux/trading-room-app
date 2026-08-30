@@ -385,6 +385,14 @@ describe('every export has a reader, or says why it has none', () => {
         it. "Only tests import it" is the correct and only possible state for it, so it is named
         rather than hidden.
       */
+      /*
+        A COMMENT STRIPPER, and it is on this list for the same reason the harness above is: only a
+        test ever needs it. `orphan-component-contract.test.ts` owned the correct implementation
+        locally while eighty-two other contract tests carried a naive two-liner that silently deletes
+        code from four of this room's `.svelte` files. Moving it out was the point; it has two
+        readers now and both are tests, which is the only state it can be in.
+      */
+      'lib/source-comments.ts',
       'lib/server/remote-command-harness.ts',
       'lib/room/derived-return-probe.svelte.ts'
     ]);
