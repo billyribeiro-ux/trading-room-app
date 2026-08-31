@@ -183,6 +183,85 @@ decides what building the tab costs.
 That is the failure `CLAUDE.md`'s own checklist names: a comment claiming absence, written from a
 grep, surviving long enough that the next reader plans around it.
 
+### 2026-08-31 08:48 EDT — The player and the two alert panes, read end to end; three wrong citations found, two fixed
+
+**Runtime impact: NO.** Three comment corrections inside two `.svelte` files, one register document,
+one new contract test, one bounded slice in an existing test. No template, no logic, no behaviour
+changed: both edited components were recompiled with the repository's own `svelte@5.57.0` and the
+emitted module differs ONLY in the comment text itself — Svelte carries JSDoc through, so "byte
+identical" would have been a false claim. With comments stripped the two emitted modules are equal
+character for character, 11,369 and 13,472 characters.
+
+`StreamingView.svelte`, `day-trade-alerts/DayTradeAlertsPane.svelte` and
+`swing-alerts/SwingAlertsPane.svelte` audited against
+`apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, twenty-one rows appended to
+`docs/decoded/room-surface-audit-2026-08-30.md` as `## StreamingView.svelte`,
+`## DayTradeAlertsPane.svelte` and `## SwingAlertsPane.svelte`. The `consts` tables of both
+components were bracket-walked BY VALUE — eighteen entries at 1,909,054 for `app-streaming-view`,
+292 at 1,994,264 for `app-presentationarea` — rather than indexed to a slot a comment named.
+
+**Three citations were wrong and every one of them pointed at plausible bytes**, which is why they
+had survived: `2,017,748` lands on the `h` of `hasDayTradeAlerts`, seven bytes into
+`O(49,o.hasDayTradeAlerts?49:-1)` at **2,017,741**; `1,945,235` lands on the opening quote of the
+string inside `v(4," Latest Day Trade Alerts (Last ")` at **1,945,231**. Both are corrected in
+`DayTradeAlertsPane.svelte` (`DTP-01`). The third is the same 2,017,748 at
+`PresentationArea.svelte:947` and is deliberately **not** touched — that file was outside this
+batch's three surfaces — so it is named in the row instead.
+
+**`StreamingView.svelte`'s only provenance pointer named a file that is not in this checkout**
+(`STV-01`). It cited `docs/source/components/app-streaming-view.full.js` and sixteen line ranges
+into it; `docs/source` is one of the thirteen gitignored capture roots `gate/evidence-bound-tests.mjs`
+already reports missing on every vitest run. The docblock now names the pinned v4 bundle and the
+class's byte range, and the row carries a table mapping all twenty-six members to their v4 offsets.
+
+**Two reference defects were read out end to end and are recorded rather than reproduced.** A
+buffer-size click upstream reloads the HLS pipeline TWICE — `setBufferSize` calls `loadStream` AND
+`setPreference` (1,155,143) emits `preferenceChanged`, which the component's own `ngOnInit`
+subscription (1,902,159) answers with a second `loadStream` — so with N streams live one click costs
+2N teardowns; ours costs N (`STV-02`). And the adaptive machinery is one-shot: `cleanup()` clears the
+monitor, nothing resets `hasStartedPlaying`, and `startPerformanceMonitoring` has exactly two callers,
+so after the first reload `BUFFER_CHECK_WINDOW`, `BUFFER_THRESHOLD` and `MAX_RECOVERY_ATTEMPTS` stop
+meaning anything (`STV-04`). Ours reproduces that faithfully and now says so under assertion.
+
+**Six rows are `BLOCKED` on the Svelte MCP, which was not available in this session.** `CLAUDE.md`
+makes it mandatory for every `.svelte` touch, so no template or lifecycle change was made: the
+missing `{' '}` mustaches on eleven text nodes across the three surfaces (`STV-06`, `DTP-02`,
+`SWP-01`) and the missing `this.hls` guard that restarts a native-HLS viewer's stream on a
+buffer-size change (`STV-03`) are measured, named and left. The two edits that were made are comment
+text only.
+
+**New:** `apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts` — 167
+assertions. It pins all 113 byte offsets the twenty-one rows and the three surfaces cite, AT their
+offsets, and it discovers its own subjects: a citation added later without a pin fails there rather
+than going unverified. Four negative controls were run and each printed its failure — a one-byte
+offset shift went red three ways (the offset, and both coverage assertions); an unpinned
+`byte 1,234,567` added to `SwingAlertsPane.svelte` went red on coverage; restoring `2,017,748` to
+the pane went red on two assertions; and resetting `hasStartedPlaying` inside `cleanup()` — the
+change that would make `STV-04` stale — went red on `expected 2 to be 1`.
+
+**Fixed in `room-surface-audit-counts.test.ts`:** `lists exactly that many refuted claims under it`
+sliced from the refuted heading to the END of the file, which was correct only while that section
+was last. The three appended sections carry markdown tables of their own, and forty-eight of their
+rows were counted as refuted claims — `expected [ …(99) ] to have a length of 51`. The slice is
+bounded at the next `## ` heading now, with its end anchor checked rather than inlined, for the
+reason the surfaces-table parser twenty lines below already states.
+
+**What the gate caught that nothing else would have.** The first run went red four ways and every
+one of them was mine: `prettier` on the new test file; `no-control-regex` on an ASCII check that was
+the `Buffer.byteLength` equality spelled twice and is now that equality alone, with the proof written
+out; `slice-anchor-contract` at `143 against a ceiling of 142`, from two `BUNDLE.slice(a,
+BUNDLE.indexOf(…))` in the `DTP-03` rule reader — bound to locals and asserted now, which matters
+here because a -1 end would have made a six-selector count come out at zero and turned a
+`not.toContain` GREEN; and the `StreamingView` docblock at four lines instead of three, which failed
+`source-size-contract` (`606 against a ceiling of 605`) and `todo-next-coverage-contract`
+(`says 604, is 605`) at once. The docblock fix is line-neutral now: 604 before, 604 after.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit 0 read from the log, 275 test files, 4,781 passed. The Svelte MCP was NOT
+available in this session and is reported as such at every row that would have needed it; in its
+place both edited components were compiled before and after and their emitted modules compared with
+comments stripped (equal), `svelte-check` and `prettier --check` ran inside the gate, and no
+`.svelte` change touched anything but comment text.
+
 ### 2026-08-31 08:45 EDT — Room-surface audit batch 3: `RoomNavbar`, `RoomOverlays`, `ExtraChatPane`
 
 **Runtime impact: YES.** Six behaviour changes, all in the room: one navbar item reordered, one

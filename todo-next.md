@@ -90,10 +90,10 @@ guessed.
 | 14 | `lib/components/ScreenPane.svelte` | 669 | no |
 | 15 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 638 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
-| 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
-| 18 | `lib/components/StreamingView.svelte` | 604 | no |
+| 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | `## DayTradeAlertsPane.svelte` in the v4 register — **5 rows. |
+| 18 | `lib/components/StreamingView.svelte` | 604 | `## StreamingView.svelte` in the v4 register — **10 rows, from one end-to-end reading of class `xCe` — bytes 1,901,122 to 1,914,468 of the pinned |
 | 19 | `lib/components/FilesPane.svelte` | 585 | no |
-| 20 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | no |
+| 20 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | `## SwingAlertsPane.svelte` in the v4 register — **6 rows. |
 | 21 | `lib/components/notes/NotesPane.svelte` | 524 | `## NotesPane.svelte` in the v4 register — 4 rows, read against `zSe` (byte 1,930,173) — the notes pane inside `app-presentationarea` — and its |
 | 22 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
 | 23 | `lib/components/VideoPlayer.svelte` | 411 | `## VideoPlayer.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860, |
@@ -157,7 +157,7 @@ guessed.
 | 81 | `routes/logout/+page.svelte` | 31 | no |
 | 82 | `routes/+layout.svelte` | 27 | no |
 
-**32 of 82 surfaces audited · 11,295 of 35,993 lines · 31.4%.**
+**35 of 82 surfaces audited · 13,098 of 35,993 lines · 36.4%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

@@ -177,7 +177,7 @@ as it ran.
 
 ## Where the work stands
 
-**0 open · 410 closed · 410 rows.**
+**0 open · 431 closed · 431 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -9792,3 +9792,935 @@ upstream gives that one different margins on purpose.
 
 *This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
 two-verifier pass the tables above describe, and therefore deliberately outside them.*
+## StreamingView.svelte
+
+**10 rows, from one end-to-end reading of class `xCe` — bytes 1,901,122 to 1,914,468 of the pinned
+v4 bundle — with its `consts` table bracket-walked BY VALUE from 1,909,054 rather than looked up by
+slot.** No count of "behaviours confirmed present" is given because none was taken; what was taken
+is the difference list, and it is the ten rows below.
+
+> **This is the PLAYER, not the screenshare pane.** `## StreamingView + ScreenPane + ScreenTabs`
+> above reads the two together and files eleven `SV-SP-` rows, of which `SV-SP-01`, `SV-SP-10` and
+> `SV-SP-13` touch this file. They are cited here and not re-argued. `SV-SP-12` — refuted in the
+> table below the fold — already established that this component's detach members are dead; `STV-08`
+> extends that from two members to ten, with the occurrence counts and a passing control, because
+> the refutation established *"these are dead"* and not *"here is everything else that came with
+> them"*.
+>
+> **Every offset in this section was re-derived rather than copied**, and the bundle is byte-for-byte
+> ASCII — `chars === bytes === 2,891,205`, measured with `readFileSync(path)` and
+> `readFileSync(path, 'utf8')` side by side — so a character index into it IS a byte offset and the
+> CRLF hazard that cost a correction earlier today cannot arise for this artefact. The gate for this
+> section and the two below it is
+> `apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts`.
+>
+> **`apps/room/docs/MEDIA-PLANE-MEASURED.md` was read before any claim here about playback**, and
+> `STV-10` records exactly what it settles and what it does not.
+
+### STV-01 — The file's only provenance pointer names a decode workspace that is not in this checkout
+
+**FIXED 2026-08-31.** The docblock's opening sentence now names the pinned v4 bundle and the byte
+range of the class, and points at this row for the per-member map.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`StreamingView.svelte:5` said *"Transcribed from `docs/source/components/app-streaming-view.full.js`,
+all 418 lines"*, and **that path does not exist here.** The glob `apps/room/docs/*/*.js` returns
+exactly two files — `source-v3-2026-08-15/main.99a5781d1d7a7775.js` and
+`source-v4-2026-08-15/main.d1d09071be31f1ba.js` — and `apps/room/docs/**/*.full.js` returns none.
+That is the absence REPORTED with its passing control, not inferred from a failed grep: the same
+glob family that finds nothing for `*.full.js` finds both bundles.
+
+**And the harness says the same thing independently**, which is the confirmation that turns a glob
+into a fact. Every `vitest` run in `apps/room` opens with
+`42 evidence-bound test file(s) excluded: this checkout is missing 13 of 14 reference-capture roots
+(docs/source, second-dump, new-evidence, …)` — `gate/evidence-bound-tests.mjs` already knows
+`docs/source` is one of the gitignored capture roots that is not here. **That is not a defect and
+nothing is being asked for**: the roots are gitignored by design and `source-v4-2026-08-15` is the
+one that IS pinned in. The defect is only that a component's docblock cites a missing root as
+though it were the artefact to re-read.
+
+**The cost is sixteen dead citations in one file**, because every other reference in it is a line
+number into that missing artefact. Counted rather than estimated —
+`grep -onE "lines? [0-9]+(-[0-9]+)?"` returns exactly sixteen, at file lines 84, 110, 113, 119, 192,
+200, 207, 238, 256, 264, 300, 311, 334, 350, 361 and 367: `lines 21-24`, `line 116`, `267-277`,
+`50-111`, `45-49`, `133-139`, `141-158`, `159-179`, `211-218`, `180-210`, `219-228`, `121-132`,
+`29-36`, `229-238`, `239-243` and `278-285`. Byte `1901148` on the old line 7 was the one citation
+that resolved, and it does: `function wCe(t,n){1&t&&(d(0,"div",2),T(1,"i",15),v(2,"\xa0Loading
+Stream..."),u())}` begins there exactly.
+
+**Two more of the same shape are in `mtx-streams.ts` and are named rather than counted here**, since
+that file is not one of this batch's three surfaces: `app-streaming-view.full.js:113-115` and `:116`
+for the `__reb` suffix and the playlist URL, and `docs/source/main.d6d3c112b59b7d0d.js` at byte
+1137300 for `MtxHandlerService` — a THIRD bundle, neither v3 nor v4. The two constructs those cite
+are live in v4 at **1,903,977** (`setupStream`) and were re-read this session; `__reb` is built and
+correct.
+
+**The map, so the next reader re-derives instead of trusting.** Each of these was found by searching
+for the member's own opening text and each occurs EXACTLY ONCE in all 2,891,205 bytes:
+
+| member | v4 byte | member | v4 byte |
+| --- | ---: | --- | ---: |
+| `const SCe=["videoPlayer"]` | 1,901,122 | `setupHlsEventListeners(e)` | 1,906,064 |
+| the five sub-templates (`wCe`) | 1,901,148 | `handleFatalError(e)` | 1,906,919 |
+| `let xCe=(()=>{class t{constructor` | 1,901,632 | `setupNativeHLS(e)` | 1,907,122 |
+| `this.BUFFER_CHECK_WINDOW=3e4` | 1,902,027 | `toggleFullscreen()` | 1,907,373 |
+| `this.MAX_RECOVERY_ATTEMPTS=2` | 1,902,104 | `toggleMute()` | 1,907,652 |
+| `ngOnInit()` | 1,902,159 | `onVolumeChange(e)` | 1,907,778 |
+| `cleanup()` | 1,902,616 | `newScreenStream(e)` | 1,907,934 |
+| `getHlsConfig()` | 1,902,786 | `reAttachScreen()` | 1,908,154 |
+| `setupStream()` | 1,903,977 | `getBufferSizeName()` | 1,908,449 |
+| `loadStream()` | 1,904,378 | `setBufferSize(e)` | 1,908,582 |
+| `startPerformanceMonitoring()` | 1,904,725 | `consts:[` | 1,909,054 |
+| `checkAndAdaptPerformance()` | 1,904,918 | the `styles:[` block | 1,910,939 |
+| `adaptToPerformanceIssues()` | 1,905,469 | end of class | 1,914,468 |
+
+**Fixed in the comment and not in the sixteen line references**, deliberately, and the fix is
+LINE-NEUTRAL — three lines rewritten in place, 604 before and 604 after. That is not tidiness: the
+file is one line under its `source-size-contract` ceiling of 605 AND is pinned at 604 by
+`todo-next.md`, which `todo-next-coverage-contract.test.ts` checks and which this batch is not
+permitted to edit, so a fourth line fails two gates at once. Both were seen red — `606 lines against
+a ceiling of 605` and `says 604, is 605` — on the first attempt at this sentence.
+
+Sixteen edits inside a docblock that this repository treats as a deliberate practice is also sixteen
+chances to mangle one, and the Svelte MCP that `CLAUDE.md` makes mandatory for `.svelte` work was
+**not available in this session**. One sentence naming the artefact, plus this table pinned by the
+contract test, makes all sixteen resolvable without touching them.
+
+**low** · `defect` · reference byte **1,901,148**
+
+```
+function wCe(t,n){1&t&&(d(0,"div",2),T(1,"i",15),v(2,"\xa0Loading Stream..."),u())}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:5-7.
+
+### STV-02 — Upstream reloads the whole HLS pipeline TWICE on one buffer-size click; ours reloads once
+
+**DELIBERATE DIVERGENCE — read and measured 2026-08-31. Matching the reference here would reproduce
+a defect, and the row exists so nobody restores it as "the reference's arrangement".**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The double is not visible from either end alone, which is why it is worth writing down. Read the
+three offsets together:
+
+1. `setBufferSize(e)` at **1,908,582** ends
+   `…this.appService.setPreference("bufferSizeLevel",e),this.hls&&this.loadStream())` — one reload.
+2. `setPreference` at **1,155,143** is
+   `setPreference(e,i){this.globals.preferences[e]=i,this.savePreferences(),this.guiEventBus.emit("preferenceChanged",{key:e,value:i})}`
+   — so step 1 emits.
+3. `ngOnInit` at **1,902,159** subscribes to that very event:
+   `"bufferSizeLevel"===e.key&&this.hls&&(…,this.loadStream())` — a second reload, synchronously,
+   before step 1's own call.
+
+So one click destroys and rebuilds the hls.js instance twice, and `preferenceChanged` is on the
+**shared** `guiEventBus`, so with N streams live one click costs 2N teardowns. `preferenceChanged`
+occurs four times in the whole bundle — 996,829 and 1,025,558 (both `profilePic`), 1,155,238 (the
+emit) and 1,902,321 (this subscription) — which is the control on "the subscription really is the
+only other reader".
+
+**Ours reloads once per instance**, from the single `$effect` keyed on `videoSrc` and
+`bufferSizeLevel`. Halving it is not a preference: a second teardown drops the media element's
+buffered range on the floor a second time and the viewer sees two stalls where the reference's own
+design intends one.
+
+**low** · `defect` · reference byte **1,908,582**
+
+```
+setBufferSize(e){e<1||e>3||this.getBufferSizeLevel()!==e&&(this.appService.globals.preferences.bufferSizeLevel=e,this.appService.setPreference("bufferSizeLevel",e),this.hls&&this.loadStream())}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:340-346 and :368-372. The refusal guards
+(`level < 1 || level > 3`, and the no-op `(bufferSizeLevel || 3) === level`) are transcribed exactly;
+it is only the second reload that is dropped.
+
+### STV-03 — The reload path has no `this.hls` guard, so a native-HLS viewer restarts their stream for a setting that cannot reach them
+
+**BLOCKED — read and measured 2026-08-31; what would unblock it is named below.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+Both of the reference's reload paths are guarded by `this.hls` — byte 1,902,159 for the
+subscription, byte 1,908,582 for `setBufferSize` — and `this.hls` is null on exactly one path:
+`loadStream()` at **1,904,378** falls through to
+`e.canPlayType("application/vnd.apple.mpegurl")&&this.setupNativeHLS(e)` when `bf.isSupported()` is
+false. That is **iOS Safari, where native HLS is the only path there is**, and every number
+`getHlsConfig()` computes is consumed by `new bf(…)` and by nothing else — so a buffer-size change
+provably cannot affect a native-HLS viewer.
+
+Ours has no such guard. `StreamingView.svelte:340-346` re-runs on any `bufferSizeLevel` change and
+calls `loadStream()`, which reaches `setupNativeHLS(media)` and assigns `media.src = videoSrc`
+again — a full reload to the live edge, losing the buffered range, for nothing. `setupNativeHLS`
+also adds a fresh `loadedmetadata` listener each time and removes none, which is the `STV-05`
+mechanism arriving on a second path.
+
+**What blocks it is the fix's shape, not its size.** The guard cannot simply be added: the same
+`$effect` serves the FIRST load, where `hls` is legitimately null, and separating "a new stream must
+always load" from "a buffer change need not" means restructuring the effect's dependencies. That is
+a Svelte-semantics change — which `$effect` tracks what, and whether `untrack` belongs in it — and
+`CLAUDE.md` makes the Svelte MCP mandatory for exactly that class of question. **The MCP was not
+available in this session.** Unblocked by a session that has it; the reference's own guard is the
+target shape and both its byte offsets are above.
+
+**medium** · `missing-behaviour` · reference byte **1,902,159**
+
+```
+ngOnInit(){console.log("Streaming view comp ngOnInit muser:"+JSON.stringify(this.muser)),this.bufferPreferenceSubscription=this.appService.guiEventBus.subscribe("preferenceChanged",e=>{"bufferSizeLevel"===e.key&&this.hls&&(console.log("Buffer size preference changed, reloading stream"),this.loadStream())})}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:340-346, :316-330.
+
+### STV-04 — The adaptive machinery is one-shot: after the first reload nothing ever restarts the monitor
+
+**MEASURED REFUSAL — read and measured 2026-08-31; ours reproduces the reference exactly and the
+measurement is now written where the constants are.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+Four offsets, read together, and the conclusion is in none of them alone:
+
+- `startPerformanceMonitoring()` (**1,904,725**) is called from exactly two places: `setupStream()`
+  (**1,903,977**, once, from `ngAfterViewInit`) and the `playing` listener inside
+  `setupHlsEventListeners` (**1,906,064**).
+- That listener's call is inside the `hasStartedPlaying` **else** branch:
+  `this.hasStartedPlaying?…:( …,this.hasStartedPlaying=!0,this.startPerformanceMonitoring())`.
+- `hasStartedPlaying` is set to `!1` in the constructor and **never reset** — not by `cleanup()`
+  (**1,902,616**), not by `loadStream()`, not by `handleFatalError()` (**1,906,919**).
+- `cleanup()` DOES `clearInterval(this.performanceMonitor)`, and `loadStream()` calls it on every
+  reload.
+
+So the first reload after playback has begun kills the interval permanently. `BUFFER_CHECK_WINDOW`
+(30 s), `BUFFER_THRESHOLD` (6) and the live-edge catch-up at `>10 s` / `>15 s` all stop running, and
+`MAX_RECOVERY_ATTEMPTS = 2` is in practice a cap of **one**: the first `adaptToPerformanceIssues()`
+calls `loadStream()`, which kills the only thing that could call it again. The single remaining
+caller is `handleFatalError`.
+
+**Ours reproduces this exactly**, member for member, and that is the right answer — but our comment
+at `:238-243` says *"`recoveryAttempts` caps it at 2 per window so a permanently bad connection
+cannot reload the stream forever"*, which is true and is not the real bound. The tighter bound is
+recorded here rather than in the file for the reason `STV-01` gives, and the contract test asserts
+the four facts it rests on so that a future repair of `cleanup()` cannot silently make this row
+stale.
+
+**Read carefully, and it is the subtlest thing in this component:**
+`o>10&&"optimal"===this.currentPerformanceLevel?i.playbackRate=1.5:o>15?i.currentTime=this.hls.liveSyncPosition-5:i.playbackRate=1`
+is a NESTED ternary, so the seek at `>15 s` is unreachable while the level is `optimal` — the first
+branch wins. `StreamingView.svelte:227-233` has the same nesting, `if / else if / else`, and is
+faithful. Flattening it to three independent `if`s would build a different feature.
+
+**low** · `divergence` · reference byte **1,904,725**
+
+```
+startPerformanceMonitoring(){!this.hls||!this.hasStartedPlaying||(console.log("Starting performance monitoring"),this.performanceMonitor=setInterval(()=>{this.checkAndAdaptPerformance()},2e3))}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:200-204, :192-198, :213-235, :244-254.
+
+### STV-05 — Every reload adds a second `playing` and `waiting` listener to the same `<video>` and removes none
+
+**MEASURED REFUSAL — read and measured 2026-08-31. The reference does the same thing and the one
+case where it changes behaviour is stated rather than generalised.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`setupHlsEventListeners(e)` at **1,906,064** ends with
+`e.addEventListener("playing",…)` and `e.addEventListener("waiting",…)`, and `e` is
+`this.videoPlayer.nativeElement` — the SAME element across every reload, because `loadStream()`
+re-reads it rather than replacing it. Nothing calls `removeEventListener` anywhere in the class.
+Ours is the same shape at `StreamingView.svelte:265-298`, with `bind:this` keeping the element
+stable across `$effect` re-runs.
+
+**The honest scope, because the tempting claim is wrong.** After N reloads there are N `waiting`
+listeners, each doing `bufferingEvents += 1`, so a single stall counts N times. That would trip
+`BUFFER_THRESHOLD` N times sooner — **except that `STV-04` proves the only reader of
+`bufferingEvents` is already dead by then**, in every case where the reload happened after playback
+began. The one case where it does change behaviour is the other one: a fatal error BEFORE playback
+destroys and retries after 2 s with `hasStartedPlaying` still false, so the second `playing` listener
+DOES fire, monitoring DOES start, and there are now two `waiting` listeners feeding it — the
+threshold of six trips at three real stalls.
+
+Not fixed here for the reason `STV-03` gives: removing listeners is a change to the component's
+lifecycle, and the Svelte MCP that `CLAUDE.md` makes mandatory for that was not available in this
+session. Recorded with the exact case it bites so the next reader does not have to re-derive it.
+
+**low** · `defect` · reference byte **1,906,064**
+
+```
+setupHlsEventListeners(e){this.hls&&(this.hls.on(bf.Events.ERROR,…),e.addEventListener("playing",()=>{this.hasStartedPlaying?this.bufferingEvents>0&&console.log("Playback resumed after buffering"):(console.log("Stream playback started successfully"),this.hasStartedPlaying=!0,this.startPerformanceMonitoring())}),e.addEventListener("waiting",()=>{this.hasStartedPlaying&&(this.bufferingEvents++,…)}))}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:265-298, called from :316-330 on every
+load.
+
+### STV-06 — The buffer button's trailing space is not rendered, measured on the compiler rather than the source
+
+**BLOCKED — read and measured 2026-08-31; what would unblock it is named below.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The reference's update block writes the button's text as `Ne(" Buffer: ",o.getBufferSizeName()," ")`
+— `ɵɵtextInterpolate1`, one text node, a leading AND a trailing space. Ours compiles to
+`$.set_text(text_1, \` Buffer: ${$.get(bufferSizeName) ?? ''}\`)`, taken from `svelte@5.57.0`'s own
+emitted module rather than from reading the template: the leading space survives, the trailing one
+does not, because Svelte trims whitespace before a closing tag.
+
+**This is `DTF-01` again**, the fourteenth node of the same shape, and its argument carries
+unchanged: the space is invisible on screen — it is the last thing in a `<button>`'s line box —
+and it is still carried, because every capture comparison in this repository diffs RENDERED STRINGS
+and `apps/room/AGENTS.md` already argues the `{' Retry '}` idiom for exactly this. The fix is one
+character in a template: `Buffer: {bufferSizeName}` becomes `Buffer: {bufferSizeName}{' '}`.
+
+**Blocked on the same thing `DTF-01` was not**: that row was built by a session with the Svelte MCP,
+whose step 3 — `svelte-autofixer` until it returns nothing — is where the `{' '}` idiom is checked
+against `svelte/no-useless-mustaches` and the repository's two standing declines. The MCP was not
+available in this session, so the one-character change is named and not made.
+
+**low** · `divergence` · reference byte **1,910,654**
+
+```
+m(6),Ne(" Buffer: ",o.getBufferSizeName()," ")
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:423.
+
+### STV-07 — `volume` is a `$state` with no writer, and the compiler proves the rune costs nothing
+
+**MEASURED REFUSAL — read and measured 2026-08-31; the declaration stays, and the measurement is
+what makes that a decision rather than an oversight.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`StreamingView.svelte:95` is `let volume = $state(1)`, and **nothing in the file assigns it.** It
+exists because const 3 of the reference's table — read by bracket-walking, not by slot —
+is `["autoplay","autoplay",1,"video-streaming",3,"dblclick","id","muted","volume"]`, so `volume` is a
+real property binding upstream: `z("muted",o.isMuted)("volume",o.volume)`.
+
+**Upstream's writer is dead too, and that is the finding.** `onVolumeChange(e)` at **1,907,778**
+occurs EXACTLY ONCE in all 2,891,205 bytes — its own definition, no call site — and
+`showVolumeSlider`, which `toggleMute()` flips at **1,907,652**, occurs twice: the constructor
+initialiser and that flip. Neither is in the 27-declaration template. The control on both counts is
+`onImagePaste`, which returns its definition PLUS both call sites. So the reference ships a volume
+slider's model with no slider, and this file's `:361` comment already says so.
+
+**The rune costs nothing, and that is measured rather than assumed.** `svelte@5.57.0` compiles
+`let volume = $state(1)` to a plain `let volume = 1;` and `{volume}` to a single
+`video.volume = volume;` outside the update effect — no signal, no `$.get`, no re-run — because no
+assignment exists to make it reactive. That answers `CLAUDE.md`'s `$state`-overhead rule with a
+measurement instead of a preference, and it is why the answer is "leave it": deleting the binding
+would drop a captured property from const 3, and demoting the rune would change nothing the compiler
+has not already changed.
+
+**low** · `divergence` · reference byte **1,909,111**
+
+```
+["autoplay","autoplay",1,"video-streaming",3,"dblclick","id","muted","volume"]
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:95, :387-395, :361-365.
+
+### STV-08 — Ten members copy-pasted from the screenshare pane are dead here, and the spelling proves which copy is which
+
+**MEASURED REFUSAL — read and measured 2026-08-31. `SV-SP-12` established that two of them are dead;
+this is the rest of them, with counts and a passing control.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`app-streaming-view`'s constructor (**1,901,632**) initialises `isConnected`, `isDetached`,
+`isDetachedCtrl`, `showVolumeSlider`, `showControls` and `path`, and the class defines
+`newScreenStream(e)` (**1,907,934**), `startWatchScreenOf(e){}` (**1,908,109**),
+`stopWatchScreenOf(e){}` (**1,908,132**), `reAttachScreen()` (**1,908,154**) and `detachScreen()`
+(**1,908,230**). Two of those bodies are literally empty. **None is reachable:** the template has
+`decls:27` and its only handlers are `dblclick`→`toggleFullscreen`, three `setBufferSize` clicks and
+`toggleMute`, and `ngOnInit` subscribes to `preferenceChanged` and to nothing else — no
+`detachScreenShare`, no `reatachScreenShare`.
+
+**The spelling is the evidence, and it is a clean control.** The screenshare pane spells it
+`reAttachScren` and that name occurs **three** times — 1,492,806 (the `<h3>`'s click), 1,495,434
+(the `reatachScreenShare` subscription) and 1,499,638 (the definition) — all live, all cited by
+`SV-SP-02`. The streaming view spells it `reAttachScreen`, correctly, and that name occurs **once**:
+its own definition, with no caller. Same for `detachScreen(){this.isDetached=!0`, which occurs twice
+— 1,499,713, live, and 1,908,230, dead. A search for the same family of needle DOES match where the
+behaviour exists, which is what makes the single-occurrence counts an absence and not a bad grep.
+
+**Ours carries none of them, and should not.** `StreamingView.svelte` has no `isDetached`, no
+`detach`, no watch stubs. `RoomScreens.detach` / `isDetachedHere` / `reattach` — built for `SV-SP-02`
+— belong to the screenshare pane, which is where the reference's live copies are. Recorded rather
+than left unmentioned because "the reference has five methods we do not" is the shape that gets
+re-found and re-investigated at full cost, twice.
+
+**low** · `missing-behaviour` · reference byte **1,908,109**
+
+```
+startWatchScreenOf(e){}stopWatchScreenOf(e){}reAttachScreen(){this.isDetached=!1,this.startWatchScreenOf(this.muser._id)}detachScreen(){this.isDetached=!0,this.stopWatchScreenOf(this.muser._id),this.popoutService.openPopoutModal("screen",{pres:this.muser})}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte, whole file — deliberately absent.
+
+### STV-09 — The consts table decoded BY VALUE: eighteen entries, and two static attributes ours does not reproduce byte for byte
+
+**MEASURED REFUSAL — read and measured 2026-08-31. Both differences are improvements and both are
+recorded so they are not re-litigated as gaps.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The table at **1,909,054**–**1,909,708** was bracket-walked, not indexed, and holds eighteen
+entries. Every class list, id and icon this file transcribes was checked against that walk and all
+of them hold. Two entries differ from what we render, and neither is an oversight:
+
+- **const 8** is
+  `["type","button","id","bufferSizeDropdown","data-bs-toggle","dropdown","aria-expanded","false",1,"btn","btn-sm","dropdown-toggle"]`
+  — `aria-expanded` is the STATIC string `"false"`, never bound. Upstream that is correct only
+  because Bootstrap's dropdown JavaScript rewrites the attribute at runtime, and
+  `bootstrap-dropdown-contract.test.ts` records that this app ships no Bootstrap JavaScript at all.
+  `StreamingView.svelte:419` binds it to `menus.streamBuffer` instead, so the attribute tells the
+  truth on the only mechanism this app has. Reproducing the static `"false"` would ship a control
+  that permanently announces itself as closed.
+- **const 3** opens `["autoplay","autoplay",…]` — the attribute carries the value `"autoplay"`,
+  where Svelte emits the bare boolean form and renders `autoplay=""`. Semantically identical to
+  every HTML parser; different as a rendered STRING, which is the axis `DTF-01` cares about. Left
+  alone: `autoplay="autoplay"` is writable in Svelte, so this is a choice, and the choice is that a
+  boolean attribute's canonical serialisation is not a captured value the way a text node is.
+
+**And the three dead style rules are confirmed dead**, which the file already claims at `:514-517`.
+`#message`, `#lang-icon` and `#lang-list` are in the reference's `styles:` block from **1,911,064**
+to **1,912,909** — `#lang-icon` carries a 1.1 KB base64 SVG — and none of the eighteen consts names
+any of those three elements, so with `decls:27` there is nothing for them to style. The claim was
+verified against the decoded table rather than against the comment that makes it.
+
+**low** · `divergence` · reference byte **1,909,288**
+
+```
+["type","button","id","bufferSizeDropdown","data-bs-toggle","dropdown","aria-expanded","false",1,"btn","btn-sm","dropdown-toggle"]
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:415-424, :387-395, :509-518.
+
+### STV-10 — What the live MediaMTX run settles for this component, and what it does not
+
+**MEASURED REFUSAL — `apps/room/docs/MEDIA-PLANE-MEASURED.md` read in full 2026-08-31 before any
+claim here about playback. It changes nothing in this file, and saying so is the point.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+That document was produced by running MediaMTX v1.20.1 in this container, and what it measured is
+the INGEST and CONTROL plane: the `/v3/paths/list` envelope (`available` alongside the deprecated
+`ready`), the hook names `runOnAvailable` / `runOnAvailableRestart` / `runOnUnavailable` with
+`runOnReady` / `runOnNotReady` occurring zero times, the API's bind-versus-authorisation
+distinction, the duplicate-delivery defect between the hook and the reconciler, and `record` +
+`playback` as an archive service. **None of that is this component.** `StreamingView` is a pure
+consumer: it builds `https://{streamServerMTX}/{path}/index.m3u8?jwt={mtxToken}` through
+`mtxPlaylistUrl` and hands it to hls.js. The file's own docblock claim — HLS on 443 for playback,
+WHIP/RTMP on 8889/1935 for ingest, two protocols at the two ends of one path — is consistent with
+the measured run, which published over WHIP and was watched on the wire.
+
+**The one finding that reaches this surface is a NEGATIVE one, and it is stated as unmeasured.** The
+run recorded `[recorder] skipping track 2 (VP8)` and then `recording 1 track (Opus)` — a WebRTC
+publisher that negotiates VP8 records audio only. That is the fmp4 RECORDER. **Whether the HLS
+muxer accepts VP8 was not measured and is not claimed here**, and neither was H264, because that
+Chromium offered `video/VP8 video/rtx video/AV1 video/VP9 video/VP9 video/red video/ulpfec` and no
+H264 at all. What can be said from THIS component is where such a failure would surface: `isLoading`
+starts `true`, is cleared only by `MANIFEST_LOADED`, and is never set back — so a path that never
+produces a playable playlist leaves `Loading Stream...` on screen indefinitely, with a fatal-error
+retry every 2 s behind it and no timeout, no error state and no message naming the codec. That is
+the reference's behaviour too, verbatim, and it is why the row is a refusal and not a build: adding
+a timeout here would be inventing a state the capture does not have.
+
+**low** · `divergence` · reference byte **1,906,064**
+
+```
+this.hls.on(bf.Events.MANIFEST_LOADED,()=>{e.play().catch(i=>console.warn("Autoplay failed:",i)),this.isLoading=!1})
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:93, :284-287, :268-277, :377-381.
+
+---
+
+## DayTradeAlertsPane.svelte
+
+**5 rows. `Iwe` (1,945,126), its list surface `Rwe` (1,943,979) and its row `Pwe` (1,943,242) were
+read end to end**, together with `Mwe` (1,942,714), `Awe` (1,943,028), `xwe` (1,942,630) and
+`kwe` (1,942,524), and with the `consts:[` table of `app-presentationarea` bracket-walked BY VALUE
+from 1,994,264 — 292 entries, ending at 2,014,220 — rather than looked up by slot. No count of
+"behaviours confirmed present" is given because none was taken.
+
+> **This is the PANE, not the composer.** `## DayTradeAlertForm.svelte` and
+> `## SwingAlertForm.svelte` above read `Ewe` and `hwe` on 2026-08-31 and file `DTF-01` … `DTF-05`
+> and `SWF-01` … `SWF-05`; `## day-trade-alerts + swing-alerts panes` above files `dta-01` …
+> `dta-05` across both panes. All fifteen are cited here and none is re-argued.
+>
+> **Every byte this pane cites was re-derived at its offset**, and twenty-five of the twenty-seven
+> hold exactly. The two that do not are both `DTP-01`. The gate is
+> `apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts`.
+>
+> **These two panes are in better shape than any surface read in this batch**, and the rows below say
+> so rather than manufacturing gaps: the `Ze` / `Ne` split, the pipe ORDER, the `?? 0` mapping of an
+> emptied number box, the search pipe's deliberate asymmetry, the week-numbering year and the
+> twelve-hour clock are all already exact.
+
+### DTP-01 — Two byte citations land inside the constructs they quote rather than at them
+
+**FIXED 2026-08-31.** 2,017,748 → **2,017,741**, and 1,945,235 → **1,945,231**.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`DayTradeAlertsPane.svelte:45` quotes `O(49, o.hasDayTradeAlerts ? 49 : -1)` and gives 2,017,748.
+`O(49,o.hasDayTradeAlerts?49:-1)` occurs exactly once in the bundle and begins at **2,017,741**; the
+cited byte is seven characters further on, landing on the `h` of `hasDayTradeAlerts`. A reader who
+follows it sees plausible bytes — they ARE the gate — and never notices the boundary is wrong,
+which is precisely the failure `SWF-02` recorded and the reason this batch re-derived every citation
+rather than spot-checking.
+
+**The swing twin had no byte at all**, which is why it is `SWP-02` and not a second half of this
+row: `SwingAlertsPane.svelte:40` quotes `O(48, o.hasSwingTradeAlerts ? 48 : -1)` with no offset. It
+is at **2,017,703**, thirty-eight bytes before this one, in the same update block.
+
+**The second one is smaller and is the same shape.** `:275` quotes
+`v(4," Latest Day Trade Alerts (Last ")` and gave 1,945,235, which is the opening `"` of the string —
+four bytes into the `v(4,` the quote begins with. `v(4," Latest Day Trade Alerts (Last ")` occurs
+once, at **1,945,231**. Four bytes is not seven and a string's opening quote is a cleaner landing
+than the middle of an identifier, and it is corrected anyway: the whole contract of a per-row offset
+in this document is that the next person re-reads AT it, and `SWF-02`'s lesson is that the offsets
+which land on plausible bytes are the ones nobody questions.
+
+**The same wrong 2,017,748 is at `PresentationArea.svelte:947` and is deliberately NOT touched
+here.** That file is outside this batch's three surfaces; the number is named so the next reader of
+it does not have to re-derive what this row already did.
+
+**low** · `defect` · reference byte **2,017,741**
+
+```
+O(49,o.hasDayTradeAlerts?49:-1)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:45. Pinned by
+apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts, which also refuses the
+superseded number.
+
+### DTP-02 — Five text nodes render without the reference's own leading and trailing spaces
+
+**BLOCKED — read and measured on the compiler 2026-08-31; what would unblock it is named below.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+**The reference's own `Ze` / `Ne` split is what makes this precise**, and it is the reason the row
+names five nodes rather than "the table". `Pwe`'s update block writes six of the row's eight cells
+with `ɵɵtextInterpolate` — `Ze(e.direction)`, `Ze(e.entryPrice)`, `Ze(e.stop)`, `Ze(e.target)`,
+`Ze(e.senderName)` — and exactly two with `ɵɵtextInterpolate1`: `Ne(" ",e.symbol," ")` and
+`Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," ")`. **Ours honours that split everywhere it
+matters and loses it on exactly those two**, plus three more outside the row:
+
+| node | reference | ours |
+| --- | --- | --- |
+| symbol | `Ne(" ",e.symbol," ")` | `set_text(text_1, row.symbol)` |
+| alert date | `Ne(" ",Ct(10,12,…)," ")` | `set_text(text_3, $0)` |
+| empty state (`xwe`, 1,942,630) | `v(1," No Day Trade Alerts to display. ")` | `>No Day Trade Alerts to display.<` |
+| heading prefix (`Iwe`) | `v(4," Latest Day Trade Alerts (Last ")` | `>Latest Day Trade Alerts (Last ` |
+| heading suffix (`Iwe`) | `v(8," Months) ")` | ` Months)<` |
+
+Every right-hand column entry is read out of `svelte@5.57.0`'s emitted module for this file, not off
+the template. The two INTERNAL spaces of the heading — before and after the `<select>` — DO survive,
+so the sentence reads identically; it is only the block-edge ones that are lost.
+
+**All five are invisible on screen and are carried anyway**, which is `DTF-01`'s split stated
+honestly for this surface rather than borrowed. The date's spaces sit at the two edges of a `<td>`
+and collapse; the empty state's sit at the edges of an `<h4>`; the heading's sit at the edges of the
+same `<h4>`. The symbol's are the interesting case and they still come out even: upstream puts them
+INSIDE `<strong class="ms-2 font-weight-bold">`, and Svelte emits a whitespace text node between the
+presenter-conditional anchor and the `<strong>` instead — one space either way when a presenter's
+edit icons precede it, none when they do not, because leading whitespace at a block's start
+collapses in both. **Same pixels, different rendered string**, and the rendered string is what every
+capture comparison in this repository diffs.
+
+**Blocked on the same thing `STV-06` is.** The fix is five `{' '}` mustaches, which is the idiom
+`apps/room/AGENTS.md` records as one of the two `svelte-autofixer` suggestions this repository
+declines — and step 3 of the mandatory Svelte MCP workflow is where that decline is exercised. The
+MCP was not available in this session, so the five nodes are named, measured and left.
+
+**low** · `divergence` · reference byte **1,943,655**
+
+```
+m(2),Ne(" ",e.symbol," "),m(2),Ze(e.direction),m(2),Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," "),m(3),Ze(e.entryPrice),m(2),Ze(e.stop),m(2),Ze(e.target)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:393, :402, :309,
+:282 and :297.
+
+### DTP-03 — The limit box's missing `width: 100%` re-read at the whole rule, and it holds
+
+**ALREADY BUILT — verified by reading 2026-08-31. The pane's most detailed claim is also its most
+falsifiable one, and it survives.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`DayTradeAlertsPane.svelte:547-559` claims that the `width:100%` rule at 2,024,939 names exactly six
+selectors and that `.dayTradeAlert-limit-container` is in NEITHER container's half of it. **Read as
+a whole rule rather than searched for the class**, from 2,024,939 to its `{width:100%}`, it is:
+
+```
+.day-trade-alerts-container #dayTradeAlert-search, .day-trade-alerts-container #swingAlert-search,
+.day-trade-alerts-container .swingAlert-limit-container, .swing-alerts-container #dayTradeAlert-search,
+.swing-alerts-container #swingAlert-search, .swing-alerts-container .swingAlert-limit-container
+{width:100%}
+```
+
+Six selectors, the cross product of two containers with `#dayTradeAlert-search`, `#swingAlert-search`
+and `.swingAlert-limit-container` — and `.dayTradeAlert-limit-container` absent from all six. The
+control that makes that an absence rather than a bad read is in the same string twice:
+`.swingAlert-limit-container` IS there, under both containers. And the `max-width:180px` rule 915
+bytes later at **2,025,854** DOES carry all four limit-container combinations, which is the
+comment's other half and is also exact.
+
+**So the shipped build genuinely gives the Day Trade limit box a max width and no width**, and this
+pane reproduces that by declaring only `#dayTradeAlert-search { width: 100% }`. Adding the missing
+declaration would make this pane wider than the one the reference ships. The remaining twenty-five
+byte citations in the file's `<style>` block were re-read the same way and all of them hold —
+2,022,161, 2,024,764, 2,024,171, 2,024,333, 2,031,534, 2,025,489, 2,022,363, 2,022,557, 2,022,891,
+2,026,319, 2,026,556 and 2,026,976.
+
+**low** · `divergence` · reference byte **2,024,939**
+
+```
+.day-trade-alerts-container[_ngcontent-%COMP%]   #dayTradeAlert-search[_ngcontent-%COMP%], …, .swing-alerts-container[_ngcontent-%COMP%]   .swingAlert-limit-container[_ngcontent-%COMP%]{width:100%}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:560-572.
+
+### DTP-04 — The repeater tracks by IDENTITY upstream; ours keys by `row.id`
+
+**DELIBERATE DIVERGENCE — read and measured 2026-08-31. Keying by identity here would reproduce a
+teardown the room does not need, and the row exists because nothing in either pane records the
+choice.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`ht(32,Pwe,23,17,"tr",null,Li)` — `ɵɵrepeaterCreate`, whose seventh argument is the track function.
+`Li` is `function Li(t,n){return n}` at **100,136**: it takes `(index, item)` and returns the ITEM,
+so the reference tracks by object identity. `Li=` matches zero times in the bundle and
+`function Li` matches once, which is how the definition was found by value rather than assumed from
+the name.
+
+Within one render pass the two are equivalent: `searchDayTradeLogs` returns the SAME array object
+when the term is empty and `Array.prototype.filter` / `slice` preserve element references, so
+identity is stable across every search and limit change. **They differ on a refetch.** The months
+`<select>` calls `onTradeAlertWeeksChange("DayTrade")`, the log comes back as fresh objects, and
+identity tracking tears down and rebuilds every `<tr>` — new DOM, lost focus, lost scroll anchoring
+— where `{#each visibleAlerts as row (row.id)}` reuses the rows whose id is unchanged.
+
+Not the `each-key-contract.test.ts` case, and the difference is worth stating because the two look
+alike: that file removed keys from `MessageBody`'s segments because a parsed segment **has no
+identity** and an index key would have CLAIMED a safety it did not have. An alert row has
+`_id` upstream and `id` here, so the key is a real identity and not a stand-in for one.
+
+**low** · `divergence` · reference byte **1,944,820**
+
+```
+ht(32,Pwe,23,17,"tr",null,Li)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:362.
+
+### DTP-05 — Every const index the pane cites, checked against the bracket-walk
+
+**ALREADY BUILT — verified by reading 2026-08-31. All of them hold, and the walk found the one
+addition that is ours.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The table was walked from **1,994,264** by tracking string state and bracket depth, never by
+counting commas to a slot a comment named. 292 entries, and every index this pane names resolves to
+what it claims:
+
+| const | offset | value |
+| ---: | ---: | --- |
+| 28 | 1,996,170 | `["id","dayTradeAlerts","role","tabpanel","aria-labelledby","dayTradeAlerts-tab",1,"tab-pane","position-relative",3,"ngClass"]` |
+| 166 | 2,004,878 | `[1,"text-center","m-0","p-1","px-3"]` |
+| 167 | 2,004,915 | `[1,"form-select","form-select-sm","d-inline-block","w-auto","trade-alerts-select",3,"ngModelChange","ngModel"]` |
+| 169 | 2,005,040 | `[1,"text-center","m-0","p-1","px-3","bg-secondary"]` |
+| 204 | 2,008,042 | `[1,"fas","fa-save"]` |
+| 208 | 2,008,343 | `[3,"ngClass"]` |
+| 209 | 2,008,357 | `[1,"ms-2","font-weight-bold"]` |
+| 210 | 2,008,387 | `[1,"text-center","align-middle","p-0","m-0"]` |
+| 212 | 2,008,503 | `[1,"p-0"]` |
+| 213 | 2,008,513 | `[1,"mx-1","font-weight-bold"]` |
+| 214 | 2,008,543 | `[1,"alert-sender-img",3,"src","alt"]` |
+| 216 | 2,008,625 | `[1,"fa","fa-trash"]` |
+| 218 | 2,008,688 | `[1,"fa","fa-edit"]` |
+| 219 | 2,008,707 | `["title","Click to view image",1,"uploaded-alert-image",3,"click","src","alt"]` |
+| 221 | 2,008,829 | `[1,"day-trade-alerts-container","m-2"]` |
+| 232 | 2,010,306 | `[1,"input-group","input-group-sm","dayTradeAlert-limit-container","m-2","ms-0"]` |
+| 233 | 2,010,386 | `["type","number","step","5","min","0","id","dayTradeAlert-limit","aria-label","dayTradeAlert-limit",1,"form-control",3,"ngModelChange","ngModel"]` |
+| 234 | — | `["title","Download Day Trades",1,"m-1","ms-4","download-day-trades-btn",3,"click"]` |
+| 235 | — | `["type","search","id","dayTradeAlert-search","placeholder","Enter your search term","aria-label","dayTradeAlert-search","aria-describedby","dayTradeAlert-search",1,"form-control","form-control-sm","m-2","me-0",3,"ngModelChange","ngModel"]` |
+
+Const **204** is the one the pane's own comment at `:333` calls out — `fas fa-save` with **no**
+`me-1`, against the Save Changes icon at const 198 which has it — and the walk confirms both.
+Const **214** is the other useful one: `[1,"alert-sender-img",3,"src","alt"]` carries **no** width
+and no height, so the `width="30" height="30"` at `:434-435` is OURS, derived from the reference's
+own `?d=mm&s=30` at **1,943,900** and required by `CLAUDE.md`'s no-layout-shift rule. The file
+already says exactly that, and the walk is what makes it checkable rather than plausible.
+
+**low** · `divergence` · reference byte **1,994,264**
+
+```
+consts:[["alertForm","ngForm"],["speechRecoBody",""],[1,"mainPresentationAreaHolder"],…
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte, whole file.
+
+---
+
+## SwingAlertsPane.svelte
+
+**6 rows. `vwe` (1,938,750), `bwe` (1,937,634) and `_we` (1,936,897) were read end to end**, with
+`mwe` (1,936,375), `gwe` (1,936,683), `fwe` (1,936,289) and `pwe` (1,936,183), against the same
+292-entry `consts` walk. Five of the six rows are the swing half of a day-trade row and say so;
+`SWP-03` is the one that is only true on this side.
+
+> **This is the PANE, not the composer**, and the same fifteen rows named at the head of
+> `## DayTradeAlertsPane.svelte` apply here. The twin invariant those two form sections established
+> — *"the only differences are the ids, the names and the class"* — is **NOT** true of the panes,
+> and `SWP-06` is the list of the ways it is not.
+
+### SWP-01 — Five text nodes render without the reference's own leading and trailing spaces
+
+**BLOCKED — read and measured on the compiler 2026-08-31.** The swing half of `DTP-02`; the
+reasoning, the compiler measurement and the honest split between the rendered string and the
+rendered pixels are recorded there and are not repeated.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The five are `Ne(" ",e.symbol," ")` and `Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," ")` in
+`_we`, `v(1," No Swing Trade Alerts to display. ")` in `fwe` (**1,936,289**), and
+`v(4," Latest Swing Trade Alerts (Last ")` / `v(8," Months) ")` in `vwe`. Filed as its own row
+rather than folded into the day-trade one for the reason `dta-01` … `dta-04` all exist: **every one
+of those four was missing from BOTH panes**, and a row that names one pane is a row that lets the
+pair drift.
+
+**low** · `divergence` · reference byte **1,937,310**
+
+```
+m(2),Ne(" ",e.symbol," "),m(2),Ze(e.direction),m(2),Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," ")
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:369, :378, :285, :259
+and :273.
+
+### SWP-02 — The entitlement gate is quoted with no byte at all
+
+**MEASURED REFUSAL — read and measured 2026-08-31; the offset is recorded here rather than added to
+the file, and why is stated.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`SwingAlertsPane.svelte:40` quotes `O(48, o.hasSwingTradeAlerts ? 48 : -1)` and gives no offset,
+where the day-trade twin gives one — and gives it wrong, which is `DTP-01`. The construct
+`O(48,o.hasSwingTradeAlerts?48:-1)` occurs exactly once, at **2,017,703**, thirty-eight bytes before
+its twin at 2,017,741, in the same update block:
+
+```
+…P?47:-1),m(),O(48,o.hasSwingTradeAlerts?48:-1),m(),O(49,o.hasDayTradeAlerts?49:-1),m(),z("ngClass",…
+```
+
+**A missing citation is a smaller defect than a wrong one and it is not nothing**, which is why it
+is recorded rather than shrugged at: `48` and `49` are `ɵɵconditional` SLOT indices and they collide
+with const indices 48 (`[1,"mt-4","text-center"]`) and 49 (`[3,"startTime","ytURL"]`) in the same
+component's table. A reader who assumes the number in a `.svelte` comment is a const index — which
+most of the numbers in these two files ARE — decodes the wrong thing and finds a plausible answer.
+The byte is what disambiguates, and it is now asserted by
+`apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts` whether or not the
+comment carries it.
+
+Not added to the file, for the reason `SWF-04` gives about this pair: the file is at 577 lines
+against a `source-size-contract` ceiling of 578, and the Svelte MCP that `CLAUDE.md` makes mandatory
+for `.svelte` work was not available in this session, so the single edit made in this batch was
+spent on the WRONG number rather than the missing one.
+
+**low** · `missing-behaviour` · reference byte **2,017,703**
+
+```
+O(48,o.hasSwingTradeAlerts?48:-1)
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:40.
+
+### SWP-03 — The search pipe's missing optional chaining is deliberate, and both classes were re-read side by side
+
+**ALREADY BUILT — verified by reading 2026-08-31. The most refutable-looking thing on this surface
+is correct, and it is correct in the direction that looks like a bug.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The two pipe classes sit 487 bytes apart and do NOT do the same thing:
+
+```
+PCe  transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>o.symbol.toLowerCase().includes(i)||o.senderName.toLowerCase().includes(i))):e:[]}
+ICe  transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>o?.symbol?.toLowerCase()?.includes(i)||o?.senderName?.toLowerCase()?.includes(i))):e:[]}
+```
+
+`PCe` is `searchSwingLogs` and dereferences bare; `ICe` is `searchDayTradeLogs` and guards every
+step. `apps/room/src/lib/swing-alerts.ts:210-221` reproduces the bare form and
+`apps/room/src/lib/day-trade-alerts.ts` the guarded one, and the comment at `:201-208` records why:
+both columns are `NOT NULL` in this room's own table, so a row that reaches the pipe without them is
+a defect that should be loud, and transcribing the swing pipe as forgiving would be quietly choosing
+the other component's behaviour.
+
+**The row is filed as verification, not as a gap**, because this is the shape that gets "tidied" by
+the next reader: an inconsistency between two sibling files reads as an oversight, the fix is one
+character in each of four places, and it would erase a decision that has a written reason and a
+reference behind it. It is now asserted rather than argued.
+
+The two limit pipes, `RCe` and `OCe`, ARE identical — `e&&0!==i?e.slice(0,i):[]` both — and the
+`?? 0` at `SwingAlertsPane.svelte:102` is what makes an emptied number box reach that `0!==i` branch
+instead of Svelte's `undefined`, which `slice` would read as "everything". That inversion is the one
+the comment at `:94-101` was written for and it is exact.
+
+**low** · `divergence` · reference byte **1,915,269**
+
+```
+transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>o.symbol.toLowerCase().includes(i)||o.senderName.toLowerCase().includes(i))):e:[]}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:121 via
+apps/room/src/lib/swing-alerts.ts:210-221.
+
+### SWP-04 — The repeater tracks by IDENTITY upstream; ours keys by `row.id`
+
+**DELIBERATE DIVERGENCE — read and measured 2026-08-31.** The swing half of `DTP-04`: the same
+`ht(32,_we,23,17,"tr",null,Li)` shape, the same `function Li(t,n){return n}` at **100,136**, the same
+refetch behaviour behind the months `<select>`.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+Worth one sentence that is only true on this side: the swing months `<select>` offers **twenty**
+options against day trade's fifteen, so this is the pane where a viewer is more likely to change the
+window and therefore the pane where the identity teardown costs more. `zCe=()=>[1,…,20]` is at
+**1,916,549** and `WCe=()=>[1,…,15]` at **1,916,648**, ninety-nine bytes apart in the same const
+block, both read by value.
+
+**low** · `divergence` · reference byte **1,938,465**
+
+```
+ht(32,_we,23,17,"tr",null,Li)
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:338.
+
+### SWP-05 — The `h4` style citation points at the second selector of a two-selector rule
+
+**MEASURED REFUSAL — read and measured 2026-08-31; the asymmetry with the day-trade file is checked
+and left, and this row is why it is not a defect.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`SwingAlertsPane.svelte:493` cites 2,024,836 for *"both headings, the title and the empty state"*,
+while `DayTradeAlertsPane.svelte:523` cites 2,024,764 for the same rule. Read at both:
+
+```
+2,024,764  .day-trade-alerts-container   h4, .swing-alerts-container   h4{background-color:#08668e;color:#fff}
+2,024,836                                    ^ the swing selector begins here
+```
+
+One rule, two selectors, one declaration block. The day-trade file points at the rule's start; the
+swing file points at its OWN selector inside it, seventy-two bytes in. **Both are honest and neither
+is the `DTF-02` shape**, because 2,024,836 is a selector BOUNDARY — it is where
+`.swing-alerts-container` begins — not a position inside an expression. A reader landing there sees
+their own selector and the declarations sixty bytes to the right.
+
+Left alone deliberately. Rewriting it to the rule's start would make the swing file cite a selector
+it does not use, and rewriting the day-trade file to its own selector would lose the one citation
+that shows the rule is SHARED — which is the fact that matters, because `#08668e` is one colour
+applied to both panes through one rule and is why `--day-trade-alerts-heading-bg` aliases
+`--swing-alerts-heading-bg` in `tokens.css` rather than repeating the literal.
+
+**low** · `divergence` · reference byte **2,024,764**
+
+```
+.day-trade-alerts-container[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%], .swing-alerts-container[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%]{background-color:#08668e;color:#fff}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:493-497 and
+apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:523-527.
+
+### SWP-06 — The two panes are NOT twins, and the six ways they differ are all reference values
+
+**ALREADY BUILT — verified by reading 2026-08-31. Every one of the six is carried, and the row
+exists because the FORMS' sections above prove the opposite invariant about the composers.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`## SwingAlertForm.svelte` asserts its two composers EQUAL line for line after a mechanical rename,
+and `trade-alert-form-contract.test.ts` enforces it. **That invariant does not extend to the panes**,
+and a reader who assumes it does will "fix" a real captured difference. The six, each read by value:
+
+| | swing | day trade |
+| --- | --- | --- |
+| months options | `zCe` 1,916,549, `[1..20]` | `WCe` 1,916,648, `[1..15]` |
+| months initialiser | `this.swingAlertMonths=2` at 1,955,344 | `this.dayTradeAlertMonths=1` at 1,955,601 |
+| search pipe | `PCe`, bare dereference | `ICe`, fully optional-chained |
+| symbol class helper | `GCe` 1,916,610, `swing-symbol-container` | `qCe` 1,916,694, `day-trade-symbol-container` |
+| limit box `width:100%` | present, in the 2,024,939 rule | absent — `DTP-03` |
+| entitlement slot | `O(48,…)` at 2,017,703 | `O(49,…)` at 2,017,741 |
+
+The two months initialisers sit **257 bytes apart in the same constructor** (1,955,601 − 1,955,344)
+and were read together, which is the only way to be sure the 2 and the 1 are not a transcription
+slip; both files already say so. The limit initialiser is the one value that IS shared — `10` on
+both, at 1,955,546 — and both files say that too.
+
+**And one difference that is OURS and is right.** Both panes' first fetch is hardcoded — 21 days for
+day trade, 42 for swing — under labels reading "Last 1 Months" and "Last 2 Months". That mismatch is
+the reference's, is documented in `day-trade-alerts.ts` and `swing-alerts.ts` at the constants, and
+is not a pane row: changing the select once reconciles them, and inventing a matching first fetch
+would be inventing a value.
+
+**low** · `divergence` · reference byte **1,955,344**
+
+```
+this.swingAlertMonths=2,this.hasDayTradeAlerts=!1,this.dayTradeAlert={alertTxt:"",direction:"long"…
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:103 and
+apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:114, via
+apps/room/src/lib/swing-alerts.ts:131-139 and apps/room/src/lib/day-trade-alerts.ts:184-192.
