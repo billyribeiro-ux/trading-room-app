@@ -98,7 +98,7 @@ export default defineConfig(
     In flat config the LAST entry to match a file wins. These three were moved below the override
     block in `060ba72`, and that silently reversed the two decisions documented inside it:
     `svelte.configs.recommended` turns `svelte/no-useless-mustaches` and
-    `svelte/prefer-svelte-reactivity` back on, so the fifteen lines of reasoning explaining why they
+    `svelte/prefer-svelte-reactivity` back on, so the whole block of reasoning explaining why they
     are off sat there being ignored. The `room quality` job reported 43 errors for exactly the
     patterns those comments say are deliberate.
 
@@ -175,8 +175,32 @@ export default defineConfig(
         "nothing renders from it ... making it reactive would buy a dependency and no redraw".
         Turning them into `SvelteMap` would add a reactive dependency to buy nothing.
 
-        Neither signal is lost: the Svelte MCP autofixer reports both on every run, as suggestions,
-        which is the right severity for a judgement call that has to be made per declaration.
+        Neither signal is lost: the Svelte MCP autofixer reports both as SUGGESTIONS rather than
+        issues, which is the right severity for a judgement call that has to be made per
+        declaration.
+
+        **That sentence used to end "reports both on every run", and half of it was wrong.** The MCP
+        became available in this repository for the first time on 2026-08-31 and the claim was
+        finally testable; two probes settled it, and the difference is worth the paragraph because
+        it makes the autofixer the BETTER instrument of the two rather than a like-for-like stand-in
+        for a rule turned off here.
+
+          - `{' '}` is reported every time — twenty-two occurrences across four components in one
+            session: five in `EmojiPicker`, one in `StreamingView`, and eight in EACH alert pane.
+            The two panes returning the same eight is the twins agreeing, which is what
+            `dta-01` … `dta-04` exist to keep true.
+          - A `Map` or `Set` is reported only when it is **MUTATED**. The wording is the tool's own:
+            *"Found a mutable instance of the built-in Map class."* A probe holding a `new Map` and
+            a `new Set` that are written with `.set` / `.add` drew one suggestion each; a probe
+            holding a `new Map` and a `new Set` built once and only READ drew NOTHING AT ALL — the
+            whole response was empty. `EmojiPicker.svelte`'s `entriesById` is the second kind and is
+            silently, correctly, not flagged.
+
+        `svelte/prefer-svelte-reactivity` does not draw that distinction: it flags every plain `Map`
+        and `Set`, which is why it produced 43 errors here and is off. The autofixer flags the
+        subset that could actually want reactivity. A reader trusting the old sentence would have
+        expected a suggestion on a read-only collection, not found one, and concluded the tool had
+        missed it.
       */
       'svelte/no-useless-mustaches': 'off',
       'svelte/prefer-svelte-reactivity': 'off'

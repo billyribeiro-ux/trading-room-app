@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
  *
  * ## The failure this exists for, in full, because the shape of it matters more than the fix
  *
- * `eslint.config.js` carries fifteen lines explaining why `svelte/no-useless-mustaches` and
+ * `eslint.config.js` carries a long block explaining why `svelte/no-useless-mustaches` and
  * `svelte/prefer-svelte-reactivity` are deliberately `off` — the mustaches hold whitespace the
  * reference emits, and every plain `Map` and `Set` in this codebase is a documented non-reactive
  * collection. On 2026-08-15 commit `060ba72` moved `js/ts/svelte.configs.recommended` from ABOVE

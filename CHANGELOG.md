@@ -144,7 +144,7 @@ silently ignored:
 
 | suggestion | disposition |
 | --- | --- |
-| *"Unexpected mustache interpolation with a string literal value"* × 30 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time. Sixteen of the thirty are the eight pads in each alert pane, which came back identical on both — the twins agree, which is what `dta-01` … `dta-04` exist to keep true |
+| *"Unexpected mustache interpolation with a string literal value"* × 22 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time. Five in `EmojiPicker`, one in `StreamingView`, eight in EACH alert pane — the twins returned the same eight, which is what `dta-01` … `dta-04` exist to keep true |
 | *"the stateful variable `staged` is assigned inside an `$effect`"* (EmojiPicker) | declined — a `$derived` cannot express "one macrotask has passed since mount" |
 | *"calling `loadStream` inside an `$effect`"* × 2 (StreamingView) | declined — the docs name *"third-party library integration"* as what effects are for |
 | *"`bind:this` … consider an attachment"* (StreamingView) | declined, and **load-bearing**: `STV-05` pinned that the reference re-reads the SAME `<video>` across reloads; an attachment rebuilds the handle per re-run and would silently break that |
@@ -175,6 +175,37 @@ run at all.
 `svelte-check` **1,559 files, 0 errors, 0 warnings**; `prettier --check` clean on all four
 components. **Not verified:** nothing was opened in a browser for this change — the two `$effect`s
 are asserted as shape, and the eleven spaces as source, not as rendered output.
+
+#### A claim in `eslint.config.js` that was finally testable, and half wrong
+
+The room's lint already encodes both standing declines — `svelte/no-useless-mustaches` and
+`svelte/prefer-svelte-reactivity` are `off` with their reasoning in place, and
+`eslint-config-resolution.test.ts` asserts the RESOLVED config so a preset-ordering change cannot
+silently turn them back on. That is the durable half of this gate and it was already right.
+
+What was not right was the sentence closing that block: *"the Svelte MCP autofixer reports both on
+every run"*. It had never been testable. It is now, and **two probes settled it**:
+
+- A component holding a `new Map` and a `new Set` written with `.set` / `.add` drew one suggestion
+  each — *"Found a mutable instance of the built-in Map class."*
+- A component holding a `new Map` and a `new Set` built once and only READ drew **nothing at all**;
+  the whole response was empty.
+
+So the autofixer flags only MUTATED collections, where `svelte/prefer-svelte-reactivity` flags every
+plain `Map` and `Set` — which is why that rule produced 43 errors here and is off. The autofixer is
+therefore the **narrower and better** instrument, not a like-for-like stand-in for the disabled
+rule, and `EmojiPicker.svelte`'s read-only `entriesById` is silently and correctly unflagged. A
+reader trusting the old sentence would have expected a suggestion there, not found one, and
+concluded the tool had missed it.
+
+The `{' '}` half of the claim is true and now carries its count: twenty-two occurrences across four
+components in one session.
+
+Two stale prose counts went with it. `eslint.config.js` and `eslint-config-resolution.test.ts` both
+said the block was *"fifteen lines"*; it was already longer than that before today and is longer
+still now. Replaced with a description rather than a new number, because a count that no test
+enforces is the thing that goes stale — which is the rule `CLAUDE.md` states as "two places
+recording the same thing is how one of them goes stale".
 
 **One operational note, because it stopped the suite dead and is not a code fault.** The container's
 writable allowance hit 100% mid-run and vitest failed 60 files with `ENOSPC: no space left on
