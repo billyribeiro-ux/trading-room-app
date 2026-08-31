@@ -72,6 +72,104 @@ and the unit set, 0 failed, `--no-fail-fast` — plus `cargo clippy --all-target
 pins (`migrate.rs` → `d264ec6e…`, `tests/migrations.rs` → `9afb6ebf…`, each with its dated
 paragraph).
 
+### 2026-08-31 14:43 UTC — The Svelte MCP became available, and four rows that were blocked on it are closed
+
+**Runtime impact: YES**, on two counts: a native-HLS viewer no longer has their stream restarted for
+a setting that cannot reach them, and eleven text nodes across three surfaces now render the spaces
+the reference renders.
+
+`CLAUDE.md` makes the Svelte MCP mandatory on every `.svelte` touch — `list-sections`,
+`get-documentation`, then `svelte-autofixer` until it returns nothing. **It has never been available
+in this repository before this session.** Fifteen entries below this line say so in those words, and
+`docs/decoded/room-surface-audit-2026-08-30.md` carries four rows filed `BLOCKED` on nothing else.
+All four are now built.
+
+#### `STV-03` — the reload path had no `this.hls` guard
+
+Both of the reference's reload paths carry `&& this.hls` (bytes 1,902,159 and 1,908,582), and
+`this.hls` is null on exactly one path: `loadStream()` at 1,904,378 falls through to
+`canPlayType("application/vnd.apple.mpegurl") && setupNativeHLS(e)` when `Hls.isSupported()` is
+false. **That is iOS Safari, where native HLS is the only path there is.** Every number
+`getHlsConfig()` computes is consumed by `new Hls(…)` and by nothing else, so a buffer-size change
+provably cannot reach such a viewer — and ours reloaded them anyway, costing their whole buffered
+range and a jump back to the live edge for a setting that could not have applied.
+
+The row was blocked on the fix's SHAPE, not its size, and the shape is one `$effect` becoming two.
+The guard could not simply be added: the same effect served the first load, where `hls` is
+legitimately null, so a guard inside it would have suppressed that load too. The load effect now
+reads `videoSrc` and the element; the buffer effect reads `bufferSizeLevel` and returns early when
+`hls` is null — upstream's own guard, and upstream's own split (`ngAfterViewInit` loads
+unconditionally, the `ngOnInit` subscription reloads conditionally).
+
+**Two facts were settled from the official `$effect` documentation rather than assumed**, which is
+what the mandatory step 1 is for, and both are written at the code because neither is visible from
+it: `getHlsConfig()`'s read of `bufferSizeLevel` sits after `await import('hls.js')` and so is NOT
+tracked — *"values that are read asynchronously … will not be tracked"* — and the new effect's first
+run is a no-op because `hls` is still null at mount, so no `mounted` latch has to be kept in step
+with anything.
+
+#### `STV-06`, `DTP-02`, `SWP-01` — eleven text nodes, and the four that are deliberately NOT touched
+
+The reference writes these with `ɵɵtextInterpolate1` (`Ne(" ", x, " ")`) where it writes their
+neighbours with `ɵɵtextInterpolate` (`Ze(x)`), and that split is what makes the rows countable.
+Svelte trims whitespace after an opening tag and before a closing one, so ours lost exactly the
+block-edge spaces — measured on `svelte@5.57.0`'s emitted modules, not read off the templates.
+
+Eleven `{' '}` mustaches restore them. **The two spaces either side of each pane's months `<select>`
+are deliberately left alone**: they survive compilation untouched, so wrapping them would render a
+double space. That asymmetry is why `DTP-02` names five nodes rather than "the heading".
+
+All eleven are invisible on screen and are carried anyway, because every capture comparison in this
+repository diffs RENDERED STRINGS.
+
+#### What the autofixer actually said, and every decline recorded at the code
+
+Run on four components. **Zero issues on all four.** The suggestions are declines and each is now
+written down beside the code it concerns rather than silently ignored:
+
+| suggestion | disposition |
+| --- | --- |
+| *"Unexpected mustache interpolation with a string literal value"* × 14 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time |
+| *"the stateful variable `staged` is assigned inside an `$effect`"* (EmojiPicker) | declined — a `$derived` cannot express "one macrotask has passed since mount" |
+| *"calling `loadStream` inside an `$effect`"* × 2 (StreamingView) | declined — the docs name *"third-party library integration"* as what effects are for |
+| *"`bind:this` … consider an attachment"* (StreamingView) | declined, and **load-bearing**: `STV-05` pinned that the reference re-reads the SAME `<video>` across reloads; an attachment rebuilds the handle per re-run and would silently break that |
+| *"`bind:this` … consider an attachment"* (EmojiPicker) | **TAKEN.** This file already held its scroller and every category section through attachments, so the one binding was the odd handle out. All three now clear in place, guarded `=== node` |
+
+#### Evidence
+
+Four negative controls, each seen RED and restored:
+
+- `bufferSizeLevel` put back into the load effect → red on the shape assertion.
+- the `hls` guard removed from the buffer effect → red.
+- `streaming-view-and-alert-panes-citation-contract.test.ts` had **four assertions pinning the
+  UNFIXED shape**, and its own comment said *"if somebody builds the row and adds `{' '}`, this
+  flips and the two rows have to be re-dispositioned rather than silently contradicted. That is the
+  intended failure, not a false alarm."* All four flipped together the moment the panes were edited.
+  That is this change's control already run, by a test written to expect it.
+
+The `Ze` half of that file still asserts the ABSENCE of pads on the six `ɵɵtextInterpolate` cells,
+which is now the only direction the pair can drift.
+
+**Ratchet raises, argued in `source-size-contract.test.ts` as that file requires:** StreamingView
+605 → 689, DayTradeAlertsPane 623 → 639, SwingAlertsPane 578 → 590, and EmojiPicker unchanged at 894
+(858 lines, inside its existing ceiling). Twenty-one of StreamingView's sixty-two new lines are the
+three autofixer declines, written down because this is the first session in which that tool could be
+run at all.
+
+**Verified:** `apps/room` full suite **301 files / 5,469 passed / 1 skipped / exit 0**;
+`svelte-check` **1,559 files, 0 errors, 0 warnings**; `prettier --check` clean on all four
+components. **Not verified:** nothing was opened in a browser for this change — the two `$effect`s
+are asserted as shape, and the eleven spaces as source, not as rendered output.
+
+**One operational note, because it stopped the suite dead and is not a code fault.** The container's
+writable allowance hit 100% mid-run and vitest failed 60 files with `ENOSPC: no space left on
+device` and zero failing assertions. The cause was **2.8 GB of stale agent worktrees** under
+`.claude/worktrees/` — twelve of them, from rounds whose commits were cherry-picked long ago.
+`git worktree remove` on all twelve freed the space; **all fifteen `worktree-agent-*` branch refs
+are kept**, so every commit in them is still reachable. A collection error with no failing
+assertion is a disk symptom, not a test result, and reading it as one would have sent the next
+reader looking at working code.
+
 ### 2026-08-31 14:17 UTC — The attestor's ledger error named a chain two extensions old, and prose ranges now have a test
 
 **Runtime impact: NO** — an error string, a comment sentence, and a new unit test; no control flow
