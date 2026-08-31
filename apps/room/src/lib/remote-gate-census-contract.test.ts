@@ -68,6 +68,33 @@ const GATES = [
 const files = globSync('*.remote.ts', { cwd: ROUTES }).sort();
 
 /**
+ * The OTHER door class: every `+server.ts` under `src/routes`.
+ *
+ * A remote function and an endpoint are the same thing from outside — a URL that answers. They are
+ * counted separately here only because they are gated differently: a remote function reaches the
+ * session through `getRequestEvent()`, an endpoint receives `locals` as an argument, and one census
+ * over both would have to accept the union of two vocabularies and would then be satisfied by either
+ * on either.
+ */
+const endpoints = globSync('**/+server.ts', { cwd: ROUTES }).sort();
+
+/**
+ * The one endpoint with no SESSION gate, and why that is correct rather than an exception.
+ *
+ * `internal/media-hook` is called by MediaMTX, which has no session and never will: it is a `curl`
+ * the media server spawns from `runOnAvailable` / `runOnUnavailable`. It authenticates with a bearer
+ * compared in constant time against `MEDIA_HOOK_SECRET`, and an unset secret refuses everything —
+ * without one there is no way to tell MediaMTX from anyone who found the URL, and the route can
+ * inject stream tabs into any room.
+ *
+ * Named here, singular, so a SECOND machine door has to be added deliberately. That is the whole
+ * value of the entry: "this endpoint has no session gate" is a sentence somebody must write.
+ */
+const MACHINE_DOORS = new Map([
+  ['internal/media-hook/+server.ts', 'MEDIA_HOOK_SECRET, constant-time, refuse-if-unset']
+]);
+
+/**
  * Doors that answer with ANOTHER account's private details, which must be presenter-only.
  *
  * Declared by name rather than inferred. There is no way to tell from source text that a query
@@ -94,6 +121,7 @@ describe('the remote-function census', () => {
       plausible deletion.
     */
     expect(files.length, 'no *.remote.ts files were discovered').toBeGreaterThan(30);
+    expect(endpoints.length, 'no +server.ts endpoints were discovered').toBeGreaterThan(5);
   });
 
   it('names only gates that exist', () => {
@@ -131,6 +159,57 @@ describe('the remote-function census', () => {
         `authority is that somebody ASKED), it still calls requireUser and requireRoomShortCode to ` +
         `know who and where.`
     ).toEqual([]);
+  });
+
+  it('gates every endpoint too, or names it a machine door', () => {
+    /*
+      The same rule for the same reason, on the class the census above cannot see. An endpoint is a
+      URL that answers; nothing about it being written as `+server.ts` rather than as a remote
+      function changes who can call it.
+
+      A machine door is not an exemption from authentication — `media-hook` compares a bearer in
+      constant time and refuses when the secret is unset. It is an exemption from the SESSION
+      vocabulary, because the caller is a media server and there is no session to require.
+    */
+    const ungated = endpoints.filter((file) => {
+      if (MACHINE_DOORS.has(file)) return false;
+      const code = codeOf(file, readFileSync(`${ROUTES}${file}`, 'utf8'));
+      return !GATES.some((gate) => code.includes(gate));
+    });
+
+    expect(
+      ungated,
+      `these endpoints require nothing of their caller. If one is a MACHINE door — called by ` +
+        `something with no session, like MediaMTX's hooks — add it to MACHINE_DOORS with the ` +
+        `credential it checks instead, so that "this URL has no session gate" is a sentence ` +
+        `somebody had to write.`
+    ).toEqual([]);
+  });
+
+  it('keeps every machine door on a secret of its own, and refusing when it is unset', () => {
+    /*
+      The entry in `MACHINE_DOORS` is a claim, so it is checked rather than trusted. Two properties,
+      both load-bearing:
+
+      A CONSTANT-TIME comparison, because a bearer compared with `===` leaks its prefix to anyone who
+      can time the response, and this door can inject stream tabs into any room.
+
+      A DISTINCT secret. `media-hook`'s value is written into a shell command in a media server's
+      config file, and the room's session signer does not belong there — so an entry naming
+      `ROOM_JWT_SECRET` would be this door borrowing the credential that mints entry to every room.
+    */
+    for (const [file, credential] of MACHINE_DOORS) {
+      expect(endpoints, `${file} is named a machine door but does not exist`).toContain(file);
+      const source = readFileSync(`${ROUTES}${file}`, 'utf8');
+      const code = codeOf(file, source);
+      const secret = credential.split(',')[0]!.trim();
+
+      expect(code, `${file} does not read ${secret}`).toContain(secret);
+      expect(code, `${file} compares its bearer with a non-constant-time equality`).toContain(
+        'timingSafeEqual'
+      );
+      expect(code, `${file} must not borrow the session signer`).not.toContain('ROOM_JWT_SECRET');
+    }
   });
 
   it('makes the doors onto another account’s details presenter-only', () => {

@@ -82,7 +82,34 @@ they sit inside the same envelope rather than getting a door of their own — th
 question, and they are strictly narrower than their neighbours, since `liveConnectionFor` answers
 only about a connection the hub is holding right now.
 
-**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **291 files, 5,007 passed,
+#### The other door class, and the one door that has no session
+
+`+server.ts` endpoints are the same thing from outside — a URL that answers — and are counted
+separately only because they are gated differently: a remote function reaches the session through
+`getRequestEvent()`, an endpoint receives `locals` as an argument, so one census over both would
+accept the union of two vocabularies and be satisfied by either on either.
+
+All nine are gated, and exactly one has no SESSION gate: `internal/media-hook`, which MediaMTX calls
+from `runOnAvailable` / `runOnUnavailable` and which has no session and never will. It is declared as
+a MACHINE DOOR rather than exempted, and the declaration is checked rather than trusted — its bearer
+is compared with `timingSafeEqual`, an unset secret refuses everything, and it must **not** name
+`ROOM_JWT_SECRET`, because that value is written into a shell command in a media server's config file
+and the room's session signer does not belong there. A second machine door has to be added by hand,
+which is the point: *"this URL has no session gate"* becomes a sentence somebody wrote.
+
+Three more controls, each RED and restored: an ungated `api/probe/+server.ts` added;
+`timingSafeEqual` renamed away in the hook; `ROOM_JWT_SECRET` imported into it.
+
+#### The controller's half was already complete, and that was checked rather than assumed
+
+Before writing any of this, all fourteen routes under `apps/controller/src/routes/internal` were
+enumerated with the verifier each calls. Every one verifies — eight `config-read`, five
+`config-write`, and `media-auth` on its own `decideIngestAuth` — and
+`config-read-cannot-write-contract.test.ts` already carries the completeness assertion *"names every
+internal route that takes a credential"*. Nothing was added there; the gap was on the room side and
+that is where the census went.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **291 files, 5,009 passed,
 1 skipped, gate-exit=0**.
 
 ### 2026-08-31 03:30 UTC — Three more surface audits merged, and two of them had to be reconciled against each other
