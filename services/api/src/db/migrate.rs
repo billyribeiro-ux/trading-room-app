@@ -108,6 +108,107 @@ struct RuntimeRolePosture {
     membership_count: i64,
 }
 
+/// Whether this preflight may accept an ABSENT baseline role.
+///
+/// Two states of one database, and they want opposite answers from the same check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AbsentBaselineRole {
+    /// Absence is a refusal. Everything except the one case below.
+    Refuse,
+    /// Absence is the intended end state, and refusing it would block every future deploy.
+    Accept,
+}
+
+/// Decides whether `ptr_clone_app` may be absent, from whether `0001` has already been applied.
+///
+/// ── WHY THIS EXISTS, MEASURED RATHER THAN REASONED ──────────────────────────────────────────
+///
+/// [`BASELINE_PROVISIONED_ROLE`] is a FENCE, and the thing it fences is precise: `0001_baseline.sql`
+/// carries a forensic branch that creates `ptr_clone_app` with the placeholder password committed at
+/// its line 26. Requiring the role to exist *before the chain runs* keeps that branch unreachable.
+///
+/// That branch is only reachable while `0001` is PENDING. Once SQLx has recorded `0001` as applied,
+/// it never executes again on that database, so on that database the fence is guarding a branch that
+/// cannot run — and the requirement has no remaining subject.
+///
+/// It does, however, still have an effect, and on 2026-08-31 that effect was measured on a live
+/// PostgreSQL 16.13 cluster. `migrations/0010_retire_ptr_clone_app.sql` strips every privilege the
+/// baseline role holds, and its closing note documents the operator step that finishes the job on a
+/// cluster which will take no further new databases:
+///
+/// ```text
+/// DROP ROLE ptr_clone_app;   -- refuses, correctly, while any database still grants
+/// ```
+///
+/// With the requirement unconditional, that step BRICKS THE DEPLOYMENT. The very next run of the
+/// `migrate` binary against a database that had already applied the entire chain — the ordinary
+/// shape of a deploy — exited 1:
+///
+/// ```text
+/// migrate failed: migration preflight requires preprovisioned runtime role ptr_clone_app;
+///                 run the role provisioner before migrations
+/// ```
+///
+/// So the unconditional requirement and the retirement cannot both stand: it makes the documented
+/// end state permanently un-deployable, and it does so for a database where the branch it guards is
+/// already unreachable. This is that step's consumer — without it the step is not takeable, and
+/// `0010` says so where it prescribes it.
+///
+/// ── WHY THIS IS NOT A WEAKENING ─────────────────────────────────────────────────────────────
+///
+/// The fence is untouched in every state where it can act. Absence is accepted on exactly one
+/// condition — `0001` already recorded applied and successful — and in that state `0001` will not
+/// run, so no placeholder password can be created. On a fresh database, on a database whose ledger
+/// does not exist yet, and on a database where `0001` is recorded as FAILED and will therefore be
+/// retried, this returns [`AbsentBaselineRole::Refuse`] and the preflight behaves exactly as before.
+///
+/// Presence is not weakened either, in either state: an existing baseline role is still put through
+/// the complete posture check by [`validate_runtime_role_posture`]. A cluster that re-provisions the
+/// role after retirement — which is what `docker/postgres/10-provision-roles.sh` does at cluster
+/// init — is therefore still refused if it provisions it unsafely.
+///
+/// Fail-closed by construction: the only input that unlocks acceptance is positive evidence read
+/// from the database's own ledger. Every failure to obtain that evidence lands on `false`.
+const fn baseline_role_absence_policy(baseline_migration_applied: bool) -> AbsentBaselineRole {
+    if baseline_migration_applied {
+        AbsentBaselineRole::Accept
+    } else {
+        AbsentBaselineRole::Refuse
+    }
+}
+
+/// Whether SQLx's ledger records [`BASELINE_VERSION`] as applied AND successful on this database.
+///
+/// Two queries rather than one, because a relation name is resolved at PARSE time: a single
+/// `SELECT … FROM _sqlx_migrations WHERE to_regclass('_sqlx_migrations') IS NOT NULL` still fails
+/// with `relation does not exist` on a fresh database, since the guard never gets to run.
+///
+/// `to_regclass` is unqualified on purpose, so it resolves through the same `search_path` SQLx
+/// itself uses to create and read the table. A hardcoded `public.` would answer about a different
+/// relation than the one the migrator is about to write to.
+async fn baseline_migration_is_applied(
+    connection: &mut PgConnection,
+) -> Result<bool, MigrateError> {
+    let ledger_exists: bool =
+        sqlx::query_scalar("SELECT to_regclass('_sqlx_migrations') IS NOT NULL")
+            .fetch_one(&mut *connection)
+            .await?;
+
+    if !ledger_exists {
+        return Ok(false);
+    }
+
+    // `success` is load-bearing: a FAILED `0001` will be retried, so its forensic branch is
+    // reachable again and the fence must stand.
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM _sqlx_migrations WHERE version = $1 AND success)",
+    )
+    .bind(BASELINE_VERSION)
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(MigrateError::from)
+}
+
 fn validate_migrator_identity(
     system_user: Option<&str>,
     session_role: &str,
@@ -173,6 +274,7 @@ async fn preflight_for_roles_on_connection(
     connection: &mut PgConnection,
     expected_migrator: &str,
     expected_runtime: &str,
+    absent_runtime_role: AbsentBaselineRole,
 ) -> Result<(), MigrateError> {
     let (system_user, session_role, current_role): (Option<String>, String, String) =
         sqlx::query_as("SELECT system_user, session_user::text, current_user::text")
@@ -214,9 +316,34 @@ async fn preflight_for_roles_on_connection(
     .bind(expected_runtime)
     .fetch_optional(&mut *connection)
     .await?;
+
+    // ABSENCE is the only case the caller can relax, and PRESENCE is never relaxed: a role that is
+    // here still goes through the complete posture check below, in both policies. See
+    // `baseline_role_absence_policy` for the whole argument and the run that established it.
+    if posture.is_none() && absent_runtime_role == AbsentBaselineRole::Accept {
+        tracing::info!(
+            role = expected_runtime,
+            "baseline role is absent and the baseline migration is already applied; \
+             accepting the retired end state"
+        );
+        return Ok(());
+    }
+
     validate_runtime_role_posture(expected_runtime, posture.as_ref())?;
 
     Ok(())
+}
+
+/// Exposes the ledger read that decides the baseline-role absence policy.
+///
+/// The policy function itself is a pure `const fn` with a unit test; this is the half that talks to
+/// a database, and the half whose failure mode — answering `true` on a database that has NOT applied
+/// `0001` — would silently disarm the fence.
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub async fn baseline_migration_is_applied_for_tests(pool: &PgPool) -> Result<bool, MigrateError> {
+    let mut connection = pool.acquire().await?;
+    baseline_migration_is_applied(&mut connection).await
 }
 
 /// Exercises the production preflight query with isolated, uniquely named role fixtures.
@@ -228,7 +355,17 @@ pub async fn preflight_for_tests(
     expected_runtime: &str,
 ) -> Result<(), MigrateError> {
     let mut connection = pool.acquire().await?;
-    preflight_for_roles_on_connection(&mut connection, expected_migrator, expected_runtime).await
+    // `Refuse`, always. This entry point exists to exercise the fence with isolated role fixtures,
+    // and the fixtures are named roles that no migration ledger knows about — so the retirement
+    // relaxation must not reach them, or `preflight_rejects_absent_and_unsafe_isolated_runtime_roles`
+    // would stop asserting the absent case on any database that has run its chain.
+    preflight_for_roles_on_connection(
+        &mut connection,
+        expected_migrator,
+        expected_runtime,
+        AbsentBaselineRole::Refuse,
+    )
+    .await
 }
 
 /// Proves the migration identities and applies every pending migration on one connection.
@@ -251,10 +388,17 @@ pub async fn run(pool: &PgPool) -> Result<(), MigrateError> {
     // refuse to run the migration that creates it. The runtime role's own posture is asserted twice
     // elsewhere — by `0009` when it provisions it, and by `assert_runtime_role_is_restricted` at
     // API startup.
+    //
+    // The absence policy is read from this database's own ledger rather than assumed, because
+    // `0010_retire_ptr_clone_app.sql` prescribes dropping this very role once the cluster has
+    // converged. See `baseline_role_absence_policy`.
+    let absent_baseline_role =
+        baseline_role_absence_policy(baseline_migration_is_applied(&mut connection).await?);
     preflight_for_roles_on_connection(
         &mut connection,
         EXPECTED_MIGRATOR_ROLE,
         BASELINE_PROVISIONED_ROLE,
+        absent_baseline_role,
     )
     .await?;
     tracing::info!("migration identity and runtime-role preflight passed");
@@ -416,6 +560,58 @@ mod tests {
             let mut posture = restricted_runtime_role();
             mutate(&mut posture);
             assert_runtime_role_rejected(posture, expected_reason);
+        }
+    }
+
+    /// The four states of the fence, all four asserted, because only one of them changed.
+    ///
+    /// `0010_retire_ptr_clone_app.sql` prescribes dropping `ptr_clone_app` once the cluster has
+    /// converged, and an unconditional requirement then refuses every subsequent deploy — measured
+    /// on a live cluster on 2026-08-31, `migrate` exiting 1 on a database that had applied the whole
+    /// chain.
+    ///
+    /// The relaxation is one cell of this table. The other three are here so a later edit that
+    /// widens it has to widen a stated assertion rather than a single boolean.
+    #[test]
+    fn the_baseline_role_may_be_absent_only_after_the_baseline_has_been_applied() {
+        /*
+          THE FENCE, unchanged. `0001` is still pending, so its forensic branch is still reachable
+          and an absent role would be created with the placeholder password committed at its line 26.
+        */
+        assert_eq!(
+            baseline_role_absence_policy(false),
+            AbsentBaselineRole::Refuse,
+            "a database that has not applied 0001 must still refuse an absent baseline role"
+        );
+
+        /*
+          THE RELAXATION, and the whole of it. SQLx never re-executes a migration it has recorded as
+          applied, so on this database the branch the fence guards cannot run.
+        */
+        assert_eq!(
+            baseline_role_absence_policy(true),
+            AbsentBaselineRole::Accept,
+            "after 0001 is applied, an absent baseline role is 0010's intended end state"
+        );
+
+        /*
+          PRESENCE is never relaxed, in either policy — the relaxation is reached only when the
+          lookup returned None. This is the assertion that would go red if somebody moved the
+          short-circuit above the posture check instead of beside it.
+        */
+        validate_runtime_role_posture(BASELINE_PROVISIONED_ROLE, Some(&restricted_runtime_role()))
+            .expect("a restricted baseline role is accepted whatever the ledger says");
+
+        let mut unsafe_posture = restricted_runtime_role();
+        unsafe_posture.bypasses_rls = true;
+        match validate_runtime_role_posture(BASELINE_PROVISIONED_ROLE, Some(&unsafe_posture)) {
+            Err(MigrateError::UnsafeRuntimeRole { role, reason }) => {
+                assert_eq!(role, BASELINE_PROVISIONED_ROLE);
+                assert_eq!(reason, "BYPASSRLS disables row-level security");
+            }
+            other => {
+                panic!("a re-provisioned unsafe baseline role must still be refused, got {other:?}")
+            }
         }
     }
 

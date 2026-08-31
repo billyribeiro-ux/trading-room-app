@@ -81,6 +81,149 @@ Contracts: `chat-composer-key-contract.test.ts`, `alert-chat-nav-contract.test.t
 `message-renderer-differences-contract.test.ts` — 54 assertions, every bundle claim read from the
 pinned v4 file at run time rather than quoted. Eleven negative controls seen red.
 
+### 2026-08-31 00:57 UTC — The retirement migration dropped a cluster-global role, and this repository's own convergence test refused it
+
+**Runtime impact: NO from this commit** — nothing here has been run against a deployed database.
+What changes is what `0010` will do when it is, and whether every deploy after it can still run.
+
+*(Timestamp note: this entry carries the real UTC clock. The two entries below it are labelled 02:05
+and 02:40 UTC against commits made at 23:59 and 00:07 UTC — their labels are ~2 hours ahead of the
+commits they describe. Ordering below this line follows the commits, not the labels.)*
+
+**`0010_retire_ptr_clone_app.sql` shipped nine hours ago ending in `DROP ROLE ptr_clone_app`. It was
+wrong, and the test that says so has been in this repository since 2026-08-15.**
+
+```text
+the_chain_applies_to_a_second_database_on_the_same_cluster ... FAILED
+```
+
+`migration_reappliability.rs` states the rule in its own header: *"A migration may mutate
+cluster-global state only if that mutation is convergent under repeated application from version 1
+on the same cluster."* Roles are cluster-global; the sqlx ledger is per-database. The first database
+applied the chain and dropped the role — and the **second database on that cluster could then not
+start its chain at all**, because the migrate preflight requires `ptr_clone_app` to exist before
+`0001` runs. `0001` would otherwise reach the forensic branch that creates it with the placeholder
+password committed at its line 26.
+
+That is the same non-convergence that killed the `0009` rename, arriving by a different route. It
+would have reached production as *"the second tenant database can never be created"*, and the
+previous entry described the drop as the migration's proudest property.
+
+**A second, independent failure of the same change, found first.** Before the convergence test ran,
+the `migrate` binary was pointed at a database that had already applied the whole chain — the
+ordinary shape of a deploy — with the role retired:
+
+```text
+migrate failed: migration preflight requires preprovisioned runtime role ptr_clone_app;
+                run the role provisioner before migrations
+```
+
+Exit 1. Every subsequent deploy, forever, on a converged cluster.
+
+#### What changed
+
+**`0010` is revoke-only.** It strips every privilege the baseline role holds in the database it runs
+on — table, column, routine, schema, default ACL and the DATABASE `CONNECT` — counts the residue
+across the seven `pg_catalog` relations PostgreSQL itself walks, and refuses rather than reporting
+success if anything survives. The interlock is unchanged: it still REFUSES on a database where
+`0009` has not taken effect. What it no longer does is drop the role, and the closing note in the
+file explains why at length, naming the test run that reshaped it.
+
+The risk this migration exists to remove was never a row in `pg_authid`. It was a login-capable
+identity holding DML on every table of a multi-tenant fintech database. After it runs, that identity
+holds nothing: no table, column, routine, schema, default or CONNECT privilege, and — since `0009` —
+no RLS policy naming it, so under FORCE ROW LEVEL SECURITY it reads zero rows.
+
+**Removing the role itself is now a documented operator step**, for a cluster that will take no
+further new databases. `DROP ROLE` without `CASCADE` is its own interlock: it refuses while any
+database in the cluster still grants, so it cannot be taken early.
+
+**`db::migrate::baseline_role_absence_policy` is what makes that step takeable.** The preflight
+accepts an absent baseline role on exactly one condition: this database's own sqlx ledger records
+`0001` applied **and successful**. SQLx never re-executes a recorded migration, so on such a database
+the branch the fence guards cannot run and the requirement has no remaining subject. On a fresh
+database, on one with no ledger, and on one where `0001` is recorded FAILED and will be retried, an
+absent role is still refused. Presence is never relaxed in either state — a re-provisioned role still
+goes through the complete posture check, so a cluster that recreates it unsafely is still refused.
+
+The ledger read is two queries rather than one, because a relation name is resolved at PARSE time: a
+single `SELECT … FROM _sqlx_migrations WHERE to_regclass(…) IS NOT NULL` still fails with *relation
+does not exist* on a fresh database, since the guard never gets to run.
+
+#### Measured on a live PostgreSQL 16.13 cluster, through the `migrate` binary
+
+| # | database state | baseline role | result |
+| --- | --- | --- | --- |
+| A | full chain applied | retired | **exit 0** — was exit 1 before the fix |
+| B | fresh, no ledger | absent | **exit 1** — the fence, untouched |
+| C | fresh | provisioned | chain `0001`→`0010` applied, ledger at version 10 |
+| D | the database from C | retired | **exit 0**, tenancy intact at **87 grants / 22 policies** |
+
+`the_chain_applies_to_a_second_database_on_the_same_cluster` is green, three consecutive runs, and
+the role survives the suite — which is what convergent looks like from the outside.
+
+#### A harness race that my third concurrent test made reproducible
+
+`Scratch::sweep` argued its own safety like this: *"a database another test is using right now still
+has a backend attached, so its `DROP` fails and it is left alone."* True only **after** a backend
+attaches. Between `CREATE DATABASE` and the first connection there is none, and every sibling test's
+`create()` sweeps in that window:
+
+```text
+connect to the scratch database: database "tradingroom_migrate_test_7be62f0e…" does not exist
+detail: It seems to have just been dropped or renamed.
+```
+
+Two consecutive runs, deterministic. Sweeping is now scoped by an eight-character per-process token
+embedded in every name: litter from an earlier `cargo test` is still collected, a sibling thread's
+half-created database is not. Cross-process concurrency is deliberately not covered, and the comment
+says so rather than implying it is.
+
+#### Negative controls, each seen RED and restored
+
+- `baseline_role_absence_policy` forced to always `Accept` → the unit test failed on the fence
+  assertion by name: *"a database that has not applied 0001 must still refuse an absent baseline
+  role"*.
+- `DROP ROLE` and a `WHEN dependent_objects_still_exist` handler reintroduced into `0010` → **two**
+  contract tests failed, each on its own assertion, and the file was restored byte-identical to its
+  new pin afterwards.
+
+#### The claims corrected, all seven of them
+
+The previous entry and five other sites described a migration that dropped the role. Each now
+describes the one that does not, and says why:
+
+- `0010_retire_ptr_clone_app.sql` — the header's *"revoke-then-drop reaches the identical end state
+  every time"* and the whole closing section
+- `apps/controller/scripts/verify-backend.mjs` — the pin's reviewed-properties paragraph, now four
+  properties, re-pinned `f38b8ee8`
+- `apps/controller/scripts/verify-backend-provenance.mjs` — the `LOCALLY_AUTHORED` note, plus fresh
+  pins for `migrate.rs`, `migrations.rs`, `support/mod.rs`, `postgres-release-attestation.rs` and
+  `migration_reappliability.rs`
+- `apps/controller/src/lib/naming-boundary.test.ts` — *"it deletes itself once the rollout
+  completes"* was false in both places it appeared; the entry stays on the allow-list because the
+  role outlives the chain by design
+- `apps/controller/src/lib/retire-baseline-role-contract.test.ts` — rewritten to lead with the
+  property that reshaped the migration. Its vacuity floor now reads from stripped CODE, because the
+  migration's prose quotes the `DROP ROLE` it does not run and a raw-text floor would have been
+  satisfied by the explanation of the absent statement.
+- `services/api/tests/migrations.rs` — the `role_exists` guard's reason
+- `apps/room/TODO.md` — the retirement entry's outcome table and its three lessons, now four
+
+**`ATTESTED_MIGRATION_VERSIONS` extended `0001-0009` → `0001-0010`.** `0010` shipped without it, and
+`the_embedded_migration_pin_matches_the_migrations_on_disk` caught it — the same way it caught `0009`
+shipping in `b9f775e` without the list being extended. The reviewed-act paragraph that list requires
+is written at the constant.
+
+**Not verified:** `cargo clippy --all-targets` cannot run in this container — `mediasoup-sys` fetches
+libsrtp from github and the agent proxy answers 403 — so linting was run as `cargo clippy -p
+tradingroom-api --lib --features testing -- -D warnings`, clean. The rust-analyzer MCP that
+`CLAUDE.md` mandates for `.rs` work is not available in this session; `cargo fmt`, that clippy
+invocation and the test suite stood in for it, and this line records the substitution rather than
+implying otherwise. All evidence above is PostgreSQL **16.13**, while `services/compose.yml` pins
+`postgres:17` — the one known divergence is `MAINTAIN`, a PG17 privilege, which is why
+`runtime_object_privileges_match_the_current_api_sql_surface` reports it here.
+
 ### 2026-08-31 02:40 UTC — Entry 2 closed by an owner ruling, and entry 5's own measurement had become self-referential
 
 **Runtime impact: NO.** Two register entries and one exemption. No `src` module or migration changed.
@@ -134,6 +277,14 @@ Allow-list ceiling **40 → 41**, with the argument at the code: both new entrie
 the day the rollout completes.
 
 ### 2026-08-31 02:05 UTC — `ptr_clone_app` is retired, and the live cluster taught the migration three things
+
+> **PARTLY SUPERSEDED by the 00:57 UTC entry above.** Everything here about the revoke, the
+> interlock, the DATABASE grant and the catalogue-exact residual still holds. What does not is the
+> **drop**: `0010` ended in `DROP ROLE ptr_clone_app` when this was written, and
+> `migration_reappliability.rs` later refused it — a dropped cluster-global role stops the next
+> database on the cluster from starting its chain. The migration is revoke-only now, and removing
+> the role is a documented operator step. Read the tolerated-failure paragraph and the outcome table
+> below as history rather than as the current shape.
 
 **Runtime impact: NO from this commit** — the migration ships, it has not been run against any
 deployed database. What it does when run is below, measured rather than described.

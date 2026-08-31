@@ -72,6 +72,29 @@ async fn force_rls_count(pool: &PgPool) -> i64 {
     .expect("count FORCE RLS tables")
 }
 
+/// Whether a role exists at all.
+///
+/// `has_table_privilege` takes a role NAME and errors — it does not answer `false` — when no such
+/// role exists. So every assertion below about what `ptr_clone_app` may not do stops being an
+/// assertion the moment that role is retired, and starts being a panic.
+///
+/// `0010_retire_ptr_clone_app.sql` revokes every privilege the baseline role holds in the database
+/// it runs on and deliberately does NOT drop the role, because a dropped cluster-global role is not
+/// convergent — `migration_reappliability.rs` is where that was measured. So on an ordinary cluster
+/// the role is still present here and the branch below is not taken.
+///
+/// It is taken on the end state the migration documents: once a cluster will take no further new
+/// databases, an operator may finish the retirement with `DROP ROLE ptr_clone_app`. Guarding for
+/// that is not speculative — it is the difference between this file asserting on that cluster and
+/// panicking on it.
+async fn role_exists(pool: &PgPool, role: &str) -> bool {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = $1)")
+        .bind(role)
+        .fetch_one(pool)
+        .await
+        .unwrap_or_else(|error| panic!("look up role {role}: {error}"))
+}
+
 async fn has_table_privilege(pool: &PgPool, table: &str, privilege: &str) -> bool {
     sqlx::query_scalar("SELECT has_table_privilege('ptr_clone_app', $1, $2)")
         .bind(table)
@@ -753,6 +776,30 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
     let scratch = Scratch::create().await;
     let owner = scratch.pool().await;
     migrate::run(&owner).await.expect("migrations apply");
+
+    // THE BASELINE ROLE MAY BE GONE, AND ITS ABSENCE IS THE STRONGER OUTCOME.
+    //
+    // Every assertion below says `ptr_clone_app` must NOT hold some privilege.
+    // `0010_retire_ptr_clone_app.sql` revokes them all; the role itself outlives the chain by
+    // design, and disappears only when an operator runs the `DROP ROLE` that migration documents —
+    // so the subject of those assertions is usually present and occasionally does not exist.
+    //
+    // That is not this test losing its meaning; it is this test's meaning being satisfied
+    // completely. A role that does not exist holds no privileges on anything, which is strictly
+    // stronger than "holds none of these eight on these three tables". What it cannot do is be
+    // MEASURED: `has_table_privilege` takes a name and errors on an unknown role rather than
+    // answering false, so without this the retirement turns a passing assertion into a panic.
+    //
+    // Asserted rather than skipped silently: reaching here means the chain applied and the role is
+    // gone, and both halves are worth stating.
+    if !role_exists(&owner, "ptr_clone_app").await {
+        assert!(
+            role_exists(&owner, "tradingroom_app").await,
+            "the baseline role is retired but the runtime role is absent too - this database has no \
+             application identity at all, which 0010's interlock exists to prevent"
+        );
+        return;
+    }
 
     let enterprise_columns = ["id", "name", "slug", "settings", "created_at", "updated_at"];
     let user_columns = [

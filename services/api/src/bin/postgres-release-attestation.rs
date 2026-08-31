@@ -1022,8 +1022,24 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// role that may bypass RLS.
 ///
 /// `0009` shipped in `b9f775e` without this list being extended, which is exactly the reviewed-act
-/// gate working: `main` went red until somebody looked.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+/// gate working: `main` went red until somebody looked. `0010` did the same thing on 2026-08-31,
+/// and the gate caught it the same way.
+///
+/// Slot 10 is `0010_retire_ptr_clone_app.sql`, reviewed on the same terms. It finishes what `0009`
+/// began: `0009` gave `tradingroom_app` parity and took the baseline role out of all 22 policies,
+/// leaving `ptr_clone_app` inert with respect to tenant rows but still holding 87 table grants, 26
+/// column grants, 6 routine grants, schema USAGE and CONNECT. `0010` revokes every one of those, in
+/// the database it runs on, counting the residue from `pg_catalog` and refusing rather than
+/// reporting success if anything survives. It also REFUSES on a database where `0009` has not taken
+/// effect, so a database that is not ready keeps its only working role.
+///
+/// It does NOT drop the role, and that is a reviewed decision rather than an omission. Its first
+/// version ended in `DROP ROLE`; `migration_reappliability.rs` failed on
+/// `the_chain_applies_to_a_second_database_on_the_same_cluster`, because roles are cluster-global
+/// and a second database could no longer start its chain — the migrate preflight requires that role
+/// to exist before `0001` runs. Removing the role itself is a documented operator step, and
+/// `db::migrate::baseline_role_absence_policy` is what keeps that step from blocking later deploys.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1037,7 +1053,7 @@ fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
 
     Err(AttestationError::new(
         "embedded_migration_contract_changed",
-        "the attestor is pinned to repository migration versions 0001 through 0009",
+        "the attestor is pinned to repository migration versions 0001 through 0010",
     ))
 }
 

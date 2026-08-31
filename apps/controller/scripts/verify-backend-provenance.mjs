@@ -92,7 +92,7 @@ const LOCALLY_AUTHORED = new Map([
     // must be appliable to any number of databases on one cluster. Nothing in the imported tree
     // stated that rule, which is why a non-convergent migration passed review and shipped.
     'services/api/tests/migration_reappliability.rs',
-    '3faadc515e1f228c3abf261cdfc1f30ba7523a8ea181d0adfe293affc8a107a1'
+    '600967960d80695a40ea5c83d2ac608627056e06aa51e24d53d5fead2fe72ef3'
   ],
   [
     'services/api/migrations/0009_provision_tradingroom_app.sql',
@@ -101,12 +101,16 @@ const LOCALLY_AUTHORED = new Map([
   [
     // Authored here on 2026-08-31, and the pair to `migration_reappliability.rs` above: that test
     // states the chain must apply to any number of databases on one cluster, and this migration is
-    // where that rule stops being about SQL and becomes about a cluster-global ROLE. It revokes
-    // per-database and drops only when it is the last database still granting — verified across
-    // three databases on a live PostgreSQL 16.13 cluster, including the refusal on one where 0009
-    // had not run. `CHANGELOG.md` carries the full evidence.
+    // where that rule stops being about SQL and becomes about a cluster-global ROLE.
+    //
+    // It revokes PER-DATABASE and does not drop the role. The first version did drop it, and that
+    // test is what refused it — `the_chain_applies_to_a_second_database_on_the_same_cluster`, on a
+    // live PostgreSQL 16.13 cluster: the first database dropped the role and the second could no
+    // longer start its chain, because the migrate preflight requires it before `0001` runs. The pair
+    // held. `CHANGELOG.md` carries the full evidence, including the refusal on a database where
+    // `0009` had not run.
     'services/api/migrations/0010_retire_ptr_clone_app.sql',
-    'a134bdcf67ae8662fb9c10a0c7a80581adf23ec0f59739e0363bde6ed4d3d36a'
+    'f38b8ee829abb7e0525d4f31ccb389ddafad9e92c309c53a18ddc9969e1e5251'
   ]
 ]);
 
@@ -209,9 +213,15 @@ const DIVERGED_FROM_IMPORT = new Map([
     them — the 1:1 this evidence exists to state — and exactly two distinct `USING` expressions, the
     general tenant predicate and `room_events`' member-scoped one.
   */
+  /*
+    Re-pinned 2026-08-31: `ATTESTED_MIGRATION_VERSIONS` extended 0001-0009 -> 0001-0010 when
+    `0010_retire_ptr_clone_app.sql` landed, with the reviewed-act paragraph that list requires. The
+    attestor's own test caught the omission — the same way it caught `0009` shipping in `b9f775e`
+    without the list being extended.
+  */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '04eaa8613989ebe0e7f4764d43bb730290b5185bb97bd8446aa1579d007ade51'
+    '6b4a8f0be567db9c5dff7cd6f73ef09e5d6b281d4323e592913050440681c240'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -226,12 +236,12 @@ const DIVERGED_FROM_IMPORT = new Map([
   // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
   ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
-  ['services/api/tests/migrations.rs', 'da2739797a45c6eb27beb61d55fd000a500357bfa6ad3b373931bd3ba7165136'],
+  ['services/api/tests/migrations.rs', '319d7865f8241cc599bdf55d73745cfce084cfc5df12135d7690dfb032fa7795'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
   ],
-  ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
+  ['services/api/src/db/migrate.rs', '559b8f0ba1192475aa08b94c01a36b1a641b3beab8901722b10f842ad7cf197d'],
   /*
     Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half
     missed. Each was an untouched import until now, and each leaves the aggregate for its own pin
@@ -260,7 +270,18 @@ const DIVERGED_FROM_IMPORT = new Map([
                  roots are in fact our own direct dependencies, traced with `cargo tree -i`.
   */
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
-  ['services/api/tests/support/mod.rs', 'ebdc169b422d4f700a73de6c5ebd2e41f3b452732b11cdf419c76cf3b0664787'],
+  [
+    'services/api/tests/support/mod.rs',
+    '1f878cd85b80d4450b08d3ec4d24e8edc8cc1a090880e138d2de88fe928f9950'
+    /*
+      Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
+      Its safety argument — a live database keeps a backend attached, so its DROP fails — held only
+      after a backend attached; between `CREATE DATABASE` and the first connect there is none, and a
+      sibling thread's sweep collected the database out from under it. Adding a third concurrent
+      `Scratch::create` to `migration_reappliability.rs` reproduced it on two consecutive runs
+      ("It seems to have just been dropped or renamed"), and three runs are green after.
+    */
+  ],
   ['services/api/tests/auth_http.rs', '79a5b173119977db1ec1eac94a03b86897d40a42c0f25474d5fbd8cadedac98c'],
   ['services/api/tests/realtime.rs', '62c6629bed604164b3f9709220f737da51708c794e1b0062210a18d7ee7d0056'],
   ['services/api/tests/refresh_rotation.rs', '65531ae9d457eacedb87755fd673a6999fa607ea4822e37081d2a553637c49d7'],
