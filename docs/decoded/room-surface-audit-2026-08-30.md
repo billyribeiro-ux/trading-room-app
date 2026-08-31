@@ -7115,7 +7115,13 @@ This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ### STB-04 — `stream-tabs-contract.test.ts` reads a bundle that is not in this repository, so the whole file asserts nothing
 
-**BLOCKED 2026-08-31 — and NEW EVIDENCE on 2026-08-31 removes the obvious second repair.** The one
+**OWNER DECISION 2026-08-31 21:30 UTC — re-dispositioned from BLOCKED, and the row's own last
+paragraph is why: *"Retiring the file stays an owner decision."*** Nothing built here changes that,
+and "BLOCKED" reads as *something could unblock this*, which is the label `SVC-04` carried for the
+same reason and has also been corrected. The two are now the honest pair: buildable halves done,
+judgements left to the owner.
+
+**The evidence below is unchanged and is what makes it a judgement rather than an obstacle.** The one
 candidate this row did not consider was re-pointing at `docs/source-v3-2026-08-15`, which this
 checkout DOES hold. It does not work: that directory holds `main.99a5781d1d7a7775.js`, a THIRD
 minifier generation carrying neither this file's literals (`ut(9,Go,`, `Go=t=>({active:t})` — both

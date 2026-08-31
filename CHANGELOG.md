@@ -76,10 +76,20 @@ one reintroduced ahead of the correction record; the old const index; the wrong-
 moved to 2,001,505, the offset of the class NAME rather than of the const holding it, which is the
 near-miss a hand-written offset actually lands on; and `pSe`'s offset swapped for `hSe`'s.
 
-`SVC-04` is re-dispositioned from BLOCKED to OWNER DECISION rather than closed. Its buildable half —
-a new file bound to the tracked bundle — was already done; what remains is whether an evidence-bound
-test whose evidence is permanently gitignored should be retired or re-pointed, and "blocked"
-mislabels a judgement as something building could remove.
+**Two rows are re-dispositioned from BLOCKED to OWNER DECISION, which is a correction and not a
+tidy-up.** `SVC-04` and `STB-04` are the same shape: each has a buildable half that is done — a new
+file bound to the tracked bundle, and a `STB-04` note carrying the three-generation table into the
+superseded file itself — and each ends in the owner deciding whether an evidence-bound test whose
+evidence is permanently gitignored should be retired or re-pointed. `STB-04`'s own last paragraph
+already said so in those words. "BLOCKED" reads as *something could unblock this*, and no amount of
+building here can; keeping the wrong label is how a judgement waits behind work that will never
+arrive.
+
+**That leaves fourteen BLOCKED rows, and every one is external**: four on the absent streaming/player
+server, three on an archive service, two on a server-side supply that does not exist (`years`,
+`isNew`), one each on a Discord registration, a Twilio integration, the linked-room fan-out, a
+re-capture of `app-extra-chat`'s stylesheet, and the three bundle chunks this checkout does not hold.
+None is closable from inside this repository.
 
 ### 2026-08-31 20:45 UTC — A dropped chat channel now takes the composer with it, in both columns
 
