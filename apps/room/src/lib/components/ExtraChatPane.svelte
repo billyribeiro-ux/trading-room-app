@@ -27,9 +27,23 @@
    * `app-chat` emits `hideChat` for non-presenters when the mode becomes `d`; this component's
    * `changeChatMode` handler only re-runs its own resize. That asymmetry is upstream's and is kept:
    * the extra column is not the thing that collapses the layout.
+   *
+   * ## The measured facts about this surface live in `#lib/extra-chat-surface.ts`
+   *
+   * Every const index below is read from THIS component's table (byte 2,393,850) and not from
+   * `app-chat`'s, which is not an offset of it. That module carries the decoded tables, the id this
+   * composer must wear (`XCP-01`), and the three gaps this file cannot close from inside itself —
+   * the absent YouTube button (`XCP-08`), the entire missing component stylesheet (`XCP-09`) and
+   * the `ngClass` this room refuses (`XCP-07`).
    */
   import { tick } from 'svelte';
 
+  import { composerEnterAction } from '#lib/chat-composer-enter.js';
+  import {
+    EXTRA_CHAT_COMPOSER_HOLDER_ID,
+    EXTRA_CHAT_EMOJI_POPOVER,
+    EXTRA_CHAT_GIF_TRIGGER
+  } from '#lib/extra-chat-surface.js';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
@@ -86,43 +100,21 @@
     showPmButton: boolean;
     canPostImages: boolean;
     /*
-      `isPresenter` USED TO BE HERE and is gone, 2026-08-14.
-
-      Upstream's `app-extra-chat` reads it six times — the admin-chat tab (`isPresenter ||
-      user.hasAdminChat`), image posting (`isPresenter || sessData.userUploads`), the mention badge,
-      the limited-presenter branch and the mic check. It is genuinely load-bearing THERE because the
-      component computes its own gates.
-
-      This one does not. The parent computes each gate once and passes the RESULT —
-      `showPmButton`, `canPostImages`, `canUseRTE` — which is the better shape: authority is decided
-      in one place instead of re-derived per component. Passing the raw flag as well meant a second
-      input that no line read, and a future reader could have gated something on it directly and
-      quietly disagreed with the parent.
+      `isPresenter` USED TO BE HERE and is gone, 2026-08-14. Upstream's component reads it six times
+      because it computes its own gates; this one is handed each RESULT instead, so authority is
+      decided once in the parent. `#lib/extra-chat-surface.ts` carries the full argument.
     */
     canUseRTE: boolean;
     giphyApiKey: string;
     /**
      * The sixteen props every message in this room shares, spread straight into `RoomMessage`.
      *
-     * ONE prop where there were twelve, and it closed a real defect rather than only tidying the
-     * declaration. Twelve were declared, destructured and forwarded here purely to pass through
-     * untouched — and the four that were NOT (`usersPublicReply`, `enableReactions`,
-     * `enableEditMessage`, `enableEditAlerts`) therefore fell to their `false` defaults, so the same
+     * ONE prop where there were twelve, and it closed a real defect rather than tidying a
+     * declaration: the four that were not forwarded fell to their `false` defaults, so the same
      * chat message carried a reaction bar and an edit entry in the main column and neither here.
-     *
-     * THE CAPTURE SAYS THAT IS WRONG, and says it twice. `app-chat` and `app-extra-chat` are
-     * declared with the SAME const 212 in the room template, and the message component reads those
-     * gates off the shared service rather than off any per-column input:
-     *
-     * ```js
-     * O(19, sessData.enableReactions && "chat" === logType || … ? 19 : -1)
-     * sessData.enableEditMessage && "chat" === logType && (this.canEditMessage = …)
-     * canPublicReply = "chat" === logType && … && (isPresenter || sessData.usersPublicReply)
-     * ```
-     *
-     * Keyed on `logType` alone. A message in this column is `logType === "chat"` exactly as one in
-     * the main column is, so it gets identical reply, edit and reaction capability. There is no
-     * per-column narrowing upstream to reproduce.
+     * `room-message-chrome.ts` is the argument — it names this component by name, quotes the three
+     * captured lines that key those gates on `logType` alone, and says why there is no per-column
+     * narrowing upstream to reproduce. Pointed at rather than restated.
      */
     chrome: RoomMessageChrome;
     /**
@@ -154,17 +146,10 @@
     /**
      * This column's scroll-follow decision, and the four things it needs.
      *
-     * The `$effect` that acts on it lives HERE, not on the page, which is what Svelte's own
-     * best-practices page asks for: an effect is for "direct DOM manipulation", and the DOM in
-     * question is this component's scroller. `scroll-follow.ts` had already written down the same
-     * conclusion for its own reasons — *"the `tick()`-then-check dance around a scroller that may
-     * have been replaced mid-flight belongs where the element lives"* — and until 2026-08-16 the
-     * element lived here while the dance lived on `+page.svelte`.
-     *
-     * `follow` is the page's INSTANCE rather than a fresh one, because its markers are what make
-     * the decision stateful across renders and because the alerts column deliberately gets a
-     * differently-configured one. Constructing it here would silently give this column the
-     * `alwaysScrollToBottom` override the alerts instance is forbidden.
+     * The `$effect` that acts on it lives HERE because the DOM in question is this component's
+     * scroller — see the effect below, and `scroll-follow.ts`, which reached the same conclusion
+     * for its own reasons. `follow` is the page's INSTANCE rather than a fresh one: constructing it
+     * here would silently give this column the `alwaysScrollToBottom` the alerts one is forbidden.
      */
     follow: RoomScrollFollow<ChatTab>;
     viewerId: number;
@@ -174,11 +159,9 @@
     onscrolltobottom: (scroller: HTMLElement) => void;
     onprivatechat: () => void;
     /**
-     * The magnifier. The PAGE decides what it does — see `ExtraChatPane`'s own note below.
-     *
-     * It opened the Chat Logs modal until 2026-08-29 and now toggles the search bar, which is what
-     * upstream's `toggleChatToolbarSearchOnly()` does and what this room's alerts column already did.
-     * The modal is still reached from the sidebar.
+     * The magnifier. The PAGE decides what it does: it toggles the search bar, which is upstream's
+     * `toggleChatToolbarSearchOnly()` and what the alerts column already did. The Chat Logs modal
+     * it used to open is still reached from the sidebar.
      */
     onsearch: () => void;
     /** Whether the search bar under the header is showing — `RoomChat.searchBarOpen('extra')`. */
@@ -263,28 +246,13 @@
   let giphyOpen = $state(false);
   let showMessageOptions = $state(false);
 
-  /*
-    `globals.chatInputFocus = 'textAreaTxtExtra'` — set on focus and read by the mention router,
-    which sends `doMentionExtra` instead of `doMention` when this composer is the focused one. The
-    page holds the flag because it is the thing that routes mentions; this only reports.
-  */
+  /* `globals.chatInputFocus = 'textAreaTxtExtra'` — set on focus, read by the mention router. */
   /**
    * The extra chat column's scroll container, and the autoscroll it drives.
    *
-   * `onscrollerready` wrote this element up to `+page.svelte` and NOTHING read it until 2026-08-14,
-   * so the second chat column never followed a new message while the first one did — a message
-   * arrived, the column stayed where it was, and the reader saw nothing. ESLint is what surfaced
-   * it, as an "assigned but never used" that turned out to be a missing feature.
-   *
-   * The effect below is a deliberate parallel of the main chat's, not a new design: same four
-   * conditions (first view, channel switch, new message, and the reader's own scroll position via
-   * `shouldAutoScrollForMessage`), same `tick()` before measuring, and the same identity re-check
-   * afterwards so a scroller swapped out mid-await is not written to.
-   *
-   * It is a local `$state` here as of 2026-08-16, rather than a `let` on the page fed by that
-   * callback. The round trip existed only so a page-level `$effect` could reach an element this
-   * component owns; with the effect here it has no reader, and a prop whose whole job was to hand
-   * an element upward is "no config nothing reads" in prop form.
+   * A local `$state` since 2026-08-16, not a `let` on the page fed by an `onscrollerready`
+   * callback — the round trip existed only so a page-level effect could reach an element this
+   * component owns. `#lib/extra-chat-surface.ts` records what that prop cost while nothing read it.
    */
   /* `| null` — what `bind:this` writes on teardown. `if (!current) return` below covers it. */
   let scroller = $state<HTMLElement | null>(null);
@@ -348,9 +316,19 @@
     }
   });
 
+  /**
+   * `XCP-03` and `XCP-04` — Enter, decoded rather than assumed.
+   *
+   * The three-way branch, both offsets and both divergences are in `#lib/chat-composer-enter.ts`,
+   * which exists because this composer and `AlertQaModal`'s disagreed about it. Two things were
+   * wrong HERE: Alt+Enter SENT, where byte 2,386,309 inserts a newline; and the emoji picker
+   * survived a send, where byte 2,386,367 makes `showEmojiChooser = !1` the first act of the send
+   * branch — a popover left covering the message it was used to write.
+   */
   function submitOnEnter(event: KeyboardEvent) {
-    if (event.key !== 'Enter' || event.shiftKey) return;
+    if (composerEnterAction(event) !== 'send') return;
     event.preventDefault();
+    emojiOpen = false;
     onsend();
   }
 </script>
@@ -366,6 +344,12 @@
         <!-- svelte-ignore a11y_missing_attribute -->
         <a class="navbar-brand ml-1 mr-1"
           ><i class="fas fa-comment"></i>
+          <!--
+            `XCP-02` — `j3e` (byte 2,367,381) renders `<span>\xa0Chat</span>` under
+            `O(5, 0 == o.chatTabs.length ? 5 : -1)` (byte 2,399,848). `ChatTabStrip` already carries
+            the other half of `acA-11`; without this one a channel-less room said nothing at all.
+          -->
+          {#if chatTabs.length === 0}<span>&nbsp;Chat</span>{/if}
           {#if doNotDisturbOn}
             <span class="badge badge-danger ml-2"><i class="fas fa-bell-slash"></i> DND</span>
           {/if}</a
@@ -423,9 +407,10 @@
     {/if}
 
     <!--
-      `app-extra-roomscroller` — its own element, not the main pane's. The reference gives the extra
-      column a separate scroller component for the same reason it gives it a separate chat
-      component: two scrollers with two independent positions.
+      `app-extra-roomscroller` — its own element, because the reference gives this column a separate
+      scroller component for the same reason it gives it a separate chat one: two independent
+      positions. `XCP-07` — the `ngClass` it also binds (byte 2,400,160) is refused; see
+      `#lib/extra-chat-surface.ts`.
     -->
     <app-extra-roomscroller
       bind:this={scroller}
@@ -456,7 +441,13 @@
       </div>
     </app-extra-roomscroller>
 
-    <!-- `O(21, o.webinarMode ? 21 : -1)`, tooltip verbatim from const 56. -->
+    <!--
+      `O(21, o.webinarMode ? 21 : -1)` at byte 2,400,282, tooltip verbatim from const **53**.
+
+      `XCP-06` — this said "const 56", which is `app-chat`'s number for it. 56 in THIS component's
+      table is the typing counter. `Z3e` (byte 2,371,066) also closes with a bare `T(4,"i")` — no
+      const, so no class and no text — which is measured and refused: nothing can style or read it.
+    -->
     {#if webinarMode}
       <div class="px-1 webinarMode">
         Webinar Mode
@@ -498,7 +489,13 @@
         </h5>
       </div>
     {:else}
-      <div id="textAreaHolderExtra" class="d-flex align-items-center textSendDiv">
+      <!--
+        `XCP-01` — const 25 is `["id","textAreaHolder",…]` and the `Extra` suffix was OURS. It cost
+        this column every `#textAreaHolder` rule in `app.css` INCLUDING the `container-type` the
+        composer's two `@container` queries resolve against, so both button sets rendered at every
+        width and pressing "+" only hid "+". `#lib/extra-chat-surface.ts` holds the measurement.
+      -->
+      <div id={EXTRA_CHAT_COMPOSER_HOLDER_ID} class="d-flex align-items-center textSendDiv">
         <div class="flex-fill d-flex mx-0">
           <div class="px-0 flex-fill">
             <!--
@@ -526,9 +523,12 @@
             ]}
           >
             <div class="composer-options">
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <!--
+                `XCP-05` — const 66's four popover attributes, absent on this trigger alone. Its two
+                `svelte-ignore` lines went with them; `#lib/extra-chat-surface.ts` says why.
+              -->
               <span
+                {...EXTRA_CHAT_EMOJI_POPOVER}
                 class="textAreaBtns"
                 aria-describedby={emojiOpen ? 'ngb-popover-extra' : undefined}
                 onclick={() => {
@@ -557,9 +557,10 @@
                 </span>
               {/if}
               {#if canPostImages}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- `XCP-05` — const 72; this trigger had no tooltip at all. Ignores dropped as above. -->
                 <span
+                  {...EXTRA_CHAT_GIF_TRIGGER}
+                  {@attach ngbTooltip}
                   class="textAreaBtns"
                   style="font-size: 12px;"
                   aria-describedby={giphyOpen ? 'ngb-popover-giphy-extra' : undefined}
@@ -582,6 +583,11 @@
                   />
                 {/if}
               {/if}
+              <!--
+                `XCP-08` — the FOURTH button of this group, `iMe` at byte 2,371,656, is absent and
+                BLOCKED: it is a Bootstrap `data-bs-target` upstream and this room's modal host is
+                reached through a prop nothing passes here. `#lib/extra-chat-surface.ts` measures it.
+              -->
               <!--
                 The RTE button is on THIS composer too: the reference puts `openRTEModal()` on
                 exactly two components, `app-chat` and `app-extra-chat`, and the extra one reads
@@ -618,18 +624,11 @@
         </div>
         {#if emojiOpen}
           <!--
-            `EMOJI-10` — the `popoverId` MUST match what the trigger advertises, and here it did not.
-
-            The trigger sets `aria-describedby="ngb-popover-extra"` (see the composer toolbar above);
-            this mounted the picker with no `popoverId`, so the popover element carried the default
-            `ngb-popover-3`. `portalPopover` then runs
-            `document.querySelector('[aria-describedby="ngb-popover-3"]')` and finds either NOTHING —
-            leaving the popover at the hardcoded inline `translate3d(483.5px, -52.5px, 0px)` it ships
-            with, i.e. somewhere arbitrary on screen — or, when the MAIN column's picker is also open,
-            that column's trigger, and positions this popover over the wrong composer.
-
-            `AlertQaModal`, `ModalHost` and `NoteEditor` all pass a matching id. This was the one that
-            did not, which is why the row is a `defect` and not a divergence.
+            `EMOJI-10` — the `popoverId` MUST match what the trigger advertises, and here it did not:
+            the picker mounted with the default `ngb-popover-3` while the trigger said
+            `ngb-popover-extra`, so `portalPopover`'s lookup found nothing — or, with the main
+            column's picker also open, THAT column's trigger, and positioned this popover over the
+            wrong composer. `#lib/extra-chat-surface.ts` carries the measurement.
           -->
           <EmojiPicker popoverId="ngb-popover-extra" onselect={(glyph) => (composer += glyph)} />
         {/if}

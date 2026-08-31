@@ -46,7 +46,7 @@ inside the document itself. The table describes the two-verifier pass **as it ra
 refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
 exactly as RM-25 belongs in the next paragraph and not in that table.
 
-**Fifty-nine rows have been appended since this document was committed**, and none of them is
+**Eighty-one rows have been appended since this document was committed**, and none of them is
 folded into the totals above — those describe the two-verifier pass and should keep describing it.
 
 **Each such row says so at itself**, in one sentence, and that sentence is the whole mechanism:
@@ -63,19 +63,18 @@ marker.** The lesson RM-25 taught is still the cheaper half of the one UIM-03 te
 who decodes the table finds rows a reader who looks up the cited const cannot** — and this
 document's per-row byte offsets make the second reading the tempting one.
 
-**Fourteen of the fifty-nine are the two surfaces added on 2026-08-31** — `MainTabStrip.svelte`
+**Fourteen of the eighty-one are the two surfaces added on 2026-08-31** — `MainTabStrip.svelte`
 (MTS-01 to MTS-07) and `RoomOverlays.svelte` (OVL-01 to OVL-07), read end to end at verified
 boundaries. Neither had a section here. **Three of those fourteen exist only because the consts
 tables were decoded by value rather than looked up** — MTS-04, MTS-06 and OVL-01 — which is RM-25's
 lesson holding a second time, on a second pair of surfaces, at better than one in five.
 
-**Seventeen more were appended on 2026-08-31**, in the three sections at the foot of this document —
-`VideoPlayer.svelte`, `ScheduledAlerts.svelte` and `AvDevicePane.svelte`, none of which had a section
-here before. Eighteen rows now stand outside the two-verifier pass: RM-25 and those seventeen. They
-are deliberately NOT folded into the tables above, for the reason the two paragraphs above give, and
-they are countable rather than asserted — every one of them carries the same sentence in its body,
-and `room-surface-audit-counts.test.ts` requires the document to hold exactly `223 + <that count>`
-rows. A row appended without the sentence, or a sentence written without a row, fails it.
+**Seventeen more are `VideoPlayer.svelte`, `ScheduledAlerts.svelte` and `AvDevicePane.svelte`**,
+none of which had a section here before. They are deliberately NOT folded into the tables above, for
+the reason the two paragraphs above give, and they are countable rather than asserted — every one of
+them carries the same sentence in its body, and `room-surface-audit-counts.test.ts` requires the
+document to hold exactly `223 + <that count>` rows. A row appended without the sentence, or a
+sentence written without a row, fails it.
 
 **The three surfaces were chosen because they had NO section here at all**, and two of them proved
 the point RM-25 makes about which reading finds what. `SCH-02` is the sharpest case: a decode from
@@ -84,9 +83,28 @@ table and were not read; do not guess them."* They are not in the const table �
 multi-key `ngClass` into a shared factory beside the template functions — which is why looking where
 the note said to look found nothing, and why the note survived two weeks.
 
+**Twenty-two more are `ExtraChatPane.svelte` and `AlertQaModal.svelte`** — nine `XCP-` rows and
+thirteen `QAM-` rows — two further surfaces this document had no section for at all. Each says so in
+its own body, in the fixed sentence `room-surface-audit-counts.test.ts` counts, and the surfaces
+table above is deliberately left at eighteen for the same reason.
+
+**These four batches landed in parallel and were merged one at a time**, which is why the running
+total lives in ONE paragraph — the first — and each batch paragraph says only what it read. Three of
+them arrived each carrying their own "N rows have therefore been appended" sentence, computed against
+the document as it stood in that worktree, and all three were stale on arrival. A count that appears
+in four places disagrees with itself the moment two of them move; the marker count is the only one
+that cannot.
+
+That reading is worth one sentence of its own, because it repeats RM-25's lesson at a larger scale.
+`ExtraChatPane` is the SECOND compiled copy of the chat column, and reading `app-extra-chat`'s own
+const table rather than assuming it mirrors `app-chat`'s is what produced `XCP-06` — a cited const
+index that belonged to the other table — and `XCP-09`, five thousand eight hundred bytes of component
+stylesheet that no capture in this repository has ever seen, which is invisible from the markup and
+was found only by reading the bundle's `styles:` array.
+
 ## Where the work stands
 
-**0 open · 282 closed · 282 rows.**
+**0 open · 304 closed · 304 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -5548,6 +5566,661 @@ is the half of the pair that has a consumer.
 ---
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## ExtraChatPane.svelte
+
+Nine rows, all added on 2026-08-31 by a reading of `app-extra-chat` end to end — its consts table
+decoded by value at byte 2,393,850, its template function at 2,399,236, its class body from 2,374,375
+and its own stylesheet at 2,400,462. This surface had no section in this document before that
+reading, and it is deliberately not in the surfaces table above: that table describes the
+two-verifier pass, and this is not part of it.
+
+`ExtraChatPane` is the SECOND compiled copy of the chat column and the two copies differ, so every
+offset below says which copy it came from. Where the difference is `ChatTabStrip`'s — `acA-06` and
+the second half of `acA-11` — it is named and not touched, because that file belongs to another
+reading in progress.
+
+### XCP-01 — `#textAreaHolderExtra` is an invented id, and it cost the column its whole composer stylesheet plus the width container
+
+**FIXED 2026-08-31.** The holder wears `textAreaHolder` again, through
+`EXTRA_CHAT_COMPOSER_HOLDER_ID` in `#lib/extra-chat-surface.ts`, which carries the measurement.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The suffix was ours, added for id uniqueness, and it silently cut the second chat column off from
+five rule families at once: `#textAreaHolder` itself (`app.css:394` — the flex row, the 5px margin
+and padding, the 8px radius, the textarea background), the two 35px min-heights on its wrappers
+(`:410`, `:415`), `#textAreaHolder textarea` and its focus ring (`:420`, `:439`), all three
+`.darkTheme #textAreaHolder` rules (`:1410`, `:1414`, `:1421`), and — the one that turned a control
+into a no-op — `container-type: inline-size` at `:476`.
+
+**A container query with no container ancestor evaluates to false.** So
+`@container (width < 410px) .textAreaBtnsCol:not(.composer-options-forced) .composer-options`
+never hid the option buttons and `@container (width >= 410px) .composer-expand` never hid the "+",
+and BOTH sets rendered at every width. The only rule still biting was
+`.composer-options-forced .composer-expand`, which is not inside a query — so pressing "+" hid "+"
+and revealed nothing, because nothing was hidden. That is `CLAUDE.md`'s "no control whose only
+effect is changing its own label", in the room, reachable by any viewer with the second column on.
+
+`.textSendDiv` has NO rule in any stylesheet in this repository — grepped, zero hits — so nothing
+covered for the missing id.
+
+**high** · `defect` · reference byte **2,393,850**
+
+```
+[1,"px-0","flex-fill"],["id","textAreaHolder",1,"d-flex","align-items-center","textSendDiv"]
+```
+
+**Ours:** ExtraChatPane.svelte rendered `<div id="textAreaHolderExtra" …>`. The reference's const 25
+is byte-identical to `app-chat`'s, and `app-extra-chat`'s OWN component stylesheet addresses it by
+that id at byte **2,405,618** — `#textAreaHolder[_ngcontent-%COMP%]{background-color:var(--textarea-bg);border-radius:8px;padding:5px;margin:5px}`.
+The duplicate id is therefore the reference's own; this repository already carried it twice
+(`AlertChatArea.svelte:1208`, `AlertQaComposer.svelte`). Nothing in `src/` resolves it in script —
+every occurrence is a CSS selector, markup, or a contract test. The FIELD ids stay distinct
+(`textAreaTxt` / `textAreaTxtExtra`), which is the separation `RM-16` shows the reference itself
+makes. Pinned by `extra-chat-surface-contract.test.ts`, whose negative control (restoring the
+suffix) failed two assertions.
+
+### XCP-02 — the brand has no `&nbsp;Chat` label when the room has no channels
+
+**BUILT 2026-08-31.** `{#if chatTabs.length === 0}<span>&nbsp;Chat</span>{/if}`, in the navbar brand.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The second half of `acA-11`, which `AlertChatArea.svelte:1028` has carried since that row was
+written and this column never got. `ChatTabStrip` already suppresses the whole `<ul>` when there are
+no tabs, so without this label a room with no channels configured drew a bare comment glyph in this
+column's header and nothing said "Chat". `&nbsp;` and not a space: the capture's character is the
+escape `\xa0`, and a plain space would be folded away by the surrounding template whitespace.
+
+**low** · `missing-behaviour` · reference byte **2,367,381**
+
+```
+function j3e(t,n){1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}
+```
+
+**Ours:** ExtraChatPane.svelte's `<a class="navbar-brand ml-1 mr-1">` held the comment glyph and the
+DND badge and nothing else. The gate is `O(5,0==o.chatTabs.length?5:-1)` at byte **2,399,848**,
+inside `app-extra-chat`'s own template function at 2,399,236 — not the main column's, which is a
+separate copy at 1,453,850.
+
+### XCP-03 — Alt+Enter sends the message where the reference inserts a newline
+
+**FIXED 2026-08-31.** The captured three-way branch is now one function,
+`composerEnterAction` in `#lib/chat-composer-enter.ts`, and both composers this repository owns route
+through it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`submitOnEnter` guarded on `event.shiftKey` alone, so Alt+Enter fell through to the send. The Q&A
+modal's composer had the same rule right against the same upstream shape, so the two composers in
+this repository disagreed about one keystroke — the "three implementations, one of them unfed"
+failure `room-message-chrome.ts` records, in miniature. Falling through rather than appending `"\n"`
+by hand is a deliberate divergence and is kept: the browser puts the break at the caret and keeps
+the undo stack, which `i.val(i.val()+"\n")` does not.
+
+**medium** · `defect` · reference byte **2,386,309**
+
+```
+e.altKey?(i.val(i.val()+"\n"),this.autoExpand(e.target)):(this.showEmojiChooser=!1,this.sendMessage()
+```
+
+**Ours:** ExtraChatPane.svelte's `submitOnEnter` read
+`if (event.key !== 'Enter' || event.shiftKey) return;`. The shift branch is at byte **2,386,255** and
+the alt branch at **2,386,309**, both inside `app-extra-chat`'s `onKey` (byte 2,386,131) — the extra
+column's own handler, keyed to `#textAreaTxtExtra`.
+
+### XCP-04 — sending a message leaves the emoji picker open over the message that just arrived
+
+**BUILT 2026-08-31.** `emojiOpen = false` before `onsend()`, which is the order the reference uses.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`this.showEmojiChooser = !1` is the FIRST act of the send branch, before `sendMessage()`. It is not
+incidental: the picker is an absolutely positioned popover over the composer, so leaving it up hides
+the message the viewer just sent. `AlertQaModal` already closed its own; this column did not.
+
+**low** · `missing-behaviour` · reference byte **2,386,367**
+
+```
+this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target)
+```
+
+**Ours:** ExtraChatPane.svelte's send path called `onsend()` and touched neither `emojiOpen` nor
+`giphyOpen`.
+
+### XCP-05 — the emoji and GIF triggers carry none of their captured attributes
+
+**BUILT 2026-08-31.** Both const tables are now named constants in `#lib/extra-chat-surface.ts`,
+quoted in full beside the values they produce, and spread onto the two triggers.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The emoji trigger had `class` and `aria-describedby` and nothing else, where const 66 carries four
+popover attributes — `placement`, `container`, `autoClose`, `popoverClass`. They are the popover's
+placement and its escape rule, not decoration: `autoClose: "outside"` is what dismisses the picker on
+a click elsewhere and `container: "body"` is what stops it being clipped by the composer's overflow.
+The main column's trigger (`AlertChatArea.svelte`) and the Q&A modal's both carry them; this was the
+third of three and the only one without, which is the same one-of-two shape `EMOJI-10` records for
+`popoverId`.
+
+The GIF trigger carried the font size alone, so it was the ONE composer button in this column with no
+tooltip at all. Const 72 writes `placement` TWICE — `top` then `auto` — and `auto` is reproduced,
+because the later value is the one Angular applies and it is what `AlertChatArea` already resolved
+the same const to.
+
+Applying the two spreads removed four `svelte-ignore` lines, and that is expected rather than a
+regression: the compiler stops issuing `a11y_click_events_have_key_events` and
+`a11y_no_static_element_interactions` once a spread is present, so the ignores suppressed nothing and
+`svelte/no-unused-svelte-ignore` failed on them. Verified by removing them and re-running
+`svelte-check` — 1,495 files, 0 errors, 0 warnings — and `eslint`, clean.
+
+**low** · `divergence` · reference byte **2,393,850**
+
+```
+["placement","auto","container","body","autoClose","outside","popoverClass","popOverDiv",1,"textAreaBtns",3,"click","ngbPopover"]
+```
+
+**Ours:** ExtraChatPane.svelte's emoji `<span>` was `class="textAreaBtns"` plus `aria-describedby`;
+its GIF `<span>` was `class="textAreaBtns" style="font-size: 12px;"` plus `aria-describedby`. Const
+66 and const 72 of this component's own table are decoded in
+`extra-chat-surface-contract.test.ts`, which slices the bundle for both rather than trusting the
+transcription.
+
+### XCP-06 — a cited const number belongs to `app-chat`'s table, not this component's
+
+**FIXED 2026-08-31.** The webinar tooltip is const **53** here; the comment said 56.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The two tables are NOT an offset of one another. `app-chat` carries a "Detach Chat" button at its own
+53/54 that this column has no node for at all, so its numbering runs ahead: index 56 there is the
+webinar tooltip, index 56 here is `[1,"users-count","me-1"]` — the typing indicator's counter, a
+different control entirely. A const number is only readable against the table it came from, and this
+is the second time in a week that a cited index in this repository pointed at something else.
+
+The same reading measured `Z3e`'s fifth node — `T(4,"i")`, a bare `<i>` with no const, so no class,
+no attribute and no text — and REFUSED it. An element with no class cannot be styled and this room
+has no rule that could reach it, so reproducing it would add a tag nothing renders and nothing reads.
+
+**low** · `wrong-constant` · reference byte **2,393,850**
+
+```
+["placement","top","ngbTooltip","In webinar mode users only see their own chat messages, while Presenters see everyones messages...",1,"ml-2"]
+```
+
+**Ours:** ExtraChatPane.svelte's webinar comment read "tooltip verbatim from const 56". The tooltip
+string itself was always right; only the index pointing at it was wrong.
+`extra-chat-surface-contract.test.ts` proves the divergence by asserting that `"title","Detach Chat"`
+is in `app-chat`'s table and absent from this one.
+
+### XCP-07 — the roomscroller's `ngClass` is not bound
+
+**MEASURED REFUSAL 2026-08-31.** The class it would apply has no rule in any of the 52 stylesheets
+this repository holds, and that measurement already exists — this row points at it rather than
+repeating it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`USM-18` and `settings-preference-wiring-contract.test.ts` argued this pair for the settings checkbox
+that drives it and refused the same binding there. Binding it here would switch on a class name
+nothing reads, which is the "no `.flipped` class with no CSS" rule.
+
+**low** · `divergence` · reference byte **2,400,160**
+
+```
+("ngClass",ct(13,B3e,o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview))
+```
+
+**Ours:** ExtraChatPane.svelte's `<app-extra-roomscroller>` carries the three captured inline styles
+and no `class`. `B3e` at byte **2,367,305** is `t=>({"chat-uploaded-img-sm":t})`;
+`extra-chat-surface-contract.test.ts` reads both offsets and then asserts the class has no rule in
+`app.css` or `captured-runtime-components.css`.
+
+### XCP-08 — the "Play YouTube For All" button is absent from this composer
+
+**BLOCKED 2026-08-31.** One line in `routes/+page.svelte` unblocks it, named below.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`lMe` resolves five children and the gates at byte **2,373,334** read
+`O(2, canPostImages …)` image, `O(3, isPresenter …)` **YouTube**, `O(4, canPostImages …)` GIF,
+`O(5, …enableRTE && …enableRTE && …isPresenter …)` RTE. The main column draws the third
+(`AlertChatArea.svelte:1288`) and this one does not, so a presenter can send a video to the room from
+one chat column and not from the other.
+
+**What would unblock it:** `apps/room/src/routes/+page.svelte`, inside the `<ExtraChatPane …/>` call
+that begins at **line 1477** — add one prop:
+`onyoutube={gates.isPresenter ? () => modals.open('youtube') : undefined}`. The gate belongs on the
+page for the reason this component's own note gives: it is handed each entitlement's RESULT rather
+than the raw `isPresenter`, so authority stays decided in one place. Without a caller, an optional
+handler and its branch would be a prop nothing passes and a control nothing reaches, which is the
+scaffolding rule this repository has already paid for once.
+
+**medium** · `missing-control` · reference byte **2,371,656**
+
+```
+function iMe(t,n){1&t&&(d(0,"span",68),T(1,"i",71),u())}
+```
+
+**Ours:** ExtraChatPane.svelte draws emoji, image, GIF and RTE and nothing between the image and the
+GIF. Const 68 is
+`["data-bs-toggle","modal","data-bs-target","#play-youtube-modal",1,"textAreaBtns"]` and const 71 is
+`["ngbTooltip","Play YouTube For All","placement","left",1,"fas","fa-video"]`. The reference's span
+carries NO click — it is a Bootstrap data-target — and this room's `Modal` is not Bootstrap-driven,
+which is why `AlertChatArea` reaches its host through a prop and why this column cannot.
+
+### XCP-09 — `app-extra-chat` has no transcribed stylesheet at all, and the capture it would come from never saw the component
+
+**BLOCKED 2026-08-31.** A re-capture unblocks it; a hand-edit is forbidden.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+This is the largest single gap on the surface and it is invisible from the markup, which is why it
+was found by reading the bundle's `styles:` array rather than the template. `app-extra-chat` ships
+**5,818 bytes** of component styles — `.chatTabs` and its five `.nav-link` states, `.counterBadge`,
+`.typing-indicator-container`, `.users-count`, `.users-typing`, `.txt-area` and its focus ring,
+`.textAreaBtns` and its hover, `.textAreaBtnsCol`, `#textAreaHolder`, `.chatDisabled`,
+`.webinarMode`, `.roomLog`, and the whole Giphy popover. `src/lib/styles/captured-runtime-components.css`
+contains the string `app-extra-chat` **zero times**.
+
+The reason is in the generator's INPUT rather than the generator: `apps/room/css/complete-app-styles.css`
+— whose SHA-256 is the one that generated file's header pins — contains `extra-chat` zero times too.
+That capture was taken from a room with `preferences.extraChatColumn` OFF, so Angular never mounted
+the component and never injected its styles into the document being captured.
+
+**What would unblock it:** a re-capture of `apps/room/css/complete-app-styles.css` from a room with
+the second chat column enabled, followed by `pnpm css:sync-captured`. It is NOT a hand-edit:
+`AGENTS.md` forbids editing a generated artifact and that sheet's own header says so on line 9.
+
+**high** · `missing-behaviour` · reference byte **2,400,462**
+
+```
+styles:[".navbar[_ngcontent-%COMP%]{font-size:12px;padding:2px}.chatToolbar[_ngcontent-%COMP%], .chatHeader[_ngcontent-%COMP%]{background-color:var(--msgs-header-bg);color:var(--msgs-header-color)}
+```
+
+**Ours:** everything this column renders is styled only by rules that happen to be global or to be
+`app-chat`'s written unscoped. Spot-checked: `.chatDisabled` and `.webinarMode` exist in `app.css`;
+`.chatTabs`, `.counterBadge`, `.typing-indicator-container`, `.users-typing` and `.txt-area` exist
+ONLY under `app-chat`, `app-privchat`, `app-reply-modal` or `app-alert-qa-modal` scopes in
+`captured-runtime-components.css`, none of which reaches this component.
+`extra-chat-surface-contract.test.ts` asserts both halves — the bundle HAS the stylesheet, and
+neither the generated sheet nor its input has ever seen the component.
+
+## AlertQaModal.svelte
+
+Thirteen rows, all added on 2026-08-31 by a reading of `app-alert-qa-modal` end to end — its consts
+table decoded by value at byte 2,341,450, its template function at 2,343,416, its class body from
+2,333,560 and its own stylesheet at 2,344,356. This surface had no section in this document before
+that reading, and it is deliberately not in the surfaces table above.
+
+Four rows were built, two were fixed, one was already built, one is a measured refusal and four are
+BLOCKED on the same two lines of `ModalHost.svelte` and its render of this component. The modal
+reached its `source-size-contract` ceiling in the process, so `AlertQaAlertCard.svelte` (the
+reference's own `e3e`) and `AlertQaComposer.svelte` (its footer) came out of it; the rows name
+whichever of the three now owns the code.
+
+### QAM-01 — a Q&A thread never shows a date separator, because `showDateSeparator` is hardcoded false
+
+**BUILT 2026-08-31.** `showsDateSeparator(index)`, reproducing the reference's `prevD`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference passes each entry the PREVIOUS entry's timestamp, and `app-st-message` turns it into
+`isND`, which its own template gates the separator on — `O(2, o.isND ? 2 : -1)` at byte **1,361,572**.
+An alert's Q&A stays open for as long as the position does, so a thread running past midnight is
+ordinary rather than exotic; it showed one unbroken run of times with no day boundary anywhere.
+
+`sameCalendarDay` and NOT `getDay()`: upstream compares the day of the WEEK, so two entries exactly
+seven days apart compare equal and the separator is skipped. That is a defect and this repository
+already decided against reproducing it — the same helper draws the separator in both chat columns.
+`index > 0` reproduces the `i > 0 ? … : 0` half exactly: the first entry has no predecessor, so
+`prevD` is `0`, so `this.prevD &&` is false, so `isND` stays at its `!1` initial value.
+
+**medium** · `missing-behaviour` · reference byte **2,332,963**
+
+```
+("msg",e)("isP",o.isPresenter)("logType",o.logType)("isQAMsg",o.isQAMsg)("qaMsgID",o.qaMsg._id)("msgIndex",i)("prevD",i>0?o.msgs[i-1].t:0)
+```
+
+**Ours:** AlertQaModal.svelte passed `showDateSeparator={false}` to every entry. The same `prevD`
+binding is at byte **2,333,284** in the COMPACT renderer, and the flag it feeds is built at byte
+**1,346,064** in `app-st-message`. Pinned by `alert-qa-surface-contract.test.ts`, whose negative
+control (restoring the hardcoded `false`) went red.
+
+### QAM-02 — the composer is not emptied when the modal opens on a different alert
+
+**BUILT 2026-08-31.** Cleared on the open transition, keyed by the alert's id.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`Modal` keeps this component mounted and toggles `display`, so `qaComposer` survived every close.
+Half a question typed against alert A, abandoned, then the Q&A opened on alert B — and the fragment
+was sitting in the box addressed to the wrong alert, one Enter away from being posted there. That is
+why this is a defect rather than a tidiness point.
+
+The marker is a PLAIN field and not `$state`: nothing renders from it, and an effect that reads its
+own marker reactively re-runs on the write that was meant to end it. `arrivals.ts` records the same
+reasoning for the same shape.
+
+**medium** · `defect` · reference byte **2,334,927**
+
+```
+i&&(yi("#alertQAModal").modal("show"),this.modalId=e._id,yi("#textAreaQATxt").val(""))
+```
+
+**Ours:** AlertQaModal.svelte declared `qaComposer = $state('')` and cleared it only on a successful
+send. The clear is the `openModal` half of the `openAlertQAModal` subscription upstream, so it fires
+on an OPEN and not on the thread refreshes that follow it — which is why this is keyed on the alert
+id rather than on `open` alone.
+
+### QAM-03 — the thread opens on its oldest entry
+
+**BUILT 2026-08-31.** The modal body is scrolled to its bottom on open and on each arrival.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`scrollToBottomQA()` is called from three places upstream: on `openAlertQAModal` once the thread is
+assigned, from `ngAfterViewInit`, and at the end of `sendMessage`. Its target is the `.modal-body`
+itself — reference index 0 in the consts table, attached by `d(9,"div",10,0)`. The container really
+does scroll: `#alertQAModal .modal-body` is
+`min-height:330px; max-height:70vh; height:100%; overflow-y:auto` in the component's own stylesheet
+at byte **2,344,478**, transcribed at `captured-runtime-components.css:5400`. Without it, opening the
+Q&A on an alert with a long thread showed the OLDEST question and the answer everyone came for was
+below the fold.
+
+`tick()` rather than the reference's `setTimeout(…, 500)`: that wait exists because Bootstrap's
+`.modal("show")` animates, and what is actually being waited for is the body having a layout to
+measure. `Modal` sets `display: block` in the same flush that flips `open`.
+
+**medium** · `missing-behaviour` · reference byte **2,335,916**
+
+```
+scrollToBottomQA(){const e=this;try{setTimeout(()=>{e.qaContainer.nativeElement.scrollTop=e.qaContainer.nativeElement.scrollHeight},500)}catch{}}
+```
+
+**Ours:** AlertQaModal.svelte had no scroll of any kind. The element is reached with `bind:this` on
+the component's own host element and a `querySelector` for `.modal-body` inside it —
+`dom-reference-contract.svelte.test.ts`'s rule, taken the way it asks rather than with an attachment
+that assigns and clears a node.
+
+### QAM-04 — "the captured textarea had no handler at all" is false, and it was licence
+
+**FIXED 2026-08-31.** The claim is corrected in place, with the three bindings that refute it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The behaviour under that sentence was RIGHT and the justification was invented, which is worse than
+no comment: a handler introduced with "the capture had none" is a handler anybody may redesign. Const
+17 ends `3,"keyup","paste","placeholder"` — three bindings, not zero — the template attaches the
+first two at byte **2,343,759**, and `onKey` at byte **2,336,560** is the same three-way Enter branch
+every composer in the application carries.
+
+The correction is recorded rather than the sentence deleted, so it reaches whoever read the old one.
+The `keydown`-not-`keyup` divergence is real and stays: upstream needs a second binding
+(`onKeydown(e){e.preventDefault()}`) purely to stop the browser inserting a newline before the keyup
+arrives, and one handler on `keydown` has nothing to keep in step.
+
+**low** · `defect` · reference byte **2,342,103**
+
+```
+["name","txt-area","id","textAreaQATxt","rows","1","spellcheck","true",1,"txt-area","form-control","border-0",3,"keyup","paste","placeholder"]
+```
+
+**Ours:** AlertQaModal.svelte carried the false sentence above `handleQaKeydown`; the handler now
+lives in `AlertQaComposer.svelte` with the measurement. The Enter rule itself moved to
+`#lib/chat-composer-enter.ts`, shared with `ExtraChatPane` — which is `XCP-03`'s other half.
+
+### QAM-05 — the image-upload button has no click handler, and its gate is narrower than the reference's
+
+**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+Two defects in one node. **It does not act:** const 36 is `[1,"textAreaBtns",3,"click"]` — a click
+binding — and `l3e` at byte **2,333,483** wires it to `imgUpload()`. Ours carries no handler at all,
+so a presenter clicking the image icon in the Q&A footer gets nothing. **Its gate is the wrong
+value:** `canPostImages` is set once in `ngOnInit` at byte **2,334,626** as
+`(this.isPresenter || sessData.userUploads)`, so a room with member uploads on offers this to
+members; `isPresenter` narrows it to presenters only.
+
+**What would unblock it:** `apps/room/src/lib/components/ModalHost.svelte`, in the `<AlertQaModal …/>`
+call at **line 5636** — add one prop, `onimageupload={() => composer.openImageUpload()}`, the same
+path both chat composers already use. Building the upload call locally instead would put a second
+implementation inside a modal, which is how two of them drift.
+
+**high** · `missing-control` · reference byte **2,333,483**
+
+```
+function l3e(t,n){if(1&t){const e=Y();d(0,"span",36),x("click",function(){return D(e),E(g().imgUpload())}),T(1,"i",37),u()}}
+```
+
+**Ours:** the span is rendered — with its tooltip, its class and its gate — and does nothing. It now
+lives in `AlertQaComposer.svelte` with both measurements recorded at it.
+`alert-qa-surface-contract.test.ts` asserts the button IS drawn before asserting what it lacks, so
+the row cannot go green by the button disappearing.
+
+### QAM-06 — pasting an image into the Q&A composer does nothing
+
+**BLOCKED 2026-08-31.** The same line as `QAM-05` unblocks it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+Const 17 declares `paste` beside `keyup`, and the template binds it to `onImagePaste` at byte
+**2,343,759**; the handler itself is at byte **2,339,887** and uploads the pasted file with whatever
+is already in the box as its message. There is no paste handler on our Q&A composer at all.
+
+Filed separately from `QAM-05` rather than folded into it because the two are different affordances
+with different failure modes — a dead button is visible, a missing paste handler is not — but they
+are unblocked by the same prop, and a reader closing one should close the other.
+
+**medium** · `missing-behaviour` · reference byte **2,342,103**
+
+```
+3,"keyup","paste","placeholder"
+```
+
+**Ours:** `AlertQaComposer.svelte`'s textarea binds `onkeydown` only. `#lib/pasted-image.ts` and
+`ImageUploadDialog.svelte` exist and are wired to the two chat composers; neither is reachable from
+this modal.
+
+### QAM-07 — `bodyStyle="max-height: 70vh;"` duplicates one declaration of a four-declaration rule
+
+**FIXED 2026-08-31.** The inline copy is gone; the transcribed rule is unchanged.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`#alertQAModal .modal-body{min-height:330px;max-height:70vh;height:100%;overflow-y:auto}` is the
+component's own stylesheet at byte **2,344,478**, transcribed at
+`captured-runtime-components.css:5400-5405`. An inline copy of one of the four wins the cascade for
+that one and says nothing about the other three, so a reader comparing the modal to the capture found
+the height in two places and the overflow in neither — and the inline copy is the one that goes
+stale, because it is not what `pnpm css:sync-captured` regenerates.
+
+**low** · `divergence` · reference byte **2,344,478**
+
+```
+#alertQAModal[_ngcontent-%COMP%]   .modal-body[_ngcontent-%COMP%]{min-height:330px;max-height:70vh;height:100%;overflow-y:auto}
+```
+
+**Ours:** AlertQaModal.svelte passed `bodyStyle="max-height: 70vh;"` to `Modal`. Removing it is what
+made `QAM-03` possible to reason about: the scroll depends on `overflow-y: auto`, which only the
+transcribed rule supplies.
+
+### QAM-08 — the alert card is drawn even when there is no alert
+
+**BUILT 2026-08-31.** `{#if alert}`, in `AlertQaAlertCard.svelte`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`O(7, o.qaMsg ? 7 : -1)` gates the whole of `e3e`, and each of the four fields inside it is gated
+again — one `hasOwnProperty` apiece for `"avt" || "pic"`, `"t"`, `"n"` and `"txt"`. Rendered
+unconditionally with a `?? ''` behind each field, an alert-less open drew the FRAME of a card: the
+bordered `admin-alert` box, a 50px mystery-man avatar, an empty `<strong>` and an empty body, under a
+heading reading "Q&A for Alert:". `Modal` keeps its subtree mounted and toggles `display`, so that is
+reachable state and not a theoretical one.
+
+**low** · `missing-behaviour` · reference byte **2,344,076**
+
+```
+O(7,o.qaMsg?7:-1)
+```
+
+**Ours:** AlertQaModal.svelte rendered the card unconditionally. `e3e` at byte **2,332,074** is a
+sub-template called once, which is the seam the card was extracted along when the modal hit its size
+ceiling — the reference's own division, not a new one.
+
+### QAM-09 — the alert sender's name loses the reference's two spaces
+
+**BUILT 2026-08-31.** `{' '}{alert.senderName}{' '}`, the repository's standing idiom.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`username` is `mx-1` on a `flex-nowrap` row beside the timestamp, so those two spaces are rendered
+separation between the name and whatever sits against it. `AGENTS.md` records the autofixer
+suggestion this repository declines for exactly this reason: every capture comparison here diffs
+rendered strings, so a space is evidence rather than formatting.
+
+**low** · `divergence` · reference byte **2,331,372**
+
+```
+Ne(" ",e.qaMsg.n," ")
+```
+
+**Ours:** AlertQaModal.svelte rendered `{targetMessage?.senderName ?? ''}`, which Prettier and HTML
+whitespace folding both collapse.
+
+### QAM-10 — the alert body in the header is rendered as plain text where the reference pipes it
+
+**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference binds `innerHTML` to
+`parseLinks(parseSymbols(qaMsg.txt, "chat", qaMsg.avt, null), preferences.chatGif, qaMsg._id, false)`
+and chooses between two templates on `O(0, sessData.copyTrades ? 0 : 1)` at byte **2,332,021** —
+`Xxe` with a `copyTradeOnClick` handler, `Jxe` without. So a `$TICKER` in the alert is coloured, a
+pasted URL is a link and an image URL renders as the image. Ours shows the raw string, so the same
+alert is fully piped in the log beneath the modal and markup-free inside it.
+
+**What would unblock it:** `apps/room/src/lib/components/ModalHost.svelte` at **line 529**, in the
+`targetMessage` shape — add `targetUrl?: string | null;`. `MessageBody` renders those segments and
+emits `image` clicks, which `room/message-actions.svelte.ts:497` resolves through exactly that field;
+without it this component cannot name the URL the dispatcher would open, and rendering the image with
+a click that cannot act is the control-with-no-effect this repository refuses. The value is present
+at runtime — `RoomOverlays.svelte:783` passes `messageActions.selected`, a full `MessageActionItem` —
+so this is a declaration catching up with the data, not a new dependency.
+
+**medium** · `missing-behaviour` · reference byte **2,331,625**
+
+```
+z("innerHTML",Tn(2,6,Tn(1,1,e.qaMsg.txt,"chat",e.qaMsg.avt,null),e.appService.globals.preferences.chatGif,e.qaMsg._id,!1),wn)
+```
+
+**Ours:** `AlertQaAlertCard.svelte` renders `{alert.body}` inside the captured
+`msg-left text-formated preText ml-2 mr-2 p-0` div. `messageChrome` already carries both `chatGif`
+and `copyTrades`, so the pipe's other two arguments are available; only the image click is not.
+
+### QAM-11 — the avatar fallback drops the sender's gravatar hash
+
+**BLOCKED 2026-08-31.** The same declaration as `QAM-10`, one field wider.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference falls back to THAT SENDER's gravatar, built from their email hash. Ours falls back to
+the hashless URL, which is the generic mystery-man for everyone — so a presenter with no stored
+picture is anonymous in the Q&A header and identified everywhere else in the room.
+
+**What would unblock it:** the same `targetMessage` shape at `ModalHost.svelte:529` — add
+`senderEmailHash?: string;`. Adding an optional field to this component alone would leave it
+`undefined` at the type level while the value is present at runtime, which is the invisible mismatch
+this repository keeps finding; the declaration is what has to move.
+
+**low** · `divergence` · reference byte **2,331,038**
+
+```
+z("src",e.qaMsg.pic||"https://secure.gravatar.com/avatar/"+e.qaMsg.avt+"?d=mm&s=50",Mt)
+```
+
+**Ours:** `AlertQaAlertCard.svelte` renders
+`src={alert.senderAvatarUrl ?? 'https://secure.gravatar.com/avatar/?d=mm&s=50'}`. The `width` and
+`height` beside it are OURS and stay: const 31 is `["alt","qaMsg.avt",3,"src"]` and sizes the image
+from `.avatar img { max-width: 50px }`, which is a layout shift this repository's standard forbids.
+
+### QAM-12 — the dialog's root class is bound to the alert's own id
+
+**MEASURED REFUSAL 2026-08-31.** The effect that class exists to produce is already built elsewhere.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`Rh("modal fade ", o.qaMsg._id, "")` concatenates the alert's id onto the class list, so the dialog
+wears a class named after a database row. Its ONE reader is four hundred bytes away at 2,334,927: a
+jQuery selector finding the dialog by that class in order to hang a Bootstrap `hidden.bs.modal`
+listener that deletes the alert's `unreadQA` marker.
+
+Refused, and the refusal is safe because that effect is already built:
+`RoomModals.closeActive` (`room/modals.svelte.ts:167`) clears `unreadQaAlertIds` for the selected
+alert on the way out and quotes this very line as its reason. Nothing in this room dispatches
+`hidden.bs.modal` — the only two occurrences of the string in `src/` are that comment and the one in
+`AlertQaModal.svelte`. A class with no rule and no reader is the "no `.flipped` class with no CSS"
+case, and this one would additionally be unstable: a different string on every alert, which no
+stylesheet and no test could ever name.
+
+**low** · `divergence` · reference byte **2,344,038**
+
+```
+Rh("modal fade ",o.qaMsg._id,""),m(7),O(7,o.qaMsg?7:-1)
+```
+
+**Ours:** AlertQaModal.svelte passes `rootClass="fade modal"`. The order against the reference's
+`"modal fade "` is order alone, which CSS does not read.
+
+### QAM-13 — the thread's compact display mode
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.** `RoomMessage.svelte:578` branches on
+the mode and renders `app-st-compactmessage` itself.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference chooses between two whole loops — `o3e` over `app-st-message` and `r3e` over
+`app-st-compactmessage` — which reads at first glance as a branch this modal is missing. It is not:
+the branch is one level down, in the component all three message surfaces share, so the modal's job
+is to pass `displayMode` and nothing else. Recorded rather than duplicated, and recorded at all
+because a reader decoding `a3e` will ask the same question.
+
+**low** · `missing-behaviour` · reference byte **2,333,453**
+
+```
+function a3e(t,n){1&t&&H(0,o3e,2,0)(1,r3e,2,0),2&t&&O(0,"r"==g().displayMode?0:1)}
+```
+
+**Ours:** AlertQaModal.svelte passes `{displayMode}` to every entry and `RoomMessage` does the rest.
+The mode itself is the ALERTS one, which is the reference's own choice — its `loadAlertsMode()` at
+byte 2,335,599 is the same function the alerts log calls.
+
+---
 
 ## The fifty-one refuted claims
 

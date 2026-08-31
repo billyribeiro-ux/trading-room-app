@@ -70,7 +70,7 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 79 surfaces, measured
+## The inventory — all 81 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
@@ -89,7 +89,7 @@ guessed.
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/ScreenPane.svelte` | 669 | no |
 | 15 | `lib/components/PostAlertModal.svelte` | 656 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 639 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 638 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
 | 18 | `lib/components/StreamingView.svelte` | 604 | no |
 | 19 | `lib/components/FilesPane.svelte` | 585 | no |
@@ -97,7 +97,7 @@ guessed.
 | 21 | `lib/components/notes/NotesPane.svelte` | 524 | no |
 | 22 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
 | 23 | `lib/components/VideoPlayer.svelte` | 411 | no |
-| 24 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
+| 24 | `lib/components/AlertQaModal.svelte` | 370 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
 | 25 | `lib/components/MainTabStrip.svelte` | 370 | no |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | no |
 | 27 | `lib/components/ScreenTabs.svelte` | 341 | no |
@@ -115,54 +115,56 @@ guessed.
 | 39 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
 | 40 | `lib/components/RichTextEditor.svelte` | 191 | no |
 | 41 | `lib/components/MessageBody.svelte` | 173 | no |
-| 42 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
-| 43 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
-| 44 | `lib/components/Modal.svelte` | 157 | no |
-| 45 | `lib/components/TabGearMenu.svelte` | 156 | no |
-| 46 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
-| 47 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
-| 48 | `lib/components/LogArchiveModals.svelte` | 147 | no |
-| 49 | `lib/components/BootboxDialog.svelte` | 145 | no |
-| 50 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
-| 51 | `lib/components/ChatArchivePane.svelte` | 143 | no |
-| 52 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 53 | `lib/components/ChatSearchBar.svelte` | 141 | no |
-| 54 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
-| 55 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
-| 56 | `lib/components/MobileRestorePane.svelte` | 130 | no |
-| 57 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 58 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 59 | `lib/components/SoundCloudMenu.svelte` | 114 | no |
-| 60 | `lib/components/UserNotesPane.svelte` | 114 | no |
-| 61 | `lib/components/RestreamPane.svelte` | 105 | no |
-| 62 | `lib/components/ChatTabStrip.svelte` | 104 | no |
-| 63 | `lib/components/CloseSessionPane.svelte` | 104 | no |
-| 64 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
-| 65 | `lib/components/ImageLightbox.svelte` | 94 | no |
-| 66 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 67 | `lib/components/SoundCloudViewerStop.svelte` | 89 | no |
-| 68 | `lib/components/CompactMessageRow.svelte` | 77 | no |
-| 69 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
-| 70 | `lib/components/PositionsContainer.svelte` | 74 | no |
-| 71 | `lib/components/ModeratorMessage.svelte` | 73 | no |
-| 72 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
-| 73 | `lib/components/ToastHost.svelte` | 64 | no |
-| 74 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
-| 75 | `lib/components/PollSavedList.svelte` | 59 | no |
-| 76 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 77 | `lib/components/PositionsControls.svelte` | 44 | no |
-| 78 | `routes/logout/+page.svelte` | 31 | no |
-| 79 | `routes/+layout.svelte` | 27 | no |
+| 42 | `lib/components/AlertQaAlertCard.svelte` | 170 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
+| 43 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
+| 44 | `lib/components/AlertQaComposer.svelte` | 166 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
+| 45 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
+| 46 | `lib/components/Modal.svelte` | 157 | no |
+| 47 | `lib/components/TabGearMenu.svelte` | 156 | no |
+| 48 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 49 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 50 | `lib/components/LogArchiveModals.svelte` | 147 | no |
+| 51 | `lib/components/BootboxDialog.svelte` | 145 | no |
+| 52 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
+| 53 | `lib/components/ChatArchivePane.svelte` | 143 | no |
+| 54 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 55 | `lib/components/ChatSearchBar.svelte` | 141 | no |
+| 56 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
+| 57 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
+| 58 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 59 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 60 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 61 | `lib/components/SoundCloudMenu.svelte` | 114 | no |
+| 62 | `lib/components/UserNotesPane.svelte` | 114 | no |
+| 63 | `lib/components/RestreamPane.svelte` | 105 | no |
+| 64 | `lib/components/ChatTabStrip.svelte` | 104 | no |
+| 65 | `lib/components/CloseSessionPane.svelte` | 104 | no |
+| 66 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
+| 67 | `lib/components/ImageLightbox.svelte` | 94 | no |
+| 68 | `lib/components/RoomBranding.svelte` | 91 | no |
+| 69 | `lib/components/SoundCloudViewerStop.svelte` | 89 | no |
+| 70 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 71 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
+| 72 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 73 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 74 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
+| 75 | `lib/components/ToastHost.svelte` | 64 | no |
+| 76 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 77 | `lib/components/PollSavedList.svelte` | 59 | no |
+| 78 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 79 | `lib/components/PositionsControls.svelte` | 44 | no |
+| 80 | `routes/logout/+page.svelte` | 31 | no |
+| 81 | `routes/+layout.svelte` | 27 | no |
 
-**2 of 79 surfaces audited · 1,072 of 35,571 lines · 3.0%.**
+**5 of 81 surfaces audited · 2,045 of 35,905 lines · 5.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
 > behaviours confirmed present. **It does not re-score the table above, deliberately.** That list is
-> 79 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
+> 81 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
 > entries are slices of `ModalHost.svelte` alone. Marking rows audited from a differently-shaped list
 > is how a coverage number stops meaning anything, so the counts here are untouched and this row
-> stays 2 of 79 until a surface is read whole against a file in this table.
+> stays 5 of 81 until a surface is read whole against a file in this table.
 >
 > Its own headline number to keep is the **19% false-claim rate**: of 274 differences claimed by the
 > readers, 51 were refuted on verification — 32 already built here under another name, 19 resting on

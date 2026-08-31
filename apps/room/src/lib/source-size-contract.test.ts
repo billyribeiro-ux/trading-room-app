@@ -1945,8 +1945,46 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       saying why `followedUsers` is still NOT passed: this component has never had it, and adding
       it would be a behaviour change nothing asked for.
     */
-    max: 372,
-    why: 'app-alert-qa-modal - the Q&A thread on one alert, its composer and its own open menu row'
+    /*
+      372 -> 371, 2026-08-31, and it went DOWN while the modal gained four behaviours — which is what
+      the two entries below paid for.
+
+      `QAM-01` (a date separator between entries, the reference's `prevD` at byte 2,332,963),
+      `QAM-02` (the composer is emptied when the modal opens on a different alert, byte 2,334,927),
+      `QAM-03` (the thread opens on its newest entry, `scrollToBottomQA` at byte 2,335,916) and
+      `QAM-08` (the alert card is gated on there BEING an alert, byte 2,344,076) all landed here,
+      and the header card and the footer composer left for components of their own. Both seams are
+      the reference's: `e3e` is a sub-template called once, and the footer is one subtree reading
+      nothing the thread above it reads.
+    */
+    max: 371,
+    why: 'app-alert-qa-modal - the Q&A thread on one alert, its own open menu row and its wiring'
+  },
+  {
+    file: 'lib/components/AlertQaAlertCard.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, 2026-08-31.
+
+      `e3e` at bundle byte 2,332,074 — the alert card the Q&A modal reproduces in its header, plus
+      the two date formatters that feed it. It came out because `AlertQaModal` had no line left and
+      the ratchet's answer to that is an extraction; it is mostly the four `QAM` rows that live on
+      its markup, two of them BLOCKED on a field `ModalHost` does not declare.
+    */
+    max: 171,
+    why: 'the alert card the Q&A modal reproduces in its own header - `e3e`, called once'
+  },
+  {
+    file: 'lib/components/AlertQaComposer.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, 2026-08-31.
+
+      `#textAreaQATxt` and the modal footer around it. The second seam out of `AlertQaModal`, and
+      the reference's own: `d(15,"div",13)` through `H(23,l3e,…)` is one subtree with one field, one
+      picker and one button. It carries `QAM-04` — the correction of a comment that claimed the
+      captured textarea had no handler, which const 17 at byte 2,342,104 refutes in three bindings.
+    */
+    max: 167,
+    why: 'the Q&A thread composer - one field, one picker, one button, and one refuted claim'
   },
   {
     file: 'lib/components/RemoteAudioSinks.svelte',
@@ -5630,8 +5668,54 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       trigger, and positioned this popover over the wrong composer. Three other call sites pass a
       matching id; this was the one that did not, which is why the audit filed it as a `defect`.
     */
+    /*
+      HELD AT 640 on 2026-08-31 while the column gained four fixes, and that is the whole point of
+      the two entries below.
+
+      `XCP-01` (the composer holder wears the capture's own id again, so `app.css`'s whole
+      `#textAreaHolder` family and the container query reach it), `XCP-02` (the `\xa0Chat` brand
+      label, byte 2,367,381), `XCP-03`/`XCP-04` (Alt+Enter inserts a newline instead of sending, and
+      a send closes the emoji picker) and `XCP-05` (two captured attribute tables that were never
+      applied) all landed WITHOUT the number moving.
+
+      No markup could be extracted to pay for them: four contract tests name strings inside every
+      candidate slice — `emoji-picker-contract` the emoji trigger and picker,
+      `extra-chat-column-contract` the textarea id, the RTE button, the `chatDisabled` and
+      `webinarMode` blocks and the chrome prop, `authority-gate-contract` the `showPmButton` gate,
+      `typing-indicator-contract` the indicator markup. So what moved was the REASONING, into
+      `lib/extra-chat-surface.ts` and `lib/chat-composer-enter.ts`, which is the third thing this
+      file's `+page.svelte` entry describes: "moving an explanation to the code it explains is the
+      extraction itself." Nothing was shortened to hit the number; every relocated paragraph is in
+      one of those two modules verbatim, and each is pointed at from the line it left.
+    */
     max: 640,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
+  },
+  {
+    file: 'lib/extra-chat-surface.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, 2026-08-31.
+
+      `app-extra-chat`'s decoded const tables and the decisions this room has made about them. Three
+      exported values with real consumers in `ExtraChatPane.svelte`, and the arguments the component
+      had no line to hold — including the three gaps it cannot close from inside itself: the absent
+      YouTube button, the entire missing component stylesheet, and the `ngClass` this room refuses.
+    */
+    max: 279,
+    why: 'the second chat column`s decoded const tables and the decisions taken against them'
+  },
+  {
+    file: 'lib/chat-composer-enter.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, 2026-08-31.
+
+      What Enter does in a chat composer, once. It exists because the two composers this repository
+      owns disagreed about the same captured branch in opposite directions: the extra column sent on
+      Alt+Enter where byte 2,386,309 inserts a newline, and the Q&A composer carried a comment
+      claiming the captured field had no handler at all, which byte 2,336,560 refutes.
+    */
+    max: 78,
+    why: 'the captured three-way Enter branch, defined once for both composers'
   },
   {
     file: 'lib/components/FilesPane.svelte',
