@@ -33,6 +33,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 23:00 UTC — PollPanel audited: a faithful transcription that nothing running could prove
+
+**Runtime impact: NO** — no code changed. What changed is that the surface is now checked.
+
+`todo-next.md` listed `PollPanel.svelte` (883 lines) as unaudited. It was read end to end against
+`app-poll-modal` in the pinned bundle — the selector at byte 2,112,472, all **53 consts decoded by
+value** with `const-table.mjs` and swept against `PollPanel` and `PollSavedList`.
+
+**Zero gaps.** Every const value is present, including the reference's own `ria-controls` typo on
+the saved-polls tab — the `a` is missing there while its sibling const spells `aria-controls`
+correctly, so it is a typo in one of two adjacent attributes and is transcribed rather than fixed.
+One divergence, and it is right: the loading gif is `/assets/…` rather than the reference's
+`../../assets/…`, because that relative path resolves from an Angular component's location and this
+app serves the file from `static/`. The asset's existence is asserted too — a divergence pointing at
+a missing file is the same bug by another route.
+
+**So the finding is not a missing feature; it is that nothing which RUNS said any of this.**
+`poll-source-contract.test.ts` reads `docs/source/components/app-poll-modal.full.js`, an evidence
+root this repository does not ship, so it is one of the 42 files `gate/evidence-bound-tests.mjs`
+excludes on every run here and on CI. Every claim it makes about this panel has been unasserted for
+as long as that has been true. Same shape as `SVC-04` and `STB-04`, same remedy: the old file is
+neither deleted nor re-pointed (retiring it is the owner's call), and the facts are re-derived from
+the tracked v4 bytes.
+
+**And one of those unasserted claims had a silent failure mode.** `PollPanel.svelte` has NO `<style>`
+block. All seventeen of the component's rules — 2,040 bytes — ship in
+`captured-runtime-components.css` re-homed onto the custom element:
+
+```css
+app-poll-modal .poll-panel-titlebar:not(:root) { … cursor: move; user-select: none; … }
+```
+
+They apply only while the panel renders inside an `<app-poll-modal>` element. Replace that wrapper
+with a `div` — exactly the tidy-up somebody reaches for in a 6,900-line file — and the titlebar loses
+its background, its drag cursor and its layout, the buttons lose their box, and **nothing in this
+repository says a word**. That was measured, not asserted: with the wrapper swapped for a `div`,
+`svelte-check` reported *1,579 files, 0 errors, 0 warnings*. `img-dimensions-contract.test.ts`
+documents the identical trap for `app-privchat`'s avatars and calls it "a real and silent failure
+mode"; this is the same one, two orders of magnitude larger. Both halves are pinned now — the
+wrapper, and the sheet still scoping to it — because either alone goes green on half the defect.
+
+**Verified — five negative controls, each red on its own assertion, green after restore:** the
+wrapper replaced by a `div`; the `ria-controls` typo "corrected"; the loader path "restored" to the
+reference literal; a const value dropped (the sweep named it, `const 22: Enter a choice (i.e. Up,
+Down, Sideways)`); and the generated sheet's scoping removed.
+
+`slice-anchor-contract` refused the first draft — two `indexOf` calls inlined into a `slice` — and
+they are bound and asserted now. Coverage moves to **42 of 84 surfaces, 17,551 of 37,259 lines,
+47.1%**, and the inventory row names this contract so the cell cannot claim audited without saying
+what did it.
+
+Room gate exit 0: 304 test files / 5,576 passed / 1 skipped.
+
 ### 2026-08-31 22:30 UTC — Two more TODO.md rows that described work already done, one for eight days
 
 **Runtime impact: NO** — comments and trackers. Both rows named a blocker, and neither blocker was

@@ -84,7 +84,7 @@ guessed.
 | 8 | `lib/components/RoomOverlays.svelte` | 1,148 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
-| 11 | `lib/components/PollPanel.svelte` | 883 | no |
+| 11 | `lib/components/PollPanel.svelte` | 883 | `poll-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-poll-modal` (selector at byte 2,112,472), all 53 consts decoded BY VALUE and swept against `PollPanel` + `PollSavedList`. ZERO gaps; one recorded divergence (the loader's `../../assets/` path). The finding is the `app-poll-modal` ANCESTOR: all 17 style rules are scoped to it in the generated sheet, so deleting the wrapper unstyles the panel with nothing else noticing. |
 | 12 | `lib/components/RoomSidebar.svelte` | 871 | no |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/ScreenPane.svelte` | 671 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
@@ -159,7 +159,7 @@ guessed.
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 
-**41 of 84 surfaces audited · 16,668 of 37,259 lines · 44.7%.**
+**42 of 84 surfaces audited · 17,551 of 37,259 lines · 47.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
