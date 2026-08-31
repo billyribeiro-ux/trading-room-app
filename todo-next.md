@@ -89,7 +89,7 @@ guessed.
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 15 | `lib/components/StreamingView.svelte` | 604 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 639 | no |
+| 16 | `lib/components/ExtraChatPane.svelte` | 638 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 622 | no |
 | 18 | `lib/components/FilesPane.svelte` | 585 | no |
 | 19 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 577 | no |
@@ -98,7 +98,7 @@ guessed.
 | 22 | `lib/components/ScreenPane.svelte` | 669 | no |
 | 23 | `lib/components/VideoPlayer.svelte` | 413 | no |
 | 24 | `lib/components/MainTabStrip.svelte` | 371 | no |
-| 25 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
+| 25 | `lib/components/AlertQaModal.svelte` | 370 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | no |
 | 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | no |
 | 28 | `lib/components/StreamTabs.svelte` | 305 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**5 of 74 surfaces audited · 2,045 of 35,271 lines · 5.8%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -142,7 +142,12 @@ guessed.
 > 62 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
 > entries are slices of `ModalHost.svelte` alone. Marking rows audited from a differently-shaped list
 > is how a coverage number stops meaning anything, so the counts here are untouched and this row
-> stays 2 of 62 until a surface is read whole against a file in this table.
+> stayed 2 of 62 until a surface was read whole against a file in this table — which happened on
+> 2026-08-31, on the register's own terms rather than by re-scoring. `app-extra-chat` and
+> `app-alert-qa-modal` were each read end to end at verified boundaries, their const tables decoded
+> by value, and the result is 22 new rows in that register under two new headings. Those two files
+> and the two components extracted from the second are the three-to-five move above; every other
+> count in this table is still untouched.
 >
 > Its own headline number to keep is the **19% false-claim rate**: of 274 differences claimed by the
 > readers, 51 were refuted on verification — 32 already built here under another name, 19 resting on
@@ -161,6 +166,8 @@ guessed.
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 73 | `lib/components/AlertQaAlertCard.svelte` | 170 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
+| 74 | `lib/components/AlertQaComposer.svelte` | 166 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

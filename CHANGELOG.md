@@ -33,6 +33,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 01:10 UTC — `ExtraChatPane` and `AlertQaModal` audited whole against the v4 bundle: 22 rows, 7 built or fixed, 6 blocked
+
+**Runtime impact: YES.** Seven of the twenty-two rows change what a viewer sees. The two surfaces
+had no section in `docs/decoded/room-surface-audit-2026-08-30.md` before this; they have one each
+now, `XCP-01` … `XCP-09` and `QAM-01` … `QAM-13`, all outside the two-verifier pass's totals and
+each saying so in its own body. The register reads **0 open · 246 closed · 246 rows**.
+
+**The largest single defect was one word in an id.** `ExtraChatPane` rendered its composer as
+`#textAreaHolderExtra`, a suffix this repository invented for uniqueness, where const 25 of
+`app-extra-chat`'s own table (byte 2,393,850) is `id="textAreaHolder"` — byte-identical to
+`app-chat`'s, and the id that component's own stylesheet addresses at byte 2,405,618. The suffix cut
+the second chat column off from every `#textAreaHolder` rule in `app.css`: the flex row and its
+radius, the two 35px min-heights, the textarea's height, colour and background, all three dark-theme
+rules, and `container-type: inline-size`. A container query with no container ancestor is false, so
+BOTH composer button sets rendered at every width and the only surviving rule was
+`.composer-options-forced .composer-expand` — pressing "+" hid "+" and revealed nothing, which is
+`CLAUDE.md`'s "no control whose only effect is changing its own label", live in the room.
+
+**Built or fixed:** the `&nbsp;Chat` brand label when a room has no channels (`XCP-02`); Alt+Enter
+inserting a newline instead of sending, and a send closing the emoji picker (`XCP-03`, `XCP-04`);
+two captured attribute tables that were never applied to the emoji and GIF triggers (`XCP-05`); a
+cited const index that belonged to `app-chat`'s table, not this one (`XCP-06`); a date separator
+between Q&A entries that cross a day (`QAM-01`); the Q&A composer emptied when the modal opens on a
+different alert (`QAM-02`); the thread opening on its newest entry rather than its oldest (`QAM-03`);
+a comment claiming the captured Q&A textarea had no handler, which const 17 refutes in three
+bindings (`QAM-04`); an inline `max-height` duplicating one declaration of a four-declaration
+transcribed rule (`QAM-07`); the alert card drawn even with no alert (`QAM-08`); and the sender
+name's two captured spaces (`QAM-09`).
+
+**Six rows are BLOCKED and each names its one-line unblock**, all on files outside this change's
+scope: the "Play YouTube For All" button needs a prop on the `<ExtraChatPane>` call in
+`routes/+page.svelte:1477` (`XCP-08`); the Q&A image button and paste handler need
+`onimageupload` on the `<AlertQaModal>` call in `ModalHost.svelte:5636` (`QAM-05`, `QAM-06`); and the
+Q&A header's body pipe and avatar fallback need `targetUrl` and `senderEmailHash` on the
+`targetMessage` shape at `ModalHost.svelte:529` (`QAM-10`, `QAM-11`).
+
+**`XCP-09` is the finding worth reading even if nothing else is.** `app-extra-chat` ships 5,818
+bytes of component styles at byte 2,400,462 — its tab strip, counter badge, typing indicator,
+textarea, button column, Giphy popover and more — and `captured-runtime-components.css` contains the
+string `app-extra-chat` **zero times**. So does `css/complete-app-styles.css`, the capture that file
+is generated from, because that capture was taken from a room with `preferences.extraChatColumn`
+OFF: Angular never mounted the component and never injected its styles. The unblock is a re-capture,
+not a hand-edit. It is invisible from the markup and was found only by reading the bundle's
+`styles:` array.
+
+**Four modules and components came out of the two files, because the ratchet said so.**
+`AlertQaModal` hit its ceiling and gave up `AlertQaAlertCard.svelte` (the reference's own `e3e`
+sub-template) and `AlertQaComposer.svelte` (its footer), and its ceiling went DOWN, 372 to 371.
+`ExtraChatPane` sat at exactly 640 of 640 with no markup that could move — four contract tests name
+strings inside every candidate slice — so what moved was the reasoning, into
+`lib/extra-chat-surface.ts` (the decoded const tables plus seven relocated decisions, verbatim) and
+`lib/chat-composer-enter.ts` (the captured three-way Enter branch, defined once because the two
+composers this repository owns disagreed about it in opposite directions). Its ceiling did not move.
+
+**Verified:** `svelte-check` 1,495 files / 0 errors / 0 warnings; `eslint` clean;
+`extra-chat-surface-contract.test.ts` (23) and `alert-qa-surface-contract.test.ts` (30) are new and
+re-read every cited offset out of the pinned bundle rather than trusting it — six offsets in the
+first draft were wrong and those tests are what found them. Seven negative controls were run and
+seen red. **The Svelte MCP was unavailable in this session, so `svelte-autofixer` was NOT run on any
+of the six touched or created `.svelte` files;** `svelte-check` and `eslint` were run in its place
+and that substitution is recorded rather than glossed.
+
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships

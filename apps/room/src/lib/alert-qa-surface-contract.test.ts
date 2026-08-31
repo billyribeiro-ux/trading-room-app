@@ -1,0 +1,270 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+import { codeOf } from './source-comments';
+
+/**
+ * `QAM-01` … `QAM-13` — the alert Q&A modal, audited against the pinned v4 bundle on 2026-08-31.
+ *
+ * ## Every offset is re-read here rather than trusted
+ *
+ * A cited byte offset in a document has been wrong more than once in this repository, and a wrong
+ * one reads exactly like a right one. So each row below SLICES the bundle at the offset it names
+ * and compares the bytes. The bundle's own length is asserted first: read the wrong file and every
+ * number below is meaningless, which is what that assertion exists to prevent.
+ *
+ * ## Where the subjects live, and why that is three files
+ *
+ * `AlertQaModal.svelte` reached its `source-size-contract` ceiling on 2026-08-31 and two seams came
+ * out of it — `AlertQaAlertCard.svelte` (the reference's `e3e`, called once) and
+ * `AlertQaComposer.svelte` (its footer). This file reads all three, so a region moving between them
+ * fails a POSITIVE assertion here rather than quietly turning a `not.toContain` green, which is the
+ * trap `source-size-contract.test.ts` records in full.
+ */
+
+const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf8');
+
+const MODAL = codeOf('components/AlertQaModal.svelte', read('./components/AlertQaModal.svelte'));
+const CARD = codeOf(
+  'components/AlertQaAlertCard.svelte',
+  read('./components/AlertQaAlertCard.svelte')
+);
+const COMPOSER = codeOf(
+  'components/AlertQaComposer.svelte',
+  read('./components/AlertQaComposer.svelte')
+);
+const COMPOSER_RAW = read('./components/AlertQaComposer.svelte');
+const CAPTURED_CSS = read('./styles/captured-runtime-components.css');
+const BUNDLE = read('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js');
+
+/** See the same helper in `extra-chat-surface-contract.test.ts` for why the length is derived. */
+const at = (offset: number, expected: string) => BUNDLE.slice(offset, offset + expected.length);
+
+describe('the bundle these rows were read from', () => {
+  it('is the pinned one — the vacuity floor for every offset below', () => {
+    expect(BUNDLE.length).toBe(2_891_205);
+  });
+
+  it('and the offsets sit inside `app-alert-qa-modal`', () => {
+    const selector = BUNDLE.indexOf('selectors:[["app-alert-qa-modal"]]');
+    expect(selector, 'the Q&A modal is not in this bundle').toBeGreaterThan(-1);
+    /* Its consts table, which several rows below decode by value. */
+    expect(BUNDLE.slice(selector, selector + 2_000)).toContain('["qaContainer",""]');
+  });
+});
+
+describe('QAM-01 — a Q&A thread shows a date separator when it crosses a day', () => {
+  it('is `prevD` in the reference, passed by both renderers', () => {
+    const prevD = '("prevD",i>0?o.msgs[i-1].t:0)';
+    expect(at(2_332_963, prevD)).toBe(prevD);
+    expect(at(2_333_284, prevD)).toBe(prevD);
+  });
+
+  it('and `app-st-message` turns it into the flag its separator is gated on', () => {
+    const isND = 'this.isND=this.msg.t.getDay()!=this.prevD.getDay()';
+    expect(at(1_346_064, isND)).toBe(isND);
+    const gate = 'O(2,o.isND?2:-1)';
+    expect(at(1_361_572, gate)).toBe(gate);
+  });
+
+  it('so the modal computes it per entry instead of hardcoding false', () => {
+    expect(MODAL).toContain('showDateSeparator={showsDateSeparator(index)}');
+    expect(MODAL).not.toContain('showDateSeparator={false}');
+    expect(MODAL).toContain('function showsDateSeparator(index: number)');
+    /* The first entry has no predecessor, which is the `i > 0 ? … : 0` half. */
+    expect(MODAL).toContain('if (index === 0) return false;');
+  });
+
+  it('and compares the calendar day rather than reproducing the reference’s weekday bug', () => {
+    /*
+      `getDay()` is the day of the WEEK, so two entries exactly seven days apart compare equal
+      upstream and the separator is skipped. `sameCalendarDay` compares year, month and date, and it
+      is the same helper both chat columns already use.
+    */
+    expect(MODAL).toContain('sameCalendarDay');
+    expect(MODAL).not.toContain('getDay()');
+  });
+});
+
+describe('QAM-02 — the composer is emptied when the modal opens on a different alert', () => {
+  it('is what the `openModal` half of the subscription does', () => {
+    const clear = 'this.modalId=e._id,yi("#textAreaQATxt").val("")';
+    expect(at(2_334_927, clear)).toBe(clear);
+  });
+
+  it('so the modal clears it on the transition, keyed by the alert', () => {
+    expect(MODAL).toContain('let openedAlertId: number | null = null;');
+    expect(MODAL).toContain('if (openedAlertId === id) return;');
+    expect(MODAL).toContain("qaComposer = '';");
+  });
+
+  it('and the marker is a plain field, because nothing renders from it', () => {
+    /*
+      An effect that reads its own marker reactively re-runs on the write that was meant to end it.
+      `$state` on this line would be that shape; the absence is asserted next to the positive above
+      so it cannot pass by the whole block having gone.
+    */
+    expect(MODAL).not.toContain('let openedAlertId = $state');
+  });
+});
+
+describe('QAM-03 — the thread opens on its newest entry', () => {
+  it('is `scrollToBottomQA` in the reference', () => {
+    const scroll = 'scrollToBottomQA(){const e=this;try{setTimeout(()=>{';
+    expect(at(2_335_916, scroll)).toBe(scroll);
+  });
+
+  it('over a `.modal-body` that really does scroll', () => {
+    const styles = '#alertQAModal[_ngcontent-%COMP%]   .modal-body[_ngcontent-%COMP%]{min-height';
+    expect(at(2_344_478, styles)).toBe(styles);
+    /* And the transcription this room already carries, which is why QAM-07 removes the inline copy. */
+    expect(CAPTURED_CSS).toContain('app-alert-qa-modal #alertQAModal:not(:root) .modal-body');
+    expect(CAPTURED_CSS).toContain('overflow-y: auto;');
+  });
+
+  it('so the modal scrolls it, after the DOM has the new rows', () => {
+    expect(MODAL).toContain("host?.querySelector('.modal-body')");
+    expect(MODAL).toContain('body.scrollTop = body.scrollHeight;');
+    expect(MODAL).toContain('void tick().then(');
+    /* Reads the count so an ARRIVING question re-runs it, not only the modal opening. */
+    expect(MODAL).toContain('const count = qaQuestions.length;');
+  });
+
+  it('and reaches the element with `bind:this` rather than a hand-rolled capture', () => {
+    expect(MODAL).toContain('<app-alert-qa-modal bind:this={host}>');
+    expect(MODAL).toContain('let host = $state<HTMLElement | null>(null);');
+  });
+});
+
+describe('QAM-04 — the claim that the captured textarea had no handler was false', () => {
+  it('const 17 declares three bindings, not zero', () => {
+    const const17 =
+      '["name","txt-area","id","textAreaQATxt","rows","1","spellcheck","true",1,"txt-area","form-control","border-0",3,"keyup","paste","placeholder"]';
+    expect(at(2_342_103, const17)).toBe(const17);
+  });
+
+  it('and the template attaches two of them', () => {
+    const bind = 'x("keyup",function(a){return D(s),E(o.onKey(a))})';
+    expect(at(2_343_759, bind)).toBe(bind);
+  });
+
+  it('and `onKey` is the same three-way Enter branch every composer carries', () => {
+    const onKey = 'onKey(e){if(13===e.keyCode){e.preventDefault();const i=yi("#textAreaQATxt")';
+    expect(at(2_336_560, onKey)).toBe(onKey);
+  });
+
+  it('so the composer records the correction rather than deleting the sentence', () => {
+    expect(COMPOSER_RAW).toContain('That is false, and it was measured false on 2026-08-31.');
+    expect(COMPOSER).toContain("if (composerEnterAction(event) !== 'send') return;");
+  });
+});
+
+describe('QAM-05 and QAM-06 — the image button does not act, and there is no paste handler', () => {
+  it('the reference wires the button to `imgUpload`', () => {
+    const l3e =
+      'function l3e(t,n){if(1&t){const e=Y();d(0,"span",36),x("click",function(){return D(e),E(g().imgUpload())})';
+    expect(at(2_333_483, l3e)).toBe(l3e);
+  });
+
+  it('and gates it on `canPostImages`, which is wider than `isPresenter`', () => {
+    const gate = 'O(23,o.canPostImages?23:-1)';
+    expect(at(2_344_277, gate)).toBe(gate);
+    const init = '(this.isPresenter||this.appService.globals.sessData.userUploads)';
+    expect(at(2_334_626, init)).toBe(init);
+  });
+
+  it('so the span is drawn and is honestly recorded as inert', () => {
+    /* Positive first: the button IS rendered, which is what makes the absent handler a defect. */
+    expect(COMPOSER).toContain("ngbtooltip: 'Upload an Image'");
+    expect(COMPOSER).toContain('{#if isPresenter}');
+    expect(COMPOSER_RAW).toContain('QAM-05');
+    expect(COMPOSER_RAW).toContain('QAM-06');
+    /* And no paste handler, which is the other half of the same blocked row. */
+    expect(COMPOSER).not.toContain('onpaste');
+  });
+});
+
+describe('QAM-07 — the inline body height duplicated a rule this room already carries', () => {
+  it('is gone from the modal, and the rule it duplicated is not', () => {
+    expect(MODAL).toContain('<Modal');
+    expect(MODAL).not.toContain('bodyStyle=');
+    expect(CAPTURED_CSS).toContain('max-height: 70vh;');
+  });
+});
+
+describe('QAM-08 — the alert card is drawn only when there is an alert', () => {
+  it('is the reference’s own gate', () => {
+    const gate = 'O(7,o.qaMsg?7:-1)';
+    expect(at(2_344_076, gate)).toBe(gate);
+  });
+
+  it('and `e3e` is the sub-template it gates, which is why the card is its own component', () => {
+    const e3e = 'function e3e(t,n){if(1&t&&(d(0,"div",8)(1,"div",22)(2,"div",23)(3,"div",24)';
+    expect(at(2_332_074, e3e)).toBe(e3e);
+    expect(MODAL).toContain('<AlertQaAlertCard alert={targetMessage} />');
+    expect(CARD).toContain('{#if alert}');
+  });
+});
+
+describe('QAM-09 — the username keeps the reference’s two spaces', () => {
+  it('is `Ne(" ", …, " ")` at the offset', () => {
+    const name = 'Ne(" ",e.qaMsg.n," ")';
+    expect(at(2_331_372, name)).toBe(name);
+  });
+
+  it('and the card renders them through the repository’s standing idiom', () => {
+    expect(CARD).toContain("<strong class=\"username mx-1\">{' '}{alert.senderName}{' '}</strong>");
+  });
+});
+
+describe('QAM-10 and QAM-11 — the two BLOCKED rows, and what blocks them', () => {
+  it('the body pipe and its copy-trade branch are real', () => {
+    const pipe = 'Tn(1,1,e.qaMsg.txt,"chat",e.qaMsg.avt,null)';
+    expect(at(2_331_625, pipe)).toBe(pipe);
+    const branch = 'O(0,g(2).appService.globals.sessData.copyTrades?0:1)';
+    expect(at(2_332_021, branch)).toBe(branch);
+  });
+
+  it('and so is the avatar fallback that needs the sender’s hash', () => {
+    const avatar = 'e.qaMsg.pic||"https://secure.gravatar.com/avatar/"+e.qaMsg.avt+"?d=mm&s=50"';
+    expect(at(2_331_038, avatar)).toBe(avatar);
+  });
+
+  it('and the field that blocks both is genuinely not declared for this modal', () => {
+    /*
+      The measurement the two rows rest on, taken here so it cannot rot into prose: the host's
+      `targetMessage` shape names six fields and neither `targetUrl` nor an email hash is among
+      them, while the image dispatcher resolves through exactly that field.
+    */
+    const host = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+    const shape = host.slice(host.indexOf('    targetMessage: {'));
+    const declared = shape.slice(0, shape.indexOf('} | null;'));
+    expect(declared, 'the targetMessage shape was not found').toContain(
+      'senderAvatarUrl?: string;'
+    );
+    expect(declared).not.toContain('targetUrl');
+    expect(declared).not.toContain('senderEmailHash');
+
+    const actions = readFileSync(
+      new URL('./room/message-actions.svelte.ts', import.meta.url),
+      'utf8'
+    );
+    expect(actions).toContain("if (action === 'image' && item.targetUrl)");
+  });
+});
+
+describe('QAM-13 — the compact renderer is already built one level down', () => {
+  it('is a display-mode branch in the reference', () => {
+    const branch = 'O(0,"r"==g().displayMode?0:1)';
+    expect(at(2_333_453, branch)).toBe(branch);
+  });
+
+  it('and `RoomMessage` draws it, so the modal passes the mode and nothing else', () => {
+    const message = readFileSync(
+      new URL('./components/RoomMessage.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(message).toContain('<app-st-compactmessage>');
+    expect(MODAL).toContain('{displayMode}');
+  });
+});
