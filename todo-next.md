@@ -79,7 +79,7 @@ guessed.
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,258 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,168 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,171 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,148 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
@@ -141,7 +141,7 @@ guessed.
 | 65 | `lib/components/CloseSessionPane.svelte` | 104 | no |
 | 66 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 67 | `lib/components/ImageLightbox.svelte` | 94 | no |
-| 68 | `lib/components/NavbarRecIndicator.svelte` | 92 | §NAV — born 2026-08-31 out of `RoomNavbar`; the three REC badges, and where `breathing-rec` is not. |
+| 68 | `lib/components/NavbarRecIndicator.svelte` | 108 | §NAV — born 2026-08-31 out of `RoomNavbar`; the three REC badges, and where `breathing-rec` is not. |
 | 69 | `lib/components/RoomBranding.svelte` | 91 | no |
 | 70 | `lib/components/CompactMessageRow.svelte` | 77 | no |
 | 71 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
@@ -158,7 +158,7 @@ guessed.
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 
-**38 of 83 surfaces audited · 15,231 of 36,652 lines · 41.6%.**
+**38 of 83 surfaces audited · 15,250 of 36,671 lines · 41.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

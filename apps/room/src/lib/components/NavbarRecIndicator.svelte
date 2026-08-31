@@ -53,25 +53,41 @@
     its own opinion about it — the gate was reading a viewer preference nothing wrote until
     2026-08-28, and every member in every room saw a name the owner had hidden.
 
-    ## `breathing-rec` on `[ REC ]` is OURS, and it is recorded rather than absorbed
+    ## `NAV-08` — `breathing-rec` was OURS on this badge, and it is GONE
 
-    The reference has no class map on const 93 at all. `iPe = (t, n) => ({ 'breathing-rec': t,
-    recIndicatorStart: n })` (byte 2,465,900) is bound ONCE, at byte 2,477,678, and the element it
-    lands on is the `<i class="far fa-2x fa-dot-circle">` inside the PRESENTER's recording dropdown —
-    element index 2 of `t4e`, not this badge and not its container. That placement is built where the
-    reference has it, in `RoomNavbar.svelte`; this copy stays because
-    `room-navbar-contract.test.ts` pins `breathing-rec` to `.recIndicator`, and that file is not this
-    batch's to edit. `NAV-08` in `docs/decoded/room-surface-audit-2026-08-30.md` names the one line.
+    The reference has no class map on const 93 at all. `UPe` (byte 2,474,097) renders
+    `li` const 93 `[1,"nav-item","recIndicator","animated","fadeIn"]` and binds exactly one thing on
+    it, `ngbTooltip`. Meanwhile `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })`
+    (byte 2,465,900) is bound ONCE in 2,891,205 bytes, at byte 2,477,678, onto the
+    `<i class="far fa-2x fa-dot-circle">` inside the PRESENTER's Start/Stop Recording dropdown —
+    element index 2 of `t4e`, not this badge and not its container.
+
+    **So the pulse is a presenter's cue on their own recording button, and this bar was showing it to
+    every member in the room.** `.breathing-rec` is a 5s scale pulse plus `color: red !important`
+    (`captured-runtime-components.css:4281`), so the divergence was visible on every screen rather
+    than theoretical.
+
+    `NAV-04` built the real placement in `RoomNavbar.svelte`, where the reference has it. This copy
+    stayed only because two contract tests pinned the class to `.recIndicator` and neither file
+    belonged to that batch. Both are re-pointed now and the class is removed here, which leaves the
+    badge exactly what `UPe` renders: a tooltip and the words.
   */
   import type { RoomMedia } from '#lib/room/media.svelte.js';
 
+  /*
+    `blinkingRec` LEFT this component with `NAV-08` on 2026-08-31, and the removal is the point.
+
+    Its only reader was the `breathing-rec` class above, which the reference does not put here. A
+    prop kept "in case" is a prop the next reader gates something on — and this one names an owner
+    setting, so gating on it would look correct while showing every member a cue the reference shows
+    only to the presenter who owns the recording. `RoomNavbar.svelte` still takes it, because that is
+    where `NAV-04` built the real placement.
+  */
   let {
     media,
-    /** `sessData.recordingReminder`'s neighbour — "Blinking REC?", the owner's switch. */
-    blinkingRec,
     /** Already resolved by `RoomGates`: a member may not be shown the recording file name. */
     recordingTooltip
-  }: { media: RoomMedia; blinkingRec: boolean; recordingTooltip: string } = $props();
+  }: { media: RoomMedia; recordingTooltip: string } = $props();
 </script>
 
 {#if media.roomRecordingPaused && media.roomRecording}
@@ -80,7 +96,7 @@
     <a>[ REC PAUSED]</a>
   </li>
 {:else if media.roomRecording}
-  <li class={['nav-item recIndicator animated fadeIn', { 'breathing-rec': blinkingRec }]}>
+  <li class="nav-item recIndicator animated fadeIn">
     <!-- svelte-ignore a11y_missing_attribute -->
     <a title={recordingTooltip}>[ REC ]</a>
   </li>

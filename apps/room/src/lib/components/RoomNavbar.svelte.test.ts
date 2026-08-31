@@ -234,20 +234,39 @@ describe('the recording indicator', () => {
   });
 
   /*
-    "Blinking REC?" — and the DIVERGENCE the prop's docblock records is what is asserted. Upstream
-    binds `breathing-rec` through a class map on the recording `ul`; this bar renders one `li` per
-    state, so the class lands on the `[ REC ]` item. Same element breathing, one level down.
+    `NAV-08` — RE-POINTED 2026-08-31, and the comment that stood here repeated the claim `NAV-06`
+    had already corrected: *"upstream binds `breathing-rec` through a class map on the recording
+    `ul`; this bar renders one `li` per state, so the class lands on the `[ REC ]` item. Same
+    element breathing, one level down."*
+
+    It is not the same element and not one level down. `UPe` at byte 2,474,097 renders the badge's
+    `li` from const 93 and binds only `ngbTooltip` on it. `iPe` (byte 2,465,900) is bound ONCE in the
+    whole bundle, at byte 2,477,678, onto the `<i class="far fa-2x fa-dot-circle">` inside the
+    PRESENTER's Start/Stop Recording dropdown — const 153, element index 2 of `t4e`.
+
+    So the pulse belongs to a presenter looking at their own recording button, and this bar was
+    putting it on a badge every member sees. Mounted rather than server-rendered because the class
+    is driven by `RoomMedia` state that arrives after a command, which is what `roomRecordingStarted`
+    below simulates.
   */
-  it('breathes only when the room asked it to', () => {
-    const off = render();
+  it('NAV-08 — breathes the presenter s recording icon, and not the room-wide badge', () => {
+    const off = render({ isPresenter: true });
     off.media.roomRecordingStarted('rec.mp4');
     flushSync();
-    expect(off.root.querySelector('.recIndicator')?.className).not.toContain('breathing-rec');
+    expect(off.root.querySelector('.fa-dot-circle')?.className).not.toContain('breathing-rec');
 
-    const on = render({ blinkingRec: true });
+    const on = render({ isPresenter: true, blinkingRec: true });
     on.media.roomRecordingStarted('rec.mp4');
     flushSync();
-    expect(on.root.querySelector('.recIndicator')?.className).toContain('breathing-rec');
+    expect(on.root.querySelector('.fa-dot-circle')?.className).toContain('breathing-rec');
+
+    /*
+      The badge is still rendered, and it never wears the class. Both halves: a query that found
+      nothing would satisfy `not.toContain` on `undefined` and prove nothing at all.
+    */
+    const badge = on.root.querySelector('.recIndicator');
+    expect(badge, 'the [ REC ] badge must still render').not.toBeNull();
+    expect(badge?.className).not.toContain('breathing-rec');
   });
 
   /*

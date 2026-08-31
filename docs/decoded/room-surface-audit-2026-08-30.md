@@ -6993,7 +6993,25 @@ This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ### STB-04 — `stream-tabs-contract.test.ts` reads a bundle that is not in this repository, so the whole file asserts nothing
 
-**BLOCKED 2026-08-31, with the exact change and why it is not one line.** Line 20 reads
+**BLOCKED 2026-08-31 — and NEW EVIDENCE on 2026-08-31 removes the obvious second repair.** The one
+candidate this row did not consider was re-pointing at `docs/source-v3-2026-08-15`, which this
+checkout DOES hold. It does not work: that directory holds `main.99a5781d1d7a7775.js`, a THIRD
+minifier generation carrying neither this file's literals (`ut(9,Go,`, `Go=t=>({active:t})` — both
+absent) nor v4's. Measured, not assumed.
+
+**The buildable half is done.** A `STB-04` note now heads the superseded file itself, where whoever
+re-points or retires it will actually be reading — the pairing existed only in the v4 file's
+docblock, and a one-directional cross-reference is how a pair comes apart. It carries the
+three-generation table above. `stream-tabs-v4-contract.test.ts` asserts that note is still there,
+so the pairing cannot rot silently.
+
+**Retiring the file stays an owner decision, and the reason is sharper than "gitignored".**
+`docs/source` is a real evidence root that **74 test files in this app read**; it is absent from
+containers like this one and present for its author. This file may well run there. Deleting a test
+whose evidence is visible to its owner and invisible here, from inside the container that cannot see
+it, is exactly the shape this repository refuses.
+
+Line 20 reads
 `../../docs/source/main.d6d3c112b59b7d0d.js`. No file of that name exists anywhere in this
 checkout, and `docs/source` is a gitignored evidence root, so `gate/evidence-bound-tests.mjs`
 excludes the file — one of the 42 the vitest banner names on every run. All twelve of its `it`
@@ -7281,11 +7299,23 @@ function p4e(t,n){1&t&&(d(0,"li",19)(1,"a",150),T(2,"i",181),u()())}     // webc
 
 ### NAV-08 — The `[ REC ]` badge's `breathing-rec` is ours, and removing it needs one line elsewhere
 
-**BLOCKED 2026-08-31.** Const 93 is `[1,"nav-item","recIndicator","animated","fadeIn"]` and `UPe`
+**FIXED 2026-08-31.** Const 93 is `[1,"nav-item","recIndicator","animated","fadeIn"]` and `UPe`
 (byte 2,474,097) binds one thing on it, `ngbTooltip`. There is no class map on the room-wide badge in
-the reference, so the `breathing-rec` this bar puts there is an invention — a pulse every member sees
-where the reference shows one only to the presenter who owns the recording. NAV-04 builds the real
-placement; this row is the other half, and it cannot be closed from inside this batch's scope.
+the reference, so the `breathing-rec` this bar put there was an invention — a pulse every member saw
+where the reference shows one only to the presenter who owns the recording, and `.breathing-rec` is a
+5s scale pulse plus `color: red !important`, so it was visible on every screen rather than
+theoretical. NAV-04 built the real placement; this row was the other half and needed a session owning
+the two test files that pinned the class to `.recIndicator`.
+
+**The class is gone from the badge, and `blinkingRec` went with it.** That prop's only reader was the
+class. A prop named for an owner setting, kept with no reader, is one the next person gates something
+on — which would look correct and reinstate exactly this defect — so `NavbarRecIndicator.svelte` no
+longer takes it at all.
+
+Both tests are re-pointed rather than deleted, and both assert the FULL rule now: the presenter's icon
+breathes with the switch on and not with it off, a MEMBER never sees it either way, and the badge
+still renders for everyone. A test that only checked the presenter's icon would go green again if the
+badge's copy came back. The control — restoring the class — printed its failure in both files.
 
 **What would unblock it, exactly.** In `apps/room/src/lib/room-navbar-contract.test.ts`, the
 assertion block `it('breathes the REC badge only when the room asked for it')` pins the class to

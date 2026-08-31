@@ -164,8 +164,11 @@
      *
      * Index 2 is the `<i class="far fa-2x fa-dot-circle">` inside the PRESENTER's Start/Stop
      * Recording anchor — not the `ul` and not the room-wide `[ REC ]` badge. `NAV-04` builds it
-     * there. The badge's own copy is ours; `NavbarRecIndicator.svelte` carries that record and
-     * `NAV-08` names the one line that blocks removing it.
+     * there, and `NAV-08` REMOVED the badge's own copy on 2026-08-31: it was ours, and it showed
+     * every member in the room a cue the reference shows only to the presenter who owns the
+     * recording. `NavbarRecIndicator.svelte` no longer takes this prop at all, because with the
+     * class gone it had no reader — and a prop named for an owner setting, kept with no reader, is
+     * one the next person gates something on.
      *
      * `.breathing-rec` is a real rule — a 5s `scale` pulse plus `color: red !important`,
      * `captured-runtime-components.css:4281` — so on that icon it is what a presenter looks at while
@@ -602,7 +605,7 @@
           `NavbarRecIndicator.svelte` on 2026-08-31 rather than being left behind as a comment about
           something no longer in this file.
         -->
-      <NavbarRecIndicator {media} {blinkingRec} {recordingTooltip} />
+      <NavbarRecIndicator {media} {recordingTooltip} />
       <!--
           Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
           session control - drive what the room sends to everyone, so they are presenter-only.

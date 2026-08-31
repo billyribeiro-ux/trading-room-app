@@ -6395,7 +6395,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `RoomMedia` and renders one `li`, and every control the bar carries is on the other side of
       that line.
     */
-    max: 93,
+    /*
+      93 -> 109, 2026-08-31, and the CODE got shorter — a class map became a plain class list and a
+      prop went away entirely. Every added line is the `NAV-08` record.
+
+      `breathing-rec` on the room-wide `[ REC ]` badge was OURS. `UPe` (byte 2,474,097) renders that
+      `li` from const 93 and binds exactly one thing on it, `ngbTooltip`; `iPe` (byte 2,465,900) is
+      bound ONCE in 2,891,205 bytes, at 2,477,678, onto the presenter's own recording icon. So the
+      pulse is a presenter's cue and this bar showed it to every member — visible on every screen,
+      since `.breathing-rec` is a 5s scale pulse plus `color: red !important`.
+
+      `blinkingRec` left with it. Its only reader was that class, and a prop named for an owner
+      setting kept with no reader is one the next person gates something on — which would look
+      correct and reinstate exactly this defect.
+    */
+    max: 109,
     why: 'the three REC badges the whole room sees, and the one class that is ours'
   },
   {
@@ -6575,7 +6589,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       confused, so one file holding both hosts the confusion it documents — is recorded here because
       it is a real cost of this choice rather than a point against it.
     */
-    max: 1169,
+    /*
+      1169 -> 1172, 2026-08-31. Three lines on the `blinkingRec` docblock recording that `NAV-08`
+      removed the badge's copy of `breathing-rec` and the prop that fed it, so the correction sits
+      where the prop is declared rather than only in the register.
+    */
+    max: 1172,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

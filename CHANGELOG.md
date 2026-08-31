@@ -33,6 +33,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 17:45 UTC — A pulse every member saw that belongs to one presenter, and a note that disabled the file it was written in
+
+**Runtime impact: YES** for `NAV-08` — the `[ REC ]` badge no longer pulses for members. `STB-04` is
+documentation and one assertion.
+
+#### `NAV-08` — `breathing-rec` on the room-wide badge was ours
+
+`UPe` at byte 2,474,097 renders that badge's `li` from const 93
+`[1,"nav-item","recIndicator","animated","fadeIn"]` and binds exactly ONE thing on it, `ngbTooltip`.
+Meanwhile `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })` (byte 2,465,900) is bound
+once in 2,891,205 bytes — at 2,477,678, onto the `<i class="far fa-2x fa-dot-circle">` inside the
+PRESENTER's Start/Stop Recording dropdown.
+
+So the pulse is a presenter's cue on their own button, and this bar was showing it to **every member
+in the room**. `.breathing-rec` is a 5s scale pulse plus `color: red !important`, so it was visible
+on every screen rather than theoretical. `NAV-04` had already built the real placement; this row was
+blocked only because two contract tests pinned the class to `.recIndicator` and neither file belonged
+to that batch.
+
+**`blinkingRec` left `NavbarRecIndicator` with it.** Its only reader was that class, and a prop named
+for an owner setting kept with no reader is one the next person gates something on — which would look
+correct and reinstate exactly this defect.
+
+Both tests are re-pointed rather than deleted, and both now assert the FULL rule: the presenter's
+icon breathes with the switch on and not with it off, a MEMBER never sees it either way, and the
+badge still renders for everyone. A test that only checked the presenter's icon would go green again
+if the badge's copy came back.
+
+#### `STB-04` — the repair the row did not consider, measured and refused
+
+`stream-tabs-contract.test.ts` reads `docs/source/main.d6d3c112b59b7d0d.js`, which this checkout does
+not have, so twelve `it` blocks whose names read as live guarantees assert nothing here. The obvious
+second repair — point it at `docs/source-v3-2026-08-15`, which this checkout DOES hold — was measured
+and does not work: that directory holds `main.99a5781d1d7a7775.js`, a **third** minifier generation
+carrying neither this file's literals (`ut(9,Go,` and `Go=t=>({active:t})`, both absent) nor v4's.
+
+**Retiring it stays an owner decision, and I nearly took it anyway.** The reasoning that stopped me
+is worth recording: `docs/source` is a real evidence root that **74 test files in this app read**. It
+is absent from containers like this one and present for its author, so that file may well run there.
+Deleting a test whose evidence is visible to its owner and invisible here, from inside the container
+that cannot see it, is precisely the shape this repository refuses.
+
+What was buildable is done: the `STB-04` note now heads the superseded file itself, where whoever
+re-points or retires it will actually be reading. The pairing had existed only in the v4 file's
+docblock, and a one-directional cross-reference is how a pair comes apart.
+
+#### The note disabled the file it was asserted from, and the gate caught it in a minute
+
+The new assertion in `stream-tabs-v4-contract.test.ts` contained the literal string
+`'docs/source/main.d6d3c112b59b7d0d.js'`. `evidence-bound-tests.mjs` strips comments and then matches
+a quote, `../` or `/` followed by a missing root — so a string literal holding that path is CODE, not
+a comment. **The one file that actually runs became the 43rd excluded one**, and vitest reported "No
+test files found" for it.
+
+That is the exact mirror of defect 1 in that module's own docblock — *"a citation is not a read"* —
+running the other way: a read that was only a citation looked like one. Fixed by asserting the
+bundle's filename alone, never with its directory, with the reason at the assertion. Excluded count
+is back to 42 and the file runs 27 tests.
+
+**Evidence:** two negative controls seen RED and restored — restoring `breathing-rec` to the badge
+(red in both re-pointed test files) and blanking the `STB-04` heading (red on the new
+cross-reference). Room gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors,
+**301 test files / 5,499 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
+browser.
+
 ### 2026-08-31 17:15 UTC — A third wrong prescription, and one line that fixes focus for all 22 dialogs
 
 **Runtime impact: YES.** A screenshot pasted into the second chat column uploads and posts — to
