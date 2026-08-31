@@ -1681,7 +1681,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       This is the composition root doing its job: resolve the answer where both halves of the
       question are in scope, and hand over a boolean. Nothing to extract.
     */
-    max: 1081,
+    /*
+      1081 -> 1065, 2026-08-31, and it went DOWN while three behaviours were added. Two extractions
+      paid for it. `ImagePasteConfirm.svelte` took the "Upload this image?" dialog, which was three
+      transcriptions of one control here — two of them carrying the same sixteen-line citation word
+      for word. `ImageLightbox.svelte` took the imgur modal, which is markup with no state and whose
+      one interesting decision, the `alt`, is now argued in the file that makes it.
+
+      What ARRIVED in the same commit: the `hasQAOnAlerts` entitlement gate on the Q&A notice
+      (OVL-02), the mention ring the bundle puts under `chatSoundOn` (OVL-04), and the reconnect
+      flash's two children in the capture's order (OVL-01). What LEFT is a whole effect and its
+      tracker — the per-message chat ding (OVL-03), which was a second and wrong copy of a rule
+      `#lib/chat-arrival-sound.ts` already owns.
+    */
+    max: 1065,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2478,6 +2491,62 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
+    file: 'lib/components/TabGearMenu.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, for the reason `ModeratorMessage` and
+      `MainTabStrip` both give below: components are a hand-kept list here, and a new one that ships
+      without a number is exactly how `PresentationArea` went uncapped for a whole phase.
+
+      156 lines, of which the markup is TWENTY-FIVE. The rest is the measurement that produced it —
+      the reference's two sub-templates (`KCe` 1,916,736 and `ZCe` 1,918,232), the consts they
+      resolve, and the table showing how this room's two hand-wirings of them had diverged. That
+      ratio is correct: what this component is FOR is that the two cogs cannot diverge again, and
+      the argument is the deliverable.
+
+      If this number climbs, the thing to check is whether the cog has started deciding WHO sees it.
+      It must not: both gates are `{#if}` at the call site, where the values are, because `-1` in
+      `ɵɵconditional` means no element rather than a hidden one.
+    */
+    max: 157,
+    why: 'the notes and files cogs, which were one control with two implementations'
+  },
+  {
+    file: 'lib/components/ImagePasteConfirm.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, like its two siblings above and below.
+
+      76 lines, eight of them markup. It exists because `RoomOverlays.svelte` held THREE copies of
+      one `bootbox.confirm` and two of them carried the same sixteen-line citation verbatim — and
+      because `dta-04` had already been raised for the failure that shape invites: two of the three
+      shipped without `<h4>Upload this image?</h4>`, leaving an unlabelled OK button over a picture.
+
+      If this number climbs, the thing to check is whether it has started deciding WHICH uploader
+      runs. It must not: `doImggurUpload` dispatches on a feature name deny-by-default (byte
+      1,992,037), so each caller keeps its own `onconfirm`, and sharing one is how an image meant
+      for a form is posted into chat.
+    */
+    max: 77,
+    why: 'the "Upload this image?" confirm - one dialog that was three transcriptions'
+  },
+  {
+    file: 'lib/components/ImageLightbox.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, same rule as its two siblings.
+
+      94 lines and no state at all: a url and a dismissal. Most of it is the transcription of
+      `showImagePreview(e, i = "")` (byte 1,992,730) and, more importantly, the two things that
+      CANNOT be transcribed from this checkout — where bootbox puts a `buttons` entry and what
+      classes it ends up with, since `window.bootbox` is a global whose source is not in the bundle.
+      Writing down what is unevidenced is the point of the file being this size.
+
+      If this number climbs, the thing to check is whether it has grown a second caller's needs. It
+      has one, `RoomOverlays`, and the room's other renderer of the same image is a popped-out
+      window built by `RoomModals.showImage` — a different surface, deliberately not merged.
+    */
+    max: 95,
+    why: 'the imgur lightbox - one image, a download that does not dismiss, and one alt rule'
+  },
+  {
     file: 'lib/components/ModeratorMessage.svelte',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE, for the reason `WebcamStrip` and `MainTabStrip`
@@ -2515,7 +2584,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Every gate it draws arrives already decided; it writes exactly one value, `mainTab`, and that
       is what a tab strip is.
     */
-    max: 372,
+    /*
+      372 -> 371, 2026-08-31. `TabGearMenu.svelte` took both cogs, which were one interaction with
+      two hand-wirings that had drifted apart — see that file. The room made by the extraction paid
+      for the files cog's `{#if isPresenter}` gate (byte 2,017,076) and for the measurement of the
+      one gate this strip deliberately does NOT reproduce, `z('hidden', o.hideScreens)`.
+    */
+    max: 371,
     why: 'ul#mainTabs - eight tabs, two dropdowns, and a byte citation on every gate'
   },
   {

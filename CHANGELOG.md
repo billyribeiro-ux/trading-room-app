@@ -33,62 +33,16 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
-### 2026-08-30 22:55 UTC — Chat composer keys, two navbar nodes, and six places the two message renderers disagree
-
-**Runtime impact: YES**, on both surfaces. Two components changed — `AlertChatArea.svelte` and
-`RoomMessage.svelte` — plus three new modules and three new contract tests. Audit rows `ACA-01` …
-`ACA-06` and `RMSG-01` … `RMSG-06` in `docs/decoded/room-surface-audit-2026-08-30.md`.
-
-**What a member will notice.** ALT+Enter in the chat composer inserted nothing and POSTED the
-message; it now breaks the line, which is `i.val(i.val() + "\n")` at bundle byte 1,439,821. The
-typing indicator stopped five seconds after a send and now stops at the Enter, which is
-`refreshTypingStatus(!0)` running before the branch. The emoji picker stayed open across a send and
-now closes, which is `showEmojiChooser = !1` on the send branch alone. A presenter's Poll indicator
-painted its blink on the `<li>` and now paints it on the `<a>`, where `Tt` after a bare `m()` puts
-it and where the non-presenter entry beside it already had it. On the alerts card a presenter's
-username was Bootstrap blue and no longer is. A member's chat card gains the font colour the
-reference gives its username row, and an admin's alert card loses one the reference has no node
-for. Compact rows lose two invented spaces in the Q&A count and two more around the Trial badge,
-and the date separator takes the message's own colour in both renderers.
-
-**Every one of the six `RMSG` rows is a single literal or a single binding section**, and four of
-them were found by decoding both consts tables end to end and diffing rather than by looking up the
-const a row named. That is the same lesson `RM-25` recorded and it is the cheaper half of `UIM-03`'s.
-
-**Two claims of this repository's own are corrected, and neither is code.** `inline-alert-key.ts`
-states that the chat composer's Shift+Enter is the newline "one column over" as a fact about the
-REFERENCE; the bundle carries the identical `i.val(i.val())` swallow in both chat components, so
-that sentence describes this room. And `chat-paste-image-contract.test.ts` refuses a paste handler
-on the extra chat column because "the reference binds paste on the main composer only and its
-handler reads `#textAreaTxt` by id" — `app-extra-chat`'s composer const carries `paste`, `cMe`
-binds it at byte 2,373,521, and its own `onImagePaste` at 2,392,023 reads `#textAreaTxtExtra`. Both
-files belong to other agents this session; `ACA-02` and `ACA-05` name the exact lines.
-
-**One refusal and one divergence, each with the measurement at the code.** Both compiled copies end
-the Webinar Mode block with `T(4,"i")` — no const index, no class, no text, and no rule in any of
-the three stylesheets involved — so it is not emitted (`ACA-04`). And the compact MEMBER reaction
-repeater is the only one of four with no `clickedBy` gate, so upstream draws a `🎉 0` pill there
-once a reaction empties; this room gates all four (`RMSG-06`).
-
-**Three new modules, and the ratchet is why two of them exist.** `chat-composer-key.ts` holds the
-Enter rule measured on BOTH compiled copies. `alert-chat-nav.ts` holds the poll class map and the
-refused icon. `message-renderer-differences.ts` holds all six card-vs-compact measurements beside
-their consumers — an argument about the bundle that lives inside markup gets re-wrapped and
-eventually re-summarised until it stops being checkable. `RoomMessage.svelte`'s ceiling went DOWN,
-1260 -> 1259, while taking six rows, and `AlertChatArea.svelte` stayed at its 1496.
-
-Contracts: `chat-composer-key-contract.test.ts`, `alert-chat-nav-contract.test.ts`,
-`message-renderer-differences-contract.test.ts` — 54 assertions, every bundle claim read from the
-pinned v4 file at run time rather than quoted. Eleven negative controls seen red.
-
 ### 2026-08-31 00:57 UTC — The retirement migration dropped a cluster-global role, and this repository's own convergence test refused it
 
 **Runtime impact: NO from this commit** — nothing here has been run against a deployed database.
 What changes is what `0010` will do when it is, and whether every deploy after it can still run.
 
-*(Timestamp note: this entry carries the real UTC clock. The two entries below it are labelled 02:05
-and 02:40 UTC against commits made at 23:59 and 00:07 UTC — their labels are ~2 hours ahead of the
-commits they describe. Ordering below this line follows the commits, not the labels.)*
+*(Timestamp note: this entry carries the real UTC clock, read from `date -u` at the moment it was
+written. Several entries below it do not — the ones labelled 02:05 and 02:40 UTC describe commits
+made at 23:59 and 00:07 UTC, ~2 hours ahead of themselves, and the file mixes UTC with the EDT its
+own header prescribes. Ordering below this line follows the commits, not the labels. Reconciling
+them is a separate pass and is not attempted here.)*
 
 **`0010_retire_ptr_clone_app.sql` shipped nine hours ago ending in `DROP ROLE ptr_clone_app`. It was
 wrong, and the test that says so has been in this repository since 2026-08-15.**
@@ -223,6 +177,54 @@ invocation and the test suite stood in for it, and this line records the substit
 implying otherwise. All evidence above is PostgreSQL **16.13**, while `services/compose.yml` pins
 `postgres:17` — the one known divergence is `MAINTAIN`, a PG17 privilege, which is why
 `runtime_object_privileges_match_the_current_api_sql_surface` reports it here.
+
+### 2026-08-30 22:55 UTC — Chat composer keys, two navbar nodes, and six places the two message renderers disagree
+
+**Runtime impact: YES**, on both surfaces. Two components changed — `AlertChatArea.svelte` and
+`RoomMessage.svelte` — plus three new modules and three new contract tests. Audit rows `ACA-01` …
+`ACA-06` and `RMSG-01` … `RMSG-06` in `docs/decoded/room-surface-audit-2026-08-30.md`.
+
+**What a member will notice.** ALT+Enter in the chat composer inserted nothing and POSTED the
+message; it now breaks the line, which is `i.val(i.val() + "\n")` at bundle byte 1,439,821. The
+typing indicator stopped five seconds after a send and now stops at the Enter, which is
+`refreshTypingStatus(!0)` running before the branch. The emoji picker stayed open across a send and
+now closes, which is `showEmojiChooser = !1` on the send branch alone. A presenter's Poll indicator
+painted its blink on the `<li>` and now paints it on the `<a>`, where `Tt` after a bare `m()` puts
+it and where the non-presenter entry beside it already had it. On the alerts card a presenter's
+username was Bootstrap blue and no longer is. A member's chat card gains the font colour the
+reference gives its username row, and an admin's alert card loses one the reference has no node
+for. Compact rows lose two invented spaces in the Q&A count and two more around the Trial badge,
+and the date separator takes the message's own colour in both renderers.
+
+**Every one of the six `RMSG` rows is a single literal or a single binding section**, and four of
+them were found by decoding both consts tables end to end and diffing rather than by looking up the
+const a row named. That is the same lesson `RM-25` recorded and it is the cheaper half of `UIM-03`'s.
+
+**Two claims of this repository's own are corrected, and neither is code.** `inline-alert-key.ts`
+states that the chat composer's Shift+Enter is the newline "one column over" as a fact about the
+REFERENCE; the bundle carries the identical `i.val(i.val())` swallow in both chat components, so
+that sentence describes this room. And `chat-paste-image-contract.test.ts` refuses a paste handler
+on the extra chat column because "the reference binds paste on the main composer only and its
+handler reads `#textAreaTxt` by id" — `app-extra-chat`'s composer const carries `paste`, `cMe`
+binds it at byte 2,373,521, and its own `onImagePaste` at 2,392,023 reads `#textAreaTxtExtra`. Both
+files belong to other agents this session; `ACA-02` and `ACA-05` name the exact lines.
+
+**One refusal and one divergence, each with the measurement at the code.** Both compiled copies end
+the Webinar Mode block with `T(4,"i")` — no const index, no class, no text, and no rule in any of
+the three stylesheets involved — so it is not emitted (`ACA-04`). And the compact MEMBER reaction
+repeater is the only one of four with no `clickedBy` gate, so upstream draws a `🎉 0` pill there
+once a reaction empties; this room gates all four (`RMSG-06`).
+
+**Three new modules, and the ratchet is why two of them exist.** `chat-composer-key.ts` holds the
+Enter rule measured on BOTH compiled copies. `alert-chat-nav.ts` holds the poll class map and the
+refused icon. `message-renderer-differences.ts` holds all six card-vs-compact measurements beside
+their consumers — an argument about the bundle that lives inside markup gets re-wrapped and
+eventually re-summarised until it stops being checkable. `RoomMessage.svelte`'s ceiling went DOWN,
+1260 -> 1259, while taking six rows, and `AlertChatArea.svelte` stayed at its 1496.
+
+Contracts: `chat-composer-key-contract.test.ts`, `alert-chat-nav-contract.test.ts`,
+`message-renderer-differences-contract.test.ts` — 54 assertions, every bundle claim read from the
+pinned v4 file at run time rather than quoted. Eleven negative controls seen red.
 
 ### 2026-08-31 02:40 UTC — Entry 2 closed by an owner ruling, and entry 5's own measurement had become self-referential
 
@@ -640,6 +642,68 @@ that must never cross. Every one of the 21 is dispositioned. There is no phase o
 
 **Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **264 files, 4,455 passed,
 1 skipped, gate-exit=0**.
+### 2026-08-30 20:46 EDT — `MainTabStrip` and `RoomOverlays` audited against the v4 bundle: fourteen rows, seven behaviours changed
+
+**Runtime impact: YES.** Seven observable changes, listed below. Neither surface had a section in
+`docs/decoded/room-surface-audit-2026-08-30.md` before this; both now do (MTS-01 to MTS-07, OVL-01 to
+OVL-07), and the register's header and its appended-rows paragraph are updated with them.
+
+**What a member or presenter will notice:**
+
+1. **A member no longer sees the presenter's file-upload cog** on the Files tab (MTS-01). Upstream
+   instantiates it only for `isP` — byte 2,017,076 — and nothing downstream refused it here:
+   `RoomNotes.mountUploadFileLink` opens the `file-upload` modal with no role check.
+2. **The Notes cog now selects the Notes tab and closes the Files menu**, which the Files cog already
+   did (MTS-07). Both cogs are one component, `TabGearMenu.svelte`, and the sibling menu to close is
+   derived rather than written, so the two cannot drift apart again.
+3. **The tab strip is keyboard-reachable** (MTS-05). `tabindex` was `{active ? undefined : -1}`, so
+   no tab could hold focus and all seven `onkeydown` handlers were unreachable code. It is `? 0 : -1`
+   now — a roving tabindex.
+4. **A room that never bought Q&A on alerts no longer flashes alerts or rings for questions**
+   (OVL-02). Upstream's whole `updateAlertMsg` Q&A branch is behind
+   `if (!sessData.hasQAOnAlerts) return` at byte 1,408,794; this room had no such gate, while its own
+   composer already refuses to draw the ask button without it.
+5. **Chat no longer dings for every message** (OVL-03). `RoomOverlays` held a second copy of the
+   arrival sound that played `pling` for any incoming batch, under a comment quoting a gate that
+   exists at none of the bundle's eight `pling.play()` sites. The real rule — a followed sender, a
+   per-member list, or `dingOnNewMessage`, and silence otherwise — is `#lib/chat-arrival-sound.ts`
+   and was already wired in `room/events.svelte.ts`. So upstream's silent case rang on every message
+   and upstream's ringing case rang twice.
+6. **A mention now rings, and turning the popup off no longer silences it** (OVL-04). Byte 1,431,259:
+   `chatSoundOn` gates the sound and `chatPopup` gates the toast, as siblings under one Do Not
+   Disturb; this effect returned on both.
+7. **The reconnect flash renders its tick before its text**, with the capture's leading space
+   (OVL-01, byte 2,547,023), and **the image lightbox describes an image with its url** rather than a
+   filename it invented (OVL-05, byte 1,992,730 — the same value this room's own popped-out image
+   window already used).
+
+**Two refusals, each with the measurement at the code.** `z('hidden', o.hideScreens)` on the Screens
+tab (MTS-04) is not reproduced: `hideScreens` occurs three times in the 2,891,205-byte bundle — its
+`!1` initialiser and the two template reads — and `ngOnInit` assigns its four siblings and not it, so
+the binding can never be true. And the lightbox's download button placement (OVL-06) is left as ours
+and recorded as ours: bootbox decides where a `buttons` entry lands, and `window.bootbox` is a global
+whose source is not in the bundle.
+
+**Two blocked, each on one line outside this change's editable set.** The Notes cog's gate (MTS-02)
+needs `canEditNotes={data.canEditNotes === true}` on the `<MainTabStrip …/>` call at
+`apps/room/src/lib/components/PresentationArea.svelte:507`. The Recordings tab (MTS-03) needs
+`'recordings'` in `MainTab`, `sessData.recsInRoom` in the room config, and a `#recordings` pane.
+
+**Three components came out, and both ceilings went DOWN.** `TabGearMenu.svelte` (the two cogs),
+`ImagePasteConfirm.svelte` (one "Upload this image?" dialog that was three transcriptions, two of
+them carrying the same sixteen-line citation verbatim) and `ImageLightbox.svelte` (the imgur modal).
+`RoomOverlays` 1081 -> 1065 and `MainTabStrip` 372 -> 371 in `source-size-contract.test.ts`, while
+seven behaviours changed — which is what an extraction is supposed to look like.
+
+**New contract tests:** `main-tab-strip-gates.svelte.test.ts` (jsdom, mounts the strip and drives
+focus and both cogs against a real `RoomMenus`) and `overlay-delivery-contract.test.ts` (source
+assertions through `codeOf`, for the reason `connection-overlay-contract.test.ts` already gives —
+rendering `RoomOverlays` means rendering `ModalHost`'s eighty-five props). Every assertion in both
+had its negative control run and seen red.
+
+**The Svelte MCP was NOT available in this session** and is therefore not part of what was verified;
+`svelte-check` (0 errors, 0 warnings) and `prettier --write` were run on every touched file instead.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
