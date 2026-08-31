@@ -1079,6 +1079,19 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// `db::migrate::baseline_role_absence_policy` is what keeps that step from blocking later deploys.
 const ATTESTED_MIGRATION_VERSIONS: [i64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+/// The two human-facing error messages that name that chain's range in PROSE, as named constants
+/// so `the_prose_ranges_track_the_attested_chain` can hold them against
+/// `ATTESTED_MIGRATION_VERSIONS`. The ledger message below said `0001 through 0008` until
+/// 2026-08-31 — TWO chain extensions stale, found during the merge of PR #177 — because an error
+/// string has no reader until the attestation actually fails, which is exactly when a wrong range
+/// does its damage: it steers the operator toward the wrong chain length in the middle of a
+/// refused release. The embedded-contract message beside it was moved by hand both times;
+/// hand-moving is the convention that failed here, so the test moves the burden.
+const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
+    "the attestor is pinned to repository migration versions 0001 through 0010";
+const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
+     repository migrations 0001 through 0010 with exact descriptions and checksums";
+
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
         .migrations
@@ -1091,7 +1104,7 @@ fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
 
     Err(AttestationError::new(
         "embedded_migration_contract_changed",
-        "the attestor is pinned to repository migration versions 0001 through 0010",
+        EMBEDDED_MIGRATION_CONTRACT_MESSAGE,
     ))
 }
 
@@ -1144,7 +1157,7 @@ async fn query_and_validate_migrations(
 const fn migration_ledger_mismatch() -> AttestationError {
     AttestationError::new(
         "migration_ledger_mismatch",
-        "the SQLx ledger must contain only successful repository migrations 0001 through 0008 with exact descriptions and checksums",
+        MIGRATION_LEDGER_MISMATCH_MESSAGE,
     )
 }
 
@@ -2244,6 +2257,29 @@ fn write_stdout(output: &str) -> Result<(), AttestationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_prose_ranges_track_the_attested_chain() {
+        /*
+          `migration_ledger_mismatch` named `0001 through 0008` until 2026-08-31 — two chain
+          extensions stale, found during the merge of PR #177. Nothing reads an error string until
+          the check it belongs to fails, so a prose range rots invisibly and then misleads at the
+          worst moment: inside the error text of a refused production attestation. This holds both
+          range-naming messages against the const they describe, so extending
+          `ATTESTED_MIGRATION_VERSIONS` without moving the prose goes red here instead.
+        */
+        let first = ATTESTED_MIGRATION_VERSIONS[0];
+        let last = ATTESTED_MIGRATION_VERSIONS[ATTESTED_MIGRATION_VERSIONS.len() - 1];
+        let range = format!("{first:04} through {last:04}");
+        assert!(
+            EMBEDDED_MIGRATION_CONTRACT_MESSAGE.contains(&range),
+            "the embedded-contract message names a range the chain has outgrown"
+        );
+        assert!(
+            MIGRATION_LEDGER_MISMATCH_MESSAGE.contains(&range),
+            "the ledger-mismatch message names a range the chain has outgrown"
+        );
+    }
 
     fn restricted_runtime_row() -> RoleRow {
         RoleRow {

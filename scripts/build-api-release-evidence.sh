@@ -8,18 +8,18 @@
 set -euo pipefail
 umask 077
 
-SYFT_VERSION="1.44.0"
-SYFT_CHECKSUM_MANIFEST_SHA256="fa24ce6cafe6edbdba166414ce79de8142fbc217f8167e418dfb09e5aedfbf4e"
-SYFT_ARCHIVE_SHA256="0e91737aee2b5baf1d255b959630194a302335d848ff97bb07921eb6205b5f5a"
-GRYPE_VERSION="0.112.0"
-GRYPE_CHECKSUM_MANIFEST_SHA256="6294bee2e41b4af0c6f603b049b836b8dab25e39dac12343c7b69dfa9e7f1399"
-GRYPE_ARCHIVE_SHA256="acb14a030010fe9bdb9594b4ae108d9d14ef2f926d936aa0916dc62c89c058ea"
-BUILDX_VERSION="0.34.1"
-BUILDKIT_VERSION="v0.31.2"
+SYFT_VERSION="1.51.1"
+SYFT_CHECKSUM_MANIFEST_SHA256="105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75"
+SYFT_ARCHIVE_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"
+GRYPE_VERSION="0.118.0"
+GRYPE_CHECKSUM_MANIFEST_SHA256="7a0cfafb6082951a68f89199c3a45f84b0ed8670491e509529ab5f8ee4977a2b"
+GRYPE_ARCHIVE_SHA256="1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2"
+BUILDX_VERSION="0.36.1"
+BUILDKIT_VERSION="v0.32.2"
 BUILDX_BUILDER="api-release-builder"
-BUILDER_IMAGE="rust:1.97.1-alpine3.24@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900"
-RUNTIME_BASE_IMAGE="gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6"
-RUST_SYSROOT="/usr/local/rustup/toolchains/1.97.1-x86_64-unknown-linux-musl"
+BUILDER_IMAGE="rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce"
+RUNTIME_BASE_IMAGE="gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7"
+RUST_SYSROOT="/usr/local/rustup/toolchains/1.98.0-x86_64-unknown-linux-musl"
 RUST_LIBUNWIND_SOURCE="${RUST_SYSROOT}/lib/rustlib/x86_64-unknown-linux-musl/lib/self-contained/libunwind.a"
 RCRT1_SHA256="5e93abc3f181bdb1b177e8725dbad7c08ddf2dc5d94d47d593a34a7a4cba1df5"
 CRTI_SHA256="a0af2446e5bce05119163883c5d522c3c44e3a9d1aa5014f468c1feb8dc2cb54"
@@ -274,8 +274,8 @@ docker run --rm --platform linux/amd64 --network none --read-only --cap-drop ALL
 	musl musl-dev gcc libgcc-static binutils ca-certificates \
 	>"${evidence_root}/builder-packages.json"
 
-grep --fixed-strings --line-regexp 'release: 1.97.1' "${evidence_root}/builder-toolchain.txt" >/dev/null ||
-	fail "builder evidence does not report Rust 1.97.1"
+grep --fixed-strings --line-regexp 'release: 1.98.0' "${evidence_root}/builder-toolchain.txt" >/dev/null ||
+	fail "builder evidence does not report Rust 1.98.0"
 grep --fixed-strings --line-regexp 'host: x86_64-unknown-linux-musl' "${evidence_root}/builder-toolchain.txt" >/dev/null ||
 	fail "builder evidence does not report the x86-64 musl host"
 jq --exit-status '
@@ -781,6 +781,23 @@ jq --exit-status \
 jq --exit-status '
 	([.artifacts[] | select(.type == "deb") | { name, version }] | unique | sort_by(.name)) == [
 		{ "name": "base-files", "version": "13.8+deb13u6" },
+		#
+		# ca-certificates ARRIVED WITH THE 2026-08-30 RUNTIME DIGEST. It is an upstream addition,
+		# not one made here. Both images were unpacked from the registry and their
+		# var/lib/dpkg/status.d entries read directly: the previous digest f7f8f729 carries exactly
+		# the five below, and the current digest 1c2c046b carries those same five plus this one, at
+		# identical versions. The diff between the two inventories is this single line, nothing else.
+		#
+		# NO APOSTROPHES IN THIS BLOCK, and that is not a style choice. This jq program is a
+		# single-quoted shell string, so one apostrophe here closes it and the rest of the program
+		# becomes shell tokens — which is exactly what happened while this comment was being written,
+		# caught by `bash -n` before it could reach CI.
+		#
+		# This does not undo the note in api/Dockerfile saying no builder-owned CA file is copied
+		# into the runtime stage. That remains true: nothing is copied. The store now ships in the
+		# base image itself, and SQLx still uses the lockfile-pinned rustls/webpki roots either way,
+		# so this is an inventory fact to record rather than a change in what is trusted.
+		{ "name": "ca-certificates", "version": "20250419" },
 		{ "name": "media-types", "version": "13.0.0" },
 		{ "name": "netbase", "version": "6.5" },
 		{ "name": "tzdata", "version": "2026b-0+deb13u1" },

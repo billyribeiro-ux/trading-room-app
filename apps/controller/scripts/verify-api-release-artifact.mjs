@@ -575,8 +575,8 @@ async function verifyContract() {
   }
 
   const requiredDockerfileFragments = [
-    'FROM rust:1.97.1-alpine3.24@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900 AS builder',
-    'ENV RUSTUP_TOOLCHAIN=1.97.1',
+    'FROM rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS builder',
+    'ENV RUSTUP_TOOLCHAIN=1.98.0',
     'ARG TARGETARCH',
     "cargo install --locked cargo-auditable --version '=0.7.5'",
     "base_rustflags='-C target-feature=+crt-static -C relocation-model=pic -C link-self-contained=no -L native=/rust-native'",
@@ -597,7 +597,7 @@ async function verifyContract() {
     'test "$(find /rust-native -mindepth 1 -maxdepth 1 | wc -l)" -eq 1',
     'COPY --from=builder /out/tradingroom-api /usr/local/bin/tradingroom-api',
     'COPY --from=builder /out/migrate /usr/local/bin/migrate',
-    'FROM gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6 AS runtime',
+    'FROM gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7 AS runtime',
     'USER 65532:65532'
   ];
   for (const fragment of requiredDockerfileFragments) {
@@ -631,11 +631,11 @@ async function verifyContract() {
     '5433:5432',
     'test ! -s "${negative_stdout}"',
     "'[target_cluster_mismatch]'",
-    'uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5',
+    'uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e',
     'name: api-release-builder',
-    'version: v0.34.1',
+    'version: v0.36.1',
     'driver: docker-container',
-    'image=moby/buildkit:v0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec',
+    'image=moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8',
     /*
       Invoked by PATH, not through `pnpm backend:release:verify`.
 
@@ -670,17 +670,17 @@ async function verifyContract() {
   }
 
   const requiredBuildFragments = [
-    'SYFT_VERSION="1.44.0"',
-    'SYFT_CHECKSUM_MANIFEST_SHA256="fa24ce6cafe6edbdba166414ce79de8142fbc217f8167e418dfb09e5aedfbf4e"',
-    'SYFT_ARCHIVE_SHA256="0e91737aee2b5baf1d255b959630194a302335d848ff97bb07921eb6205b5f5a"',
-    'GRYPE_VERSION="0.112.0"',
-    'GRYPE_CHECKSUM_MANIFEST_SHA256="6294bee2e41b4af0c6f603b049b836b8dab25e39dac12343c7b69dfa9e7f1399"',
-    'GRYPE_ARCHIVE_SHA256="acb14a030010fe9bdb9594b4ae108d9d14ef2f926d936aa0916dc62c89c058ea"',
-    'BUILDX_VERSION="0.34.1"',
-    'BUILDKIT_VERSION="v0.31.2"',
+    'SYFT_VERSION="1.51.1"',
+    'SYFT_CHECKSUM_MANIFEST_SHA256="105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75"',
+    'SYFT_ARCHIVE_SHA256="8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3"',
+    'GRYPE_VERSION="0.118.0"',
+    'GRYPE_CHECKSUM_MANIFEST_SHA256="7a0cfafb6082951a68f89199c3a45f84b0ed8670491e509529ab5f8ee4977a2b"',
+    'GRYPE_ARCHIVE_SHA256="1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2"',
+    'BUILDX_VERSION="0.36.1"',
+    'BUILDKIT_VERSION="v0.32.2"',
     'BUILDX_BUILDER="api-release-builder"',
-    'BUILDER_IMAGE="rust:1.97.1-alpine3.24@sha256:3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900"',
-    'RUNTIME_BASE_IMAGE="gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6"',
+    'BUILDER_IMAGE="rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce"',
+    'RUNTIME_BASE_IMAGE="gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7"',
     'RCRT1_SHA256="5e93abc3f181bdb1b177e8725dbad7c08ddf2dc5d94d47d593a34a7a4cba1df5"',
     'CRTI_SHA256="a0af2446e5bce05119163883c5d522c3c44e3a9d1aa5014f468c1feb8dc2cb54"',
     'CRTBEGIN_SHA256="21cc007ae9682cad220f2bd0c0475e483f6ef12204f65e99c464f6caf7eb0766"',
@@ -754,6 +754,10 @@ async function verifyContract() {
     'runtime filesystem contains a forbidden shell, package manager, loader, glibc, libgcc, or Perl path',
     'runtime OCI SBOM differs from the exact reviewed static-distroless package inventory',
     '{ "name": "base-files", "version": "13.8+deb13u6" }',
+    // Added 2026-08-30 with the runtime digest. Asserted here so the inventory cannot quietly lose
+    // an entry the base image actually ships; both digests were unpacked from the registry and
+    // their dpkg status entries compared, and this line is the whole diff between them.
+    '{ "name": "ca-certificates", "version": "20250419" }',
     '{ "name": "tzdata-legacy", "version": "2026b-0+deb13u1" }',
     "docker image inspect --format '{{.Os}}/{{.Architecture}}'",
     'assert_static_elf',
@@ -865,13 +869,13 @@ async function verifyContract() {
   }
 
   for (const checksum of [
-    'fa24ce6cafe6edbdba166414ce79de8142fbc217f8167e418dfb09e5aedfbf4e',
-    '0e91737aee2b5baf1d255b959630194a302335d848ff97bb07921eb6205b5f5a',
-    '6294bee2e41b4af0c6f603b049b836b8dab25e39dac12343c7b69dfa9e7f1399',
-    'acb14a030010fe9bdb9594b4ae108d9d14ef2f926d936aa0916dc62c89c058ea',
+    '105346699e7cb694afa37a21e2386432df6278c99f71331c24b1e0bb0f38cc75',
+    '8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3',
+    '7a0cfafb6082951a68f89199c3a45f84b0ed8670491e509529ab5f8ee4977a2b',
+    '1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2',
     'cd121127b91d68074770a620544182345d7db56d03dcbd85316ab11e54a5b1bc',
-    '3c38f3f82c2f3d73da3b38e18d279393a04cb43ddded0e35088a8c3324d40900',
-    'f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6',
+    'a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce',
+    '1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7',
     '1.2.6-r2'
   ]) {
     if (!evidenceDoc.includes(checksum)) fail(`release evidence document missing checksum ${checksum}`);

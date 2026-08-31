@@ -17,7 +17,11 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ipnetwork::IpNetwork;
-use rand::RngCore;
+// `Rng`, not `RngCore`: rand 0.10 re-exports `Rng` from rand_core at the crate root and no longer
+// re-exports `RngCore`, which survives only as the marker supertrait `trait RngCore: Rng {}`.
+// `fill_bytes` is declared on `Rng` (rand_core 0.10.1 src/lib.rs:62), so this import is what makes
+// the call below resolve.
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 use uuid::Uuid;

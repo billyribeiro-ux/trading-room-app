@@ -46,7 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # Commit-pinned, not a floating `@v4`. This was the last workflow in the repository still
+      # trusting a mutable tag: `quality.yml` and `backend-quality.yml` already resolve these two
+      # actions by SHA, in nine places between them. A tag can be repointed at any commit by anyone
+      # who can push it, so a floating tag in a release-adjacent job is a supply-chain hole that the
+      # rest of the repository had already closed. Same SHAs the other two workflows use.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # PINNED TO THE FILE, not to a floating major.
       #
@@ -59,7 +64,7 @@ jobs:
       # Not academic: the `undici` parser crash that broke this repository's CI on 2026-08-23 lives
       # in a SPECIFIC Node build's bundled copy. A smoke job floating across 24.x is one that can
       # meet a runtime-specific defect nobody else is running.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
 

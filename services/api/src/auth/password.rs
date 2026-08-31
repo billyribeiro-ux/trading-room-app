@@ -12,11 +12,15 @@
 use std::sync::{Arc, LazyLock};
 
 use argon2::{Algorithm, Argon2, Params, Version};
-// `OsRng` comes from password-hash's own rand_core re-export, not from the top-level
-// `rand` crate: they resolve to different rand_core majors, and mixing them fails the
-// `CryptoRngCore` bound.
-use password_hash::rand_core::OsRng;
-use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+// The salt is no longer constructed here, and that is a deliberate simplification rather than a
+// loss. password-hash 0.6 moved the PHC string types into their own `phc` crate and gave
+// `PasswordHasher::hash_password` a ONE-argument form that generates the salt itself through
+// `getrandom`, at the 16 bytes the PHC specification recommends (password-hash 0.6.1
+// src/lib.rs:77-110). The `SaltString`/`OsRng` pair this module used to carry is gone with it —
+// and so is the rand_core-major mismatch its old comment existed to warn about, because no
+// rand_core type crosses this boundary any more.
+use password_hash::phc::PasswordHash;
+use password_hash::{PasswordHasher, PasswordVerifier};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::limits;
@@ -70,9 +74,8 @@ fn hasher() -> Argon2<'static> {
 /// Without it, "unknown email" returns in microseconds while "wrong password" takes the
 /// full Argon2 cost, which is a user-enumeration oracle any stopwatch can read.
 static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
-    let salt = SaltString::generate(&mut OsRng);
     hasher()
-        .hash_password(b"a password that matches nothing", &salt)
+        .hash_password(b"a password that matches nothing")
         .expect("hashing a fixed input with valid params cannot fail")
         .to_string()
 });
@@ -88,9 +91,8 @@ pub async fn hash_password(plain: String) -> Result<String, PasswordError> {
 
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let salt = SaltString::generate(&mut OsRng);
         hasher()
-            .hash_password(plain.as_bytes(), &salt)
+            .hash_password(plain.as_bytes())
             .map(|hash| hash.to_string())
             .map_err(|_| PasswordError::HashingFailed)
     })

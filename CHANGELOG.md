@@ -131,7 +131,87 @@ are kept**, so every commit in them is still reachable. A collection error with 
 assertion is a disk symptom, not a test result, and reading it as one would have sent the next
 reader looking at working code.
 
----
+### 2026-08-31 14:17 UTC — The attestor's ledger error named a chain two extensions old, and prose ranges now have a test
+
+**Runtime impact: NO** — an error string, a comment sentence, and a new unit test; no control flow
+moved. Found by the adversarial re-read of the PR #177 merge (entry below), then verified by hand.
+
+**The defect:** `migration_ledger_mismatch` in `postgres-release-attestation.rs` still said *"0001
+through 0008"* while the contract beside it pins `0001-0010` — stale through TWO chain extensions,
+because an error string has no reader until the attestation fails, which is exactly when a wrong
+range does its damage: it steers the operator toward the wrong chain length in the middle of a
+refused release. Fixed to `0010`, and both range-naming messages are now named constants —
+`EMBEDDED_MIGRATION_CONTRACT_MESSAGE`, `MIGRATION_LEDGER_MISMATCH_MESSAGE` — held against
+`ATTESTED_MIGRATION_VERSIONS` by a new unit test, `the_prose_ranges_track_the_attested_chain`, so
+the next extension moves the prose or goes red. **Negative control run:** the message flipped back
+to `0008` fails the test; restored, it passes.
+
+**Also fixed, one sentence in `naming-boundary.test.ts`:** the ceiling comment said the CHANGELOG
+holds *"four databases … including the refusal on one where `0009` had not run"*. Read against the
+entries, the four-database table's refusal (row B) is the migrate preflight on a fresh database;
+the `0009`-interlock refusal — a database run to `0008` only — lives in the earlier three-database
+entry. The sentence now says which refusal is where. Every fact was already in the CHANGELOG; the
+sentence had merged two tables.
+
+**The attestor's provenance pin moved** `68ef6264…` → `607e1df8…` with a dated paragraph in
+`verify-backend-provenance.mjs`, per the governed-edit rule for `services/**`.
+
+**Verified:** attestor unit tests 19/19 including the new one; the negative control red-then-green;
+`cargo fmt --check`, `cargo clippy --all-targets --features testing -- -D warnings`, rust-analyzer
+0 diagnostics; `verify-backend-provenance.mjs` PASS against the new pin; `naming-boundary.test.ts`
+4/4. **Deliberately NOT fixed:** `0010_retire_ptr_clone_app.sql`'s opening prose still says *"then
+drop it"* while its body stops before any drop — those bytes are ledger-pinned on the live cluster,
+editing a shipped migration is forbidden, and the contract test reads the CODE, which is drop-free.
+Recorded here instead.
+
+### 2026-08-31 14:15 UTC — `main` merged into the audit branch: four real conflicts, and the migration decides three of them
+
+**Runtime impact: NO by itself.** The merge of `origin/main` (through PR #176) into
+`claude/repo-audit-implementation-e3oiu8` so PR #177 can land; it carries both sides'
+already-recorded work and adds one character of markup and one union. Unlike PR #163's phantom
+conflicts below, these were REAL: one merge base (`9f4c8fc`), `git merge-tree` exit 1, four files
+edited on both sides — `CHANGELOG.md`, `naming-boundary.test.ts`, `verify-backend-provenance.mjs`,
+and the attestor.
+
+**Three of the four conflicts were the same factual disagreement, and the merged tree's own
+migration settles it.** Both sides described `0010_retire_ptr_clone_app.sql`. `main`'s side —
+written for the bytes `d5e3391` carried — still said the migration "revokes everything the baseline
+role holds and then drops it", with a tolerated `2BP01`. The branch's `bb0ea63` had since removed
+the drop, because `the_chain_applies_to_a_second_database_on_the_same_cluster` refused the dropping
+version, and the merged tree holds the no-drop bytes. So the branch's text won in
+`naming-boundary.test.ts` and in the attestor's chain comment — not as a preference but because
+`retire-baseline-role-contract.test.ts` asserts the migration's CODE contains no `DROP ROLE` and no
+exception handler, and it passes against the merged tree. Nothing `main` alone knew was lost: its
+`40 → 41` boundary history lives in its two entries kept below (20:17 and 20:45 EDT), and the
+`922 where 26` column-ACL reading its dropped bullet cited lives verbatim in the migration itself.
+
+**The attestor resolved to the branch's bytes exactly** — `git hash-object` `ed25a914`, unchanged —
+because `main`'s only non-prose change there, the chain extending `0001-0009` → `0001-0010`, is one
+both sides had made identically. The provenance pin `68ef6264…` therefore stands and no re-pin was
+needed. `CHANGELOG.md` resolved as the exact union: entry-header multisets across `HEAD`, `main`
+and the merged file agree (642 + 3 main-only → 645; no loss, no duplicate), and every seam keeps
+newest-first order.
+
+**One character was fixed outside the conflict lines:** both parents carried `The first:**` — a
+bold marker missing its opening — in the ceiling comment of `naming-boundary.test.ts`; it now reads
+`**The first:**`.
+
+**An adversarial re-read of the resolution** (independent agent; each finding then verified by
+hand) confirmed the three-way result — exact union, pins recomputed, both-sides-changed-since-base
+intersection = exactly the four resolved files — and flagged what it should: the merge REPLACES the
+bytes of a `0010` that `main` briefly carried, which is correct three-way behaviour and safe on the
+recorded claim (entry 00:57 UTC below) that no deployed database ever ran `main`'s bytes; and the
+migration's opening prose still says "then drop it" while its body stops before any drop. Those
+bytes are now ledger-pinned on the live cluster, so the prose stays as recorded debt; the contract
+test reads the CODE, and the code is drop-free.
+
+**Verified:** `naming-boundary.test.ts` + `retire-baseline-role-contract.test.ts` — 12/12;
+`verify-backend-provenance.mjs` PASS (98 pins + 3 authored, counts agree); `cargo check` and
+`cargo clippy --all-targets --features testing -- -D warnings` clean on `tradingroom-api` under the
+newly merged Rust 1.98 / argon2 0.6 / sha2 0.11 tree; `cargo fmt --check` clean; rust-analyzer 0
+diagnostics on the attestor; `svelte-check` 1559 files, 0 errors 0 warnings. **Not run here:** the
+full app gates and the live-PostgreSQL Rust suite — that is this push's PR gate, which is the only
+verification a merge to `main` ever gets.
 
 ### 2026-08-31 13:50 UTC — A tab every room showed that only some rooms asked for
 
@@ -1729,6 +1809,114 @@ implying otherwise. All evidence above is PostgreSQL **16.13**, while `services/
 `postgres:17` — the one known divergence is `MAINTAIN`, a PG17 privilege, which is why
 `runtime_object_privileges_match_the_current_api_sql_surface` reports it here.
 
+### 2026-08-30 20:45 EDT — Two fixes for the same defect collided, and the attestor still pins `0001-0009`
+
+**Runtime impact: NO.** One allow-list entry removed as a duplicate, one attested version range
+extended, one provenance pin moved. No shipped byte changes.
+
+**1. `controller quality` is red on `expected 42 to be less than or equal to 41`, and the cause is a
+COLLISION rather than a new admission.** `9f4c8fc` and `7a38465` fixed the same defect —
+`d5e3391` adding `retire-baseline-role-contract.test.ts` without allow-listing it — independently
+and within the hour. Each added the entry and each raised the ceiling. The merge concatenated both
+additions instead of recognising one entry, so `ALLOWED_PREFIXES` holds **42 entries of which 41 are
+unique**, `retire-baseline-role-contract.test.ts` twice.
+
+The fix is to delete the duplicate, NOT to raise the ceiling to 42 — the ceiling of 41 is correct and
+raising it would record a growth that never happened. `9f4c8fc` landed first, so its entry and its
+comment stay and the later duplicate goes; the file is back to 41 unique entries and its guard is
+4/4. Nothing about the boundary itself changes, and this is the second time in one evening that the
+`d5e3391` omission has cost a red gate — the first fixing it twice, the second being that the two
+fixes met.
+
+**2. `main` is LATENTLY red on the release attestor, and its own CI says otherwise.**
+`ATTESTED_MIGRATION_VERSIONS` pins `0001-0009`; `d5e3391` shipped `0010` without moving it, so
+`the_embedded_migration_pin_matches_the_migrations_on_disk` fails with
+`embedded_migration_contract_changed`. `main`'s latest Backend quality run reports **success**, and
+that success is empty: steps 21 and 22 — Clippy and "Run all Rust tests against real row-level
+security" — were **skipped**, because that push touched no `services/**` path and the job is
+scoped. The failure fires on the next backend-scoped push. A green tick over skipped steps is the
+kind of evidence this repository does not accept, and it is why this was chased rather than trusted.
+
+That constant's doc comment already records `0009` doing exactly this — *"`main` went red until
+somebody looked"* — so it is a REVIEWED-ACT gate and the answer is to read the migration, not bump
+a number. `0010_retire_ptr_clone_app.sql` was read end to end and earns it on `0009`'s terms, each
+checked in the SQL rather than taken from its prose: forward-only and idempotent, returning early
+when the role is gone; it **fails CLOSED**, refusing unless `tradingroom_app` is already named by an
+RLS policy, because dropping the baseline role on a database that never ran `0009` would leave every
+tenant read empty; no `CASCADE` in either branch; residue counted from `pg_catalog` across seven ACL
+classes and asserted zero before the drop, with column ACLs read from `pg_attribute.attacl` rather
+than the view that reports 922 where 26 exist; and exactly one tolerated SQLSTATE, `2BP01`, meaning
+another database in the cluster still grants — announced with what finishes it, not swallowed.
+
+Extended to `0001-0010`. The attestor's suite goes 16-passed-1-failed to **17 passed**. The binary is
+individually pinned, so `verify-backend-provenance` moved in the same change per its own rule.
+
+**Verified:** naming boundary 4/4 with 41 unique entries; attestor 17/17; `cargo fmt --check` clean
+and `clippy --workspace --all-targets --features testing -- -D warnings` clean; provenance PASS
+(67 untouched + 31 diverged + 3 authored here); migration integrity **10 pinned migrations**;
+controller **1077 tests across 104 files**; the documented-count gate green across its four sites;
+lint and format clean.
+
+### 2026-08-30 20:17 EDT — `main` was red on two independent things; both are fixed and both had a negative control
+
+**Runtime impact: NO** for the boundary half — one test file and four documented numbers. **YES** for
+the SBOM half only in that it unblocks the release-artifact gate; no shipped byte changes.
+
+`main` was failing two separate jobs at once, from two unrelated causes. Neither was diagnosed from
+the job name: each was reproduced locally first, and in both cases the first plausible explanation
+was wrong.
+
+**1. `Rust and PostgreSQL security contracts` — the runtime SBOM inventory.** Caused by PR #169,
+which merged while this check was still red. Re-resolving the runtime digest moved the base image,
+and the reviewed inventory is an exact list compared with `==`, so one extra entry fails it. Both
+digests were unpacked straight from the gcr.io registry — token, manifest index, amd64 manifest,
+every layer blob — and their `var/lib/dpkg/status.d` entries READ: `f7f8f729` carries the five
+reviewed packages, `1c2c046b` carries those same five at identical versions plus
+**`ca-certificates 20250419`**, and that single line is the whole diff. The old digest reproducing
+the reviewed five exactly is the control that shows the extraction is sound rather than the method
+being trusted. It does not weaken the Dockerfile note that no builder-owned CA file is copied into
+the runtime stage: nothing is copied, the store ships in the base now, and SQLx still uses the
+lockfile-pinned rustls/webpki roots. Controls: the amended rule rejects the old five, an injected
+`apk` artifact, and a wrong version.
+
+**2. `controller quality` — the naming boundary, and it was an INCOMPLETE CHANGE, not a new rule.**
+`d5e3391` added three things in one commit: `0010_retire_ptr_clone_app.sql`, the source contract
+`retire-baseline-role-contract.test.ts`, and the `naming-boundary.test.ts` update that admits the
+migration and raises the ceiling 39 → 40. It listed the migration and forgot the contract, so `main`
+failed its own boundary two assertions at a time — once for the allow-list, and once for the
+stricter product-surface rule that `ALLOWED_PREFIXES` deliberately does not reach.
+
+The contract earns its entry on the same argument the migration did, because it has no other
+subject: every one of its assertions is a search for a literal that must appear in that SQL, so the
+name cannot be paraphrased out. Assembling it from fragments was rejected for the reason
+`verify-privacy-boundary.mjs` records — that hides the string from the scanner that should see it,
+trading a visible tolerated use for an invisible one. Ceiling 40 → 41, and both entries expire
+together with `0010`.
+
+The product-surface exemption moved from `endsWith('naming-boundary.test.ts')` to two EXACT paths.
+That is a tightening in the same edit that admits the second file: the suffix would have matched
+that filename in any directory, and a blanket "any test file may" would have covered the next test
+that pastes a live connection string.
+
+**Negative control, and the first attempt at it was invalid.** A planted `ptr_clone_app` literal in
+`src/lib` did not trip the guard — because `filesNamingTheReference()` runs `git grep`, which only
+sees TRACKED files, and the probe was untracked. That is a fact about the probe, not the guard.
+Re-run with the probe staged, the guard fails both assertions and names the file; removed, 4/4
+green. Reporting the first result would have been a defect I manufactured.
+
+**One self-inflicted defect on the way, caught before CI.** The new ceiling paragraph was written
+after the block comment had already closed, leaving prose as loose tokens and a stray `*/`; the file
+stopped parsing and vitest reported "no tests" rather than a failure. Found by running it. The same
+family as the apostrophes that closed the jq string in the commit before this one.
+
+**The documented Vitest count moved again, 1070 → 1077 across 104 files**, because `d5e3391` added
+seven tests and moved no documented site — the same drift this gate exists to catch, now the third
+time it has caught it.
+
+**Verified:** controller **1077 tests across 104 files, all passing**; the count gate green across
+its four sites; lint and format clean; the release-artifact contract and its policy self-test both
+pass; `bash -n` clean on the build script.
+
 ### 2026-08-30 22:55 UTC — Chat composer keys, two navbar nodes, and six places the two message renderers disagree
 
 **Runtime impact: YES**, on both surfaces. Two components changed — `AlertChatArea.svelte` and
@@ -2778,6 +2966,134 @@ rows**. `todo-next.md`'s inventory is re-measured for the four files it names.
 
 ---
 
+### 2026-08-30 19:04 EDT — Every dependency to registry-latest of THIS day, and the correction of a 2026-08-26 entry that claimed work which never shipped
+
+**Runtime impact: YES.** Dependency versions ship in both apps and both services. Two source lines
+changed, both forced by crate majors; nothing else about the code moved.
+
+**This entry exists because the 2026-08-26 12:01 EDT entry below is FALSE, and has been since the day
+it was written.** That entry records Rust 1.98.0, Node 24.20.0, Syft 1.51.0, `smoke.yml` off floating
+tags, provenance 74 → 68 and the whole crate bump, "verified green end to end". Only the JS half ever
+reached a commit — `d78b594`, which carried the two `package.json` files, `pnpm-lock.yaml` and
+`pnpm-workspace.yaml`. The Rust, toolchain and CI half was never committed anywhere:
+`git log --all -S'24.20.0'` and `-S'1.98.0'` both return nothing. It sat as uncommitted working-tree
+state for four days and was discarded on the owner's instruction on 2026-08-30. The entry below now
+says so; this entry is the work actually landing, re-resolved against today's registries rather than
+restored from that stale tree — which mattered, because five values had moved in those four days.
+
+Every version below was read from its registry TODAY — `pnpm outdated -r`, the crates.io API,
+nodejs.org's release index, GitHub releases, registry manifests via `buildx imagetools` — never from
+memory, and never copied from the discarded tree.
+
+**Node is the LATEST LTS, not the latest.** nodejs.org's index gives v26.8.1 as newest overall and
+**v24.20.0** (Krypton, released 2026-08-26) as the newest carrying an LTS codename. Both `.nvmrc` and
+`.node-version` read 24.20.0.
+
+**Rust 1.98.0** (`88d9e12ae`, stable of 2026-08-18) in `rust-toolchain.toml` and `rust-version`.
+**pnpm 11.24.0** was already correct and did not move.
+
+**Rust, and the two source lines the majors forced.** Workspace: thiserror 2.0.20, uuid 1.26.0,
+time 0.3.55, base64 0.23, sha2 0.10 → 0.11 — 0.11 because ed25519-dalek 3.0.0's own dependency
+metadata declares `sha2 ^0.11`, so the tree carries one digest generation rather than two. api:
+**argon2 0.5.3 → 0.6.0 together with password-hash 0.5 → 0.6**, which cannot be split because argon2
+0.6.0 declares `password-hash ^0.6`. That pair is the whole reason this could not be a copy of the
+discarded tree: on 2026-08-26 argon2 0.5.3 was the newest release and its `^0.5` requirement was
+recorded as the reason password-hash stayed back. argon2 0.6.0 exists now and the hold is obsolete.
+The `std` feature both crates carried at 0.5 does not exist at 0.6, so the feature list is now
+alloc/getrandom/phc, and `auth/password.rs` lost its `SaltString`/`OsRng` pair entirely —
+`PasswordHasher::hash_password` is one-argument at 0.6 and generates its own 16-byte salt through
+`getrandom`, the length the PHC specification recommends. rand 0.9 → 0.10 changed one import:
+`RngCore` is no longer re-exported at rand's root and survives only as the marker supertrait
+`trait RngCore: Rng {}`, so `fill_bytes` now arrives via `Rng`. media: mediasoup 0.24 → 0.27,
+tower-http 0.6 → 0.7, ed25519-dalek 2 → 3 (unified with the workspace), base64 0.23 — zero source
+changes.
+
+**Held, each with evidence read today, none by neglect:**
+
+- `tokio-tungstenite` stays 0.29: axum 0.8.9's dependency metadata declares `tokio-tungstenite
+  ^0.29.0`, and being axum's exact crate is that dev-dependency's stated purpose.
+- TypeScript stays 6.0.3 though 7.0.2 exists: `svelte-check@4.7.6` peers `^5.0.0 || ^6.0.0` and
+  `typescript-eslint@8.68.0` peers `>=4.8.4 <6.1.0`. 6.0.3 is the newest satisfying both.
+- `@fortawesome/fontawesome-free@5.8.1`, `font-awesome@4.3.0`, `animate.css@3.7.2` — capture pins.
+
+**JS, both apps:** the nine `@tiptap/*` packages 3.30.3 → 3.30.5, svelte 5.56.10 → 5.57.0, zod
+4.4.3 → 4.5.4, mediasoup-client 3.22.0 → 3.23.1, @threlte/core 8.5.16 → 8.6.0, @types/node
+26.3.0 → 26.4.0, and `@playwright/test` 1.62.1 installed where it had been declared but absent.
+
+**Five values had moved since 2026-08-26, which is why this was re-resolved rather than restored:**
+uuid 1.25.0 → 1.26.0, Syft 1.51.0 → 1.51.1, Grype 0.117.0 → 0.118.0, the `postgres:17` digest, and
+the `distroless/cc-debian13` digest. Restoring the discarded tree would have shipped all five stale.
+
+**The pin chain, moved with them:** `postgres:17` re-resolved by digest in both workflows; Buildx
+action v4.3.0 by commit SHA, Buildx v0.36.1, BuildKit v0.32.2 by digest; cargo-audit 0.22.2 and
+cargo-deny 0.20.2; Syft 1.51.1 and Grype 0.118.0 with their manifest and archive SHA-256s recomputed
+from the official checksum files, each confirmed to match exactly one archive entry; both Dockerfiles
+re-pinned by digest; and `smoke.yml` off floating `@v4` onto the SAME commit SHAs `quality.yml` and
+`backend-quality.yml` already use in nine places between them — it was the last workflow in the
+repository trusting a mutable tag.
+
+**The builder image's native link inputs were EXTRACTED, not assumed.** Changing the builder to
+`rust:1.98.0-alpine3.24` changes the toolchain that supplies them, so all seven were re-read out of
+the new image (`docker run --platform linux/amd64`, then `sha256sum`): rcrt1.o, crti.o, crtbeginS.o,
+libunwind.a, libc.a, crtendS.o, crtn.o are **byte-identical** to the pinned values, the sysroot is
+`1.98.0-x86_64-unknown-linux-musl`, `rustc` reports `release: 1.98.0`, and the packages are still
+musl-dev 1.2.6-r2 and libgcc-static 15.2.0-r5. Only the FROM, toolchain and sysroot lines moved.
+
+**The runtime SBOM inventory gained a sixth package, and CI is what found it.** The reviewed
+static-distroless inventory is an exact list — `sort_by(.name)` compared with `==`, so one extra
+entry fails it — and the first CI run of this branch failed on precisely that: `runtime OCI SBOM
+differs from the exact reviewed static-distroless package inventory`. It was real, and it was caused
+by this change: re-resolving the runtime digest moved the base image. Both digests were then
+unpacked straight from the gcr.io registry, layer blobs and all, and their `var/lib/dpkg/status.d`
+entries read: `f7f8f729` carries the five reviewed packages; `1c2c046b` carries those same five at
+identical versions **plus `ca-certificates 20250419`**. The diff between the two inventories is that
+single line and nothing else — the old digest reproducing the reviewed five exactly is also what
+proves the extraction method, rather than the method being taken on trust. The list is now six, in
+the build script, the verifier fragment and the evidence document. It does not weaken the
+Dockerfile's guarantee that no builder-owned CA file is copied into the runtime stage: nothing is
+copied, the store simply ships in the base now, and SQLx still uses the lockfile-pinned
+rustls/webpki roots. Negative controls were run on the changed rule — it rejects the old five, an
+injected `apk` artifact, and a wrong version — because a gate that cannot fail is worse than none.
+One self-inflicted defect on the way, caught by `bash -n` before it reached CI: the jq program is a
+single-quoted shell string, and the apostrophes in the first draft of that comment closed it. The
+comment now says so, and carries no apostrophes.
+
+**`verify-backend-provenance` re-pinned per its own rule, 74 → 67.** Seven files that had been
+untouched imports left the aggregate for individual pins — both crate manifests, the workspace
+manifest, `rust-toolchain.toml`, the api Dockerfile, and the two source files above — each with its
+reason beside its hash. Nothing became unsealed; seven seals moved onto their own lines.
+
+**A documented count that was already stale is corrected here.** The four documented Vitest sites
+read 101 files / 1034 tests; the tree measures **103 / 1070**. That drift is NOT from this change —
+no test file was touched. Since `6913210`, the commit that last set 1034, exactly two controller test
+files were added (`package-scripts-contract.test.ts`, `room-credential-prompt.test.ts`), and one
+further case arrived on `main` during the rebase below. All four sites now read the measured figure.
+
+**Verified on this tree, today:** `cargo fmt --check` clean and `cargo clippy --workspace
+--all-targets --features testing -- -D warnings` clean on 1.98.0; **api library 155 tests pass**,
+including all seven password tests — the `$argon2id$` prefix, the OWASP parameter profile, and
+distinct salts across two hashes of one password, which is what proves argon2 0.6's self-generated
+salt is random; **media 125 tests pass** (114 library + 11 binary) against mediasoup 0.27;
+`cargo check --workspace --all-targets --features testing` clean. Controller: **1070 Vitest tests
+across 103 files, all passing**, plus schema, migrations, provenance, release-artifact, privacy,
+breakpoints, manage-styles, account, home, fonts, room-login, the fail-closed runtime HTTP contract
+and the documented-count gate; svelte-check **1551 files, 0 errors, 0 warnings**; lint and
+format:check clean. Room: svelte-check **1491 files, 0 errors, 0 warnings**; lint and format:check
+clean.
+
+**Pre-existing and left, each measured rather than assumed** — a worktree at the base commit with its
+ORIGINAL dependencies and the same evidence symlinks was used to attribute all three:
+
+- The room suite is **32 failed / 4979 passed across 302 files**. The baseline is **37 failed / 4941
+  passed**, so this change did not break it — it fixes five. The remainder predates this work; no
+  `apps/room/src` file is touched here.
+- `evidence:verify` fails locally on `evidence-dumps/account-page`, a gitignored directory present on
+  this machine since 2026-08-12 and absent from the verifier's expected set. A clean checkout of the
+  base commit passes, and CI has no such directory.
+- `runtime:http` and one `naming-boundary` case time out under load and pass on a quiet machine;
+  both are 5-second budgets, not assertion failures.
+
+**Not run:** the full Docker release-artifact build (CI's release gate) and Playwright e2e.
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
@@ -15473,6 +15789,27 @@ That needs two browsers in a live room and is the owner's.
 
 
 ### 2026-08-26 12:01 EDT — Every dependency to registry-latest of this day, and every pin that holds one moved with it
+
+> **CORRECTION, 2026-08-30 19:04 EDT — ONLY THE JS HALF OF THIS ENTRY EVER SHIPPED.**
+>
+> Everything below about **Rust, the toolchain, and CI** — Rust 1.98.0, Node 24.20.0, Syft 1.51.0 /
+> Grype 0.117.0, Buildx v0.36.1 / BuildKit v0.32.2, cargo-audit 0.22.2 / cargo-deny 0.20.2, the
+> `smoke.yml` SHA pins, the crate bumps, the rand 0.10 import, and provenance 74 → 68 — **was never
+> committed.** `git log --all -S'24.20.0'` and `-S'1.98.0'` both return nothing: those values have
+> never existed in any commit on any branch. The work sat as uncommitted working-tree state and was
+> discarded on 2026-08-30 at the owner's instruction.
+>
+> What DID ship on this date is the JS half, in `d78b594` — both `package.json` files,
+> `pnpm-lock.yaml` and `pnpm-workspace.yaml`, carrying pnpm 11.24.0, the JS dependency bumps and the
+> esbuild override. The "Verified" paragraph below describes a tree that was never committed, so
+> treat every Rust/toolchain/CI claim in this entry as a record of intent, not of the repository.
+>
+> The two `pnpm test` fixes it describes — the `privacy:verify` JWT fixture and the documented-count
+> gate — were separately and differently fixed on `main` on 2026-08-28.
+>
+> This entry is left standing rather than rewritten, because a corrected record of what was claimed
+> is more useful than a tidy one. **The work itself landed on 2026-08-30**, re-resolved against that
+> day's registries: see the entry of 2026-08-30 19:04 EDT at the top of this file.
 
 **Runtime impact: YES.** Dependency versions ship in both apps and both services; nothing else about
 the code changed except one import line that rand 0.10 forced.

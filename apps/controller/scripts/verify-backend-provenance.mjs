@@ -61,9 +61,16 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
 
   Last moved 2026-08-15, 75 -> 74: `services/README.md` left the aggregate for its own pin below,
   because three of its prose claims still named `ptr_clone_app` as the runtime role.
+
+  Moved again 2026-08-30, 74 -> 67: the dependency-currency update took SEVEN files that had been
+  untouched imports until then — the workspace manifest and both crate manifests, the toolchain
+  file, the api Dockerfile, and the two source files the new crate majors forced to change
+  (`auth/password.rs` for password-hash 0.6, `auth/refresh.rs` for rand 0.10). Each is pinned
+  individually in `DIVERGED_FROM_IMPORT` with its reason beside its hash, exactly as the rule above
+  requires. Nothing became unsealed; seven seals moved from the aggregate onto their own lines.
 */
-const EXPECTED_UNTOUCHED_COUNT = 74;
-const EXPECTED_MANIFEST_SHA256 = 'cfb319e72317631a15280a6fff725fa7617de15a7ae39ec98d4de04d83fe898a';
+const EXPECTED_UNTOUCHED_COUNT = 67;
+const EXPECTED_MANIFEST_SHA256 = '53150c809d96786080a39dae158f2311cd7f475ab76c27db1f257299298849a6';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -165,7 +172,43 @@ const DIVERGED_FROM_IMPORT = new Map([
     migrate. The README now says so where it used to imply the opposite.
   */
   ['services/README.md', '8aece32950b831df72d68efc2411f9b80352877001fc8a0f4a51b7f617f027fc'],
-  ['services/Cargo.lock', '9ba77dc5f3fe6dac83a40799f6c5d60ad9e5f358f635ab094ceae608ca6d1668'],
+  /*
+    Re-pinned 2026-08-30 by the dependency-currency update: `cargo update` after raising the
+    workspace requirements to the crates.io latest of that day. The registry evidence for every
+    line is in the CHANGELOG entry of the same date.
+  */
+  ['services/Cargo.lock', '08bcc15f03d68664e643b30830bcec7f2589c2d9c72f0938381969a1a2d33aa0'],
+  /*
+    Diverged 2026-08-30, all seven by that same update, each leaving the aggregate for its own pin:
+
+      Cargo.toml                workspace requirements raised to the crates.io latest resolved that
+                                day; rust-version 1.97 -> 1.98. sha2 0.10 -> 0.11 because
+                                ed25519-dalek 3.0.0 declares `sha2 ^0.11` and one digest generation
+                                per tree is the point.
+      api/Cargo.toml            argon2 0.5.3 -> 0.6.0 WITH password-hash 0.5 -> 0.6, which cannot be
+                                split: argon2 0.6.0 declares `password-hash ^0.6`. The `std` feature
+                                both carried at 0.5 no longer exists at 0.6, so the feature list is
+                                now alloc/getrandom/phc. rand 0.9 -> 0.10.
+      media/Cargo.toml          mediasoup 0.24 -> 0.27, tower-http 0.6 -> 0.7, ed25519-dalek 2 -> 3
+                                (unified with the workspace), base64 0.22 -> 0.23. Zero source
+                                changes; the 125-test service surface passes against it.
+      api/src/auth/password.rs  password-hash 0.6 moved the PHC types into the `phc` crate and made
+                                `hash_password` one-argument, generating its own 16-byte salt. The
+                                `SaltString`/`OsRng` pair is gone. All seven password tests pass,
+                                including the `$argon2id$` prefix and OWASP-parameter assertions.
+      api/src/auth/refresh.rs   one import: rand 0.10 no longer re-exports `RngCore` at the root, so
+                                `fill_bytes` now arrives via the `Rng` trait.
+      api/Dockerfile            builder image rust:1.97.1-alpine3.24 -> rust:1.98.0-alpine3.24 by
+                                resolved digest, and the runtime distroless digest re-resolved.
+      rust-toolchain.toml       channel 1.97.1 -> 1.98.0 (stable of 2026-08-18).
+  */
+  ['services/Cargo.toml', '0d155ff4b1d976fa5b0eb675c71a26f4e2a23c77abacf5b28d45d02aa06a2b1a'],
+  ['services/api/Cargo.toml', '1756786fe07a5e2efddbba28b6c75514dcd14c52862daf057ef978f2b69d37d5'],
+  ['services/api/Dockerfile', '23bb473a3f8f0b4478e3b9232405f19b7debb1be734b5ca2159c320f29fd841c'],
+  ['services/api/src/auth/password.rs', 'c6b6ce785e1dd22477e1927819c451554baf90291bacb34366cf83502ccd4bb1'],
+  ['services/api/src/auth/refresh.rs', '7f6f803829576d1e94d53d853ca15f610ccd3768ac29af8eba3c3c4d0bfcbbdd'],
+  ['services/media/Cargo.toml', 'e386a431215a4ebedb958f35ca2bc52ac760b1910fdb4f83663a3e9110179b7d'],
+  ['services/rust-toolchain.toml', 'c006532ab2e9ff938d021819684751cd16c130aad10fffe5c788c00d09b23231'],
   /*
     Diverged 2026-08-14, and it is the file this very comment block warned about.
 
@@ -228,10 +271,16 @@ const DIVERGED_FROM_IMPORT = new Map([
     `0010_retire_ptr_clone_app.sql` landed, with the reviewed-act paragraph that list requires. The
     attestor's own test caught the omission — the same way it caught `0009` shipping in `b9f775e`
     without the list being extended.
+
+    Re-pinned 2026-08-31 (PR #177 merge follow-up): `migration_ledger_mismatch` still said
+    `0001 through 0008` — TWO chain extensions stale, because an error string has no reader until
+    the attestation fails. Both range-naming messages are now named constants held against
+    `ATTESTED_MIGRATION_VERSIONS` by `the_prose_ranges_track_the_attested_chain`, whose negative
+    control was run red-then-green, so the next extension moves the prose or goes red.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '68ef62646046b56b236809f7cf4d9850b27e01c871172105ba00bf2e5dd3a894'
+    '607e1df8bfb387b531d6ef7b8efb81088bd4130ed1f40eeda1cd7186a123d13f'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -325,7 +374,9 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/room_api.rs', 'd4c507b29d7dc8335de398ac0c655941ad8321d0c0abe9385986768e57738e67'],
   ['services/compose.yml', '22d5aeef341b15ee1ae45041faaa142864a91aba0cb45557d68f9b051a08cc98'],
   ['services/deny.toml', '57165267aa3ccb0eec647a01232e10c13ab920aa3aaf9293bd2a701e21fa9d14'],
-  ['services/media/Dockerfile', 'ae967613fdd0dba2065ec6b488c71d8a61e29eef47fca32f90690066b0eb407a'],
+  // Re-pinned 2026-08-30: builder and runtime base images moved to the digests current that day
+  // (rust:1-bookworm, distroless/cc-debian13:nonroot), part of the dependency-currency update.
+  ['services/media/Dockerfile', '334ee72a651e01f205547e2fd71c8b46e6d98618776b52f7a678760c22b219d0'],
   ['services/media/src/config.rs', 'f9af8fb80a7ccadb1a05b506c14ecd043fae4e5b169e36d403d5d8f1fd4fe449'],
   ['services/media/src/grant.rs', '772f12a8bd9ea55e1d92fa1b460aeb1b451520c1c243c59083a658b4f1989908'],
   ['services/media/src/main.rs', 'eb7106333b2a66cfa84b8de943954e658701216a469a048e6eda8e0e9ac767aa'],
