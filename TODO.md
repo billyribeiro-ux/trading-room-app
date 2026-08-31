@@ -113,20 +113,35 @@ Consequence of the one key that could not be restored and was regenerated: API k
 2026-08-15 can no longer be re-displayed on the account page. They still **authenticate** —
 `secret_hash` is what authenticates and it is untouched. Delete and recreate any key you want visible.
 
-### The runtime-role cutover is not finished
+### The runtime-role cutover: one row left, and it is an operator step
 
-`ops/naming-provenance.md` is the authority on all of this; these are the rows it points at. Verified
-2026-08-17: the highest migration is `services/api/migrations/0009_provision_tradingroom_app.sql`,
-and there is **no `DROP ROLE` or `REASSIGN OWNED` in any migration**, so all three rows stand.
+`ops/naming-provenance.md` is the authority on all of this.
+
+**The RUNTIME role is finished.** `0009_provision_tradingroom_app.sql` gave `tradingroom_app` parity
+and retargeted all 22 RLS policies onto it; `0010_retire_ptr_clone_app.sql`, authored 2026-08-31,
+strips every privilege the baseline role holds in the database it runs on — 87 table grants, 26
+column grants, 6 routine grants, schema `USAGE` and the DATABASE `CONNECT` — counts the residue from
+`pg_catalog` and refuses rather than reporting success if anything survives. It also REFUSES on a
+database where `0009` has not taken effect. Measured on a live PostgreSQL 16.13 cluster across four
+databases; the CHANGELOG entry of 2026-08-31 00:57 UTC carries the evidence.
+
+**It deliberately does not `DROP ROLE`, and the earlier version of this row that demanded one was
+wrong.** Roles are cluster-global while the sqlx ledger is per-database, so a chain that drops the
+role cannot be applied to the next database: the migrate preflight requires `ptr_clone_app` to exist
+before `0001` runs, because `0001` would otherwise create it with the placeholder password committed
+at its line 26. `migration_reappliability.rs` is what refused it, on
+`the_chain_applies_to_a_second_database_on_the_same_cluster`. Dropping the role is an operator step
+for a cluster that will take no further new databases, and `db::migrate::baseline_role_absence_policy`
+is what stops that step from blocking every deploy after it.
+
+**The grant-site list this row used to carry is no longer load-bearing** and is not reproduced: the
+migration enumerates ACLs from the catalogue rather than from a hand-kept list of `GRANT` lines,
+which is what made two sites missing from that list (`0003:106` and `0004:55`) a documentation bug
+rather than a defect. The counted residual is the check.
 
 | # | what | why it is not done yet |
 | --- | --- | --- |
-| 1 | **Retire `ptr_clone_app`** — a forward-only migration that drops the baseline role | Deliberately deferred until the cutover is proven in a real deployment, not just on scratch clusters. Since 2026-08-15 the role is named by no policy — `0009_provision_tradingroom_app.sql:199-258` retargets every policy onto `tradingroom_app` and RAISEs `RLS retarget incomplete` if a residual remains — and it reads zero rows from all 22 tenant tables. **It is inert but still holds object privileges, and they are granted at `0001_baseline.sql:1821-1938` (22 table-wide grants plus the function grants), `0006_restrict_runtime_object_privileges.sql:69-107` and `0007_saved_polls.sql:134` — and, added **PROVEN ON A REAL CLUSTER, 2026-08-29 — and the approach in this row would have been UNSAFE.** PostgreSQL 16.13 was brought up in this container, the roles provisioned by `docker/postgres/10-provision-roles.sh`, the whole chain applied by `cargo run --bin migrate`, and `api/fixtures/seed.sql` loaded, so the numbers below are measurements rather than readings of the SQL. **The retarget holds, and the control proves the measurement is not vacuous:** the owner sees 2 rooms and 4 alerts; `tradingroom_app` with no tenant key sees **0**; `tradingroom_app` carrying tenant A's key sees **1** room (the positive control — the mechanism works) and **0** of tenant B's (isolation); `ptr_clone_app` sees **0** with no key **and 0 while carrying a valid tenant key**. An INSERT as `ptr_clone_app` is refused with *"new row violates row-level security policy for table rooms"*. Its remaining surface, measured: **87 table privileges over 22 tables** (22 SELECT, 22 INSERT, 22 DELETE, **21** UPDATE — one table has none), **6 routine grants**, USAGE on schema `public`, **0** default ACLs, **0** database grants, **0** owned objects, and it can still LOG IN. **THE DROP THIS ROW ASKS FOR MUST NOT BE WRITTEN.** `0001_baseline.sql:25-28` carries `IF NOT EXISTS (… 'ptr_clone_app') THEN CREATE ROLE ptr_clone_app LOGIN PASSWORD 'CHANGE_ME_APP'`, and `0001` is byte-identical to the captured schema and may not be edited. `db/migrate.rs:243-258` exists precisely to keep that branch from firing — its preflight REFUSES to migrate unless `ptr_clone_app` is already provisioned. So dropping the role (a) makes the next `migrate` run fail that preflight, and (b) re-arms the committed-password branch on every fresh database. **Retirement here means NEUTER, NOT DROP**: revoke all 87 privileges, the 6 routine grants and schema USAGE, and `ALTER ROLE ptr_clone_app NOLOGIN`, keeping the role so both the fence and `0001` stay satisfied. That removes the credential path and every privilege while leaving nothing to recreate. **Still deferred, and the condition is unchanged**: this was a scratch cluster, which is exactly what this row says is not enough |
-2026-08-23 after re-reading every migration for `GRANT … ptr_clone_app`, **`0003_room_events.sql:106`
-and `0004_list_memberships.sql:55`**, neither of which this row named. A retirement migration that
-misses a grant site fails at the worst possible moment.** An earlier draft of this row cited `0005:85`; that line is a `TO ptr_clone_app` clause inside a `CREATE POLICY`, and `0005` contains **no `GRANT` at all** — a policy target is not a privilege, and citing one as the other would send whoever writes the migration to the wrong file. The migration must REFUSE rather than `CASCADE`: a cascade silently drops whatever still depends on it. `0001_baseline.sql` re-creates the role on every new database, so retirement cannot be a rename and cannot assume absence. |
-| 2 | **Owner role and database name `ptr_clone` → `tradingroom`** | Its own change, deliberately not bundled. Different mechanism (ownership and `CREATE DATABASE`, not policy membership) and different blast radius: `EXPECTED_MIGRATOR_ROLE`, the preflight identity check, every `MIGRATE_DATABASE_URL`, and the provisioning scripts. Bundling would mean one failure obscures the other. Same shape as the role: add, prove, cut over, retire — **never rename**, which is the mistake the withdrawn `0009_rename_runtime_roles` made. |
-| 3 | **DONE 2026-08-28, and it found something.** The chain was run against a real PostgreSQL: `0001`-`0008` applied, the cluster aged by hand, then `0009`. **The retarget works** — 22 policies moved off the baseline role with `0` residual, and a policy hand-widened to name BOTH roles was repaired to name the runtime role alone, which is the claim this row made. **What it does NOT do is inspect the PREDICATE, and nothing downstream did either:** `alert_media` widened to `USING (true)` survived `0009` intact while the migration reported success, because `postgres-release-attestation` asserted a predicate for exactly one table, `public.room_events`. Closed by extending that attestation to every policy in `public`. Still outstanding here: a database with real PRODUCTION history, which a scratch cluster aged by hand is not. |
+| 1 | **Owner role and database name `ptr_clone` → `tradingroom`** | Its own change, deliberately not bundled. Different mechanism (ownership and `CREATE DATABASE`, not policy membership) and different blast radius: `EXPECTED_MIGRATOR_ROLE`, the preflight identity check, every `MIGRATE_DATABASE_URL`, and the provisioning scripts. Bundling would mean one failure obscures the other. Same shape as the role: add, prove, cut over, retire — **never rename**, which is the mistake the withdrawn `0009_rename_runtime_roles` made. |
 
 **The cost constraint that governs how these get tested.** Every push against an open PR starts a
 run. The backend gate is ~33 minutes when the diff touches a backend path and ~25 seconds when it
