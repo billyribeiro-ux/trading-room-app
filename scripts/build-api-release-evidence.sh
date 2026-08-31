@@ -781,6 +781,23 @@ jq --exit-status \
 jq --exit-status '
 	([.artifacts[] | select(.type == "deb") | { name, version }] | unique | sort_by(.name)) == [
 		{ "name": "base-files", "version": "13.8+deb13u6" },
+		#
+		# ca-certificates ARRIVED WITH THE 2026-08-30 RUNTIME DIGEST. It is an upstream addition,
+		# not one made here. Both images were unpacked from the registry and their
+		# var/lib/dpkg/status.d entries read directly: the previous digest f7f8f729 carries exactly
+		# the five below, and the current digest 1c2c046b carries those same five plus this one, at
+		# identical versions. The diff between the two inventories is this single line, nothing else.
+		#
+		# NO APOSTROPHES IN THIS BLOCK, and that is not a style choice. This jq program is a
+		# single-quoted shell string, so one apostrophe here closes it and the rest of the program
+		# becomes shell tokens — which is exactly what happened while this comment was being written,
+		# caught by `bash -n` before it could reach CI.
+		#
+		# This does not undo the note in api/Dockerfile saying no builder-owned CA file is copied
+		# into the runtime stage. That remains true: nothing is copied. The store now ships in the
+		# base image itself, and SQLx still uses the lockfile-pinned rustls/webpki roots either way,
+		# so this is an inventory fact to record rather than a change in what is trusted.
+		{ "name": "ca-certificates", "version": "20250419" },
 		{ "name": "media-types", "version": "13.0.0" },
 		{ "name": "netbase", "version": "6.5" },
 		{ "name": "tzdata", "version": "2026b-0+deb13u1" },

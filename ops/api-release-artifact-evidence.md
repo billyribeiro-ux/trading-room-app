@@ -108,10 +108,15 @@ inventory of the final filesystem. It must contain both release binaries and
 must not contain a shell, package manager, dynamic loader, glibc, libgcc shared
 object, Perl path, or Alpine package database. Static-distroless does retain
 dpkg status metadata, so the effective-runtime Syft SBOM is not represented as
-package-free. It must contain exactly these five reviewed `deb` identities:
-`base-files 13.8+deb13u6`, `media-types 13.0.0`, `netbase 6.5`,
-`tzdata 2026b-0+deb13u1`, and `tzdata-legacy 2026b-0+deb13u1`, with no `apk` or
-`rpm` artifact. These exact allowlist and executable/path denials are enforced
+package-free. It must contain exactly these six reviewed `deb` identities:
+`base-files 13.8+deb13u6`, `ca-certificates 20250419`, `media-types 13.0.0`,
+`netbase 6.5`, `tzdata 2026b-0+deb13u1`, and `tzdata-legacy 2026b-0+deb13u1`,
+with no `apk` or `rpm` artifact. It was five until 2026-08-30:
+`ca-certificates` arrived with the runtime digest re-resolved that day, and is
+upstream's addition. Both digests were unpacked from the registry and their
+`var/lib/dpkg/status.d` entries read directly — the previous `f7f8f729` carries
+the five, the current `1c2c046b` carries those same five at identical versions
+plus this one, and that single line is the entire diff between the two. These exact allowlist and executable/path denials are enforced
 checks, not assumptions inferred from the base image name.
 
 Both entry points first run without secrets under no network, a read-only root
