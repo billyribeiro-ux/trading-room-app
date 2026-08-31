@@ -110,6 +110,8 @@
     oncomposerfocus: () => void;
     /** `imgUpload()` — open this conversation's own image dialog. */
     onimageupload: () => void;
+    /** `PCC-06` — a screenshot pasted into the composer. Forwarded; the page owns the dialog. */
+    onimagepaste: (file: File) => void;
     /** `sendGif(title, url)` — the double-clicked GIF. */
     onselectgif: (title: string, url: string) => void;
     /** `emojiSelect` — the glyph goes into the draft. */
@@ -160,6 +162,7 @@
     giphyApiKey,
     oncomposerfocus,
     onimageupload,
+    onimagepaste,
     onselectgif,
     onemoji,
     doNotDisturb,
@@ -510,6 +513,7 @@
             {onsend}
             onfocus={oncomposerfocus}
             {onimageupload}
+            {onimagepaste}
             {onselectgif}
             {onemoji}
           />

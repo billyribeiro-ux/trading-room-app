@@ -426,13 +426,53 @@ describe('the composer button column — G1, G11 and G13', () => {
     */
     expect(STATE).toContain('canPost: () => boolean;');
     expect(STATE).toContain('this.#dialogs.alert = "Sorry, you can\'t post to this channel";');
-    const at = STATE.indexOf('async send()');
-    expect(at, 'send must exist').toBeGreaterThan(-1);
-    const refusal = STATE.indexOf('if (!this.#canPost())', at);
-    expect(refusal, 'the gate must be inside send').toBeGreaterThan(at);
-    expect(refusal, 'and before anything is trimmed or sent').toBeLessThan(
-      STATE.indexOf('const text = this.#draft.trim();', at)
+
+    /*
+      RE-DISPOSITIONED 2026-08-31, and the new assertion is STRICTLY STRONGER than the one it
+      replaces.
+
+      This used to locate `async send()` and assert `if (!this.#canPost())` sat inside it, before the
+      trim. That was the whole invariant while `send` was the only way to reach the server. `PCC-06`
+      gave the class a second one — a pasted screenshot — and "the gate is inside `send`" would then
+      have stayed GREEN on an implementation whose paste path had no gate at all. A test that cannot
+      fail for the thing it is named after is worse than no test.
+
+      What is actually being protected is: **nothing reaches `#commands.send` without the gate.**
+      So the gate lives in one method, that method is the first statement of the one function that
+      calls the server, and the count of call sites is pinned — a third sender added later fails
+      here rather than shipping ungated.
+    */
+    expect(STATE).toContain(
+      '#refuseUnlessPostable(): boolean {\n    if (this.#canPost()) return true;'
     );
+
+    const post = STATE.indexOf('async #post(text: string): Promise<boolean> {');
+    expect(post, '#post must exist').toBeGreaterThan(-1);
+    expect(
+      STATE.indexOf('if (!this.#refuseUnlessPostable()) return false;', post),
+      'the gate must be #post s FIRST statement'
+    ).toBe(post + 'async #post(text: string): Promise<boolean> {\n    '.length);
+
+    /* Exactly one call to the server, and it is inside `#post`. */
+    const callSites = STATE.split('this.#commands.send(').length - 1;
+    expect(callSites, 'a second call site would bypass the gate').toBe(1);
+    expect(STATE.indexOf('this.#commands.send(')).toBeGreaterThan(post);
+
+    /* And both senders go through it. */
+    expect(STATE).toContain('if (!(await this.#post(this.#draft.trim()))) return;');
+    expect(STATE).toContain('if (await this.#post(body)) {');
+
+    /*
+      `PCC-06`'s own half: the paste path asks BEFORE it spends an upload, not only inside `#post`
+      afterwards. Upstream has no gate on that path at all, so this is ours; asserting the ORDER is
+      what stops it degrading into an upload that happens and is then refused.
+    */
+    const confirm = STATE.indexOf('async confirmImagePaste(): Promise<void> {');
+    expect(confirm, 'confirmImagePaste must exist').toBeGreaterThan(-1);
+    expect(
+      STATE.indexOf('if (!this.#refuseUnlessPostable()) return;', confirm),
+      'the refusal must precede the upload'
+    ).toBeLessThan(STATE.indexOf('await this.#uploadImages([pending.file])', confirm));
   });
 
   it('G1 — the image dialog is this conversation s OWN, not the chat composer s', () => {

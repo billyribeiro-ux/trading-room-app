@@ -1681,6 +1681,7 @@
       {giphyApiKey}
       oncomposerfocus={() => privateChat.composerFocused()}
       onimageupload={() => privateChat.beginImageUpload()}
+      onimagepaste={(file) => privateChat.beginImagePaste(file)}
       onselectgif={(_title, url) => {
         /*
           `sendGif(o.title, o.images.original.url)` — the double-clicked GIF is SENT, not staged.

@@ -185,6 +185,9 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
   #composerHasFocus;
   /** The composer's image dialog while it is open — see `beginImageUpload`. */
   #imageUpload;
+  /** `PCC-06` — the pasted image awaiting confirmation, and the message travelling with it. */
+  #pastedImage;
+  #pastedImageMessage;
   /** `loadMoreLastID` — the row to scroll back to once older history lands. See `loadMore`. */
   #loadMoreAnchorId = '';
   /** `privChatSearchResults` — the search's own bucket, so it cannot overwrite the thread. */
@@ -302,6 +305,14 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     this.#searchResults = $state.raw<PrivateChatMessage[]>([]);
 
     this.#imageUpload = $state(false);
+    /*
+      `$state.raw` on the pair the paste replaces WHOLESALE, and a plain `$state` on the message the
+      dialog's textarea types into — the split `composer.svelte.ts` already draws for the chat copy,
+      and for the same reason: the file and its object URL arrive and leave together, the message is
+      edited a keystroke at a time.
+    */
+    this.#pastedImage = $state.raw<{ file: File; previewUrl: string } | null>(null);
+    this.#pastedImageMessage = $state('');
 
     this.#threads = $state.raw<Record<number, PrivateChatMessage[]>>({});
 
@@ -701,24 +712,35 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
       authority is how they come to disagree. The server refuses independently regardless — this is
       the message, not the enforcement.
     */
-    if (!this.#canPost()) {
-      this.#dialogs.alert = "Sorry, you can't post to this channel";
-      return;
-    }
+    if (!(await this.#post(this.#draft.trim()))) return;
+    this.#draft = '';
+  }
 
-    const text = this.#draft.trim();
-    if (!text || this.#peerId === null) return;
+  /**
+   * Send one body to the open peer, with the gate, the refusal wording and the scroll.
+   *
+   * Extracted from {@link send} on 2026-08-31 when `PCC-06` gave the class a SECOND way to post —
+   * a pasted image. Two senders each carrying their own copy of `canPost` is exactly the shape the
+   * comment above refuses for the client-versus-server split, one level down: two places deciding
+   * one authority is how they come to disagree. There is one place, and both callers go through it.
+   *
+   * Returns whether the message actually travelled, because the two callers clear different things
+   * afterwards and neither should clear on a refusal.
+   */
+  async #post(text: string): Promise<boolean> {
+    if (!this.#refuseUnlessPostable()) return false;
+    if (!text || this.#peerId === null) return false;
 
     try {
       await this.#commands.send({ peerId: this.#peerId, body: text });
     } catch (cause) {
       // The server's own wording, which includes the capture's `Chatting with yourself again?`.
       this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'Message not sent.';
-      return;
+      return false;
     }
-    this.#draft = '';
     // The echo on `/privChat` is what actually appends it, so nothing is inserted here.
     this.scrollToBottom();
+    return true;
   }
 
   /**
@@ -745,6 +767,20 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
     return this.#imageUpload;
   }
 
+  /** `PCC-06` — the pasted image awaiting its confirmation, or `null`. */
+  get pastedImage(): { file: File; previewUrl: string } | null {
+    return this.#pastedImage;
+  }
+
+  /** The message travelling with that image. Bound by the dialog's `msg-text-pc` textarea. */
+  get pastedImageMessage(): string {
+    return this.#pastedImageMessage;
+  }
+
+  set pastedImageMessage(next: string) {
+    this.#pastedImageMessage = next;
+  }
+
   /**
    * `imgUpload()` — open the composer's image dialog for THIS conversation.
    *
@@ -759,6 +795,131 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
 
   cancelImageUpload(): void {
     this.#imageUpload = false;
+  }
+
+  /**
+   * The `canPost` gate and its wording, in ONE place, answering `true` when posting may proceed.
+   *
+   * Two callers rather than one, and the second is why this is a method: `confirmImagePaste` has to
+   * ask BEFORE it spends an upload, and `#post` asks again immediately before sending. The same
+   * source of truth read twice is fine; two copies of the sentence would not be.
+   */
+  #refuseUnlessPostable(): boolean {
+    if (this.#canPost()) return true;
+    this.#dialogs.alert = "Sorry, you can't post to this channel";
+    return false;
+  }
+
+  /**
+   * ── `PCC-06` — pasting a screenshot into a private conversation ────────────────────────────
+   *
+   * `onImagePaste(e)`, byte **2,212,274**, read whole rather than from the row that filed this:
+   *
+   * ```js
+   * onImagePaste(e){ const i=this, o=(e.clipboardData||e.originalEvent.clipboardData).items;
+   *   let s=null;
+   *   for(const r of o) 0===r.type.indexOf("image") && (s=r.getAsFile());
+   *   if(s){ const r=URL.createObjectURL(s), a=Ao("#textAreaTxtPM").val().trim();
+   *     bootbox.confirm({ message:'…<h4>Upload this image?</h4><img …src="'+r+'" />' +
+   *       '<textarea … id="msg-text-pc" … placeholder="Enter your message">'+a+'</textarea>…',
+   *       callback: l => { if(l){ const c = Ao("#msg-text-pc").val().trim();
+   *         doImggurUpload(s, c) } } }) } }
+   * ```
+   *
+   * **The row that filed this said "takes the first `image/*`" and the bundle says otherwise.** The
+   * loop keeps assigning, so the LAST image item wins — identical to the chat composer's copy,
+   * which `pasted-image.ts` already carries as one shared rule. Corrected in the register; the
+   * shared module is used here rather than a second loop, which is what makes the two agree by
+   * construction instead of by inspection.
+   *
+   * The dialog's textarea id is `msg-text-pc`, where chat's is `msg-text`. Both are seeded with
+   * their OWN composer's trimmed text, which is why this class seeds from `#draft` and not from
+   * anything the chat composer holds.
+   */
+  beginImagePaste(file: File): void {
+    /* A second paste replaces the first and releases its preview — `composer.svelte.ts`'s rule. */
+    this.cancelImagePaste();
+    /*
+      No `target` discriminator, where the chat copy has one. That class serves TWO boxes — the chat
+      composer and the inline alert box — and has to remember which paste it is holding. This one
+      serves a single composer, so a field whose only value is a constant would be a field nothing
+      reads.
+    */
+    this.#pastedImage = { file, previewUrl: URL.createObjectURL(file) };
+    this.#pastedImageMessage = this.#draft.trim();
+  }
+
+  /** Discard the pending paste, releasing its preview. Safe to call when there is none. */
+  cancelImagePaste(): void {
+    const pending = this.#pastedImage;
+    this.#pastedImage = null;
+    this.#pastedImageMessage = '';
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+  }
+
+  /**
+   * Upload the pasted image and send it, with whatever text the dialog was left holding.
+   *
+   * `doImggurUpload(e, i = null, o = !1)` at byte **2,211,249** is what decides the ORDER, and it is
+   * not the obvious one:
+   *
+   * ```js
+   * s.imggurUploadTxt += s.imggurUploadTxt && s.imggurUploadTxt.length>0 ? " "+F : F;
+   * o || (i && (s.imggurUploadTxt += " " + i, Ao("#textAreaTxtPM").val("")),
+   *       s.appService.sendPrivChat(s.currUser, s.imggurUploadTxt, s.recvdUser),
+   *       s.imggurUploadTxt = "")
+   * ```
+   *
+   * **The URL comes FIRST and the typed message is appended after it** — `link + " " + message`,
+   * not the other way round. That is the same order the chat composer uses and it is worth stating,
+   * because "message, then attachment" is what every other messenger does and is what a reader will
+   * assume.
+   *
+   * **The composer is cleared only when a message actually travels** (`i && (… , val(""))`).
+   * Clearing unconditionally would eat a draft that was never sent.
+   *
+   * The pending paste is taken and cleared BEFORE the upload awaits, so a viewer who starts typing
+   * during a slow upload keeps what they typed — `composer.svelte.ts` argues the same point, and it
+   * is why this does not route the composed text through `#draft` on its way to the server.
+   */
+  async confirmImagePaste(): Promise<void> {
+    const pending = this.#pastedImage;
+    if (!pending) return;
+    const message = this.#pastedImageMessage.trim();
+    this.#pastedImage = null;
+    this.#pastedImageMessage = '';
+    URL.revokeObjectURL(pending.previewUrl);
+
+    /*
+      REFUSED BEFORE THE UPLOAD, not after it.
+
+      Upstream has no gate on this path at all — `doImggurUpload` uploads and then calls
+      `sendPrivChat` unconditionally, and the `canPost` check lives only in `sendMessage`. Ours
+      already diverges by having one (see the note on the composer's `handlePaste`); asking here
+      rather than only inside `#post` is that same divergence spent where it is worth something. A
+      muted member's screenshot would otherwise be pushed to the upload server in full and then
+      refused, which is bytes spent, a file left on the host, and a slower refusal.
+    */
+    if (!this.#refuseUnlessPostable()) return;
+
+    let url: string | undefined;
+    try {
+      [url] = await this.#uploadImages([pending.file]);
+    } catch (error) {
+      console.error(error);
+      this.#dialogs.alert = 'Upload Failed...';
+      return;
+    }
+    if (!url) {
+      this.#dialogs.alert = 'Upload Failed...';
+      return;
+    }
+
+    const body = message ? `${url} ${message}` : url;
+    if (await this.#post(body)) {
+      /* `Ao("#textAreaTxtPM").val("")` — and ONLY on the branch that had a message to carry. */
+      if (message) this.#draft = '';
+    }
   }
 
   /**

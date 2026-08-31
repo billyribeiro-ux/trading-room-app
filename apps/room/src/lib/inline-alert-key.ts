@@ -27,9 +27,25 @@
  * | Alt + Enter | insert a newline |
  * | **Shift + Enter** | **nothing** — the default is prevented and the value reassigned to itself |
  *
- * One column over, in the chat composer, **Shift+Enter is the newline**. A reader who knows that box
- * will assume this one matches and it does not, so the rule is written down where it can be executed
- * rather than left as a branch inside an event handler that only a browser can drive.
+ * `PCC-09` — **this paragraph used to hand the chat composer's Shift arm the newline, and the bundle
+ * refutes that.** Byte 1,439,821 IS that composer:
+ *
+ * ```js
+ * onKey(e){ if(13==e.keyCode){ e.preventDefault(), …; const i=li("#textAreaTxt");
+ *   e.shiftKey ? (i.val(i.val()), this.autoExpand(e.target)) : e.altKey ? (…) }
+ * ```
+ *
+ * `i.val(i.val())` is the SAME no-op this box performs. The contrast that justified a module was
+ * never between the two boxes' Shift arms; it is between their SEND arms — one column over, the
+ * five chat composers call `autoExpand` after clearing, and this one clears and re-heights.
+ *
+ * The sentence is not decorative and getting it wrong was not free: it is the argument a reader uses
+ * to decide which box behaves how, and it sent one batch's composer to a third answer before the six
+ * offsets were read together. Corrected 2026-08-31 from the bundle rather than from the neighbouring
+ * component, which is what made it wrong the first time.
+ *
+ * The rule is still written down here rather than left as a branch inside an event handler, for the
+ * reason that always applied: a branch in a handler can only be driven by a browser.
  *
  * ## Two things the POST branch does that are easy to collapse into one
  *

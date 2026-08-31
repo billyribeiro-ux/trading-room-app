@@ -33,6 +33,106 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 15:35 UTC — Pasting a screenshot into a private conversation, and the row that was blocked only by who owned the file
+
+**Runtime impact: YES.** A screenshot pasted into the private composer did nothing at all. It
+uploads and sends now, with the message that was already typed.
+
+`PCC-06` was filed `BLOCKED` and the blocker was **scope, not capability**: the component could not
+take an `onimagepaste` prop that nothing passed — that is the scaffolding DPE rule 3 exists to
+refuse — and the file that would pass it belonged to a different parallel batch. Nothing about the
+feature was unknown. One session owning `PrivateChatComposer`, `PrivateChatPanel`, `+page.svelte`,
+`RoomOverlays` and `private-chat.svelte.ts` at once closes it, which is the argument for running
+these sequentially rather than fanned out.
+
+#### Reading the handler whole corrected the row that filed it
+
+The row said the loop *"takes the first `image/*`"*. Byte 2,212,274 says otherwise:
+
+```js
+let s=null; for(const r of o) 0===r.type.indexOf("image") && (s=r.getAsFile());
+```
+
+No `break`. Every image item overwrites the previous one, so **the LAST image wins** — identical to
+the chat composer, which is why `pasted-image.ts` is one shared rule and is used here rather than a
+second loop. A paste carrying a screenshot AND its text URL resolves to the picture. The register is
+corrected and the loop is now asserted by value, because a sentence is what was wrong the first time.
+
+#### Two things in `doImggurUpload` read backwards from what anyone would assume
+
+```js
+s.imggurUploadTxt += s.imggurUploadTxt && s.imggurUploadTxt.length>0 ? " "+F : F;
+o || (i && (s.imggurUploadTxt += " " + i, Ao("#textAreaTxtPM").val("")),
+      s.appService.sendPrivChat(s.currUser, s.imggurUploadTxt, s.recvdUser), …)
+```
+
+**The URL goes FIRST** and the typed message is appended after it — not message-then-attachment,
+which is what every other messenger does and what a reader will assume. **The box is cleared only on
+the branch that had a message to carry**, so a draft begun during a slow upload survives. Both are
+executed by the class test, and the negative controls for both were seen red.
+
+#### One deliberate divergence, asserted in both directions
+
+Upstream's PM handler has **no `canPostImages` guard**, where the chat composer's copy opens with
+`if(!this.canPostImages)return!1`. Ours gates anyway, and the reason is about this room: that flag
+already decides whether the upload and GIF buttons render at all, so an ungated paste would offer
+through the keyboard exactly the capability the buttons deny. The test pins the ABSENCE upstream as
+well as the presence here, so a capture that adds the guard forces a re-read rather than leaving the
+comment describing a difference that stopped existing.
+
+Ours also refuses **before** the upload rather than after it. Upstream uploads and then sends
+unconditionally; a muted member's screenshot would otherwise be pushed to the upload server in full,
+left on the host, and refused afterwards.
+
+#### `#post` is an extraction, and it forced a test to be re-dispositioned
+
+The class gained a second way to reach the server, so the `canPost` gate moved into one method both
+senders go through. `private-chat-strip-contract.test.ts`'s G13 assertion located `async send()` and
+checked the gate sat inside it — **which would have stayed green on a paste path with no gate at
+all.** A test that cannot fail for the thing it is named after is worse than no test, so it now
+asserts the invariant it was always protecting: there is exactly one call to `#commands.send`, it is
+inside `#post`, the gate is `#post`'s first statement, both senders go through it, and
+`confirmImagePaste` refuses before the upload. The control — a second, ungated call site — printed
+`expected 2 to be 1`.
+
+`trade-alert-pane-contract.test.ts` counted three `ImagePasteConfirm` call sites and now counts
+four, plus four DISTINCT confirm handlers. The count is kept rather than dropped as brittle,
+because it is exactly what fails when a fifth call site shares another's handler — and sharing one
+is how an image meant for one person is posted into the room.
+
+#### Evidence
+
+Five negative controls, each seen RED and restored: message-before-URL; unconditional clear;
+the pre-upload refusal removed; the composer's `canPostImages` gate removed; a second ungated
+`#commands.send` call site.
+
+`svelte-autofixer` on `PrivateChatComposer.svelte`: **no issues**; three suggestions, all
+pre-existing declines this file and repository already argue (`untrack` inside the `autoExpand`
+effect, `bind:this` on the textarea, and the `{' Webinar Mode '}` pad). **Nothing the change
+introduced drew a suggestion.**
+
+**Ratchet raises, argued in `source-size-contract.test.ts`:** `private-chat.svelte.ts` 990 → 1148,
+`PrivateChatComposer` 312 → 358, `RoomOverlays` 1065 → 1092, `PrivateChatPanel` 524 → 525,
+`+page.svelte` 1730 → 1731.
+
+**Verified:** `apps/room` full suite **301 files / 5,484 passed / 1 skipped / exit 0**;
+`svelte-check` 1,574 files, 0 errors. **Not verified:** nothing was opened in a browser — the paste
+path is executed against the class and asserted as markup, not driven from a real clipboard.
+
+#### `PCC-09` in the same pass, and a tripwire that worked exactly as written
+
+`inline-alert-key.ts` gave, as the whole reason it exists as a module, a contrast the bundle
+refutes: *"one column over, in the chat composer, Shift+Enter is the newline"*. Byte 1,439,821 IS
+that composer and its shift arm is `i.val(i.val())` — the SAME no-op the alert box performs. What
+actually differs is the SEND arm. The module's CODE was always correct; only the sentence was
+wrong, and it is the load-bearing kind, having already sent one batch's composer to a third answer.
+
+`chat-composer-key-contract.test.ts` held a tripwire for it — asserting the PRESENCE of the refuted
+phrasing, so the row could not be closed silently. It fired, and is re-dispositioned to assert the
+phrasing is gone AND the correction is present. Both halves: absence alone would pass on a module
+that deleted the paragraph outright, which is the outcome the row exists to prevent. Control run,
+red printed.
+
 ### 2026-08-31 14:59 UTC — The merged tree's first CI run found the two tests nobody had run since the owner cutover, and both were the tests being right
 
 **Runtime impact: NO** — one comment reworded, one assertion rebound, two provenance re-pins. No
@@ -144,7 +244,7 @@ silently ignored:
 
 | suggestion | disposition |
 | --- | --- |
-| *"Unexpected mustache interpolation with a string literal value"* × 30 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time. Sixteen of the thirty are the eight pads in each alert pane, which came back identical on both — the twins agree, which is what `dta-01` … `dta-04` exist to keep true |
+| *"Unexpected mustache interpolation with a string literal value"* × 22 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time. Five in `EmojiPicker`, one in `StreamingView`, eight in EACH alert pane — the twins returned the same eight, which is what `dta-01` … `dta-04` exist to keep true |
 | *"the stateful variable `staged` is assigned inside an `$effect`"* (EmojiPicker) | declined — a `$derived` cannot express "one macrotask has passed since mount" |
 | *"calling `loadStream` inside an `$effect`"* × 2 (StreamingView) | declined — the docs name *"third-party library integration"* as what effects are for |
 | *"`bind:this` … consider an attachment"* (StreamingView) | declined, and **load-bearing**: `STV-05` pinned that the reference re-reads the SAME `<video>` across reloads; an attachment rebuilds the handle per re-run and would silently break that |
@@ -175,6 +275,37 @@ run at all.
 `svelte-check` **1,559 files, 0 errors, 0 warnings**; `prettier --check` clean on all four
 components. **Not verified:** nothing was opened in a browser for this change — the two `$effect`s
 are asserted as shape, and the eleven spaces as source, not as rendered output.
+
+#### A claim in `eslint.config.js` that was finally testable, and half wrong
+
+The room's lint already encodes both standing declines — `svelte/no-useless-mustaches` and
+`svelte/prefer-svelte-reactivity` are `off` with their reasoning in place, and
+`eslint-config-resolution.test.ts` asserts the RESOLVED config so a preset-ordering change cannot
+silently turn them back on. That is the durable half of this gate and it was already right.
+
+What was not right was the sentence closing that block: *"the Svelte MCP autofixer reports both on
+every run"*. It had never been testable. It is now, and **two probes settled it**:
+
+- A component holding a `new Map` and a `new Set` written with `.set` / `.add` drew one suggestion
+  each — *"Found a mutable instance of the built-in Map class."*
+- A component holding a `new Map` and a `new Set` built once and only READ drew **nothing at all**;
+  the whole response was empty.
+
+So the autofixer flags only MUTATED collections, where `svelte/prefer-svelte-reactivity` flags every
+plain `Map` and `Set` — which is why that rule produced 43 errors here and is off. The autofixer is
+therefore the **narrower and better** instrument, not a like-for-like stand-in for the disabled
+rule, and `EmojiPicker.svelte`'s read-only `entriesById` is silently and correctly unflagged. A
+reader trusting the old sentence would have expected a suggestion there, not found one, and
+concluded the tool had missed it.
+
+The `{' '}` half of the claim is true and now carries its count: twenty-two occurrences across four
+components in one session.
+
+Two stale prose counts went with it. `eslint.config.js` and `eslint-config-resolution.test.ts` both
+said the block was *"fifteen lines"*; it was already longer than that before today and is longer
+still now. Replaced with a description rather than a new number, because a count that no test
+enforces is the thing that goes stale — which is the rule `CLAUDE.md` states as "two places
+recording the same thing is how one of them goes stale".
 
 **One operational note, because it stopped the suite dead and is not a code fault.** The container's
 writable allowance hit 100% mid-run and vitest failed 60 files with `ENOSPC: no space left on

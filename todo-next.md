@@ -75,13 +75,13 @@ guessed.
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,868 | no |
-| 2 | `routes/+page.svelte` | 1,729 | no |
+| 2 | `routes/+page.svelte` | 1,730 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,258 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,168 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
-| 8 | `lib/components/RoomOverlays.svelte` | 1,064 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
+| 8 | `lib/components/RoomOverlays.svelte` | 1,091 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
 | 11 | `lib/components/PollPanel.svelte` | 883 | no |
@@ -95,7 +95,7 @@ guessed.
 | 19 | `lib/components/FilesPane.svelte` | 585 | no |
 | 20 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 589 | `## SwingAlertsPane.svelte` in the v4 register — **6 rows. |
 | 21 | `lib/components/notes/NotesPane.svelte` | 524 | `## NotesPane.svelte` in the v4 register — 4 rows, read against `zSe` (byte 1,930,173) — the notes pane inside `app-presentationarea` — and its |
-| 22 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
+| 22 | `lib/components/PrivateChatPanel.svelte` | 524 | no |
 | 23 | `lib/components/VideoPlayer.svelte` | 411 | `## VideoPlayer.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860, |
 | 24 | `lib/components/AlertQaModal.svelte` | 370 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
 | 25 | `lib/components/MainTabStrip.svelte` | 370 | `## MainTabStrip.svelte` in the v4 register — 7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts |
@@ -104,7 +104,7 @@ guessed.
 | 28 | `lib/components/AvDevicePane.svelte` | 338 | `## AvDevicePane.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: `loadDevices` at bytes 2,162,037–2,165,010, |
 | 29 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | `room-surface-audit-2026-08-30.md` §SwingAlertForm — 5 rows (`SWF-01` … `SWF-05`) against `hwe`, bundle byte 1,933,979, read the same way and on the same date. The two forms are now asserted IDENTICAL once the day-trade half is renamed, so neither can drift alone. |
 | 30 | `lib/components/ScheduledAlerts.svelte` | 319 | `## ScheduledAlerts.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle. |
-| 31 | `lib/components/PrivateChatComposer.svelte` | 311 | `## PrivateChatComposer.svelte` in the v4 register — Nine rows, read on 2026-08-31 against the pinned v4 bundle by bracket-walking `consts:[[` at byte |
+| 31 | `lib/components/PrivateChatComposer.svelte` | 357 | `## PrivateChatComposer.svelte` in the v4 register — Nine rows, read on 2026-08-31 against the pinned v4 bundle by bracket-walking `consts:[[` at byte |
 | 32 | `lib/components/StreamTabs.svelte` | 304 | `## StreamTabs.svelte` in the v4 register — Six rows, appended 2026-08-31. |
 | 33 | `lib/components/RoomShell.svelte` | 268 | `## components/RoomShell.svelte` in the v4 register — 6 rows (SHL-01…06), 4 of them citation defects of ours. Read end to end 2026-08-31. |
 | 34 | `lib/components/MessageMenu.svelte` | 251 | §MSM — 6 rows against all four captured kebab menus: 1 fixed, 1 already built, 2 measured refusals, 2 deliberate divergences. `docs/decoded/room-surface-audit-2026-08-30.md`. |
@@ -158,7 +158,7 @@ guessed.
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 
-**38 of 83 surfaces audited · 14,850 of 36,183 lines · 41.0%.**
+**38 of 83 surfaces audited · 14,923 of 36,261 lines · 41.2%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

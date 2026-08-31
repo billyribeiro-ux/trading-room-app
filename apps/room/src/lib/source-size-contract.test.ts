@@ -679,7 +679,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       for `#seeded`: an effect that read its own marker reactively would re-run on the write meant to
       end it.
     */
-    max: 1730,
+    /*
+      1730 -> 1731, 2026-08-31. One line: `PCC-06`'s `onimagepaste` wired to
+      `privateChat.beginImagePaste`, beside the `onimageupload` it already passed.
+    */
+    max: 1731,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1708,7 +1712,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       tracker — the per-message chat ding (OVL-03), which was a second and wrong copy of a rule
       `#lib/chat-arrival-sound.ts` already owns.
     */
-    max: 1065,
+    /*
+      1065 -> 1092, 2026-08-31, for `PCC-06`'s confirmation — a FOURTH `ImagePasteConfirm` instance,
+      for the reason the three above it are separate and which the file already states: `onImagePaste`
+      on `app-privchat` ends in `doImggurUpload` -> `sendPrivChat`, so routing a private paste through
+      the chat composer's handler would post the screenshot into the ROOM.
+
+      The textarea is the reference's own and its id is the single thing that differs from the chat
+      copy twenty lines above: `msg-text-pc`, not `msg-text`.
+    */
+    max: 1092,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2228,7 +2241,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `chat-composer-enter.ts`. The const transcription became assertions in
       `private-chat-composer-v4-contract.test.ts` instead of a fenced block nothing checks.
     */
-    max: 312,
+    /*
+      312 -> 358, 2026-08-31, for `PCC-06`'s composer half: one `onpaste`, one prop, one handler,
+      and a docblock that is most of the raise because it records a DELIBERATE DIVERGENCE.
+
+      Upstream's PM `onImagePaste` at byte 2,212,274 has **no `canPostImages` guard** — the chat
+      composer's copy opens with `if(!this.canPostImages)return!1` and this one does not. Ours gates
+      anyway: `canPostImages` already decides whether the upload and GIF buttons render at all, so a
+      paste that uploaded in a room where those buttons are hidden would offer through the keyboard
+      exactly the capability the buttons deny. The contract test asserts BOTH halves — the absence
+      upstream and the presence here — so a future capture that adds the guard makes this re-read
+      rather than leaving the comment describing a difference that stopped existing.
+    */
+    max: 358,
     why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
@@ -2292,7 +2317,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       520 -> 524, 2026-08-30. `oncomposerfocus` passed through for G27. Four lines, three of them the
       prop's docblock.
     */
-    max: 524,
+    /*
+      524 -> 525, 2026-08-31. One line: `PCC-06`'s `onimagepaste` forwarded to the composer. The
+      panel owns no paste behaviour and deliberately none — it is the same pass-through this file
+      already performs for `onimageupload`.
+    */
+    max: 525,
     why: 'the private-chat panel - tabs, thread and composer; the row itself is a shared component'
   },
   {
@@ -4556,7 +4586,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       The seam named in the entry below is still the SEARCH, and it is still the next cut.
     */
-    max: 990,
+    /*
+      990 -> 1148, 2026-08-31, for `PCC-06` — pasting a screenshot into a private conversation, and
+      the row was BLOCKED on SCOPE rather than on anything unknown: the composer could not take an
+      `onimagepaste` prop that nothing passed, and the file that would pass it belonged to another
+      batch. One session owning both closes it.
+
+      Most of the raise is the two docblocks, and both record something the code cannot say:
+
+      `beginImagePaste` carries the decoded handler at byte 2,212,274 and a CORRECTION. The register
+      row that filed this said the loop "takes the first `image/*`"; the bundle keeps assigning with
+      no `break`, so the LAST image wins — identical to the chat composer, which is why the shared
+      `pasted-image.ts` rule is used rather than a second loop. A paste carrying a screenshot AND
+      its text URL resolves to the picture, and that is the difference the sentence got backwards.
+
+      `confirmImagePaste` carries `doImggurUpload` at byte 2,211,249, where two things read
+      backwards from what anyone would assume: the URL goes FIRST and the typed message is appended
+      after it, and the composer is cleared ONLY on the branch that had a message to carry. Both are
+      executed by `private-chat.svelte.test.ts` and both negative controls were run.
+
+      `#post` is an EXTRACTION, not new surface. The class gained a second way to post, and two
+      senders each holding their own copy of `canPost` is the shape this repository refuses one
+      level up — the class's own comment already argues it for the client-versus-server split.
+    */
+    max: 1148,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
