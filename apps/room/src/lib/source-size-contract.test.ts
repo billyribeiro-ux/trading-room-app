@@ -692,7 +692,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1733 -> 1734, 2026-08-31. One line: `ACA-05`'s `onpasteimage` for the extra column, naming its
       own target rather than defaulting to the main column's.
     */
-    max: 1734,
+    /*
+      1734 -> 1785, 2026-08-31. `ACA-06`'s three gates, resolved ONCE and spread into both columns,
+      plus the paragraph on why the object is declared AFTER `createRoom` rather than beside the
+      other `$derived`s: it reads `media.limitedPresenter`, and this repository has shipped a 500
+      from a declaration-before-dependency TWICE — `ModalHost`'s `activeConnectivityTab` and
+      `createRoom` itself, both invisible to lint and to the unit suite.
+
+      One object rather than three ternaries at each of two call sites, because two hand-written
+      copies is how the second column comes to disagree with the first about who may archive. Detach
+      is passed at the main call site alone, since its gate is `chatOnlyMode` and its control does
+      not exist in the extra column's const table at all.
+
+      Read out BY NAME at both call sites rather than spread, which is eleven of those lines.
+      `unfed-props-contract.test.ts` proves every prop has a supplier by finding it NAMED at a call
+      site, so a `{...spread}` silently removed six props from that guarantee — caught the moment it
+      was tried. Naming them keeps one definition and keeps every prop greppable.
+    */
+    max: 1796,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1932,7 +1949,35 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       long now: it carries the whole decode, and `chat-search-contract.test.ts` pins all six offsets
       by value so the two docblocks cannot drift apart again.
     */
-    max: 171,
+    /*
+      171 -> 374, 2026-08-31, for THREE of `ACA-06`'s four controls: Archive Chat Messages, the Group
+      Chat Control dropdown and Detach Chat. The bar had rendered Mod Only and closed.
+
+      Two consts' worth of markup and a great deal of why. The three gates are the page's, so each
+      control's PRESENCE is its gate — a boolean beside a `() => void` would put one gate in two
+      places, which is this component's standing rule.
+
+      **Detach Chat is main-column only, and that is the const tables' answer rather than a choice.**
+      `app-extra-chat`'s extended section (`Q3e`, byte 2,369,619) carries Mod Only and Group Chat
+      Control and STOPS; `app-chat` carries three entries its table does not — 47 and 53, the two
+      forms of the button, and 54, its `fa-window-restore` icon — which is exactly the offset by
+      which every const from 48 onward shifts between the two tables.
+
+      **One divergence, and it is the substitution already argued twice here.** The capture's
+      dropdown item is `a` const 51 `[1,"dropdown-item"]` — an anchor with NO `href`, so upstream
+      these three items are unreachable by keyboard. A `<button class="dropdown-item">` carries the
+      click instead, styled identically by Bootstrap, and the handler moves one node in from the
+      `li` with it. `StreamTabs` keeps its anchor and that is not an inconsistency: its const 57 is
+      `['href','#',1,'dropdown-item']`, which is focusable.
+
+      **The fourth control is not built and the reason is a SERVER command, not scope.**
+      `downloadLog("chat")` at byte 1,415,703 opens a radio prompt over three ranges and hands the
+      answer to `downloadLogType`, which awaits `invokeServerCommand("getAllLog", …)`. `getAllLog`
+      returns zero hits in this repository, so the button would open a dialog whose every option
+      fails — worse than no button. The alerts column's twin exports rows the page already holds;
+      this one asks the server for history the page has never seen.
+    */
+    max: 374,
     why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
@@ -5734,7 +5779,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a later consistency pass does not undo a measurement. `acA-11` adds the `&nbsp;Chat` label and
       says why it is `&nbsp;` and not a space.
     */
-    max: 1496,
+    /*
+      1496 -> 1523, 2026-08-31. `ACA-06`'s three controls forwarded to `ChatSearchBar`, with the note
+      on why they arrive as props rather than being derived from the flags this component already
+      holds: it holds two of the four terms those gates need, and re-deriving a gate from a subset
+      is how two answers to one question come to disagree.
+    */
+    max: 1523,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -5924,7 +5975,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `if(s)` block here where `app-chat`'s opens with it — behaviourally identical, and noted so a
       reader comparing the two copies does not think one was transcribed loosely.
     */
-    max: 722,
+    /*
+      722 -> 744, 2026-08-31. `ACA-06`'s TWO controls for this column — and the paragraph recording
+      that the third, Detach Chat, is absent by the const tables' own arithmetic rather than by
+      oversight. A reader finding two here and three in the main column needs that sentence.
+    */
+    max: 744,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

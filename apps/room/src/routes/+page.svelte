@@ -479,6 +479,7 @@
    * implementation disagreed.
    */
   const canPostImages = $derived(isPresenter || data.sessData?.userUploads === true);
+
   /**
    * The room's chat mode — `g` group, `p` webinar, `d` disabled.
    *
@@ -605,6 +606,60 @@
     mtx,
     unreadQaAlertIds,
     defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
+  });
+
+  /*
+    DECLARED AFTER `createRoom`, and the position is the fix rather than a formatting choice.
+
+    This reads `media.limitedPresenter`, which is destructured out of `createRoom(...)` above. A
+    `$derived` is lazy, so an initializer placed before that destructure does not throw on its own —
+    but `svelte-check` refuses it, and this repository has shipped a 500 from that exact shape TWICE:
+    `ModalHost.svelte`'s `activeConnectivityTab` and `createRoom` itself, both recorded in
+    `CHANGELOG.md`, both invisible to lint and to the unit suite because a `$state` initializer
+    evaluates eagerly at component init and throws during SSR.
+
+    Keeping the declaration below its dependency costs nothing and removes the whole class.
+  */
+  /**
+   * `ACA-06` — the chat toolbar's built controls, and their gates RESOLVED HERE, once, for both
+   * columns.
+   *
+   * The two chat columns render one `ChatSearchBar`, and that component is handed each
+   * entitlement's RESULT rather than the raw flags — so a control's gate is the PRESENCE of its
+   * handler. One object, because two hand-written copies of three ternaries is how the second
+   * column comes to disagree with the first about who may archive.
+   *
+   * **Read out BY NAME at both call sites rather than spread**, and that is not verbosity.
+   * `unfed-props-contract.test.ts` proves every component prop has a supplier by finding it named
+   * at a call site; a `{...spread}` is invisible to it, so spreading these three silently removed
+   * six props from that guarantee — which the test caught the moment it was tried. Naming them
+   * keeps both properties: one definition, and every prop still greppable from the component that
+   * declares it.
+   *
+   * The two gates, transcribed:
+   *
+   * ```js
+   * O(2, isPresenter && !isLimitedPresenter ? 2 : -1)                       // archive
+   * O(4, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 4)       // Group Chat Control
+   * ```
+   *
+   * The second is written on the `-1` branch upstream and is reproduced by negating it rather than
+   * by re-deriving what it "means": the control shows for a presenter OR anyone holding the mic,
+   * and hides for a limited presenter regardless of either. Flipping a De Morgan by hand is how the
+   * `acA-07` half-gate happened.
+   *
+   * **Detach is NOT here.** Its gate is `O(5, chatOnlyMode ? -1 : 5)` and it belongs to the main
+   * column alone — `app-extra-chat`'s const table carries neither form of the button — so it is
+   * passed at that one call site instead of through this object.
+   */
+  const chatToolbarControls = $derived({
+    onchatarchive:
+      isPresenter && !media.limitedPresenter ? () => modals.open('chat-logs') : undefined,
+    chatMode,
+    onchatmodechange:
+      (!isPresenter && data.user.hasMic !== true) || media.limitedPresenter
+        ? undefined
+        : (mode: ChatMode) => void changeChatMode(mode)
   });
 
   /**
@@ -1361,6 +1416,10 @@
               ondetachalerts={() => alertsPane.detach()}
               onsavealerts={() => alertsPane.save()}
               onarchivealerts={() => alertsPane.archive()}
+              onchatarchive={chatToolbarControls.onchatarchive}
+              chatMode={chatToolbarControls.chatMode}
+              onchatmodechange={chatToolbarControls.onchatmodechange}
+              ondetachchat={chatOnlyMode ? undefined : () => alertsPane.detach()}
               onmessageaction={(kind, action, item, payload) =>
                 messageActions.handle(kind, action, item, payload)}
               onprivatechat={() => privateChat.show()}
@@ -1518,6 +1577,9 @@
                 modOnly={chat.modOnly('extra')}
                 onmodonly={(next) => chat.setModOnly('extra', next)}
                 ontoggletoolbar={() => chat.search.toggleExtended('extra')}
+                onchatarchive={chatToolbarControls.onchatarchive}
+                chatMode={chatToolbarControls.chatMode}
+                onchatmodechange={chatToolbarControls.onchatmodechange}
                 onimageupload={() => composer.openImageUpload()}
                 onpasteimage={(file) => composer.beginImagePaste(file, 'extra')}
                 onyoutube={isPresenter ? () => modals.open('youtube') : undefined}

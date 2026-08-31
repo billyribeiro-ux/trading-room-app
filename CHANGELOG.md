@@ -33,6 +33,85 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 18:40 UTC — Three of the chat toolbar's four controls, and the fourth blocked on a command that does not exist
+
+**Runtime impact: YES.** The chat toolbar's extended section rendered a Mod Only checkbox and
+stopped. It now carries Archive Chat Messages, the Group Chat Control dropdown and — in the main
+column — Detach Chat.
+
+| control | state |
+| --- | --- |
+| Archive Chat Messages | **built** — const 41/42, opens the `chat-logs` modal `RoomChatArchive` already backs |
+| Group Chat Control | **built** — const 46/48/49/50/51/52, all three items, `kw`'s tick |
+| Detach Chat | **built**, main column only — const 53/54 |
+| Save chat messages | **BLOCKED on `getAllLog`** |
+
+#### The fourth is not a scope problem, and the row assumed it was
+
+`downloadLog("chat")` at byte **1,415,703** is not the alerts twin. It opens a `bootbox.prompt` with
+`inputType:"radio"` over *"Entire chat history"* / *"Last 24 hours"* / *"Last 7 days"* and hands the
+answer to `downloadLogType`, which awaits
+`invokeServerCommand("getAllLog", {type, channel, limit}, {ackTimeoutMs:6e4})`.
+
+**`getAllLog` returns zero hits in this repository.** The button would open a dialog whose every
+option fails, which is worse than no button. The alerts column's twin exports rows the page already
+holds; this one asks the server for history the page has never seen — which is why one was
+buildable and the other is not, and why this belongs in the register as a server gap rather than a
+missing control.
+
+#### A fourth correction to this row
+
+It said *"the alerts column's Detach button is `detachAlerts`, a different command"*. `detachChat()`
+(byte 1,446,750) and `detachAlerts()` (byte 2,051,887) have **byte-identical bodies** — both emit
+`"detachChat"` on `appEventBus` and raise the same bootbox alert. Same action, two method names, so
+the chat button calls the `alertsPane.detach()` this room already built rather than a second copy.
+
+#### The dropdown's one divergence
+
+The capture's item is `a` const 51 `[1,"dropdown-item"]` — an anchor with **no `href`**, so upstream
+these three items cannot be reached by keyboard at all. A `<button class="dropdown-item">` carries
+the click instead; Bootstrap styles both identically and the handler moves one node in from the `li`
+with it. `StreamTabs` keeps its anchor and that is not an inconsistency: its const 57 is
+`['href','#',1,'dropdown-item']`, which IS focusable. Different const, different answer.
+
+All three ticks are RENDERED and one is made visible by a class — `kw = t => ({ visible: t })` at
+byte 1,420,712 — rather than one being rendered conditionally, because a conditional would produce a
+different DOM for the same state.
+
+#### Three things the repository's own gates caught while I built this
+
+1. **`unfed-props-contract` refused a `{...spread}`.** I passed the three gates as one object spread
+   into both call sites to avoid two copies of three ternaries. That test proves every prop has a
+   supplier by finding it NAMED at a call site, so the spread silently removed six props from that
+   guarantee. Fixed by reading the object out by name — one definition, every prop still greppable.
+2. **`svelte-check` refused a declaration before its dependency.** `chatToolbarControls` reads
+   `media.limitedPresenter` and sat above `createRoom`. `$derived` is lazy so it would not
+   necessarily have thrown — but this repository has shipped a 500 from that exact shape TWICE, and
+   the remedy is the recorded one: declare it below.
+3. **`slice-anchor-contract` refused an inlined `indexOf`** as a slice's end bound, for the third
+   time this session. Bound and asserted.
+
+And the tripwire I wrote thirty minutes earlier — `not.toContain` on all four control names, added
+with the note that it existed *"so that building one of them without closing `ACA-06` fails here"* —
+fired on my own build. It is closed rather than relaxed: the three built keep their captured strings
+pinned, and the fourth keeps its ABSENCE pinned, so the row cannot be marked done while a control is
+missing nor reopened by deleting one that exists.
+
+#### One observation I could not explain, recorded rather than dressed up
+
+A full run failed three assertions in `trade-alerts-mirror-delete.test.ts` with
+`SqliteError: UNIQUE constraint failed: users.email` — a file this change does not touch. It passed
+in isolation, and passed on three subsequent full runs. Its three emails are unique to that file,
+`vitest.setup.ts` gives each worker pid its own database and removes it at exit, and I could not
+reproduce it. **Mechanism not identified.** Recorded here because a `UNIQUE` collision in a suite
+that claims per-worker isolation is worth someone's attention, and because inventing a cause would
+be worse than saying so.
+
+**Verified:** `apps/room` gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors
+0 warnings, **301 test files / 5,504 passed / 1 skipped**, build. `svelte-autofixer` on
+`ChatSearchBar.svelte`: no issues; two suggestions, both the standing `{' '}` decline for the
+capture's own label pads. **Not verified:** nothing was opened in a browser.
+
 ### 2026-08-31 18:05 UTC — A citation that was wrong in two files, and landed 161 bytes inside the function it named
 
 **Runtime impact: NO** — two docblocks and one new contract test. `ACA-06`'s four controls stay

@@ -3982,7 +3982,7 @@ function cMe(t,n){if(1&t){const e=Y();d(0,"div",25)(1,"div",59,3)(3,"div",60)(4,
 
 ### ACA-06 — The chat toolbar's extended section is missing all four of its controls, and `ChatSearchBar`'s own docblock names two of them wrongly
 
-**HALF BUILT 2026-08-31 — the CORRECTION is done, the four controls are not.**
+**HALF BUILT 2026-08-31 — the correction is done, three of the four controls are built, and the fourth is blocked on a server command.**
 
 The row has two halves and they were never the same size. The second — *"a separate one-line correction, in the same file"* — is done: both `ChatSearchBar.svelte` and `chat-search.svelte.ts` said the unbuilt controls were the save-chat and archive pair at `Y_e`/`Q_e`, node 4 and 5 of `X_e`, byte 1,423,265. **Four names and one offset were wrong**, in two files, and every one is now decoded by value:
 
@@ -3997,7 +3997,24 @@ The row has two halves and they were never the same size. The second — *"a sep
 
 `1,423,265` lands 161 bytes INSIDE `X_e`'s body, which is why the citation survived several readings — a spot-check finds the right neighbourhood and moves on. `chat-search-contract.test.ts` now opens all six offsets and reads each function's own signature back, and asserts the four control names appear nowhere in the bar's source, so building one without closing this row fails there. The control restoring the wrong offset printed its failure.
 
-**The four controls remain unbuilt**, and the row stays open on them. `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
+**THREE of the four are BUILT 2026-08-31. The fourth is blocked on a SERVER COMMAND, which the row did not know.**
+
+| control | state |
+| --- | --- |
+| Archive Chat Messages | **built** — const 41/42, opens the `chat-logs` modal `RoomChatArchive` already backs |
+| Group Chat Control | **built** — const 46/48/49/50/51/52, all three items, `kw`'s tick |
+| Detach Chat | **built**, main column only — const 53/54 |
+| Save chat messages | **BLOCKED on `getAllLog`** |
+
+`downloadLog("chat")` at byte **1,415,703** is not the alerts twin. It opens a `bootbox.prompt` with `inputType:"radio"` over *"Entire chat history"* / *"Last 24 hours"* / *"Last 7 days"* and hands the answer to `downloadLogType`, which awaits `invokeServerCommand("getAllLog", {type, channel, limit}, {ackTimeoutMs:6e4})`. **`getAllLog` returns zero hits in this repository.** The button would open a dialog whose every option fails, which is worse than no button. The alerts column's twin exports the rows the page already holds; this one asks the server for history the page has never seen, which is why one was buildable and the other is not.
+
+**A fourth correction to this row.** It said *"the alerts column's Detach button is `detachAlerts`, a different command"*. `detachChat()` (byte 1,446,750) and `detachAlerts()` (byte 2,051,887) have **byte-identical bodies** — both emit `"detachChat"` on `appEventBus` and raise the same bootbox alert. Same action, two method names, so the chat toolbar's button calls the `alertsPane.detach()` this room already built.
+
+**One divergence, and it is the substitution already argued twice here.** The capture's dropdown item is `a` const 51 `[1,"dropdown-item"]` — an anchor with **no `href`**, so upstream these three items cannot be reached by keyboard at all. A `<button class="dropdown-item">` carries the click instead, Bootstrap styles both identically, and the handler moves one node in from the `li` with it. `StreamTabs` keeps its anchor and that is not an inconsistency: its const 57 is `['href','#',1,'dropdown-item']`, which IS focusable.
+
+The three gates are resolved on the page, once, for both columns, and each control's PRESENCE is its gate — `ChatSearchBar` is handed each entitlement's result and never a raw flag. `O(4, …)` is written on its negative branch upstream and is reproduced by negating it rather than by re-deriving what it means, because flipping a De Morgan by hand is how `acA-07`'s half-gate happened.
+
+`acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
 
 * **Save chat messages** — `K_e` at 1,421,929, `span` const 38 (`id="addon-chat-save"`), click `It(18).downloadLog("chat")`. Inside the input group, beside the clear `×`. The ALERTS column's twin of this IS built.
 * **Archive Chat Messages** — `q_e` at 1,421,800, `div` const 41 (`id="addon-chat-archive"`), click `archiveOptions()`, gated `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` — the same two-term gate `acA-07` restored on the alerts side.

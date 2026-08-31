@@ -37,6 +37,7 @@
   */
   import { tick, type Snippet } from 'svelte';
 
+  import type { ChatMode } from '#lib/chat-mode.js';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
@@ -236,6 +237,24 @@
     ondetachalerts: () => void;
     onsavealerts: () => void;
     onarchivealerts: () => void;
+    /**
+     * `ACA-06` — the CHAT toolbar's three built controls, forwarded to `ChatSearchBar`.
+     *
+     * Each is optional and its presence IS its gate, which is the shape that component's own props
+     * argue: it is handed each entitlement's RESULT and never a raw flag, so a boolean beside a
+     * handler would put one gate in two places. The three upstream gates the page resolves are
+     * `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` for archive,
+     * `O(4, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 4)` for the mode dropdown,
+     * and `O(5, chatOnlyMode ? -1 : 5)` for detach.
+     *
+     * They arrive here rather than being built from the flags this component already holds because
+     * this component holds only two of the four terms, and re-deriving a gate from a subset is how
+     * two answers to one question come to disagree.
+     */
+    onchatarchive?: () => void;
+    chatMode?: ChatMode;
+    onchatmodechange?: (mode: ChatMode) => void;
+    ondetachchat?: () => void;
     /*
       `onalertsscroll` and `onchatscroll` WERE HERE, and the note twenty lines above already said
       why they should not have been: *"`feedScroll` arrives WHOLE rather than as six callbacks"*.
@@ -367,6 +386,10 @@
     ondetachalerts,
     onsavealerts,
     onarchivealerts,
+    onchatarchive,
+    chatMode,
+    onchatmodechange,
+    ondetachchat,
     onmessageaction,
     onprivatechat,
     showPmButton,
@@ -1098,6 +1121,10 @@
               extended={chat.search.isExtended('main')}
               modOnly={chat.modOnly('main')}
               onmodonly={(next) => chat.setModOnly('main', next)}
+              onarchive={onchatarchive}
+              {chatMode}
+              onchatmode={onchatmodechange}
+              ondetach={ondetachchat}
             />
           {/if}
 
