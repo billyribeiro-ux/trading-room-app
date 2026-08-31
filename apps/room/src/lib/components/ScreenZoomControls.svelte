@@ -7,20 +7,20 @@
    * and two different containers. Both are reproduced here because the buttons, their classes and
    * their icons are identical - only the arrangement differs.
    *
-   * **attached** - `app-presentationarea`, inside `li.nav-item.ms-auto`
-   * (`docs/source/components/app-presentationarea.render-helpers.js:395-458`, function `CSe`),
-   * decoded against that component's const table:
+   * **attached** - `app-presentationarea`, inside `li.nav-item.ms-auto`, function `SSe` at byte
+   * 1,923,312. RE-DECODED 2026-08-31 by bracket-walking that component's 292-entry const table BY
+   * VALUE from `consts:[[` at byte 1,994,264 - every index from 66 up is one lower than it was:
    *
    * ```html
-   * <li class="nav-item ms-auto">                            <!-- const 71 -->
-   *   <div class="zoom-controls-container position-relative"> <!-- const 88, rendered by ScreenTabs -->
-   *     <div class="zoom-controls position-absolute"          <!-- const 89, *ngIf showZoomCtrl -->
+   * <li class="nav-item ms-auto">                            <!-- const 70 -->
+   *   <div class="zoom-controls-container position-relative"> <!-- const 87, rendered by ScreenTabs -->
+   *     <div class="zoom-controls position-absolute"          <!-- const 88, *ngIf showZoomCtrl -->
    *          [ngClass]="{'viewer-only-screen-zoom-controls': viewerOnlyMode}">
    *       <button class="btn btn-sm btn-warning" (click)="panZoomIn()">   <i class="icon fas fa-search-plus"></i>
    *       <button class="btn btn-sm btn-warning" (click)="panZoomOut()">  <i class="icon fas fa-search-minus"></i>
    *       <button class="btn btn-sm btn-warning" (click)="panZoomReset()"><i class="icon fas fa-redo"></i>
    *     </div>
-   *     …volume dropdown…                                    <!-- consts 90-97, the `volume` snippet -->
+   *     …volume dropdown…                                    <!-- consts 89-96, the `volume` snippet -->
    *     <button class="btn btn-sm btn-dark" (click)="togglePanZoom()">     <i class="icon fas fa-search"></i>
    *     <button class="btn btn-sm btn-dark" (click)="captureVideoImage()"> <i class="icon fas fa-camera"></i>
    *     <button class="btn btn-sm btn-dark" (click)="fullScreenshare()">   <i class="icon fas fa-expand"></i>
@@ -31,21 +31,21 @@
    * The volume dropdown is `ScreenVolumeControl.svelte`, passed in as the {@link Props.volume}
    * snippet rather than rendered here, because its state is the PAGE's: `audioVolume`, the
    * preference maps and `talkingUsers` all live in `+page.svelte`, exactly as the reference keeps
-   * them on the component that owns `CSe`. What this component owns is the ORDER — children 2, 3
-   * and 4 of const 88 come before children 16, 18 and 20 — and that is why the slot is here and not
+   * them on the component that owns `SSe`. What this component owns is the ORDER — children 2, 3
+   * and 4 of const 87 come before children 16, 18 and 20 — and that is why the slot is here and not
    * beside the cluster in the page.
    *
    * Note the order: in the bar the gated trio comes FIRST and is `position-absolute`, so it floats
    * clear of the row rather than widening it. `app-presentationarea`'s own stylesheet places it at
    * `.zoom-controls { top: -33px; left: -33px }` - above and left of the container. That rule is
-   * already applied globally by `src/lib/styles/captured-runtime-components.css:6902`, scoped under
+   * already applied globally by `src/lib/styles/captured-runtime-components.css:6930`, scoped under
    * the `app-presentationarea` host that `+page.svelte` already renders, so no CSS is declared here.
    *
-   * **detached** - `app-screenshare-view`, over the video
-   * (`docs/source/components/app-screenshare-view.render-helpers.js:74-108`, function `Y0e`):
+   * **detached** - `app-screenshare-view`, over the video, function `Y0e` at byte 1,493,686, its
+   * own 20-entry const table walked from `consts:[[` at byte 1,500,337 (those indices did NOT move):
    *
    * ```html
-   * <div class="zoom-controls-container-detached">           <!-- const 4 -->
+   * <div class="zoom-controls-container-detached" [ngClass]> <!-- const 4; SV-SP-14 owns the class -->
    *   <button class="btn btn-sm btn-dark" (click)="togglePanZoomDetached()"><i class="icon fas fa-search"></i>
    *   <button class="btn btn-sm btn-dark" (click)="captureVideoImage()">   <i class="icon fas fa-camera"></i>
    *   <div>                                                  <!-- *ngIf showZoomCtrlDetached, NO class -->
@@ -71,7 +71,7 @@
      */
     variant: 'attached' | 'detached';
     /**
-     * The volume dropdown — consts 90-97, children [3] and [4] of const 88.
+     * The volume dropdown — consts 89-96, children [3] and [4] of const 87.
      *
      * ATTACHED ONLY. `app-screenshare-view`'s detached cluster has no volume control of any kind:
      * its const table runs `zoom-controls-container-detached`, the two dark buttons and the
@@ -82,12 +82,12 @@
     /**
      * `viewerOnlyMode`, which moves the gated trio rather than hiding it.
      *
-     * `lSe`'s update block is one line — `z('ngClass', ut(1, VCe, …globals.viewerOnlyMode))` with
-     * `VCe = (t) => ({'viewer-only-screen-zoom-controls': t})`
-     * (`app-presentationarea.render-helpers.js:10, 261`) — and the class it toggles is already in
-     * this app's stylesheet, painting nothing:
-     * `.viewer-only-screen-zoom-controls { top: 33px !important; left: -3px !important }`
-     * (`css/complete-app-styles.css:6979`). Without the binding the trio keeps `.zoom-controls`'
+     * `cSe`'s update block is one line — `z('ngClass', ct(1, HCe, …globals.viewerOnlyMode))` at byte
+     * 1,920,974, with `HCe = t => ({'viewer-only-screen-zoom-controls': t})` at byte 1,916,482: a
+     * shared arrow beside the template functions, NOT a const-table entry, which is the only place
+     * an `ngClass` object's class NAMES exist. `VCe` 38 bytes earlier is `viewer-only-screen-tab` —
+     * a DIFFERENT class this file used to name. The rule, `{ top: 33px !important; left: -3px
+     * !important }`, ships in `styles/protradingroom-source.css`; without the binding the trio keeps
      * `top:-33px; left:-33px` in viewer-only mode, i.e. 66px above where the reference puts it.
      *
      * ATTACHED ONLY, like the volume slot: `app-screenshare-view`'s detached trio wrapper carries no
@@ -131,11 +131,11 @@
   }: Props = $props();
 
   /**
-   * `ondblclick` is stopped on every button because in the DETACHED arrangement the cluster sits
-   * inside `.video-screen-container`, whose double-click maximises the screen. Without it, a quick
-   * double-tap on the magnifier would also go fullscreen. It is inert in the attached arrangement,
-   * where the cluster is in the tab bar and has no such ancestor - the buttons are declared once
-   * and shared, so the guard travels with them.
+   * `ondblclick` is stopped on every button because in OUR detached arrangement the cluster sits
+   * inside `.video-screen-container`, whose double-click maximises the screen - so a quick
+   * double-tap on the magnifier would go fullscreen too. UPSTREAM IT IS NOT NESTED: `Y0e` is node 5
+   * of that component's root template and the `appDoubleClick` box (const 5) is node 6, a SIBLING,
+   * so the reference needs no guard. Ours nests it to fullscreen with the picture (SV-SP-01).
    */
   function swallowDoubleClick(event: MouseEvent) {
     event.stopPropagation();
@@ -206,14 +206,14 @@
     </div>
   {/if}
   <!--
-    Children [3] and [4] of const 88, and they come BEFORE the dark buttons at [16], [18] and [20].
-    `CSe`'s create block is the whole ordering:
-      d(1,'div',88), H(2, lSe, …'div',89)(3, hSe, …'button',90), d(4,'div',91)…, d(16,'button',98)…
+    Children [3] and [4] of const 87, and they come BEFORE the dark buttons at [16], [18] and [20].
+    `SSe`'s create block, read at byte 1,923,312, is the whole ordering:
+      d(1,'div',87), H(2, cSe, …'div',88)(3, pSe, …'button',89), d(4,'div',90)…, d(16,'button',97)…
   -->
   {@render volume?.()}
   {@render darkButtons()}
   <!--
-    Const 98 again, with const 101 / 116 swapping on `isFullScreenshare`. The owner's capture of
+    Const 97 again, with const 100 / 115 swapping on `isFullScreenshare`. The owner's capture of
     the bar shows all THREE dark buttons - search, camera, expand - and this room rendered two.
   -->
   <button

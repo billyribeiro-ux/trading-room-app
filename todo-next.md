@@ -101,7 +101,7 @@ guessed.
 | 25 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | no |
 | 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | no |
-| 28 | `lib/components/StreamTabs.svelte` | 305 | no |
+| 28 | `lib/components/StreamTabs.svelte` | 304 | no |
 | 29 | `lib/components/ScreenTabs.svelte` | 341 | no |
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
 | 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**2 of 72 surfaces audited · 1,072 of 34,936 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

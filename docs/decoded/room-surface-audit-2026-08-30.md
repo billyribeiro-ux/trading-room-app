@@ -51,11 +51,20 @@ RM-12 by decoding the compact component's whole consts table rather than the ent
 named. It is not folded into the totals above, which describe the two-verifier pass and should keep
 describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes
 the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
-byte offsets make the second reading the tempting one.
+byte offsets make the second reading the tempting one. **Fourteen more were appended on
+2026-08-31** by the read of `ScreenZoomControls.svelte`, `ScreenVolumeControl.svelte` and
+`StreamTabs.svelte` — four `SZC-`, four `SVC-` and six `STB-`, which is what that pass read and
+all it read. **This paragraph is the only place the added-row total is stated.** Three earlier
+passes each added their own version of that sentence elsewhere in this document and all three were
+stale on arrival, because each was computed against its own worktree; they have been consolidated
+here. It does not need restating anywhere, because every added row repeats the marker sentence
+that opens this paragraph in its own body, so `room-surface-audit-counts.test.ts` DERIVES the
+count from the rows and fails if this number and that one disagree in either direction. Fifteen
+markers, fifteen rows outside the two-verifier totals: RM-25 plus these fourteen.
 
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 238 closed · 238 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4393,6 +4402,384 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 **Ours:** apps/room/src/routes/api/day-trade-alerts/+server.ts:20-31 documents the omission and takes the room from the session row instead of the request; the twin note is at apps/room/src/routes/api/swing-alerts/+server.ts:21-25 and the setting is explicitly excluded from the room config in apps/room/src/lib/server/room-config-client.ts:452 and :480. `apps/room/src/lib/room/trade-alerts.svelte.ts:219-223` fetches `${endpoint}?days=…` with no session parameter. A room configured upstream to mirror another room's alert log will show its own log here. Recorded as a deliberate, security-motivated divergence rather than an oversight (the same offset 1,010,164 initial-load path is likewise not carried).
 
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
+
+---
+
+## ScreenZoomControls.svelte
+
+Four rows, appended 2026-08-31. The surface is the screen tab bar's `ms-auto` control cluster, in
+both of the arrangements the capture ships it in — `SSe`'s children 2/3/4/16/18/20 inside
+`app-presentationarea`'s const 87, and `Y0e`'s three nodes inside `app-screenshare-view`'s const 4.
+The container itself is not this component's: `ScreenTabs.svelte:308` draws const 87 and
+`ScreenPane.svelte:567` draws const 4, so the rows below are about the buttons, their order and the
+evidence the file cites for them.
+
+Read end to end at verified boundaries in the pinned v4 bundle, with both const tables
+bracket-walked BY VALUE from their `consts:[[` — `app-presentationarea`'s at byte 1,994,264, 292
+entries, and `app-screenshare-view`'s at byte 1,500,337, 20 entries. Every finding below is one a
+slot-number lookup could not produce.
+
+### SZC-01 — The const-index table and the `ngClass` factory both name a build this repository does not hold, and the factory it names is a different class
+
+**FIXED 2026-08-31.** Every const index this component cited from 66 upward was ONE TOO HIGH for the
+pinned bundle, and the entries either side of each boundary are plausible enough that following one
+reads as correct: the header said const 71 for `li.nav-item.ms-auto` (it is 70), const 88 for
+`zoom-controls-container position-relative` (87), const 89 for the floating trio (88), consts 90-97
+for the volume dropdown (89-96), const 98 for the dark button (97) and consts 101/116 for the
+fullscreen icon swap (100/115). Const 98 is the magnifier GLYPH; the button that holds it is 97. All
+re-decoded by value and corrected in place, with the bundle byte for `SSe` (1,923,312) and for the
+table itself carried in the comment so the next reader re-walks rather than trusts.
+
+**The second half is the one a by-value decode is required for.** The file said the trio's class
+came from `` `VCe = (t) => ({'viewer-only-screen-zoom-controls': t})` ``. In the pinned bundle `VCe`
+is at byte 1,916,444 and is `t => ({"viewer-only-screen-tab": t})` — a DIFFERENT class, on a
+different element. The zoom-controls factory is `HCe` at byte 1,916,482, thirty-eight bytes later,
+and `cSe` binds it at byte 1,920,974. Neither name is in the const table at all, and that is the
+general fact rather than an accident of this one entry: Angular compiles an `ngClass` object literal
+to a shared arrow beside the template functions and leaves only the marker `3,"ngClass"` in the
+const, so const 88 reads `[1,"zoom-controls","position-absolute",3,"ngClass"]` and names nothing.
+A reader looking for the class name in the table finds the nearest arrow instead, which is exactly
+how `VCe` got written down. `screen-cluster-v4-contract.test.ts` asserts the absence directly —
+the whole 19,957-byte table contains neither `viewer-only-screen-zoom-controls` nor
+`viewer-only-screen-tab` nor `show active` — so the note cannot be re-derived the wrong way.
+
+**Also corrected, and separately measured:** the file cited
+`src/lib/styles/captured-runtime-components.css:6902` for `.zoom-controls { top: -33px; left: -33px }`.
+Line 6902 is `app-presentationarea #notesTabsContent`; the rule is at 6930. And the shipped copy of
+`.viewer-only-screen-zoom-controls { top: 33px !important; left: -3px !important }` is
+`src/lib/styles/protradingroom-source.css`, not the capture the comment named — the class is not an
+orphan, which is what the citation was there to establish.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SZC-02 — The detached arrangement's HTML sketch draws a container the reference binds a class on
+
+**FIXED 2026-08-31.** The header's detached sketch read `<div class="zoom-controls-container-detached">`
+with no binding. `app-screenshare-view`'s const 4, walked out of its table by value, is
+`[1,"zoom-controls-container-detached",3,"ngClass"]`, and `Y0e`'s update block at byte 1,493,972
+binds `ct(2,$0e,!e.isDetached&&(!e.isConnected||e.isPresentingThisScreen&&!e.localpreview||e.mediaService.saveData))`
+with `$0e = t => ({hidden: t})` at byte 1,492,696.
+
+**The BINDING is not a gap and is deliberately not re-filed.** `SV-SP-14` above built it, on
+`ScreenPane.svelte:567`, which is the component that owns that container. What was wrong was only
+this file's drawing of it, which is the document a reader of `ScreenZoomControls` reaches first and
+which said the container carries no class logic at all. The sketch now shows the binding and points
+at the row that owns it.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SZC-03 — The `ondblclick` guard on all five buttons is justified by a nesting the reference does not have
+
+**DELIBERATE DIVERGENCE, measured 2026-08-31.** `swallowDoubleClick` is on every button in both
+variants, and the reason recorded for it was "in the DETACHED arrangement the cluster sits inside
+`.video-screen-container`, whose double-click maximises the screen". In the reference it does not.
+`app-screenshare-view`'s root template, read at byte 1,501,300, is
+`H(4,q0e,3,2,"h3",3)(5,Y0e,6,4,"div",4),d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)` — the
+cluster is **node 5** and the `appDoubleClick` box (const 5,
+`["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]`) is
+**node 6**. They are SIBLINGS under const 0, so upstream no double-click on the cluster can reach a
+fullscreen handler and the reference carries no guard.
+
+**Ours is nested, and on purpose.** `ScreenPane.svelte:565-578` puts the cluster inside
+`#video-screen-container-…`, which is what makes it fullscreen with the picture — the same nesting
+`SV-SP-01` relies on for the user-ID watermark, which is clipped away if it sits outside. So the
+guard is the price of a placement this repository chose, not a transcription of anything, and
+un-nesting it to match the reference would undo a row already built. Recorded at the code rather
+than removed, because a guard whose stated reason is false is a guard the next reader deletes.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SZC-04 — Nothing that runs in this checkout asserts anything about this component
+
+**BUILT 2026-08-31 — `apps/room/src/lib/screen-cluster-v4-contract.test.ts`, 29 assertions, all of
+which execute here and on CI.** The cluster's only guard was `screen-volume-contract.test.ts`, which
+opens five files under `docs/source/components/` — a directory `.gitignore` excludes because
+republishing a third party's compiled application from a public repository is not a question to
+answer by accident. `gate/evidence-bound-tests.mjs` therefore drops it: it is one of the 42 files
+the vitest banner names on every run of this suite, and every claim it makes about
+`ScreenZoomControls` and `ScreenVolumeControl` has been unasserted for as long as that has been true.
+
+**The replacement is bound to evidence that ships.** `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`
+is TRACKED — 2,891,205 bytes, SHA-256 `40796ca8…`, verified against that directory's own
+`sha256sums.txt` — and it is the bundle this whole register is written against. The new file walks
+both const tables with `src/lib/const-table.mjs`, the repository's own tokenizer, and pins the
+consts, the three gate expressions, the icon bounds, the `HCe`/`VCe` distinction, the detached
+sibling placement and the rendered order of both variants.
+
+**One of its negative controls came back GREEN and the assertion was the thing at fault.** The
+detached case asserted `not.toContain('dropdownVolume')` while passing no `volume` snippet, so it
+was asking whether nothing renders nothing; adding the volume slot to the detached branch — the
+exact defect it names — left it passing. A `createRawSnippet` marker now makes the two branches
+distinguishable, the attached case asserts the marker IS rendered so the snippet cannot silently
+stop working, and the re-run control is red.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+---
+
+## ScreenVolumeControl.svelte
+
+Four rows, appended 2026-08-31. The surface is `#dropdownVolume` as `app-presentationarea` renders
+it — `pSe` (trigger, byte 1,921,142) and const 90's menu with its slider, its two gated buttons and
+its `room-sound-options` rows — which is a different control from the navbar dropdown of the same id
+(`app-room` const 104). Read end to end against `SSe`'s create and update blocks, with the const
+table bracket-walked by value.
+
+The transcription is faithful: every class, attribute and order below is the reference's. What the
+pass found is three citation defects and one gap in what is actually guarded.
+
+### SVC-01 — The three captured text nodes lost the reference's own leading and trailing spaces
+
+**FIXED 2026-08-31.** `SSe` emits `v(6," Volume ")` at byte 1,923,441, `fSe` emits `v(1," Mute ")`
+at byte 1,921,484 and `mSe` emits `v(1," Unmute ")` at byte 1,921,611. All three carry a leading AND
+a trailing space. This component wrote them as plain text nodes on their own lines, and Svelte drops
+whitespace-only text at an element boundary, so all six spaces were gone from the rendered strings —
+the file's own closing sentence, "every class, attribute, order and text node is the reference's,
+spaces included", was false for exactly the text nodes.
+
+All three now use the brace idiom `apps/room/AGENTS.md` records and defends for the forty-odd other
+captured strings in this repository — `{' Mute '}` — which is the standing exception to the
+autofixer's "unexpected mustache interpolation with a string literal" suggestion, argued there on
+precisely this ground: the braces preserve spaces that Prettier and HTML whitespace folding lose,
+and every capture comparison here diffs rendered strings.
+
+**One residual, stated rather than hidden.** In the `h4` the reference has ` Volume ` immediately
+followed by const 91's close span; here a comment block sits between them, so Svelte collapses the
+newline into one space and the rendered gap before the span is two characters rather than one. The
+span is `float-right`, so nothing moves. Naming it is cheaper than a reader re-finding it.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SVC-02 — The const table in the header is off by one from const 66 up, against a build that is not in this repository
+
+**FIXED 2026-08-31.** The header cited `app-presentationarea 90` for the trigger (it is 89), const 91
+for the menu (90), const 92 for the close span (91), const 94 for the slider (93), consts 95/109 and
+96/110 for Mute and Unmute (94/108 and 95/109), const 97 for `room-sound-options` (96), const 112 for
+the `value="Presenter audiob"` checkbox (111) and consts 98/102 for the two `ScreenZoomControls`
+buttons it compares itself to (97/101). The two prop docstrings naming const 109 and const 110 for
+the mute and unmute clicks were the same shift. `app-room 104` for the navbar trigger is CORRECT and
+was left alone — the app-room table did not move, which is the measurement that says this is a
+per-component boundary rather than a global one.
+
+**The source of the drift is named rather than guessed at.** The citations pointed at
+`docs/source/components/app-presentationarea.render-helpers.js` and `.compiled.js`, which are files
+of an OLDER build and are not in this repository under any path — `git ls-files` finds nothing under
+`apps/room/docs/source/`. So a reader following any of them had nothing to open, and a reader
+resolving the numbers against the pinned bundle landed one entry past every const named.
+
+**BLOCKED tail, outside this pass's three files, with the exact change.**
+`apps/room/src/lib/screen-volume.ts:51-52` carries the same shift for the same reason: "The three
+icon classes of consts 106, 107 and 108" and "const 108 is `[1,"fas","fa-volume-off"]`
+(compiled.js:2128)". In the pinned bundle they are 105, 106 and 107, decoded by value. The one-line
+change is `consts 106, 107 and 108` → `consts 105, 106 and 107` on line 51, with the sentence on 52
+becoming `const 107 is [1,"fas","fa-volume-off"] (byte 2,001,495)`. The VALUES that module ships are
+correct; only the numbers pointing at them are not.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SVC-03 — The reference gives both volume dropdowns the same presenter-row ids; ours diverges, and nothing that runs said so
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.** The divergence and its whole
+argument are in `apps/room/src/lib/screen-volume.ts:99-114`, at `presenterRowId`, and
+`PresenterMuteRows.svelte:51-59` states it again at the prop. The audit reader would have filed this
+as an invented value; it is a decision already taken, recorded, and applied in exactly one of the
+two places.
+
+**What was missing is the measurement, in a form that executes.** Re-read by value: the reference
+builds `ei("name","talkingPresenter",i,"-donot-disturb")` and its matching `id` and `for` in BOTH
+components — `vSe` at byte 1,922,603 for the overlay and `T4e` at byte 2,483,544 for the navbar —
+six occurrences of the literal `"talkingPresenter"` over two components, confirmed by splitting the
+whole 2,891,205-byte file rather than by a match window. Both dropdowns are in the document at once
+in viewer-only mode, because the navbar's is ungated and the overlay's trigger renders only there,
+so upstream every `label[for]` in the overlay resolves to the navbar's checkbox of the same index
+and the overlay's own rows cannot be muted by clicking their labels.
+
+`screen-cluster-v4-contract.test.ts` now asserts the count, both byte offsets, and that the rendered
+overlay emits `screenTalkingPresenter0-donot-disturb` and NOT `talkingPresenter0-donot-disturb`. The
+citations in `screen-volume.ts` still name the absent decoded-components paths; that file is outside
+this pass and the change is one line — `app-presentationarea.render-helpers.js:370-371` and
+`app-room.render-helpers.js:1087-1088` → `bytes 1,922,603 and 2,483,544`.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SVC-04 — `screen-volume-contract.test.ts` cannot run in this checkout or on CI, so this control's guard is the new file and not that one
+
+**BLOCKED 2026-08-31, and the blocker is named with what would unblock it.** That file reads five
+paths under `docs/source/components/` (lines 41-55 and 539-546). `docs/source` is one of the
+fourteen evidence roots `.gitignore` excludes and `gate/evidence-bound-tests.mjs` discovers as
+missing, so vitest excludes the file on every run here and on CI. It is not deleted and not edited:
+its subject genuinely is a build this checkout cannot see, and deleting a test because its evidence
+is absent is how a repository loses the record that the evidence ever existed.
+
+**It is not a one-line repair, and saying so is the point of the row.** Re-pointing line 41 at
+`../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` would make the file run and then fail:
+its literals are the older build's minifier output. Measured against the pinned bundle, at least
+these move — `ut(` → `ct(`, `Dt(` → `Et(`, `Go` → `mo`, `hSe` → `pSe`, `CSe` → `SSe`, `bSe` → `vSe`
+— and the const numbers shift by one from 66 up, which is `SVC-02`. The honest unblocking step is
+the one taken here: a new file, bound to the tracked bundle, re-deriving each fact from the v4 bytes
+rather than copying an assertion across. What remains blocked is the OLD file, and what would
+unblock it is the owner deciding whether an evidence-bound test whose evidence is permanently
+gitignored should be retired or re-pointed. That is not this pass's call.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+---
+
+## StreamTabs.svelte
+
+Six rows, appended 2026-08-31.
+
+**`StreamTabs` is a different component from `ScreenTabs`, and this was checked before the pass
+began rather than assumed.** Both exist on disk — `apps/room/src/lib/components/StreamTabs.svelte`
+(306 lines) and `apps/room/src/lib/components/ScreenTabs.svelte` — and they transcribe two different
+reference templates from the same component: `ISe` at byte 1,925,991 renders `ul#streamsTabs` from
+the MediaMTX stream list, and `lSe` at byte 1,919,600 renders `ul#screenTabs` from
+`mediaService.screenSharingUsers`. `ISe` has no `img.presenter-img`, labels a tab with
+`Ze(e.mediaValue.name)` alone, and its menu holds two items; `lSe` has the avatar, the
+`{name}-{screenName}` join and four. So the `## StreamingView + ScreenPane + ScreenTabs` section
+above, and its `SV-SP-05`/`SV-SP-06` rows about the screenshare bar, describe a different surface,
+and nothing below re-files any of them.
+
+The two bars DO share const entries — 31, 54, 55, 56, 57, 74 and the lock/unlock consts are single
+table entries read by both — which is a fact this pass corrected a comment about, and is `STB-05`.
+
+### STB-01 — The tab-select listener is on the anchor, and three `stopPropagation` calls suppress selections the reference performs
+
+**BUILT 2026-08-31.** Const 31 is `["role","presentation",1,"nav-item",3,"click"]` and `ISe` opens
+`d(0,"li",31),x("click",function(){const o=D(e).$implicit;return E(g(2).onStreamTabChange(o._id))})`
+at byte 1,926,042 — the tab-select click is on the **`li`**. Const 73, the anchor, binds `ngClass`
+and `id` and nothing else; it carries no `click` at all. This component had the handler on the
+`<a>` and then stopped propagation in three places: the gear's `toggleMenu`, the lock badge's
+handler, and `runItem` for every dropdown item.
+
+**Nothing in the reference tab stops that click**, and the assertion is made rather than assumed:
+the 609 bytes of `ISe` contain no `stopPropagation`, and Angular's compiled listeners suppress an
+event only by RETURNING FALSE — `E(…)` is `ɵɵresetView`, which returns what the component method
+returned, and `onStreamTabChange`, `toggleLockScreenMTX` and `bringFocusToScreen` all return
+`undefined`. The gear has no handler of its own at all: const 78 is `data-bs-toggle="dropdown"` and
+Bootstrap delegates that on `document`, above the `li`, so it cannot stop the bubble either.
+
+So upstream, opening a gear menu selects its tab, clicking the lock badge locks AND selects, and
+clicking a dropdown item selects too. Here none of the three did. `onselect` now sits on the `li`
+where const 31 puts it, all three `stopPropagation` calls are gone, and `onkeydown` stays on the
+anchor because it is the only focusable node in the tab — the roving-tabindex divergence this file
+already recorded is unaffected. Two controls seen red: putting `onselect` back on the anchor, and
+reintroducing one `stopPropagation`.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-02 — Every const index this component names from 66 up is one too high for the pinned bundle
+
+**FIXED 2026-08-31.** The header carried a fourteen-row index table and eleven of its rows named the
+entry AFTER the one described: 118 for the streams bar (117 — 118 is `streamsTabsContent`), 74 for
+the tab anchor (73 — 74 is the tooltip), 75 for the forced-screen tooltip (74), 83 for the lock badge
+(82 — 83 is the padlock glyph), 78 for `d-inline-block` (77), 79 for the gear toggle (78), 55/56/57/58
+for the cog, its menu, the menu `li` and its anchor (54/55/56/57), 81/86 for the two titles (80/85)
+and 82/84/87 for the three glyphs (81/83/86). Consts 31 and 14 are unchanged, which is what places
+the boundary between 31 and 54 rather than making this a blanket shift.
+
+The table is now walked by value and the corrected numbers are asserted against the decoded entries
+rather than against each other: for each corrected index `stream-tabs-v4-contract.test.ts` also
+asserts what the STALE index holds, because an off-by-one in a table of tab markup produces
+plausible neighbours and an assertion that only checks the new number passes on both.
+
+The citations that produced it are the older build's — `app-presentationarea.full.js:543-588` and a
+const table "at `:3790` onward" — and no such file is in this repository. Replaced with the byte
+offsets of `ISe` and of `consts:[[`.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-03 — All four "inert upstream" findings hold in the pinned bundle, and all four byte offsets were the older build's
+
+**FIXED 2026-08-31.** This component's header carries the most valuable prose on the surface — four
+controls that render and do nothing upstream, recorded so nobody "finishes" one by inventing a
+protocol. Every one of the four SURVIVES re-reading in the pinned bundle, and every one of the
+offsets under them pointed somewhere else in it:
+
+| finding | cited | pinned v4 |
+| --- | --- | --- |
+| `forcedScreenMTXID` template read | 1926192 | **1,926,600** |
+| `forcedScreenMTXID=""` in the constructor | 1952638 | **1,954,252** |
+| `lockedScreenIDMTX=""` in globals | 977288 | **977,288** (unchanged) |
+| `lockedScreenIDMTX` template read | 1926252 | **1,926,660** |
+| the `selectStreamTabOfId` guard's two reads | 1960257 | **1,961,921** and **1,961,964** |
+| `toggleLockScreenMTX` stub | `full.js:3056-3058` | **1,976,853** |
+| the working `toggleLockScreen` beside it | `:3050` | **1,976,706**, 147 bytes earlier |
+| `bringFocusToScreen` | `:2727` | **1,969,281** |
+| the `focusOnScreen` subscriber | 1962380 | **1,964,131** |
+
+The COUNTS all hold: `forcedScreenMTXID` twice, `lockedScreenIDMTX` four times — the four rather
+than three that a `grep -o` match window once reported, re-confirmed here by splitting the whole
+file — and the subscriber still scans `mediaService.screenSharingUsers` and never
+`mtxHandlerService.mtxStreams`. So the four refusals stand unchanged; what was wrong was every
+address a reader would use to check them, which for a standing refusal is most of its value.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-04 — `stream-tabs-contract.test.ts` reads a bundle that is not in this repository, so the whole file asserts nothing
+
+**BLOCKED 2026-08-31, with the exact change and why it is not one line.** Line 20 reads
+`../../docs/source/main.d6d3c112b59b7d0d.js`. No file of that name exists anywhere in this
+checkout, and `docs/source` is a gitignored evidence root, so `gate/evidence-bound-tests.mjs`
+excludes the file — one of the 42 the vitest banner names on every run. All twelve of its `it`
+blocks, including the four standing refusals `STB-03` is about and the two-lock-fields test its own
+comment calls "THE test that earns this file", have been unexecuted here and on CI throughout.
+
+The exact one-line change is line 20:
+`new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url)` →
+`new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url)`.
+It is not sufficient on its own and the row would be dishonest without saying so: five of that
+file's literals are the older minifier's and fail against v4 — `ut(9,Go,` → `ct(9,mo,`, `Dt(` →
+`Et(`, `Go=t=>({active:t})` → `mo=t=>({active:t})`, and the two `O(10,…)`/`O(13,…)` node numbers sit
+inside a longer update string that must be re-quoted from byte 1,926,570.
+
+What this pass did instead is build `stream-tabs-v4-contract.test.ts`, which re-derives all twelve
+facts from the v4 bytes and RUNS: 26 assertions, five of them negative controls seen red. Retiring
+or re-pointing the old file is an owner decision about a test whose evidence is permanently
+gitignored, and is deliberately not taken here.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-05 — The forced-screen tooltip is ONE const entry read by both bars, not "two literals in one table"
+
+**FIXED 2026-08-31.** The comment above `FORCED_SCREEN_TOOLTIP` justified duplicating the 250-character
+string in `StreamTabs` and `ScreenTabs` on the ground that "`ScreenTabs` reads it from ITS const (75
+as well) … They are two literals in one table." Decoding the table says otherwise: there is exactly
+one entry, const 74 at byte 2,000,042, and both readers open it — `xSe` at byte 1,925,418 (streams)
+and `iSe` at byte 1,918,787 (screenshares) each emit `d(0,"span",74)`. Two components of ours read
+one const of theirs.
+
+**The DECISION does not change and the reason for it is now the true one.** Sharing the string in
+TypeScript is still a choice the reference does not make for us, and `ScreenTabs.svelte` is outside
+this pass, so the duplication stays. What changed is that the comment no longer claims a fact about
+the reference that the reference contradicts. The transcription itself is now asserted by value
+rather than against a copy of itself: the test joins the component's three concatenated fragments
+and compares the result to the decoded const, which is the only version of that assertion that can
+fail for a real reason — a `toContain` of the whole string would fail on a component that is
+correct, because Prettier splits the literal.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-06 — `href="#{id}"` where const 57 is a literal `href="#"`
+
+**DELIBERATE DIVERGENCE, measured 2026-08-31.** Const 57 is `["href","#",1,"dropdown-item"]`, decoded
+by value, and it is the anchor of both dropdown items. Upstream nothing prevents its default: the
+click handler is on the `li` (const 56, `[3,"click"]`), the anchor has none, and neither
+`bringFocusToScreen` nor `toggleLockScreenMTX` returns `false`. So a menu click in the reference
+runs its command AND navigates to `#`, which scrolls the room to the top.
+
+Half of that is reproduced here and half is not. The BUBBLING is reproduced as of `STB-01` — the
+click reaches the `li` and selects the tab, exactly as upstream. The JUMP is not: `runItem` keeps
+`event.preventDefault()`, and the `href` is `#` plus the stream's own id rather than a bare `#`, so
+the fragment at least names the tab it belongs to. Matching the reference literally here would
+reproduce a defect that has nothing to do with the feature, and would do it on the only control in
+this menu that a viewer can reach by keyboard.
+
+This is recorded rather than left in a handler comment because the previous comment explained the
+`preventDefault` and not the changed `href`, and an unexplained divergence is the one a future
+reader "corrects" back.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ---
 

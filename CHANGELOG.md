@@ -33,6 +33,56 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 02:30 EDT — The screen zoom, screen volume and stream-tab surfaces, audited against the pinned v4 bundle
+
+**Runtime impact: YES, in two places.** `StreamTabs.svelte` now selects a tab from the `li` rather
+than the anchor and no longer stops the click reaching it, so opening a gear menu, clicking a lock
+badge or choosing a menu item selects that stream's tab — which is what the reference does and what
+this room did not. `ScreenVolumeControl.svelte` now renders ` Volume `, ` Mute ` and ` Unmute ` with
+the reference's own leading and trailing spaces instead of trimmed text nodes. Everything else in
+the change is comments, byte offsets and two new test files.
+
+**Fourteen rows appended to `docs/decoded/room-surface-audit-2026-08-30.md`** — four `SZC-`, four
+`SVC-`, six `STB-` — with the single added-row paragraph near the top updated rather than a second
+one added, which is what three earlier passes each did and all three of which were stale on arrival.
+The register is now 238 rows, all closed, and `room-surface-audit-counts.test.ts` derives that from
+the rows rather than from a number anyone maintains.
+
+**What the pass actually found, and why a by-value decode was needed to find it.** Both const tables
+were bracket-walked from `consts:[[` and decoded with `src/lib/const-table.mjs` — never looked up by
+slot number. Read that way, **every const index the three components cited from 66 upward was one
+too high for the pinned bundle**: 118 for the streams bar is `streamsTabsContent`, 98 for the dark
+button is the magnifier glyph it contains, 90 for the volume trigger is its menu. Corrected in
+place, index by index, across all three files. The citations that produced them named
+`docs/source/components/*.js`, an older build that `git ls-files` finds nowhere in this repository.
+
+**And the trap the brief named, confirmed and pinned.** `ScreenZoomControls` credited the trio's
+class to `` VCe = (t) => ({'viewer-only-screen-zoom-controls': t}) ``. In the pinned bundle `VCe`
+(byte 1,916,444) is `viewer-only-screen-tab` — a different class on a different element — and the
+zoom factory is `HCe` at byte 1,916,482. Neither name is in the const table at all: Angular compiles
+an `ngClass` object to a shared arrow beside the template functions and leaves only `3,"ngClass"` in
+the entry. `screen-cluster-v4-contract.test.ts` asserts the whole 19,957-byte table contains none of
+the three class names, so the wrong derivation cannot be repeated.
+
+**Two new contract files, and they RUN.** `screen-cluster-v4-contract.test.ts` (29) and
+`stream-tabs-v4-contract.test.ts` (26) read `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`,
+which is tracked. The files that previously guarded these three components —
+`screen-volume-contract.test.ts` and `stream-tabs-contract.test.ts` — read `docs/source/`, a
+gitignored evidence root, so `gate/evidence-bound-tests.mjs` excludes both on every run here and on
+CI. Neither is edited or deleted; both are filed BLOCKED with the change that would move them and
+the reason it is not one line. Fourteen negative controls were run; one came back GREEN and the
+assertion was at fault, not the component — a detached-variant `not.toContain` that passed no volume
+snippet was asking whether nothing renders nothing. Fixed with a `createRawSnippet` marker and
+re-run red.
+
+**Sizes.** All three components are exactly at their `source-size-contract` ceilings and none was
+raised: 237, 228 and 306. The corrections are line-for-line replacements, and where new prose was
+needed it was paid for by handler code the change deleted.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit code read from the log. `svelte-check` 0 errors,
+0 warnings. Not run: anything in `apps/controller` or `services/`, neither of which this change
+touches.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
