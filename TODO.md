@@ -750,10 +750,17 @@ about `apps/room`.
 The room's own gap register is `docs/reference/room-component-gap-register.md`, and the work queue
 that goes with it is **`todo-next.md`** — deliberately a separate file, because this one is being
 edited concurrently by the decomposition work and two sessions writing one TODO is how a merge
-conflict eats a finding. **Read `todo-next.md`'s own header before treating it as a build spec: as of
-2026-08-31 it covers 5 of 81 room surfaces, 2,045 of 35,905 lines — 5.7%. Those numbers are not
-copied here; `todo-next-coverage-contract.test.ts` measures every row against the file it names and
-the headline against the rows, so the tracker is checked rather than remembered.** `NEW-TODO.md` covers Part 1 flaws in the
+conflict eats a finding. **Read `todo-next.md`'s own header before treating it as a build spec — and read it THERE.**
+
+> **This sentence carried the coverage figures for four hours and they were stale within one.** It
+> said *"as of 2026-08-31 it covers 5 of 81 room surfaces, 2,045 of 35,905 lines"*, in the same
+> breath as *"those numbers are not copied here"*, which they plainly were. Three audit merges later
+> the file said 10 of 82 and 3,814 of 36,024, and this line still said 5 of 81 — the exact failure
+> the paragraph above it forbids, committed while forbidding it.
+>
+> So there is no number here now. `todo-next-coverage-contract.test.ts` measures every row against
+> the file it names and the headline against the rows, so that file is checked on every run and this
+> one cannot go stale about it: there is nothing left here to be stale. `NEW-TODO.md` covers Part 1 flaws in the
 ORIGINAL that we deliberately do not reproduce.
 
 As of 2026-08-27: **66 CLOSED, 6 OPEN, 15 parked/won't-fix, 87 total.**
