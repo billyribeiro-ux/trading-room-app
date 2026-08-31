@@ -33,6 +33,48 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 22:30 UTC — Two more TODO.md rows that described work already done, one for eight days
+
+**Runtime impact: NO** — comments and trackers. Both rows named a blocker, and neither blocker was
+real; the code they said was missing had shipped.
+
+**Alert Labels' composer picker.** The row read *"Evidence gap, not a port: `alertLabels` is one of
+`direct-evidence-contract.ts`'s `hiddenCapabilityBranches`, so that branch never rendered in any
+capture we hold and **there is no markup to match**. Needs a new capture from a room that has the
+entitlement."*
+
+The DOM-capture half is true. The conclusion does not follow, and that is the finding: **the compiled
+template is in the pinned bundle.** `zTe` at byte 2,119,145 is the per-label row —
+`div.form-check` > `input.form-check-input#alert-trade-label-{i}` and a `label[for]` showing
+`e.name` with a trailing `?` — `GTe` at 2,119,525 repeats it over `globals.alertLabels`, the gate is
+`O(62, …length > 0 ? 62 : -1)` at 2,138,428, and `processAlertLabels` at 2,131,295 is the
+`" #"+hash` prefix rule. Decoding compiled templates is how this entire repository was built, so *no
+rendered capture* was never the same claim as *no markup to match*.
+
+And it was built from exactly those bytes: `PostAlertModal.svelte:518-553` carries the transcription
+with the offsets, `alertLabelPrefix` is in `alert-labels.ts`, and `alert-label-picker-contract.test.ts`
+holds it. The same wrong inference was in `alert-labels.ts`'s own docblock, which described the
+`checked` flag as being carried for a shape *"the composer will need"* — future tense. Corrected in
+place rather than deleted, because the wrong inference is the useful part: it is the one the next
+reader of `hiddenCapabilityBranches` will make again.
+
+**`kick-duplicates`.** The defect table said *"NOT fixable without inventing … the positive arm needs
+a kick the room cannot perform"*. The "OPEN RIGHT NOW" table, in the same file, had recorded the
+opposite on the day it shipped: *"the row's blocker was my own bad reading"*. `emailHash` was already
+on `User`, already filled from `hashEmail(account.email)`, and already read as `connectedUsers`; what
+misled the original reading was `RosterAuthority`, a narrow `{id, isP?}` interface written for
+`mute-all-non-admins` alone and wrongly generalised to be the roster. **Two cells describing one
+control, disagreeing for eight days** — which is what "a row that is DONE is deleted" exists to
+prevent, and why deleting that table yesterday was the right call rather than a tidy-up.
+
+The six-defects heading is corrected with them. It read *"REAL, FIXABLE, and not yet done"* over
+*"they are simply not built yet"*; all six are closed. The table is kept in full, because it is now
+more useful as a record of how the VERDICTS fared than as a work list: four of the six were wrong
+about the state of the code, three of them calling built work missing. A verdict reached without
+locating the code is a verdict about the author's memory.
+
+Room gate exit 0.
+
 ### 2026-08-31 22:00 UTC — The kicked page, and TODO.md's twelve-row table is empty
 
 **Runtime impact: YES.** A kicked member used to get a DISMISSIBLE dialog over a room whose stream

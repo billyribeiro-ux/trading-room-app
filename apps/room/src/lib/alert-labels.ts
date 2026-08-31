@@ -19,10 +19,23 @@
  *
  * The third such setting, beside `modAlertFilterList` and `chatTabsWithBadges`. The `checked = false`
  * stamped onto every entry is NOT for rendering — it is the selection state of the post-alert
- * composer's label picker, whose branch is `hiddenCapabilityBranches: ['…', 'alertLabels', …]` in
- * `direct-evidence-contract.ts`, i.e. never rendered in the capture we hold. It is carried here
- * because the parse is the same parse, and dropping it would silently change the shape the composer
- * will need.
+ * composer's label picker.
+ *
+ * **That picker IS built, and this paragraph used to imply it could not be.** It said the branch is
+ * `hiddenCapabilityBranches: ['…', 'alertLabels', …]` in `direct-evidence-contract.ts`, *"never
+ * rendered in the capture we hold"*, and that the `checked` flag was carried for a shape *"the
+ * composer will need"* — future tense. `TODO.md` drew the stronger conclusion from the same fact and
+ * called the picker an evidence gap with *"no markup to match"*.
+ *
+ * The DOM-capture half is true and the conclusion does not follow. **The compiled template is in the
+ * pinned bundle**: `zTe` at byte 2,119,145 is the per-label row, `GTe` at 2,119,525 repeats it over
+ * `globals.alertLabels`, and the gate is `O(62, …length > 0 ? 62 : -1)` at 2,138,428. Decoding
+ * compiled templates is how this entire repository was built, so *no rendered capture* was never the
+ * same claim as *no markup to match*. `PostAlertModal.svelte:518-553` carries the transcription and
+ * `alert-label-picker-contract.test.ts` holds it.
+ *
+ * Corrected 2026-08-31 rather than deleted: the wrong inference is the useful part, because it is
+ * the one a reader of `hiddenCapabilityBranches` will make again.
  *
  * **`JSON.parse` with no try/catch**, exactly like `parseModAlertFilterList`. A malformed setting
  * throws rather than quietly disabling labels, which is the reference's behaviour and the honest one:
