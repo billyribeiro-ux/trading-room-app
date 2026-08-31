@@ -1519,6 +1519,7 @@
                 onmodonly={(next) => chat.setModOnly('extra', next)}
                 ontoggletoolbar={() => chat.search.toggleExtended('extra')}
                 onimageupload={() => composer.openImageUpload()}
+                onpasteimage={(file) => composer.beginImagePaste(file, 'extra')}
                 onyoutube={isPresenter ? () => modals.open('youtube') : undefined}
                 onrte={() => composer.openExtraRTE()}
                 onselectgif={(url) => composer.selectGif('', url)}

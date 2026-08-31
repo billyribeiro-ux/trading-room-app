@@ -824,6 +824,16 @@
   {canPostImages}
   onQaImageUpload={() => messageActions.beginQaImageUpload()}
   onQaImagePaste={(file, draft) => messageActions.beginQaImagePaste(file, draft)}
+  onQaAlertBodyAction={(action, payload) => {
+    /*
+      `QAM-10` — the header card's body acts on the ALERT, and the full `MessageActionItem` lives
+      here rather than inside the modal. `selected` is what `targetMessage` already is, so this is
+      the same row the card is rendering; the guard is for the window between a close and the next
+      open, which `Modal` keeps mounted.
+    */
+    const alert = messageActions.selected;
+    if (alert) messageActions.handle('alert', action, alert, payload);
+  }}
   alertQuestions={data.alertQuestions}
   {messageChrome}
   {presenterColors}

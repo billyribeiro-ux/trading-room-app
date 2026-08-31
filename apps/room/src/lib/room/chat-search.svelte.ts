@@ -41,9 +41,15 @@
  * extended bar carries: the **Mod Only** checkbox. So both toggles are transcribed above, term for
  * term, and both are implemented below.
  *
- * The rest of that bar is still not built — the save-chat and archive controls (`Y_e` and `Q_e`,
- * nodes 4 and 5 of `X_e` at byte 1,423,265) are separate features — so the extended section renders
- * the checkbox and nothing else. That is a gap in what the bar OFFERS, not a flag with no reader.
+ * The rest of that bar is still not built, and `ACA-06` corrected WHICH controls those are: `Y_e`
+ * (1,422,202) and `Q_e` (1,422,956) are the Group Chat Control dropdown and the Detach Chat button,
+ * nodes 4 and 5 of `X_e` at byte **1,423,104**; the save-chat and archive pair is `K_e`/`q_e`
+ * (1,421,929 / 1,421,800) at node **9 of `J_e`**, in the other of the bar's two extended slots.
+ * Four names and one offset were wrong here and in `ChatSearchBar.svelte`'s docblock, which carries
+ * the full decode; this file names them rather than restating it.
+ *
+ * So the extended section renders the checkbox and nothing else. That is a gap in what the bar
+ * OFFERS, not a flag with no reader.
  *
  * ## One divergence, and it is in the reader's favour
  *

@@ -112,6 +112,40 @@ describe('the evidence this file measures is loaded', () => {
   it('walked a const table rather than an empty one', () => {
     expect(CONSTS.length).toBe(292);
   });
+
+  it('STB-04 — and the superseded file still SAYS it does not run here', () => {
+    /*
+      The pairing between these two files is the only thing stopping a reader trusting twelve `it`
+      names that assert nothing on this checkout, and until 2026-08-31 it existed solely in this
+      file's docblock — where somebody reading the OTHER file would never see it.
+
+      That note now lives at the head of `stream-tabs-contract.test.ts` too, and this asserts it is
+      still there. A one-directional cross-reference is how the pair comes apart: whoever re-points
+      or retires that file will be reading that file, not this one.
+
+      The three bundle generations are named there as a table, because the obvious repair — point it
+      at the v3 capture this checkout DOES hold — was measured and does not work: v3 is a third
+      minifier generation carrying neither this file's literals nor that one's.
+    */
+    const superseded = readFileSync(
+      new URL('./stream-tabs-contract.test.ts', import.meta.url),
+      'utf8'
+    );
+    expect(superseded).toContain('`STB-04` — READ THIS BEFORE TRUSTING ANY ASSERTION BELOW');
+    expect(superseded).toContain('stream-tabs-v4-contract.test.ts` is the file that RUNS');
+    /*
+      And it still reads the absent bundle, which is the fact the note is about — asserted by
+      FILENAME ALONE, never with its directory.
+
+      Writing the full path here excluded THIS file. `evidence-bound-tests.mjs` strips comments and
+      then matches a quote, `../` or `/` followed by a missing root; a string literal holding
+      `docs/source/…` is code, not a comment, so the one file that runs became the 43rd excluded one
+      and the suite reported "No test files found" for it. Caught within a minute by the gate, and
+      it is the precise mirror of defect 1 that module's own docblock records — a citation is not a
+      read, and here a read that was only a citation looked like one.
+    */
+    expect(superseded).toContain('main.d6d3c112b59b7d0d.js');
+  });
 });
 
 describe('STB-02 — the const indices, decoded by VALUE out of the pinned table', () => {

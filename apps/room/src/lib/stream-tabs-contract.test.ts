@@ -5,6 +5,37 @@ import StreamTabs from './components/StreamTabs.svelte';
 import type { MtxStream } from './mtx-streams';
 
 /*
+  ── `STB-04` — READ THIS BEFORE TRUSTING ANY ASSERTION BELOW ──────────────────────────────────────
+
+  **This file does not run in a checkout that lacks `docs/source/`, and it is silently EXCLUDED
+  rather than failing.** `gate/evidence-bound-tests.mjs` drops it into the count the vitest banner
+  prints on every run ("42 evidence-bound test file(s) excluded"), so twelve `it` blocks whose names
+  read as live guarantees — including the four standing refusals and the two-lock-fields test that
+  the comment below calls the one that earns this file — assert nothing there.
+
+  `stream-tabs-v4-contract.test.ts` is the file that RUNS. It re-derives every fact here from the
+  pinned v4 bundle and adds eleven more, most of them const-number corrections this file's numbers
+  predate. If you are looking for the current guarantee about this component, it is there.
+
+  **Re-pointing this file is not one line, and the obvious second candidate does not work either.**
+  Measured 2026-08-31, three bundle generations:
+
+  | bundle | in this checkout | carries this file's literals |
+  | --- | --- | --- |
+  | `docs/source/main.d6d3c112b59b7d0d.js` | no | — (the file this reads) |
+  | `docs/source-v3-2026-08-15/main.99a5781d1d7a7775.js` | yes | **no** — `ut(9,Go,` and `Go=t=>({active:t})` are both absent |
+  | `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` | yes | **no** — five literals are the older minifier's |
+
+  So v3 is a THIRD generation rather than the one this was written against, and a v4 re-point needs
+  five literal rewrites plus two node numbers re-quoted from byte 1,926,570.
+
+  What to do with this file is deliberately NOT decided here: `docs/source` is a real evidence root
+  that 74 test files in this app read, gitignored by design and absent only from containers like the
+  one this note was written in. It may well run where that root exists. Retiring or re-pointing a
+  test whose evidence is present for its author and absent for everyone else is an owner's call, and
+  taking it from inside a container that cannot see the evidence would be exactly the shape this
+  repository refuses.
+
   `StreamTabs.svelte` is a transcription of `RSe`, and a transcription whose source is not asserted
   is a guess with a citation stapled to it.
 

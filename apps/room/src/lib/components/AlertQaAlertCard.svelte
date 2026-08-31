@@ -1,6 +1,9 @@
 <script lang="ts">
+  import MessageBody from '#lib/components/MessageBody.svelte';
+  import { parseBodySegments } from '#lib/message-body-segments.js';
   import { ngbTooltipWith } from '#lib/ngb-tooltip.js';
   import { alertDateFormatter } from '#lib/message-formatters.js';
+  import type { MessageAction, TradeCopyPayload } from '#lib/types.js';
 
   /**
    * `e3e` — the alert card the Q&A modal reproduces in its own header.
@@ -36,7 +39,13 @@
      * The NARROW shape the host holds, copied rather than widened — see `QAM-10` and `QAM-11` below
      * for the two fields it deliberately does not carry and what that costs.
      */
-    alert
+    alert,
+    /** `preferences.chatGif` — `parseLinks`' second argument. A muted gif shows a placeholder. */
+    chatGif = false,
+    /** `sessData.copyTrades` — which of the reference's two templates renders the body. */
+    copyTrades = false,
+    /** A click inside the piped body — an image, a link, a ticker. See `QAM-10`. */
+    onaction
   }: {
     alert: {
       id: number;
@@ -45,8 +54,60 @@
       senderAvatarUrl?: string;
       createdAt?: Date | string;
       evidenceTimestampText?: string;
+      /**
+       * `QAM-11` — `e.qaMsg.avt`, the sender's gravatar hash.
+       *
+       * OPTIONAL here and REQUIRED on `MessageActionItem`, which is what actually arrives. The
+       * narrow shape is the host's and is copied rather than widened; declaring it optional is the
+       * honest description of a field this component must render without when it is absent, which
+       * is exactly what the fallback below does.
+       */
+      senderEmailHash?: string;
+      /**
+       * `QAM-10` — the URL an image click opens.
+       *
+       * `room/message-actions.svelte.ts` resolves an `image` action through `item.targetUrl`, so a
+       * body rendered without it would draw an image whose click cannot act — the
+       * control-with-no-effect this repository refuses. Present at runtime on every
+       * `MessageActionItem`; this declaration is it catching up with the data.
+       */
+      targetUrl?: string | null;
     } | null;
+    chatGif?: boolean;
+    copyTrades?: boolean;
+    onaction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
   } = $props();
+
+  /**
+   * `QAM-10` — the alert body PIPED, as the reference pipes it.
+   *
+   * ```js
+   * z("innerHTML", parseLinks(parseSymbols(e.qaMsg.txt, "chat", e.qaMsg.avt, null),
+   *   preferences.chatGif, e.qaMsg._id, !1))                               // byte 2,331,625
+   * ```
+   *
+   * **`"chat"`, not `"alerts"`, and that is the load-bearing argument of this whole derivation.**
+   * `parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'`, which is
+   * the reference's own `"alerts" === i`. The alert card in the Q&A header is passed `"chat"`, so a
+   * `[{( … )}]` order that renders as a copyable trade in the log beneath the modal stays LITERAL
+   * text here. That is upstream's behaviour, it is surprising, and it is why `kind` is written out
+   * with this paragraph instead of being taken from the row's own type.
+   *
+   * `copyTrades` is still passed rather than hardcoded `false`: it is the reference's own template
+   * discriminator (`O(0, sessData.copyTrades ? 0 : 1)`, byte 2,332,021), the context's field is
+   * named for it, and pinning it to a literal here would hide which of two facts is doing the work
+   * if `kind` ever changed.
+   */
+  const bodySegments = $derived(
+    alert
+      ? parseBodySegments(alert.body, {
+          kind: 'chat',
+          messageId: alert.id,
+          alertLabels: [],
+          copyTrades
+        })
+      : []
+  );
 
   const qaTimeFormatter = new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
@@ -104,11 +165,15 @@
                 than wrong here. `z("src", e.qaMsg.pic || "https://secure.gravatar.com/avatar/" +
                 e.qaMsg.avt + "?d=mm&s=50")` at byte 2,331,038 falls back to THAT SENDER's gravatar;
                 this falls back to the hashless URL, which is the generic mystery-man for everyone.
-                `avt` is the email hash, and the shape above has no field carrying it because
-                `ModalHost.svelte:529` declares `targetMessage` without one. Adding an optional field
-                here would leave it `undefined` at the type level while the value is present at
-                runtime — the invisible mismatch this repository keeps finding. The one-line change
-                is named in the audit register.
+                BUILT 2026-08-31. `avt` is the email hash and the shape now carries it, so the
+                fallback is THAT SENDER's gravatar rather than the generic mystery-man.
+
+                The earlier note said adding an optional field would leave it `undefined` at the
+                type level while the value was present at runtime, and that reading was half right:
+                the mismatch is real, and the answer is to widen the shape at the HOST as well —
+                which is what `QAM-10` needed anyway, and what was done. It stays optional on this
+                component because this component must still render when it is absent, and the
+                fallback below is what that means.
 
                 `width` and `height` are ours: the capture's const 31 is `["alt","qaMsg.avt",3,"src"]`
                 and sizes the image from `.avatar img { max-width: 50px }`, which is a layout shift
@@ -116,7 +181,8 @@
               -->
               <img
                 alt="qaMsg.avt"
-                src={alert.senderAvatarUrl ?? 'https://secure.gravatar.com/avatar/?d=mm&s=50'}
+                src={alert.senderAvatarUrl ||
+                  `https://secure.gravatar.com/avatar/${alert.senderEmailHash ?? ''}?d=mm&s=50`}
                 loading="lazy"
                 width="50"
                 height="50"
@@ -154,14 +220,21 @@
               string, so a member reading the Q&A sees markup-free text where the same alert in the
               log beneath the modal is fully piped.
 
-              BLOCKED, on the same field `QAM-11` needs. `MessageBody` is the component that renders
-              those segments and it emits `image` clicks, which `room/message-actions.svelte.ts:497`
-              resolves through `item.targetUrl`. `ModalHost.svelte:529` declares `targetMessage`
-              without `targetUrl`, so nothing here can name the URL the dispatcher would open — and
-              rendering the image with a click that cannot act is the control-with-no-effect this
-              repository refuses. The one-line change is named in the audit register.
+              BUILT 2026-08-31. It was blocked on the same declaration `QAM-11` needed:
+              `MessageBody` emits `image` clicks, which `room/message-actions.svelte.ts` resolves
+              through `item.targetUrl`, and `ModalHost`'s `targetMessage` shape declared no such
+              field — so nothing here could name the URL the dispatcher would open, and rendering an
+              image whose click cannot act is the control-with-no-effect this repository refuses.
+
+              The value was present at runtime the whole time: `RoomOverlays` passes
+              `messageActions.selected`, a full `MessageActionItem`, on which `targetUrl` and
+              `senderEmailHash` are both declared. This was a declaration catching up with its data,
+              not a new dependency — which is why the fix is a widened shape and a forwarded handler
+              rather than a new prop chain from the page.
             -->
-            <div class="msg-left text-formated preText ml-2 mr-2 p-0">{alert.body}</div>
+            <div class="msg-left text-formated preText ml-2 mr-2 p-0">
+              <MessageBody segments={bodySegments} {chatGif} messageId={alert.id} {onaction} />
+            </div>
           </div>
         </div>
       </div>

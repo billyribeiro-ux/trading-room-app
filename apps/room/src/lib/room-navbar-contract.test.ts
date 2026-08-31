@@ -204,12 +204,42 @@ describe('the two room settings the navbar reads', () => {
     expect(html({ isPresenter: true })).toContain('startStopWebCam');
   });
 
-  it('breathes the REC badge only when the room asked for it', () => {
+  it('NAV-08 — breathes the PRESENTER s recording icon, and never the room-wide badge', () => {
+    /*
+      RE-POINTED 2026-08-31. These three lines pinned `breathing-rec` to the `[ REC ]` badge, which
+      is where this room had put it and where the reference does not.
+
+      `UPe` (byte 2,474,097) renders that badge's `li` from const 93
+      `[1,"nav-item","recIndicator","animated","fadeIn"]` and binds exactly ONE thing on it,
+      `ngbTooltip` — no class map. `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })`
+      (byte 2,465,900) is bound once in the whole bundle, at byte 2,477,678, onto the
+      `<i class="far fa-2x fa-dot-circle">` inside the PRESENTER's Start/Stop Recording dropdown.
+
+      So the pulse is a presenter's cue on their own button, and this bar was showing it to every
+      member. `.breathing-rec` is a 5s scale pulse plus `color: red !important`, so it was visible
+      on every screen rather than theoretical.
+
+      The assertion is now the FULL rule, both terms and both audiences, because a test that only
+      checked the presenter's icon would go green again if the badge's copy came back.
+    */
     const recording = { ...MEDIA, roomRecording: true, roomRecordingPaused: false };
-    expect(html({ media: recording, blinkingRec: true })).toContain('breathing-rec');
-    expect(html({ media: recording, blinkingRec: false })).not.toContain('breathing-rec');
-    // …and the badge itself is there either way, so the refusal above is not "nothing rendered".
-    expect(html({ media: recording, blinkingRec: false })).toContain('[ REC ]');
+
+    /* The presenter, with the switch on: the icon breathes. */
+    expect(html({ media: recording, isPresenter: true, blinkingRec: true })).toContain(
+      'breathing-rec'
+    );
+    /* The presenter, with the switch off: it does not. */
+    expect(html({ media: recording, isPresenter: true, blinkingRec: false })).not.toContain(
+      'breathing-rec'
+    );
+    /* A MEMBER never sees it, switch or no switch — which is the divergence this row removed. */
+    expect(html({ media: recording, isPresenter: false, blinkingRec: true })).not.toContain(
+      'breathing-rec'
+    );
+
+    /* And the badge itself renders for everyone either way, so none of the above is "nothing". */
+    expect(html({ media: recording, isPresenter: false, blinkingRec: true })).toContain('[ REC ]');
+    expect(html({ media: recording, isPresenter: true, blinkingRec: false })).toContain('[ REC ]');
   });
 });
 

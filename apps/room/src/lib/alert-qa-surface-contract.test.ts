@@ -263,7 +263,7 @@ describe('QAM-08 — the alert card is drawn only when there is an alert', () =>
   it('and `e3e` is the sub-template it gates, which is why the card is its own component', () => {
     const e3e = 'function e3e(t,n){if(1&t&&(d(0,"div",8)(1,"div",22)(2,"div",23)(3,"div",24)';
     expect(at(2_332_074, e3e)).toBe(e3e);
-    expect(MODAL).toContain('<AlertQaAlertCard alert={targetMessage} />');
+    expect(MODAL).toContain('alert={targetMessage}');
     expect(CARD).toContain('{#if alert}');
   });
 });
@@ -279,7 +279,7 @@ describe('QAM-09 — the username keeps the reference’s two spaces', () => {
   });
 });
 
-describe('QAM-10 and QAM-11 — the two BLOCKED rows, and what blocks them', () => {
+describe('QAM-10 and QAM-11 — the body is piped and the avatar knows its sender', () => {
   it('the body pipe and its copy-trade branch are real', () => {
     const pipe = 'Tn(1,1,e.qaMsg.txt,"chat",e.qaMsg.avt,null)';
     expect(at(2_331_625, pipe)).toBe(pipe);
@@ -292,18 +292,22 @@ describe('QAM-10 and QAM-11 — the two BLOCKED rows, and what blocks them', () 
     expect(at(2_331_038, avatar)).toBe(avatar);
   });
 
-  it('and the field that blocks both is genuinely not declared for this modal', () => {
+  it('and the field that blocked both is now declared for this modal', () => {
     /*
-      The measurement the two rows rest on, taken here so it cannot rot into prose: the host's
-      `targetMessage` shape names six fields and neither `targetUrl` nor an email hash is among
-      them, while the image dispatcher resolves through exactly that field.
+      RE-DISPOSITIONED 2026-08-31. This asserted the ABSENCE of `targetUrl` and `senderEmailHash`
+      from the host's `targetMessage` shape — the measurement the two rows rested on, pinned so it
+      could not rot into prose. Both fired the moment the shape was widened, which is this change's
+      negative control already written.
+
+      Neither field was a new dependency, and that is the finding rather than the fix: `RoomOverlays`
+      passes `messageActions.selected`, a full `MessageActionItem`, on which both are declared. The
+      narrow shape was a declaration lagging its own data for as long as the rows were open.
+
+      The slice is still bound to locals and asserted before use, which `slice-anchor-contract.test.ts`
+      is the file about: a moved marker makes `indexOf` return -1 and `slice(-1)` yields one
+      character, against which any `toContain` proves nothing either way.
     */
     const host = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
-    /*
-      Bound to locals and asserted rather than inlined, which `slice-anchor-contract.test.ts` is the
-      file about: a moved marker makes `indexOf` return -1, `slice(-1)` yields one character, and
-      the two NEGATIVE assertions below then pass against that character while proving nothing.
-    */
     const shapeAt = host.indexOf('    targetMessage: {');
     expect(shapeAt, 'the targetMessage shape moved out of ModalHost').toBeGreaterThan(-1);
     const shape = host.slice(shapeAt);
@@ -315,14 +319,40 @@ describe('QAM-10 and QAM-11 — the two BLOCKED rows, and what blocks them', () 
     expect(declared, 'the targetMessage shape was not found').toContain(
       'senderAvatarUrl?: string;'
     );
-    expect(declared).not.toContain('targetUrl');
-    expect(declared).not.toContain('senderEmailHash');
+    expect(declared).toContain('targetUrl?: string | null;');
+    expect(declared).toContain('senderEmailHash?: string;');
 
+    /* And the dispatcher it exists for still resolves through exactly that field. */
     const actions = readFileSync(
       new URL('./room/message-actions.svelte.ts', import.meta.url),
       'utf8'
     );
     expect(actions).toContain("if (action === 'image' && item.targetUrl)");
+  });
+
+  it('QAM-10 — the card renders the body through MessageBody, parsed as "chat"', () => {
+    /*
+      `"chat"`, not `"alerts"`, is the surprising half and the one worth pinning.
+      `parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the
+      reference's own `"alerts" === i` — and the Q&A header is passed `"chat"`. So a `[{( … )}]`
+      order that renders as a copyable trade in the log beneath the modal stays LITERAL text here.
+      Asserted, because it is exactly the kind of detail a later reader "fixes".
+    */
+    expect(CARD).toContain('<MessageBody');
+    expect(CARD).toContain("kind: 'chat',");
+    expect(CARD).not.toContain("kind: 'alert'");
+    /* Not the raw string any more. */
+    expect(CARD).not.toContain('preText ml-2 mr-2 p-0">{alert.body}');
+  });
+
+  it('QAM-11 — the avatar falls back to THAT senders gravatar, not the shared mystery-man', () => {
+    /*
+      `||` and not `??`, matching `e.qaMsg.pic || "…"`: an empty-string `pic` must fall through to
+      the gravatar, and `??` would keep the empty string and render a broken image.
+    */
+    expect(CARD).toContain('alert.senderAvatarUrl ||');
+    expect(CARD).toContain("${alert.senderEmailHash ?? ''}?d=mm&s=50");
+    expect(CARD).not.toContain("'https://secure.gravatar.com/avatar/?d=mm&s=50'");
   });
 });
 

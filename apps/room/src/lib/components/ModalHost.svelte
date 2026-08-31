@@ -206,6 +206,17 @@
     onQaImageUpload: () => void;
     /** `QAM-06` — a screenshot pasted into the Q&A composer, with that box's own draft. */
     onQaImagePaste: (file: File, draft: string) => void;
+    /**
+     * `QAM-10` — a click inside the Q&A header card's piped body.
+     *
+     * It acts on the ALERT the thread belongs to, so it cannot go through `onQaAction`, which
+     * addresses a thread ENTRY. The page holds the full `MessageActionItem` and dispatches there.
+     *
+     * `chatGif` and `copyTrades` are NOT props beside it: both are already on `messageChrome`,
+     * which this component receives, and reading them from there is what stops the Q&A header
+     * disagreeing with every other body in the room about the same two preferences.
+     */
+    onQaAlertBodyAction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
     alertQuestions?: readonly {
       id: number;
       alertId: number;
@@ -547,6 +558,21 @@
       senderAvatarUrl?: string;
       createdAt?: Date | string;
       evidenceTimestampText?: string;
+      /**
+       * `QAM-11` — `e.qaMsg.avt`, so the avatar falls back to THAT SENDER's gravatar rather than
+       * the hashless mystery-man every sender shares.
+       */
+      senderEmailHash?: string;
+      /**
+       * `QAM-10` — the URL an image click opens, which `room/message-actions.svelte.ts` resolves
+       * through `item.targetUrl`.
+       *
+       * Both of these were the whole of what blocked those two rows, and neither was a new
+       * dependency: `RoomOverlays` passes `messageActions.selected`, a full `MessageActionItem`, on
+       * which both are declared. The narrow shape here was a declaration lagging its data, and a
+       * body rendered without `targetUrl` would have drawn an image whose click could not act.
+       */
+      targetUrl?: string | null;
     } | null;
     /**
      * The viewer's mod-alert filter, applied to SERVER search results.
@@ -667,6 +693,7 @@
     canPostImages,
     onQaImageUpload,
     onQaImagePaste,
+    onQaAlertBodyAction,
     alertQuestions = [],
     messageChrome,
     presenterColors,
@@ -5660,6 +5687,9 @@
   {canPostImages}
   onimageupload={onQaImageUpload}
   onimagepaste={onQaImagePaste}
+  chatGif={messageChrome.chatGif}
+  copyTrades={messageChrome.copyTrades}
+  onAlertBodyAction={onQaAlertBodyAction}
   {onclose}
   {onQuestionSend}
   {onQaAction}

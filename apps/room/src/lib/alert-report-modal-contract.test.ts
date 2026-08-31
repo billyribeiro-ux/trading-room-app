@@ -449,14 +449,12 @@ describe('SRCH-05 — the truncation notice is ours, and stays', () => {
  * `titleId` per site in one change, by somebody who owns all three files. The count is asserted
  * below so that "ten" cannot quietly become "eleven".
  *
- * **ASR-3 — nothing focuses this dialog when it opens.** Bootstrap's modal plugin calls
- * `_element.focus()` upstream and this room does not ship Bootstrap's JavaScript at all
- * (`bootstrap-dropdown-contract.test.ts` holds that premise for every app here). `Modal.svelte`'s
- * only focus management is `releaseFocusWhenClosed`, which blurs on CLOSE. **BLOCKED**, on one line
- * in a file this pass does not own: `Modal.svelte:95`, `if (open) return;` becomes
- * `if (open) { node.focus(); return; }`. The root already carries `tabindex="-1"`, so it is
- * programmatically focusable, and the attachment it would live in already runs on every `open`
- * change. It is one line for all 22 dialogs, which is exactly why it should not be done for one.
+ * **ASR-3 — BUILT 2026-08-31.** Bootstrap's modal plugin calls `_element.focus()` on show and this
+ * room ships no Bootstrap JavaScript at all (`bootstrap-dropdown-contract.test.ts` holds that
+ * premise for every app here), so opening a dialog left focus wherever it was, behind an `inert`
+ * boundary about to move. `Modal.svelte`'s attachment took the fix — one line, in the one component
+ * every dialog in this room is, which is exactly why it was right to wait for a session that owned
+ * it rather than special-case one call site.
  */
 describe('ASR-1 — the reference stylesheet, and the two rules of it that reach us', () => {
   /** The `styles` array of `app-alert-send-report-modal`, sliced at bounds that were found. */
@@ -545,15 +543,36 @@ describe('ASR-2 — the self-referential aria-labelledby, and the count that kee
   });
 });
 
-describe('ASR-3 — the dialog is never focused when it opens, and the one line that would', () => {
-  it('confirms the only focus management in Modal.svelte is the release on close', () => {
-    const source = readFileSync(`${ROOT}lib/components/Modal.svelte`, 'utf8');
-    expect(source).toContain('const releaseFocusWhenClosed');
-    expect(source).toContain('if (open) return;');
+describe('ASR-3 — the dialog takes focus when it opens, as Bootstrap did for the reference', () => {
+  it('focuses on open and still releases on close, in the one attachment both belong to', () => {
     /*
-      The negative half, and it is the assertion that goes red the day somebody applies the one-line
-      fix — at which point this row is closed and this test is what says so.
+      RE-DISPOSITIONED 2026-08-31. The previous version asserted `not.toContain('node.focus()')` and
+      said of itself: *"the assertion that goes red the day somebody applies the one-line fix — at
+      which point this row is closed and this test is what says so."* It went red. This is it saying
+      so.
+
+      Both halves are asserted, because they live in one effect and either could be lost while the
+      other kept passing: taking focus on open is `ASR-3`, and releasing it on close is the older
+      `inert`/`aria-hidden` fix the same docblock records.
     */
-    expect(source).not.toContain('node.focus()');
+    const source = readFileSync(`${ROOT}lib/components/Modal.svelte`, 'utf8');
+    expect(source).toContain('const manageFocus');
+    expect(source).toContain('node.focus();');
+    expect(source).toContain('if (focused instanceof HTMLElement && node.contains(focused))');
+
+    /*
+      THE ORDER, which is the part that would break silently. `inert={!open}` is bound on the same
+      element and an inert element cannot be focused, so the focus call only works because Svelte
+      runs `$effect` after DOM updates have been applied. Asserted as SHAPE — the focus lives inside
+      the effect, not in the attachment body that runs before it.
+    */
+    const attachAt = source.indexOf('const manageFocus');
+    expect(attachAt, 'the attachment must exist').toBeGreaterThan(-1);
+    const effectAt = source.indexOf('$effect(() => {', attachAt);
+    expect(effectAt, 'the attachment must own an effect').toBeGreaterThan(attachAt);
+    expect(source.indexOf('node.focus();', attachAt)).toBeGreaterThan(effectAt);
+
+    /* And the element it focuses is programmatically focusable without joining the tab order. */
+    expect(source).toContain('tabindex="-1"');
   });
 });

@@ -33,6 +33,247 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 18:05 UTC — A citation that was wrong in two files, and landed 161 bytes inside the function it named
+
+**Runtime impact: NO** — two docblocks and one new contract test. `ACA-06`'s four controls stay
+unbuilt and the row stays open on them.
+
+`ChatSearchBar.svelte` and `chat-search.svelte.ts` both said the chat toolbar's unbuilt controls
+were *"the save-chat and archive controls (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e` at byte
+1,423,265)"*. **Four names and one offset were wrong.** Decoded by value, every offset opened:
+
+| function | byte | what it actually is |
+| --- | --- | --- |
+| `q_e` | 1,421,800 | `div` const 41, click `archiveOptions()` — Archive Chat Messages |
+| `K_e` | 1,421,929 | `span` const 38, click `downloadLog("chat")` — Save chat messages |
+| `Y_e` | 1,422,202 | const 46, button const 48 `" Group Chat Control "` |
+| `Q_e` | 1,422,956 | button const 53, click `detachChat()`, `" Detach Chat"` |
+| `X_e` | **1,423,104** | the Mod Only checkbox, with `Y_e` and `Q_e` as nodes 4 and 5 |
+| `J_e` | 1,423,745 | the bar itself; `K_e`/`q_e` hang off it at node **9** |
+
+So `Y_e` and `Q_e` are a dropdown and a button, the save/archive pair is `K_e`/`q_e` in the OTHER of
+the bar's two extended slots, and the extended state is two independent slots rather than one:
+`O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, …)` beneath it.
+
+**Why it survived several readings:** `1,423,265` lands 161 bytes INSIDE `X_e`'s body. A spot-check
+finds the right neighbourhood and moves on. That is the failure mode a byte offset has that a
+verbatim string does not, which is why the new test reads each function's own signature back rather
+than checking the region looks about right.
+
+The sentence mattered because of what it is FOR: it tells a reader which sub-template holds what, so
+it pointed the next person at the wrong two functions in the wrong slot. Corrected in both files —
+`ChatSearchBar.svelte` carries the decode and `chat-search.svelte.ts` points at it rather than
+carrying a second copy, which is the rule that had just been broken.
+
+`chat-search-contract.test.ts` gains four assertions: all six offsets opened and their signatures
+read back, each control identified by its own string, the wrong offset shown to land mid-function,
+and the four control names asserted ABSENT from the bar's source — so building one of them without
+closing `ACA-06` fails there rather than leaving the register disagreeing with its own repository.
+
+**Evidence:** the control restoring `1,423,265` printed `expected 'modOnly,o)||(' to be 'function
+X_e('`. Room gate exit 0 — `svelte-check` 1,574 files 0 errors, **301 test files / 5,503 passed / 1
+skipped**, build.
+
+**Still open on this row:** Save chat messages, Archive Chat Messages, Group Chat Control and Detach
+Chat. All four have existing machinery here (`RoomChatArchive`, `changeChatMode`, the alerts
+column's built twin of the save button, `window-handlers.ts`'s `detachAlerts`), so this is a build
+rather than a discovery — and the const tables say Detach Chat belongs to the main column alone.
+
+### 2026-08-31 17:45 UTC — A pulse every member saw that belongs to one presenter, and a note that disabled the file it was written in
+
+**Runtime impact: YES** for `NAV-08` — the `[ REC ]` badge no longer pulses for members. `STB-04` is
+documentation and one assertion.
+
+#### `NAV-08` — `breathing-rec` on the room-wide badge was ours
+
+`UPe` at byte 2,474,097 renders that badge's `li` from const 93
+`[1,"nav-item","recIndicator","animated","fadeIn"]` and binds exactly ONE thing on it, `ngbTooltip`.
+Meanwhile `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })` (byte 2,465,900) is bound
+once in 2,891,205 bytes — at 2,477,678, onto the `<i class="far fa-2x fa-dot-circle">` inside the
+PRESENTER's Start/Stop Recording dropdown.
+
+So the pulse is a presenter's cue on their own button, and this bar was showing it to **every member
+in the room**. `.breathing-rec` is a 5s scale pulse plus `color: red !important`, so it was visible
+on every screen rather than theoretical. `NAV-04` had already built the real placement; this row was
+blocked only because two contract tests pinned the class to `.recIndicator` and neither file belonged
+to that batch.
+
+**`blinkingRec` left `NavbarRecIndicator` with it.** Its only reader was that class, and a prop named
+for an owner setting kept with no reader is one the next person gates something on — which would look
+correct and reinstate exactly this defect.
+
+Both tests are re-pointed rather than deleted, and both now assert the FULL rule: the presenter's
+icon breathes with the switch on and not with it off, a MEMBER never sees it either way, and the
+badge still renders for everyone. A test that only checked the presenter's icon would go green again
+if the badge's copy came back.
+
+#### `STB-04` — the repair the row did not consider, measured and refused
+
+`stream-tabs-contract.test.ts` reads `docs/source/main.d6d3c112b59b7d0d.js`, which this checkout does
+not have, so twelve `it` blocks whose names read as live guarantees assert nothing here. The obvious
+second repair — point it at `docs/source-v3-2026-08-15`, which this checkout DOES hold — was measured
+and does not work: that directory holds `main.99a5781d1d7a7775.js`, a **third** minifier generation
+carrying neither this file's literals (`ut(9,Go,` and `Go=t=>({active:t})`, both absent) nor v4's.
+
+**Retiring it stays an owner decision, and I nearly took it anyway.** The reasoning that stopped me
+is worth recording: `docs/source` is a real evidence root that **74 test files in this app read**. It
+is absent from containers like this one and present for its author, so that file may well run there.
+Deleting a test whose evidence is visible to its owner and invisible here, from inside the container
+that cannot see it, is precisely the shape this repository refuses.
+
+What was buildable is done: the `STB-04` note now heads the superseded file itself, where whoever
+re-points or retires it will actually be reading. The pairing had existed only in the v4 file's
+docblock, and a one-directional cross-reference is how a pair comes apart.
+
+#### The note disabled the file it was asserted from, and the gate caught it in a minute
+
+The new assertion in `stream-tabs-v4-contract.test.ts` contained the literal string
+`'docs/source/main.d6d3c112b59b7d0d.js'`. `evidence-bound-tests.mjs` strips comments and then matches
+a quote, `../` or `/` followed by a missing root — so a string literal holding that path is CODE, not
+a comment. **The one file that actually runs became the 43rd excluded one**, and vitest reported "No
+test files found" for it.
+
+That is the exact mirror of defect 1 in that module's own docblock — *"a citation is not a read"* —
+running the other way: a read that was only a citation looked like one. Fixed by asserting the
+bundle's filename alone, never with its directory, with the reason at the assertion. Excluded count
+is back to 42 and the file runs 27 tests.
+
+**Evidence:** two negative controls seen RED and restored — restoring `breathing-rec` to the badge
+(red in both re-pointed test files) and blanking the `STB-04` heading (red on the new
+cross-reference). Room gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors,
+**301 test files / 5,499 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
+browser.
+
+### 2026-08-31 17:15 UTC — A third wrong prescription, and one line that fixes focus for all 22 dialogs
+
+**Runtime impact: YES.** A screenshot pasted into the second chat column uploads and posts — to
+*that* column. And every dialog in the room now takes focus when it opens.
+
+#### `ACA-05` — the row corrected an earlier wrong claim, and was itself wrong about the destination
+
+The refusal this row overturned said the reference binds paste on the main composer's textarea and
+reads `#textAreaTxt` by id, *"so a second column pasting through it would seed from the first
+column's box."* Both halves are false of `app-extra-chat`: const 61 carries `paste`, `cMe` at byte
+2,373,521 binds it, and that component's own `onImagePaste` at byte 2,392,023 reads
+`ui("#textAreaTxtExtra")`. Each column reads its own box. That was the row's finding, and it was
+right.
+
+**Its own prescribed fix then repeated the mistake one layer down.** It said to feed the handler
+*"beside the main column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"* — which
+defaults to the `'chat'` target, whose branch posts with no channel argument, i.e. the main tab.
+Byte 2,389,468:
+
+```js
+o||(i&&(s.imggurUploadTxt+=" "+i, ui("#textAreaTxtExtra").val("")),
+    s.appService.sendGrpChat(s.channel, s.imggurUploadTxt), s.imggurUploadTxt="")
+```
+
+`s.channel` is the extra column's tab. **A screenshot pasted into the second column would have
+appeared in the first.** `'extra'` is a third DESTINATION rather than a third caller: it seeds from
+its own box and posts to `chat.extraTab`.
+
+`#uploadImagesTo` is the extraction that lets one body serve both channels — two copies of that loop
+would be two places to get the progress dialog, the `Upload Failed...` wording and the
+join-with-spaces wrong. The chat path still passes `undefined` and lets `sendBody` apply its own
+default, and that is asserted, so the refactor is provably behaviour-preserving rather than merely
+compiling.
+
+One detail the row did not have: upstream's `canPostImages` guard sits INSIDE the `if(s)` block
+here, where `app-chat`'s copy opens with it. Behaviourally identical, written down so a reader
+comparing the two copies does not think one was transcribed loosely.
+
+#### `ASR-3` — one line, and the reason it works is not visible from the line
+
+Bootstrap's modal plugin calls `_element.focus()` on show. **This room ships no Bootstrap JavaScript
+at all** — `bootstrap-dropdown-contract.test.ts` holds that premise for every app here — so opening
+a dialog left focus wherever it was, behind an `inert` boundary about to move. A keyboard user's
+next Tab started outside the dialog and a screen reader announced nothing.
+
+**The ORDER is the part that would have broken silently.** `inert={!open}` is bound on the same
+element and an inert element cannot be focused. It works only because Svelte runs `$effect` *"after
+any DOM updates have been applied"* — the official documentation says so outright — so `inert` is
+already gone by the time the body runs. Moving the call anywhere earlier makes it a no-op with no
+error, which is why that paragraph sits at the code.
+
+One line in ONE component rather than 22 call sites, which is exactly why it was right to wait for a
+session that owned `Modal.svelte`.
+
+#### Evidence
+
+Three negative controls on `ACA-05`, each seen RED and restored: the register's own prescription
+(defaulting to `'chat'`), seeding from the main box, and posting to the main tab. Two tripwires
+fired on their own — `not.toContain('onpaste')` on the extra column, and
+`not.toContain('node.focus()')` on `Modal.svelte`, the latter carrying its own note that it *"goes
+red the day somebody applies the one-line fix"*.
+
+Two more repo guards caught mistakes of mine. `orphaned-comment-contract` refused a handler I
+inserted between the `XCP-03`/`XCP-04` docblock and the function it explains. And
+`inline-alert-entry-contract` pinned the whole two-way ternary `target === 'chat' ? … : ''`, which
+went red on a third target it had no opinion about — re-dispositioned to assert the rule it was
+always protecting: the ALERT branch seeds from nothing, and exactly two of the three read a
+composer.
+
+`svelte-autofixer`: **no issues** on `Modal.svelte`; its three suggestions are one advisory raised
+for `focus()`, `blur()` and `contains()`, all DOM manipulation, which the docs name as what effects
+are for. Declined at the code with the reason.
+
+**Verified:** `apps/room` gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors,
+**301 test files / 5,498 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
+browser; the focus change in particular is asserted as shape, not observed on a real dialog.
+
+### 2026-08-31 16:45 UTC — The Q&A header's alert body was raw text, and both rows were blocked by a declaration lagging its own data
+
+**Runtime impact: YES.** A `$TICKER` in the alert is coloured in the Q&A header now, a pasted URL is
+a link, an image URL renders as the image, and the sender's avatar falls back to THEIR gravatar
+rather than the hashless mystery-man every sender shared.
+
+`QAM-10` and `QAM-11` were filed `BLOCKED` on "one line in `ModalHost.svelte`", and the interesting
+part is what that line was. `RoomOverlays` passes `messageActions.selected` — a full
+`MessageActionItem`, on which `targetUrl` and `senderEmailHash` are both declared — into a
+`targetMessage` shape that named neither. **The values were present at runtime the whole time.** The
+rows were a declaration lagging its own data, and both close with the same widening.
+
+That mattered: `MessageBody` emits `image` clicks and `room/message-actions.svelte.ts` resolves them
+through `item.targetUrl`, so a piped body without it would have drawn an image whose click could not
+act — the control-with-no-effect this repository refuses, which is exactly why the earlier session
+left the body as raw text rather than half-building it.
+
+#### `"chat"`, not `"alerts"` — the one word the docblock is for
+
+```js
+z("innerHTML", parseLinks(parseSymbols(e.qaMsg.txt, "chat", e.qaMsg.avt, null),
+  preferences.chatGif, e.qaMsg._id, !1))                                  // byte 2,331,625
+```
+
+`parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the
+reference's own `"alerts" === i` — and this card is passed **`"chat"`**. So a `[{( … )}]` order that
+renders as a copyable trade in the log beneath the modal stays LITERAL text in the Q&A header. It is
+upstream's behaviour, it is surprising, and without the paragraph it is precisely the kind of detail
+a later reader "fixes". Asserted both ways: `kind: 'chat'` present, `kind: 'alert'` absent.
+
+#### Two preferences that did NOT become props
+
+`chatGif` and `copyTrades` are read off `messageChrome` at the `ModalHost` boundary rather than
+threaded from the page. That object is what every other body in this room already reads, and a
+second source for the same two preferences is how the Q&A header comes to disagree with the log
+sitting behind it.
+
+#### `||` and not `??`
+
+`e.qaMsg.pic || "https://secure.gravatar.com/avatar/" + e.qaMsg.avt + "?d=mm&s=50"` at byte
+2,331,038. An empty-string `pic` must fall through to the gravatar; `??` would keep the empty string
+and render a broken image. The control substituting `??` printed its failure.
+
+#### Evidence
+
+Three negative controls, each seen RED and restored: parsing as `'alert'`; `??` for `||`; and
+dropping `targetUrl` from the host shape. Two pre-existing tripwires fired on their own — the
+contract test asserted the ABSENCE of both fields, which was the measurement the two rows rested on.
+
+**Verified:** `apps/room` gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors,
+**301 test files / 5,495 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
+browser; the piped body is asserted as source and as segments, not as rendered pixels.
+
 ### 2026-08-31 16:20 UTC — Three more scope-blocked rows, and a register prescription that would have leaked a private answer into the room
 
 **Runtime impact: YES**, three ways. A presenter can send a video from the second chat column.

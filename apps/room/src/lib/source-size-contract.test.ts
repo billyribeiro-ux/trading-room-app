@@ -688,7 +688,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `canPostImages` forwarded to `RoomOverlays` for `QAM-05`. Both are the page answering an
       authority question once, which is the only place this repository answers them.
     */
-    max: 1733,
+    /*
+      1733 -> 1734, 2026-08-31. One line: `ACA-05`'s `onpasteimage` for the extra column, naming its
+      own target rather than defaulting to the main column's.
+    */
+    max: 1734,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1734,7 +1738,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       comment says it at the call site: this one's confirm reaches `sendAlertQAReply`, so sharing the
       chat composer's handler would post a presenter's answer to one member's question into the room.
     */
-    max: 1139,
+    /*
+      1139 -> 1149, 2026-08-31. `QAM-10`'s dispatch for the Q&A header card's piped body, with the
+      note on why the full `MessageActionItem` stays HERE: `messageActions.selected` is what
+      `targetMessage` already is, and handing the modal a narrow copy is what had blocked the row.
+    */
+    max: 1149,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1907,7 +1916,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `<label for>` operates the main column's checkbox. The id carries the column here, and the
       paragraph saying why is what stops somebody "correcting" it back to the capture.
     */
-    max: 142,
+    /*
+      142 -> 171, 2026-08-31, and every added line is a CORRECTION rather than a feature.
+
+      This docblock said the extended bar's unbuilt controls were *"the save-chat and archive
+      controls (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e` at byte 1,423,265)"*. Four names and one
+      offset were wrong. Decoded by value: `Y_e` (1,422,202) is the Group Chat Control dropdown and
+      `Q_e` (1,422,956) is the Detach Chat button; the save/archive pair is `K_e`/`q_e`
+      (1,421,929 / 1,421,800) at node 9 of `J_e`, in the OTHER of the bar's two extended slots; and
+      `X_e` begins at 1,423,104 — 161 bytes earlier, so the old offset landed mid-function and read
+      as plausible to anyone spot-checking it.
+
+      That sentence is the one a reader uses to decide which sub-template holds what, so it pointed
+      the next person at the wrong two functions in the wrong slot. It is also why the paragraph is
+      long now: it carries the whole decode, and `chat-search-contract.test.ts` pins all six offsets
+      by value so the two docblocks cannot drift apart again.
+    */
+    max: 171,
     why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
@@ -1988,7 +2013,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       371 -> 394, 2026-08-31. `QAM-05`/`QAM-06`'s three props forwarded to the composer, and the
       note on why `isPresenter` and `canPostImages` are two props rather than one.
     */
-    max: 394,
+    /*
+      394 -> 409, 2026-08-31. `QAM-10`'s three forwards to the header card. `chatGif` and
+      `copyTrades` come off `messageChrome` at the `ModalHost` boundary rather than as new props
+      from the page — reading them from the object every other body in this room already reads is
+      what stops the Q&A header disagreeing with the log beneath it about the same two preferences.
+    */
+    max: 409,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its own open menu row and its wiring'
   },
   {
@@ -2001,7 +2032,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the ratchet's answer to that is an extraction; it is mostly the four `QAM` rows that live on
       its markup, two of them BLOCKED on a field `ModalHost` does not declare.
     */
-    max: 171,
+    /*
+      171 -> 244, 2026-08-31, for `QAM-10` and `QAM-11`, and the two rows were blocked on ONE thing:
+      a declaration that lagged its own data. `RoomOverlays` passes `messageActions.selected`, a full
+      `MessageActionItem` carrying both `targetUrl` and `senderEmailHash`; the host's `targetMessage`
+      shape named neither, so a body rendered here would have drawn an image whose click could not
+      act, and the avatar fell back to the hashless mystery-man every sender shares.
+
+      Most of the raise is the derivation's docblock, and it earns its lines on one word.
+      `parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the
+      reference's own `"alerts" === i` — and byte 2,331,625 passes **`"chat"`** for this card. So a
+      `[{( … )}]` order that renders as a copyable trade in the log beneath the modal stays LITERAL
+      text in the Q&A header. That is upstream's behaviour, it is surprising, and without the
+      paragraph it is exactly the kind of thing a later reader "fixes".
+    */
+    max: 244,
     why: 'the alert card the Q&A modal reproduces in its own header - `e3e`, called once'
   },
   {
@@ -3190,7 +3235,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `sessData.userUploads` is the other half of it and this component is not given that — a second
       answer to "may this viewer upload" is the shape `CLAUDE.md` refuses.
     */
-    max: 6888,
+    /*
+      6888 -> 6918, 2026-08-31. `QAM-10`/`QAM-11`: two fields on the `targetMessage` shape and one
+      dispatch prop, with the note that `chatGif` and `copyTrades` are deliberately NOT props beside
+      it — both are already on `messageChrome`, which this component receives, and reading them from
+      there is what stops the Q&A header disagreeing with every other body in the room.
+    */
+    max: 6918,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -3371,7 +3422,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rather than closing it — and `toggleChatToolbar` re-extends an open search-only bar. Neither
       reads as intentional without the transcription beside it.
     */
-    max: 178,
+    /*
+      178 -> 184, 2026-08-31. The same wrong sentence lived here too, in six words — `ACA-06`
+      corrected both. This file names the controls and points at `ChatSearchBar.svelte` for the
+      decode rather than carrying a second copy of it, which is the rule that had just been broken:
+      two places stating one fact is how one of them goes stale.
+    */
+    max: 184,
     why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
   },
   {
@@ -4240,7 +4297,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       method, so the inline box silently inherits whatever five checkboxes that modal was last left
       holding.
     */
-    max: 792,
+    /*
+      792 -> 851, 2026-08-31, for `ACA-05`, and the raise is one extraction plus the two paragraphs
+      that record why the register's prescribed fix would have posted into the wrong column.
+
+      The row said to feed the extra column's paste through `+page.svelte` *"beside the main
+      column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"*. That defaults to
+      `'chat'`, and the chat branch posts with NO channel argument — the main tab. `app-extra-chat`'s
+      own `doImggurUpload` at byte 2,389,468 ends in `sendGrpChat(s.channel, …)` against THIS
+      column's tab, so a screenshot pasted into the second column would have appeared in the first.
+
+      `'extra'` is therefore a third DESTINATION rather than a third caller, and it seeds from its
+      own box (`ui("#textAreaTxtExtra")`, byte 2,392,023) rather than the main one.
+      `#uploadImagesTo` is the extraction that made one body serve both channels: two copies of that
+      loop would be two places to get the progress dialog, the `Upload Failed...` wording and the
+      join-with-spaces wrong.
+    */
+    max: 851,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -5837,7 +5910,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the reason the row was blocked). A `boolean` beside a `() => void` would have put one gate in
       two places and let them disagree.
     */
-    max: 685,
+    /*
+      685 -> 722, 2026-08-31, for `ACA-05` — the `paste` binding this column has had upstream since
+      it was written, and whose absence here rested on a measurement of the WRONG compiled copy.
+
+      The refusal that stood in `chat-paste-image-contract.test.ts` said the reference binds paste on
+      the main composer's textarea and reads `#textAreaTxt` by id, so a second column would seed from
+      the first column's box. Both halves are false of `app-extra-chat`: const 61 carries `paste`,
+      `cMe` at byte 2,373,521 binds it, and that component's own `onImagePaste` reads
+      `ui("#textAreaTxtExtra")`. Each column reads its own box; there was never a shared one.
+
+      The handler's docblock also records that upstream's `canPostImages` guard sits INSIDE the
+      `if(s)` block here where `app-chat`'s opens with it — behaviourally identical, and noted so a
+      reader comparing the two copies does not think one was transcribed loosely.
+    */
+    max: 722,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -5957,7 +6044,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/Modal.svelte',
-    max: 158,
+    /*
+      158 -> 182, 2026-08-31, for `ASR-3` — one line of code and the paragraph that makes it safe to
+      keep.
+
+      Bootstrap's modal plugin calls `_element.focus()` on show and this room ships no Bootstrap
+      JavaScript at all, so every dialog opened without taking focus: a keyboard user's next Tab
+      started outside it and a screen reader announced nothing.
+
+      **The ORDER is the part that is not obvious and would break silently.** `inert={!open}` is
+      bound on the same element and an inert element cannot be focused; this works only because
+      Svelte runs `$effect` after DOM updates have been applied, which the official documentation
+      states outright. Moving the call anywhere that runs earlier makes it a no-op with no error.
+
+      One line in ONE component rather than 22 call sites, which is exactly why it was right to wait
+      for a session that owned this file.
+
+      Six of the twenty-four lines are the `svelte-autofixer` decline: it raises "calling a function
+      inside an `$effect`" once each for `focus()`, `blur()` and `contains()`, and all three are DOM
+      manipulation — which Svelte's own `$effect` documentation names as what effects are for. A
+      decline with its reason at the code is what stops the next reader, holding the same three
+      suggestions, "fixing" it.
+    */
+    max: 189,
     why: 'the modal shell every captured modal is rendered through'
   },
   {
@@ -6308,7 +6417,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `RoomMedia` and renders one `li`, and every control the bar carries is on the other side of
       that line.
     */
-    max: 93,
+    /*
+      93 -> 109, 2026-08-31, and the CODE got shorter — a class map became a plain class list and a
+      prop went away entirely. Every added line is the `NAV-08` record.
+
+      `breathing-rec` on the room-wide `[ REC ]` badge was OURS. `UPe` (byte 2,474,097) renders that
+      `li` from const 93 and binds exactly one thing on it, `ngbTooltip`; `iPe` (byte 2,465,900) is
+      bound ONCE in 2,891,205 bytes, at 2,477,678, onto the presenter's own recording icon. So the
+      pulse is a presenter's cue and this bar showed it to every member — visible on every screen,
+      since `.breathing-rec` is a 5s scale pulse plus `color: red !important`.
+
+      `blinkingRec` left with it. Its only reader was that class, and a prop named for an owner
+      setting kept with no reader is one the next person gates something on — which would look
+      correct and reinstate exactly this defect.
+    */
+    max: 109,
     why: 'the three REC badges the whole room sees, and the one class that is ours'
   },
   {
@@ -6488,7 +6611,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       confused, so one file holding both hosts the confusion it documents — is recorded here because
       it is a real cost of this choice rather than a point against it.
     */
-    max: 1169,
+    /*
+      1169 -> 1172, 2026-08-31. Three lines on the `blinkingRec` docblock recording that `NAV-08`
+      removed the badge's copy of `breathing-rec` and the prop that fed it, so the correction sits
+      where the prop is declared rather than only in the register.
+    */
+    max: 1172,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

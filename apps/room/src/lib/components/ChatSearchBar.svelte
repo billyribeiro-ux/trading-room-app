@@ -32,7 +32,7 @@
    *
    * The bar has two states upstream — search-only, and extended with the controls under it. The
    * extended section was not rendered here at all while none of its controls existed. `acA-04` built
-   * the first: **Mod Only**, `X_e` at byte 1,423,265, whose const table is
+   * the first: **Mod Only**, `X_e` at byte **1,423,104**, whose const table is
    *
    * ```js
    * 43 ["placement","top","ngbTooltip","Show only Moderators messages",
@@ -48,9 +48,38 @@
    * and it is the reason this is a divergence rather than a faithful copy. The two halves stay in
    * step because ONE expression builds both.
    *
-   * The save-chat and archive controls beside it (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e`) are
-   * separate features and are still not built, so nothing stands in for them: an empty toolbar
+   * ## `ACA-06` — what is still not built, named CORRECTLY this time
+   *
+   * This paragraph used to read: *"The save-chat and archive controls beside it (`Y_e` and `Q_e`,
+   * nodes 4 and 5 of `X_e`) are separate features and are still not built."* **Four names and one
+   * byte offset were wrong**, and the sentence is the one a reader uses to decide which sub-template
+   * holds what — so it pointed the next person at the wrong two functions in the wrong slot.
+   *
+   * Decoded by value on 2026-08-31, every offset opened and read:
+   *
+   * ```js
+   * function q_e  // 1,421,800  div const 41 — click archiveOptions()          Archive Chat Messages
+   * function K_e  // 1,421,929  span const 38 — click downloadLog("chat")      Save chat messages
+   * function Y_e  // 1,422,202  div const 46, button const 48 " Group Chat Control "
+   * function Q_e  // 1,422,956  button const 53 — click detachChat()           " Detach Chat"
+   * function X_e  // 1,423,104  the Mod Only checkbox, plus Y_e and Q_e as nodes 4 and 5
+   * function J_e  // 1,423,745  the bar itself; K_e/q_e hang off it at node 9
+   * ```
+   *
+   * So `Y_e` and `Q_e` are the **Group Chat Control dropdown** and the **Detach Chat button**, and
+   * the save/archive pair is `K_e`/`q_e` at node **9 of `J_e`** — a different slot entirely. The
+   * extended state is TWO independent slots, not one: `O(9, showChatToolbarExtended ? 9 : -1)`
+   * inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it.
+   *
+   * None of the four is built. Nothing stands in for them, which is deliberate: an empty toolbar
    * section is a control whose only effect is its own presence.
+   *
+   * **The two columns differ, and that decides where three of them belong.** `app-extra-chat`'s
+   * extended section (`Q3e`, byte 2,369,619) carries Mod Only and Group Chat Control and STOPS —
+   * there is no Detach Chat. The const tables agree: `app-chat` carries three entries
+   * `app-extra-chat` does not (47 and 53, the two forms of the Detach button, and 54, its
+   * `fa-window-restore` icon), which is exactly the offset by which every const from 48 onward
+   * shifts between the two tables. Detach Chat belongs to the main column alone.
    */
   type Props = {
     /** What is typed. A value plus a handler, not a binding — see `oninput`. */

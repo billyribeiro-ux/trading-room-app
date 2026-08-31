@@ -153,7 +153,14 @@ export class RoomComposer {
         `onImagePaste`, so upstream has exactly one paste confirmation and the alerts column borrows
         it (byte 2,125,263). Two states here would be two dialogs and two ways to leak a preview URL.
       */
-      target: 'chat' | 'alert';
+      /*
+        `'extra'` joined on 2026-08-31 with `ACA-05`, and it is a third DESTINATION rather than a
+        third caller: each of the three seeds from its own box and posts to its own place. The
+        extra column's `doImggurUpload` ends in `sendGrpChat(s.channel, …)` against ITS tab (byte
+        2,389,468), so folding it into `'chat'` would have put a screenshot pasted in the second
+        column into the first.
+      */
+      target: 'chat' | 'alert' | 'extra';
     } | null>(null);
     /*
       The message that will travel with it, seeded from the composer and then OWNED by the dialog.
@@ -231,7 +238,7 @@ export class RoomComposer {
     return this.#pendingGifUrl;
   }
 
-  get pastedImage(): { file: File; previewUrl: string } | null {
+  get pastedImage(): { file: File; previewUrl: string; target: 'chat' | 'alert' | 'extra' } | null {
     return this.#pastedImage;
   }
 
@@ -286,7 +293,7 @@ export class RoomComposer {
    * not given — and it is not the real one either way: `composer-image.remote.ts` re-checks on the
    * server, which is where it counts.
    */
-  beginImagePaste(file: File, target: 'chat' | 'alert' = 'chat'): void {
+  beginImagePaste(file: File, target: 'chat' | 'alert' | 'extra' = 'chat'): void {
     /*
       A second paste while a confirmation is open replaces the first, and the first's object URL is
       revoked on the way — otherwise every discarded paste pins its image bytes for the life of the
@@ -300,7 +307,19 @@ export class RoomComposer {
       runs — so the seed comes in through {@link pastedImageMessage} from there, not from the CHAT
       composer, which is a different box entirely.
     */
-    this.#pastedImageMessage = target === 'chat' ? this.#chat.composer.trim() : '';
+    /*
+      `ACA-05` — the EXTRA column seeds from its OWN box, and that is the whole reason it is a third
+      target rather than a second caller of `'chat'`.
+
+      `app-extra-chat`'s `onImagePaste` at byte **2,392,023** reads `ui("#textAreaTxtExtra").val()
+      .trim()` — not `#textAreaTxt`. The row that filed this was itself correcting an earlier claim
+      that the reference pastes through the main composer's box; reading the second compiled copy
+      showed each column reads its own, and reading it once more showed the destination differs too
+      (see `confirmImagePaste`).
+    */
+    if (target === 'chat') this.#pastedImageMessage = this.#chat.composer.trim();
+    else if (target === 'extra') this.#pastedImageMessage = this.#chat.extraComposer.trim();
+    else this.#pastedImageMessage = '';
   }
 
   /** Discard the pending paste, releasing its preview. Safe to call when there is none. */
@@ -350,6 +369,29 @@ export class RoomComposer {
         legalDisclosure: false,
         legalDisclosureText: ''
       });
+      return;
+    }
+    if (pending.target === 'extra') {
+      /*
+        `ACA-05` — THE EXTRA COLUMN POSTS TO ITS OWN CHANNEL, and the register's prescribed fix did
+        not.
+
+        ```js
+        o||(i&&(s.imggurUploadTxt+=" "+i, ui("#textAreaTxtExtra").val("")),
+            s.appService.sendGrpChat(s.channel, s.imggurUploadTxt), s.imggurUploadTxt="")
+        ```                                                          // byte 2,389,468
+
+        `s.channel` is the EXTRA column's current tab. The row proposed feeding this through
+        `+page.svelte` *"beside the main column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"*
+        — which defaults to `'chat'`, and `uploadImages` posts with no channel argument, i.e. to the
+        MAIN tab. A screenshot pasted into the second column would have appeared in the first.
+
+        The clear is conditional on a message travelling, exactly as the chat branch below is, and
+        it clears the EXTRA box. `sendBody`'s third argument is the channel — the same one
+        `sendExtra` passes.
+      */
+      if (message) this.#chat.clear(EXTRA_COMPOSER);
+      await this.#uploadImagesTo([pending.file], message, this.#chat.extraTab);
       return;
     }
     if (message) this.#chat.clear('textAreaTxt');
@@ -648,6 +690,23 @@ export class RoomComposer {
   }
 
   async uploadImages(files: File[], message: string) {
+    await this.#uploadImagesTo(files, message, undefined);
+  }
+
+  /**
+   * The upload-and-post body both columns share, with the CHANNEL as the only difference.
+   *
+   * Extracted on 2026-08-31 for `ACA-05`. `uploadImages` posted with no channel argument, which is
+   * the main tab; the extra column's own `doImggurUpload` (byte 2,389,468) ends in
+   * `sendGrpChat(s.channel, …)` against ITS tab. Two copies of this loop would be two places to get
+   * the progress dialog, the `Upload Failed...` wording and the join-with-spaces wrong; one body
+   * with a channel argument is the same behaviour with one place to read it.
+   *
+   * `undefined` rather than a literal default, because that is what `sendBody` already means by
+   * "this room's main channel" — inventing a second spelling for it here would be a second thing to
+   * keep in step.
+   */
+  async #uploadImagesTo(files: File[], message: string, channel: string | undefined) {
     this.#closeModal();
     if (files.length === 0) return;
 
@@ -660,7 +719,7 @@ export class RoomComposer {
 
       const body = `${uploadedUrls.join(' ')}${message ? ` ${message}` : ''}`;
       this.#dialogs.alert = null;
-      await this.sendBody(body);
+      await this.sendBody(body, undefined, channel);
     } catch (error) {
       console.error(error);
       this.#dialogs.alert = 'Upload Failed...';

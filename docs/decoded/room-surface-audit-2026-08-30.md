@@ -3954,7 +3954,17 @@ function e0e(t,n){1&t&&(d(0,"div",24),v(1," Webinar Mode "),d(2,"span",56),T(3,"
 
 ### ACA-05 — The extra chat column's composer binds `paste` upstream; the refusal recorded here rests on a measurement of one copy that the other copy contradicts
 
-**BLOCKED — needs one file this session does not own.** `acA-02` built the chat paste handler and recorded, as its reason for giving the extra column none, that *"the reference binds paste on textarea const 64 (the main composer) and its handler reads `#textAreaTxt` by id, so a second column pasting through it would seed from the first column's box."* **Both halves are false of `app-extra-chat`.** Its composer const (61) is `["name","txt-area","id","textAreaTxtExtra","rows","1","spellcheck","true","placeholder","Type your message here..",1,"txt-area","form-control","border-0",3,"keyup","paste","keydown.enter","focus"]` — `paste` is in the binding section — `cMe` at byte 2,373,521 binds it, and that component's OWN `onImagePaste` at byte 2,392,023 reads `ui("#textAreaTxtExtra")`, not `#textAreaTxt`, behind the same `if(!this.canPostImages)return!1` guard. There is no shared box and no seeding across columns.
+**BUILT 2026-08-31 — and reading the handler once more found a SECOND thing the row got wrong.**
+
+The row's prescribed fix said to feed the handler from `+page.svelte` *"beside the main column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"*. That call defaults to the `'chat'` target, whose branch posts with no channel argument — the MAIN tab. `app-extra-chat`'s own `doImggurUpload` at byte **2,389,468** ends in `sendGrpChat(s.channel, s.imggurUploadTxt)` against THIS column's tab, so a screenshot pasted into the second column would have appeared in the first. `'extra'` is a third DESTINATION, not a third caller: it seeds from `#textAreaTxtExtra` and posts to `chat.extraTab`.
+
+`#uploadImagesTo` is the extraction that lets one body serve both channels — two copies of that loop would be two places to get the progress dialog, the `Upload Failed...` wording and the join-with-spaces wrong. A chat paste still passes `undefined` and lets `sendBody` apply its own default, which is asserted so the refactor is provably behaviour-preserving rather than merely compiling.
+
+One further detail the row did not have: upstream's `canPostImages` guard sits INSIDE the `if(s)` block here, where `app-chat`'s copy opens with it. Behaviourally identical, and written down so a reader comparing the two copies does not think one was transcribed loosely.
+
+The false assertion in `chat-paste-image-contract.test.ts` is inverted, with its reason replaced by the measurement. Three negative controls were run and each printed its failure: the register's own prescription, seeding from the main box, and posting to the main tab.
+
+`acA-02` built the chat paste handler and recorded, as its reason for giving the extra column none, that *"the reference binds paste on textarea const 64 (the main composer) and its handler reads `#textAreaTxt` by id, so a second column pasting through it would seed from the first column's box."* **Both halves are false of `app-extra-chat`.** Its composer const (61) is `["name","txt-area","id","textAreaTxtExtra","rows","1","spellcheck","true","placeholder","Type your message here..",1,"txt-area","form-control","border-0",3,"keyup","paste","keydown.enter","focus"]` — `paste` is in the binding section — `cMe` at byte 2,373,521 binds it, and that component's OWN `onImagePaste` at byte 2,392,023 reads `ui("#textAreaTxtExtra")`, not `#textAreaTxt`, behind the same `if(!this.canPostImages)return!1` guard. There is no shared box and no seeding across columns.
 
 **This is the shape the document's own preface warns about, in the other direction:** a claim framed as a fact about "the reference" that was read off one of the two compiled copies. The rule for this surface is that both are read before a divergence is claimed, and here that was not done.
 
@@ -3972,7 +3982,22 @@ function cMe(t,n){if(1&t){const e=Y();d(0,"div",25)(1,"div",59,3)(3,"div",60)(4,
 
 ### ACA-06 — The chat toolbar's extended section is missing all four of its controls, and `ChatSearchBar`'s own docblock names two of them wrongly
 
-**BLOCKED — every one of them lives in `ChatSearchBar.svelte`, owned by another agent this session.** `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
+**HALF BUILT 2026-08-31 — the CORRECTION is done, the four controls are not.**
+
+The row has two halves and they were never the same size. The second — *"a separate one-line correction, in the same file"* — is done: both `ChatSearchBar.svelte` and `chat-search.svelte.ts` said the unbuilt controls were the save-chat and archive pair at `Y_e`/`Q_e`, node 4 and 5 of `X_e`, byte 1,423,265. **Four names and one offset were wrong**, in two files, and every one is now decoded by value:
+
+| function | byte | what it actually is |
+| --- | --- | --- |
+| `q_e` | 1,421,800 | `div` const 41, click `archiveOptions()` — Archive Chat Messages |
+| `K_e` | 1,421,929 | `span` const 38, click `downloadLog("chat")` — Save chat messages |
+| `Y_e` | 1,422,202 | const 46, button const 48 `" Group Chat Control "` |
+| `Q_e` | 1,422,956 | button const 53, click `detachChat()`, `" Detach Chat"` |
+| `X_e` | **1,423,104** | the Mod Only checkbox, with `Y_e` and `Q_e` as nodes 4 and 5 |
+| `J_e` | 1,423,745 | the bar itself; `K_e`/`q_e` hang off it at node **9** |
+
+`1,423,265` lands 161 bytes INSIDE `X_e`'s body, which is why the citation survived several readings — a spot-check finds the right neighbourhood and moves on. `chat-search-contract.test.ts` now opens all six offsets and reads each function's own signature back, and asserts the four control names appear nowhere in the bar's source, so building one without closing this row fails there. The control restoring the wrong offset printed its failure.
+
+**The four controls remain unbuilt**, and the row stays open on them. `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
 
 * **Save chat messages** — `K_e` at 1,421,929, `span` const 38 (`id="addon-chat-save"`), click `It(18).downloadLog("chat")`. Inside the input group, beside the clear `×`. The ALERTS column's twin of this IS built.
 * **Archive Chat Messages** — `q_e` at 1,421,800, `div` const 41 (`id="addon-chat-archive"`), click `archiveOptions()`, gated `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` — the same two-term gate `acA-07` restored on the alerts side.
@@ -6206,7 +6231,13 @@ whitespace folding both collapse.
 
 ### QAM-10 — the alert body in the header is rendered as plain text where the reference pipes it
 
-**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+**BUILT 2026-08-31.** The blocker was a DECLARATION LAGGING ITS OWN DATA, which is the finding rather than the fix: `RoomOverlays` passes `messageActions.selected`, a full `MessageActionItem` on which both `targetUrl` and `senderEmailHash` are declared, while `ModalHost`'s `targetMessage` shape named neither. Widening that shape closes this row and `QAM-11` at once.
+
+**`"chat"`, not `"alerts"`, is the surprising half and it is asserted rather than described.** `parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the reference's own `"alerts" === i` — and byte 2,331,625 passes `"chat"` for this card. So a `[{( … )}]` order that renders as a copyable trade in the log beneath the modal stays LITERAL text in the Q&A header. Upstream's behaviour, reproduced, with the paragraph that stops a later reader "fixing" it.
+
+`chatGif` and `copyTrades` are read off `messageChrome` at the `ModalHost` boundary rather than threaded as new props from the page: that object is what every other body in this room already reads, and a second source for the same two preferences is how the Q&A header comes to disagree with the log beneath it.
+
+The contract test asserted the ABSENCE of both fields — the measurement the row rested on. Both flipped, which is this change's negative control already written; a third control (parsing as `'alert'`) went red on the `kind` assertion.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -6238,7 +6269,11 @@ and `copyTrades`, so the pipe's other two arguments are available; only the imag
 
 ### QAM-11 — the avatar fallback drops the sender's gravatar hash
 
-**BLOCKED 2026-08-31.** The same declaration as `QAM-10`, one field wider.
+**BUILT 2026-08-31, with `QAM-10` and by the same widening.** The avatar falls back to THAT sender's gravatar now — `e.qaMsg.pic || "https://secure.gravatar.com/avatar/" + e.qaMsg.avt + "?d=mm&s=50"`, byte 2,331,038 — rather than the hashless mystery-man every sender shared.
+
+`||` and not `??`, matching the capture: an empty-string `pic` must fall through to the gravatar, where `??` would keep the empty string and render a broken image. That is asserted, and the control substituting `??` printed its failure.
+
+The earlier note said an optional field here would be `undefined` at the type level while the value was present at runtime. That reading was half right — the mismatch was real, and the answer was to widen the shape at the HOST as well, which `QAM-10` needed anyway. It stays optional on the card because the card must still render when it is absent.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -6973,7 +7008,25 @@ This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ### STB-04 — `stream-tabs-contract.test.ts` reads a bundle that is not in this repository, so the whole file asserts nothing
 
-**BLOCKED 2026-08-31, with the exact change and why it is not one line.** Line 20 reads
+**BLOCKED 2026-08-31 — and NEW EVIDENCE on 2026-08-31 removes the obvious second repair.** The one
+candidate this row did not consider was re-pointing at `docs/source-v3-2026-08-15`, which this
+checkout DOES hold. It does not work: that directory holds `main.99a5781d1d7a7775.js`, a THIRD
+minifier generation carrying neither this file's literals (`ut(9,Go,`, `Go=t=>({active:t})` — both
+absent) nor v4's. Measured, not assumed.
+
+**The buildable half is done.** A `STB-04` note now heads the superseded file itself, where whoever
+re-points or retires it will actually be reading — the pairing existed only in the v4 file's
+docblock, and a one-directional cross-reference is how a pair comes apart. It carries the
+three-generation table above. `stream-tabs-v4-contract.test.ts` asserts that note is still there,
+so the pairing cannot rot silently.
+
+**Retiring the file stays an owner decision, and the reason is sharper than "gitignored".**
+`docs/source` is a real evidence root that **74 test files in this app read**; it is absent from
+containers like this one and present for its author. This file may well run there. Deleting a test
+whose evidence is visible to its owner and invisible here, from inside the container that cannot see
+it, is exactly the shape this repository refuses.
+
+Line 20 reads
 `../../docs/source/main.d6d3c112b59b7d0d.js`. No file of that name exists anywhere in this
 checkout, and `docs/source` is a gitignored evidence root, so `gate/evidence-bound-tests.mjs`
 excludes the file — one of the 42 the vitest banner names on every run. All twelve of its `it`
@@ -7261,11 +7314,23 @@ function p4e(t,n){1&t&&(d(0,"li",19)(1,"a",150),T(2,"i",181),u()())}     // webc
 
 ### NAV-08 — The `[ REC ]` badge's `breathing-rec` is ours, and removing it needs one line elsewhere
 
-**BLOCKED 2026-08-31.** Const 93 is `[1,"nav-item","recIndicator","animated","fadeIn"]` and `UPe`
+**FIXED 2026-08-31.** Const 93 is `[1,"nav-item","recIndicator","animated","fadeIn"]` and `UPe`
 (byte 2,474,097) binds one thing on it, `ngbTooltip`. There is no class map on the room-wide badge in
-the reference, so the `breathing-rec` this bar puts there is an invention — a pulse every member sees
-where the reference shows one only to the presenter who owns the recording. NAV-04 builds the real
-placement; this row is the other half, and it cannot be closed from inside this batch's scope.
+the reference, so the `breathing-rec` this bar put there was an invention — a pulse every member saw
+where the reference shows one only to the presenter who owns the recording, and `.breathing-rec` is a
+5s scale pulse plus `color: red !important`, so it was visible on every screen rather than
+theoretical. NAV-04 built the real placement; this row was the other half and needed a session owning
+the two test files that pinned the class to `.recIndicator`.
+
+**The class is gone from the badge, and `blinkingRec` went with it.** That prop's only reader was the
+class. A prop named for an owner setting, kept with no reader, is one the next person gates something
+on — which would look correct and reinstate exactly this defect — so `NavbarRecIndicator.svelte` no
+longer takes it at all.
+
+Both tests are re-pointed rather than deleted, and both assert the FULL rule now: the presenter's icon
+breathes with the switch on and not with it off, a MEMBER never sees it either way, and the badge
+still renders for everyone. A test that only checked the presenter's icon would go green again if the
+badge's copy came back. The control — restoring the class — printed its failure in both files.
 
 **What would unblock it, exactly.** In `apps/room/src/lib/room-navbar-contract.test.ts`, the
 assertion block `it('breathes the REC badge only when the room asked for it')` pins the class to
@@ -8610,7 +8675,12 @@ three files; the count is pinned so that "ten" cannot quietly become "eleven".
 
 ### ASR-3 — nothing focuses this dialog when it opens, because Bootstrap's modal plugin did that upstream
 
-**BLOCKED 2026-08-31, on one line in a file this pass does not own.**
+**BUILT 2026-08-31.** One line, in the one component every dialog in this room is — which is exactly why it was right to wait for a session that owned `Modal.svelte` rather than special-case one call site.
+
+**The ORDER is the part that is not obvious and would have broken silently.** `inert={!open}` is bound on the same element and an inert element cannot be focused. It works only because Svelte runs `$effect` *"after any DOM updates have been applied"*, which the official documentation states outright, so `inert` is already gone by the time the body runs. Moving the call anywhere earlier makes it a no-op with no error, which is why the paragraph is at the code rather than in this register.
+
+The contract test held the tripwire — `not.toContain('node.focus()')`, with its own note that it *"goes red the day somebody applies the one-line fix"*. It did. It now asserts both halves of the attachment (focus on open, release on close), that the focus call lives INSIDE the effect rather than in the attachment body that runs before it, and that the root still carries `tabindex="-1"`.
+
 This row was ADDED after this document was committed.
 
 Upstream the dialog is adopted by Bootstrap's modal plugin, which calls `_element.focus()` on show.
