@@ -3982,7 +3982,22 @@ function cMe(t,n){if(1&t){const e=Y();d(0,"div",25)(1,"div",59,3)(3,"div",60)(4,
 
 ### ACA-06 — The chat toolbar's extended section is missing all four of its controls, and `ChatSearchBar`'s own docblock names two of them wrongly
 
-**BLOCKED — every one of them lives in `ChatSearchBar.svelte`, owned by another agent this session.** `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
+**HALF BUILT 2026-08-31 — the CORRECTION is done, the four controls are not.**
+
+The row has two halves and they were never the same size. The second — *"a separate one-line correction, in the same file"* — is done: both `ChatSearchBar.svelte` and `chat-search.svelte.ts` said the unbuilt controls were the save-chat and archive pair at `Y_e`/`Q_e`, node 4 and 5 of `X_e`, byte 1,423,265. **Four names and one offset were wrong**, in two files, and every one is now decoded by value:
+
+| function | byte | what it actually is |
+| --- | --- | --- |
+| `q_e` | 1,421,800 | `div` const 41, click `archiveOptions()` — Archive Chat Messages |
+| `K_e` | 1,421,929 | `span` const 38, click `downloadLog("chat")` — Save chat messages |
+| `Y_e` | 1,422,202 | const 46, button const 48 `" Group Chat Control "` |
+| `Q_e` | 1,422,956 | button const 53, click `detachChat()`, `" Detach Chat"` |
+| `X_e` | **1,423,104** | the Mod Only checkbox, with `Y_e` and `Q_e` as nodes 4 and 5 |
+| `J_e` | 1,423,745 | the bar itself; `K_e`/`q_e` hang off it at node **9** |
+
+`1,423,265` lands 161 bytes INSIDE `X_e`'s body, which is why the citation survived several readings — a spot-check finds the right neighbourhood and moves on. `chat-search-contract.test.ts` now opens all six offsets and reads each function's own signature back, and asserts the four control names appear nowhere in the bar's source, so building one without closing this row fails there. The control restoring the wrong offset printed its failure.
+
+**The four controls remain unbuilt**, and the row stays open on them. `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
 
 * **Save chat messages** — `K_e` at 1,421,929, `span` const 38 (`id="addon-chat-save"`), click `It(18).downloadLog("chat")`. Inside the input group, beside the clear `×`. The ALERTS column's twin of this IS built.
 * **Archive Chat Messages** — `q_e` at 1,421,800, `div` const 41 (`id="addon-chat-archive"`), click `archiveOptions()`, gated `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` — the same two-term gate `acA-07` restored on the alerts side.

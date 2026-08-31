@@ -33,6 +33,52 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 18:05 UTC — A citation that was wrong in two files, and landed 161 bytes inside the function it named
+
+**Runtime impact: NO** — two docblocks and one new contract test. `ACA-06`'s four controls stay
+unbuilt and the row stays open on them.
+
+`ChatSearchBar.svelte` and `chat-search.svelte.ts` both said the chat toolbar's unbuilt controls
+were *"the save-chat and archive controls (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e` at byte
+1,423,265)"*. **Four names and one offset were wrong.** Decoded by value, every offset opened:
+
+| function | byte | what it actually is |
+| --- | --- | --- |
+| `q_e` | 1,421,800 | `div` const 41, click `archiveOptions()` — Archive Chat Messages |
+| `K_e` | 1,421,929 | `span` const 38, click `downloadLog("chat")` — Save chat messages |
+| `Y_e` | 1,422,202 | const 46, button const 48 `" Group Chat Control "` |
+| `Q_e` | 1,422,956 | button const 53, click `detachChat()`, `" Detach Chat"` |
+| `X_e` | **1,423,104** | the Mod Only checkbox, with `Y_e` and `Q_e` as nodes 4 and 5 |
+| `J_e` | 1,423,745 | the bar itself; `K_e`/`q_e` hang off it at node **9** |
+
+So `Y_e` and `Q_e` are a dropdown and a button, the save/archive pair is `K_e`/`q_e` in the OTHER of
+the bar's two extended slots, and the extended state is two independent slots rather than one:
+`O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, …)` beneath it.
+
+**Why it survived several readings:** `1,423,265` lands 161 bytes INSIDE `X_e`'s body. A spot-check
+finds the right neighbourhood and moves on. That is the failure mode a byte offset has that a
+verbatim string does not, which is why the new test reads each function's own signature back rather
+than checking the region looks about right.
+
+The sentence mattered because of what it is FOR: it tells a reader which sub-template holds what, so
+it pointed the next person at the wrong two functions in the wrong slot. Corrected in both files —
+`ChatSearchBar.svelte` carries the decode and `chat-search.svelte.ts` points at it rather than
+carrying a second copy, which is the rule that had just been broken.
+
+`chat-search-contract.test.ts` gains four assertions: all six offsets opened and their signatures
+read back, each control identified by its own string, the wrong offset shown to land mid-function,
+and the four control names asserted ABSENT from the bar's source — so building one of them without
+closing `ACA-06` fails there rather than leaving the register disagreeing with its own repository.
+
+**Evidence:** the control restoring `1,423,265` printed `expected 'modOnly,o)||(' to be 'function
+X_e('`. Room gate exit 0 — `svelte-check` 1,574 files 0 errors, **301 test files / 5,503 passed / 1
+skipped**, build.
+
+**Still open on this row:** Save chat messages, Archive Chat Messages, Group Chat Control and Detach
+Chat. All four have existing machinery here (`RoomChatArchive`, `changeChatMode`, the alerts
+column's built twin of the save button, `window-handlers.ts`'s `detachAlerts`), so this is a build
+rather than a discovery — and the const tables say Detach Chat belongs to the main column alone.
+
 ### 2026-08-31 17:45 UTC — A pulse every member saw that belongs to one presenter, and a note that disabled the file it was written in
 
 **Runtime impact: YES** for `NAV-08` — the `[ REC ]` badge no longer pulses for members. `STB-04` is

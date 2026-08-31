@@ -272,3 +272,85 @@ describe('a search belongs to one channel', () => {
     expect(ended).toEqual(['extra']);
   });
 });
+
+describe('ACA-06 — the four unbuilt toolbar controls, named by VALUE', () => {
+  /*
+    ── THE PROSE WAS WRONG IN TWO FILES AND THIS IS WHAT STOPS IT DRIFTING BACK ──────────────────
+
+    `ChatSearchBar.svelte` and `chat-search.svelte.ts` both said the extended bar's unbuilt controls
+    were *"the save-chat and archive controls (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e` at byte
+    1,423,265)"*. Four names and one offset were wrong: `Y_e` and `Q_e` are the Group Chat Control
+    dropdown and the Detach Chat button, the save/archive pair is `K_e`/`q_e` in the OTHER extended
+    slot, and `X_e` begins at 1,423,104 — 161 bytes earlier, in the middle of a different function.
+
+    That sentence is the one a reader uses to decide which sub-template holds what, so it pointed
+    the next person at the wrong two functions in the wrong slot. It is corrected in both files and
+    pinned here BY VALUE: each offset is opened and the function's own signature read back, so a
+    different capture turns this red rather than leaving two docblocks quietly wrong again.
+  */
+  const BUNDLE = readFileSync(
+    fileURLToPath(
+      new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url)
+    ),
+    'utf8'
+  );
+
+  const at = (offset: number, text: string) => BUNDLE.slice(offset, offset + text.length);
+
+  it('opens each of the six sub-templates AT the offset the docblocks now give', () => {
+    for (const [offset, name] of [
+      [1_421_800, 'q_e'],
+      [1_421_929, 'K_e'],
+      [1_422_202, 'Y_e'],
+      [1_422_956, 'Q_e'],
+      [1_423_104, 'X_e'],
+      [1_423_745, 'J_e']
+    ] as const) {
+      expect(at(offset, `function ${name}(`), `${name} is not at ${offset}`).toBe(
+        `function ${name}(`
+      );
+    }
+  });
+
+  it('and each one is the control the corrected sentence says it is', () => {
+    /* The two the old sentence named — a dropdown and a button, not save and archive. */
+    expect(at(1_422_202, 'function Y_e')).toBe('function Y_e');
+    expect(BUNDLE.slice(1_422_202, 1_422_400)).toContain('" Group Chat Control "');
+    expect(BUNDLE.slice(1_422_956, 1_423_104)).toContain('detachChat()');
+    expect(BUNDLE.slice(1_422_956, 1_423_104)).toContain('" Detach Chat"');
+
+    /* And the pair it should have named, in the other slot. */
+    expect(BUNDLE.slice(1_421_929, 1_422_080)).toContain('downloadLog("chat")');
+    expect(BUNDLE.slice(1_421_800, 1_421_929)).toContain('archiveOptions()');
+  });
+
+  it('the WRONG offset lands mid-function, which is why it read as plausible', () => {
+    /*
+      1,423,265 is inside `X_e`'s body rather than at its head, so a reader checking the citation by
+      eye would find the right neighbourhood and move on. That is exactly how a byte offset stays
+      wrong through several readings.
+    */
+    expect(at(1_423_265, 'function')).not.toBe('function');
+    expect(1_423_265).toBeGreaterThan(1_423_104);
+  });
+
+  it('none of the four is built, which is what makes this a gap rather than a defect', () => {
+    /*
+      Six names, zero hits across the app. Asserted so that building one of them without closing
+      `ACA-06` fails here — the row would otherwise stay open while the work was already done, which
+      is how a register comes to disagree with its own repository.
+    */
+    const app = readFileSync(
+      fileURLToPath(new URL('./components/ChatSearchBar.svelte', import.meta.url)),
+      'utf8'
+    );
+    for (const name of [
+      'group-chat-control',
+      'Detach Chat',
+      'addon-chat-save',
+      'addon-chat-archive'
+    ]) {
+      expect(app, `${name} appears in the bar's SOURCE`).not.toContain(`"${name}"`);
+    }
+  });
+});

@@ -1916,7 +1916,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `<label for>` operates the main column's checkbox. The id carries the column here, and the
       paragraph saying why is what stops somebody "correcting" it back to the capture.
     */
-    max: 142,
+    /*
+      142 -> 171, 2026-08-31, and every added line is a CORRECTION rather than a feature.
+
+      This docblock said the extended bar's unbuilt controls were *"the save-chat and archive
+      controls (`Y_e` and `Q_e`, nodes 4 and 5 of `X_e` at byte 1,423,265)"*. Four names and one
+      offset were wrong. Decoded by value: `Y_e` (1,422,202) is the Group Chat Control dropdown and
+      `Q_e` (1,422,956) is the Detach Chat button; the save/archive pair is `K_e`/`q_e`
+      (1,421,929 / 1,421,800) at node 9 of `J_e`, in the OTHER of the bar's two extended slots; and
+      `X_e` begins at 1,423,104 — 161 bytes earlier, so the old offset landed mid-function and read
+      as plausible to anyone spot-checking it.
+
+      That sentence is the one a reader uses to decide which sub-template holds what, so it pointed
+      the next person at the wrong two functions in the wrong slot. It is also why the paragraph is
+      long now: it carries the whole decode, and `chat-search-contract.test.ts` pins all six offsets
+      by value so the two docblocks cannot drift apart again.
+    */
+    max: 171,
     why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
@@ -3406,7 +3422,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rather than closing it — and `toggleChatToolbar` re-extends an open search-only bar. Neither
       reads as intentional without the transcription beside it.
     */
-    max: 178,
+    /*
+      178 -> 184, 2026-08-31. The same wrong sentence lived here too, in six words — `ACA-06`
+      corrected both. This file names the controls and points at `ChatSearchBar.svelte` for the
+      decode rather than carrying a second copy of it, which is the rule that had just been broken:
+      two places stating one fact is how one of them goes stale.
+    */
+    max: 184,
     why: 'the two chat search boxes; the rows they return belong to RoomFeeds'
   },
   {

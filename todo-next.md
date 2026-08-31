@@ -129,7 +129,7 @@ guessed.
 | 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 54 | `lib/components/ChatArchivePane.svelte` | 143 | no |
 | 55 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 56 | `lib/components/ChatSearchBar.svelte` | 141 | no |
+| 56 | `lib/components/ChatSearchBar.svelte` | 170 | no |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
 | 59 | `lib/components/MobileRestorePane.svelte` | 130 | no |
@@ -158,7 +158,7 @@ guessed.
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 
-**38 of 83 surfaces audited · 15,250 of 36,671 lines · 41.6%.**
+**38 of 83 surfaces audited · 15,250 of 36,700 lines · 41.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
