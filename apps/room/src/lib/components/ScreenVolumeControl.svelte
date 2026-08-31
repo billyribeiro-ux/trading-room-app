@@ -8,15 +8,15 @@
    * | variant | const | where |
    * | --- | --- | --- |
    * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"nav-link","d-flex","align-items-center"]` | app-room 104 | the navbar — already built, `RoomNavbar.svelte:663` |
-   * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]` | app-presentationarea 90 | HERE, the screen tab bar's `ms-auto` cluster |
+   * | `["id","dropdownVolume","data-bs-toggle","dropdown",1,"btn","btn-sm","btn-dark"]` | app-presentationarea 89 | HERE, the screen tab bar's `ms-auto` cluster |
    *
-   * Decoded from `docs/source/components/app-presentationarea.render-helpers.js:264-459`
-   * (`cSe`/`dSe`/`uSe`, `hSe`, `pSe`/`fSe`, `mSe`/`gSe`, `_Se`, `bSe`, `vSe`, `CSe`) against that
-   * component's const table at `app-presentationarea.compiled.js:2088-2169`.
+   * RE-DECODED 2026-08-31 against the PINNED v4 bundle: `SSe` at byte 1,923,312, its const table
+   * bracket-walked BY VALUE from `consts:[[` at byte 1,994,264. Every index from 66 up is one lower
+   * there than in the build first decoded here, so each number below had named the entry after it.
    *
    * ## Why nobody ever saw this control
    *
-   * `CSe`'s update block gates the trigger — and ONLY the trigger — on viewer-only mode:
+   * `SSe`'s update block (byte 1,924,167) gates the trigger — and ONLY it — on viewer-only mode:
    *
    * ```text
    * m(2), O(2, e.showZoomCtrl ? 2 : -1),                         // the zoom trio
@@ -27,25 +27,25 @@
    * m(3), O(15, e.mediaService.talkingUsers && e.mediaService.talkingUsers.length > 0 ? 15 : -1)
    * ```
    *
-   * so no capture taken in a normal room could contain it. The MENU (const 91) carries no gate at
-   * all — it is created unconditionally in `CSe`'s create block and hidden by Bootstrap's own
+   * so no capture taken in a normal room could contain it. The MENU (const 90) carries no gate at
+   * all — it is created unconditionally in `SSe`'s create block and hidden by Bootstrap's own
    * `.dropdown-menu { display: none }` until `.show` lands, which is why it is rendered here
    * unconditionally too.
    *
    * ## The traps, each reproduced deliberately
    *
    * - **The icon branches are STRICT** (`> 50`, `< 50 && > 4`, `< 4`), so at exactly 50 and exactly
-   *   4 the button renders EMPTY. `volumeIcon()` in `#lib/screen-volume.js` owns that and
-   *   `screen-volume-contract.test.ts` fails if anyone relaxes a bound.
-   * - **`value="Presenter audiob"`** on the checkbox (const 112) is the reference's typo, reproduced
+   *   4 the button renders EMPTY. `volumeIcon()` in `#lib/screen-volume.js` owns it; the guard is
+   *   `screen-cluster-v4-contract.test.ts` — `screen-volume-contract.test.ts` cannot run here.
+   * - **`value="Presenter audiob"`** on the checkbox (const 111) is the reference's typo, reproduced
    *   the same way this codebase already reproduces `clas=` and `noboby`.
    * - **`audioMutedFor[userID]` is an object `{name}`**, so "muted" is a truthiness check and
    *   unmuting is a `delete`. See `#lib/screen-volume.js`.
    * - **Mute and Unmute are two separate gated buttons**, not one button with a swapped label:
-   *   const 109 and const 110 differ only in their `title`, and each has its own click handler.
+   *   const 108 and const 109 differ only in their `title`, and each has its own click handler.
    *
    * `type="button"` is added to all three buttons, which the reference's consts omit. Same call as
-   * `ScreenZoomControls.svelte` already makes for consts 98/102: a bare `<button>` defaults to
+   * `ScreenZoomControls.svelte` already makes for consts 97/101: a bare `<button>` defaults to
    * `submit`, and this cluster is one `<form>` away from being a live defect. Nothing else is
    * changed — every class, attribute, order and text node is the reference's, spaces included.
    */
@@ -70,9 +70,9 @@
     individualVolumeControls: boolean;
     /** `adjustVol($event)` — the master slider's `change` and `input`. */
     onvolume: (value: number) => void;
-    /** `mute()` — const 109's click. */
+    /** `mute()` — const 108's click. */
     onmute: () => void;
-    /** `unmute()` — const 110's click. */
+    /** `unmute()` — const 109's click. */
     onunmute: () => void;
     /** `toggleTalkingPresenter(user)` — the checkbox's `change`. */
     ontogglepresenter: (user: TalkingPresenter) => void;
@@ -117,7 +117,7 @@
 </script>
 
 <!--
-  Const 90. Gated on `viewerOnlyMode` alone — `O(3, e.appService.globals.viewerOnlyMode ? 3 : -1)`.
+  Const 89, `pSe` at byte 1,921,142. Gated on `viewerOnlyMode` alone — `O(3, …viewerOnlyMode ? 3 : -1)`.
 -->
 {#if viewerOnlyMode}
   <button
@@ -129,7 +129,7 @@
     onclick={ontoggle}
   >
     <!--
-      Three independent conditionals, exactly as `hSe` emits them. At audioVolume === 50 and
+      Three independent conditionals, exactly as `pSe` emits them. At audioVolume === 50 and
       audioVolume === 4 every branch is false and the button is empty; that is the reference's
       behaviour and `verify-screen-volume.mjs` renders both of those values to prove it.
     -->
@@ -146,7 +146,7 @@
 {/if}
 
 <!--
-  Const 91. No gate in the reference: created unconditionally, hidden by `.dropdown-menu` until
+  Const 90. No gate in the reference: created unconditionally, hidden by `.dropdown-menu` until
   `.show` lands. Upstream Bootstrap's JavaScript adds that; this app ships none, so it comes from
   `RoomMenus` — as the navbar's twin of this control always did.
 -->
@@ -155,11 +155,11 @@
   class={open ? 'dropdown-menu volumeControl show' : 'dropdown-menu volumeControl'}
 >
   <h4>
-    Volume
+    {' Volume '}
     <!--
-      Const 92 — a `span[data-bs-toggle=dropdown]` INSIDE the h4, which is how the reference closes
+      Const 91 — a `span[data-bs-toggle=dropdown]` INSIDE the h4, which is how the reference closes
       the menu: toggling the same dropdown a second time collapses it. It carries no handler of its
-      own (`d(7,'span',92), T(8,'i',93)` with no `x('click', …)`) because Bootstrap's JavaScript
+      own (`d(7,'span',91), T(8,'i',92)` with no `x('click', …)`) because Bootstrap's JavaScript
       reads the attribute — and NOTHING reads it here, so this closed nothing until 2026-08-29.
 
       `ontoggle` rather than a bare close: the reference's mechanism IS a second toggle, and the
@@ -173,7 +173,7 @@
     </span>
   </h4>
   <!--
-    Const 94. `audioVolSlider` is a template-reference name in the reference (`['audioVolSlider','',…]`),
+    Const 93. `audioVolSlider` is a template-reference name in the reference (`['audioVolSlider','',…]`),
     which Angular consumes and never writes to the DOM; it is emitted here as the empty attribute the
     navbar copy already emits, so the two stay identical.
   -->
@@ -189,31 +189,31 @@
     oninput={(event) => onvolume(Number(event.currentTarget.value))}
   />
   <br />
-  <!-- Const 95/109 — rendered when `audioVolume > 0`. -->
+  <!-- Const 94/108, `fSe` at byte 1,921,378 — rendered when `audioVolume > 0`. -->
   {#if audioVolume > 0}
     <button type="button" title="Mute Audio" class="btn btn-primary btn-sm" onclick={onmute}>
-      Mute
+      {' Mute '}
     </button>
   {/if}
-  <!-- Const 96/110 — rendered when `0 == audioVolume`. A separate gate, not an `{:else}`. -->
+  <!-- Const 95/109, `mSe` at byte 1,921,503 — a SEPARATE gate on `0 == audioVolume`. -->
   {#if audioVolume === 0}
     <button type="button" title="Unmute Audio" class="btn btn-primary btn-sm" onclick={onunmute}>
-      Unmute
+      {' Unmute '}
     </button>
   {/if}
   <hr />
   <!--
-    Const 97. The overlay's `room-sound-options` holds ONE ROW PER TALKING PRESENTER and nothing
-    else. The navbar's `room-sound-options` holds the same rows FOLLOWED BY an `hr` and the six
-    sound checkboxes (`app-room.render-helpers.js:1224-1279`), so the two are a superset and a
-    subset of each other rather than alternatives — copying either one across renders the wrong
-    control under the right class name.
+    Const 96, byte 2,001,143. The overlay's `room-sound-options` holds ONE ROW PER TALKING
+    PRESENTER and nothing else. The navbar's, at byte 2,540,026, holds the same rows FOLLOWED BY an
+    `hr` and the six sound checkboxes, so the two are a superset and a subset of each other rather
+    than alternatives — copying either one across renders the wrong control under the right class
+    name.
   -->
   <div class="room-sound-options">
     <!--
-      The rows are `PresenterMuteRows`, shared with the navbar dropdown: `bSe` and `_4e` render the
-      same markup from the same const values, and the navbar copy adds a trailing `hr` this one does
-      not have.
+      The rows are `PresenterMuteRows`, shared with the navbar dropdown: `vSe` (byte 1,922,302) and
+      `T4e` (byte 2,483,243) render the same markup from the same consts; the navbar copy adds a
+      trailing `hr`. `idPrefix` diverges — `screen-cluster-v4-contract.test.ts` says why and pins it.
     -->
     <PresenterMuteRows
       {talkingUsers}

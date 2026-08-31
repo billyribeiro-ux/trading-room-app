@@ -105,7 +105,7 @@ guessed.
 | 29 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | no |
 | 30 | `lib/components/ScheduledAlerts.svelte` | 319 | no |
 | 31 | `lib/components/PrivateChatComposer.svelte` | 311 | no |
-| 32 | `lib/components/StreamTabs.svelte` | 305 | no |
+| 32 | `lib/components/StreamTabs.svelte` | 304 | no |
 | 33 | `lib/components/RoomShell.svelte` | 268 | no |
 | 34 | `lib/components/MessageMenu.svelte` | 252 | no |
 | 35 | `lib/components/SpeechRecoOverlay.svelte` | 246 | no |
@@ -156,7 +156,7 @@ guessed.
 | 80 | `routes/logout/+page.svelte` | 31 | no |
 | 81 | `routes/+layout.svelte` | 27 | no |
 
-**5 of 81 surfaces audited · 2,045 of 35,879 lines · 5.7%.**
+**5 of 81 surfaces audited · 2,045 of 35,878 lines · 5.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
