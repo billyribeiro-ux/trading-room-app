@@ -33,6 +33,100 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 03:24 UTC — the archived chat log can be READ, which is the half of the archive that was never built
+
+**Runtime impact: YES** — a new presenter-only remote query, a new view inside the chat-logs modal,
+and a second reader over `messages`. No existing read path changed behaviour.
+
+## How the surface was found
+
+Not by reading. The const sweep committed ninety minutes earlier reported six values missing from
+`app-chat-logs-modal` and the same six from `app-alert-logs-modal` — `log-header-container`,
+`log-header`, `search-addon`, `Enter search term`, `btn-ligth`, `fa-box-open`. All twelve belong to
+ONE view: `toggleShowLogs`, the modal's second half.
+
+**This room could sweep an archive and could restore one, and could not look inside either.** That is
+the one thing a presenter standing at that dialog wants before restoring anything, and no tracker row
+had it.
+
+## What was built
+
+`readChatArchiveLog` (upstream's `getArchiveLog {id}`), `RoomChatArchiveLog`, and
+`ChatArchiveLogPane.svelte` — Back, a search over the log, Download Log, a presenter-only Unarchive,
+and the messages. Transcribed from `jxe` at bundle byte **2,309,873**, consts 17–37 of the table at
+**2,305,566**, and `downloadLog()` at **2,304,904**, each offset opened by the contract rather than
+trusted.
+
+**A second row builder, and the argument for why it is safe.** `chatRows` has always ended
+`and(isNull(messages.archiveId), where)` so the live exclusion is stated once and cannot be dropped by
+a call site — its own comment says forgetting it ships "a whole feature, green and inert". The
+archived reader could not be a flag on it without putting that decision back at every call site. So
+the projection was split out as `chatQuery`, which nothing outside the module can reach, and
+`archivedChatRows` matches on an archive ID — and a live row's `archiveId` is NULL, which `=` never
+matches. The two are disjoint by construction, in both directions.
+
+**That argument is right in principle and could be wrong in a dialect, so it is executed.**
+`chat-archive-read.test.ts` builds one table holding all four combinations — live and archived, this
+room and another — and runs both readers over it. The live page returns only the live message; the
+archived read returns only the archived ones, oldest-first; another room's archive id returns nothing
+and its lookup refuses identically to a missing one, so the refusal is not an oracle over which ids
+exist elsewhere.
+
+**Stricter than the reference, deliberately.** Upstream renders the viewer for anyone who reaches the
+modal and gates only Unarchive on `isPresenter`. The whole read is `presenterRoom()` here: an archive
+is every member's messages swept by an administrator, and a member who could read one could read a
+channel swept before they joined. The projection is also narrower than a live message's — no
+`bodyHtml`, no reply context, and no `senderEmailHash`, which is derived from an address.
+
+## Three divergences, recorded rather than smoothed
+
+- **Consts 24 and 25 carry the same `id`.** Two elements with `id="search-addon"` in one modal, with
+  the input's `aria-describedby` naming it — so upstream's description resolves to whichever the
+  browser finds first. One id here; the clear control is a button with a label.
+- **`btn-ligth` is upstream's typo for `btn-light` and is transcribed anyway.** It matches no rule in
+  `app.css` or the captured sheet, which means it matched nothing upstream either.
+- **The rows are `app-st-compactmessage`, not `app-st-message`.** The full component brings
+  reactions, the menu, replies and colours, every one inert over an archive nobody can act on, and
+  the compact row already owns the link split and the time format.
+
+The component's own Angular `styles:[…]` came with it. They are in NEITHER sheet here — the generated
+one is a capture of the global stylesheet and never saw them — so without them all four class names
+would have been classes with no CSS.
+
+## The read is bounded, and says so when the bound bites
+
+`CHAT_ARCHIVE_LOG_LIMIT` is 2,000. Upstream has no limit: it assigns `o.data.logArr` whole. When the
+limit bites, the viewer says which messages are on screen and that the search covers only those —
+`alert-toolbar-search-scope.ts` argues at length that a filter over a window nobody was told about is
+worse than no filter.
+
+## Verification
+
+Nine negative controls, each seen RED and restored. Three on the runtime class: the previous log
+cleared after the await instead of before, the search no longer ending when the box empties, and
+Download Log writing the filtered view. Three on the source contract: a residual value dropped from
+the markup, the room dropped from the archived predicate, and the read no longer presenter-gated.
+Three on the database: the room predicate dropped, the archived read reversed, and the live builder's
+exclusion removed.
+
+**One of the nine passed GREEN and was investigated rather than repaired.** Deleting
+`log-header-container` from the element's `class` attribute left the case passing, because the
+component's own `<style>` block still declares `.log-header-container` and `codeOf` keeps stylesheets
+— they are code, not prose. A case written to assert a value is RENDERED was passing on a value that
+was only STYLED. It now strips the style block, and the styles are asserted separately by name.
+
+The size ratchet refused the change three times and each refusal produced the better arrangement: the
+viewer is its own component and its own class rather than more of `LogArchiveModals` and
+`RoomChatArchive`. The two raises that remained are argued at their entries.
+
+**Not opened in a browser.** The room's Playwright job needs a server and a seeded database; what ran
+is the gate. Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files /
+5,680 passed / 1 skipped.
+
+The const sweep's own table moved with it, which is what a ratchet is for: **146 residuals to 130, 33
+fully-covered components to 35.** Three of the drop are `app-alert-send-report-modal`'s, which shared
+`search-addon`, `Enter search term` and `btn-ligth` with the log modals.
+
 ### 2026-09-01 02:38 UTC — a residual is not the same thing as work, and the sweep now measures the difference
 
 **Runtime impact: NO** — two cases and a corrected note on the contract added forty minutes earlier.

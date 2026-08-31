@@ -70,7 +70,7 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 83 surfaces, measured
+## The inventory — all 86 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
@@ -124,11 +124,12 @@ guessed.
 | 48 | `lib/components/TabGearMenu.svelte` | 156 | no |
 | 49 | `lib/components/AlertSendReportModal.svelte` | 161 | `## AlertSendReportModal.svelte` in the v4 register — 3 rows (ASR-01…03) read end to end 2026-08-31: 2 measured refusals, 1 blocked on a one-line change in `Modal.svelte` that this pass did not own. |
 | 50 | `lib/components/notes/NoteTabContent.svelte` | 134 | `## notes/NoteTabContent.svelte` in the v4 register — 3 rows (NTC-01…03) read end to end 2026-08-31. NTC-01 removed an INVENTED value: `title="Welcome Mat"` occurs 0 times in the 2,891,205-byte bundle. |
-| 51 | `lib/components/LogArchiveModals.svelte` | 147 | no |
+| 51 | `lib/components/LogArchiveModals.svelte` | 206 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 52 | `lib/components/BootboxDialog.svelte` | 145 | no |
 | 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
-| 54 | `lib/components/ChatArchivePane.svelte` | 143 | no |
+| 54 | `lib/components/ChatArchivePane.svelte` | 169 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 55 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 86 | `lib/components/ChatArchiveLogPane.svelte` | 227 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 56 | `lib/components/ChatSearchBar.svelte` | 373 | no |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -160,7 +161,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**45 of 85 surfaces audited · 19,214 of 37,465 lines · 51.3%.**
+**48 of 86 surfaces audited · 19,816 of 37,777 lines · 52.5%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

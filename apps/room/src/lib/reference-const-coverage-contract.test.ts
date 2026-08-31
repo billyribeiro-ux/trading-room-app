@@ -227,7 +227,17 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'date-label',
     'search-container',
     'Search transcripts...',
-    'Clear search',
+    /*
+      `Clear search` was here until 2026-08-31 and left WITHOUT being built. It is the aria-label on
+      the archived-log viewer's clear button, so the sweep — a substring search over the whole app —
+      now finds it and stops calling it a gap.
+
+      Recorded rather than quietly deleted, because it is the measurement's one real weakness: a
+      short, generic value can be matched by an unrelated surface. It cannot produce a FALSE GAP,
+      only miss a true one, which is the direction that fails safe — and the eight-line placeholder
+      `app-session-transcript` still shows twenty-six absent values, so nothing about its verdict
+      moved.
+    */
     'pagination-info',
     'transcript-body',
     'loading-container',
@@ -378,7 +388,11 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'cssSoundCloudIcon',
     '/assets/images/playing.gif'
   ],
-  /* All fifteen are the `RPT-*` refusal, enumerated as orphans in `alert-report-modal-contract.test.ts`. */
+  /*
+    The `RPT-*` refusal, enumerated as orphans in `alert-report-modal-contract.test.ts`. Fifteen when
+    this table was written and twelve now: `search-addon`, `Enter search term` and `btn-ligth` are
+    shared with the two log modals, and building the archived-log viewer shipped all three.
+  */
   'app-alert-send-report-modal': [
     'report-header-container',
     'report-header',
@@ -386,10 +400,7 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'search-select-addon',
     'Search select',
     'queued',
-    'search-addon',
-    'Enter search term',
     'clear-search-addon',
-    'btn-ligth',
     'report-body',
     'sent-time',
     'failed-reason',
@@ -404,23 +415,6 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'sendLaterAsEmail',
     'sendLaterAsNick',
     'ignoreWeekendsChk'
-  ],
-  /* The two log modals are the same component twice over, and their residuals agree exactly. */
-  'app-chat-logs-modal': [
-    'log-header-container',
-    'log-header',
-    'search-addon',
-    'Enter search term',
-    'btn-ligth',
-    'fa-box-open'
-  ],
-  'app-alert-logs-modal': [
-    'log-header-container',
-    'log-header',
-    'search-addon',
-    'Enter search term',
-    'btn-ligth',
-    'fa-box-open'
   ],
   /* `recordings` is the archive tab — blocked on an archive service, and recorded as such. */
   'app-presentationarea': [
@@ -492,15 +486,15 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-three components fully covered, one hundred and forty-six values not', () => {
+  it('holds the ratchet: thirty-five components fully covered, one hundred and thirty values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
       edits the table without knowing which way they moved it.
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(33);
-    expect(residuals).toBe(146);
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(35);
+    expect(residuals).toBe(130);
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {
@@ -532,10 +526,10 @@ describe('how much of the gap has already been written about', () => {
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 146 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(146);
-    expect(all.filter(mentioned)).toHaveLength(38);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(108);
+  it('splits the 130 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(130);
+    expect(all.filter(mentioned)).toHaveLength(37);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(93);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

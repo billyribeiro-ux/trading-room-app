@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, like, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, like, type SQL } from 'drizzle-orm';
 
 import { db } from './db';
 import { messages, users } from './db/schema';
@@ -96,7 +96,7 @@ export { BUILT_IN_CHAT_TABS as CHAT_CHANNELS } from '#lib/chat-tabs.js';
 export type ChatChannel = string;
 
 /**
- * The projection and the join, shared by the two readers of this table.
+ * The projection and the join, shared by the two builders below.
  *
  * Extracted when `searchChatChannel` arrived. A second hand-written copy of twenty columns is a
  * second place for `senderEmail` to be forgotten — and forgetting it does not fail to compile, it
@@ -104,7 +104,7 @@ export type ChatChannel = string;
  * search results only. The `email -> hash` step below is the reason this pair travels together at
  * all: the raw address must never reach a client, and one function is one place to enforce that.
  */
-function chatRows(where: SQL | undefined) {
+function chatQuery(where: SQL | undefined) {
   return (
     db
       .select({
@@ -131,24 +131,55 @@ function chatRows(where: SQL | undefined) {
       .from(messages)
       .innerJoin(users, eq(messages.senderId, users.id))
       /*
-      ARCHIVED ROWS ARE NOT THE LIVE LOG, and this predicate is the entire archive feature.
-
-      `messages.archiveId` is null while a message is live and points at a `chat_archives` row once
-      a presenter has swept it. Every reader goes through this builder, so the exclusion is stated
-      ONCE rather than at each call site — which is how one of them would eventually be forgotten.
-
-      Forgetting it is the failure worth naming: the sweep would write every row, the archive list
-      would fill, `unarchiveLogs` would restore correctly, and NOTHING would ever leave anybody's
-      screen. A whole feature, green and inert.
-
-      **The caller's predicate is a PARAMETER and not a chained `.where()`**, and that is not style.
-      Drizzle's `.where()` SETS the clause; a second call replaces the first rather than ANDing it,
-      so a `chatRows().where(...)` at the call site would silently drop this line and produce
-      exactly the inert feature above, with every test still green. Taking the predicate here makes
-      the combination the only way to build the query.
+      NOTHING CALLS THIS DIRECTLY, and that is the point. The two builders below are the only
+      callers, they are disjoint, and between them they decide live-versus-archived exactly once
+      each. A third caller that passed its own predicate here would be reading BOTH at once.
     */
-      .where(and(isNull(messages.archiveId), where))
+      .where(where)
   );
+}
+
+/**
+ * The LIVE log — every row whose sweep has not happened.
+ *
+ * ARCHIVED ROWS ARE NOT THE LIVE LOG, and this predicate is the entire archive feature.
+ *
+ * `messages.archiveId` is null while a message is live and points at a `chat_archives` row once a
+ * presenter has swept it. Every reader of the live log goes through this builder, so the exclusion
+ * is stated ONCE rather than at each call site — which is how one of them would eventually be
+ * forgotten.
+ *
+ * Forgetting it is the failure worth naming: the sweep would write every row, the archive list would
+ * fill, `unarchiveLogs` would restore correctly, and NOTHING would ever leave anybody's screen. A
+ * whole feature, green and inert.
+ *
+ * **The caller's predicate is a PARAMETER and not a chained `.where()`**, and that is not style.
+ * Drizzle's `.where()` SETS the clause; a second call replaces the first rather than ANDing it, so a
+ * `chatRows().where(...)` at the call site would silently drop this line and produce exactly the
+ * inert feature above, with every test still green. Taking the predicate here makes the combination
+ * the only way to build the query.
+ */
+function chatRows(where: SQL | undefined) {
+  return chatQuery(and(isNull(messages.archiveId), where));
+}
+
+/**
+ * The one reader that wants ARCHIVED rows — the log viewer inside the archive browser.
+ *
+ * ## Why this is a second builder and not a flag on the first
+ *
+ * `chatRows` above exists so the live exclusion is written once and cannot be dropped by a call
+ * site. Turning it into `chatRows(scope, where)` would put that decision back at every call site,
+ * which is the arrangement its own note argues against.
+ *
+ * This one is safe in the other direction by construction: it matches on an archive ID, and a LIVE
+ * row's `archiveId` is NULL, which `=` never matches in SQL. So no predicate a caller can pass makes
+ * this return a live message, in the same way no predicate makes `chatRows` return an archived one.
+ * The two are exhaustive and disjoint, and the projection they share is `chatQuery`'s — one column
+ * list, so `senderEmail` cannot be forgotten in one of them and ship a placeholder avatar.
+ */
+function archivedChatRows(archiveId: number, where: SQL | undefined) {
+  return chatQuery(and(eq(messages.archiveId, archiveId), where));
 }
 
 /** Rows as the client reads them: reactions parsed, and the address replaced by its hash. */
@@ -184,6 +215,47 @@ export function loadChatPage(roomShortCode: string, channel: ChatChannel, page =
       /* Back into chronological order, because every reader downstream — the renderer, the date
        separators, the autoscroll — assumes oldest-first. `loadThread` does the same. */
       .reverse()
+  );
+}
+
+/**
+ * The most messages one archived log will hand back in a single read.
+ *
+ * The reference has no limit: `toggleShowLogs` awaits `getArchiveLog {id}` and assigns
+ * `o.data.logArr` whole, so a room that swept forty thousand messages serialises forty thousand into
+ * one modal. An archive is created by hand and is immutable once written, so its size is bounded by
+ * whatever the room had accumulated — which is precisely the "grows only when somebody clicks" shape
+ * the archive LIST's own cap was written against, one order of magnitude larger.
+ *
+ * Two thousand rather than the list's two hundred because the units differ: two hundred is a count
+ * of sweeps a presenter performed, two thousand is a count of messages inside one of them, and a
+ * viewer that silently showed the first fifty of a five-hundred-message log would be a search over a
+ * window nobody was told about. The caller compares what it got against the archive's own
+ * `messageCount` and says so on screen when they differ.
+ */
+export const CHAT_ARCHIVE_LOG_LIMIT = 2_000;
+
+/**
+ * One archived log's messages, oldest-first — upstream's `getArchiveLog {id}`.
+ *
+ * The room is a predicate and NOT an assumption. `archiveId` alone would be enough to find the rows,
+ * and that is exactly the shape the 2026-08-07 escalation took: an id chosen by the caller, trusted
+ * because it looked internal. A presenter of room A naming room B's archive matches zero rows here,
+ * because every message carries the room it was posted in and both are checked.
+ *
+ * Oldest-first, unlike `loadChatPage`, and for the opposite reason: a page is taken newest-first so
+ * the LIMIT keeps the newest and is then reversed. An archive is read from its beginning, so the
+ * limit must keep the OLDEST — the reference's viewer opens at the top of the log and scrolls down.
+ */
+export function loadArchivedChatLog(roomShortCode: string, archiveId: number) {
+  return chatRowsToMessages(
+    archivedChatRows(archiveId, eq(messages.roomShortCode, roomShortCode))
+      /* `id` breaks ties for the same reason it does in `loadChatPage`: two messages in one
+         millisecond would otherwise order however SQLite feels, and this list is paged by nothing —
+         a reordering here is visible as two messages swapping every time the modal is opened. */
+      .orderBy(asc(messages.createdAt), asc(messages.id))
+      .limit(CHAT_ARCHIVE_LOG_LIMIT)
+      .all()
   );
 }
 

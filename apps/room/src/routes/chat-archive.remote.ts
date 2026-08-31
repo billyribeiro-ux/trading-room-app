@@ -5,10 +5,13 @@ import { presenterRoom, requireUser } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
 import {
   archiveChatChannel,
+  chatArchiveById,
   listChatArchivesFor,
   unarchiveChatLog,
-  type ChatArchiveBrowser
+  type ChatArchiveBrowser,
+  type ChatArchiveLog
 } from '#lib/server/chat-archive.js';
+import { CHAT_ARCHIVE_LOG_LIMIT, loadArchivedChatLog } from '#lib/server/chat-log.js';
 import { isMemberChatChannel, memberChatChannels } from '#lib/server/chat-channels.js';
 import { publishToRoom } from '#lib/server/room-events.js';
 
@@ -92,6 +95,63 @@ export const listChatArchives = query(async (): Promise<ChatArchiveBrowser> => {
     channels: await memberChatChannels(request, room, requireUser(locals))
   };
 });
+
+/**
+ * `getArchiveLog {id}` — open one archived log and read its messages.
+ *
+ * ## The half of the archive feature that was never built
+ *
+ * `app-chat-logs-modal` is two views, and only the first was here. `toggleShowLogs(entry)` swaps the
+ * LIST for a log VIEWER — a Back button, a search box, Download Log, a presenter-only Unarchive, and
+ * the messages themselves (`jxe` at bundle byte 2,309,873). This room drew the list, could sweep and
+ * could restore, and offered no way to see what was IN an archive before restoring it — which is the
+ * one thing a presenter standing at that dialog actually wants to know.
+ *
+ * ## It is presenter-gated, and that is stricter than the reference
+ *
+ * Upstream renders the viewer for anyone who reaches the modal and gates only the Unarchive button
+ * on `isPresenter`. Here the whole read is `presenterRoom()`, for the reason the archive list
+ * already is: an archive is every member's messages, swept by an administrator, and reading it back
+ * is an administrative act rather than a member's view of their own room. A member who could read
+ * archives could read a channel that was swept before they joined.
+ *
+ * ## The projection is NARROWER than the live log's, deliberately
+ *
+ * A live message carries reactions, reply context, colours, `bodyHtml` and the sender's avatar hash
+ * because the room renders all of it. An archived log is read-only history: the viewer draws a name,
+ * a time and a body, and nothing here can react to or reply to a message that is no longer in the
+ * log. Sending the rest would be shipping fields with no consumer, and one of them — the avatar hash
+ * — is derived from an address, so the narrow projection is also the smaller disclosure.
+ */
+export const readChatArchiveLog = query(
+  z.strictObject({ archiveId: z.number().int().positive() }),
+  async ({ archiveId }): Promise<ChatArchiveLog> => {
+    ensureDatabase();
+    const room = presenterRoom();
+
+    const archive = chatArchiveById(room, archiveId);
+    if (!archive) error(404, 'That archive is no longer there.');
+
+    const rows = loadArchivedChatLog(room, archiveId);
+    return {
+      archive,
+      messages: rows.map((row) => ({
+        id: row.id,
+        senderName: row.senderName,
+        body: row.body,
+        isAdmin: row.isAdmin,
+        createdAt: row.createdAt
+      })),
+      /*
+        Compared against the LIMIT and not against `messageCount`. They usually agree, and when they
+        do not it is because a message was restored out of this archive individually — a fact about
+        the archive, not about this read. What the viewer needs to say is "you are not looking at all
+        of it", and only the limit answers that.
+      */
+      truncated: rows.length >= CHAT_ARCHIVE_LOG_LIMIT
+    };
+  }
+);
 
 /**
  * Sweep one channel's messages older than a moment — upstream's `archiveLogs {type,date,channel}`.

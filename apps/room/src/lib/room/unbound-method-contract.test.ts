@@ -15,6 +15,7 @@ import { RoomMessageDeletion } from './message-delete';
 import { RoomNotesAccess } from './notes-access.svelte';
 import { RoomAdminNotes } from './admin-notes';
 import { RoomChatArchive } from './chat-archive.svelte';
+import { RoomChatArchiveLog } from './chat-archive-log.svelte';
 import { RoomUserNotes } from './user-notes.svelte';
 import { RoomEventStream } from './events.svelte';
 import { RoomGates } from './gates';
@@ -140,6 +141,7 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
   notesAccess: RoomNotesAccess,
   adminNotes: RoomAdminNotes,
   chatArchive: RoomChatArchive,
+  chatArchiveLog: RoomChatArchiveLog,
   userNotes: RoomUserNotes,
   screens: RoomScreens,
   mediaTransport: RoomMediaTransport,

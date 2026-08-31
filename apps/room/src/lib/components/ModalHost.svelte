@@ -4907,7 +4907,7 @@
     onend={onPollEnd}
   />
 </app-poll-modal>
-<LogArchiveModals {name} {onclose} {onAlert} {onConfirm} />
+<LogArchiveModals {name} {onclose} {onAlert} {onConfirm} {isPresenter} />
 <app-session-control-modal>
   <Modal
     id="session-control-modal"

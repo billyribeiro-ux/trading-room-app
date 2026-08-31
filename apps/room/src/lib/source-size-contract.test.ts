@@ -1476,8 +1476,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       which is what the ratchet argued for when threading a thirty-seventh state class through three
       capped files was refused at all three.
     */
-    max: 148,
-    why: 'the chat and alerts archive modals, and the credential that separates them'
+    /*
+      148 -> 207, 2026-08-31, and this one is a RAISE, which the rule requires be argued rather than
+      taken. What arrived is the modal's SECOND VIEW — `toggleShowLogs`, the log viewer that was
+      never built, found by `reference-const-coverage-contract.test.ts` as six missing const values in
+      each of the two log modals.
+
+      The extraction the ratchet asks for HAPPENED, and it is what makes the raise small: the viewer
+      is `ChatArchiveLogPane.svelte` and its state is `RoomChatArchiveLog`, both new files with their
+      own ceilings below. What is left here is the composition — one more object constructed, one
+      `{#if}` choosing between two panes, and the effect that returns to the list when the modal
+      closes — plus the paragraphs arguing each. There is no third thing to extract: splitting the
+      chooser from the two things it chooses between would be a file whose only content is an `{#if}`.
+    */
+    max: 207,
+    why: 'the chat and alerts archive modals, the credential that separates them, and the list-or-log chooser'
   },
   {
     file: 'lib/components/ChatArchivePane.svelte',
@@ -1485,8 +1498,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The archives browser and the sweep dialog. Replaced a hardcoded "There are no archived chats at
       this time" and a `Reload Log List` button that carried no `onclick` at all.
     */
-    max: 147,
-    why: 'the chat archives browser - a date, a channel picker, two sweeps and a restore per row'
+    /*
+      147 -> 170, 2026-08-31. A raise, argued: each row became a CONTROL that opens the archive's log
+      (upstream's const 14, `[1,"list-group-item","list-group-item-action",3,"click"]`), which is a
+      button, a stopPropagation on the restore beside it so one click cannot do both, and the two
+      paragraphs saying why the handler is on a button rather than on the `li` the reference puts it
+      on. Nothing here is separable: a list pane whose rows are not clickable is the pane that was
+      already here, and the log it opens is its own component.
+    */
+    max: 170,
+    why: 'the chat archives browser - a date, a channel picker, two sweeps, and a row that opens its log'
+  },
+  {
+    file: 'lib/components/ChatArchiveLogPane.svelte',
+    /*
+      ONE ARCHIVED LOG, OPENED — the half of `app-chat-logs-modal` that was never built, transcribed
+      from `jxe` at bundle byte 2,309,873 and consts 17 to 37 of the modal's table.
+
+      Larger than the list pane it sits beside, and the reason is the three divergences it records
+      rather than any extra behaviour: upstream's two elements sharing one `id`, its `btn-ligth` typo,
+      and the compact row standing in for `app-st-message`. The component's own Angular `styles:[…]`
+      travel with it too — without them every class name in the markup would be a class with no CSS.
+    */
+    max: 228,
+    why: 'the archived-log viewer - a back button, a search, a download, and the reference styles that came with it'
   },
   {
     file: 'lib/components/RoomOverlays.svelte',
@@ -3869,6 +3904,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 183,
     why: 'the chat archive - three calls, four dialogs, and the list they replace'
+  },
+  {
+    file: 'lib/room/chat-archive-log.svelte.ts',
+    /*
+      The log VIEWER's state — one archive, its messages, and the search over them. A second class
+      rather than more of `RoomChatArchive` because that file sat at 182 against a ceiling of 183 and
+      the instruction is to extract rather than raise; following it produced the better split, which
+      is the usual outcome. It takes ONE function rather than a port object, because it makes one
+      call and an object wrapping a single function is a layer whose only content is its own name.
+    */
+    max: 203,
+    why: 'one archived log - open, back, the search over it, and the text Download Log writes'
   },
   {
     file: 'lib/room/chat-archive-port.ts',
