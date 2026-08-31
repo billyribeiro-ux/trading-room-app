@@ -33,6 +33,214 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 23:20 UTC — Thirty style-scoping ancestors, twenty of them asserted by nothing
+
+**Runtime impact: NO** — one new contract. What it guards is a defect class that ships silently.
+
+The poll audit an hour earlier found that `PollPanel.svelte` has no `<style>` block: its seventeen
+rules live in `captured-runtime-components.css`, re-homed onto the custom element, and apply only
+while the panel renders inside `<app-poll-modal>`. Swap that wrapper for a `div` and the panel is
+unstyled with **`svelte-check` reporting 0 errors and 0 warnings**.
+
+That is not one component's problem. Measured across the generated sheet: **thirty custom-element
+ancestors are used as style scopes, and twenty of the thirty were named by no test in this
+repository** — `app-webrtc-troubleshooter` with 64 rules, `app-user-info-modal` with 31,
+`app-reply-modal` with 30, `app-room-roster` with 19, on down. Every one of them is a wrapper that
+looks like scaffolding and is load-bearing.
+
+`captured-css-ancestor-contract.test.ts` sweeps the sheet for every `app-*` used as the first term of
+a selector and requires the element to exist in the shipped markup. A sweep rather than twenty
+assertions, for two reasons: twenty hand-written cases leave the thirty-first to be found the way the
+first was, and the sheet is GENERATED from a SHA-256-pinned source, so a regeneration that adds a
+host is covered without anybody remembering.
+
+**Its own first draft was the kind of test this repository exists to refuse, and the negative control
+is what caught it.** That draft read raw file text and carried a case claiming to check each host
+*"is rendered as an ELEMENT, not merely mentioned in prose"*. Run against `WebcamStrip.svelte` with
+the real `<app-presenter-cams>` removed and only the component's explanatory comments left quoting
+it, **the control came back GREEN**: a comment containing `<app-presenter-cams>` satisfies both the
+open tag and the `>` after it. A case that cannot fail for its stated reason is worse than no case,
+because the green is what gets believed. The components here quote the reference constantly — that is
+the house style — so the markup is read through `svelteCodeOf` now and the two weak cases collapse
+into one strong one. Re-run, the same control goes red naming `app-presenter-cams`.
+
+A second slip on the way, recorded because it changes what a reader should trust: the first attempt
+at that control replaced only ONE of five occurrences of the name in the file and passed for that
+reason rather than for the reason I first read into it. A control that passes needs its own
+explanation before it is believed, exactly as a test that passes does.
+
+**Verified — three negative controls, red then green:** `<app-poll-modal>` replaced by a `div` (the
+measured silent case); `<app-presenter-cams>` replaced by a `div`, a host no test had ever named; and
+the element removed while its prose mentions stayed, which is the one that failed the first draft.
+
+Room gate exit 0: 305 test files / 5,581 passed / 1 skipped.
+
+### 2026-08-31 23:00 UTC — PollPanel audited: a faithful transcription that nothing running could prove
+
+**Runtime impact: NO** — no code changed. What changed is that the surface is now checked.
+
+`todo-next.md` listed `PollPanel.svelte` (883 lines) as unaudited. It was read end to end against
+`app-poll-modal` in the pinned bundle — the selector at byte 2,112,472, all **53 consts decoded by
+value** with `const-table.mjs` and swept against `PollPanel` and `PollSavedList`.
+
+**Zero gaps.** Every const value is present, including the reference's own `ria-controls` typo on
+the saved-polls tab — the `a` is missing there while its sibling const spells `aria-controls`
+correctly, so it is a typo in one of two adjacent attributes and is transcribed rather than fixed.
+One divergence, and it is right: the loading gif is `/assets/…` rather than the reference's
+`../../assets/…`, because that relative path resolves from an Angular component's location and this
+app serves the file from `static/`. The asset's existence is asserted too — a divergence pointing at
+a missing file is the same bug by another route.
+
+**So the finding is not a missing feature; it is that nothing which RUNS said any of this.**
+`poll-source-contract.test.ts` reads `docs/source/components/app-poll-modal.full.js`, an evidence
+root this repository does not ship, so it is one of the 42 files `gate/evidence-bound-tests.mjs`
+excludes on every run here and on CI. Every claim it makes about this panel has been unasserted for
+as long as that has been true. Same shape as `SVC-04` and `STB-04`, same remedy: the old file is
+neither deleted nor re-pointed (retiring it is the owner's call), and the facts are re-derived from
+the tracked v4 bytes.
+
+**And one of those unasserted claims had a silent failure mode.** `PollPanel.svelte` has NO `<style>`
+block. All seventeen of the component's rules — 2,040 bytes — ship in
+`captured-runtime-components.css` re-homed onto the custom element:
+
+```css
+app-poll-modal .poll-panel-titlebar:not(:root) { … cursor: move; user-select: none; … }
+```
+
+They apply only while the panel renders inside an `<app-poll-modal>` element. Replace that wrapper
+with a `div` — exactly the tidy-up somebody reaches for in a 6,900-line file — and the titlebar loses
+its background, its drag cursor and its layout, the buttons lose their box, and **nothing in this
+repository says a word**. That was measured, not asserted: with the wrapper swapped for a `div`,
+`svelte-check` reported *1,579 files, 0 errors, 0 warnings*. `img-dimensions-contract.test.ts`
+documents the identical trap for `app-privchat`'s avatars and calls it "a real and silent failure
+mode"; this is the same one, two orders of magnitude larger. Both halves are pinned now — the
+wrapper, and the sheet still scoping to it — because either alone goes green on half the defect.
+
+**Verified — five negative controls, each red on its own assertion, green after restore:** the
+wrapper replaced by a `div`; the `ria-controls` typo "corrected"; the loader path "restored" to the
+reference literal; a const value dropped (the sweep named it, `const 22: Enter a choice (i.e. Up,
+Down, Sideways)`); and the generated sheet's scoping removed.
+
+`slice-anchor-contract` refused the first draft — two `indexOf` calls inlined into a `slice` — and
+they are bound and asserted now. Coverage moves to **42 of 84 surfaces, 17,551 of 37,259 lines,
+47.1%**, and the inventory row names this contract so the cell cannot claim audited without saying
+what did it.
+
+Room gate exit 0: 304 test files / 5,576 passed / 1 skipped.
+
+### 2026-08-31 22:30 UTC — Two more TODO.md rows that described work already done, one for eight days
+
+**Runtime impact: NO** — comments and trackers. Both rows named a blocker, and neither blocker was
+real; the code they said was missing had shipped.
+
+**Alert Labels' composer picker.** The row read *"Evidence gap, not a port: `alertLabels` is one of
+`direct-evidence-contract.ts`'s `hiddenCapabilityBranches`, so that branch never rendered in any
+capture we hold and **there is no markup to match**. Needs a new capture from a room that has the
+entitlement."*
+
+The DOM-capture half is true. The conclusion does not follow, and that is the finding: **the compiled
+template is in the pinned bundle.** `zTe` at byte 2,119,145 is the per-label row —
+`div.form-check` > `input.form-check-input#alert-trade-label-{i}` and a `label[for]` showing
+`e.name` with a trailing `?` — `GTe` at 2,119,525 repeats it over `globals.alertLabels`, the gate is
+`O(62, …length > 0 ? 62 : -1)` at 2,138,428, and `processAlertLabels` at 2,131,295 is the
+`" #"+hash` prefix rule. Decoding compiled templates is how this entire repository was built, so *no
+rendered capture* was never the same claim as *no markup to match*.
+
+And it was built from exactly those bytes: `PostAlertModal.svelte:518-553` carries the transcription
+with the offsets, `alertLabelPrefix` is in `alert-labels.ts`, and `alert-label-picker-contract.test.ts`
+holds it. The same wrong inference was in `alert-labels.ts`'s own docblock, which described the
+`checked` flag as being carried for a shape *"the composer will need"* — future tense. Corrected in
+place rather than deleted, because the wrong inference is the useful part: it is the one the next
+reader of `hiddenCapabilityBranches` will make again.
+
+**`kick-duplicates`.** The defect table said *"NOT fixable without inventing … the positive arm needs
+a kick the room cannot perform"*. The "OPEN RIGHT NOW" table, in the same file, had recorded the
+opposite on the day it shipped: *"the row's blocker was my own bad reading"*. `emailHash` was already
+on `User`, already filled from `hashEmail(account.email)`, and already read as `connectedUsers`; what
+misled the original reading was `RosterAuthority`, a narrow `{id, isP?}` interface written for
+`mute-all-non-admins` alone and wrongly generalised to be the roster. **Two cells describing one
+control, disagreeing for eight days** — which is what "a row that is DONE is deleted" exists to
+prevent, and why deleting that table yesterday was the right call rather than a tidy-up.
+
+The six-defects heading is corrected with them. It read *"REAL, FIXABLE, and not yet done"* over
+*"they are simply not built yet"*; all six are closed. The table is kept in full, because it is now
+more useful as a record of how the VERDICTS fared than as a work list: four of the six were wrong
+about the state of the code, three of them calling built work missing. A verdict reached without
+locating the code is a verdict about the author's memory.
+
+Room gate exit 0.
+
+### 2026-08-31 22:00 UTC — The kicked page, and TODO.md's twelve-row table is empty
+
+**Runtime impact: YES.** A kicked member used to get a DISMISSIBLE dialog over a room whose stream
+the same frame had just closed. They read the message, pressed OK, and were left staring at a frozen
+room with nothing on screen saying why — which is worse than showing nothing, because the room then
+looks broken rather than closed to them. The page is replaced now, and it stays replaced.
+
+`app-kicked-page` is in the pinned bundle and was decoded whole (byte 2,561,780): four declarations,
+one variable, three consts, one CSS rule. `TODO.md` row 6 had carried it as its one residual and
+`private-commands.ts` had named it in those words — *"upstream sets `currPage="kicked"` and renders
+`app-kicked-page`. This room has none."*
+
+Three things in the decode were worth transcribing rather than tidying. **`d-flex-column` is not a
+Bootstrap class** — Bootstrap's is `flex-column` — so the row stays horizontal and the heading is
+centred across rather than down; reproduced, because "fixing" it would leave this page matching no
+capture at all. **`vertical-align: middle` on a block element** is inert in the reference too.
+**Two different defaults exist upstream** and neither is normally reached: the component's own
+`"kicked"` and the host's `"Kicked"`; both are kept, because choosing between them would be a
+decision with no evidence behind it.
+
+**The `<audio id="webcam">` stays outside the branch, and that is evidenced rather than assumed.**
+`app-root`'s template is three declarations — `T(0,"router-outlet"), H(1,IRe,5,1), T(2,"audio",0)`
+at byte 2,602,869 — so the sink is a sibling of the page switch and survives every arm upstream too.
+Putting it inside the `{:else}` would have been a divergence nothing else here would have caught.
+
+**The ratchet pushed back and the change moved.** The first version put the whole decode of `IRe`,
+upstream's five-way page switch, at the branch in `+page.svelte` — the largest file in the app —
+and landed at 1852 against a 1798 ceiling. That decode is about `app-root` and about the component
+occupying arm 2, so it went into `KickedPage.svelte`'s own docblock with a pointer left behind.
+Fifteen lines came off the biggest file, and the citation now has one home instead of two that could
+disagree. `every component is discovered and capped` then refused the new file until it had a number
+— the second time this repository has been TOLD about an uncapped component rather than finding one
+by accident.
+
+**`TODO.md`'s "OPEN RIGHT NOW" table is deleted.** It held twelve rows and every one was done; the
+kicked page was the only line in it still describing unbuilt work. The header's own rule says how
+that ends — *"A row that is DONE is deleted, never struck through … Two places describing the same
+thing is how one of them goes stale."* Each row was verified against the code before removal, not
+taken on its own say-so.
+
+Nothing in it was lost. The four controls that are inert and are NOT work keep their reasons at
+`INERT_ACTIONS`; `permsChangeReload`'s missing capture is named at `dialogs.svelte.ts:90` and
+`user-actions.svelte.ts:866`; row 9's analysis is in the audit register with its byte offsets.
+
+**The disposition census moved with them, and moving it caught me committing the exact error it
+exists to prevent.** The census belongs on the code it describes, so it is in `user-action-intent.ts`
+now beside the buckets, and the contract reads one file instead of two. I copied the number from the
+contract's own explanatory prose — *"Measured 2026-08-29: 39 dispatched"*, itself already superseded
+— instead of measuring. `counts the dispatched actions correctly` went red with `expected 39 to be
+38` on the first run. The correct figure is **38 dispatched, 4 inert, 2 carrying a fixed alert**, and
+the slip is recorded at the census rather than quietly fixed, because it is the same failure the
+paragraphs beside it describe. A census taken from a neighbouring sentence is not a census.
+
+That contract also went red when the table was deleted, which is the behaviour it was written for
+arriving from an unplanned direction: a document-reading test whose document goes away must fail
+loudly, not quietly stop checking anything.
+
+**Verified — eight negative controls, each red on its own assertion, green after restore.** The
+dialog reinstated; `d-flex-column` "corrected" to Bootstrap's spelling; an empty message falling back
+to the default; `hidden` in place of `{#if}`, which renders the kicked page BESIDE a live room; the
+audio sink pulled inside the branch; `$state` in place of `$state.raw`; the census drifted by one;
+and the census sentence reworded out of a checkable shape.
+
+Svelte MCP: `get-documentation` on `{#if}` and scoped styles before the branch and the component;
+`svelte-autofixer` clean on `KickedPage.svelte`. rust-analyzer MCP: not used and not needed — no
+`.rs` file was touched.
+
+Ceilings: `KickedPage.svelte` declared at 107; `+page.svelte` 1798 -> 1838;
+`addressed-channel.ts` 74 -> 102 (net-zero code — one dep added, one removed);
+`create-room.svelte.ts` 1420 -> 1435.
+
 ### 2026-08-31 21:15 UTC — Thirteen citations that pointed at nothing, and the two that named the wrong function
 
 **Runtime impact: NO** — comments only. The values `screen-volume.ts` ships were correct throughout;

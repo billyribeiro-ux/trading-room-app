@@ -161,6 +161,44 @@ export const TOAST_ONLY_ACTIONS: readonly string[] = Object.keys(EXACT_ALERTS);
   each needs either the reference's captured wire protocol or an infrastructure decision, and this
   repository forbids inventing either. That is the honest reason they are all still here.
 */
+/*
+  ── THE DISPOSITION CENSUS, AND WHY IT LIVES HERE NOW ────────────────────────────────────────────
+
+  **Disposition census, measured 2026-08-31: 38 dispatched actions, 4 inert, 2 carrying a fixed
+  alert.**
+
+  This number was 39 for one commit's worth of minutes, and the gate below caught it — which is
+  worth recording rather than quietly fixing, because it is the SAME failure the paragraphs below
+  describe, committed by the person moving the sentence. The count was copied from the contract
+  file's own explanatory prose (*"Measured 2026-08-29: 39 dispatched, 6 inert…"*, itself already
+  superseded) instead of being measured. `counts the dispatched actions correctly` went red with
+  `expected 39 to be 38` immediately.
+
+  A census taken from a neighbouring sentence is not a census. The only reason this one is right is
+  that something recomputes it.
+
+  It used to live in `TODO.md` row 4, and it moved on 2026-08-31 when that table was deleted — every
+  one of its twelve rows had closed. Moving it is the better arrangement rather than a consolation:
+  the census describes THIS FILE, so a reader who changes a bucket now sees the sentence that
+  describes it in the same edit, and `user-action-disposition-contract.test.ts` reads one file
+  instead of two.
+
+  **The count has a history of being wrong, which is why it is gated at all.** Row W's own text
+  records this family being counted as seven, then nine, then twelve — each time by arithmetic over
+  the previous number rather than by reading the code. Row 4 then said *40 dispatched, 6 inert, 3
+  carrying a fixed alert* and named `mute-chat-indefinitely` as sending nothing; that was true when
+  written and stopped being true the same day, when the control was wired and its `EXACT_ALERTS`
+  entry deleted. Two rows in one file contradicted each other for two days.
+
+  The contract recomputes all three from the buckets below and fails if this sentence disagrees, so
+  a drift now fails on the commit that causes it rather than being found by hand a fortnight later.
+
+  **Four inert, and the number is 4 rather than 6 because two of the six were BUILT on 2026-08-29** —
+  `debug-log` and `upload-profile-picture` both have real commands and contract cover. Of the four
+  left, NONE is unbuilt work: two need a server-side recorder this deployment does not have, one is
+  a MATCH (the reference wires nothing to it), and one is a deliberate security divergence. Each
+  says which at its own entry.
+*/
 export const INERT_ACTIONS: Readonly<Record<string, string>> = {
   /*
     "NO WIRE CAPTURED" WAS FALSE FOR ALL SIX OF THESE, AND IT WAS FALSE THE DAY IT WAS WRITTEN.

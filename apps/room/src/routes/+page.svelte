@@ -56,6 +56,7 @@
   } from '#lib/navbar-labels.js';
   import RoomNavbar from '#lib/components/RoomNavbar.svelte';
   import RoomSidebar from '#lib/components/RoomSidebar.svelte';
+  import KickedPage from '#lib/components/KickedPage.svelte';
   import RoomShell from '#lib/components/RoomShell.svelte';
   import { DUMP_CONTRACT } from '#lib/dump-contract.js';
   import {
@@ -241,6 +242,25 @@
    */
 
   let previewWindowsVisible = $state(true);
+
+  /**
+   * `TODO.md` row 6's one residual — the message a kicked member is left looking at, or `null`.
+   *
+   * Upstream this is `currPage`, an app-root field the whole page switches on: `app-room`,
+   * `app-closed-session-page`, `app-kicked-page`, `app-detached-screen` and `app-session-login` are
+   * five siblings and exactly one renders (`ARe`, byte 2,593,537, is the kicked arm). Only one of
+   * those five is modelled here, so this is the one flag rather than a five-way enum — an enum with
+   * four unreachable members is a shape that invites somebody to reach for them.
+   *
+   * `$state.raw` and not `$state`: it holds a string or null and is only ever REPLACED. A deep proxy
+   * over a primitive is pure overhead on every read, which `CLAUDE.md` names by hand.
+   *
+   * ONE-WAY, deliberately, and nothing clears it. Upstream has no path back either — the kick frame
+   * arrives, the stream closes, and the member's way out is a reload, which re-enters through
+   * `+page.server.ts` where the ban (if there was one) is enforced server-side. A "dismiss" here
+   * would return the member to a room whose connection is gone.
+   */
+  let kickedMessage = $state.raw<string | null>(null);
   let showMessageOptions = $state(false);
 
   /**
@@ -603,6 +623,7 @@
     },
     chatMissedWhileHidden: () => roomRefresh.chatMissedWhileHidden(),
     hidePreviewWindows: () => (previewWindowsVisible = false),
+    kicked: (message) => (kickedMessage = message),
     mtx,
     unreadQaAlertIds,
     defaultFollowChatStyle: () => defaultFollowChatStyle(theme)
@@ -1177,615 +1198,634 @@
 <app-root ng-version="17.3.12">
   <router-outlet></router-outlet>
   <!--
-    `.detach-screen` is the captured stylesheet's own hook for a popped-out screen:
-      .detach-screen .webcamScreen    { max-height: 100vh !important }
-      .detach-screen .overflow-hidden { overflow: initial !important }
-    so the screen fills the popout window instead of being boxed by the room's layout.
+    `currPage` — upstream's app-root instantiates exactly ONE of five pages, and this is that
+    switch. The five arms, the byte offsets and the reason only two of them are modelled here are in
+    `KickedPage.svelte`'s own docblock, beside the component that occupies arm 2, rather than copied
+    onto the page: the decode is about `IRe` and `app-root`, and one home for it is the difference
+    between a citation that gets updated and two that disagree.
+
+    `{#if}` and not `hidden`. Angular's `ɵɵconditional` instantiates one arm, so a kicked member's
+    browser is not holding a room it cannot use — and the room's effects, sockets and observers stop
+    with it rather than running behind a page saying the member has been removed.
+
+    THE `<audio id="webcam">` BELOW STAYS OUTSIDE THIS BRANCH. `app-root`'s template is three
+    declarations — `T(0,"router-outlet"), H(1,IRe,5,1), T(2,"audio",0)` at byte 2,602,869 — so the
+    sink is a SIBLING of the switch and survives every arm upstream too.
   -->
-  <app-room
-    id="topRoomDiv"
-    class={{ 'detach-screen': screens.detachedScreenId !== null }}
-  >
+  {#if kickedMessage !== null}
+    <KickedPage msg={kickedMessage} />
+  {:else}
     <!--
-      `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})`, bound as
-      `Kn(6, KAe, o.showSidebar, videoOnlyMode || chatOnlyMode || viewerOnlyMode)`
-      (`docs/source/components/app-room.full.js:4029-4039`, pure function at `:5`).
-
-      `mt-0` was never bound here, and it is not cosmetic. This component's own stylesheet sets
-      `.wrapper { margin-top: 49px }` and `.navbar { height: 49px }`
-      (`app-room.component.css`), so the 49px is space reserved FOR the navbar — and the navbar is
-      removed in these same three modes (see the gate on `mainNavigation` below). Without `mt-0`
-      the room keeps a 49px gap where a navbar used to be, and `vh-100` on the split then pushes
-      49px of content off the bottom of the window.
-
-      `videoOnlyMode` is the `r` query parameter, which this room does not model — the same honest
-      gap recorded for `hideFiles` in `files-gates.ts`. The two modes it does model are bound.
+      `.detach-screen` is the captured stylesheet's own hook for a popped-out screen:
+        .detach-screen .webcamScreen    { max-height: 100vh !important }
+        .detach-screen .overflow-hidden { overflow: initial !important }
+      so the screen fills the popout window instead of being boxed by the room's layout.
     -->
-    <div
-      class={['wrapper', { 'push-wrapper': sidebarOpen, 'mt-0': chatOnlyMode || gates.viewerOnlyMode }]}
+    <app-room
+      id="topRoomDiv"
+      class={{ 'detach-screen': screens.detachedScreenId !== null }}
     >
-      <div class="d-flex flex-column-reverse flex-sm-row room-container">
-        {#snippet mainNavigation()}
-        <!--
-          `.mainAppNav` is `RoomNavbar.svelte` since 2026-08-15 — the third of the five template
-          regions and the one with the most CONTROLS. Seventy-odd identifiers, two thirds of them
-          handlers, and almost every piece of state it reads belonging to `RoomMedia` or
-          `RoomMenus`: three instances replace about thirty scalars.
+      <!--
+        `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})`, bound as
+        `Kn(6, KAe, o.showSidebar, videoOnlyMode || chatOnlyMode || viewerOnlyMode)`
+        (`docs/source/components/app-room.full.js:4029-4039`, pure function at `:5`).
 
-          Nothing in that file starts a recording, opens a device or touches a `MediaStream`. It
-          decides what a button LOOKS like; `RoomMedia` says what is true, and the work stays here.
-        -->
-        <RoomNavbar
-          {isPresenter}
-          hasMic={data.user.hasMic === true}
-          bind:sidebarOpen
-          bind:mobileNavOpen
-          {media}
-          {menus}
-          {roster}
-          volume={roomVolume.volume}
-          presenterAudio={roomVolume.presenterAudio}
-          individualVolumeControls={gates.individualVolumeControls}
-          recordingReminderAllowed={gates.recordingReminderAllowed}
-          recordingTooltip={gates.recordingTooltip}
-          benzinga={gates.benzinga}
-          mobileAppAvailable={gates.mobileAppAvailable}
-          tawkAvailable={gates.tawkAvailable}
-          doNotDisturbOn={prefs.doNotDisturbOn}
-          mp3Playing={broadcasts.mp3Playing}
-          youtubeForAllUrl={broadcasts.youtubeForAllUrl}
-          backgroundVolume={roomVolume.backgroundVolume}
-          soundChecks={prefs.soundChecks}
-          noSpeakerText={NO_SPEAKER_TEXT}
-          shareScreenText={SHARE_SCREEN_TEXT}
-          virtualCamText={VIRTUAL_CAM_TEXT}
-          stopSharingAllText={STOP_SHARING_ALL_TEXT}
-          {setInputChecked}
-          {setRangeValue}
-          ontoggletopmenu={(menu) => modals.toggleTopMenu(menu)}
-          onstartrecording={() => void recording.startRecording()}
-          onstoprecording={() => void recording.stopRecording()}
-          onpauserecording={() => recording.pauseRecording()}
-          onresumerecording={() => recording.resumeRecording()}
-          ondownloadrecording={() => recording.downloadRecording()}
-          onpromptforsoundcloud={() => broadcasts.promptForSoundCloud()}
-          onstopsoundcloud={() => broadcasts.stopSoundCloud()}
-          onstopsoundcloudforme={() => broadcasts.stopSoundCloudForMe()}
-          ontogglemicrophone={() => void mediaTransport.toggleMicrophone()}
-          ontogglewebcam={() => void mediaTransport.toggleWebcam()}
-          hideWebcamForRoom={data.sessData?.hideWebcamForRoom === true}
-          blinkingRec={data.sessData?.blinkingRec === true}
-          onpromptforscreenname={(source) => void mediaTransport.promptForScreenName(source)}
-          onstopscreensharing={() => void mediaTransport.stopScreenSharing()}
-          onopensessioncontrol={(tab) => modals.openSessionControl(tab)}
-          onsetmastervolume={(level) => roomVolume.setMasterVolume(level)}
-          onsetbackgroundvolume={(level) => roomVolume.setBackgroundVolume(level)}
-          ontogglemute={() => roomVolume.toggleMute()}
-          onadjustpresentervolume={(user, raw) => roomVolume.adjustPresenterVolume(user, raw)}
-          ontoggletalkingpresenteraudio={(user) => roomVolume.toggleTalkingPresenterAudio(user)}
-          onupdatesoundcheck={(event) => prefs.updateSoundCheck(event)}
-          ontoggletawksupport={() => tawk.toggle()}
-          ongetmypinanddoinfo={() => void getMyPinAndDoInfo()}
-          onrequestreload={requestReload}
-          onshowrecpreview={() => recording.showRecPreview()}
-          onhiderecpreview={() => recording.hideRecPreview()}
-          tip={tipButtonFor(data.sessData)}
-          alwaysShowRoster={data.sessData?.alwaysShowRoster === true}
-          rosterCountVisible={gates.rosterCountVisible}
-          streamingTabAvailable={data.sessData?.useMediaMTX === true}
-          localScreens={localScreenShares}
-          onmutetalkinguser={(user) => userActions.muteTalkingUserDialog(user)}
-          onopenstreamingtab={() => modals.openSessionControl('streaming-selection')}
-          onreopenpreview={() => (previewWindowsVisible = true)}
-          onstoplocalscreen={(producerId) => mediaTransport.stopLocalScreen(producerId)}
-        />
-        {/snippet}
+        `mt-0` was never bound here, and it is not cosmetic. This component's own stylesheet sets
+        `.wrapper { margin-top: 49px }` and `.navbar { height: 49px }`
+        (`app-room.component.css`), so the 49px is space reserved FOR the navbar — and the navbar is
+        removed in these same three modes (see the gate on `mainNavigation` below). Without `mt-0`
+        the room keeps a 49px gap where a navbar used to be, and `vh-100` on the split then pushes
+        49px of content off the bottom of the window.
 
-        <!--
-          Nodes 3 and 4 of the root template, and they carry the SAME gate:
-
-            O(3, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 3)   // _Pe  = the sidebar
-            O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)   // A4e  = the navbar
-
-          (`docs/source/components/app-room.full.js:4043-4059`.) Both were rendered
-          unconditionally here, so a room entered with `?vo=1` or `?co=1` kept a full navbar and a
-          full sidebar that the reference removes entirely — and the `vh-100` on the split below
-          assumes they are gone. One `{#if}` covers both because upstream it is one condition
-          evaluated twice, not two decisions.
-
-          The gate is deliberately NOT `hideChatAlerts`: that flag hides the chat/alerts COLUMN and
-          has five sources of its own (`full.js:1893-1902`). This is the chrome, and it goes on the
-          mode alone.
-        -->
-        {#if !(chatOnlyMode || gates.viewerOnlyMode)}
-        <!--
-          `.room-sidebar` is `RoomSidebar.svelte` since 2026-08-15 — the second of the five
-          template regions, and the first to take state CLASSES as props rather than a wall of
-          scalars. `roster` and `menus` go whole; three references replace about twenty.
-
-          That is the argument for the classes landing BEFORE the components, paying off where it
-          can be seen: extracting this markup first would have meant a prop surface the size of the
-          file it came from.
-
-          The GATES are passed as the page's own predicates, not re-derived: every authority
-          decision in this room is made in one place from data the server owns.
-        -->
-        <RoomSidebar
-          {sidebarOpen}
-          {theme}
-          {isPresenter}
-          session={rosterSession}
-          {roster}
-          {menus}
-          roomEventsConnected={roomEvents.connected}
-          mediaConnected={media.connected}
-          {chatAlertsDetached}
-          rosterVisible={gates.rosterVisible}
-          rosterCountVisible={gates.rosterCountVisible}
-          badgesFor={(emailHash) => feeds.badgesFor(emailHash)}
-          archivesAvailable={gates.archivesAvailable}
-          {rowVisible}
-          {rosterRowClass}
-          locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
-          rowIsFull={(entry) => rosterRowIsFull(entry, rosterSession)}
-          tip={tipButtonFor(data.sessData)}
-          canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
-          mobileAppAvailable={gates.mobileAppAvailable}
-          benzinga={gates.benzinga}
-          dumpVersion={DUMP_CONTRACT.version}
-          onopenmodal={(name) => modals.open(name)}
-          onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}
-          onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}
-          onmentionrosteruser={(user) => userActions.mentionFromRoster(user)}
-          onselectuser={(id) => userActions.selectUserId(id)}
-          onusersearchkey={doUserSearch}
-          ongetmobilepin={() => void getMyPinAndDoInfo()}
-          ongetrandomuser={getRandomUser}
-          onopentranscript={() => alertsPane.openTranscript()}
-          onreopenalertschat={() => alertsPane.reopen()}
-          onreload={() => void invalidateAll()}
-        />
-        {@render mainNavigation()}
-        {/if}
-
+        `videoOnlyMode` is the `r` query parameter, which this room does not model — the same honest
+        gap recorded for `hideFiles` in `files-gates.ts`. The two modes it does model are bound.
+      -->
+      <div
+        class={['wrapper', { 'push-wrapper': sidebarOpen, 'mt-0': chatOnlyMode || gates.viewerOnlyMode }]}
+      >
+        <div class="d-flex flex-column-reverse flex-sm-row room-container">
+          {#snippet mainNavigation()}
           <!--
-            ONE gate on the whole chat/alerts column, because upstream it is one flag:
-            `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`). Its five writers
-            and the two this room cannot model are documented on `hideChatAlerts` itself, in the
-            script above.
+            `.mainAppNav` is `RoomNavbar.svelte` since 2026-08-15 — the third of the five template
+            regions and the one with the most CONTROLS. Seventy-odd identifiers, two thirds of them
+            handlers, and almost every piece of state it reads belonging to `RoomMedia` or
+            `RoomMenus`: three instances replace about thirty scalars.
 
-            This used to be three branches - a hardcoded test on `viewerOnlyMode`, a detached
-            branch, and the column - which is the shape that let the room SETTING an owner ticks do
-            nothing at all: it had no branch of its own, and adding one would have been a fourth
-            copy of the same decision.
-
-            The detached case no longer renders a "Reopen here" panel here. Upstream, detaching
-            hides this column outright and raises `reopenAlertsChatBtn`, whose control is a SIDEBAR
-            item - `H(25, oPe, 5, 0, 'li', 19)` gated by `O(25, e.reopenAlertsChatBtn ? 25 : -1)`
-            (`app-room.render-helpers.js:312, 355`, markup at `:76-87`). That is what the bootbox
-            means by "you can reopen the chat in this window from the side menu", and the item is
-            now rendered there. Keeping a half-height panel in a column the reference deletes was
-            the divergence, not the fix.
+            Nothing in that file starts a recording, opens a device or touches a `MediaStream`. It
+            decides what a button LOOKS like; `RoomMedia` says what is true, and the work stays here.
           -->
-          {#snippet chatAlertsPane()}
-            <AlertChatArea
-              isLimitedPresenter={media.limitedPresenter}
-              extraChatArea={extraChatInnerArea}
-              {broadcasts}
-              {split}
-              {alerts}
-              {chat}
-              {polls}
-              {menus}
-              {isPresenter}
-              doNotDisturbOn={prefs.doNotDisturbOn}
-              {pollIsActive}
-              {alertFilterConfigured}
-              {alertFilterActive}
-              {chatOnlyMode}
-              {webinarMode}
-              {chatEnabled}
-              chatChannelUp={roomEvents.chatChannelUp}
-              {selfMutedUntil}
-              {canPostImages}
-              canUseRTE={composer.canUseRTE}
-              {giphyApiKey}
-              bind:showMessageOptions
-              visibleAlerts={feeds.visibleAlerts}
-              searchScopeNotice={alertsPane.searchScopeNotice}
-              visibleChatMessages={feeds.visibleChat}
-              alertLabels={gates.alertLabels}
-              chatTabs={data.chatTabs}
-              alertsDisplayMode={displayModes.alerts}
-              chatDisplayMode={displayModes.chat}
-              {messageChrome}
-              followedUsers={userActions.followedUsers}
-              presenterColors={data.presenterColors}
-              {captureAlertChatElement}
-              {captureAlertsScroller}
-              {captureComposerElement}
-              {observeComposerWidth}
-              {feedScroll}
-              {alertsFollow}
-              {chatFollow}
-              viewerId={data.user.id}
-              onopenmodal={(name) => modals.open(name)}
-              onopenpoll={() => modals.openPollUI()}
-              ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
-              ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
-              onchatsearch={searchChat}
-              ondetachalerts={() => alertsPane.detach()}
-              onsavealerts={() => alertsPane.save()}
-              onarchivealerts={() => alertsPane.archive()}
-              onchatarchive={chatToolbarControls.onchatarchive}
-              chatMode={chatToolbarControls.chatMode}
-              onchatmodechange={chatToolbarControls.onchatmodechange}
-              ondetachchat={chatOnlyMode ? undefined : () => alertsPane.detach()}
-              onmessageaction={(kind, action, item, payload) =>
-                messageActions.handle(kind, action, item, payload)}
-              onprivatechat={() => privateChat.show()}
-              showPmButton={gates.showPmButton}
-              onpasteimage={(file) => composer.beginImagePaste(file)}
-              oninlinealert={(body) => void composer.postInlineAlert(body)}
-              oninlinealertimage={(file, alertText) =>
-                composer.beginAlertImagePaste(file, alertText)}
-              oninlineentrytoggle={(open) => alertsPane.toggleInlineEntry(open)}
-              onexpandcomposer={autoExpandComposer}
-              ontyped={(value) => typing.main.typed(value)}
-              onstoppedtyping={() => typing.main.stop()}
-              typists={chat.typists}
-              onsend={() => composer.send()}
-              onimageupload={() => composer.openImageUpload()}
-              onrte={() => composer.openRTE()}
-              onselectgif={(title, url) => composer.selectGif(title, url)}
-              onbeginsplit={beginSplit}
-            />
+          <RoomNavbar
+            {isPresenter}
+            hasMic={data.user.hasMic === true}
+            bind:sidebarOpen
+            bind:mobileNavOpen
+            {media}
+            {menus}
+            {roster}
+            volume={roomVolume.volume}
+            presenterAudio={roomVolume.presenterAudio}
+            individualVolumeControls={gates.individualVolumeControls}
+            recordingReminderAllowed={gates.recordingReminderAllowed}
+            recordingTooltip={gates.recordingTooltip}
+            benzinga={gates.benzinga}
+            mobileAppAvailable={gates.mobileAppAvailable}
+            tawkAvailable={gates.tawkAvailable}
+            doNotDisturbOn={prefs.doNotDisturbOn}
+            mp3Playing={broadcasts.mp3Playing}
+            youtubeForAllUrl={broadcasts.youtubeForAllUrl}
+            backgroundVolume={roomVolume.backgroundVolume}
+            soundChecks={prefs.soundChecks}
+            noSpeakerText={NO_SPEAKER_TEXT}
+            shareScreenText={SHARE_SCREEN_TEXT}
+            virtualCamText={VIRTUAL_CAM_TEXT}
+            stopSharingAllText={STOP_SHARING_ALL_TEXT}
+            {setInputChecked}
+            {setRangeValue}
+            ontoggletopmenu={(menu) => modals.toggleTopMenu(menu)}
+            onstartrecording={() => void recording.startRecording()}
+            onstoprecording={() => void recording.stopRecording()}
+            onpauserecording={() => recording.pauseRecording()}
+            onresumerecording={() => recording.resumeRecording()}
+            ondownloadrecording={() => recording.downloadRecording()}
+            onpromptforsoundcloud={() => broadcasts.promptForSoundCloud()}
+            onstopsoundcloud={() => broadcasts.stopSoundCloud()}
+            onstopsoundcloudforme={() => broadcasts.stopSoundCloudForMe()}
+            ontogglemicrophone={() => void mediaTransport.toggleMicrophone()}
+            ontogglewebcam={() => void mediaTransport.toggleWebcam()}
+            hideWebcamForRoom={data.sessData?.hideWebcamForRoom === true}
+            blinkingRec={data.sessData?.blinkingRec === true}
+            onpromptforscreenname={(source) => void mediaTransport.promptForScreenName(source)}
+            onstopscreensharing={() => void mediaTransport.stopScreenSharing()}
+            onopensessioncontrol={(tab) => modals.openSessionControl(tab)}
+            onsetmastervolume={(level) => roomVolume.setMasterVolume(level)}
+            onsetbackgroundvolume={(level) => roomVolume.setBackgroundVolume(level)}
+            ontogglemute={() => roomVolume.toggleMute()}
+            onadjustpresentervolume={(user, raw) => roomVolume.adjustPresenterVolume(user, raw)}
+            ontoggletalkingpresenteraudio={(user) => roomVolume.toggleTalkingPresenterAudio(user)}
+            onupdatesoundcheck={(event) => prefs.updateSoundCheck(event)}
+            ontoggletawksupport={() => tawk.toggle()}
+            ongetmypinanddoinfo={() => void getMyPinAndDoInfo()}
+            onrequestreload={requestReload}
+            onshowrecpreview={() => recording.showRecPreview()}
+            onhiderecpreview={() => recording.hideRecPreview()}
+            tip={tipButtonFor(data.sessData)}
+            alwaysShowRoster={data.sessData?.alwaysShowRoster === true}
+            rosterCountVisible={gates.rosterCountVisible}
+            streamingTabAvailable={data.sessData?.useMediaMTX === true}
+            localScreens={localScreenShares}
+            onmutetalkinguser={(user) => userActions.muteTalkingUserDialog(user)}
+            onopenstreamingtab={() => modals.openSessionControl('streaming-selection')}
+            onreopenpreview={() => (previewWindowsVisible = true)}
+            onstoplocalscreen={(producerId) => mediaTransport.stopLocalScreen(producerId)}
+          />
           {/snippet}
 
           <!--
-            `O(3, e.hidePresentation ? -1 : 3)` (`app-room.render-helpers.js:1662`), whose flag is
-            set by `(chatOnlyMode || sessData.isChatOnlyRoom)` (`app-room.full.js:1903-1904`).
+            Nodes 3 and 4 of the root template, and they carry the SAME gate:
 
-            The `co=1` half was already here and is unchanged in effect: the popout carries the
-            alerts and chat, so the presentation area is not rendered in it at all, which is what
-            stopped "Detach Alerts" opening a second copy of the entire room. What this adds is the
-            SECOND term - the room-wide "Chat Only Room?" setting - and the name upstream gives the
-            pair. They are one decision with two sources, and writing the mode alone meant an owner
-            could configure a chat-only room and still get a presentation area for every member.
+              O(3, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 3)   // _Pe  = the sidebar
+              O(4, videoOnlyMode || chatOnlyMode || viewerOnlyMode ? -1 : 4)   // A4e  = the navbar
+
+            (`docs/source/components/app-room.full.js:4043-4059`.) Both were rendered
+            unconditionally here, so a room entered with `?vo=1` or `?co=1` kept a full navbar and a
+            full sidebar that the reference removes entirely — and the `vh-100` on the split below
+            assumes they are gone. One `{#if}` covers both because upstream it is one condition
+            evaluated twice, not two decisions.
+
+            The gate is deliberately NOT `hideChatAlerts`: that flag hides the chat/alerts COLUMN and
+            has five sources of its own (`full.js:1893-1902`). This is the chrome, and it goes on the
+            mode alone.
           -->
-          {#snippet presentationPane()}
-            <PresentationArea
-              {data}
-              {screens}
-              {mediaTransport}
-              {split}
-              {media}
-              {menus}
-              {mtx}
-              {isPresenter}
-              viewerOnlyMode={gates.viewerOnlyMode}
-              doNotDisturbOn={prefs.doNotDisturbOn}
-              bind:mainTab
-              subtitles={prefs.subtitles}
-              onhidespeechreco={hideSpeechRecognition}
-              {currentCaption}
-              {captionHistory}
-              bind:speechRecoHistoryMode
-              archivesAvailable={gates.archivesAvailable}
-              openTranscriptPage={() => alertsPane.openTranscript()}
-              {previewWindowsVisible}
-              {webcams}
-              videoDisabled={prefs.videoDisabled}
-              volume={roomVolume.volume}
-              {screenVolume}
-              customPlayerSrc={customPlayerUrl(data.sessData?.customPlayerURL)}
-              positionsAvailable={data.sessData?.positionsIframe === true &&
-                String(data.sessData?.positionsIframeUrl ?? '').trim().length > 0}
-              positionsIframeUrl={data.sessData?.positionsIframeUrl}
-              positionsAutoRefresh={prefs.updatePositionsIframe}
-              hideStreams={gates.streamsHidden}
-              modMessage={data.sessData?.modMessage ?? ''}
-              bufferSizeLevel={prefs.bufferSizeLevel}
-              onBufferSizeChange={(level) => prefs.save('bufferSizeLevel', level)}
-              hideNotes={gates.notesHidden}
-              {streamServerMTX}
-              {mtxToken}
-              selectStreamTabByUser={(streamId) => mtx.selectByUser(streamId)}
-              {bringEveryoneToStream}
-              {toggleLockStreamMtx}
-              {noteGates}
-              {giphyApiKey}
-              {notes}
-              uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
-              {swingAlerts}
-              {dayTradeAlerts}
-              {broadcasts}
-              {files}
-              openModal={(name) => modals.open(name)}
-              {setAutoplayAttribute}
-            />
-          {/snippet}
-
+          {#if !(chatOnlyMode || gates.viewerOnlyMode)}
           <!--
-            `acA-08` — the extra chat column has THREE forms upstream, not one, and this room shipped
-            a fourth that is none of them.
+            `.room-sidebar` is `RoomSidebar.svelte` since 2026-08-15 — the second of the five
+            template regions, and the first to take state CLASSES as props rather than a wall of
+            scalars. `roster` and `menus` go whole; three references replace about twenty.
 
-            ```js
-            // phone: nRe, byte 2,496,359 — const 227 ["minSize","0",1,"alert-chat-box",3,"size","order"]
-            O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)
+            That is the argument for the classes landing BEFORE the components, paying off where it
+            can be seen: extracting this markup first would have meant a prop surface the size of the
+            file it came from.
 
-            // desktop ltr/rtl: H4e, const 207
-            //   ["minSize","0",1,"alert-chat-box","alert-chat-box-extra-column",3,"size","order"]
-            //   holding an <as-split> whose single area is const 211, `chat-box`
-            O(2, e.hideChatAlerts || !preferences.extraChatColumn ||
-                 "ltr" !== preferences.roomSplitDir && "rtl" !== preferences.roomSplitDir ? -1 : 2)
-
-            // desktop ttb/btt: j4e, byte 2,490,857 — a FOURTH area of the INNER stack, const 211
-            O(6, !preferences.extraChatColumn ||
-                 "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
-            ```
-
-            What shipped here was one ungated top-level area in every case, so a top/bottom room drew
-            the second column beside the presentation area instead of below the chat pane, and the
-            `alert-chat-box-extra-column` class hook — which the phone form correctly does NOT carry
-            — never existed at all.
-
-            The three forms share ONE `<ExtraChatPane>` call: it takes thirty props off this page's
-            state, and three transcriptions of that call is three places to forget a prop.
+            The GATES are passed as the page's own predicates, not re-derived: every authority
+            decision in this room is made in one place from data the server owns.
           -->
-          {#snippet extraChatColumn()}
-            <ExtraChatPane
-                bind:tab={chat.extraTab}
-                bind:composer={chat.extraComposer}
-                messages={feeds.visibleExtraChat}
+          <RoomSidebar
+            {sidebarOpen}
+            {theme}
+            {isPresenter}
+            session={rosterSession}
+            {roster}
+            {menus}
+            roomEventsConnected={roomEvents.connected}
+            mediaConnected={media.connected}
+            {chatAlertsDetached}
+            rosterVisible={gates.rosterVisible}
+            rosterCountVisible={gates.rosterCountVisible}
+            badgesFor={(emailHash) => feeds.badgesFor(emailHash)}
+            archivesAvailable={gates.archivesAvailable}
+            {rowVisible}
+            {rosterRowClass}
+            locationVisible={(entry) => locationVisibleTo({ isPresenter }, entry)}
+            rowIsFull={(entry) => rosterRowIsFull(entry, rosterSession)}
+            tip={tipButtonFor(data.sessData)}
+            canOpenRosterPrivateChat={(user) => privateChat.canOpenFor(user)}
+            mobileAppAvailable={gates.mobileAppAvailable}
+            benzinga={gates.benzinga}
+            dumpVersion={DUMP_CONTRACT.version}
+            onopenmodal={(name) => modals.open(name)}
+            onopenrosteruserinfo={(user) => userActions.openInfoFor(user)}
+            onopenrosterprivatechat={(user) => privateChat.openFromRoster(user)}
+            onmentionrosteruser={(user) => userActions.mentionFromRoster(user)}
+            onselectuser={(id) => userActions.selectUserId(id)}
+            onusersearchkey={doUserSearch}
+            ongetmobilepin={() => void getMyPinAndDoInfo()}
+            ongetrandomuser={getRandomUser}
+            onopentranscript={() => alertsPane.openTranscript()}
+            onreopenalertschat={() => alertsPane.reopen()}
+            onreload={() => void invalidateAll()}
+          />
+          {@render mainNavigation()}
+          {/if}
+
+            <!--
+              ONE gate on the whole chat/alerts column, because upstream it is one flag:
+              `O(1, e.hideChatAlerts ? -1 : 1)` (`app-room.render-helpers.js:1650`). Its five writers
+              and the two this room cannot model are documented on `hideChatAlerts` itself, in the
+              script above.
+
+              This used to be three branches - a hardcoded test on `viewerOnlyMode`, a detached
+              branch, and the column - which is the shape that let the room SETTING an owner ticks do
+              nothing at all: it had no branch of its own, and adding one would have been a fourth
+              copy of the same decision.
+
+              The detached case no longer renders a "Reopen here" panel here. Upstream, detaching
+              hides this column outright and raises `reopenAlertsChatBtn`, whose control is a SIDEBAR
+              item - `H(25, oPe, 5, 0, 'li', 19)` gated by `O(25, e.reopenAlertsChatBtn ? 25 : -1)`
+              (`app-room.render-helpers.js:312, 355`, markup at `:76-87`). That is what the bootbox
+              means by "you can reopen the chat in this window from the side menu", and the item is
+              now rendered there. Keeping a half-height panel in a column the reference deletes was
+              the divergence, not the fix.
+            -->
+            {#snippet chatAlertsPane()}
+              <AlertChatArea
+                isLimitedPresenter={media.limitedPresenter}
+                extraChatArea={extraChatInnerArea}
+                {broadcasts}
+                {split}
+                {alerts}
+                {chat}
+                {polls}
+                {menus}
+                {isPresenter}
                 doNotDisturbOn={prefs.doNotDisturbOn}
+                {pollIsActive}
+                {alertFilterConfigured}
+                {alertFilterActive}
+                {chatOnlyMode}
+                {webinarMode}
                 {chatEnabled}
                 chatChannelUp={roomEvents.chatChannelUp}
-                {webinarMode}
                 {selfMutedUntil}
-                showPmButton={gates.showPmButton}
                 {canPostImages}
                 canUseRTE={composer.canUseRTE}
                 {giphyApiKey}
-                chrome={messageChrome}
+                bind:showMessageOptions
+                visibleAlerts={feeds.visibleAlerts}
+                searchScopeNotice={alertsPane.searchScopeNotice}
+                visibleChatMessages={feeds.visibleChat}
+                alertLabels={gates.alertLabels}
                 chatTabs={data.chatTabs}
-                unread={chat.extraUnread}
-                displayMode={displayModes.chat}
+                alertsDisplayMode={displayModes.alerts}
+                chatDisplayMode={displayModes.chat}
+                {messageChrome}
                 followedUsers={userActions.followedUsers}
                 presenterColors={data.presenterColors}
-                openMenuKey={menus.messageId}
-                onmenutoggle={(key) => menus.openMessageMenu(key)}
-                onaction={(action, message, event) =>
-                  messageActions.handle('chat', action, message, event, true)}
-                onfocus={() => chat.focused(EXTRA_COMPOSER)}
-                ontyped={(value) => typing.extra.typed(value)}
-                onstoppedtyping={() => typing.extra.stop()}
-                typists={chat.extraTypists}
-                onsend={() => void composer.sendExtra()}
-                onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
-                follow={extraChatFollow}
+                {captureAlertChatElement}
+                {captureAlertsScroller}
+                {captureComposerElement}
+                {observeComposerWidth}
+                {feedScroll}
+                {alertsFollow}
+                {chatFollow}
                 viewerId={data.user.id}
-                readingHistory={feedScroll.extraChatReadingHistory}
-                onstopreadinghistory={() => feedScroll.stopReadingHistory('extraChat')}
-                onscrolltobottom={(scroller) => feedScroll.forceChatToBottom(scroller)}
-                onprivatechat={() => privateChat.show()}
-                onsearch={() => chat.search.toggle('extra')}
-                searchOpen={chat.search.isOpen('extra')}
-                searchTerm={chat.search.term('extra')}
-                onsearchinput={(value) => chat.search.setTerm('extra', value)}
-                onsearchsubmit={() => searchChat('extra', chat.search.term('extra'))}
-                onsearchclear={() => chat.search.clear('extra')}
-                searchExtended={chat.search.isExtended('extra')}
-                modOnly={chat.modOnly('extra')}
-                onmodonly={(next) => chat.setModOnly('extra', next)}
-                ontoggletoolbar={() => chat.search.toggleExtended('extra')}
+                onopenmodal={(name) => modals.open(name)}
+                onopenpoll={() => modals.openPollUI()}
+                ontogglealertstoolbar={() => alertsPane.toggleToolbar()}
+                ontogglealertssearch={() => alertsPane.toggleToolbarSearchOnly()}
+                onchatsearch={searchChat}
+                ondetachalerts={() => alertsPane.detach()}
+                onsavealerts={() => alertsPane.save()}
+                onarchivealerts={() => alertsPane.archive()}
                 onchatarchive={chatToolbarControls.onchatarchive}
                 chatMode={chatToolbarControls.chatMode}
                 onchatmodechange={chatToolbarControls.onchatmodechange}
+                ondetachchat={chatOnlyMode ? undefined : () => alertsPane.detach()}
+                onmessageaction={(kind, action, item, payload) =>
+                  messageActions.handle(kind, action, item, payload)}
+                onprivatechat={() => privateChat.show()}
+                showPmButton={gates.showPmButton}
+                onpasteimage={(file) => composer.beginImagePaste(file)}
+                oninlinealert={(body) => void composer.postInlineAlert(body)}
+                oninlinealertimage={(file, alertText) =>
+                  composer.beginAlertImagePaste(file, alertText)}
+                oninlineentrytoggle={(open) => alertsPane.toggleInlineEntry(open)}
+                onexpandcomposer={autoExpandComposer}
+                ontyped={(value) => typing.main.typed(value)}
+                onstoppedtyping={() => typing.main.stop()}
+                typists={chat.typists}
+                onsend={() => composer.send()}
                 onimageupload={() => composer.openImageUpload()}
-                onpasteimage={(file) => composer.beginImagePaste(file, 'extra')}
-                onyoutube={isPresenter ? () => modals.open('youtube') : undefined}
-                onrte={() => composer.openExtraRTE()}
-                onselectgif={(url) => composer.selectGif('', url)}
-            />
-          {/snippet}
+                onrte={() => composer.openRTE()}
+                onselectgif={(title, url) => composer.selectGif(title, url)}
+                onbeginsplit={beginSplit}
+              />
+            {/snippet}
 
-          <!-- The phone's form: a plain `alert-chat-box` top-level area, const 227. -->
-          {#snippet extraChatPane()}
-            <as-split-area
-              minsize="0"
-              class="alert-chat-box as-split-area"
-              style={split.extraChatAreaStyle}
-            >
-              {@render extraChatColumn()}
-            </as-split-area>
-          {/snippet}
+            <!--
+              `O(3, e.hidePresentation ? -1 : 3)` (`app-room.render-helpers.js:1662`), whose flag is
+              set by `(chatOnlyMode || sessData.isChatOnlyRoom)` (`app-room.full.js:1903-1904`).
 
-          <!--
-            `H4e` — the desktop left/right form. A top-level area carrying the extra-column class,
-            and inside it an `as-split` of its own whose single `chat-box` area holds the pane. The
-            nested split is the capture's and is kept: it is what makes the column line up with the
-            chat pane beside it rather than with the whole alert-chat stack.
+              The `co=1` half was already here and is unchanged in effect: the popout carries the
+              alerts and chat, so the presentation area is not rendered in it at all, which is what
+              stopped "Detach Alerts" opening a second copy of the entire room. What this adds is the
+              SECOND term - the room-wide "Chat Only Room?" setting - and the name upstream gives the
+              pair. They are one decision with two sources, and writing the mode alone meant an owner
+              could configure a chat-only room and still get a presentation area for every member.
+            -->
+            {#snippet presentationPane()}
+              <PresentationArea
+                {data}
+                {screens}
+                {mediaTransport}
+                {split}
+                {media}
+                {menus}
+                {mtx}
+                {isPresenter}
+                viewerOnlyMode={gates.viewerOnlyMode}
+                doNotDisturbOn={prefs.doNotDisturbOn}
+                bind:mainTab
+                subtitles={prefs.subtitles}
+                onhidespeechreco={hideSpeechRecognition}
+                {currentCaption}
+                {captionHistory}
+                bind:speechRecoHistoryMode
+                archivesAvailable={gates.archivesAvailable}
+                openTranscriptPage={() => alertsPane.openTranscript()}
+                {previewWindowsVisible}
+                {webcams}
+                videoDisabled={prefs.videoDisabled}
+                volume={roomVolume.volume}
+                {screenVolume}
+                customPlayerSrc={customPlayerUrl(data.sessData?.customPlayerURL)}
+                positionsAvailable={data.sessData?.positionsIframe === true &&
+                  String(data.sessData?.positionsIframeUrl ?? '').trim().length > 0}
+                positionsIframeUrl={data.sessData?.positionsIframeUrl}
+                positionsAutoRefresh={prefs.updatePositionsIframe}
+                hideStreams={gates.streamsHidden}
+                modMessage={data.sessData?.modMessage ?? ''}
+                bufferSizeLevel={prefs.bufferSizeLevel}
+                onBufferSizeChange={(level) => prefs.save('bufferSizeLevel', level)}
+                hideNotes={gates.notesHidden}
+                {streamServerMTX}
+                {mtxToken}
+                selectStreamTabByUser={(streamId) => mtx.selectByUser(streamId)}
+                {bringEveryoneToStream}
+                {toggleLockStreamMtx}
+                {noteGates}
+                {giphyApiKey}
+                {notes}
+                uploadAlertFiles={(files) => composer.uploadAlertFiles(files)}
+                {swingAlerts}
+                {dayTradeAlerts}
+                {broadcasts}
+                {files}
+                openModal={(name) => modals.open(name)}
+                {setAutoplayAttribute}
+              />
+            {/snippet}
 
-            `alert-chat-box-extra-column` HAS NO CSS RULE — measured: the only selectors carrying the
-            name in any of this room's stylesheets are `.alert-chat-box-extra-column-sm …`, a
-            different class, and the bundle reads it back nowhere. It ships anyway, because its twin
-            `alert-chat-regular` is in exactly the same position and `AlertChatArea.svelte:567`
-            already ships that one: the pair is what a stylesheet or a script would target, and
-            keeping one half of it is how the two stop being a pair.
-          -->
-          {#snippet extraChatSideArea()}
-            <as-split-area
-              minsize="0"
-              class="alert-chat-box alert-chat-box-extra-column as-split-area"
-              style={split.extraChatAreaStyle}
-            >
-              <as-split
-                minsize="0"
-                class={split.innerIsVertical
-                  ? 'as-percent as-vertical as-init'
-                  : 'as-percent as-horizontal as-init'}
-                style={split.innerIsVertical ? undefined : 'flex-direction: row;'}
-                dir="ltr"
-              >
-                <as-split-area minsize="0" class="chat-box as-split-area" style="flex: 0 0 100%;">
-                  {@render extraChatColumn()}
-                </as-split-area>
-              </as-split>
-            </as-split-area>
-          {/snippet}
+            <!--
+              `acA-08` — the extra chat column has THREE forms upstream, not one, and this room shipped
+              a fourth that is none of them.
 
-          <!--
-            `j4e` — the desktop top/bottom form, rendered INSIDE `AlertChatArea`'s own split. The
-            gate is here rather than there because the state it reads is this page's; the component
-            owns the place, not the decision. `split.extraChatIsInside` carries the three terms and
-            the renormalised size.
-          -->
-          {#snippet extraChatInnerArea()}
-            {#if split.extraChatIsInside && !gates.hideChatAlerts}
+              ```js
+              // phone: nRe, byte 2,496,359 — const 227 ["minSize","0",1,"alert-chat-box",3,"size","order"]
+              O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)
+
+              // desktop ltr/rtl: H4e, const 207
+              //   ["minSize","0",1,"alert-chat-box","alert-chat-box-extra-column",3,"size","order"]
+              //   holding an <as-split> whose single area is const 211, `chat-box`
+              O(2, e.hideChatAlerts || !preferences.extraChatColumn ||
+                   "ltr" !== preferences.roomSplitDir && "rtl" !== preferences.roomSplitDir ? -1 : 2)
+
+              // desktop ttb/btt: j4e, byte 2,490,857 — a FOURTH area of the INNER stack, const 211
+              O(6, !preferences.extraChatColumn ||
+                   "ttb" !== preferences.roomSplitDir && "btt" !== preferences.roomSplitDir ? -1 : 6)
+              ```
+
+              What shipped here was one ungated top-level area in every case, so a top/bottom room drew
+              the second column beside the presentation area instead of below the chat pane, and the
+              `alert-chat-box-extra-column` class hook — which the phone form correctly does NOT carry
+              — never existed at all.
+
+              The three forms share ONE `<ExtraChatPane>` call: it takes thirty props off this page's
+              state, and three transcriptions of that call is three places to forget a prop.
+            -->
+            {#snippet extraChatColumn()}
+              <ExtraChatPane
+                  bind:tab={chat.extraTab}
+                  bind:composer={chat.extraComposer}
+                  messages={feeds.visibleExtraChat}
+                  doNotDisturbOn={prefs.doNotDisturbOn}
+                  {chatEnabled}
+                  chatChannelUp={roomEvents.chatChannelUp}
+                  {webinarMode}
+                  {selfMutedUntil}
+                  showPmButton={gates.showPmButton}
+                  {canPostImages}
+                  canUseRTE={composer.canUseRTE}
+                  {giphyApiKey}
+                  chrome={messageChrome}
+                  chatTabs={data.chatTabs}
+                  unread={chat.extraUnread}
+                  displayMode={displayModes.chat}
+                  followedUsers={userActions.followedUsers}
+                  presenterColors={data.presenterColors}
+                  openMenuKey={menus.messageId}
+                  onmenutoggle={(key) => menus.openMessageMenu(key)}
+                  onaction={(action, message, event) =>
+                    messageActions.handle('chat', action, message, event, true)}
+                  onfocus={() => chat.focused(EXTRA_COMPOSER)}
+                  ontyped={(value) => typing.extra.typed(value)}
+                  onstoppedtyping={() => typing.extra.stop()}
+                  typists={chat.extraTypists}
+                  onsend={() => void composer.sendExtra()}
+                  onscroll={(scroller) => feedScroll.trackExtraChatScroll(scroller)}
+                  follow={extraChatFollow}
+                  viewerId={data.user.id}
+                  readingHistory={feedScroll.extraChatReadingHistory}
+                  onstopreadinghistory={() => feedScroll.stopReadingHistory('extraChat')}
+                  onscrolltobottom={(scroller) => feedScroll.forceChatToBottom(scroller)}
+                  onprivatechat={() => privateChat.show()}
+                  onsearch={() => chat.search.toggle('extra')}
+                  searchOpen={chat.search.isOpen('extra')}
+                  searchTerm={chat.search.term('extra')}
+                  onsearchinput={(value) => chat.search.setTerm('extra', value)}
+                  onsearchsubmit={() => searchChat('extra', chat.search.term('extra'))}
+                  onsearchclear={() => chat.search.clear('extra')}
+                  searchExtended={chat.search.isExtended('extra')}
+                  modOnly={chat.modOnly('extra')}
+                  onmodonly={(next) => chat.setModOnly('extra', next)}
+                  ontoggletoolbar={() => chat.search.toggleExtended('extra')}
+                  onchatarchive={chatToolbarControls.onchatarchive}
+                  chatMode={chatToolbarControls.chatMode}
+                  onchatmodechange={chatToolbarControls.onchatmodechange}
+                  onimageupload={() => composer.openImageUpload()}
+                  onpasteimage={(file) => composer.beginImagePaste(file, 'extra')}
+                  onyoutube={isPresenter ? () => modals.open('youtube') : undefined}
+                  onrte={() => composer.openExtraRTE()}
+                  onselectgif={(url) => composer.selectGif('', url)}
+              />
+            {/snippet}
+
+            <!-- The phone's form: a plain `alert-chat-box` top-level area, const 227. -->
+            {#snippet extraChatPane()}
               <as-split-area
                 minsize="0"
-                class="chat-box as-split-area"
-                style={split.innerExtraChatAreaStyle}
+                class="alert-chat-box as-split-area"
+                style={split.extraChatAreaStyle}
               >
                 {@render extraChatColumn()}
               </as-split-area>
-            {/if}
-          {/snippet}
+            {/snippet}
 
-        <RoomShell
-          {split}
-          {captureMainElement}
-          {chatOnlyMode}
-          viewerOnlyMode={gates.viewerOnlyMode}
-          hideChatAlerts={gates.hideChatAlerts}
-          {hidePresentation}
-          {extraChatColumnVisible}
-          {isPresenter}
-          {chatMode}
-          {beginSplit}
-          {chatAlertsPane}
-          {presentationPane}
-          {extraChatPane}
-          {extraChatSideArea}
-        />
+            <!--
+              `H4e` — the desktop left/right form. A top-level area carrying the extra-column class,
+              and inside it an `as-split` of its own whose single `chat-box` area holds the pane. The
+              nested split is the capture's and is kept: it is what makes the column line up with the
+              chat pane beside it rather than with the whole alert-chat stack.
+
+              `alert-chat-box-extra-column` HAS NO CSS RULE — measured: the only selectors carrying the
+              name in any of this room's stylesheets are `.alert-chat-box-extra-column-sm …`, a
+              different class, and the bundle reads it back nowhere. It ships anyway, because its twin
+              `alert-chat-regular` is in exactly the same position and `AlertChatArea.svelte:567`
+              already ships that one: the pair is what a stylesheet or a script would target, and
+              keeping one half of it is how the two stop being a pair.
+            -->
+            {#snippet extraChatSideArea()}
+              <as-split-area
+                minsize="0"
+                class="alert-chat-box alert-chat-box-extra-column as-split-area"
+                style={split.extraChatAreaStyle}
+              >
+                <as-split
+                  minsize="0"
+                  class={split.innerIsVertical
+                    ? 'as-percent as-vertical as-init'
+                    : 'as-percent as-horizontal as-init'}
+                  style={split.innerIsVertical ? undefined : 'flex-direction: row;'}
+                  dir="ltr"
+                >
+                  <as-split-area minsize="0" class="chat-box as-split-area" style="flex: 0 0 100%;">
+                    {@render extraChatColumn()}
+                  </as-split-area>
+                </as-split>
+              </as-split-area>
+            {/snippet}
+
+            <!--
+              `j4e` — the desktop top/bottom form, rendered INSIDE `AlertChatArea`'s own split. The
+              gate is here rather than there because the state it reads is this page's; the component
+              owns the place, not the decision. `split.extraChatIsInside` carries the three terms and
+              the renormalised size.
+            -->
+            {#snippet extraChatInnerArea()}
+              {#if split.extraChatIsInside && !gates.hideChatAlerts}
+                <as-split-area
+                  minsize="0"
+                  class="chat-box as-split-area"
+                  style={split.innerExtraChatAreaStyle}
+                >
+                  {@render extraChatColumn()}
+                </as-split-area>
+              {/if}
+            {/snippet}
+
+          <RoomShell
+            {split}
+            {captureMainElement}
+            {chatOnlyMode}
+            viewerOnlyMode={gates.viewerOnlyMode}
+            hideChatAlerts={gates.hideChatAlerts}
+            {hidePresentation}
+            {extraChatColumnVisible}
+            {isPresenter}
+            {chatMode}
+            {beginSplit}
+            {chatAlertsPane}
+            {presentationPane}
+            {extraChatPane}
+            {extraChatSideArea}
+          />
+        </div>
       </div>
-    </div>
-    <!--
-      Everything that floats above the room, in `#lib/components/RoomOverlays.svelte`.
+      <!--
+        Everything that floats above the room, in `#lib/components/RoomOverlays.svelte`.
 
-      Phase 5 slice 17, and the largest single template region left after Phase 2: the modal host,
-      the seven dialog blocks, the toast host, the image lightbox, the hidden remote-audio sinks and
-      the "Conected" overlay. 310 lines became this call.
+        Phase 5 slice 17, and the largest single template region left after Phase 2: the modal host,
+        the seven dialog blocks, the toast host, the image lightbox, the hidden remote-audio sinks and
+        the "Conected" overlay. 310 lines became this call.
 
-      Nineteen of the props are the room's state classes handed over WHOLE, which is what makes it a
-      saving rather than a move — `ModalHost` still takes its 85, but they are assembled beside it
-      instead of being drilled through here. Only `modal` and `selectedImageUrl` bind back,
-      because only they are written on the other side.
-    -->
-    <RoomOverlays
-      {alerts}
-      {debugLog}
-      {isPresenter}
-      {canPostImages}
-      {unreadQaAlertIds}
-      {broadcasts}
-      {composer}
-      {data}
-      {dayTradeAlerts}
-      {dialogs}
-      {feeds}
-      {media}
-      {mediaTransport}
-      {messageActions}
-      {messageChrome}
-      presenterColors={data.presenterColors}
-      alertLabels={gates.alertLabels}
-      captionsAvailable={gates.speechRecognitionAvailable}
-      alertsDisplayMode={displayModes.alerts}
-      chatLogDisplayMode={displayModes.chat}
-      onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}
-      {polls}
-      {prefs}
-      {privateChat}
-      {roomEvents}
-      {roster}
-      {split}
-      {swingAlerts}
-      {toasts}
-      {userActions}
-      {modals}
-      {chatMode}
-      {globalChatStyle}
-      {mobilePin}
-      mobileAppAvailable={gates.mobileAppAvailable}
-      onrestoremobiletokens={() => restoreMobileAppTokens()}
-      {theme}
-      changeChatMode={(mode) => void changeChatMode(mode)}
-      saveAlertFilter={(next) => alertsPane.saveFilter(next)}
-    />
-    <!--
-      `app-privchat` is its own component since 2026-08-15 — the first of the five template
-      regions, and the smallest, chosen to prove the pattern on a floating panel rather than on a
-      pane a member looks at all day.
+        Nineteen of the props are the room's state classes handed over WHOLE, which is what makes it a
+        saving rather than a move — `ModalHost` still takes its 85, but they are assembled beside it
+        instead of being drilled through here. Only `modal` and `selectedImageUrl` bind back,
+        because only they are written on the other side.
+      -->
+      <RoomOverlays
+        {alerts}
+        {debugLog}
+        {isPresenter}
+        {canPostImages}
+        {unreadQaAlertIds}
+        {broadcasts}
+        {composer}
+        {data}
+        {dayTradeAlerts}
+        {dialogs}
+        {feeds}
+        {media}
+        {mediaTransport}
+        {messageActions}
+        {messageChrome}
+        presenterColors={data.presenterColors}
+        alertLabels={gates.alertLabels}
+        captionsAvailable={gates.speechRecognitionAvailable}
+        alertsDisplayMode={displayModes.alerts}
+        chatLogDisplayMode={displayModes.chat}
+        onDisplayModeChange={(surface, mode) => displayModes.set(surface, mode)}
+        {polls}
+        {prefs}
+        {privateChat}
+        {roomEvents}
+        {roster}
+        {split}
+        {swingAlerts}
+        {toasts}
+        {userActions}
+        {modals}
+        {chatMode}
+        {globalChatStyle}
+        {mobilePin}
+        mobileAppAvailable={gates.mobileAppAvailable}
+        onrestoremobiletokens={() => restoreMobileAppTokens()}
+        {theme}
+        changeChatMode={(mode) => void changeChatMode(mode)}
+        saveAlertFilter={(next) => alertsPane.saveFilter(next)}
+      />
+      <!--
+        `app-privchat` is its own component since 2026-08-15 — the first of the five template
+        regions, and the smallest, chosen to prove the pattern on a floating panel rather than on a
+        pane a member looks at all day.
 
-      PROPS, not context, and the reasoning is in the component's own header: these state classes
-      are instantiated inside this file, so they are per-request already and there is nothing for
-      `createContext` to protect against. It is a direct child; a context layer for a one-level hop
-      is indirection with no reader.
+        PROPS, not context, and the reasoning is in the component's own header: these state classes
+        are instantiated inside this file, so they are per-request already and there is nothing for
+        `createContext` to protect against. It is a direct child; a context layer for a one-level hop
+        is indirection with no reader.
 
-      `showPMToolbar` did NOT come along as a prop. It was page state that nothing outside that
-      markup read or wrote, so it is component-local now — the part of this extraction that removes
-      a line rather than relocating one.
-    -->
-    <PrivateChatPanel
-      open={privateChat.open}
-      doNotDisturb={prefs.doNotDisturbOn}
-      {isPresenter}
-      pmLogsOnRight={prefs.pmLogsOnRight}
-      {canPostImages}
-      {webinarMode}
-      {giphyApiKey}
-      oncomposerfocus={() => privateChat.composerFocused()}
-      onimageupload={() => privateChat.beginImageUpload()}
-      onimagepaste={(file) => privateChat.beginImagePaste(file)}
-      onselectgif={(_title, url) => {
-        /*
-          `sendGif(o.title, o.images.original.url)` — the double-clicked GIF is SENT, not staged.
-          The title is the alt text upstream keeps for the grid and has no place in the message.
-        */
-        privateChat.draft = url;
-        void privateChat.send();
-      }}
-      onemoji={(glyph) => (privateChat.draft += glyph)}
-      peer={userActions.selectedMessageUser}
-      tabs={privateChat.tabs}
-      currentUserId={privateChat.peerId}
-      log={privateChat.log}
-      searching={privateChat.searching}
-      searchTerm={privateChat.searchTerm}
-      bind:draft={privateChat.draft}
-      onclosepeer={() => {
-        /*
-          G8 — `closeTab(uid)` clears `currUser`, and this cleared only the selection. The header
-          tab vanished and the thread and composer stayed: a conversation with nobody's name on it.
-          `closeTab` calls `onCleared`, which is what clears `selectedMessageUser`.
-        */
-        privateChat.closeTab();
-        messageActions.clearSelected();
-      }}
-      ondeletethis={() => privateChat.deleteThread()}
-      onclose={() => privateChat.close()}
-      onsearch={(term) => void privateChat.search(term)}
-      ondonotdisturb={setDND}
-      ondownload={() => privateChat.downloadLog()}
-      onswitchuser={(uid) => void privateChat.switchToUser(uid)}
-      onloadmore={() => void privateChat.loadMore()}
-      hasMore={privateChat.hasMore}
-      loadingMore={privateChat.loadingMore}
-      onsend={() => void privateChat.send()}
-    />
-  </app-room>
+        `showPMToolbar` did NOT come along as a prop. It was page state that nothing outside that
+        markup read or wrote, so it is component-local now — the part of this extraction that removes
+        a line rather than relocating one.
+      -->
+      <PrivateChatPanel
+        open={privateChat.open}
+        doNotDisturb={prefs.doNotDisturbOn}
+        {isPresenter}
+        pmLogsOnRight={prefs.pmLogsOnRight}
+        {canPostImages}
+        {webinarMode}
+        {giphyApiKey}
+        oncomposerfocus={() => privateChat.composerFocused()}
+        onimageupload={() => privateChat.beginImageUpload()}
+        onimagepaste={(file) => privateChat.beginImagePaste(file)}
+        onselectgif={(_title, url) => {
+          /*
+            `sendGif(o.title, o.images.original.url)` — the double-clicked GIF is SENT, not staged.
+            The title is the alt text upstream keeps for the grid and has no place in the message.
+          */
+          privateChat.draft = url;
+          void privateChat.send();
+        }}
+        onemoji={(glyph) => (privateChat.draft += glyph)}
+        peer={userActions.selectedMessageUser}
+        tabs={privateChat.tabs}
+        currentUserId={privateChat.peerId}
+        log={privateChat.log}
+        searching={privateChat.searching}
+        searchTerm={privateChat.searchTerm}
+        bind:draft={privateChat.draft}
+        onclosepeer={() => {
+          /*
+            G8 — `closeTab(uid)` clears `currUser`, and this cleared only the selection. The header
+            tab vanished and the thread and composer stayed: a conversation with nobody's name on it.
+            `closeTab` calls `onCleared`, which is what clears `selectedMessageUser`.
+          */
+          privateChat.closeTab();
+          messageActions.clearSelected();
+        }}
+        ondeletethis={() => privateChat.deleteThread()}
+        onclose={() => privateChat.close()}
+        onsearch={(term) => void privateChat.search(term)}
+        ondonotdisturb={setDND}
+        ondownload={() => privateChat.downloadLog()}
+        onswitchuser={(uid) => void privateChat.switchToUser(uid)}
+        onloadmore={() => void privateChat.loadMore()}
+        hasMore={privateChat.hasMore}
+        loadingMore={privateChat.loadingMore}
+        onsend={() => void privateChat.send()}
+      />
+    </app-room>
+  {/if}
   <audio
     {@attach setWebcamAudioAttributes}
     {...{

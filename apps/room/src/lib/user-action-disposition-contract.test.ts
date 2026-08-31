@@ -668,11 +668,29 @@ describe('an inert action really does nothing, executed', () => {
   drifts now fails on the commit that drifts it, naming both numbers, instead of being discovered by
   somebody re-deriving it by hand a fortnight later.
 */
-describe("TODO.md row 4's census still describes this code", () => {
-  const TODO = readFileSync('../../TODO.md', 'utf8');
+describe('the census in this module still describes this code', () => {
+  /*
+    RE-POINTED 2026-08-31, from `TODO.md` row 4 to `user-action-intent.ts` itself.
+
+    That table was deleted the same day — all twelve of its rows had closed — and this assertion is
+    what noticed, going red on the commit that removed the sentence. Exactly the behaviour it was
+    written for, arriving from a direction nobody planned: a document-reading test whose document
+    goes away should fail loudly, not quietly stop checking anything.
+
+    Reading the MODULE is the better arrangement and not a consolation. The census describes these
+    buckets, so it belongs beside them: a reader who adds an entry now sees the sentence that counts
+    it in the same edit, and this file reads one source instead of two.
+  */
+  const SOURCE = readFileSync('src/lib/user-action-intent.ts', 'utf8');
+  /*
+    WHITESPACE-TOLERANT between the fields, because the sentence now lives in a comment that wraps
+    at the file's column limit — the first draft of this regex demanded single spaces, matched the
+    one-line version in `TODO.md`, and went red the moment the same sentence moved into an 100-column
+    docblock. The numbers and their order are still pinned exactly; only the gaps are relaxed.
+  */
   const stated =
-    /\*\*Disposition census, measured [\d-]+: (\d+) dispatched actions, (\d+) inert, (\d+) carrying a fixed alert/.exec(
-      TODO
+    /\*\*Disposition census, measured [\d-]+:\s+(\d+) dispatched actions,\s+(\d+) inert,\s+(\d+)\s+carrying a fixed\s+alert/.exec(
+      SOURCE
     );
 
   it('states a census in a form that can be checked', () => {
@@ -681,7 +699,7 @@ describe("TODO.md row 4's census still describes this code", () => {
       document-reading assertion worthless. `todo-next-coverage-contract.test.ts` guards its own
       totals line the same way, for the same reason.
     */
-    expect(stated, 'row 4 no longer states a machine-checkable census').not.toBeNull();
+    expect(stated, 'the census sentence was reworded out of a checkable form').not.toBeNull();
   });
 
   it('counts the dispatched actions correctly', () => {
@@ -701,7 +719,7 @@ describe("TODO.md row 4's census still describes this code", () => {
       The specific way row 4 went stale, denied by name. `mute-chat-indefinitely` left `EXACT_ALERTS`
       on 2026-08-27; a census still calling it silent is describing a control that now sends.
     */
-    const claimedSilent = /only `([a-z-]+)` sends nothing/.exec(TODO)?.[1];
+    const claimedSilent = /only `([a-z-]+)` sends nothing/.exec(SOURCE)?.[1];
     expect(
       claimedSilent && TOAST_ONLY_ACTIONS.includes(claimedSilent)
         ? []
