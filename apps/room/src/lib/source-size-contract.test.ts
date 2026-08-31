@@ -1770,8 +1770,77 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       renderers now differ in the label table as well as the trigger class, and BOTH are pinned
       lookups keyed by the same `variant`. A THIRD such divergence is the signal to stop sharing.
     */
-    max: 253,
+    /*
+      253 -> 252, 2026-08-31, and the line came back from a docblock that prettier had spread over
+      three lines for one sentence. What went IN is `MSM-06`: `Mark Answered` and `Private Chat`
+      carry a trailing space in all four captured menus (`v(2,"\xa0\xa0Mark Answered ")` at bundle
+      byte 1,330,053, `\xa0\xa0Private Chat ` at 1,330,816) and HTML folding had eaten both, so they
+      are `{' '}` now — the braces idiom `AGENTS.md` records as a standing exception.
+
+      The pass that found it read all four menus end to end and produced five more rows, every one of
+      which is a REFUSAL or a divergence rather than markup: they live in
+      `message-menu-entries-contract.test.ts`, which is where the reason for a thing NOT built goes
+      when the file has no room to carry it. That is a real constraint on this component, not a
+      formality — one line of headroom and no unpinned seam, because
+      `chat-display-mode-contract.test.ts` requires `TRIGGER_CLASS`'s three strings to stay in this
+      file's own code.
+    */
+    max: 252,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
+  },
+  {
+    file: 'lib/components/NavbarRecIndicator.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The room's recording badge — slots 18, 19 and 20 of the navbar template `U4e`, consts 92/93/94.
+      92 lines for nine of markup, because the three arms carry four things a reader would otherwise
+      have to re-derive: the gates from `U4e`'s update block, why `[ REC ]` and the starting spinner
+      are mutually exclusive upstream by an explicit term where this room decides it by `{:else if}`
+      ORDER, why the tooltip is handed in whole rather than composed, and that `breathing-rec` on the
+      badge is OURS — the reference's one binding of `iPe` is on the presenter's recording icon.
+
+      If this number climbs, ask whether it has started DECIDING anything. It must not: it reads
+      `RoomMedia` and renders one `li`, and every control the bar carries is on the other side of
+      that line.
+    */
+    max: 93,
+    why: 'the three REC badges the whole room sees, and the one class that is ours'
+  },
+  {
+    file: 'lib/components/NavbarSoundCloud.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      BOTH of the reference's SoundCloud items — the presenter's dropdown (slot 22, const 96) and the
+      listener's stop-for-me control (slot 23, const 97), which this room had never built. 195 lines
+      for about 60 of markup: the rest is the `playing.gif` decision, which had to be made once and
+      is now made once for both arms, and const 176's two refusals — the duplicated `id` and the
+      `aria-haspopup`/`aria-expanded` pair that belong to a dropdown this element is not.
+
+      Two things to check if it climbs. Has it started deciding WHICH arm to render? It must not —
+      the reference's two gates are not each other's negation (`!scPlaying` is in one and not the
+      other), so the call site owns them and the component takes a literal variant. And has a third
+      variant appeared? That would mean the bar has a third SoundCloud item, and it does not.
+    */
+    max: 195,
+    why: 'both SoundCloud items in the top bar, and the one playing.gif decision behind them'
+  },
+  {
+    file: 'lib/components/NavbarTipButton.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      RS-09's NAVBAR copy — slot 14 of `U4e`, consts 139/140/35/36 — extracted from `RoomNavbar` in
+      the change that added `NAV-02` and `NAV-04`, because the bar was at its declared ceiling and
+      this was the largest region of it that no other contract test pins by source text.
+
+      58 lines for eleven of markup. What the rest buys is the `noopener,noreferrer` refusal:
+      `doTipToUser()` at byte 2,531,860 opens the owner-configured URL with two arguments and leaves
+      `window.opener` live, and that is a tabnabbing surface this room does not reproduce.
+    */
+    max: 59,
+    why: 'the navbar half of the tip button, and the opener refusal that is not the reference s'
   },
   {
     file: 'lib/components/AvatarOptionsMenu.svelte',
@@ -5884,7 +5953,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       which ABSORBED the same feature's other 79 lines and still lands at 6,280 against an unchanged
       ceiling of 6,335. **The pair is eighty-five lines smaller than doing neither.**
     */
-    max: 1173,
+    /*
+      1,173 -> 1,169, 2026-08-31, and the drop is what a whole-region decode costs when the file is
+      already at its ceiling. Four rows went IN — `NAV-02` (the listener's SoundCloud control),
+      `NAV-03` (the hamburger's `alwaysShowRoster` gate), `NAV-04` (`breathing-rec` on the
+      presenter's recording icon) and `NAV-07` (`nav-link` on the two launching spinners) — and
+      three regions went OUT to pay for them, each to a file that now owns its reasoning:
+      `NavbarRecIndicator.svelte` (the three REC badges), `NavbarSoundCloud.svelte` (both SoundCloud
+      items) and `NavbarTipButton.svelte` (RS-09's navbar copy).
+
+      The seams were chosen by what is PINNED, not by what is tidy. The recording dropdown, the
+      talking indicator, the volume panel, the mic and webcam controls and the Benzinga item are each
+      asserted against this file's source text by a contract test elsewhere — `recording-reminder`,
+      `dump`, `screen-volume`, `media-capture`, `mechanical-rename`, `benzinga-navbar` — so moving one
+      of them would have gone red in a file this batch was not scoped to edit. What was left
+      unpinned was exactly these three, and all three are self-contained.
+    */
+    max: 1169,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {

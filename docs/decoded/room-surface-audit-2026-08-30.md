@@ -53,9 +53,18 @@ describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **
 the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
 byte offsets make the second reading the tempting one.
 
+**Seventeen more have been appended since, for a running total of eighteen.** They are the `NAV-` and
+`MSM-` rows below, from a 2026-08-31 pass over `RoomNavbar.svelte` and `MessageMenu.svelte`, and each
+one carries that same marker sentence in its own body so the total is READ from the document rather
+than remembered. Three earlier batches each wrote their own "N rows have therefore been appended"
+sentence, computed against their own worktree, and all three were stale before they were committed;
+they are consolidated into this paragraph, which is the only place the running total lives.
+`apps/room/src/lib/room-surface-audit-counts.test.ts` fails if it disagrees with the rows in either
+direction.
+
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 241 closed · 241 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4395,6 +4404,518 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
 
 ---
+
+## RoomNavbar.svelte
+
+Eleven rows, produced 2026-08-31 by reading the reference's navbar template `U4e` (bundle byte
+2,484,831) end to end and decoding `app-room`'s 229-entry consts array **by value**, bracket-walking
+it from `consts:[[` at byte 2,533,197. Not one of these is visible to a reader who looks up a slot
+number another row cited: `app-room`'s const 40 is the sidebar's Benzinga link and
+`app-st-message`'s const 40 is a smile icon's tooltip, three tables apart.
+
+`RoomNavbar.svelte` is the largest component in this repository and had no section here at all.
+
+### NAV-01 — The navbar's help link is dead code in the reference, and is not built
+
+**MEASURED REFUSAL 2026-08-31.** `hasSTHelpLink` occurs **three times in 2,891,205 bytes** and not
+one of them assigns the field the navbar reads. Byte 2,497,854 is `app-room`'s own initialiser,
+`this.hasSTHelpLink=!1`, inside the same constructor run that sets `showWebcams=!0`,
+`isRecordingStarting=!1` and `alwaysShowRoster=!1`. Byte 2,487,906 is the READ,
+`O(9, e.hasSTHelpLink ? 9 : -1)`. Byte 1,189,005 is `this.hasSTHelpLink=!0` on a **different class** —
+the login/auth component, whose neighbouring fields are `rememberMe`, `authMode`, `showPW` and
+`readOnlyEmail`. There is no path from one to the other: a grep for `hasSTHelpLink=` returns exactly
+those two initialisers and nothing else. **Slot 9 is therefore `-1` for the life of every room**, and
+the styled `.helpLink` rule that ships beside it (`app-room`'s own `styles:[…]`, byte 2,538,214,
+`cursor:pointer;margin:0 5px` and `font-size:18px`) paints nothing.
+
+Building it would put a hard-coded link to `https://intercom.help/simpler-trading/en/` — another
+company's support desk — into every room in a multi-tenant application, to reproduce an element the
+reference itself cannot render. The `tawkAvailable` third term two items along already records this
+repository's position on shipping somebody else's support inbox.
+
+This row was ADDED after this document was committed.
+
+**low** · `missing-control` · reference byte **2,487,906**
+
+```js
+H(9,MPe,2,0,"a",84)                                     // U4e create block, byte 2,484,831
+84 ["href","https://intercom.help/simpler-trading/en/","target","_blank",1,"helpLink","mr-auto"]
+138 [1,"fas","fa-question-circle"]
+function MPe(t,n){1&t&&(d(0,"a",84),T(1,"i",138),u())}  // byte 2,472,776
+O(9, e.hasSTHelpLink ? 9 : -1)                          // byte 2,487,906
+```
+
+**Ours:** `RoomNavbar.svelte` renders the brand anchor and goes straight to the navbar toggler; there
+is no `.helpLink`. `grep -rn helpLink apps/room/src` returns zero hits. That absence now has a reason
+recorded against it rather than being an oversight nobody measured.
+
+### NAV-02 — A member hearing the room's SoundCloud track has no way to stop it for themselves
+
+**BUILT 2026-08-31.** `NavbarSoundCloud.svelte`, which now carries both of the reference's SoundCloud
+items instead of one. The presenter's dropdown (slot 22, const 96) moved into it unchanged; the
+listener's control (slot 23, const 97) is new.
+
+The two gates are **not each other's negation** — `!scPlaying` is a term of one and of neither the
+other — so the component takes a literal `variant` and the call site owns the gate, which is what
+stops a boolean named `isPresenter` from rendering two SoundCloud icons in one bar. Const 176's
+duplicated `id` is worn as `cssSoundCloudIcon`, the one a browser keeps; its `aria-haspopup` and
+`aria-expanded` are refused, because this element opens nothing and announcing a popup that does not
+exist is the same lie as a control whose only effect is changing its own label. `playing.gif` is
+substituted by `fa-volume-up`, the resolution this file already argued for on the presenter's copy.
+
+`navbar-decoded-rows-contract.test.ts` asserts it in four directions — present for a listener while a
+track plays, absent when nothing plays, absent for a presenter, and the presenter's dropdown still
+there — and each was run against a mutated component before it was trusted.
+
+This row was ADDED after this document was committed.
+
+**high** · `missing-control` · reference byte **2,478,748**
+
+```js
+H(22,i4e,18,4,"li",96)(23,o4e,4,3,"li",97)
+96  ["title","Play music from SoundCloud for all",1,"nav-item","dropdown"]
+97  ["title","Music is playing from SoundCloud for all",1,"nav-item"]
+176 ["id","cssSoundCloudIcon","id","soundcloudDropdown","aria-haspopup","true",
+     "aria-expanded","false",1,"nav-link","d-flex","align-items-center",3,"click","ngClass"]
+O(23, isPresenter || isNonPresenterAdmin || !scPlaying ? -1 : 23)     // byte 2,488,684
+function o4e(t,n){ … d(0,"li",97)(1,"a",176), x("click", () => doSoundCloudUserStop()),
+                     T(2,"i",166)(3,"img",169) … }                    // byte 2,478,748
+```
+
+**Ours (before):** `onstopsoundcloudforme` reached `broadcasts.stopSoundCloudForMe()` and was
+reachable from exactly one element — the third entry of the presenter's dropdown, inside
+`{#if isPresenter}`. A member could only pull the master volume down, which silences the presenter
+with the music.
+
+### NAV-03 — `alwaysShowRoster` removes the hamburger entirely, and this bar kept it
+
+**BUILT 2026-08-31.** The setting appears in BOTH sidebar-toggle conditions, on the refusing side of
+each, so with it on neither slot renders and the users counter is the room's only remaining toggle —
+which is exactly why that counter's handler is `alwaysShowRoster && (showSidebar = !showSidebar, …)`.
+This bar already implemented the counter half (G12) and not this one, so in an `alwaysShowRoster`
+room it rendered a control the reference removes, and that control could close a sidebar the setting
+says is always shown.
+
+The two upstream elements stay one element here: `DPe` and `EPe` differ only in title and icon, both
+of which this file already writes as a ternary on `sidebarOpen`, and the pair is the compiler
+splitting one `@if`/`@else` rather than two authored elements.
+
+This row was ADDED after this document was committed.
+
+**medium** · `missing-behaviour` · reference byte **2,487,413**
+
+```js
+H(1,DPe,2,0,"span",77)(2,EPe,2,0,"span",78)
+77 ["title","Close Sidebar",1,"sidebar-menu","active-icon"]
+78 ["title","Open Sidebar",1,"sidebar-menu"]
+O(1, e.showSidebar && !e.alwaysShowRoster ? 1 : -1)
+O(2, e.showSidebar || e.alwaysShowRoster ? -1 : 2)
+```
+
+**Ours (before):** `RoomNavbar.svelte` rendered `<span class="sidebar-menu">` unconditionally.
+
+### NAV-04 — `breathing-rec` belongs on the presenter's recording ICON, and was nowhere
+
+**BUILT 2026-08-31.** `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })` is at byte
+2,465,900 and is bound **exactly once in the whole bundle**, at byte 2,477,678, to element index 2 of
+`t4e` — the `<i class="far fa-2x fa-dot-circle">` inside the presenter's Start/Stop Recording anchor,
+const 153. So the reference's blinking REC is a presenter's cue on their own recording button, and
+`.breathing-rec` is a real rule: a 5s `scale` pulse plus `color: red !important`,
+`captured-runtime-components.css:4281`. This bar had it on no icon at all. This row was ADDED after
+this document was committed.
+
+Both terms of the first argument are carried: `roomState.isRecording && sessData.blinkingRec`, so a
+room with the setting on and nothing recording gets no pulse. That second term is the one a
+setting-shaped prop invites you to drop, and the contract test's negative control was run against
+dropping it.
+
+This row was ADDED after this document was committed.
+
+**medium** · `missing-behaviour` · reference byte **2,477,678**
+
+```js
+iPe = (t,n) => ({"breathing-rec":t, recIndicatorStart:n})                       // byte 2,465,900
+function t4e(t,n){ … d(0,"li",95)(1,"a",152), T(2,"i",153) … }                  // byte 2,477,354
+m(), z("ngClass", ct(4, KB, !e.mediaService.isScreenSharing)),                  // index 1 = a[152]
+m(), z("ngClass", Kn(6, iPe, roomState.isRecording && sessData.blinkingRec,
+                            e.isRecordingStarting)),                            // index 2 = i[153]
+153 [1,"far","fa-2x","fa-dot-circle",3,"ngClass"]
+```
+
+**Ours (before):** `<i class="far fa-2x fa-dot-circle"></i>`, a static class, with `blinkingRec`
+spent entirely on the room-wide `[ REC ]` badge instead — see NAV-06 and NAV-08.
+
+### NAV-05 — `recIndicatorStart` on that icon is inert in the reference, and is not worn
+
+**MEASURED REFUSAL 2026-08-31.** `iPe`'s second argument puts `recIndicatorStart` on the same `<i>`
+while `isRecordingStarting` is true. Its only rule anywhere is
+`app-room .recIndicatorStart:not(:root) a:not(:root)…` — `captured-runtime-components.css:988`, a
+DESCENDANT selector requiring an `a` inside the element carrying the class. An `<i>` with no children
+has none, so the class paints nothing there, in the reference as much as here. This row was ADDED
+after this document was committed.
+
+Const 94, `[1,"nav-item","recIndicatorStart"]`, puts the same name on the STARTING badge's `li`,
+which does contain the `a` that rule needs — and this room already wears it there. Adding a second
+copy on the icon would be a class with no CSS, which the root standard refuses by name.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **2,477,678**
+
+```
+94  [1,"nav-item","recIndicatorStart"]                        // the li that DOES have a descendant a
+css app-room .recIndicatorStart:not(:root) a:not(:root)… { line-height:41px; color:#ff0 }
+```
+
+**Ours:** `NavbarRecIndicator.svelte` renders `<li class="nav-item recIndicatorStart">` with an `<a>`
+inside it, which is the one placement the rule can match.
+
+### NAV-06 — The `blinkingRec` docblock stated the wrong element, and had since it was written
+
+**FIXED 2026-08-31.** The prop's docblock said the reference "binds `breathing-rec` through a class
+MAP on the recording `ul` (`iPe`, byte 2,477,678), alongside `recIndicatorStart`", and concluded
+"Same element breathing, one level down". Both halves are wrong: the binding is on an `<i>`, not a
+`ul`, and the element it is one level down from is the presenter's recording anchor rather than the
+`[ REC ]` badge — which carries no class map at all. The byte offset was right, which is how the
+claim survived: it cites the correct instruction and describes the wrong element. This row was ADDED
+after this document was committed.
+
+`server/room-config-client.ts:249` already spelled `iPe` correctly, so the repository held both the
+right statement and the wrong one, in two files, for as long as the prop has existed. That is the
+failure the root standard names — a rule with no recorded WHY gets simplified back into the bug —
+arriving as two records of one measurement disagreeing.
+
+This row was ADDED after this document was committed.
+
+**low** · `defect` · reference byte **2,477,678**
+
+```
+RoomNavbar.svelte, before:  "a class MAP on the recording `ul` … alongside `recIndicatorStart`"
+bundle, byte 2,477,678:     z("ngClass", Kn(6, iPe, …)) applied to i[153], inside a[152]
+```
+
+**Ours:** the docblock now quotes the two `m()` steps that identify the element and points at
+NAV-04's note at the icon. `RoomNavbar.svelte.test.ts:238` repeats the old sentence and is outside
+this batch's scope; NAV-08 names it.
+
+### NAV-07 — Both launching spinners lost `class="nav-link"`
+
+**BUILT 2026-08-31.** `r4e` (byte 2,479,346) and `p4e` (byte 2,481,414) are byte-identical bodies:
+`d(0,"li",19)(1,"a",150), T(2,"i",181)`, where const 19 is `[1,"nav-item"]`, const 150 is
+`[1,"nav-link"]` and const 181 is `[1,"fas","fa-2x","fa-spinner","fa-spin"]`. Both `<a>`s here were
+bare, so a spinner rendered without the padding and line-height every other item in the bar takes
+from `.nav-link` and the row shifted the moment the device finished opening. This row was ADDED after
+this document was committed.
+
+Worth recording beside it: **the reference gates these two on `micLaunching` / `camLaunching`
+ALONE**, not on any role — `O(25, e.mediaService.micLaunching ? 25 : -1)` and
+`O(28, e.mediaService.camLaunching ? 28 : -1)`. This bar keeps them inside its single
+`{#if isPresenter}` block, which is the divergence `room-navbar-contract.test.ts` already argues for
+and asserts; the spinner is only reachable from a control that block also owns, so the narrower gate
+costs nothing.
+
+This row was ADDED after this document was committed.
+
+**low** · `wrong-constant` · reference byte **2,479,346**
+
+```js
+function r4e(t,n){1&t&&(d(0,"li",19)(1,"a",150),T(2,"i",181),u()())}     // microphone
+function p4e(t,n){1&t&&(d(0,"li",19)(1,"a",150),T(2,"i",181),u()())}     // webcam
+150 [1,"nav-link"]
+```
+
+**Ours (before):** `<a><i class="fas fa-2x fa-spinner fa-spin"></i></a>`, twice.
+
+### NAV-08 — The `[ REC ]` badge's `breathing-rec` is ours, and removing it needs one line elsewhere
+
+**BLOCKED 2026-08-31.** Const 93 is `[1,"nav-item","recIndicator","animated","fadeIn"]` and `UPe`
+(byte 2,474,097) binds one thing on it, `ngbTooltip`. There is no class map on the room-wide badge in
+the reference, so the `breathing-rec` this bar puts there is an invention — a pulse every member sees
+where the reference shows one only to the presenter who owns the recording. NAV-04 builds the real
+placement; this row is the other half, and it cannot be closed from inside this batch's scope.
+
+**What would unblock it, exactly.** In `apps/room/src/lib/room-navbar-contract.test.ts`, the
+assertion block `it('breathes the REC badge only when the room asked for it')` pins the class to
+`.recIndicator`; its three `expect` lines must move to the presenter's icon, i.e.
+
+```
+-    expect(html({ media: recording, blinkingRec: true })).toContain('breathing-rec');
++    expect(html({ media: recording, isPresenter: true, blinkingRec: true })).toContain('breathing-rec');
+```
+
+with the matching change on the `not.toContain` line below it, and the same for
+`RoomNavbar.svelte.test.ts`'s `it('breathes only when the room asked it to')`, whose comment (line
+238) repeats NAV-06's corrected claim word for word and must be replaced with the `iPe` measurement.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **2,474,097**
+
+```js
+function UPe(t,n){if(1&t&&(d(0,"li",93)(1,"a",149),v(2,"[ REC ]"),u()()),2&t){ … xn("ngbTooltip", …) }}
+93 [1,"nav-item","recIndicator","animated","fadeIn"]
+```
+
+**Ours:** `NavbarRecIndicator.svelte` keeps the class and now records, at the code, that it is ours
+and why it stays.
+
+### NAV-09 — The recording reminder is missing `!micMuted`, and the gate string is pinned
+
+**BLOCKED 2026-08-31.** The reference's condition has five terms and this bar carries three of them:
+
+```js
+O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled
+     || e.mediaService.micMuted
+     || !roomState.isRecordingPaused && roomState.isRecording ? -1 : 5)      // byte 2,477,770
+```
+
+`micDisabled` is genuinely unmodelled here and `room/gates.ts:392` already records that. **`micMuted`
+is not** — `media.micMuted` is read three elements away, by the microphone control's own class map —
+so the banner tells a presenter "You are not recording!" while their microphone is muted, which is
+the one state where starting a recording would capture silence.
+
+**What would unblock it, exactly.** `apps/room/src/lib/recording-reminder-contract.test.ts:55`
+asserts the gate as a literal string, so the component and that line have to move together:
+
+```
+-      '{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}'
++      '{#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}'
+```
+
+That file is not this batch's to edit. Its `gatedSites`/`policySites` count is unaffected by the
+change, since both sides still count one site.
+
+This row was ADDED after this document was committed.
+
+**medium** · `missing-behaviour` · reference byte **2,477,770**
+
+**Ours:** `RoomNavbar.svelte` —
+`{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}`.
+
+### NAV-10 — `Download Recording` has no counterpart anywhere in the reference
+
+**DELIBERATE DIVERGENCE 2026-08-31.** The string `Download Recording` occurs **zero times in
+2,891,205 bytes**; so does `recordedUrl`. The reference's recording menu is `YPe` (byte 2,475,469) on
+the MediaMTX/rec-bot path and `e4e` (byte 2,477,105) otherwise, and neither renders a download: the
+recording is made server-side and `recPreviewLocation` is where it goes. This room records in the
+browser with a `MediaRecorder`, so it HAS a blob to hand back, and the item exists because of that —
+it is a capability of this architecture rather than a transcription.
+
+Recorded rather than removed, and recorded rather than left to look like a match. The control next to
+it is a real gap in the other direction and is named here so the next reader does not have to
+re-derive it: the reference shows **Show / Hide Rec Preview** under
+`O(9, roomState.isRecording && sessData.recPreviewLocation ? 9 : -1)` — *while recording*, with a
+preview location configured — where this bar shows it under `media.recordedUrl`, i.e. only after the
+recording has stopped. `recPreviewLocation` is not modelled here at all, which is what keeps this a
+divergence rather than a fix.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **2,475,295**
+
+```js
+H(9,KPe,5,1)  …  O(9, roomState.isRecording && sessData.recPreviewLocation ? 9 : -1)
+function KPe(t,n){ … d(0,"li"),T(1,"hr",115),u(),d(2,"li",19),H(3,WPe,3,0,"a",158)(4,qPe,3,0),u() … }
+WPe: " Hide Rec Preview "     qPe: " Show Rec Preview"      // both verbatim here already
+```
+
+**Ours:** `RoomNavbar.svelte` gates the whole block on `media.recordedUrl` and puts Download
+Recording at the head of it, with a comment recording why the preview toggle is not inside
+`{#if media.recording}`.
+
+### NAV-11 — `audioVolSlider` is an attribute with no consumer, in both applications
+
+**MEASURED REFUSAL 2026-08-31.** The background-music slider (const 200) carries
+`"audioVolSlider",""` and ours does not, which reads as a transcription gap. It is not one.
+`audioVolSlider` occurs **seven times in 2,891,205 bytes** and every occurrence is accounted for:
+four are const-table entries (2,000,881 and 2,001,857 in the AV-settings component, 2,539,771 and
+2,545,086 and 2,545,418 in `app-room`), and the remaining two are **stylesheet** text —
+`.audioVolSlider[_ngcontent-%COMP%]{background-color:#fafafa}` at bytes 2,556,585 and 2,586,249. That
+rule is a CLASS selector and the markup writes an ATTRIBUTE, so it matches nothing; and no directive
+declares `selectors:[["","audioVolSlider",""]]`, so nothing reads it either. This row was ADDED after
+this document was committed.
+
+Our master slider already carries the attribute, transcribed before this was measured. It stays —
+removing a captured attribute is a change to the DOM this repository diffs against — but the second
+copy is not added, because adding an inert attribute to match an inert attribute is work with no
+consumer at either end.
+
+This row was ADDED after this document was committed.
+
+**low** · `wrong-constant` · reference byte **2,545,086**
+
+```
+200 ["audioVolSlider","","type","range","min","0","max","100","title","Background Volume",
+     1,"px-0","py-2",3,"ngModelChange","input","ngModel"]
+css .audioVolSlider[_ngcontent-%COMP%]{background-color:#fafafa}      // a CLASS rule, byte 2,556,585
+```
+
+**Ours:** `RoomNavbar.svelte`'s `#background-volume` input carries `title="Background Volume"` and
+`class="px-0 py-2"` and no `audiovolslider`.
+
+## MessageMenu.svelte
+
+Six rows, produced 2026-08-31 by reading **all four** captured kebab menus end to end — `app-st-message`'s
+`Bge` (byte 1,333,900) and `app-st-compactmessage`'s two renderers (`z1e` at 1,372,200 and the member
+row at 1,380,700) — and decoding each component's consts array by value from its own `consts:[[`
+(1,357,732 and 1,395,767).
+
+**The finding worth stating first is that the entries already match.** Twelve gates, twelve entries,
+the same source order, the same `&nbsp;&nbsp;` prefixes and the same three trigger classes in all
+four. So five of the six rows below are refusals and divergences rather than missing behaviour, and
+each carries the measurement that makes it one.
+
+### MSM-01 — The Add Reaction icon's captured tooltip repeats the label beside it
+
+**MEASURED REFUSAL 2026-08-31.** `["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]`
+is `app-st-message`'s const 40 (byte 1,359,726) and `app-st-compactmessage`'s const 37 (byte
+1,397,773), and in both it is the `T(2,"i",…)` of the reaction anchor. **The next instruction in each
+of those functions renders the visible label:** `v(3,"\xa0\xa0Add Reaction")` in `Tge` (1,330,225) and
+in `A1e` (1,368,562). The tooltip text is byte-identical to the words four characters to its right.
+
+This repository does build captured `ngbTooltip`s — `#lib/ngb-tooltip` exists for it, and
+`PrivateChatComposer.svelte` wears const 58's `["placement","left","ngbTooltip","Add Emojis",…]` on an
+icon with NO adjacent text, where the bubble is the control's only label. Here it would repeat a
+label the reader is already looking at, and our attachment's only accessibility effect is an
+`aria-describedby` pointing at that same word while the bubble is open.
+
+A second, independent measurement is recorded with it: `source-size-contract.test.ts` caps this
+component at 253 and it stood at 252, so there was one line of headroom and no unpinned seam —
+`chat-display-mode-contract.test.ts` requires `TRIGGER_CLASS`'s three strings to stay in this file's
+own code. A refusal that cannot carry its reason at the code carries it at the gate, which is where
+this one is: `message-menu-entries-contract.test.ts`.
+
+This row was ADDED after this document was committed.
+
+**low** · `missing-behaviour` · reference byte **1,359,726**
+
+```
+app-st-message        const 40 @1,359,726   ["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]
+app-st-compactmessage const 37 @1,397,773   ["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]
+Tge @1,330,225:  d(0,"a",39,1) … T(2,"i",40), v(3,"\xa0\xa0Add Reaction")
+```
+
+**Ours:** `MessageMenu.svelte` renders `<i class="far fa-smile"></i>&nbsp;&nbsp;Add Reaction`.
+
+### MSM-02 — `aria-expanded` is a static literal in all three captured triggers
+
+**DELIBERATE DIVERGENCE 2026-08-31.** `app-st-message` const 10 (1,358,083), `app-st-compactmessage`
+const 9 (1,396,029) and const 56 (1,398,736) all read
+`…"aria-haspopup","true","aria-expanded","false",1,"msgMenu",…`, and none carries a `3,"aria-expanded"`
+binding marker — so the attribute is the string `false` for the life of the element and the reference
+leaves Bootstrap's own `data-bs-toggle="dropdown"` script to correct it. This room has no Bootstrap
+JS.
+
+Transcribing the literal would announce a collapsed menu to a screen reader every time the menu is
+open. `aria-haspopup` IS worn, so this is one divergence and not a rewrite of the trigger.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **1,358,083**
+
+**Ours:** `MessageMenu.svelte:aria-expanded={menuOpen}`, asserted in both directions by
+`message-menu-entries-contract.test.ts`.
+
+### MSM-03 — `id="dropdownMenuLink"` is duplicated once per message, in both applications
+
+**DELIBERATE DIVERGENCE 2026-08-31.** The id is a static entry of all three trigger consts, and
+`aria-labelledby="dropdownMenuLink"` is a static entry of both menu consts (`app-st-message` 11 at
+1,358,243, `app-st-compactmessage` 10 at 1,396,212). One instance is rendered per message in the
+reference and one per message here, so a 200-message log holds 200 elements carrying one DOM id and
+every menu's `aria-labelledby` resolves to the first of them — the kebab of the oldest message on
+screen.
+
+Recorded and not repaired. The change is two lines in this component — a per-instance id from
+`$props.id()` on the trigger and on the `aria-labelledby` — and it would break
+`room-message-render.test.ts`, which pins the captured DOM of eighteen kebabs including that
+attribute. That file is not this batch's to edit, and unlike NAV-08 the correction is not one line:
+the eighteen fixtures each carry the literal, so the right change is to teach that test to normalise
+the id rather than to rewrite eighteen captures.
+
+This row was ADDED after this document was committed.
+
+**low** · `defect` · reference byte **1,358,083**
+
+**Ours:** `MessageMenu.svelte:118` and `:134`, transcribed, with the duplication now measured.
+
+### MSM-04 — `User Info` and `Mention` are ungated upstream, and they are ungated here
+
+**ALREADY BUILT 2026-08-31, verified by reading, not rebuilt.** In `Bge` the two anchors are element
+indices 9 and 12 and the update block has no `O(…)` for either — the conditionals run
+`O(8, …)` then straight to `O(15, …)`. `z1e` and the compact member renderer are the same shape at
+indices 8 and 11. An audit reader listing "twelve gates" would file the two as gates this room
+invented; they are not.
+
+`sourceMessageBehavior` in `message-behavior.ts` returns the literal `openUserInfo: true` and
+`mention: true`, so the only thing that can remove either is a captured menu listing that omits it,
+which is `capturedMenuAllows` doing the job it exists for.
+
+This row was ADDED after this document was committed.
+
+**low** · `missing-behaviour` · reference byte **1,333,900**
+
+```js
+d(9,"a",12), x("click", () => doUserInfo(msg.uid, msg.rid)), T(10,"i",13), v(11,"\xa0\xa0User Info")
+d(12,"a",12), x("click", () => doMention(msg.n)),            T(13,"i",14), v(14,"\xa0\xa0Mention")
+// update block: … O(8, …), m(7), O(15, …) — nothing for 9 or 12
+```
+
+**Ours:** `messageMenuAllows` maps both through `capturedMenuAllows` onto a `true` fallback.
+
+### MSM-05 — The reaction popover's `shown`/`hidden` outputs are not reproduced
+
+**MEASURED REFUSAL 2026-08-31.** Const 39 (1,359,597) and const 36 (1,397,644) end
+`3,"click","shown","hidden","ngbPopover"`, bound in `Tge`/`A1e` to `onPopoverOpen()` and
+`onPopoverClose()`. Read whole at byte 1,355,713, all three handlers write one field:
+
+```js
+addReaction(){ this.showEmojiChooser=!0, console.log("this.popover: ", this.popover.isOpen()),
+               $(".users-dropdown-options").on("click", e => (console.log("event: ",e), e.stopPropagation())) }
+onPopoverOpen(){ this.showEmojiChooser=!0, console.log(…) }
+onPopoverClose(){ setTimeout(() => { this.showEmojiChooser=!1 }, 500), console.log(…) }
+``` `shown` writes a value the CLICK handler has
+already written on the only path that opens the popover — which is what `onreactiontoggle` is here —
+so the output is a second write and not a behaviour. And `addReaction` registers a fresh jQuery
+delegation on `.users-dropdown-options` on every click, never removed: one listener per reaction
+opened, for the life of the page, on a selector matching every kebab menu in the room. Reproducing
+that is reproducing a leak.
+
+The half that is behaviour is built and asserted: while the picker is open FROM this menu the entry
+carries `aria-describedby`, which is what ngbPopover gives the reference.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **1,355,713**
+
+**Ours:** one `onreactiontoggle` callback plus `reactionPopoverId`, the renderer owning which popover
+is open because the reaction pill can raise the same one.
+
+### MSM-06 — `Mark Answered ` and `Private Chat ` lost the trailing space the capture gives them
+
+**FIXED 2026-08-31.** `v(2,"\xa0\xa0Mark Answered ")` at byte 1,330,053 and
+`v(2,"\xa0\xa0Private Chat ")` at 1,330,816, with the compact renderer's `M1e` (1,368,390) and `I1e`
+(1,369,153) spelling both identically — so unlike `showAll`/`report`/`reply` these do not vary by
+renderer and belong in the markup rather than in `MESSAGE_MENU_TEXT`. Both were written here as text
+followed by a newline, which Svelte and HTML whitespace folding remove, so the room rendered
+`Mark Answered` where the capture has `Mark Answered `. This row was ADDED after this document was
+committed.
+
+Restored with `{' '}` — the braces idiom `apps/room/AGENTS.md` records as a standing exception,
+because every capture comparison in this repository diffs rendered strings. The other nine entries
+have no trailing space in any of the four menus and still have none, which is asserted as the control
+beside the fix.
+
+This row was ADDED after this document was committed.
+
+**low** · `wrong-constant` · reference byte **1,330,053**
+
+```js
+wge @1,330,053: d(0,"a",12),T(1,"i",38),v(2,"\xa0\xa0Mark Answered ")
+kge @1,330,816: d(0,"a",12),T(1,"i",43),v(2,"\xa0\xa0Private Chat ")
+```
+
+**Ours (before):** `&nbsp;&nbsp;Mark Answered` and `&nbsp;&nbsp;Private Chat`, each followed by a
+newline that folded away.
 
 ## The fifty-one refuted claims
 

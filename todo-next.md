@@ -70,7 +70,7 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 64 surfaces, measured
+## The inventory — all 75 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
@@ -79,7 +79,7 @@ guessed.
 | 3 | `routes/+page.svelte` | 1,729 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,168 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,080 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
@@ -105,7 +105,7 @@ guessed.
 | 29 | `lib/components/ScreenTabs.svelte` | 341 | no |
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
 | 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
-| 32 | `lib/components/MessageMenu.svelte` | 252 | no |
+| 32 | `lib/components/MessageMenu.svelte` | 251 | §MSM — 6 rows against all four captured kebab menus: 1 fixed, 1 already built, 2 measured refusals, 2 deliberate divergences. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
 | 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
 | 35 | `lib/components/RoomShell.svelte` | 268 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**7 of 75 surfaces audited · 2,835 of 35,276 lines · 8.0%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -161,6 +161,9 @@ guessed.
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 73 | `lib/components/NavbarSoundCloud.svelte` | 194 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
+| 74 | `lib/components/NavbarRecIndicator.svelte` | 92 | §NAV — born 2026-08-31 out of `RoomNavbar`; the three REC badges, and where `breathing-rec` is not. |
+| 75 | `lib/components/NavbarTipButton.svelte` | 58 | §NAV — born 2026-08-31 out of `RoomNavbar`; RS-09 s navbar copy and its `noopener` refusal. |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two
