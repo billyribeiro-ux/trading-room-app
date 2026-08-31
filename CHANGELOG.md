@@ -33,6 +33,96 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 04:45 UTC — The media plane was never blocked, and running it found a defect
+
+**Runtime impact: YES.** Every viewer of a live stream was getting two identical tabs for it.
+
+**The premise that blocked six tracker rows was never tested, and it was wrong.** `TODO.md` recorded
+rows X, AC, AD, SP, R row 10 and T5-16 as waiting on "a MediaMTX host at `STREAM_SERVER_MTX`".
+MediaMTX is a single static binary, its own release tarball downloads from this container over HTTPS
+(200), and the entire plane — control API, WHIP ingest, hooks, recording, playback — runs locally in
+about a minute. Playwright's ffmpeg cannot publish (`--disable-everything`: VP8/webm/mjpeg only, no
+libx264, no RTSP muxer), so the publisher is Chromium over WHIP, which is closer to a screenshare
+anyway.
+
+**The whole chain, on the wire:** Chromium → WHIP → MediaMTX v1.20.1 → `runOnAvailable` →
+`POST /internal/media-hook` (200) → `publishToRoom` → a subscribed presenter's SSE connection
+carrying `{"channel":"cmds","data":{"cmd":"mtxStartStream","muser":{"_id":"room__7301__Dana_Vero",
+…}}}`. The route's refusals were exercised over real HTTP in the same run: no bearer 401, wrong
+bearer 401, unknown event `400 Unknown event.`, unparseable path `400 Unrecognised path.`
+
+**That run found a defect nothing in the repository could have.** Every event arrived twice:
+
+```
+04:33:52.676  mtxStartStream    the hook   (runOnAvailable logged at 04:33:52)
+04:33:55.427  mtxStartStream    the poll,  2.75s later
+04:34:11.286  mtxStopStream     the hook   (runOnUnavailable at 04:34:11)
+04:34:15.429  mtxStopStream     the poll,  4.14s later, on the same 5-second grid
+```
+
+The hook published to subscribers without updating the reconciler's baseline, so the next poll
+re-derived a delta the room had already been told about. `applyMtxStartStream` is
+`[...state.streams, stream]` — an unconditional append, transcribed from the reference deliberately —
+so **a presenter going live put two identical tabs in every viewer's room**, and the paired duplicate
+stop cancelled them at the end. Wrong for exactly as long as the stream was up, correct again
+afterwards: the shape that survives casual testing longest.
+
+Neither side's tests could see it. `mtx-reconciler.test.ts` proves a poll publishes what changed; the
+media-hook tests prove the hook publishes what it was told. **Both are correct.** The defect lived
+only in the seam between two modules that each behaved exactly as specified, and the missing thing
+was a line rather than a wrong one.
+
+`noteHookPublished` folds what the hook announced into the baseline. It ships with an `epoch` guard
+for the case where a hook lands while a poll's request is in flight — the negative control for that
+one published `mtxStopStream` for a stream that was playing, which is strictly worse than the
+duplicate it would have replaced, so the guard is not defensive padding. After the fix, same rig, a
+20-second stream with the 5-second reconcile running throughout: **one start, one stop.**
+
+**Two source claims were false in the dangerous direction and are corrected.** `mtx-reconcile.ts` and
+`src/env.ts` both said the control API *"listens on `127.0.0.1:9997` by default, localhost-only
+unless configured otherwise."* The shipped `mediamtx.yml` has `api: false` (line 147) and
+`apiAddress: :9997` (line 149) — off by default, and every interface when on. Measured: an instance
+on `:9998` answers this container's non-loopback `192.0.2.2`; one on `127.0.0.1:9997` refuses that
+connection. What keeps it closed is `authInternalUsers` fencing the `api` action to
+`ips: ["127.0.0.1", "::1"]` — 200 over loopback, `401 authentication error` from the network. An
+authorisation fence, not a bind fence, and `POST /v3/config/paths/add` is on the same API, so a
+deployment that grants `api` with the default empty `ips: []` opens a write surface to the network
+with nothing in the address line to say so.
+
+**MediaMTX is also an archive service, which re-scopes T5-16.** `record: yes` plus `playback: yes`
+needs no extra software; `GET /list?path=…` returned
+`[{"start":"2026-08-31T04:43:32.525276Z","duration":23,"url":"…/get?duration=23&path=…"}]` against a
+real `.mp4` on disk, mapping onto all five cells the Recordings tab needs. The row's "this product
+stores no recordings server-side" is a configuration statement, not a capability one. One measured
+catch: the fmp4 recorder logged `skipping track 2 (VP8)` then `recording 1 track (Opus)`, so a
+WebRTC publisher negotiating VP8 records audio only. Whether H264 records is **not claimed** — this
+Chromium offers `video/VP8 video/rtx video/AV1 video/VP9 video/VP9 video/red video/ulpfec` and no
+H264, so the codec preference was a silent no-op.
+
+**Rows X and AC were re-tested and stay blocked, for a narrower reason than they gave.** Neither
+waits on a cluster: `recPreviewLocation` and `stopRecMsg`'s prose both come from the REFERENCE's
+server, which is not in the capture, and a live MediaMTX produces neither. R row 10 is re-scoped as
+downstream of the T5-16 decision — there is nothing to remux until something records.
+
+**Files.** `apps/room/src/lib/server/mtx-reconciler.ts` (`noteHookPublished`, `epoch`, the corrected
+timeout rationale), `apps/room/src/routes/internal/media-hook/+server.ts` (the one call),
+`apps/room/src/lib/mtx-reconcile.ts` and `apps/room/src/env.ts` (the corrected API claims, plus the
+live path-entry schema showing `ready`/`available` coexisting),
+`apps/room/src/lib/server/hook-reconcile-agreement-contract.test.ts` (new, 5 cases across the seam),
+`apps/room/src/lib/media-hook-contract.test.ts` (+2: the route makes the call, and a refused call
+moves nothing), `apps/room/docs/MEDIA-PLANE-MEASURED.md` (new, the full evidence).
+
+**Negative controls, each verified as landed, then restored:** revert the baseline update → the two
+duplicate-suppression cases fail; remove the `epoch` guard → the race case fails, publishing
+`mtxStopStream` for a playing stream; delete the route's call → the new route assertion fails while
+every other assertion in both files stays green (which is exactly why it was added); silence the
+reconcile entirely → the vacuity floor fails, because a fix that made the poll quiet would pass the
+duplicate tests and delete the feature.
+
+**Tooling, plainly: the Svelte MCP was not available in this session** — no `list-sections`,
+`get-documentation` or `svelte-autofixer` is offered here, and none was run. No `.svelte` file was
+touched by this change; the TypeScript was checked with `svelte-check` and the room's own gate.
+
 ### 2026-08-31 04:25 UTC — A repo-wide rule that held in one app, and four sweeps that found nothing
 
 **Runtime impact: NO.** What changed is which app a rule is enforced in.
