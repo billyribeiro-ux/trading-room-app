@@ -33,6 +33,48 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 23:20 UTC — Thirty style-scoping ancestors, twenty of them asserted by nothing
+
+**Runtime impact: NO** — one new contract. What it guards is a defect class that ships silently.
+
+The poll audit an hour earlier found that `PollPanel.svelte` has no `<style>` block: its seventeen
+rules live in `captured-runtime-components.css`, re-homed onto the custom element, and apply only
+while the panel renders inside `<app-poll-modal>`. Swap that wrapper for a `div` and the panel is
+unstyled with **`svelte-check` reporting 0 errors and 0 warnings**.
+
+That is not one component's problem. Measured across the generated sheet: **thirty custom-element
+ancestors are used as style scopes, and twenty of the thirty were named by no test in this
+repository** — `app-webrtc-troubleshooter` with 64 rules, `app-user-info-modal` with 31,
+`app-reply-modal` with 30, `app-room-roster` with 19, on down. Every one of them is a wrapper that
+looks like scaffolding and is load-bearing.
+
+`captured-css-ancestor-contract.test.ts` sweeps the sheet for every `app-*` used as the first term of
+a selector and requires the element to exist in the shipped markup. A sweep rather than twenty
+assertions, for two reasons: twenty hand-written cases leave the thirty-first to be found the way the
+first was, and the sheet is GENERATED from a SHA-256-pinned source, so a regeneration that adds a
+host is covered without anybody remembering.
+
+**Its own first draft was the kind of test this repository exists to refuse, and the negative control
+is what caught it.** That draft read raw file text and carried a case claiming to check each host
+*"is rendered as an ELEMENT, not merely mentioned in prose"*. Run against `WebcamStrip.svelte` with
+the real `<app-presenter-cams>` removed and only the component's explanatory comments left quoting
+it, **the control came back GREEN**: a comment containing `<app-presenter-cams>` satisfies both the
+open tag and the `>` after it. A case that cannot fail for its stated reason is worse than no case,
+because the green is what gets believed. The components here quote the reference constantly — that is
+the house style — so the markup is read through `svelteCodeOf` now and the two weak cases collapse
+into one strong one. Re-run, the same control goes red naming `app-presenter-cams`.
+
+A second slip on the way, recorded because it changes what a reader should trust: the first attempt
+at that control replaced only ONE of five occurrences of the name in the file and passed for that
+reason rather than for the reason I first read into it. A control that passes needs its own
+explanation before it is believed, exactly as a test that passes does.
+
+**Verified — three negative controls, red then green:** `<app-poll-modal>` replaced by a `div` (the
+measured silent case); `<app-presenter-cams>` replaced by a `div`, a host no test had ever named; and
+the element removed while its prose mentions stayed, which is the one that failed the first draft.
+
+Room gate exit 0: 305 test files / 5,581 passed / 1 skipped.
+
 ### 2026-08-31 23:00 UTC — PollPanel audited: a faithful transcription that nothing running could prove
 
 **Runtime impact: NO** — no code changed. What changed is that the surface is now checked.
