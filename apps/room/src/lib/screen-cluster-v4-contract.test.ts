@@ -460,3 +460,143 @@ describe('SVC-03 — the presenter-row ids diverge, and the reference is why', (
     expect(volumeBody({})).not.toContain('"talkingPresenter0-donot-disturb"');
   });
 });
+
+describe('SVC-02 and SVC-03 — the citations in `screen-volume.ts` now RESOLVE', () => {
+  /*
+    THIRTEEN CITATIONS POINTED AT NOTHING, and this block is what stops that recurring.
+
+    The module's header opened *"Everything here was decoded from this repository's own decoded copy
+    of the reference component, `docs/source/components/app-presentationarea.*`"* and then cited that
+    copy thirteen times — a build this repository does not hold under any path. Every const number in
+    them was also one too high against the bundle it does hold.
+
+    The register raised TWO of the thirteen, each with an exact one-line change. Measuring found the
+    other eleven, which is the argument for measuring rather than working the list: a row names what
+    its author happened to look at.
+
+    What runs here is the pair every citation needs — the byte the module NAMES holds what the module
+    SAYS it holds. A comment cannot be type-checked, linted or rendered, so an offset in one is
+    exactly as unverified as a prose claim unless something reads both ends. That is the whole reason
+    the old citations rotted silently through a build change.
+  */
+  const cited = (offset: number, length: number) => BUNDLE.slice(offset, offset + length);
+
+  it('the three volume icons are consts 105/106/107 at the bytes the module names', () => {
+    /*
+      The INDEX half overlaps the `105 to 107 are the three volume glyphs` case above and is kept
+      anyway: this case is about the module's citations resolving, and reading it should not require
+      trusting that some other case still covers half of what it claims. The BYTE half is new, and
+      is what the module's comments now actually say — its negative control moved 2,001,495 to
+      2,001,505, the offset of the CLASS NAME rather than of the const that holds it, which is
+      exactly the kind of near-miss a hand-written offset lands on.
+    */
+    expect(AREA[105]).toEqual([1, 'fas', 'fa-volume-up']);
+    expect(AREA[106]).toEqual([1, 'fas', 'fa-volume-down']);
+    expect(AREA[107]).toEqual([1, 'fas', 'fa-volume-off']);
+    expect(cited(2_001_443, 24)).toBe('[1,"fas","fa-volume-up"]');
+    expect(cited(2_001_468, 26)).toBe('[1,"fas","fa-volume-down"]');
+    expect(cited(2_001_495, 25)).toBe('[1,"fas","fa-volume-off"]');
+    /*
+      The OLD numbers, which is the half that can fail on an off-by-one. 108 is the Mute button —
+      plausible enough beside three icons that nobody looked, which is how it survived.
+    */
+    expect(AREA[108]).toContain('Mute Audio');
+    /* And `fa-volume-mute`, the spelling the module refuses, is in a different component entirely. */
+    expect(BUNDLE.split('fa-volume-mute').length - 1).toBe(1);
+    expect(cited(2_071_572, 14)).toBe('fa-volume-mute');
+  });
+
+  it('the presenter row is consts 110-114, not the 111-115 the module used to name', () => {
+    expect(AREA[110]).toEqual([1, 'my-1']);
+    expect(AREA[111]).toContain('form-check-input');
+    expect(AREA[112]).toContain('form-check-label');
+    expect(AREA[114]).toContain('audioVolSlider');
+    /* One past the last: the old `115` is the fullscreen glyph, nothing to do with this control. */
+    expect(AREA[115]).toEqual([1, 'icon', 'fas', 'fa-expand']);
+  });
+
+  it('the SEVEN template functions are at the bytes the module names', () => {
+    for (const [offset, name] of [
+      [1_920_627, 'cSe'],
+      [1_921_034, 'dSe'],
+      [1_921_070, 'uSe'],
+      [1_921_106, 'hSe'],
+      [1_921_142, 'pSe'],
+      [1_921_739, 'bSe'],
+      [1_922_302, 'vSe']
+    ] as const) {
+      expect(cited(offset, `function ${name}(`.length), `${name} is not at ${offset}`).toBe(
+        `function ${name}(`
+      );
+    }
+  });
+
+  it('and TWO of the thirteen named the wrong function while quoting the right code', () => {
+    /*
+      The shape that survives a review: the sentence is true and only the symbol is wrong, so a
+      reader checking the claim finds it correct and moves on. `SHL-06` was the same error in
+      `split.svelte.ts` a day earlier.
+
+      `hSe` was credited with the three-way icon choice. It renders ONE icon. `pSe` is the chooser.
+    */
+    expect(cited(1_921_106, 36)).toBe('function hSe(t,n){1&t&&T(0,"i",107)}');
+    expect(cited(1_921_142, 120)).toContain(
+      'H(1,dSe,1,0,"i",105)(2,uSe,1,0,"i",106)(3,hSe,1,0,"i",107)'
+    );
+    expect(BUNDLE.slice(1_921_142, 1_921_400)).toContain('e.audioVolume>50?1:-1');
+
+    /* `bSe` was credited with building the ids. It is the SLIDER row and builds none. */
+    expect(BUNDLE.slice(1_921_739, 1_922_302)).not.toContain('ei("name"');
+    expect(BUNDLE.slice(1_921_739, 1_922_302)).toContain('je("ngModel"');
+    expect(BUNDLE.slice(1_922_302, 1_922_760)).toContain('ei("name","talkingPresenter"');
+  });
+
+  it('the three methods are at the bytes the module names, with the bodies it quotes', () => {
+    expect(cited(1_977_664, 14)).toBe('adjustVol(e){l');
+    expect(cited(1_977_928, 20)).toBe('adjustVolPres(e,i){c');
+    expect(cited(1_978_901, 26)).toBe('toggleTalkingPresenter(e){');
+    /* UNMUTE is a `delete`, never `= false` — the one claim `PresenterMute` exists to protect. */
+    expect(BUNDLE.slice(1_978_901, 1_979_260)).toContain(
+      'delete this.appService.globals.preferences.audioMutedFor[i]'
+    );
+    /* And the STRING/NUMBER union: `e.target.value` from the slider, literal 100 from the toggle. */
+    expect(BUNDLE.slice(1_977_928, 1_978_200)).toContain(
+      'const{userID:o,mediaValue:s}=i,r=e.target.value'
+    );
+    expect(BUNDLE.slice(1_978_901, 1_979_260)).toContain('audioVolumeFor[i]=100');
+  });
+
+  it('and the 31px empty square is the overlay s own rule, not the navbar s 40px', () => {
+    /*
+      Two components ship a `#dropdownVolume` width and they disagree. Citing the wrong one would
+      make `volumeIcon`'s "31px empty square" argument describe a button that is 40px wide.
+    */
+    expect(BUNDLE.slice(2_021_587, 2_021_660)).toContain(
+      '#dropdownVolume[_ngcontent-%COMP%]{width:31px}'
+    );
+    expect(BUNDLE.slice(2_555_380, 2_555_460)).toContain(
+      '#dropdownVolume[_ngcontent-%COMP%]{width:40px}'
+    );
+  });
+
+  it('and NO citation in that module names a file this repository does not hold', () => {
+    /*
+      The guard that makes the other cases stay true. `codeOf` is not used: these are COMMENTS, and
+      the whole finding is that comments were where the rot was.
+
+      The two mentions that remain are the records of the correction — sentences beginning "this
+      cited", kept so the next reader learns why the offsets are there — so the assertion is on the
+      count rather than on absence.
+    */
+    const module = readFileSync(new URL('./screen-volume.ts', import.meta.url), 'utf8');
+    expect(module.match(/compiled\.js/g) ?? [], 'compiled.js is not in this repository').toEqual(
+      []
+    );
+    const helpers = module.match(/render-helpers\.js/g) ?? [];
+    expect(helpers, 'only the two SVC-03 correction records may name it').toHaveLength(2);
+    const [before] = module.split('`SVC-03` — this cited');
+    expect(before, 'a live citation must not precede the record of its removal').not.toContain(
+      'render-helpers.js'
+    );
+  });
+});

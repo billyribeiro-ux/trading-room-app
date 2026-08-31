@@ -6921,13 +6921,42 @@ of an OLDER build and are not in this repository under any path — `git ls-file
 `apps/room/docs/source/`. So a reader following any of them had nothing to open, and a reader
 resolving the numbers against the pinned bundle landed one entry past every const named.
 
-**BLOCKED tail, outside this pass's three files, with the exact change.**
-`apps/room/src/lib/screen-volume.ts:51-52` carries the same shift for the same reason: "The three
-icon classes of consts 106, 107 and 108" and "const 108 is `[1,"fas","fa-volume-off"]`
-(compiled.js:2128)". In the pinned bundle they are 105, 106 and 107, decoded by value. The one-line
-change is `consts 106, 107 and 108` → `consts 105, 106 and 107` on line 51, with the sentence on 52
-becoming `const 107 is [1,"fas","fa-volume-off"] (byte 2,001,495)`. The VALUES that module ships are
-correct; only the numbers pointing at them are not.
+**The BLOCKED tail is CLOSED, 2026-08-31 21:15 UTC — and the tail was two of thirteen.**
+
+The row named `screen-volume.ts:51-52` as carrying the same shift, with an exact one-line change:
+`consts 106, 107 and 108` → `105, 106 and 107`, and `const 108 … (compiled.js:2128)` →
+`const 107 … (byte 2,001,495)`. Both halves were verified against the pinned bundle before being
+applied — the `consts:` array of `app-presentationarea` begins at byte 1,994,257 and was walked to
+292 top-level entries, putting the three glyphs at 105/106/107 and bytes 2,001,443 / 2,001,468 /
+2,001,495. The row was right.
+
+**And then measuring the rest of the file found ELEVEN more citations of the same shape**, all
+pointing at `docs/source/components/app-presentationarea.*` — the header's own opening sentence
+(*"Everything here was decoded from … not from the minified bundle"*) plus twelve individual
+`compiled.js` / `render-helpers.js` line references. All thirteen now carry byte offsets into the
+tracked bundle. That is the argument for measuring rather than working the list: a row names what
+its author happened to look at.
+
+**Two of the thirteen also named the wrong SYMBOL while quoting the right code** — the shape
+`SHL-06` hit a day earlier, where the sentence is true and only the name is wrong, so a reader
+checking the claim finds it correct and moves on. `hSe` was credited with the three-way icon choice;
+`hSe` (byte 1,921,106) is `1&t&&T(0,"i",107)`, ONE icon, and the chooser is `pSe` (1,921,142). `bSe`
+was credited with building the row ids; `bSe` (1,921,739) is the SLIDER row and builds none — the
+`ei(…)` calls are in `vSe` (1,922,302).
+
+**Verified, and this is the part that matters for a comment.** A citation cannot be type-checked,
+linted or rendered, so a byte offset in one is exactly as unverified as prose unless something reads
+both ends — which is precisely how the old citations rotted silently through a build change.
+`screen-cluster-v4-contract.test.ts` now EXECUTES every offset the module names against the bundle:
+the three glyph consts and their bytes, the presenter row's 110-114, all seven template functions by
+name at their offsets, the three method bodies with the `delete`-not-`false` and string/number claims
+they support, the overlay's 31px rule as distinct from the navbar's 40px, and a guard that no live
+citation in the module names a file this repository does not hold.
+
+Six negative controls, red then green: a `compiled.js` citation reintroduced; a `render-helpers.js`
+one reintroduced ahead of the correction record; the old const index; the wrong-symbol claim; a byte
+moved to 2,001,505 (the offset of the class NAME rather than of the const holding it — the near-miss
+a hand-written offset actually lands on); and `pSe`'s offset swapped for `hSe`'s.
 
 This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
@@ -6948,17 +6977,31 @@ in viewer-only mode, because the navbar's is ungated and the overlay's trigger r
 so upstream every `label[for]` in the overlay resolves to the navbar's checkbox of the same index
 and the overlay's own rows cannot be muted by clicking their labels.
 
-`screen-cluster-v4-contract.test.ts` now asserts the count, both byte offsets, and that the rendered
-overlay emits `screenTalkingPresenter0-donot-disturb` and NOT `talkingPresenter0-donot-disturb`. The
-citations in `screen-volume.ts` still name the absent decoded-components paths; that file is outside
-this pass and the change is one line — `app-presentationarea.render-helpers.js:370-371` and
-`app-room.render-helpers.js:1087-1088` → `bytes 1,922,603 and 2,483,544`.
+`screen-cluster-v4-contract.test.ts` asserts the count, both byte offsets, and that the rendered
+overlay emits `screenTalkingPresenter0-donot-disturb` and NOT `talkingPresenter0-donot-disturb`.
+
+**The tail is CLOSED, 2026-08-31 21:15 UTC.** The row named the change as one line —
+`app-presentationarea.render-helpers.js:370-371` and `app-room.render-helpers.js:1087-1088` →
+bytes 1,922,603 and 2,483,544 — and both offsets were re-verified against the pinned bundle before
+being written (each holds `ei("name","talkingPresenter",i,"-donot-disturb")`, six occurrences of the
+literal over two components). Applied, along with the eleven sibling citations `SVC-02`'s tail
+uncovered; the two sentences beginning *"this cited"* are kept deliberately, so the next reader
+learns why the offsets are there, and the contract's guard counts them rather than asserting absence.
+
+One correction to the row itself: it credited `bSe` with building the ids. `bSe` is the slider row
+and builds none — `vSe` (byte 1,922,302) is the checkbox row that does. The BYTE the row gave was
+right; only the function it sits in was named wrong.
 
 This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ### SVC-04 — `screen-volume-contract.test.ts` cannot run in this checkout or on CI, so this control's guard is the new file and not that one
 
-**BLOCKED 2026-08-31, and the blocker is named with what would unblock it.** That file reads five
+**OWNER DECISION 2026-08-31 21:15 UTC — re-dispositioned from BLOCKED, because the buildable half is
+done and what is left is a judgement, not an obstacle.** The new bundle-bound file exists and has
+since this row was written; `SVC-02`'s and `SVC-03`'s citation tails are closed as of today. The one
+thing outstanding is the owner deciding whether an evidence-bound test whose evidence is permanently
+gitignored should be retired or re-pointed — which no amount of work here settles, and which
+"BLOCKED" mislabels as something that could be unblocked by building. That file reads five
 paths under `docs/source/components/` (lines 41-55 and 539-546). `docs/source` is one of the
 fourteen evidence roots `.gitignore` excludes and `gate/evidence-bound-tests.mjs` discovers as
 missing, so vitest excludes the file on every run here and on CI. It is not deleted and not edited:
@@ -7072,7 +7115,13 @@ This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ### STB-04 — `stream-tabs-contract.test.ts` reads a bundle that is not in this repository, so the whole file asserts nothing
 
-**BLOCKED 2026-08-31 — and NEW EVIDENCE on 2026-08-31 removes the obvious second repair.** The one
+**OWNER DECISION 2026-08-31 21:30 UTC — re-dispositioned from BLOCKED, and the row's own last
+paragraph is why: *"Retiring the file stays an owner decision."*** Nothing built here changes that,
+and "BLOCKED" reads as *something could unblock this*, which is the label `SVC-04` carried for the
+same reason and has also been corrected. The two are now the honest pair: buildable halves done,
+judgements left to the owner.
+
+**The evidence below is unchanged and is what makes it a judgement rather than an obstacle.** The one
 candidate this row did not consider was re-pointing at `docs/source-v3-2026-08-15`, which this
 checkout DOES hold. It does not work: that directory holds `main.99a5781d1d7a7775.js`, a THIRD
 minifier generation carrying neither this file's literals (`ut(9,Go,`, `Go=t=>({active:t})` — both

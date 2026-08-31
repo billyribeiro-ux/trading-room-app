@@ -33,6 +33,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 21:15 UTC — Thirteen citations that pointed at nothing, and the two that named the wrong function
+
+**Runtime impact: NO** — comments only. The values `screen-volume.ts` ships were correct throughout;
+only the pointers at them were not, which is the worse of the two failures. A wrong value is caught
+by the next person who renders the thing. A wrong citation is believed.
+
+The module's header opened *"Everything here was decoded from this repository's own decoded copy of
+the reference component, `docs/source/components/app-presentationarea.*`, not from the minified
+bundle"* and then cited that copy thirteen times. **Those files are in this repository under no
+path** — `git ls-files` finds nothing under `apps/room/docs/source/` — so every one of the thirteen
+pointed a reader at nothing, and the const numbers in them were each one too high against the bundle
+this repository does pin.
+
+The register raised TWO of the thirteen, `SVC-02`'s volume icons and `SVC-03`'s row ids, each with an
+exact one-line change. Both were verified against the bundle before being applied and both were
+right. **Measuring the rest of the file then found eleven more of the same shape**, which is the
+argument for measuring rather than working the list: a row names what its author happened to look at.
+
+All thirteen now carry byte offsets into `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` —
+2,891,205 bytes, SHA-256 `40796ca8…`, the file this repository actually holds. The const numbering was
+re-derived by walking `app-presentationarea`'s own `consts:` array from byte 1,994,257 to its 292
+top-level entries: the glyphs are 105/106/107, the presenter row 110-114.
+
+**Two of the thirteen also named the wrong SYMBOL while quoting the right code** — the shape `SHL-06`
+hit a day earlier, where the sentence is true and only the name is wrong, so a reader checking the
+claim finds it correct and moves on. `hSe` was credited with the three-way icon choice; `hSe` (byte
+1,921,106) is `1&t&&T(0,"i",107)`, one icon, and the chooser is `pSe` (1,921,142). `bSe` was credited
+with building the row ids; `bSe` (1,921,739) is the slider row and builds none — the `ei(…)` calls
+are in `vSe` (1,922,302).
+
+**A citation cannot be type-checked, linted or rendered**, so a byte offset in a comment is exactly
+as unverified as prose unless something reads both ends — which is precisely how these rotted
+silently through a build change. `screen-cluster-v4-contract.test.ts` now EXECUTES every offset the
+module names: the three glyph consts and their bytes, the presenter row's 110-114, all seven template
+functions by name at their offsets, the three method bodies with the `delete`-not-`false` and
+string/number claims they support, the overlay's 31px `#dropdownVolume` rule as distinct from the
+navbar's 40px, and a guard that no live citation in the module names a file this repository lacks.
+
+Six negative controls, red then green: a `compiled.js` citation reintroduced; a `render-helpers.js`
+one reintroduced ahead of the correction record; the old const index; the wrong-symbol claim; a byte
+moved to 2,001,505, the offset of the class NAME rather than of the const holding it, which is the
+near-miss a hand-written offset actually lands on; and `pSe`'s offset swapped for `hSe`'s.
+
+**Two rows are re-dispositioned from BLOCKED to OWNER DECISION, which is a correction and not a
+tidy-up.** `SVC-04` and `STB-04` are the same shape: each has a buildable half that is done — a new
+file bound to the tracked bundle, and a `STB-04` note carrying the three-generation table into the
+superseded file itself — and each ends in the owner deciding whether an evidence-bound test whose
+evidence is permanently gitignored should be retired or re-pointed. `STB-04`'s own last paragraph
+already said so in those words. "BLOCKED" reads as *something could unblock this*, and no amount of
+building here can; keeping the wrong label is how a judgement waits behind work that will never
+arrive.
+
+**That leaves fourteen BLOCKED rows, and every one is external**: four on the absent streaming/player
+server, three on an archive service, two on a server-side supply that does not exist (`years`,
+`isNew`), one each on a Discord registration, a Twilio integration, the linked-room fan-out, a
+re-capture of `app-extra-chat`'s stylesheet, and the three bundle chunks this checkout does not hold.
+None is closable from inside this repository.
+
 ### 2026-08-31 20:45 UTC — A dropped chat channel now takes the composer with it, in both columns
 
 **Runtime impact: YES.** A member whose chat channel dropped kept a live-looking composer. They
