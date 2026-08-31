@@ -3954,7 +3954,17 @@ function e0e(t,n){1&t&&(d(0,"div",24),v(1," Webinar Mode "),d(2,"span",56),T(3,"
 
 ### ACA-05 — The extra chat column's composer binds `paste` upstream; the refusal recorded here rests on a measurement of one copy that the other copy contradicts
 
-**BLOCKED — needs one file this session does not own.** `acA-02` built the chat paste handler and recorded, as its reason for giving the extra column none, that *"the reference binds paste on textarea const 64 (the main composer) and its handler reads `#textAreaTxt` by id, so a second column pasting through it would seed from the first column's box."* **Both halves are false of `app-extra-chat`.** Its composer const (61) is `["name","txt-area","id","textAreaTxtExtra","rows","1","spellcheck","true","placeholder","Type your message here..",1,"txt-area","form-control","border-0",3,"keyup","paste","keydown.enter","focus"]` — `paste` is in the binding section — `cMe` at byte 2,373,521 binds it, and that component's OWN `onImagePaste` at byte 2,392,023 reads `ui("#textAreaTxtExtra")`, not `#textAreaTxt`, behind the same `if(!this.canPostImages)return!1` guard. There is no shared box and no seeding across columns.
+**BUILT 2026-08-31 — and reading the handler once more found a SECOND thing the row got wrong.**
+
+The row's prescribed fix said to feed the handler from `+page.svelte` *"beside the main column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"*. That call defaults to the `'chat'` target, whose branch posts with no channel argument — the MAIN tab. `app-extra-chat`'s own `doImggurUpload` at byte **2,389,468** ends in `sendGrpChat(s.channel, s.imggurUploadTxt)` against THIS column's tab, so a screenshot pasted into the second column would have appeared in the first. `'extra'` is a third DESTINATION, not a third caller: it seeds from `#textAreaTxtExtra` and posts to `chat.extraTab`.
+
+`#uploadImagesTo` is the extraction that lets one body serve both channels — two copies of that loop would be two places to get the progress dialog, the `Upload Failed...` wording and the join-with-spaces wrong. A chat paste still passes `undefined` and lets `sendBody` apply its own default, which is asserted so the refactor is provably behaviour-preserving rather than merely compiling.
+
+One further detail the row did not have: upstream's `canPostImages` guard sits INSIDE the `if(s)` block here, where `app-chat`'s copy opens with it. Behaviourally identical, and written down so a reader comparing the two copies does not think one was transcribed loosely.
+
+The false assertion in `chat-paste-image-contract.test.ts` is inverted, with its reason replaced by the measurement. Three negative controls were run and each printed its failure: the register's own prescription, seeding from the main box, and posting to the main tab.
+
+`acA-02` built the chat paste handler and recorded, as its reason for giving the extra column none, that *"the reference binds paste on textarea const 64 (the main composer) and its handler reads `#textAreaTxt` by id, so a second column pasting through it would seed from the first column's box."* **Both halves are false of `app-extra-chat`.** Its composer const (61) is `["name","txt-area","id","textAreaTxtExtra","rows","1","spellcheck","true","placeholder","Type your message here..",1,"txt-area","form-control","border-0",3,"keyup","paste","keydown.enter","focus"]` — `paste` is in the binding section — `cMe` at byte 2,373,521 binds it, and that component's OWN `onImagePaste` at byte 2,392,023 reads `ui("#textAreaTxtExtra")`, not `#textAreaTxt`, behind the same `if(!this.canPostImages)return!1` guard. There is no shared box and no seeding across columns.
 
 **This is the shape the document's own preface warns about, in the other direction:** a claim framed as a fact about "the reference" that was read off one of the two compiled copies. The rule for this surface is that both are read before a divergence is claimed, and here that was not done.
 
@@ -8620,7 +8630,12 @@ three files; the count is pinned so that "ten" cannot quietly become "eleven".
 
 ### ASR-3 — nothing focuses this dialog when it opens, because Bootstrap's modal plugin did that upstream
 
-**BLOCKED 2026-08-31, on one line in a file this pass does not own.**
+**BUILT 2026-08-31.** One line, in the one component every dialog in this room is — which is exactly why it was right to wait for a session that owned `Modal.svelte` rather than special-case one call site.
+
+**The ORDER is the part that is not obvious and would have broken silently.** `inert={!open}` is bound on the same element and an inert element cannot be focused. It works only because Svelte runs `$effect` *"after any DOM updates have been applied"*, which the official documentation states outright, so `inert` is already gone by the time the body runs. Moving the call anywhere earlier makes it a no-op with no error, which is why the paragraph is at the code rather than in this register.
+
+The contract test held the tripwire — `not.toContain('node.focus()')`, with its own note that it *"goes red the day somebody applies the one-line fix"*. It did. It now asserts both halves of the attachment (focus on open, release on close), that the focus call lives INSIDE the effect rather than in the attachment body that runs before it, and that the root still carries `tabindex="-1"`.
+
 This row was ADDED after this document was committed.
 
 Upstream the dialog is adopted by Bootstrap's modal plugin, which calls `_element.focus()` on show.

@@ -89,10 +89,41 @@
    * that happens as the attribute is applied, and both attributes change in the same update here.
    * Releasing focus ourselves means the outcome does not depend on which the browser processes
    * first.
+   *
+   * ## `ASR-3` — and it TAKES focus on open, which upstream got from Bootstrap for free
+   *
+   * Bootstrap's modal plugin calls `_element.focus()` on show. **This room ships no Bootstrap
+   * JavaScript at all** — `bootstrap-dropdown-contract.test.ts` holds that premise for every app in
+   * the repository — so opening a dialog left focus wherever it was, behind an `inert` boundary
+   * that was about to move. A keyboard user's next Tab started from a point outside the dialog, and
+   * a screen reader announced nothing.
+   *
+   * One line, and deliberately in ONE place rather than at 22 call sites: every dialog in this room
+   * is this component.
+   *
+   * **The ORDER is what makes it work and it is not obvious.** `inert={!open}` is bound on the same
+   * element, and an inert element cannot be focused. Svelte's `$effect` documentation is explicit
+   * that effects run *"after the component has been mounted to the DOM, and in a microtask after
+   * state changes"*, with re-runs happening *"after any DOM updates have been applied"* — so by the
+   * time this body runs, `inert` has already been removed. Calling `focus()` from anywhere that ran
+   * earlier would silently do nothing.
+   *
+   * The root carries `tabindex="-1"`, which is what makes it programmatically focusable without
+   * putting it in the tab order — the same attribute the reference's markup already had.
+   *
+   * `svelte-autofixer` returns **no issues** on this file and three suggestions, all the same one:
+   * *"you are calling a function inside an `$effect` … check if it could use `$derived`"*, raised
+   * once each for `focus()`, `blur()` and `contains()`. DECLINED, and recorded rather than ignored:
+   * all three are DOM manipulation, which Svelte's own `$effect` documentation names as what
+   * effects are for. There is no value here to derive — the whole content of this effect is a side
+   * effect on an element.
    */
-  const releaseFocusWhenClosed: Attachment<HTMLDivElement> = (node) => {
+  const manageFocus: Attachment<HTMLDivElement> = (node) => {
     $effect(() => {
-      if (open) return;
+      if (open) {
+        node.focus();
+        return;
+      }
       const focused = document.activeElement;
       if (focused instanceof HTMLElement && node.contains(focused)) focused.blur();
     });
@@ -102,7 +133,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  {@attach releaseFocusWhenClosed}
+  {@attach manageFocus}
   {id}
   tabindex="-1"
   role={rootRole}

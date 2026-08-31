@@ -45,6 +45,7 @@
     EXTRA_CHAT_GIF_TRIGGER
   } from '#lib/extra-chat-surface.js';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import { pastedImageFrom } from '#lib/pasted-image.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import ChatSearchBar from './ChatSearchBar.svelte';
@@ -191,6 +192,18 @@
     ontoggletoolbar: () => void;
     onimageupload: () => void;
     /**
+     * `ACA-05` — a screenshot pasted into THIS column's composer.
+     *
+     * Const 61 carries `paste` in its binding section and `cMe` at byte **2,373,521** binds it. The
+     * refusal that used to stand here read the MAIN composer's copy and concluded a second column
+     * would seed from the first column's box; `app-extra-chat`'s own `onImagePaste` at byte
+     * **2,392,023** reads `ui("#textAreaTxtExtra")`, so each column reads its own. Reading it once
+     * more showed the DESTINATION differs too — `sendGrpChat(s.channel, …)`, this column's tab —
+     * which is why the page routes it to `beginImagePaste(file, 'extra')` and not to the main
+     * column's handler.
+     */
+    onpasteimage: (file: File) => void;
+    /**
      * `XCP-08` — "Play YouTube For All". **The presence of this handler IS the gate.**
      *
      * `lMe` at byte 2,373,038 resolves five children and gates them at 2,373,334:
@@ -258,6 +271,7 @@
     onmodonly,
     ontoggletoolbar,
     onimageupload,
+    onpasteimage,
     onyoutube,
     onrte,
     onselectgif
@@ -336,6 +350,28 @@
       });
     }
   });
+
+  /**
+   * `ACA-05` — the clipboard filter for THIS column, and the guard's position is upstream's.
+   *
+   * ```js
+   * onImagePaste(e){ … let s=null;
+   *   for(const r of o) 0===r.type.indexOf("image") && (s=r.getAsFile());
+   *   if(s){ if(!this.canPostImages) return !1; … } }             // byte 2,392,023
+   * ```
+   *
+   * The `canPostImages` check sits INSIDE the `if(s)` block here, where `app-chat`'s copy opens
+   * with it. Behaviourally identical — no image, nothing happens either way — and the order is
+   * `pastedImageFrom` first because the shared rule is the shared rule; noting it so a reader
+   * comparing the two copies does not think one of them was transcribed loosely.
+   *
+   * The default is deliberately NOT prevented: a paste of plain text still lands in the textarea.
+   */
+  function handleComposerPaste(event: ClipboardEvent): void {
+    if (!canPostImages) return;
+    const image = pastedImageFrom(event.clipboardData?.items);
+    if (image) onpasteimage(image);
+  }
 
   /**
    * `XCP-03` and `XCP-04` — Enter, decoded rather than assumed.
@@ -534,6 +570,7 @@
               bind:value={composer}
               {onfocus}
               oninput={(event) => ontyped(event.currentTarget.value)}
+              onpaste={handleComposerPaste}
               onblur={onstoppedtyping}
               onkeydown={submitOnEnter}></textarea>
           </div>

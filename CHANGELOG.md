@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 17:15 UTC — A third wrong prescription, and one line that fixes focus for all 22 dialogs
+
+**Runtime impact: YES.** A screenshot pasted into the second chat column uploads and posts — to
+*that* column. And every dialog in the room now takes focus when it opens.
+
+#### `ACA-05` — the row corrected an earlier wrong claim, and was itself wrong about the destination
+
+The refusal this row overturned said the reference binds paste on the main composer's textarea and
+reads `#textAreaTxt` by id, *"so a second column pasting through it would seed from the first
+column's box."* Both halves are false of `app-extra-chat`: const 61 carries `paste`, `cMe` at byte
+2,373,521 binds it, and that component's own `onImagePaste` at byte 2,392,023 reads
+`ui("#textAreaTxtExtra")`. Each column reads its own box. That was the row's finding, and it was
+right.
+
+**Its own prescribed fix then repeated the mistake one layer down.** It said to feed the handler
+*"beside the main column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"* — which
+defaults to the `'chat'` target, whose branch posts with no channel argument, i.e. the main tab.
+Byte 2,389,468:
+
+```js
+o||(i&&(s.imggurUploadTxt+=" "+i, ui("#textAreaTxtExtra").val("")),
+    s.appService.sendGrpChat(s.channel, s.imggurUploadTxt), s.imggurUploadTxt="")
+```
+
+`s.channel` is the extra column's tab. **A screenshot pasted into the second column would have
+appeared in the first.** `'extra'` is a third DESTINATION rather than a third caller: it seeds from
+its own box and posts to `chat.extraTab`.
+
+`#uploadImagesTo` is the extraction that lets one body serve both channels — two copies of that loop
+would be two places to get the progress dialog, the `Upload Failed...` wording and the
+join-with-spaces wrong. The chat path still passes `undefined` and lets `sendBody` apply its own
+default, and that is asserted, so the refactor is provably behaviour-preserving rather than merely
+compiling.
+
+One detail the row did not have: upstream's `canPostImages` guard sits INSIDE the `if(s)` block
+here, where `app-chat`'s copy opens with it. Behaviourally identical, written down so a reader
+comparing the two copies does not think one was transcribed loosely.
+
+#### `ASR-3` — one line, and the reason it works is not visible from the line
+
+Bootstrap's modal plugin calls `_element.focus()` on show. **This room ships no Bootstrap JavaScript
+at all** — `bootstrap-dropdown-contract.test.ts` holds that premise for every app here — so opening
+a dialog left focus wherever it was, behind an `inert` boundary about to move. A keyboard user's
+next Tab started outside the dialog and a screen reader announced nothing.
+
+**The ORDER is the part that would have broken silently.** `inert={!open}` is bound on the same
+element and an inert element cannot be focused. It works only because Svelte runs `$effect` *"after
+any DOM updates have been applied"* — the official documentation says so outright — so `inert` is
+already gone by the time the body runs. Moving the call anywhere earlier makes it a no-op with no
+error, which is why that paragraph sits at the code.
+
+One line in ONE component rather than 22 call sites, which is exactly why it was right to wait for a
+session that owned `Modal.svelte`.
+
+#### Evidence
+
+Three negative controls on `ACA-05`, each seen RED and restored: the register's own prescription
+(defaulting to `'chat'`), seeding from the main box, and posting to the main tab. Two tripwires
+fired on their own — `not.toContain('onpaste')` on the extra column, and
+`not.toContain('node.focus()')` on `Modal.svelte`, the latter carrying its own note that it *"goes
+red the day somebody applies the one-line fix"*.
+
+Two more repo guards caught mistakes of mine. `orphaned-comment-contract` refused a handler I
+inserted between the `XCP-03`/`XCP-04` docblock and the function it explains. And
+`inline-alert-entry-contract` pinned the whole two-way ternary `target === 'chat' ? … : ''`, which
+went red on a third target it had no opinion about — re-dispositioned to assert the rule it was
+always protecting: the ALERT branch seeds from nothing, and exactly two of the three read a
+composer.
+
+`svelte-autofixer`: **no issues** on `Modal.svelte`; its three suggestions are one advisory raised
+for `focus()`, `blur()` and `contains()`, all DOM manipulation, which the docs name as what effects
+are for. Declined at the code with the reason.
+
+**Verified:** `apps/room` gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors,
+**301 test files / 5,498 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
+browser; the focus change in particular is asserted as shape, not observed on a real dialog.
+
 ### 2026-08-31 16:45 UTC — The Q&A header's alert body was raw text, and both rows were blocked by a declaration lagging its own data
 
 **Runtime impact: YES.** A `$TICKER` in the alert is coloured in the Q&A header now, a pasted URL is

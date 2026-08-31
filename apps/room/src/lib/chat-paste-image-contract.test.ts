@@ -71,6 +71,11 @@ const PASTE_CONFIRM = readFileSync(
   a test `new URL(...)` is no longer a constructor. Anything reading a file has to do it up here.
 */
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
+/** `ACA-05` reads the extra column's own `doImggurUpload` tail rather than quoting it. */
+const BUNDLE = readFileSync(
+  new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url),
+  'utf8'
+);
 const POST_ALERT = readFileSync(
   new URL('./components/PostAlertModal.svelte', import.meta.url),
   'utf8'
@@ -222,6 +227,59 @@ describe('confirming it', () => {
     ]);
   });
 
+  it('ACA-05 — an EXTRA-column paste seeds from its own box and posts to its own tab', async () => {
+    /*
+      The row this closes, executed rather than read off source. Both halves matter and both were
+      wrong in the register's prescription:
+
+        - the SEED is `#textAreaTxtExtra`, not `#textAreaTxt` (byte 2,392,023);
+        - the DESTINATION is `sendGrpChat(s.channel, …)` — THIS column's tab — not the main one
+          (byte 2,389,468).
+
+      The main composer's draft is deliberately set to a DIFFERENT string, so a handler that seeded
+      from the wrong box would post the wrong text rather than merely the right text by luck.
+    */
+    const { composer, chat, sent } = make();
+    chat.composer = 'main column draft';
+    chat.extraComposer = 'extra column draft';
+    chat.extraTab = 'off-topic';
+
+    composer.beginImagePaste(png('shot.png'), 'extra');
+    expect(composer.pastedImageMessage, 'seeded from the EXTRA box').toBe('extra column draft');
+
+    await composer.confirmImagePaste();
+
+    /* `room` is what the send payload calls the channel — `sendBody`'s third argument. */
+    expect(sent).toEqual([
+      expect.objectContaining({
+        body: 'https://cdn.test/u.png extra column draft',
+        room: 'off-topic'
+      })
+    ]);
+    /* The extra box is cleared because a message travelled; the main one is untouched. */
+    expect(chat.extraComposer).toBe('');
+    expect(chat.composer).toBe('main column draft');
+  });
+
+  it('ACA-05 — and a CHAT paste still lands on `main`, unchanged by the extraction', async () => {
+    /*
+      The half that proves the refactor is behaviour-preserving rather than merely compiling.
+
+      `uploadImages` grew a channel argument so the extra column could name its tab; the chat path
+      passes `undefined` and `sendBody` applies its OWN default, which the payload shows as `main`.
+      Passing `undefined` rather than the literal `'main'` is deliberate — a second spelling of the
+      default here would be a second thing to keep in step with `sendBody` — and this assertion is
+      what catches it if that default ever moves.
+    */
+    const { composer, chat, sent } = make();
+    chat.composer = 'main column draft';
+    composer.beginImagePaste(png('shot.png'));
+    await composer.confirmImagePaste();
+
+    expect(sent).toHaveLength(1);
+    expect((sent[0] as { room?: unknown }).room).toBe('main');
+  });
+
   it('CLEARS the composer, because the text it held has now been posted', async () => {
     const { composer, chat } = make();
     chat.composer = 'look at this';
@@ -355,11 +413,43 @@ describe('the clipboard filter, in the component', () => {
     expect(mainCode).toContain('onpaste={handleComposerPaste}');
     expect(mainCode).toContain('id="textAreaTxt"');
     /*
-      The extra column deliberately has none — the reference binds paste on textarea const 64 (the
-      main composer) and its handler reads `#textAreaTxt` by id, so a second column pasting through
-      it would seed from the first column's box.
+      `ACA-05` — INVERTED 2026-08-31, and the comment that stood here is why the row existed.
+
+      It read: *"The extra column deliberately has none — the reference binds paste on textarea
+      const 64 (the main composer) and its handler reads `#textAreaTxt` by id, so a second column
+      pasting through it would seed from the first column's box."* **Both halves are false of
+      `app-extra-chat`.** Its composer const 61 carries `paste` in its binding section, `cMe` at byte
+      2,373,521 binds it, and that component's OWN `onImagePaste` at byte 2,392,023 reads
+      `ui("#textAreaTxtExtra")`. Each column reads its own box; there was never a shared one.
+
+      That is the failure mode this repository's preface names in the other direction — a claim
+      framed as a fact about "the reference" that was read off ONE of two compiled copies. The
+      assertion made the mistake permanent by pinning it.
     */
-    expect(extraCode).not.toContain('onpaste');
+    expect(extraCode).toContain('onpaste={handleComposerPaste}');
+    expect(extraCode).toContain('id="textAreaTxtExtra"');
+  });
+
+  it('ACA-05 — and the extra column posts to ITS OWN channel, which is a third destination', () => {
+    /*
+      THE ROW'S PRESCRIBED FIX WOULD HAVE POSTED INTO THE WRONG COLUMN.
+
+      It said to feed the handler from `+page.svelte` *"beside the main column's
+      `onpasteimage={(file) => composer.beginImagePaste(file)}`"* — which defaults to `'chat'`, and
+      the chat branch posts with no channel argument, i.e. the MAIN tab. `app-extra-chat`'s own
+      `doImggurUpload` at byte 2,389,468 ends in `sendGrpChat(s.channel, …)` against THIS column's
+      tab. A screenshot pasted into the second column would have appeared in the first.
+
+      Read off the bundle rather than quoted, so a different capture turns this red.
+    */
+    const tail =
+      'o||(i&&(s.imggurUploadTxt+=" "+i,ui("#textAreaTxtExtra").val("")),s.appService.sendGrpChat(s.channel,s.imggurUploadTxt),s.imggurUploadTxt="")';
+    expect(BUNDLE).toContain(tail);
+
+    /* And ours names the third target at the call site rather than defaulting to the first. */
+    expect(PAGE).toContain("onpasteimage={(file) => composer.beginImagePaste(file, 'extra')}");
+    /* The two columns' call sites are DIFFERENT, which is the whole point of this row. */
+    expect(PAGE).toContain('onpasteimage={(file) => composer.beginImagePaste(file)}');
   });
 
   it('refuses when the room does not let this viewer post images', () => {

@@ -207,10 +207,38 @@ describe('the paste', () => {
     expect(composerCode).toContain('await this.postPastedImage({');
   });
 
-  it('seeds the dialog from the ALERT box, never from the chat composer', () => {
-    expect(composerCode).toContain(
-      "this.#pastedImageMessage = target === 'chat' ? this.#chat.composer.trim() : '';"
+  it('seeds the dialog from the ALERT box, never from either chat composer', () => {
+    /*
+      RE-DISPOSITIONED 2026-08-31. This pinned the whole ternary
+      `target === 'chat' ? this.#chat.composer.trim() : ''`, which said the right thing while there
+      were exactly two targets. `ACA-05` added a third — the extra column, which seeds from
+      `#textAreaTxtExtra` (byte 2,392,023) — so the one-line ternary became a three-way branch and
+      this assertion went red on a change it had no opinion about.
+
+      What it was ALWAYS protecting is the alert branch: `inlineAlertEntryImage` carries its own
+      `alertTxt` and the caller clears that box before this runs (byte 2,047,700), so the alert
+      target must seed from NOTHING. Asserted as that rule now, plus the negative half — the alert
+      branch must not reach either chat box — which is what a fourth target could otherwise break
+      while the positive assertion kept passing.
+    */
+    expect(composerCode).toContain("else this.#pastedImageMessage = '';");
+
+    const at = composerCode.indexOf('beginImagePaste(file: File, target:');
+    expect(at, 'beginImagePaste must exist').toBeGreaterThan(-1);
+    const closes = composerCode.indexOf('\n  }', at);
+    expect(
+      closes,
+      'beginImagePaste must be closed for the slice to bound anything'
+    ).toBeGreaterThan(at);
+    const body = composerCode.slice(at, closes);
+
+    /* Each chat target reads its OWN box, and the alert target reads neither. */
+    expect(body).toContain("if (target === 'chat') this.#pastedImageMessage = this.#chat.composer");
+    expect(body).toContain(
+      "else if (target === 'extra') this.#pastedImageMessage = this.#chat.extraComposer"
     );
+    /* Exactly two assignments read a composer; the third reads nothing. */
+    expect(body.split('this.#pastedImageMessage =').length - 1).toBe(3);
   });
 });
 

@@ -75,7 +75,7 @@ guessed.
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,917 | no |
-| 2 | `routes/+page.svelte` | 1,732 | no |
+| 2 | `routes/+page.svelte` | 1,733 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,258 | no |
@@ -89,7 +89,7 @@ guessed.
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/ScreenPane.svelte` | 671 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
 | 15 | `lib/components/PostAlertModal.svelte` | 656 | no |
-| 16 | `lib/components/ExtraChatPane.svelte` | 684 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
+| 16 | `lib/components/ExtraChatPane.svelte` | 721 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 638 | `## DayTradeAlertsPane.svelte` in the v4 register — **5 rows. |
 | 18 | `lib/components/StreamingView.svelte` | 688 | `## StreamingView.svelte` in the v4 register — **10 rows, from one end-to-end reading of class `xCe` — bytes 1,901,122 to 1,914,468 of the pinned |
 | 19 | `lib/components/FilesPane.svelte` | 585 | no |
@@ -120,7 +120,7 @@ guessed.
 | 44 | `lib/components/FollowChatStylePane.svelte` | 152 | `## FollowChatStylePane.svelte` in the v4 register — 3 rows (FCS-01…03) read end to end 2026-08-31. FCS-01 is a real defect: `bind:value` on the Text Size number input writes `null` for an empty box, and `null + 1` is `1`, so clearing it and saving drew that person's username at 1px on every later message. |
 | 45 | `lib/components/AlertQaComposer.svelte` | 223 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
 | 46 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
-| 47 | `lib/components/Modal.svelte` | 157 | no |
+| 47 | `lib/components/Modal.svelte` | 188 | no |
 | 48 | `lib/components/TabGearMenu.svelte` | 156 | no |
 | 49 | `lib/components/AlertSendReportModal.svelte` | 161 | `## AlertSendReportModal.svelte` in the v4 register — 3 rows (ASR-01…03) read end to end 2026-08-31: 2 measured refusals, 1 blocked on a one-line change in `Modal.svelte` that this pass did not own. |
 | 50 | `lib/components/notes/NoteTabContent.svelte` | 134 | `## notes/NoteTabContent.svelte` in the v4 register — 3 rows (NTC-01…03) read end to end 2026-08-31. NTC-01 removed an INVENTED value: `title="Welcome Mat"` occurs 0 times in the 2,891,205-byte bundle. |
@@ -158,7 +158,7 @@ guessed.
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 
-**38 of 83 surfaces audited · 15,194 of 36,583 lines · 41.5%.**
+**38 of 83 surfaces audited · 15,231 of 36,652 lines · 41.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

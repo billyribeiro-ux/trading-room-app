@@ -688,7 +688,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `canPostImages` forwarded to `RoomOverlays` for `QAM-05`. Both are the page answering an
       authority question once, which is the only place this repository answers them.
     */
-    max: 1733,
+    /*
+      1733 -> 1734, 2026-08-31. One line: `ACA-05`'s `onpasteimage` for the extra column, naming its
+      own target rather than defaulting to the main column's.
+    */
+    max: 1734,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -4271,7 +4275,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       method, so the inline box silently inherits whatever five checkboxes that modal was last left
       holding.
     */
-    max: 792,
+    /*
+      792 -> 851, 2026-08-31, for `ACA-05`, and the raise is one extraction plus the two paragraphs
+      that record why the register's prescribed fix would have posted into the wrong column.
+
+      The row said to feed the extra column's paste through `+page.svelte` *"beside the main
+      column's `onpasteimage={(file) => composer.beginImagePaste(file)}`"*. That defaults to
+      `'chat'`, and the chat branch posts with NO channel argument — the main tab. `app-extra-chat`'s
+      own `doImggurUpload` at byte 2,389,468 ends in `sendGrpChat(s.channel, …)` against THIS
+      column's tab, so a screenshot pasted into the second column would have appeared in the first.
+
+      `'extra'` is therefore a third DESTINATION rather than a third caller, and it seeds from its
+      own box (`ui("#textAreaTxtExtra")`, byte 2,392,023) rather than the main one.
+      `#uploadImagesTo` is the extraction that made one body serve both channels: two copies of that
+      loop would be two places to get the progress dialog, the `Upload Failed...` wording and the
+      join-with-spaces wrong.
+    */
+    max: 851,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -5868,7 +5888,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the reason the row was blocked). A `boolean` beside a `() => void` would have put one gate in
       two places and let them disagree.
     */
-    max: 685,
+    /*
+      685 -> 722, 2026-08-31, for `ACA-05` — the `paste` binding this column has had upstream since
+      it was written, and whose absence here rested on a measurement of the WRONG compiled copy.
+
+      The refusal that stood in `chat-paste-image-contract.test.ts` said the reference binds paste on
+      the main composer's textarea and reads `#textAreaTxt` by id, so a second column would seed from
+      the first column's box. Both halves are false of `app-extra-chat`: const 61 carries `paste`,
+      `cMe` at byte 2,373,521 binds it, and that component's own `onImagePaste` reads
+      `ui("#textAreaTxtExtra")`. Each column reads its own box; there was never a shared one.
+
+      The handler's docblock also records that upstream's `canPostImages` guard sits INSIDE the
+      `if(s)` block here where `app-chat`'s opens with it — behaviourally identical, and noted so a
+      reader comparing the two copies does not think one was transcribed loosely.
+    */
+    max: 722,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -5988,7 +6022,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/Modal.svelte',
-    max: 158,
+    /*
+      158 -> 182, 2026-08-31, for `ASR-3` — one line of code and the paragraph that makes it safe to
+      keep.
+
+      Bootstrap's modal plugin calls `_element.focus()` on show and this room ships no Bootstrap
+      JavaScript at all, so every dialog opened without taking focus: a keyboard user's next Tab
+      started outside it and a screen reader announced nothing.
+
+      **The ORDER is the part that is not obvious and would break silently.** `inert={!open}` is
+      bound on the same element and an inert element cannot be focused; this works only because
+      Svelte runs `$effect` after DOM updates have been applied, which the official documentation
+      states outright. Moving the call anywhere that runs earlier makes it a no-op with no error.
+
+      One line in ONE component rather than 22 call sites, which is exactly why it was right to wait
+      for a session that owned this file.
+
+      Six of the twenty-four lines are the `svelte-autofixer` decline: it raises "calling a function
+      inside an `$effect`" once each for `focus()`, `blur()` and `contains()`, and all three are DOM
+      manipulation — which Svelte's own `$effect` documentation names as what effects are for. A
+      decline with its reason at the code is what stops the next reader, holding the same three
+      suggestions, "fixing" it.
+    */
+    max: 189,
     why: 'the modal shell every captured modal is rendered through'
   },
   {
