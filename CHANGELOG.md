@@ -33,6 +33,108 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 05:20 UTC — The owner rename stops being a flag day, proven on a live cluster
+
+**Runtime impact: NO today, YES for the cutover.** Nothing changes for a database that stays on
+`ptr_clone`; what changes is that a database can move to `tradingroom` without a flag day.
+
+**The blocker was in the code, not on the cluster.** `TODO.md` row 1 prescribes *"add, prove, cut
+over, retire — never rename"*, and `EXPECTED_MIGRATOR_ROLE` being a single `&str` made that
+impossible: one accepted name forces the database's ownership and the deployed binary to change in
+the same instant, and in the window between them either the old binary refuses the new owner or the
+new binary refuses the old one. Every deploy in that window fails closed against a healthy database.
+
+`ACCEPTED_MIGRATOR_ROLES` is that window — an ordered allow-list of exactly two names, `tradingroom`
+preferred. **It is not the tolerance that was removed from the runtime-role preflight**, and the
+difference is why that one failed open and this one cannot: that was a CATALOGUE LOOKUP (`WHERE
+rolname IN ($1, $2) … LIMIT 1`) which returned role Y's posture when asked about role X. This is an
+equality test against three facts the server states about the current connection, and all three must
+name the **same** accepted entry. `migration_reappliability.rs`'s source assertion names the lookup's
+`ORDER BY` shape, is untouched, and still passes.
+
+**Four cases, measured through the real `migrate` binary on a live PostgreSQL 16.13 cluster:**
+
+| # | connection | database owner | result |
+| --- | --- | --- | --- |
+| A | `tradingroom` | `tradingroom` | exit 0 — 10 migrations, 10 successful; 3 tables, 22 RLS policies |
+| B | `ptr_clone` | `ptr_clone` | exit 0 — no regression |
+| C | `stranger_owner`, a superuser | `tradingroom` | exit 1 — refused |
+| D | `tradingroom`, then `SET ROLE ptr_clone` | `tradingroom` | exit 1 — refused |
+
+Case D is the one that matters, and it is why the three facts are checked together for one entry at
+a time rather than each against the list:
+
+```
+migrate failed: migration preflight requires the authenticated identity, session_user, and
+current_user to all be tradingroom or ptr_clone; got session_user=tradingroom, current_user=ptr_clone
+```
+
+**The negative control proves that shape is load-bearing rather than stylistic.** Rewriting the check
+as the plausible `accepted.contains(&session_role) && accepted.contains(&current_role) && …` — each
+fact independently in the list — turned `the_migrator_allow_list_requires_all_three_facts_to_name_the_same_role`
+red on all four impersonation rows. Every one of them is a role executing under an authority it did
+not authenticate with, which is the exact shape the three-fact check exists to refuse.
+
+**Steps 3 and 4 rehearsed on a fully-migrated database**, and written up in the new
+`ops/OWNER-ROLE-CUTOVER.md` with the commands and the before/after numbers:
+
+| | before | after |
+| --- | --- | --- |
+| database owner | `ptr_clone` | `tradingroom` |
+| relations in `public` | `ptr_clone` × 129 | `tradingroom` × 129 |
+| RLS policies | 22 | 22 |
+| grants to `tradingroom_app` | 87 | 87 |
+
+`REASSIGN OWNED` touches neither the policies nor the runtime grants, which is what makes it safe
+while the application is running, and afterwards the chain applies as **either** owner — both were
+run, both exit 0. `ALTER DATABASE … RENAME TO` was rehearsed too; the chain then applies to the
+renamed database unchanged. And `DROP ROLE ptr_clone` **refuses** while objects remain, naming them:
+
+```
+ERROR:  role "ptr_clone" cannot be dropped because some objects depend on it
+DETAIL:  33 objects in database interlock_probe
+         154 objects in database tr_test
+```
+
+That is the fail-closed retirement the row asks for — a `DROP ROLE` that refuses rather than one that
+`CASCADE`s, and the refusal doubles as the checklist.
+
+**The release attestation resolves the owner ONCE and pins every downstream check to it**
+(`resolve_attested_owner`). Comparing each site against a two-name list independently would attest a
+database whose connection says one owner while its tables still say the other — a half-finished
+`REASSIGN OWNED`, which is exactly what a release attestation must catch. The relaxation is which
+owner a database may have; it is never that a database may have two.
+
+**Files.** `services/api/src/db/migrate.rs` (the allow-list, the unanimity loop, three new unit
+tests), `services/api/src/bin/postgres-release-attestation.rs` (`resolve_attested_owner`, the pin,
+one new test), `ops/OWNER-ROLE-CUTOVER.md` (new). Both `services/**` files are re-pinned in
+`apps/controller/scripts/verify-backend-provenance.mjs` per the root standard.
+
+**What was verified, and what could NOT be — plainly.** `cargo test -p tradingroom-api --features
+testing --lib db::migrate` → **9 passed**; `--bins` → **18 passed**; the four live-cluster runs above;
+the negative control seen red. Then `cargo fmt` reformatted, and on the formatted bytes `cargo check`
+and `cargo clippy -- -D warnings` over `--lib --bins` are **clean**.
+
+**The Rust unit tests could not be re-run after that format, and clippy could not run over
+`--all-targets` at all.** `tradingroom-api` takes `tradingroom-media` as a DEV-dependency, which
+pulls in `mediasoup-sys`, whose meson build downloads
+`github.com/versatica/libsrtp/archive/v3.0.0-beta-2fc078db.zip` — and this session's proxy answers
+**403** for that repository (`add_repo` refuses it as a cross-owner add; the commit is not reachable
+from any ref, so the git lane cannot supply it either, and substituting a different commit was
+rejected as a silently divergent toolchain). Timestamped zero-byte files in meson's `packagecache`
+show that download already failing at 00:13 today, before this turn — but clearing
+`services/target/debug/build/mediasoup-sys-*` while freeing disk removed the cached build-script
+output the TEST profile was still using, so the suite that ran green earlier can no longer be re-run
+here. That is my error and it is an environment loss, not a code one. CI runs
+`cargo clippy --locked --workspace --all-targets --features testing -- -D warnings` and
+`cargo test --locked --workspace --features testing` with network access, and that is where the
+integration targets will run.
+
+**Tooling, plainly: the rust-analyzer MCP was not available in this session** — no `definition`,
+`references`, `hover`, `diagnostics`, `code_action` or `rename` tool is offered here, and none was
+run. `cargo check`, `cargo clippy` and `cargo fmt` were used in its place, and the navigation it
+would have done was done by reading the module end to end.
+
 ### 2026-08-31 04:45 UTC — The media plane was never blocked, and running it found a defect
 
 **Runtime impact: YES.** Every viewer of a live stream was getting two identical tabs for it.

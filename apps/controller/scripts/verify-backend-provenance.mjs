@@ -214,6 +214,16 @@ const DIVERGED_FROM_IMPORT = new Map([
     general tenant predicate and `room_events`' member-scoped one.
   */
   /*
+    Re-pinned 2026-08-31 (owner cutover): `resolve_attested_owner` reads the owner from the
+    CONNECTION and every downstream check is pinned to that one name, instead of each comparing
+    against `EXPECTED_MIGRATOR_ROLE`. The reviewed act: the owner rename `ptr_clone` ->
+    `tradingroom` is staged (`ops/OWNER-ROLE-CUTOVER.md`), so a cluster mid-cutover holds databases
+    owned by either — and an attestation comparing each site against a two-name list independently
+    would pass a database whose connection says one owner while its tables still say the other,
+    which is precisely a half-finished `REASSIGN OWNED`. Resolving once and pinning is strictly
+    stronger than the single constant was: the relaxation is WHICH owner a database may have, never
+    that it may have two.
+
     Re-pinned 2026-08-31: `ATTESTED_MIGRATION_VERSIONS` extended 0001-0009 -> 0001-0010 when
     `0010_retire_ptr_clone_app.sql` landed, with the reviewed-act paragraph that list requires. The
     attestor's own test caught the omission — the same way it caught `0009` shipping in `b9f775e`
@@ -221,7 +231,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '6b4a8f0be567db9c5dff7cd6f73ef09e5d6b281d4323e592913050440681c240'
+    '68ef62646046b56b236809f7cf4d9850b27e01c871172105ba00bf2e5dd3a894'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -252,7 +262,23 @@ const DIVERGED_FROM_IMPORT = new Map([
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
   ],
-  ['services/api/src/db/migrate.rs', '559b8f0ba1192475aa08b94c01a36b1a641b3beab8901722b10f842ad7cf197d'],
+  /*
+    Re-pinned 2026-08-31 (owner cutover): `EXPECTED_MIGRATOR_ROLE` was a single `&str`, which makes
+    the `ptr_clone` -> `tradingroom` owner rename a FLAG DAY — the database's ownership and the
+    deployed binary must change in the same instant, and in the window between them one of the two
+    refuses a healthy database. `ACCEPTED_MIGRATOR_ROLES` is that window, an ordered allow-list of
+    exactly two names, and `EXPECTED_MIGRATOR_ROLE` remains what a cluster is PROVISIONED with.
+
+    The reviewed act, because this is the one place a reviewer will ask "is this the fail-open that
+    was taken out?": it is not. That one was a catalogue lookup — `WHERE rolname IN ($1, $2) …
+    LIMIT 1` — returning role Y's posture when asked about role X. This is an equality test against
+    three facts about the current connection, checked together for ONE entry at a time, so a
+    connection authenticated as one accepted owner and executing as the other is refused. Measured
+    on a live PG 16.13 cluster through the `migrate` binary: `session_user=tradingroom,
+    current_user=ptr_clone` -> exit 1. The negative control rewrote it as "each fact is in the list"
+    and turned the unanimity test red on all four impersonation rows.
+  */
+  ['services/api/src/db/migrate.rs', '6057a6e5c9dfa8bf149b4c57954329bdc6d652224cb4bade027e4a96f3af9487'],
   /*
     Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half
     missed. Each was an untouched import until now, and each leaves the aggregate for its own pin

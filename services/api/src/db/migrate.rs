@@ -34,8 +34,63 @@ pub const BASELINE_VERSION: i64 = 1;
 pub const BASELINE_SHA256: &str =
     "c8baed853578437e18de0fae3406bfa1ee2791b2e625db8d13e2b72a51ac27d9";
 
-/// The only authenticated identity permitted to execute this migration chain.
-pub const EXPECTED_MIGRATOR_ROLE: &str = "ptr_clone";
+/// The owner identities permitted to execute this migration chain, most-preferred first.
+///
+/// ── WHY A SET, AND WHY THIS IS NOT THE FAIL-OPEN THAT WAS REMOVED ────────────────────────────
+///
+/// `TODO.md` prescribes the owner rename `ptr_clone` -> `tradingroom` as **"add, prove, cut over,
+/// retire — never rename"**, and names the withdrawn `0009_rename_runtime_roles` as the mistake to
+/// avoid. A single accepted name makes that impossible: it forces a FLAG DAY, where the database's
+/// ownership and this binary have to change in the same instant. Between them there is a window in
+/// which either the old binary refuses the new owner or the new binary refuses the old one, and
+/// every deploy in that window fails closed on a database that is perfectly healthy.
+///
+/// So the cutover window is expressed here, as an ordered allow-list, and it is deliberately TWO
+/// entries and not "any role that looks like an owner".
+///
+/// **This is not the tolerance that was taken out of the runtime-role preflight**, and the
+/// difference is the reason that one failed open and this one cannot. That one was a CATALOGUE
+/// LOOKUP — `WHERE rolname IN ($1, $2) ORDER BY (rolname = $2) DESC LIMIT 1` — so asking about role
+/// X returned role Y's row whenever Y existed, and the posture of a role that was not there got
+/// reported under the name of one that was. There is no lookup here. This is an equality test
+/// against three facts the server states about the CURRENT connection, and the three must name the
+/// same accepted entry as each other:
+///
+/// ```text
+///   system_user   scram-sha-256:tradingroom   who authenticated
+///   session_user  tradingroom                 who connected
+///   current_user  tradingroom                 who is executing
+/// ```
+///
+/// A connection authenticated as `tradingroom` that has done `SET ROLE ptr_clone` names two
+/// different entries and is REFUSED, exactly as it was when the list had one entry.
+/// `validate_migrator_identity` enforces that unanimity, and
+/// `the_migrator_allow_list_requires_all_three_facts_to_name_the_same_role` is its negative control.
+///
+/// `migration_reappliability.rs` asserts on this module's source that the runtime-role posture query
+/// never grows a second bound name again. That assertion is untouched and still passes: it names the
+/// `ORDER BY (runtime_role.rolname = $2) DESC` shape, which is the lookup, and the list below is not
+/// one.
+pub const ACCEPTED_MIGRATOR_ROLES: [&str; 2] = [
+    // The target name. Preferred, so a cluster that has cut over is the normal case rather than
+    // the exception.
+    "tradingroom",
+    // The name `0001_baseline.sql` creates, at the line this module's `BASELINE_SHA256` pins. Every
+    // database that exists today is owned by it, and it is the LAST entry to be removed — after the
+    // runbook's cut-over and retire steps have run on every database in the cluster.
+    "ptr_clone",
+];
+
+/// The owner a cluster provisioned TODAY still gets, and the name every existing database uses.
+///
+/// Separate from [`ACCEPTED_MIGRATOR_ROLES`] on purpose: that list is what a running chain will
+/// ACCEPT, while this is what the provisioner CREATES and what the release attestation records as
+/// the expected owner on a cluster that has not cut over. Conflating "what we accept" with "what we
+/// make" is what turns a staged cutover back into a rename.
+///
+/// It moves to `"tradingroom"` in the cut-over commit, not before, and `ops/OWNER-ROLE-CUTOVER.md`
+/// is the runbook that says when.
+pub const EXPECTED_MIGRATOR_ROLE: &str = ACCEPTED_MIGRATOR_ROLES[1];
 
 /// The login the application authenticates as at runtime.
 ///
@@ -213,18 +268,29 @@ fn validate_migrator_identity(
     system_user: Option<&str>,
     session_role: &str,
     current_role: &str,
-    expected: &str,
+    accepted: &[&str],
 ) -> Result<(), MigrateError> {
-    let authenticated_as_expected = system_user
-        .and_then(|identity| identity.split_once(':'))
-        .is_some_and(|(method, identity)| !method.is_empty() && identity == expected);
+    /*
+      UNANIMITY, not "each fact is somewhere in the list".
 
-    if authenticated_as_expected && session_role == expected && current_role == expected {
-        return Ok(());
+      The three facts are checked together for one accepted entry at a time, so a connection that
+      authenticated as one owner and did `SET ROLE` to another names two entries and matches none.
+      Checking them independently against the list would accept exactly that — which is the
+      privilege-expansion shape the three-fact check exists to refuse, and the reason a superuser
+      cannot satisfy it by impersonating the owner.
+    */
+    for expected in accepted {
+        let authenticated_as_expected = system_user
+            .and_then(|identity| identity.split_once(':'))
+            .is_some_and(|(method, identity)| !method.is_empty() && identity == *expected);
+
+        if authenticated_as_expected && session_role == *expected && current_role == *expected {
+            return Ok(());
+        }
     }
 
     Err(MigrateError::UnexpectedMigratorIdentity {
-        expected: expected.to_owned(),
+        expected: accepted.join(" or "),
         session_role: session_role.to_owned(),
         current_role: current_role.to_owned(),
     })
@@ -272,7 +338,7 @@ fn validate_runtime_role_posture(
 
 async fn preflight_for_roles_on_connection(
     connection: &mut PgConnection,
-    expected_migrator: &str,
+    accepted_migrators: &[&str],
     expected_runtime: &str,
     absent_runtime_role: AbsentBaselineRole,
 ) -> Result<(), MigrateError> {
@@ -284,7 +350,7 @@ async fn preflight_for_roles_on_connection(
         system_user.as_deref(),
         &session_role,
         &current_role,
-        expected_migrator,
+        accepted_migrators,
     )?;
 
     // EXACTLY ONE NAME, and that is a security property rather than a simplification.
@@ -354,6 +420,9 @@ pub async fn preflight_for_tests(
     expected_migrator: &str,
     expected_runtime: &str,
 ) -> Result<(), MigrateError> {
+    // ONE name here, not the allow-list. This entry point exists so a test can name the exact role
+    // it provisioned and see it accepted or refused on its own; handing it the production list would
+    // let a fixture pass because the real owner happens to exist on the same cluster.
     let mut connection = pool.acquire().await?;
     // `Refuse`, always. This entry point exists to exercise the fence with isolated role fixtures,
     // and the fixtures are named roles that no migration ledger knows about — so the retirement
@@ -361,7 +430,7 @@ pub async fn preflight_for_tests(
     // would stop asserting the absent case on any database that has run its chain.
     preflight_for_roles_on_connection(
         &mut connection,
-        expected_migrator,
+        &[expected_migrator],
         expected_runtime,
         AbsentBaselineRole::Refuse,
     )
@@ -396,7 +465,7 @@ pub async fn run(pool: &PgPool) -> Result<(), MigrateError> {
         baseline_role_absence_policy(baseline_migration_is_applied(&mut connection).await?);
     preflight_for_roles_on_connection(
         &mut connection,
-        EXPECTED_MIGRATOR_ROLE,
+        &ACCEPTED_MIGRATOR_ROLES,
         BASELINE_PROVISIONED_ROLE,
         absent_baseline_role,
     )
@@ -472,7 +541,7 @@ mod tests {
             Some("scram-sha-256:ptr_clone"),
             EXPECTED_MIGRATOR_ROLE,
             EXPECTED_MIGRATOR_ROLE,
-            EXPECTED_MIGRATOR_ROLE,
+            &[EXPECTED_MIGRATOR_ROLE],
         )
         .expect("the exact authenticated owner is accepted");
 
@@ -503,7 +572,7 @@ mod tests {
                 system_user,
                 session_role,
                 current_role,
-                EXPECTED_MIGRATOR_ROLE,
+                &[EXPECTED_MIGRATOR_ROLE],
             ) {
                 Err(MigrateError::UnexpectedMigratorIdentity {
                     expected,
@@ -517,6 +586,119 @@ mod tests {
                 other => panic!("expected a migrator-identity error, got {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn the_migrator_allow_list_accepts_either_owner_during_the_cutover() {
+        /*
+          The whole point of the list: BOTH names work while a cluster is being cut over, so the
+          database's ownership and this binary do not have to change in the same instant.
+        */
+        for owner in ACCEPTED_MIGRATOR_ROLES {
+            validate_migrator_identity(
+                Some(&format!("scram-sha-256:{owner}")),
+                owner,
+                owner,
+                &ACCEPTED_MIGRATOR_ROLES,
+            )
+            .unwrap_or_else(|error| {
+                panic!("{owner} must be accepted during the cutover: {error:?}")
+            });
+        }
+    }
+
+    #[test]
+    fn the_migrator_allow_list_requires_all_three_facts_to_name_the_same_role() {
+        /*
+          THE NEGATIVE CONTROL FOR THE LIST, and the reason it is checked entry by entry rather than
+          fact by fact.
+
+          A connection that authenticated as one accepted owner and then did `SET ROLE` to the other
+          names two entries. Every individual fact is "in the list", and the connection is still an
+          impersonation — precisely the privilege-expansion shape the three-fact check exists to
+          refuse. Checking each fact against the list independently would accept all four rows below,
+          and each of them would be a role acting under an authority it did not authenticate with.
+        */
+        let [new_owner, old_owner] = ACCEPTED_MIGRATOR_ROLES;
+
+        for (system_user, session_role, current_role) in [
+            (
+                Some(format!("scram-sha-256:{new_owner}")),
+                new_owner,
+                old_owner,
+            ),
+            (
+                Some(format!("scram-sha-256:{new_owner}")),
+                old_owner,
+                old_owner,
+            ),
+            (
+                Some(format!("scram-sha-256:{old_owner}")),
+                new_owner,
+                new_owner,
+            ),
+            (
+                Some(format!("scram-sha-256:{old_owner}")),
+                old_owner,
+                new_owner,
+            ),
+        ] {
+            let outcome = validate_migrator_identity(
+                system_user.as_deref(),
+                session_role,
+                current_role,
+                &ACCEPTED_MIGRATOR_ROLES,
+            );
+            assert!(
+                matches!(
+                    outcome,
+                    Err(MigrateError::UnexpectedMigratorIdentity { .. })
+                ),
+                "a connection authenticated as {system_user:?} running as \
+                 session={session_role}/current={current_role} names two different accepted owners \
+                 and must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn the_migrator_allow_list_is_an_allow_list_and_not_a_shape() {
+        /*
+          Deny by default, stated. A third name — however owner-shaped — is refused, so the list
+          shrinking back to one entry after the cutover is a deletion rather than a rewrite.
+        */
+        for stranger in [
+            "postgres",
+            "tradingroom_app",
+            "ptr_clone_app",
+            "tradingroom_owner",
+        ] {
+            let outcome = validate_migrator_identity(
+                Some(&format!("scram-sha-256:{stranger}")),
+                stranger,
+                stranger,
+                &ACCEPTED_MIGRATOR_ROLES,
+            );
+            assert!(
+                matches!(
+                    outcome,
+                    Err(MigrateError::UnexpectedMigratorIdentity { .. })
+                ),
+                "{stranger} is not an accepted migration owner"
+            );
+        }
+
+        assert_eq!(
+            ACCEPTED_MIGRATOR_ROLES.len(),
+            2,
+            "the cutover window is exactly two names wide; a third is a new decision, not a tweak"
+        );
+        assert_eq!(
+            EXPECTED_MIGRATOR_ROLE, "ptr_clone",
+            "EXPECTED_MIGRATOR_ROLE is what a cluster is PROVISIONED with and what the release \
+             attestation expects on a database that has not cut over. It moves to `tradingroom` in \
+             the cut-over commit, with ops/OWNER-ROLE-CUTOVER.md, and not before."
+        );
     }
 
     #[test]
