@@ -20,6 +20,31 @@ export const kitConfig = {
   preprocess: vitePreprocess(),
   adapter: adapter(),
   /*
+    RUNES MODE, FOR EVERY COMPONENT, ENFORCED BY THE COMPILER.
+
+    Svelte 5 decides mode per FILE: a component that uses a rune is in runes mode, and one that does
+    not is in legacy mode and compiles happily. So `export let`, `$:`, `on:click`, `<slot>` and
+    `$$props` are not errors in this project by default — they are a different dialect the compiler
+    still accepts, and neither `svelte-check` nor eslint objects to a new component written entirely
+    in it.
+
+    Measured 2026-08-31 before setting this, because a flag that breaks the build is worse than the
+    drift it prevents: across the 48 shipped components here and 129 in the room, with comments
+    stripped, there are **zero** legacy constructs. Every raw match is inside a comment, where this
+    repository quotes the reference and the migration guide constantly.
+
+    The docs are explicit about what it buys: *"Once a component is in runes mode (which you can opt
+    into by using runes, or by explicitly setting the `runes: true` compiler option), legacy mode
+    features are no longer available"* (`svelte/legacy-overview`). The one dependency here that ships
+    components — `@threlte/core`, four `.svelte` files — is runes-native already; all four use
+    `$props()` and none uses `export let`, checked before this was set.
+
+    Negative control, run in the room where the same flag landed first: an `export let` added to one
+    component takes the build from exit 0 to exit 1 with *"Cannot use `export let` in runes mode —
+    use `$props()` instead"*. A flag whose effect is not observed is a flag nothing reads.
+  */
+  compilerOptions: { runes: true },
+  /*
     NO `alias`, removed 2026-08-17 with the last `$lib` specifier it existed for.
 
     It held `{ $lib: 'src/lib' }` as a deliberate shim through the Kit 3 upgrade, under a note saying

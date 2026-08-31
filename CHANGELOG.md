@@ -33,6 +33,80 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 07:34 UTC — runes mode is now enforced by the compiler, in both apps
+
+**Runtime impact: NO for behaviour, YES for the build** — a compiler option, and legacy Svelte 4
+syntax is now a build error rather than a dialect the compiler quietly accepts.
+
+**Svelte 5 decides mode per FILE.** A component that uses a rune is in runes mode; one that does not
+is in legacy mode and compiles happily. So `export let`, `$:`, `on:click`, `<slot>` and `$$props`
+were not errors in this project — they were a different dialect, and neither `svelte-check` nor
+eslint objects to a new component written entirely in it. Nothing was stopping the next component
+from being a Svelte 4 component.
+
+**Measured before setting the flag, because a flag that breaks the build is worse than the drift it
+prevents.** Across **129** shipped components in the room and **48** in the controller, with comments
+stripped: **zero** legacy constructs. The ~380 raw matches are all inside comments, where this
+repository quotes the reference and the migration guide constantly — the same false-coverage trap
+`reference-const-coverage-contract` measures from the other direction, and the reason the first
+unstripped sweep looked alarming.
+
+`compilerOptions: { runes: true }` on the `sveltekit(...)` plugin, which is Kit 3's own documented
+shape — `@sveltejs/kit`'s installed types carry that exact example at `types/index.d.ts:2122`. The
+docs are explicit about what it buys: *"Once a component is in runes mode … legacy mode features are
+no longer available"* (`svelte/legacy-overview`). A contract test could sweep for the same
+constructs; the compiler refusing to emit them is strictly stronger and costs nothing to maintain.
+
+**Both negative controls seen RED, which is the whole proof the flag is not decoration.** An
+`export let` added to a room component: build exit 1, *"Cannot use `export let` in runes mode — use
+`$props()` instead"*. A `$:` added to a controller component: build exit 1, *"`$:` is not allowed in
+runes mode, use `$derived` or `$effect` instead"*. Before the flag both compiled. The one dependency
+that ships components, `@threlte/core`, was checked first: four `.svelte` files, all four on
+`$props()`, none on `export let`.
+
+### 2026-09-01 07:33 UTC — the conformance audit named a framework major this repository does not run
+
+**Runtime impact: NO** — a version correction, a reversed decision marked, two stale claims removed
+and gated.
+
+`docs/SVELTE-CONFORMANCE-AUDIT.md` is the file whose own header says to read it *"before changing
+framework, route, component, environment, or server-boundary code"*. Its title read **"Svelte 5 /
+SvelteKit 2"** and its baseline **"Svelte 5.56.8, SvelteKit 2.70.2"**. Measured from `package.json`:
+**Svelte 5.57.0, SvelteKit 3.0.0-next.25, adapter-vercel 7.0.0-next.8, TypeScript 6.0.3, Vite
+8.2.2** — a month stale and one MAJOR behind.
+
+Worse, §7 still states an implementation decision in the present tense: *"this repository remains on
+pinned stable Kit `2.70.2`"*. **That decision was taken on 2026-08-02 and reversed on 2026-08-13.**
+It is marked at the decision rather than rewritten, because a decision made and then overturned is a
+different fact from one never made.
+
+**What the correction does NOT claim.** The 196-path documentation retrieval that file records was
+not repeated, and saying it was would be worth less than saying it was not. What a Kit 3 re-review
+owes is named instead so nobody has to guess: `svelte.config.js` no longer exists and four passages
+still describe configuration the old way, plus form actions, `$app/stores` vs `$app/state`, and the
+adapter majors.
+
+**Two stale claims found by sweeping for the shape rather than by reading.** Both apps'
+`declaration-tag-contract.test.ts` said *"`package.json` pins 5.56.10"* — the same sentence twice,
+neither load-bearing, neither ever read by anything. Both now READ the pin and assert the FLOOR the
+feature needs (5.56, where declaration tags arrived), which survives every upgrade a quoted version
+does not.
+
+`svelte-version-claims-contract.test.ts`, in both apps, keeps it that way — and its scope is the
+interesting part. It catches a CLAIM ABOUT THE PIN and nothing else, because this repository is full
+of dated observations (*"as of `3.0.0-next.23`"*, *"RE-READ against `3.0.0-next.23`"*,
+*"`svelte@5.57.0`'s emitted module"*) that record which version was examined. Forcing those to equal
+today's pin would destroy the evidence they carry. **A control proves the distinction holds**: a
+fresh pin claim fails, a dated observation passes.
+
+**And the gate flagged the record of the defect it was written for, on its first run** — the
+corrected docblock quoted the retired claim, and the phrasing is the trigger. The history is worth
+keeping and the number IS the evidence, so the sentence was rephrased rather than the rule widened to
+guess at intent. That is the third self-reference of the day, after the const sweep reading its own
+table and the citation sweep reading its own account of a bad path.
+
+Room gate exit 0 (315 files / 5,686 passed), controller gate exit 0 (104 files / 1,105 passed).
+
 ### 2026-09-01 06:48 UTC — the citation sweep ran on the controller and found four wrong pointers in one pass
 
 **Runtime impact: NO** — one contract per app, four citations corrected, two given the measurement

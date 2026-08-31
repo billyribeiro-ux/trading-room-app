@@ -1,9 +1,34 @@
-# Svelte 5 / SvelteKit 2 conformance audit
+# Svelte 5 / SvelteKit conformance audit
 
 Status: **agent-facing implementation reference**  
 Audit date: **2026-08-02**  
-Repository baseline: Svelte 5.56.8, SvelteKit 2.70.2, adapter-vercel 6.3.4,
+Baseline AT THAT DATE: Svelte 5.56.8, SvelteKit 2.70.2, adapter-vercel 6.3.4,
 TypeScript strict mode, pnpm 11.18.0
+
+> ## ⛔ VERSION CORRECTION, 2026-08-31 — this file's baseline is a MONTH old and one major behind
+>
+> Measured from `package.json` rather than remembered: this repository now runs **Svelte 5.57.0,
+> SvelteKit 3.0.0-next.25, adapter-vercel 7.0.0-next.8, TypeScript 6.0.3, Vite 8.2.2** — both apps,
+> identical pins. The title said "SvelteKit 2" and §7's implementation decision still says this
+> repository "remains on pinned stable Kit `2.70.2`". **That decision was taken on 2026-08-02 and
+> reversed on 2026-08-13**, and the reversal is marked at the decision itself rather than by editing
+> it away, because a decision that was made and then overturned is a different fact from one that
+> was never made.
+>
+> **What this means for a reader, stated precisely, because the honest answer is not "ignore this
+> file".** Its findings were reached against Kit 2 and the great majority are framework-version
+> independent: repository placement, server-only modules, the environment-variable boundary,
+> accessibility, SEO, error handling. What a Kit 3 re-review owes is narrower and is named here so
+> nobody has to guess: `svelte.config.js` no longer exists (Kit 3 takes configuration through
+> `sveltekit(...)` in `vite.config.ts`, which four passages here still describe the old way), form
+> actions, `$app/stores` vs `$app/state`, and the adapter majors. **This correction does not claim to
+> be that re-review** — the 196-path documentation retrieval this file records was not repeated, and
+> saying it was would be worth less than saying it was not.
+>
+> `svelte-version-claims-contract.test.ts` now checks that no file under `src/` states what
+> `package.json` pins as a literal. It deliberately does not police THIS file: a dated audit record
+> quoting the versions it was run against is correct, and gating it would force history to be
+> rewritten every upgrade.
 
 Read this after `docs/ENGINEERING-SSOT.md` and before changing framework,
 route, component, environment, or server-boundary code. The SSOT remains the
@@ -321,6 +346,13 @@ and the linked
 were read before this implementation decision. SvelteKit 3 is explicitly a
 `@next` preview, so this repository remains on pinned stable Kit `2.70.2`; mixing
 preview conventions into the stable application would not be a best practice.
+
+> **REVERSED 2026-08-13.** Both apps moved to `@sveltejs/kit` `3.0.0-next.25`, with
+> `adapter-vercel` `7.0.0-next.8` and `adapter-node` `6.0.0-next.10`. The decision above is left
+> standing rather than rewritten because it was correct on the evidence it had, and the reason it
+> changed is a fact about the project: `svelte.config.js` was removed by Kit 3 and the room's
+> configuration moved into `sveltekit(...)`, which is what several passages in this file still
+> describe the old way. See the version correction at the top.
 
 Stable-release findings applicable now:
 
