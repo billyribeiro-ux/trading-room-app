@@ -213,10 +213,27 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   /*
     ONE — SURFACES THIS ROOM HAS NOT BUILT AT ALL.
 
-    `app-session-transcript` is the clearest result the sweep produced: eighty values, twenty-eight of
+    `app-session-transcript` is the clearest result the sweep produced: eighty values, twenty-seven of
     them absent, and the absent ones are the whole component — its container, its header, its date
     picker, its pagination and its entries. Nothing in this repository renders a transcript list. It
-    is named in no tracker row, and it was found by measurement rather than by reading.
+    was named in no tracker row, and it was found by measurement rather than by reading.
+
+    ## Traced on 2026-08-31, and it is an OWNER DECISION rather than work
+
+    The component (byte 2,611,020) is a STANDALONE PAGE opened in its own window — it reads `token`
+    and `name` off the location hash, posts `transcriptWindowClosing` back to `window.opener`, and
+    pages a date-filtered archive through `getSessionTranscripts(token, {startDate, page, limit})` at
+    300 rows a page. What it renders is a stored history of everything anybody SAID in a session.
+
+    **This room relays captions and stores none of them, deliberately, at both layers.**
+    `room/recording.ts` sends each result straight down the signalling socket, and
+    `services/media/src/server.rs` handles `sendSpeechReco` by checking `may_produce`, bounding the
+    text, and calling `notify_room` — a relay, with no write anywhere.
+
+    Building the viewer therefore means first deciding to record every spoken word of every session to
+    disk. In a multi-tenant fintech application that is a retention, consent and jurisdiction question
+    and it belongs to the owner, not to a sweep closing a gap. **The twenty-seven values stay listed,
+    with this reason, rather than being built or quietly excluded.**
   */
   'app-session-transcript': [
     'transcript-container',
@@ -407,6 +424,25 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'fa-clock',
     'fa-exclamation-circle'
   ],
+  /*
+    TRACED VALUE BY VALUE ON 2026-08-31, and none of the seven is work. Written out because the group
+    heading above would otherwise read them as unfinished, which is what the heading itself got wrong.
+
+    - `#scheduledAlertsModal` is group three, a `data-bs-target`.
+    - `alert-text-label` is the id of the "Text this out?" checkbox (`VTe`, byte 2,118,282, model
+      `sendText`) and `alert-dont-cross-post-label` is "Don't cross post to linked alert rooms"
+      (`WTe`, byte 2,119,672, model `dontCrossPost`). Both are in `direct-evidence-contract.ts`'s
+      `hiddenCapabilityBranches`: no capture this repository holds ever rendered either, and the
+      features behind them — Twilio SMS and the linked-room fan-out — are both blocked outright.
+    - `sendLaterAsEmail` and `sendLaterAsNick` are `PAM-10`'s REFUSAL, argued in
+      `ScheduledAlerts.svelte`: upstream's form lets a presenter post an alert under someone else's
+      name and address, so those two fields are not on the wire here and the server derives the
+      sender from the session.
+    - `alert-send-later-time` and `ignoreWeekendsChk` are ids this room does not need. Upstream pairs
+      each control with a separate `<label for>`; ours WRAPS the input in its label, which associates
+      them without an id at all. A better association, not a missing one — and the only one of the
+      seven that had no reason on record anywhere before this note.
+  */
   'app-post-alert-modal': [
     '#scheduledAlertsModal',
     'alert-text-label',

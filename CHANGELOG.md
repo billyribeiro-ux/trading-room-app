@@ -33,6 +33,41 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 03:52 UTC — two more residual blocks traced: one owner decision, one already-argued set
+
+**Runtime impact: NO** — findings recorded at the code and in the tracker. No shipping file changed.
+
+**`app-session-transcript`, 27 values — an OWNER DECISION, and deliberately not started.** The
+component at bundle byte 2,611,020 is a standalone page opened in its own window: it reads `token` and
+`name` off the location hash, posts `transcriptWindowClosing` back to `window.opener`, and pages a
+date-filtered archive through `getSessionTranscripts(token, {startDate, page, limit})` at 300 rows a
+page. What it renders is a stored history of everything anybody SAID in a session.
+
+This room relays captions and stores none of them, deliberately, at BOTH layers — `room/recording.ts`
+sends each result down the signalling socket, and `services/media/src/server.rs` handles
+`sendSpeechReco` by checking `may_produce`, bounding the text and calling `notify_room`, with no write
+anywhere. Building the viewer means first deciding to record every spoken word of every session to
+disk, which in a multi-tenant fintech application is a retention, consent and jurisdiction question and
+belongs to the owner rather than to a sweep closing a gap. The values stay listed with that reason
+rather than being built or quietly excluded.
+
+**`app-post-alert-modal`, 7 values — traced, and none is work.** `#scheduledAlertsModal` is a
+`data-bs-target`. `alert-text-label` and `alert-dont-cross-post-label` are the ids of "Text this out?"
+(`VTe`, byte 2,118,282, model `sendText`) and "Don't cross post to linked alert rooms" (`WTe`, byte
+2,119,672, model `dontCrossPost`) — both in `hiddenCapabilityBranches`, and the features behind them,
+Twilio SMS and the linked-room fan-out, are blocked outright. `sendLaterAsEmail` and `sendLaterAsNick`
+are `PAM-10`'s refusal, because upstream's form lets a presenter post under someone else's name and
+address.
+
+**One of the seven had no reason on record anywhere, and now does.** `alert-send-later-time` and
+`ignoreWeekendsChk` are ids this room does not need: upstream pairs each control with a separate
+`label for`, and ours WRAPS the input inside its label, which associates them without an id at all. A
+better association rather than a missing one — but nothing said so, so a reader of the gap map would
+have taken it for unfinished work, which is exactly the mistake the previous entry corrected.
+
+Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
+skipped.
+
 ### 2026-09-01 03:24 UTC — the archived chat log can be READ, which is the half of the archive that was never built
 
 **Runtime impact: YES** — a new presenter-only remote query, a new view inside the chat-logs modal,

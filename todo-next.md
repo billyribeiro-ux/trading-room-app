@@ -247,9 +247,42 @@ Two more residuals are **reference DEFECTS, correctly not transcribed**: five co
 literal text of an expression; and `data-ng-dblclick="fullScreen()"` on the webcam screen is an
 AngularJS 1 attribute in an Angular 17 template that no runtime reads.
 
-**The largest unexamined blocks are the ones to work next:** `app-session-transcript` (26 of 28),
-`app-session-login` (29 of 32, and out of scope by decision), `app-session-control-modal` (11 of 13),
-`app-alert-send-report-modal` (7 of 15), and the two log modals (6 of 6 each).
+### Worked since, and what each turned out to be
+
+**The two log modals — 12 of the 12 CLOSED, by building the feature they belonged to.** All six values
+in each were one view: `toggleShowLogs`, the archived-log viewer, which this room had never built. It
+could sweep an archive and restore one and could not look inside either. Built 2026-08-31 —
+`readChatArchiveLog`, `RoomChatArchiveLog`, `ChatArchiveLogPane.svelte`, nine negative controls. Three
+of `app-alert-send-report-modal`'s went with them: `search-addon`, `Enter search term` and `btn-ligth`
+were shared. **146 residuals to 130, 33 fully-covered components to 35.**
+
+**`app-session-transcript` — 27 values, and it is an OWNER DECISION, not work.** The component (byte
+2,611,020) is a standalone page opened in its own window: it reads `token` and `name` off the location
+hash, posts `transcriptWindowClosing` back to `window.opener`, and pages a date-filtered archive
+through `getSessionTranscripts(token, {startDate, page, limit})` at 300 rows a page. What it renders is
+a stored history of everything anybody SAID in a session.
+
+This room relays captions and stores none of them, deliberately, at BOTH layers — `room/recording.ts`
+sends each result down the signalling socket, and `services/media/src/server.rs` handles
+`sendSpeechReco` by checking `may_produce`, bounding the text and calling `notify_room`, with no write
+anywhere. So building the viewer means first deciding to record every spoken word of every session to
+disk, which in a multi-tenant fintech application is a retention, consent and jurisdiction question and
+is the owner's. **⛔ OWNER DECISION — not started, and deliberately.**
+
+**`app-post-alert-modal` — 7 values, traced, none of them work.** `#scheduledAlertsModal` is a
+`data-bs-target`. `alert-text-label` and `alert-dont-cross-post-label` are the ids of "Text this out?"
+(`VTe`, byte 2,118,282, model `sendText`) and "Don't cross post to linked alert rooms" (`WTe`, byte
+2,119,672, model `dontCrossPost`) — both in `direct-evidence-contract.ts`'s `hiddenCapabilityBranches`,
+and the features behind them (Twilio SMS, linked-room fan-out) are blocked outright.
+`sendLaterAsEmail`/`sendLaterAsNick` are `PAM-10`'s refusal: upstream's form lets a presenter post
+under someone else's name and address. `alert-send-later-time` and `ignoreWeekendsChk` are ids this
+room does not need, because ours WRAPS each input in its label rather than pairing them by id — a
+better association, and the only one of the seven that had no reason on record anywhere.
+
+**Still to work, largest first:** `app-session-control-modal` (11 of 13, mostly `data-bs-target`),
+`app-alert-send-report-modal` (7 of 12, the `RPT-*` refusal), `app-user-info-modal` (6 of 10),
+`app-closed-session-page` (3), `app-note` (2), `app-rec-preview` (2), `app-screenshare-view` (1). And
+`app-session-login` (29 of 32), which is account management and lives on the CONTROLLER.
 
 **The comment stripping in that file is load-bearing and its own case proves it on every run.** This
 repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where
