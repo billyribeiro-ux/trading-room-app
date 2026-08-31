@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { globSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
 
@@ -22,12 +22,51 @@ import { describe, expect, it } from 'vitest';
   script block where it is inert.
 */
 
-const templates = globSync('src/**/*.svelte', { cwd: process.cwd() });
+/*
+  BOTH APPS, from one place — widened 2026-08-31, and the argument is `browser-dialog-contract`'s.
+
+  This globbed every template under `src` against `process.cwd()`, so it scanned whichever app vitest
+  was running in: the room. (The glob pattern is deliberately not quoted here — a `*` followed by a
+  `/` ends this block comment, which is this rule's own failure one layer up, and it happened while
+  writing this paragraph.) The controller has the same templates, quoting the same captured Angular
+  markup full of `<!---->` anchors, and nothing checked it.
+
+  Measured before the change rather than after: the controller is clean on both rules today — zero
+  nested markers, zero orphan closers. That is exactly the condition worth closing, in the words
+  `browser-dialog-contract` already uses for the same decision: *"clean by discipline is one careless
+  import away from not being clean, and the standard asks for clean by construction."*
+
+  `CLAUDE.md` is the ROOT standard and binds both apps. Two half-gates would let this land in
+  whichever app the author was not thinking about — and the failure this rule exists for SHIPPED
+  once, rendering paragraphs of prose and a stray `-->` inside `<ul id="mainTabs">` while
+  `svelte-check` and the whole suite stayed green.
+
+  The cost is that a controller edit can turn the room suite red. That is the correct outcome for a
+  repository-wide rule, and the offender paths below name the app.
+*/
+const REPOSITORY_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+
+const templates = (['room', 'controller'] as const).flatMap((app) => {
+  const root = `${REPOSITORY_ROOT}apps/${app}/src/`;
+  return globSync('**/*.svelte', { cwd: root }).map((file) => `${root}${file}`);
+});
 
 describe('svelte template comments', () => {
   it('finds template files to check', () => {
     // A glob that silently matches nothing would make every assertion below vacuous.
     expect(templates.length).toBeGreaterThan(5);
+
+    /*
+      And BOTH roots, separately. One glob answering for the pair would let a wrong path in either
+      one pass on the other's files — which is the failure a two-app guard has and a one-app guard
+      cannot.
+    */
+    for (const app of ['room', 'controller']) {
+      expect(
+        templates.filter((path) => path.includes(`apps/${app}/src/`)).length,
+        `no templates were found for apps/${app}`
+      ).toBeGreaterThan(5);
+    }
   });
 
   it('never nests a comment marker inside an HTML comment', () => {

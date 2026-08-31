@@ -33,6 +33,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 04:25 UTC — A repo-wide rule that held in one app, and four sweeps that found nothing
+
+**Runtime impact: NO.** What changed is which app a rule is enforced in.
+
+**Nine of the room's structural guards were checked for a controller equivalent, and only one turned
+out to have it.** `browser-dialog-contract.test.ts` already scans BOTH apps from one place, with its
+own argument written at the top: *"`CLAUDE.md` is the ROOT standard and binds both apps; two
+half-gates would let a violation land in whichever app the author was not thinking about."* The other
+eight scan the room alone.
+
+So each was measured against the controller before anything was written:
+
+| rule | controller |
+| --- | --- |
+| nested comment markers / orphan closers | **0** — and it is the one whose failure SHIPPED, so it is now widened |
+| `{#each}` with no key | 0 |
+| runes in a plain `.ts` instead of `.svelte.ts` | 0 |
+| bare `window.confirm` / `alert` / `prompt` | 0 — every call goes through `bootbox`, the project's primitive |
+| `<img>` with no intrinsic box | 0 real, 6 apparent — see below |
+
+**`comment-safety-contract.test.ts` now scans both apps.** It globbed against `process.cwd()`, so it
+scanned whichever app vitest was running in. The controller quotes the same captured Angular markup
+full of `<!---->` anchors and nothing checked it — while the failure it exists for has actually
+shipped once, rendering paragraphs of prose and a stray `-->` inside `<ul id="mainTabs">` with
+`svelte-check` and the whole suite green.
+
+The vacuity floor asserts BOTH roots separately, because one glob answering for the pair would let a
+wrong path in either one pass on the other's files.
+
+**Two negative controls, and the second was invalid first.** A nested marker planted in the
+controller's `Editable.svelte` went red immediately. The orphan-closer control came back **GREEN** —
+because the mutation had inserted a second `<script>` block, so the file no longer parsed, and the
+rule deliberately skips a file the compiler will complain about itself. A non-compiling mutation is
+not a control. Redone as an orphan `-->` in template position on a file that still parses: red.
+
+**And this file's own docblock terminated itself while being written.** A `*` followed by a `/`
+inside the new `/* */` paragraph ended the comment early — this rule's exact failure, one layer up,
+in the file that guards it. The pattern is described rather than quoted now, and the incident is
+recorded there.
+
+#### The `<img>` sweep, measured rather than assumed
+
+Six controller `<img>` tags carry no `width`/`height`/`aspect-ratio`. None is a defect, and it took
+reading each rule to know that: `.acc-badge-img` and `.user-badge-img` pin `height` with
+`max-height: 20px`; `.mg-root .navLogo` pins `height: 25px` and caps width at 300px, and its call
+site already carries a comment saying so; `.acc-brand-logo[hidden]` is `display: none !important` on
+a tag with no `src`, so it never renders; and `.auth-upload-preview` is bounded at 125×125 and
+appears only in response to the user choosing a file — which is not the case the rule targets.
+
+`auth.css` is a pixel match of the reference with every value read from a capture and verified by
+`verify-room-login-contract.mjs`, so "fixing" that last one would have edited a measured value to
+satisfy a rule it does not violate.
+
+#### And one rule that reads stricter than it is
+
+`CLAUDE.md` says *"no template syntax appears inside a comment"*. Measured: the room has **34** such
+comments and the controller **6** — both apps document themselves by quoting Svelte blocks, both
+compile, `svelte-check` is silent, and 5,000 tests pass. The rule's own explanation names the real
+failure — *"`svelte-check` stayed green while a contract test went red on exactly this"* — which is a
+SOURCE-TEXT assertion being fooled by a quoted block, and is what `codeOf` exists for and is used for
+throughout. Nothing was changed; the 40 sites are the accepted practice, not a defect.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **291 files, 5,009 passed,
+1 skipped, gate-exit=0**.
+
 ### 2026-08-31 04:10 UTC — Five legacy declaration tags the controller's own migration missed
 
 **Runtime impact: NO in practice, and the reason it is not YES is luck rather than design.**
