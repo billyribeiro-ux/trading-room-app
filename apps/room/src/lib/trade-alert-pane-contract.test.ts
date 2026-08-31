@@ -106,13 +106,17 @@ describe('dta-04 — the paste confirm asks its question', () => {
     alert pane had it.
 
     **That is a defence against three copies, and the right fix was to stop having three.** The
-    dialog is `ImagePasteConfirm.svelte` now — one component with the heading in it, rendered by all
-    three call sites — so the property to assert is no longer "how many copies say it" but "the one
-    that all three use says it", plus "all three still use it". Both are below, and together they
-    are strictly stronger: the old count passed if two copies had the heading and a third had been
-    added without it, as long as the total reached three.
+    dialog is `ImagePasteConfirm.svelte` now — one component with the heading in it, rendered by
+    every call site — so the property to assert is no longer "how many copies say it" but "the one
+    they all use says it", plus "they all still use it". Both are below, and together they are
+    strictly stronger: the old count passed if two copies had the heading and a third had been added
+    without it, as long as the total reached three.
+
+    It also survives the set GROWING, which the old count could not: `PCC-06` added a fourth call
+    site on 2026-08-31 and the heading assertion did not have to move, because there is still one
+    dialog. Only the call-site count below did.
   */
-  it('asks the question, in the one dialog all three pastes now render', () => {
+  it('asks the question, in the one dialog every paste now renders', () => {
     const confirm = code('src/lib/components/ImagePasteConfirm.svelte');
     expect(confirm.match(/<h4>Upload this image\?<\/h4>/g)?.length).toBe(1);
   });
@@ -122,17 +126,33 @@ describe('dta-04 — the paste confirm asks its question', () => {
     expect(confirm.match(/style="max-height: 50vh;"/g)?.length).toBe(1);
   });
 
-  it('and all three pastes still reach it', () => {
+  it('and all FOUR pastes still reach it, each with its own handler', () => {
     /*
       The half the count used to buy. Each call site keeps its OWN `onconfirm`, because
       `doImggurUpload` dispatches on a feature name deny-by-default (byte 1,992,037) — sharing one
       handler is how an image meant for a form is posted into chat.
+
+      THREE became FOUR on 2026-08-31, with `PCC-06`: the private composer gained the `paste` binding
+      the reference has had all along, and its confirmation is a fourth instance for exactly the
+      reason the other three are separate. `onImagePaste` on `app-privchat` ends in
+      `doImggurUpload(s, c)` -> `sendPrivChat` (byte 2,211,249), so routing a private paste through
+      the chat composer's handler would post the screenshot into the ROOM rather than to one person.
+      That is the same failure the comment above describes, with the worst blast radius of the four.
+
+      The count is kept — rather than dropped as brittle — precisely because it is what fails when a
+      fifth call site is added without its own handler, which is the only way this can go wrong.
     */
     const overlays = code('src/lib/components/RoomOverlays.svelte');
-    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(3);
+    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(4);
     expect(overlays).toContain('onconfirm={() => void composer.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void swingAlerts.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void dayTradeAlerts.confirmImagePaste()}');
+    expect(overlays).toContain('onconfirm={() => void privateChat.confirmImagePaste()}');
+
+    /* Four instances, four DISTINCT confirm handlers — no two call sites sharing one. */
+    const handlers =
+      overlays.match(/onconfirm=\{\(\) => void (\w+)\.confirmImagePaste\(\)\}/g) ?? [];
+    expect(new Set(handlers).size).toBe(4);
   });
 });
 

@@ -598,6 +598,146 @@ describe('the composer s two behaviours that live in the class', () => {
   });
 });
 
+describe('PCC-06 — a pasted screenshot, executed against the class', () => {
+  /*
+    The markup half of this row is `private-chat-composer-v4-contract.test.ts`, which pins the const
+    entry, the binding and the four bundle facts below by value. This half executes the behaviour
+    those facts describe, because a `toContain` cannot tell you what order two strings end up in.
+
+    `URL.createObjectURL` and `revokeObjectURL` are not in jsdom's implementation of `URL`, so they
+    are stubbed — and COUNTED, because releasing the preview is half of what `cancelImagePaste`
+    exists to do and a stub that only silences the error would leave that untested.
+  */
+  const withObjectUrl = async <T>(run: (revoked: string[]) => Promise<T>): Promise<T> => {
+    const revoked: string[] = [];
+    const url = URL as unknown as Record<string, unknown>;
+    const priorCreate = url.createObjectURL;
+    const priorRevoke = url.revokeObjectURL;
+    let issued = 0;
+    url.createObjectURL = () => `blob:pm-${(issued += 1)}`;
+    url.revokeObjectURL = (value: string) => revoked.push(value);
+    try {
+      return await run(revoked);
+    } finally {
+      url.createObjectURL = priorCreate;
+      url.revokeObjectURL = priorRevoke;
+    }
+  };
+
+  const png = (name = 'shot.png') => new File(['x'], name, { type: 'image/png' });
+
+  it('seeds the dialog s message from the composer s TRIMMED draft', () =>
+    withObjectUrl(async () => {
+      const harness = make();
+      await harness.chat.switchToUser(9);
+      harness.chat.draft = '  look at this  ';
+      harness.chat.beginImagePaste(png());
+
+      /* `a = Ao("#textAreaTxtPM").val().trim()`, byte 2,212,274. */
+      expect(harness.chat.pastedImageMessage).toBe('look at this');
+      expect(harness.chat.pastedImage?.previewUrl).toBe('blob:pm-1');
+    }));
+
+  it('sends the URL FIRST and appends the message, which is the order that reads backwards', () =>
+    withObjectUrl(async () => {
+      const harness = make({ uploadUrls: ['/uploads/shot.png'] });
+      await harness.chat.switchToUser(9);
+      harness.chat.draft = 'look at this';
+      harness.chat.beginImagePaste(png());
+      await harness.chat.confirmImagePaste();
+
+      /* `imggurUploadTxt += " " + i` AFTER the link — byte 2,211,249, not message-then-link. */
+      expect(harness.sent).toEqual([{ peerId: 9, body: '/uploads/shot.png look at this' }]);
+    }));
+
+  it('sends the URL alone when nothing was typed, and does NOT clear the box', () =>
+    withObjectUrl(async () => {
+      const harness = make({ uploadUrls: ['/uploads/shot.png'] });
+      await harness.chat.switchToUser(9);
+      harness.chat.beginImagePaste(png());
+      /*
+        Typed DURING the upload, which is the case the conditional clear exists for: upstream
+        clears `#textAreaTxtPM` only on the branch that had a message to carry, so a draft started
+        while the dialog was open survives.
+      */
+      harness.chat.draft = 'typed while it uploaded';
+      await harness.chat.confirmImagePaste();
+
+      expect(harness.sent).toEqual([{ peerId: 9, body: '/uploads/shot.png' }]);
+      expect(harness.chat.draft).toBe('typed while it uploaded');
+    }));
+
+  it('clears the box on the branch that DID carry a message', () =>
+    withObjectUrl(async () => {
+      const harness = make({ uploadUrls: ['/uploads/shot.png'] });
+      await harness.chat.switchToUser(9);
+      harness.chat.draft = 'carried';
+      harness.chat.beginImagePaste(png());
+      await harness.chat.confirmImagePaste();
+
+      expect(harness.chat.draft).toBe('');
+    }));
+
+  it('replaces a second paste and RELEASES the first s preview', () =>
+    withObjectUrl(async (revoked) => {
+      const harness = make();
+      await harness.chat.switchToUser(9);
+      harness.chat.beginImagePaste(png('one.png'));
+      harness.chat.beginImagePaste(png('two.png'));
+
+      expect(revoked).toEqual(['blob:pm-1']);
+      expect(harness.chat.pastedImage?.previewUrl).toBe('blob:pm-2');
+      expect(harness.chat.pastedImage?.file.name).toBe('two.png');
+    }));
+
+  it('cancelling releases the preview and sends nothing', () =>
+    withObjectUrl(async (revoked) => {
+      const harness = make({ uploadUrls: ['/uploads/shot.png'] });
+      await harness.chat.switchToUser(9);
+      harness.chat.beginImagePaste(png());
+      harness.chat.cancelImagePaste();
+
+      expect(revoked).toEqual(['blob:pm-1']);
+      expect(harness.chat.pastedImage).toBeNull();
+      await harness.chat.confirmImagePaste();
+      expect(harness.sent).toEqual([]);
+    }));
+
+  it('says so when the upload fails, and sends nothing', () =>
+    withObjectUrl(async () => {
+      const harness = make({ uploadUrls: [] });
+      await harness.chat.switchToUser(9);
+      harness.chat.beginImagePaste(png());
+      await harness.chat.confirmImagePaste();
+
+      expect(harness.dialogs.alert).toBe('Upload Failed...');
+      expect(harness.sent).toEqual([]);
+    }));
+
+  it('goes through the SAME canPost gate as a typed message, with the same wording', () =>
+    withObjectUrl(async () => {
+      /*
+        The point of extracting `#post` from `send`. A muted member pasting a screenshot must get
+        the refusal a muted member typing gets — two senders with two copies of one gate is how they
+        come to disagree, and the upload must not happen either.
+      */
+      const harness = make({ canPost: false, uploadUrls: ['/uploads/shot.png'] });
+      await harness.chat.switchToUser(9);
+      harness.chat.beginImagePaste(png());
+      await harness.chat.confirmImagePaste();
+
+      expect(harness.dialogs.alert).toBe("Sorry, you can't post to this channel");
+      expect(harness.sent).toEqual([]);
+      /*
+        AND NOTHING WAS UPLOADED. The refusal happens before the upload rather than after it, so a
+        muted member's screenshot is never pushed to the upload server — see the note at
+        `confirmImagePaste`. Asserting only `sent` would pass on an implementation that uploaded the
+        file, left it on the host, and refused afterwards.
+      */
+      expect(harness.uploaded).toEqual([]);
+    }));
+});
+
 describe('the tab-title flash — G27', () => {
   /*
     `moderator-message-contract.test.ts` named this as one of two consumers deliberately unbuilt,

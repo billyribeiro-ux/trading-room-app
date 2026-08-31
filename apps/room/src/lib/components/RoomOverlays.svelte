@@ -917,6 +917,33 @@
   />
 {/if}
 <!--
+  `PCC-06` — the PASTE confirmation for the same conversation, and a FOURTH instance of this dialog
+  for the reason the three above are separate: `onImagePaste` at byte 2,212,274 ends in
+  `doImggurUpload(s, c)` on `app-privchat`, which sends through `sendPrivChat`. Routing a private
+  paste through the chat composer's handler would post the screenshot into the ROOM.
+
+  The textarea is the reference's own, and its id is the one thing that differs from the chat copy
+  above: `msg-text-pc`, not `msg-text`. Both are seeded with their own composer's trimmed text.
+-->
+{#if privateChat.pastedImage}
+  {const pmPastePreviewUrl = $derived(privateChat.pastedImage.previewUrl)}
+  <ImagePasteConfirm
+    previewUrl={pmPastePreviewUrl}
+    onclose={() => privateChat.cancelImagePaste()}
+    onconfirm={() => void privateChat.confirmImagePaste()}
+  >
+    <div class="w-100 mt-3">
+      <textarea
+        class="form-control w-100"
+        rows="2"
+        id="msg-text-pc"
+        name="msg-text-pc"
+        placeholder="Enter your message"
+        bind:value={privateChat.pastedImageMessage}></textarea>
+    </div>
+  </ImagePasteConfirm>
+{/if}
+<!--
     `imgUpload('swing')` — the swing form's own upload dialog.
 
     A SECOND instance rather than a share of the composer's `modal === 'image-upload'`: the

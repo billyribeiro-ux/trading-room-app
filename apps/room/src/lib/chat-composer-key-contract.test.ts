@@ -60,9 +60,27 @@ describe('the reference, read rather than recalled', () => {
       This counts the swallow across the whole bundle so a future capture that removes it is seen.
     */
     expect(bundle.match(/e\.shiftKey\?\(i\.val\(i\.val\(\)\)/g) ?? []).toHaveLength(5);
-    /* And the claim being corrected is still on the page it has to be corrected on. */
+    /*
+      RE-DISPOSITIONED 2026-08-31, and the direction of the assertion is now the opposite one.
+
+      This used to read *"the claim being corrected is still on the page it has to be corrected on"*
+      and assert the presence of `Shift+Enter is the newline` — a tripwire holding the row `PCC-09`
+      open until somebody fixed the sentence. `PCC-09` was BLOCKED on scope alone (the module sat
+      outside the batch that found the defect) and is now built, so the tripwire flips: the refuted
+      phrasing must be GONE, and the correction must be present.
+
+      Both halves are needed. Asserting only the absence would pass on a module that had deleted the
+      paragraph outright, which is the outcome this row exists to prevent — the whole finding is that
+      the sentence is load-bearing, not that it is surplus.
+
+      The absence is checked against the RAW file, not `codeOf`, and deliberately so: the sentence
+      lives in a docblock, so stripping comments would leave nothing to assert and the check would
+      pass vacuously on an empty string. That is the failure mode `slice-anchor-contract.test.ts`
+      ratchets down, and it is worth the one-line exception here.
+    */
     const module = readFileSync(new URL('./inline-alert-key.ts', import.meta.url), 'utf8');
-    expect(module).toContain('Shift+Enter is the newline');
+    expect(module).not.toContain('Shift+Enter is the newline');
+    expect(module).toContain('i.val(i.val())` is the SAME no-op this box performs');
   });
 });
 

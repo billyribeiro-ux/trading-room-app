@@ -145,6 +145,7 @@ describe('the rendered composer', () => {
     onsend: () => {},
     onfocus: () => {},
     onimageupload: () => {},
+    onimagepaste: () => {},
     onselectgif: () => {},
     onemoji: () => {}
   };
@@ -221,5 +222,91 @@ describe('the rendered composer', () => {
     */
     expect(COMPOSER).toContain('panelHeight="400px"');
     expect(COMPOSER).toContain('searchButton={false}');
+  });
+});
+
+describe('PCC-06 — the composer binds `paste`, and what the bundle actually says about it', () => {
+  /*
+    The row was BLOCKED on scope alone: the component could not take an `onimagepaste` prop that
+    nothing passed — that is the scaffolding DPE rule 3 refuses — and the file that would pass it,
+    `PrivateChatPanel.svelte`, belonged to another batch. One session owning both closes it.
+
+    Everything below is read out of the pinned bundle at run time rather than quoted in a comment,
+    for the reason this file's own header gives: a fenced block is a number nothing checks.
+  */
+
+  it('has `paste` in the composer const s binding section at all', () => {
+    expect(BUNDLE).toContain(
+      '["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true","placeholder","Type your message here...",1,"txt-area","form-control",3,"keyup","paste","focus"]'
+    );
+  });
+
+  it('binds it to `onImagePaste`, which is the whole reason the const entry matters', () => {
+    expect(BUNDLE).toContain('("paste",function(o){return D(e),E(g(2).onImagePaste(o))})');
+  });
+
+  it('keeps assigning through the loop, so the LAST image wins — NOT the first', () => {
+    /*
+      THE ROW THAT FILED THIS SAID "takes the first `image/*`" AND THE BUNDLE SAYS OTHERWISE.
+
+      `s=r.getAsFile()` is a plain assignment inside a `for…of` with no `break`, so every image item
+      overwrites the previous one. That is identical to the chat composer's copy, which is why
+      `pasted-image.ts` is one shared rule and not two loops — and it is the difference between a
+      paste carrying a screenshot AND its text URL resolving to the picture or to the link.
+
+      Asserted here rather than left as a corrected sentence in the register, because a sentence is
+      what was wrong the first time.
+    */
+    expect(BUNDLE).toContain(
+      'let s=null;for(const r of o)0===r.type.indexOf("image")&&(s=r.getAsFile());'
+    );
+    expect(BUNDLE).not.toContain('0===r.type.indexOf("image")&&(s=r.getAsFile(),break)');
+  });
+
+  it('seeds the dialog from THIS composer s trimmed text, into a textarea id of its own', () => {
+    expect(BUNDLE).toContain('a=Ao("#textAreaTxtPM").val().trim()');
+    /* `msg-text-pc`, where the chat copy is `msg-text`. One character of difference, two dialogs. */
+    expect(BUNDLE).toContain(
+      'id="msg-text-pc" name="msg-text-pc" placeholder="Enter your message"'
+    );
+    expect(BUNDLE).toContain('c=yield Ao("#msg-text-pc").val().trim()');
+  });
+
+  it('sends the URL FIRST and appends the message, clearing the box only when one travels', () => {
+    /*
+      The order is not the obvious one — every other messenger puts the message first — and the
+      clear is conditional on `i`. Both are pinned because both are easy to write backwards.
+    */
+    expect(BUNDLE).toContain(
+      'o||(i&&(s.imggurUploadTxt+=" "+i,Ao("#textAreaTxtPM").val("")),s.appService.sendPrivChat(s.currUser,s.imggurUploadTxt,s.recvdUser),s.imggurUploadTxt="")'
+    );
+  });
+
+  it('and ours binds it, through the shared rule rather than a second loop', () => {
+    expect(COMPOSER).toContain('onpaste={handlePaste}');
+    expect(COMPOSER).toContain("import { pastedImageFrom } from '#lib/pasted-image.js';");
+    expect(COMPOSER).toContain('const image = pastedImageFrom(event.clipboardData?.items);');
+  });
+
+  it('gates on `canPostImages`, which upstream does NOT — the divergence, asserted both ways', () => {
+    /*
+      The chat composer's copy opens with the guard and this one has no guard at all. Both halves
+      are asserted: the ABSENCE upstream is what makes ours a divergence rather than a
+      transcription, and a future capture that adds the guard should make this row re-read rather
+      than leave the comment quietly describing a difference that stopped existing.
+    */
+    const pmHandlerAt = BUNDLE.indexOf('onImagePaste(e){const i=this,o=(e.clipboardData');
+    /*
+      The anchor is bound and checked before it is sliced with, which `slice-anchor-contract.test.ts`
+      ratchets down for a reason this assertion would walk straight into: `indexOf` answers -1 when
+      it fails, -1 is a valid `slice` argument, and the resulting "from the end" slice is a short
+      tail of the bundle that contains no `canPostImages` either — a GREEN `not.toContain` proving
+      nothing at all.
+    */
+    expect(pmHandlerAt).toBeGreaterThan(0);
+    expect(BUNDLE.slice(pmHandlerAt, pmHandlerAt + 120)).not.toContain('canPostImages');
+    /* And the chat copy, 764,000 bytes earlier, does have it. */
+    expect(BUNDLE).toContain('if(!this.canPostImages)return!1');
+    expect(COMPOSER).toContain('if (!canPostImages) return;');
   });
 });

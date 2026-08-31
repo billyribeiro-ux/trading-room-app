@@ -33,6 +33,92 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 15:35 UTC — Pasting a screenshot into a private conversation, and the row that was blocked only by who owned the file
+
+**Runtime impact: YES.** A screenshot pasted into the private composer did nothing at all. It
+uploads and sends now, with the message that was already typed.
+
+`PCC-06` was filed `BLOCKED` and the blocker was **scope, not capability**: the component could not
+take an `onimagepaste` prop that nothing passed — that is the scaffolding DPE rule 3 exists to
+refuse — and the file that would pass it belonged to a different parallel batch. Nothing about the
+feature was unknown. One session owning `PrivateChatComposer`, `PrivateChatPanel`, `+page.svelte`,
+`RoomOverlays` and `private-chat.svelte.ts` at once closes it, which is the argument for running
+these sequentially rather than fanned out.
+
+#### Reading the handler whole corrected the row that filed it
+
+The row said the loop *"takes the first `image/*`"*. Byte 2,212,274 says otherwise:
+
+```js
+let s=null; for(const r of o) 0===r.type.indexOf("image") && (s=r.getAsFile());
+```
+
+No `break`. Every image item overwrites the previous one, so **the LAST image wins** — identical to
+the chat composer, which is why `pasted-image.ts` is one shared rule and is used here rather than a
+second loop. A paste carrying a screenshot AND its text URL resolves to the picture. The register is
+corrected and the loop is now asserted by value, because a sentence is what was wrong the first time.
+
+#### Two things in `doImggurUpload` read backwards from what anyone would assume
+
+```js
+s.imggurUploadTxt += s.imggurUploadTxt && s.imggurUploadTxt.length>0 ? " "+F : F;
+o || (i && (s.imggurUploadTxt += " " + i, Ao("#textAreaTxtPM").val("")),
+      s.appService.sendPrivChat(s.currUser, s.imggurUploadTxt, s.recvdUser), …)
+```
+
+**The URL goes FIRST** and the typed message is appended after it — not message-then-attachment,
+which is what every other messenger does and what a reader will assume. **The box is cleared only on
+the branch that had a message to carry**, so a draft begun during a slow upload survives. Both are
+executed by the class test, and the negative controls for both were seen red.
+
+#### One deliberate divergence, asserted in both directions
+
+Upstream's PM handler has **no `canPostImages` guard**, where the chat composer's copy opens with
+`if(!this.canPostImages)return!1`. Ours gates anyway, and the reason is about this room: that flag
+already decides whether the upload and GIF buttons render at all, so an ungated paste would offer
+through the keyboard exactly the capability the buttons deny. The test pins the ABSENCE upstream as
+well as the presence here, so a capture that adds the guard forces a re-read rather than leaving the
+comment describing a difference that stopped existing.
+
+Ours also refuses **before** the upload rather than after it. Upstream uploads and then sends
+unconditionally; a muted member's screenshot would otherwise be pushed to the upload server in full,
+left on the host, and refused afterwards.
+
+#### `#post` is an extraction, and it forced a test to be re-dispositioned
+
+The class gained a second way to reach the server, so the `canPost` gate moved into one method both
+senders go through. `private-chat-strip-contract.test.ts`'s G13 assertion located `async send()` and
+checked the gate sat inside it — **which would have stayed green on a paste path with no gate at
+all.** A test that cannot fail for the thing it is named after is worse than no test, so it now
+asserts the invariant it was always protecting: there is exactly one call to `#commands.send`, it is
+inside `#post`, the gate is `#post`'s first statement, both senders go through it, and
+`confirmImagePaste` refuses before the upload. The control — a second, ungated call site — printed
+`expected 2 to be 1`.
+
+`trade-alert-pane-contract.test.ts` counted three `ImagePasteConfirm` call sites and now counts
+four, plus four DISTINCT confirm handlers. The count is kept rather than dropped as brittle,
+because it is exactly what fails when a fifth call site shares another's handler — and sharing one
+is how an image meant for one person is posted into the room.
+
+#### Evidence
+
+Five negative controls, each seen RED and restored: message-before-URL; unconditional clear;
+the pre-upload refusal removed; the composer's `canPostImages` gate removed; a second ungated
+`#commands.send` call site.
+
+`svelte-autofixer` on `PrivateChatComposer.svelte`: **no issues**; three suggestions, all
+pre-existing declines this file and repository already argue (`untrack` inside the `autoExpand`
+effect, `bind:this` on the textarea, and the `{' Webinar Mode '}` pad). **Nothing the change
+introduced drew a suggestion.**
+
+**Ratchet raises, argued in `source-size-contract.test.ts`:** `private-chat.svelte.ts` 990 → 1148,
+`PrivateChatComposer` 312 → 358, `RoomOverlays` 1065 → 1092, `PrivateChatPanel` 524 → 525,
+`+page.svelte` 1730 → 1731.
+
+**Verified:** `apps/room` full suite **301 files / 5,484 passed / 1 skipped / exit 0**;
+`svelte-check` 1,574 files, 0 errors. **Not verified:** nothing was opened in a browser — the paste
+path is executed against the class and asserted as markup, not driven from a real clipboard.
+
 ### 2026-08-31 14:59 UTC — The merged tree's first CI run found the two tests nobody had run since the owner cutover, and both were the tests being right
 
 **Runtime impact: NO** — one comment reworded, one assertion rebound, two provenance re-pins. No

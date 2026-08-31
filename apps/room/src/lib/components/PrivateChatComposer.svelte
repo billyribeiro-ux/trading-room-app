@@ -5,6 +5,7 @@
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import { pastedImageFrom } from '#lib/pasted-image.js';
   import { autoExpandPrivateComposer } from '#lib/private-composer-auto-expand.js';
 
   /*
@@ -40,6 +41,19 @@
      */
     readonly onfocus: () => void;
     readonly onimageupload: () => void;
+    /**
+     * `PCC-06` — the viewer pasted an image into this box.
+     *
+     * The composer const carries `paste` in its binding section
+     * (`…,3,"keyup","paste","focus"`) and `x("paste", o => onImagePaste(o))` binds it; this
+     * component had `oninput`, `onfocus` and `onkeydown` and no `onpaste` at all, so a pasted
+     * screenshot did nothing.
+     *
+     * A callback rather than the upload, for the reason every other action here is one: the
+     * confirmation dialog, the upload endpoint and the send belong to `PrivateChat`, and this
+     * component would have to be handed three more things to do the job in place.
+     */
+    readonly onimagepaste: (file: File) => void;
     readonly onselectgif: (title: string, url: string) => void;
     readonly onemoji: (glyph: string) => void;
   }
@@ -52,9 +66,40 @@
     onsend,
     onfocus,
     onimageupload,
+    onimagepaste,
     onselectgif,
     onemoji
   }: Props = $props();
+
+  /**
+   * `PCC-06` — which image a paste carries, and the one place this room decides it.
+   *
+   * `pastedImageFrom` is the shared rule and it is used rather than a second loop, because the
+   * reference's two `onImagePaste` implementations ARE the same loop: both walk
+   * `clipboardData.items` reassigning on every `image/*`, so **the LAST image wins**. The audit row
+   * that filed `PCC-06` said "the first", read the bundle again, and the register now says last.
+   *
+   * ## The gate is a DELIBERATE DIVERGENCE, and it fails closed
+   *
+   * Upstream's PM handler at byte 2,212,274 has **no `canPostImages` guard** — the chat composer's
+   * copy opens with `if(!this.canPostImages)return!1` and this one does not. It is gated here
+   * anyway, for a reason that is about this room rather than about the capture: `canPostImages`
+   * already decides whether the upload and GIF buttons render at all, so a paste that uploaded in a
+   * room where those buttons are hidden would offer through the keyboard exactly the capability the
+   * buttons deny. Two controls on one component disagreeing about one permission is the shape
+   * `CLAUDE.md` refuses.
+   *
+   * It is not the enforcement either way — `composer-image.remote.ts` re-checks on the server, which
+   * is the check that counts. This is the message.
+   *
+   * The default is deliberately NOT prevented. A paste of plain text still lands in the textarea;
+   * only an image is intercepted, which is what all four of this room's other composers do.
+   */
+  function handlePaste(event: ClipboardEvent): void {
+    if (!canPostImages) return;
+    const image = pastedImageFrom(event.clipboardData?.items);
+    if (image) onimagepaste(image);
+  }
 
   /**
    * Which popover is open — G1.
@@ -158,6 +203,7 @@
         bind:value={draft}
         bind:this={textarea}
         oninput={autoExpand}
+        onpaste={handlePaste}
         onfocus={() => onfocus()}
         onkeydown={(event) => {
           /*

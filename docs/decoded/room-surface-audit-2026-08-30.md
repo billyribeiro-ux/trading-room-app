@@ -6383,7 +6383,15 @@ d(0,"div",50)(1,"div",52),H(2,lEe,5,0,"div",53),d(3,"div",54)(4,"textarea",55)
 
 ### PCC-06 — The composer binds no `paste`, and the capture binds one straight to the image uploader
 
-**BLOCKED 2026-08-31 02:15 UTC.** The component cannot take an `onimagepaste` prop that nothing passes — that is the scaffolding DPE rule 3 exists to refuse — and `PrivateChatPanel.svelte` is outside this batch's scope. **The exact one-line change that unblocks it:** insert `onimagepaste={onimagepaste}` into the `<PrivateChatComposer … />` call at `apps/room/src/lib/components/PrivateChatPanel.svelte:513`, alongside the prop and forwarding handler that line needs.
+**BUILT 2026-08-31, by the session that owned every file in the chain.** The blocker was SCOPE and nothing else: the component could not take an `onimagepaste` prop that nothing passed — the scaffolding DPE rule 3 refuses — and `PrivateChatPanel.svelte` belonged to another batch. `PrivateChatComposer` binds `onpaste` now, the panel forwards, `+page.svelte` wires it to `PrivateChat.beginImagePaste`, and `RoomOverlays` renders a fourth `ImagePasteConfirm` with the reference's own `msg-text-pc` textarea.
+
+**Reading the handler whole corrected the row that filed it.** This row said the loop "takes the first `image/*`". It does not — `for(const r of o) 0===r.type.indexOf("image")&&(s=r.getAsFile())` has no `break`, so the LAST image wins, identical to the chat composer. That is why `pasted-image.ts` is used here rather than a second loop: the two agree by construction instead of by inspection. `private-chat-composer-v4-contract.test.ts` now asserts the loop by value so the sentence cannot drift again.
+
+**Two things in `doImggurUpload` (byte 2,211,249) read backwards from what anyone would assume**, and both are executed rather than described: the URL goes FIRST and the typed message is appended after it, and the composer is cleared ONLY on the branch that had a message to carry — so a draft begun during a slow upload survives.
+
+**One DELIBERATE DIVERGENCE, asserted in both directions.** Upstream's PM handler has no `canPostImages` guard where the chat composer's copy opens with `if(!this.canPostImages)return!1`. Ours gates anyway: that flag already decides whether the upload and GIF buttons render, so an ungated paste would offer through the keyboard exactly what the buttons deny. The test pins the ABSENCE upstream as well as the presence here, so a future capture that adds the guard forces a re-read. Ours also refuses BEFORE the upload rather than after it, so a muted member's screenshot is never pushed to the upload server.
+
+**`#post` is an extraction, not new surface.** The class gained a second way to reach the server, so the `canPost` gate moved into one method both senders go through — and `private-chat-strip-contract.test.ts`'s G13 assertion was re-dispositioned from "the gate is inside `send`" (which would have stayed green on an ungated paste path) to "there is exactly one call to `#commands.send`, it is inside `#post`, and the gate is `#post`'s first statement". Five negative controls were run and each printed its failure.
 
 **medium** · `missing-control` · reference byte **2,212,274**
 
