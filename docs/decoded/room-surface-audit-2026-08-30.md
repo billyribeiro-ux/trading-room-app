@@ -53,9 +53,18 @@ describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **
 the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
 byte offsets make the second reading the tempting one.
 
+**Eleven rows now carry that sentence, and this paragraph is the only place the running total is
+stated.** It is deliberately ONE paragraph: each later batch that appended rows also appended its
+own "N rows have therefore been appended" sentence, and every one of them was stale the moment the
+next batch ran — so they are consolidated here, and `room-surface-audit-counts.test.ts` counts the
+per-row sentence rather than trusting any of them. The ten after RM-25 are `DTF-01` … `DTF-05` and
+`SWF-01` … `SWF-05`, the two composer FORMS inside the day-trade and swing panes, appended
+2026-08-31; they sit in two `##` sections of their own and are deliberately outside the surfaces
+table, which describes the two-verifier pass and should keep describing it.
+
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 234 closed · 234 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4393,6 +4402,336 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 **Ours:** apps/room/src/routes/api/day-trade-alerts/+server.ts:20-31 documents the omission and takes the room from the session row instead of the request; the twin note is at apps/room/src/routes/api/swing-alerts/+server.ts:21-25 and the setting is explicitly excluded from the room config in apps/room/src/lib/server/room-config-client.ts:452 and :480. `apps/room/src/lib/room/trade-alerts.svelte.ts:219-223` fetches `${endpoint}?days=…` with no session parameter. A room configured upstream to mirror another room's alert log will show its own log here. Recorded as a deliberate, security-motivated divergence rather than an oversight (the same offset 1,010,164 initial-load path is likewise not carried).
 
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
+
+---
+
+## DayTradeAlertForm.svelte
+
+5 rows. `Ewe` was compared node by node and const by const against this file, and no count of
+"behaviours confirmed present" is given because none was taken: what was taken is the complete
+difference list, and it is the five rows below.
+
+> **These two sections are the FORMS, not the panes.** The section above reads
+> `DayTradeAlertsPane` and `SwingAlertsPane`; the composers inside them are named there twice and
+> once respectively, in passing, and neither carries a row. `Ewe` (byte 1,940,236) and `hwe`
+> (1,933,979) were read end to end on 2026-08-31 together with all fourteen sub-templates they
+> instantiate — `swe` 1,933,226, `rwe` 1,933,472, `awe` 1,933,621, `lwe` 1,933,754, `cwe`
+> 1,933,808, `dwe` 1,933,861, `uwe` 1,933,920, `ywe` 1,939,468, `Fwe` 1,939,723, `Cwe` 1,939,875,
+> `Swe` 1,940,011, `wwe` 1,940,065, `Twe` 1,940,118, `Dwe` 1,940,177 — and with the component's
+> whole `consts:[` table bracket-walked BY VALUE from 1,994,264 rather than looked up by slot.
+>
+> **Every const index and every style byte the two components already cited was checked against
+> that walk and all of them hold** — 92, 170-199, 222-231, and the six style offsets 2,023,059 /
+> 2,023,101 / 2,023,517 / 2,026,319 / 2,026,498 / 2,026,556. The two offsets that did NOT hold are
+> both `paste` call sites, and they are `DTF-02` and `SWF-02` below. The gate for both sections is
+> `apps/room/src/lib/trade-alert-form-contract.test.ts`.
+
+### DTF-01 — Seven text nodes render without the reference's own leading and trailing spaces
+
+**BUILT 2026-08-31 04:09 UTC, in both forms.** Fourteen nodes in all — seven here and the same seven
+in the swing twin as `SWF-01`, which is why they are one build and two rows.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+**What is user-visible, stated unevenly because it IS uneven.** Two of the seven are: ` Long ` and
+` Short ` open with a space that sits between the radio input and its word, so the reference has a
+gap here that this did not, and the label's hover target — which
+`captured-runtime-components.css:7208` gives `cursor: pointer` — is that much wider. The other five
+are trailing spaces at the end of a `<button>` or an `input-group-text`, where HTML collapses
+trailing whitespace at the end of a line box: **invisible on screen**. They are carried anyway
+because every capture comparison in this repository diffs RENDERED STRINGS, which is the argument
+`apps/room/AGENTS.md` already makes for the `{' Retry '}` idiom and the reason
+`svelte/no-useless-mustaches` is off in `eslint.config.js`. Measured outside these two files:
+**45 string-literal mustaches, 42 of them the leading-space shape.**
+
+**Measured on the compiler, not on the source**, because "the braces were typed" is not the claim.
+Svelte 5 compiles `<label>\n Long\n</label>` to `>Long</label>` inside its `from_html` template and
+`{' Long '}` to `label.textContent = ' Long ';` — both readings taken from the emitted module. The
+negative control is the same probe compiled from bare markup, and its FIRST version was green and
+worthless: it looked for a `nodeValue` assignment the bare form never produces, so an empty list
+satisfied a `not.toContain`. It asserts the trim positively now.
+
+**low** · `divergence` · reference byte **1,933,754**
+
+```
+function lwe(t,n){1&t&&(T(0,"i",196),v(1,"Discard "))}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:195, :253, :267,
+:288, :290, :295 and :297 held all seven as bare template text. The reference strings are
+`v(2," Image ")` (`Fwe` 1,939,723), `v(28," Long ")` and `v(32," Short ")` (`Ewe` nodes 28 and 32),
+`v(1,"Discard ")` (`Swe` 1,940,011), `v(1,"Cancel ")` (`wwe` 1,940,065), `v(1,"Save Changes ")`
+(`Twe` 1,940,118) and `v(1,"Submit Alert ")` (`Dwe` 1,940,177).
+
+### DTF-02 — The `paste` call site is cited 41 bytes past the construct it quotes
+
+**FIXED 2026-08-31 04:09 UTC.** 1,941,249 → **1,941,208**.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+The comment quotes `x("paste", o => onImagePaste(o, "dayTrade"))` and gave a byte that lands inside
+it, at `return D(e),E(g(2)…` — 41 bytes into the handler body rather than at the `x(` the quote
+starts with. Small, and worth a row anyway: the whole contract of a per-row offset in this document
+is that the next person re-reads AT it rather than trusting the quote, and an offset that lands
+mid-expression makes them re-derive the boundary by hand. The other byte in the same docblock,
+**1,992,037** for the deny-by-default `"swing" === i ? … : "dayTrade" === i && (…)`, was re-measured
+in the same pass and is exact.
+
+**low** · `defect` · reference byte **1,941,208**
+
+```
+x("paste",function(o){return D(e),E(g(2).onImagePaste(o,"dayTrade"))})
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:67. Pinned by
+apps/room/src/lib/trade-alert-form-contract.test.ts, which also refuses the superseded number.
+
+### DTF-03 — The reference's `cursor: pointer` rule names nine selectors; the form transcribes three
+
+**ALREADY BUILT — verified by reading 2026-08-31 04:09 UTC.** The six the form drops are all
+shipped, under a name the reader of the component would not have searched for.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`src/lib/styles/captured-runtime-components.css:7207-7215` carries all nine —
+`.uploaded-alert-image:hover`, `.form-check-label:hover`, `#dayTradeAlert-long:hover`,
+`#dayTradeAlert-short:hover`, `#swingAlert-long:hover`, `#swingAlert-short:hover`,
+`.uploaded-img-preview:hover`, `.img-upload-btn:hover`, `.remove-image-btn:hover` — host-scoped to
+`app-presentationarea`. `src/app.css:5` imports that sheet and
+`src/lib/components/PresentationArea.svelte:481` renders `<app-presentationarea>`, closing it at
+:1090, with `<SwingAlertsPane` (:922) and `<DayTradeAlertsPane` (:964) between the two. So the
+pointer cursor on the radio pair and its labels is live; the form's own three-selector copy is a
+subset, not a shortfall.
+
+**This is `UIM-03`'s lesson met for the third time**, and it is why it was filed as a row rather
+than fixed: read as a missing NAME the gap is real and survives every check that greps the
+component. What refutes it is asking whether the OUTCOME is achieved another way, and it is — by a
+generated sheet whose selectors carry a host prefix the component never mentions.
+
+**low** · `divergence` · reference byte **2,026,556**
+
+```
+.uploaded-alert-image[_ngcontent-%COMP%]:hover, .form-check-label[_ngcontent-%COMP%]:hover, #dayTradeAlert-long[_ngcontent-%COMP%]:hover, …{cursor:pointer}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:355-359 declares
+three of the nine. The reachability is now asserted rather than assumed: move either pane outside
+`<app-presentationarea>`, or drop one of the six from the generated sheet, and
+apps/room/src/lib/trade-alert-form-contract.test.ts goes red naming the selector that was lost.
+
+### DTF-04 — Every rule in the form's `<style>` block is already shipped by the generated captured sheet
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC; the block stays, and the measurement is
+now executable.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+Measured rule by rule: the form's own size rule is at `captured-runtime-components.css:7078`,
+`.input-group-text` at :7083, `.form-control` at :7090, the eight-selector radio-margin cross
+product at :7094, `.uploaded-img-preview` at :7196, `.remove-image-btn` at :7204 and the hover rule
+at :7207 — every one host-scoped to `app-presentationarea`, every one with the same declarations.
+The component's copies are therefore redundant today, and `ScreenPane.svelte:650` states this
+repository's rule in as many words: a captured rule is declared in a component *"because that file
+is GENERATED … and this rule is not in that sheet"*. By that rule these would come out.
+
+**They stay, and the reason is the failure mode rather than the tidiness.** Removing them makes the
+form's appearance depend on an ANCESTOR ELEMENT rendered by a different component; mount the form
+anywhere else and the failure is silent and total — a 12px form becomes 16px and unbounded in
+width, with nothing red anywhere. What was actually wrong is narrower and is what the row fixes:
+the block's stated justification names `styles.ee2a710065b60389.css`, the reference's global sheet,
+where these rules genuinely are not — and not the generated captured one, where they are. That
+omission is no longer invisible: if the generator ever drops one of these rules the contract fails,
+and the component copy stops being redundant and becomes load-bearing, which is exactly the moment
+somebody needs to be told.
+
+**The control on that assertion came back GREEN and it was a real hole**, recorded because it is the
+same shape twice in one batch: `includes(selector)` matched the `:hover` rule two lines below as a
+prefix, so `app-presentationarea .remove-image-btn:not(:root)` could be deleted outright with
+nothing failing — and every selector in the list has such a twin. It tests the selector BOUNDARY
+now, `, ` or ` {`.
+
+**low** · `divergence` · reference byte **2,023,059**
+
+```
+.day-trade-alert-form[_ngcontent-%COMP%], .swing-alert-form[_ngcontent-%COMP%]{font-size:12px;max-width:600px}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:304-360.
+
+### DTF-05 — `<form #alertForm="ngForm">` is not carried
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC. The measurement is an occurrence count
+with its control, not a judgement.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`d(0,"form",222,0)` ends in a LOCAL REFS index, and consts[**0**] — read by walking the table, where
+it is the first entry — is `["alertForm","ngForm"]`. So upstream the form publishes itself as a
+template reference variable.
+
+**Nothing reads it.** `alertForm` occurs **exactly once in all 2,891,205 bytes** of
+`main.d1d09071be31f1ba.js`, at byte 1,994,267, inside that consts entry itself: no template
+expression, no `@ViewChild`, no handler. The control on that count is the same search for
+`onImagePaste`, which returns the definition plus both call sites. The `NgForm` directive the ref
+names is applied to the element by `FormsModule`'s selector whether or not a ref exists, so the ref
+changes nothing — and the thing a `#alertForm` would usually be FOR, disabling submit while the form
+is invalid, is not what the reference does either: its submit button is const **190**,
+`["type","submit",1,"btn","btn-primary","btn-sm","m-1"]`, with no binding at all, and
+`onDayTradeAlertSubmit` (byte 1,985,961) re-checks the four fields itself before sending.
+
+**low** · `missing-control` · reference byte **1,994,265**
+
+```
+consts:[["alertForm","ngForm"],["speechRecoBody",""],…
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:93-100 renders the
+form with `onsubmit` and no reference variable. Recorded with its count rather than left unmentioned,
+because "the reference has a template ref we do not" is the kind of observation that gets re-found
+and re-investigated at full cost.
+
+---
+
+## SwingAlertForm.svelte
+
+5 rows, and they are `DTF-01` … `DTF-05` again — `hwe` and `Ewe` differ only in the names. Filed
+per form rather than once, for the reason the twin note below gives.
+
+> **The twin, and now provably so.** `DayTradeAlertForm.svelte`'s own header states the invariant —
+> *"the ONLY differences below are the five ids, the two radio ids, the `name=` attributes and the
+> form's own class. Anything else that differs is a mistake"* — and nothing checked it until this
+> batch. Comments stripped and the day-trade half renamed mechanically, the two files are now
+> asserted EQUAL line for line, with a guard above it requiring each to contain none of the other's
+> vocabulary: a day-trade form that accidentally spelled a swing id would otherwise survive the
+> rename and match. Both halves were seen red.
+
+### SWF-01 — Seven text nodes render without the reference's own leading and trailing spaces
+
+**BUILT 2026-08-31 04:09 UTC, in both forms.** The swing half of `DTF-01`; the reasoning, the
+compiler measurement and the honest split between the two visible spaces and the five invisible ones
+are recorded there and are not repeated here.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+The four button sub-templates are content-identical to the day-trade four, which is the point of
+filing it twice rather than once: `dta-01` … `dta-04` all exist because one behaviour was missing
+from BOTH panes, and a row that names one form is a row that lets the pair drift.
+
+**low** · `divergence` · reference byte **1,933,920**
+
+```
+function uwe(t,n){1&t&&(T(0,"i",199),v(1,"Submit Alert "))}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:179, :236, :250, :269,
+:271, :276 and :278.
+
+### SWF-02 — The `paste` call site is cited at the handler's DEFINITION, 57,326 bytes away
+
+**FIXED 2026-08-31 04:09 UTC.** 1,992,250 → **1,934,924**.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+**This is the instructive half of the pair, and the reason both were re-measured at all.** The
+comment quotes `x("paste", o => onImagePaste(o, "swing"))` — a template call site — and gave
+1,992,250, which is where `onImagePaste(e,i){` begins. That is the same offset `dta-04` cites for
+the `Upload this image?` confirm, which lives inside that method. A reader following it lands on
+bytes that are genuinely about pasting, reads the loop the comment's next paragraph describes, and
+never notices that the quoted line is 57 KB away. **An offset that lands on plausible bytes is the
+one that never gets questioned** — which is why the batch instruction to re-derive every cited
+offset produced two corrections in files whose citations are otherwise exact.
+
+**low** · `defect` · reference byte **1,934,924**
+
+```
+x("paste",function(o){return D(e),E(g(2).onImagePaste(o,"swing"))})
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:57. Pinned by
+apps/room/src/lib/trade-alert-form-contract.test.ts, which also refuses the superseded number.
+
+### SWF-03 — The reference's `cursor: pointer` rule names nine selectors; the form transcribes three
+
+**ALREADY BUILT — verified by reading 2026-08-31 04:09 UTC.** The swing half of `DTF-03`, same
+generated sheet, same host: `captured-runtime-components.css:7207-7215`, imported at `app.css:5`,
+under the `<app-presentationarea>` that `PresentationArea.svelte:481` renders with
+`<SwingAlertsPane` (:922) inside it.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`#swingAlert-long:hover` and `#swingAlert-short:hover` are two of the six selectors, and they are
+UNSCOPED upstream — the rule sits at component level, not under either form class, exactly as the
+eight-selector radio-margin cross product at 2,023,517 does sit under both. That asymmetry is the
+reference's and is why the swing radios get the pointer cursor from a sheet that never names the
+swing form.
+
+**low** · `divergence` · reference byte **2,026,556**
+
+```
+… #swingAlert-long[_ngcontent-%COMP%]:hover, #swingAlert-short[_ngcontent-%COMP%]:hover, .uploaded-img-preview[_ngcontent-%COMP%]:hover, …{cursor:pointer}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:325-329 declares three of
+the nine.
+
+### SWF-04 — Every rule in the form's `<style>` block is already shipped by the generated captured sheet
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC; the block stays, for the reason
+`DTF-04` records.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+The swing selectors are at `captured-runtime-components.css:7079` (size), :7086
+(`.input-group-text`), :7091 (`.form-control`) and :7112-7113 (the two radio ids), plus the three
+image rules at :7196, :7204 and :7207 that carry no form prefix at all.
+
+**One thing IS worse on this side and is recorded rather than fixed here.** The swing block carries
+one byte citation where its day-trade twin carries four: `2,023,101` for the size rule and
+`2,026,319` for `.uploaded-img-preview`, against the day-trade file's four plus the paragraph
+explaining that the radio-margin rule lists EIGHT selectors — the cross product of the two form
+classes with all four radio ids — of which only two are reachable. Both files are at their
+`source-size-contract` ceiling exactly (331 and 361, zero headroom), so adding the missing citations
+means extracting first, and no seam in these two files is worth taking for four comment lines.
+Named here so the asymmetry is a known debt rather than a discovery.
+
+**low** · `divergence` · reference byte **2,023,101**
+
+```
+.swing-alert-form[_ngcontent-%COMP%]{font-size:12px;max-width:600px}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:285-330.
+
+### SWF-05 — `<form #alertForm="ngForm">` is not carried
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC.** The swing half of `DTF-05`:
+`d(0,"form",170,0)`, the same consts[0] `["alertForm","ngForm"]`, the same single occurrence in
+2,891,205 bytes.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`onSwingAlertSubmit` at byte 1,981,965 is the swing counterpart that re-checks the fields itself,
+and it is worth naming what it does with them, because it is the reason a form-level validity flag
+would buy nothing: it refuses on the four required fields, then trims each and refuses again per
+field by name, then asks `bootbox.confirm`. Four gates, none of them the form's `valid`.
+
+**low** · `missing-control` · reference byte **1,994,265**
+
+```
+d(0,"form",170,0),x("ngSubmit",function(){return D(e),E(g(2).onSwingAlertSubmit())})
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:77-84.
 
 ---
 

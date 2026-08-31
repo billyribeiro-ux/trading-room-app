@@ -99,8 +99,8 @@ guessed.
 | 23 | `lib/components/VideoPlayer.svelte` | 413 | no |
 | 24 | `lib/components/MainTabStrip.svelte` | 371 | no |
 | 25 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
-| 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | no |
-| 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | no |
+| 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | `room-surface-audit-2026-08-30.md` §DayTradeAlertForm — 5 rows (`DTF-01` … `DTF-05`) against `Ewe`, bundle byte 1,940,236, read end to end 2026-08-31 with all fourteen sub-templates and the component's consts table walked BY VALUE. 1 BUILT, 1 FIXED, 1 ALREADY BUILT, 2 MEASURED REFUSAL; gated by `trade-alert-form-contract.test.ts`. |
+| 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | `room-surface-audit-2026-08-30.md` §SwingAlertForm — 5 rows (`SWF-01` … `SWF-05`) against `hwe`, bundle byte 1,933,979, read the same way and on the same date. The two forms are now asserted IDENTICAL once the day-trade half is renamed, so neither can drift alone. |
 | 28 | `lib/components/StreamTabs.svelte` | 305 | no |
 | 29 | `lib/components/ScreenTabs.svelte` | 341 | no |
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
@@ -134,15 +134,21 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**4 of 72 surfaces audited · 1,762 of 34,937 lines · 5.0%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
 > behaviours confirmed present. **It does not re-score the table above, deliberately.** That list is
 > 62 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
 > entries are slices of `ModalHost.svelte` alone. Marking rows audited from a differently-shaped list
-> is how a coverage number stops meaning anything, so the counts here are untouched and this row
-> stays 2 of 62 until a surface is read whole against a file in this table.
+> is how a coverage number stops meaning anything, so a register row only moves this table when a
+> surface is read WHOLE against a file that is in it.
+>
+> **Two have now met that condition and only two.** On 2026-08-31 the register grew two sections of
+> its own for `DayTradeAlertForm.svelte` and `SwingAlertForm.svelte` — one file, one reference
+> component, no slicing on either side — so rows 26 and 27 carry a verdict and the count moved from
+> 2 to 4. Its other eighteen surfaces still do not line up with this list and are still not scored
+> here.
 >
 > Its own headline number to keep is the **19% false-claim rate**: of 274 differences claimed by the
 > readers, 51 were refuted on verification — 32 already built here under another name, 19 resting on

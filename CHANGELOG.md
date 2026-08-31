@@ -33,6 +33,88 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 00:14 EDT — The two trade-alert COMPOSER FORMS audited against the pinned v4 bundle; `DTF-01` … `DTF-05` and `SWF-01` … `SWF-05`
+
+**Runtime impact: YES, and it is small and exactly two things wide.** Fourteen text nodes across the
+two composers now render the reference's own leading and trailing spaces. Two of them are visible:
+the radio labels are ` Long ` and ` Short ` upstream, so the space between the radio and its word —
+and the width of a hover target that `captured-runtime-components.css:7208` gives `cursor: pointer`
+— was missing here. The other five per form are trailing spaces at the end of a `<button>` or an
+`input-group-text`, where HTML collapses trailing whitespace at the end of a line box: **they change
+no pixel**, and they are carried because every capture comparison in this repository diffs rendered
+strings. Nothing else in either component changed behaviour; the two remaining code edits are byte
+citations inside comments.
+
+**What was read.** `Ewe` (bundle byte 1,940,236) and `hwe` (1,933,979) end to end, with all fourteen
+sub-templates they instantiate (`swe` 1,933,226 through `Dwe` 1,940,177), the `app-presentationarea`
+`consts:[` table bracket-walked BY VALUE from 1,994,264 — 292 entries, split on top-level commas so
+a bare non-array element could not shift every index after it — and the component's `styles:[` block
+at 2,018,622. **Every const index and every style byte the two files already cited holds**: 92,
+170-199, 222-231, and 2,023,059 / 2,023,101 / 2,023,517 / 2,026,319 / 2,026,498 / 2,026,556.
+
+**Two citations did not hold, and both were `paste` call sites.** The day-trade file gave 1,941,249
+for a construct that begins at **1,941,208** — 41 bytes, landing mid-expression. The swing file gave
+1,992,250, which is where `onImagePaste(e,i){` is DEFINED, **57,326 bytes** from the
+`x("paste", …)` its comment quotes; it is also the offset `dta-04` cites for the confirm dialog
+inside that method, so a reader following it lands on bytes that are genuinely about pasting and
+never notices. An offset that lands on plausible bytes is the one that never gets questioned.
+
+**One claimed gap was refuted by measurement rather than built.** The reference's `cursor: pointer`
+rule names NINE selectors and each form transcribes THREE; the six it drops — `.form-check-label`
+and the four radio ids among them — are all shipped by
+`src/lib/styles/captured-runtime-components.css:7207-7215`, imported at `app.css:5`, under the
+`<app-presentationarea>` that `PresentationArea.svelte:481` renders with both panes inside it. Read
+as a missing NAME the gap survives every grep of the component; asking whether the OUTCOME is
+achieved another way refutes it. Measuring that also established the larger fact recorded as
+`DTF-04` / `SWF-04`: **every rule in both `<style>` blocks is already in that generated sheet**. They
+stay anyway, because deleting them would make each form's appearance depend on an ancestor element
+rendered by a different component and the failure would be silent and total. The contract now fails
+if the generator ever drops one, which is the moment that copy stops being redundant.
+
+**New gate: `apps/room/src/lib/trade-alert-form-contract.test.ts`** (14 tests). It asserts the seven
+strings on the COMPILER'S OUTPUT rather than on the source, pins both corrected offsets, checks the
+generated sheet still carries every duplicated rule and all six undeclared cursor selectors, and —
+the assertion nothing had — requires the two forms to be **IDENTICAL** once comments are stripped
+and the day-trade half is mechanically renamed, with a guard above it forbidding each file from
+speaking the other's vocabulary at all.
+
+**Two of its negative controls came back GREEN and both were real holes**, fixed and recorded in the
+file:
+
+1. The whitespace control compiled bare markup and asserted no `nodeValue` held ` Long `. Bare text
+   is STATIC — Svelte emits it inside the `from_html` template and assigns no `nodeValue` at all —
+   so the list was empty and an empty list fails no `not.toContain`. It asserts the trim POSITIVELY
+   now, on `>Long</label>`.
+2. The duplicated-rule check used `includes(selector)`, and every selector in the list has a
+   `:hover` twin two lines below that contains it as a PREFIX. `app-presentationarea
+   .remove-image-btn:not(:root)` was renamed out of the sheet and nothing failed. It tests the
+   selector BOUNDARY now.
+
+Ten further controls were run and each was seen red: reverting either offset, reverting a `{' … '}`
+on either form, deleting a cursor selector from the generated sheet, deleting a duplicated rule,
+changing `cursor: pointer` to `default`, renaming the `<app-presentationarea>` host, reintroducing
+an `alertForm` reference, giving the day-trade form a swing id, and — on the register and the
+tracker — mis-stating the closed count and the audited line total.
+
+**Neither component gained a line.** Both sit at their `source-size-contract` ceiling exactly (361
+and 331, zero headroom), so every edit is line-for-line and no ceiling moved in either direction. The
+reasoning that would ordinarily have gone in a comment went into the contract instead, which is where
+this repository already keeps a template decision it needs to enforce (`each-key-contract.test.ts`).
+The one thing that could not be done for want of budget is recorded in `SWF-04`: the swing style
+block carries one byte citation where its day-trade twin carries four.
+
+`docs/decoded/room-surface-audit-2026-08-30.md` gains two `##` sections and ten rows — 224 to 234,
+all closed — with the running total consolidated into the single paragraph that already carried it.
+`todo-next.md` rows 26 and 27 move to audited (2 of 72 → 4 of 72, 1,072 → 1,762 lines), which is the
+condition that file's own blockquote names: a surface read WHOLE against a file in its table.
+
+**Verified:** `pnpm run gate` in `apps/room` — `format:check`, `lint`, `check`, `test`, `build` —
+read from `/tmp/gate-alertforms.log` as **`gate-exit=0`**, 265 test files, 4,469 passed and 1
+skipped. **That run did NOT cover 42 evidence-bound test files**, which the runner excluded and
+said so: this checkout is missing 13 of the 14 gitignored capture roots. `source-size-contract`
+moved no ceiling in either direction — `git diff HEAD -- source-size-contract.test.ts | grep
+'max:'` is empty — and nothing was opened in a browser.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships
