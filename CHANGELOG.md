@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 20:46 EDT — `MainTabStrip` and `RoomOverlays` audited against the v4 bundle: fourteen rows, seven behaviours changed
+
+**Runtime impact: YES.** Seven observable changes, listed below. Neither surface had a section in
+`docs/decoded/room-surface-audit-2026-08-30.md` before this; both now do (MTS-01 to MTS-07, OVL-01 to
+OVL-07), and the register's header and its appended-rows paragraph are updated with them.
+
+**What a member or presenter will notice:**
+
+1. **A member no longer sees the presenter's file-upload cog** on the Files tab (MTS-01). Upstream
+   instantiates it only for `isP` — byte 2,017,076 — and nothing downstream refused it here:
+   `RoomNotes.mountUploadFileLink` opens the `file-upload` modal with no role check.
+2. **The Notes cog now selects the Notes tab and closes the Files menu**, which the Files cog already
+   did (MTS-07). Both cogs are one component, `TabGearMenu.svelte`, and the sibling menu to close is
+   derived rather than written, so the two cannot drift apart again.
+3. **The tab strip is keyboard-reachable** (MTS-05). `tabindex` was `{active ? undefined : -1}`, so
+   no tab could hold focus and all seven `onkeydown` handlers were unreachable code. It is `? 0 : -1`
+   now — a roving tabindex.
+4. **A room that never bought Q&A on alerts no longer flashes alerts or rings for questions**
+   (OVL-02). Upstream's whole `updateAlertMsg` Q&A branch is behind
+   `if (!sessData.hasQAOnAlerts) return` at byte 1,408,794; this room had no such gate, while its own
+   composer already refuses to draw the ask button without it.
+5. **Chat no longer dings for every message** (OVL-03). `RoomOverlays` held a second copy of the
+   arrival sound that played `pling` for any incoming batch, under a comment quoting a gate that
+   exists at none of the bundle's eight `pling.play()` sites. The real rule — a followed sender, a
+   per-member list, or `dingOnNewMessage`, and silence otherwise — is `#lib/chat-arrival-sound.ts`
+   and was already wired in `room/events.svelte.ts`. So upstream's silent case rang on every message
+   and upstream's ringing case rang twice.
+6. **A mention now rings, and turning the popup off no longer silences it** (OVL-04). Byte 1,431,259:
+   `chatSoundOn` gates the sound and `chatPopup` gates the toast, as siblings under one Do Not
+   Disturb; this effect returned on both.
+7. **The reconnect flash renders its tick before its text**, with the capture's leading space
+   (OVL-01, byte 2,547,023), and **the image lightbox describes an image with its url** rather than a
+   filename it invented (OVL-05, byte 1,992,730 — the same value this room's own popped-out image
+   window already used).
+
+**Two refusals, each with the measurement at the code.** `z('hidden', o.hideScreens)` on the Screens
+tab (MTS-04) is not reproduced: `hideScreens` occurs three times in the 2,891,205-byte bundle — its
+`!1` initialiser and the two template reads — and `ngOnInit` assigns its four siblings and not it, so
+the binding can never be true. And the lightbox's download button placement (OVL-06) is left as ours
+and recorded as ours: bootbox decides where a `buttons` entry lands, and `window.bootbox` is a global
+whose source is not in the bundle.
+
+**Two blocked, each on one line outside this change's editable set.** The Notes cog's gate (MTS-02)
+needs `canEditNotes={data.canEditNotes === true}` on the `<MainTabStrip …/>` call at
+`apps/room/src/lib/components/PresentationArea.svelte:507`. The Recordings tab (MTS-03) needs
+`'recordings'` in `MainTab`, `sessData.recsInRoom` in the room config, and a `#recordings` pane.
+
+**Three components came out, and both ceilings went DOWN.** `TabGearMenu.svelte` (the two cogs),
+`ImagePasteConfirm.svelte` (one "Upload this image?" dialog that was three transcriptions, two of
+them carrying the same sixteen-line citation verbatim) and `ImageLightbox.svelte` (the imgur modal).
+`RoomOverlays` 1081 -> 1065 and `MainTabStrip` 372 -> 371 in `source-size-contract.test.ts`, while
+seven behaviours changed — which is what an extraction is supposed to look like.
+
+**New contract tests:** `main-tab-strip-gates.svelte.test.ts` (jsdom, mounts the strip and drives
+focus and both cogs against a real `RoomMenus`) and `overlay-delivery-contract.test.ts` (source
+assertions through `codeOf`, for the reason `connection-overlay-contract.test.ts` already gives —
+rendering `RoomOverlays` means rendering `ModalHost`'s eighty-five props). Every assertion in both
+had its negative control run and seen red.
+
+**The Svelte MCP was NOT available in this session** and is therefore not part of what was verified;
+`svelte-check` (0 errors, 0 warnings) and `prettier --write` were run on every touched file instead.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships

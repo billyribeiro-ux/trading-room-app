@@ -81,7 +81,7 @@ guessed.
 | 5 | `lib/components/RoomMessage.svelte` | 1,259 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,172 | no |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
-| 8 | `lib/components/RoomOverlays.svelte` | 1,080 | no |
+| 8 | `lib/components/RoomOverlays.svelte` | 1,064 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 914 | no |
 | 10 | `lib/components/PollPanel.svelte` | 895 | no |
 | 11 | `lib/components/RoomSidebar.svelte` | 872 | no |
@@ -97,7 +97,7 @@ guessed.
 | 21 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
 | 22 | `lib/components/ScreenPane.svelte` | 669 | no |
 | 23 | `lib/components/VideoPlayer.svelte` | 413 | no |
-| 24 | `lib/components/MainTabStrip.svelte` | 371 | no |
+| 24 | `lib/components/MainTabStrip.svelte` | 370 | no |
 | 25 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | no |
 | 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**2 of 75 surfaces audited · 1,072 of 35,246 lines · 3.0%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -161,6 +161,9 @@ guessed.
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 73 | `lib/components/TabGearMenu.svelte` | 156 | no |
+| 74 | `lib/components/ImageLightbox.svelte` | 94 | no |
+| 75 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

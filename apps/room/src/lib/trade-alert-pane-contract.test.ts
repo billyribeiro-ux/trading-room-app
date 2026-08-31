@@ -97,18 +97,42 @@ describe('dta-02 and dta-03 — the image lightbox', () => {
 });
 
 describe('dta-04 — the paste confirm asks its question', () => {
-  it('carries the heading on BOTH panes, not just the chat composer s', () => {
-    /*
-      Counted rather than `toContain`ed: the chat composer's copy has had this heading since it was
-      built, so a single-occurrence check was already satisfied before either pane had it.
-    */
-    const overlays = code('src/lib/components/RoomOverlays.svelte');
-    expect(overlays.match(/<h4>Upload this image\?<\/h4>/g)?.length).toBeGreaterThanOrEqual(3);
+  /*
+    ## The three copies became ONE on 2026-08-31, which is why this counts differently now
+
+    The assertion here used to be `>= 3` occurrences inside `RoomOverlays.svelte`, and the comment
+    beside it explained why counting beat `toContain`: the chat composer's copy had carried the
+    heading since it was built, so a single-occurrence check was already satisfied before either
+    alert pane had it.
+
+    **That is a defence against three copies, and the right fix was to stop having three.** The
+    dialog is `ImagePasteConfirm.svelte` now — one component with the heading in it, rendered by all
+    three call sites — so the property to assert is no longer "how many copies say it" but "the one
+    that all three use says it", plus "all three still use it". Both are below, and together they
+    are strictly stronger: the old count passed if two copies had the heading and a third had been
+    added without it, as long as the total reached three.
+  */
+  it('asks the question, in the one dialog all three pastes now render', () => {
+    const confirm = code('src/lib/components/ImagePasteConfirm.svelte');
+    expect(confirm.match(/<h4>Upload this image\?<\/h4>/g)?.length).toBe(1);
   });
 
   it('sizes the preview at the reference s 50vh rather than inheriting 70vh', () => {
+    const confirm = code('src/lib/components/ImagePasteConfirm.svelte');
+    expect(confirm.match(/style="max-height: 50vh;"/g)?.length).toBe(1);
+  });
+
+  it('and all three pastes still reach it', () => {
+    /*
+      The half the count used to buy. Each call site keeps its OWN `onconfirm`, because
+      `doImggurUpload` dispatches on a feature name deny-by-default (byte 1,992,037) — sharing one
+      handler is how an image meant for a form is posted into chat.
+    */
     const overlays = code('src/lib/components/RoomOverlays.svelte');
-    expect(overlays.match(/style="max-height: 50vh;"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(3);
+    expect(overlays).toContain('onconfirm={() => void composer.confirmImagePaste()}');
+    expect(overlays).toContain('onconfirm={() => void swingAlerts.confirmImagePaste()}');
+    expect(overlays).toContain('onconfirm={() => void dayTradeAlerts.confirmImagePaste()}');
   });
 });
 
@@ -121,8 +145,14 @@ describe('the download itself', () => {
       been extracted yet.
     */
     expect(read('src/lib/room/modals.svelte.ts')).not.toContain('downloadImage(url: string)');
-    expect(code('src/lib/components/RoomOverlays.svelte')).toContain(
-      'onclick={() => downloadImage(modals.selectedImageUrl as string)}'
+    /*
+      The lightbox left `RoomOverlays.svelte` for `ImageLightbox.svelte` on 2026-08-31, and the cast
+      went with it: the component takes `url: string`, so `modals.selectedImageUrl as string` — the
+      assertion that a `string | null` narrowed by an enclosing `{#if}` really is a string — is now
+      the prop's type instead of a cast at the call site.
+    */
+    expect(code('src/lib/components/ImageLightbox.svelte')).toContain(
+      'onclick={() => downloadImage(url)}'
     );
   });
 

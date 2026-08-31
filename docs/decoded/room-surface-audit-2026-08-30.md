@@ -46,16 +46,26 @@ inside the document itself. The table describes the two-verifier pass **as it ra
 refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
 exactly as RM-25 belongs in the next paragraph and not in that table.
 
-**One row was ADDED after this document was committed** — RM-25, found while building RM-11 and
-RM-12 by decoding the compact component's whole consts table rather than the entries those rows
-named. It is not folded into the totals above, which describe the two-verifier pass and should keep
-describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes
-the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
-byte offsets make the second reading the tempting one.
+**FIFTEEN rows have been appended since this document was committed**, and each of them carries the
+sentence *this row was ADDED after this document was committed* in its body, so the count below is
+derived from the rows rather than written beside them. None is folded into the totals above, which
+describe the two-verifier pass and should keep describing it.
+
+The first was **RM-25**, found while building RM-11 and RM-12 by decoding the compact component's
+whole consts table rather than the entries those rows named. The lesson is the cheaper half of the
+same one UIM-03 teaches: **a reader who decodes the table finds rows a reader who looks up the cited
+const cannot**, and this document's per-row byte offsets make the second reading the tempting one.
+
+The other fourteen are the two surfaces added on **2026-08-31** — `MainTabStrip.svelte` (MTS-01 to
+MTS-07) and `RoomOverlays.svelte` (OVL-01 to OVL-07), read end to end at verified boundaries.
+Neither had a section here, and neither is in the surfaces table above for the same reason RM-25 is
+not: that table describes the pass as it ran. **Three of the fourteen exist only because the consts
+tables were decoded by value rather than looked up** — MTS-04, MTS-06 and OVL-01 — which is RM-25's
+lesson holding a second time, on a second pair of surfaces, at a rate of better than one in five.
 
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 238 closed · 238 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4393,6 +4403,445 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 **Ours:** apps/room/src/routes/api/day-trade-alerts/+server.ts:20-31 documents the omission and takes the room from the session row instead of the request; the twin note is at apps/room/src/routes/api/swing-alerts/+server.ts:21-25 and the setting is explicitly excluded from the room config in apps/room/src/lib/server/room-config-client.ts:452 and :480. `apps/room/src/lib/room/trade-alerts.svelte.ts:219-223` fetches `${endpoint}?days=…` with no session parameter. A room configured upstream to mirror another room's alert log will show its own log here. Recorded as a deliberate, security-motivated divergence rather than an oversight (the same offset 1,010,164 initial-load path is likewise not carried).
 
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
+
+## MainTabStrip.svelte
+
+7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts
+table opening at 1,994,264, template and update block at 2,014,221-2,017,200. Every one of the
+eight `<li>` elements and both dropdown sub-templates were decoded BY VALUE rather than by looking
+up the consts a claim names; three of the seven below exist only because of that.
+
+This surface had no section in this register. It is not counted in the surfaces table above, which
+describes the two-verifier pass as it ran.
+
+### MTS-01 — The Files cog is drawn for every member; the reference instantiates it only for a presenter
+
+**BUILT 2026-08-31.** `{#if isPresenter}` around it, and `{#if}` rather than `hidden` because `-1`
+is `ɵɵconditional`'s "instantiate nothing" — the distinction this strip already turns on. The cog
+and its menu moved into `TabGearMenu.svelte` in the same change (see MTS-07), so the gate sits at
+the call site where the value is. `main-tab-strip-gates.svelte.test.ts` mounts the strip as a member
+and asserts the ELEMENT is absent rather than hidden, with the presenter render as its control.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**high** · `missing-control` · reference byte **2,017,076**
+
+```
+H(35,ZCe,8,0,"div"), … O(35,o.isP?35:-1)
+function ZCe(t,n){if(1&t){const e=Y();d(0,"div")(1,"span",66),T(2,"i",54),u(),d(3,"ul",67)(4,"li",56),x("click",function(){return D(e),E(g().newFile())}),d(5,"a",57),T(6,"i",58),v(7," Upload File"),u()()()()}}
+```
+
+**Ours:** MainTabStrip.svelte rendered `span#dropdownMenuFiles` and its `ul.dropdown-menu`
+unconditionally, inside the Files tab's anchor. The menu's only item is mounted by
+`RoomNotes.mountUploadFileLink` (`room/notes.svelte.ts:291`), whose click opens the room's
+`file-upload` modal — so a member was shown the presenter's file uploader. Nothing downstream
+refused it either: `mountUploadFileLink` calls `this.#modals.open('file-upload')` with no role
+check, unlike its notes twin which at least refuses inside `requestNewNote`.
+
+### MTS-02 — The Notes cog has no gate; the reference instantiates it only for a presenter or a member who may author notes
+
+**BLOCKED 2026-08-31.** The gate cannot be applied from `MainTabStrip.svelte`: its eleven props
+carry `isPresenter` but nothing carrying the VIEWER's `canEditNotes`, and inventing a default is
+worse than leaving it — `false` takes the New Note cog away from a member who legitimately has it,
+`true` is no gate at all.
+
+**The one line that unblocks it:** `apps/room/src/lib/components/PresentationArea.svelte:507`, in the
+`<MainTabStrip … />` props between `{hideNotes}` and `{menus}`, add
+`canEditNotes={data.canEditNotes === true}` — `data.canEditNotes` is already on that component's
+`data` prop. Then `{#if isPresenter || canEditNotes}` around the `<TabGearMenu id="dropdownMenuNotes" …/>`,
+exactly as MTS-01 now has. That file is outside this task's editable set.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `missing-control` · reference byte **2,016,713**
+
+```
+O(23,o.isP||o.appService.globals.user.canEditNotes?23:-1)
+function KCe(t,n){if(1&t){const e=Y();d(0,"div",15)(1,"span",53),T(2,"i",54),u(),d(3,"ul",55)(4,"li",56),x("click",function(){return D(e),E(g().newNote())}),d(5,"a",57),T(6,"i",58),v(7," New Note"),u()()()()}}
+```
+
+**Ours:** the cog is drawn for everybody. It is less severe than MTS-01 because the ACTION behind
+it already refuses — `RoomNotes.requestNewNote` sets `newNoteOpen` to `this.#noteGates().editorMounted`,
+so a member who may not author gets nothing when they press it. That is precisely the shape the
+root standard names, though: a control whose only effect is nothing. The reference declines to draw
+it at all.
+
+### MTS-03 — The Recordings tab does not exist here at all
+
+**BLOCKED 2026-08-31.** Not buildable from this component or from any file in this task's editable
+set, and the block is structural rather than a missing prop: `MainTab` in `apps/room/src/lib/types.ts`
+has no `'recordings'` member, so `mainTab = 'recordings'` does not type-check, and
+`PresentationArea.svelte` has no `#recordings` pane (upstream const 25,
+`["id","recordings","role","tabpanel","aria-labelledby","recordings-tab",1,"tab-pane","position-relative","h-100",3,"ngClass"]`),
+so a tab added here would select a value nothing renders.
+
+**What unblocks it, in order:** add `| 'recordings'` to `MainTab` in `apps/room/src/lib/types.ts:16`;
+add `recsInRoom?: boolean` to `RoomSessionSettings` in `apps/room/src/lib/server/room-config-client.ts`
+and pass it through the load; add the `#recordings` pane to `PresentationArea.svelte`. The first
+half of the gate is already built — `RoomGates.archivesAvailable` (`room/gates.ts:336`) is
+`archivesAvailableTo(viewer, session)`, the transcription of the reference method at byte 1,959,447,
+and `roster-gates.test.ts:52` already pins it against these same bytes. The second half,
+`sessData.recsInRoom`, returns ZERO hits across `apps/room/src`.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `missing-control` · reference byte **2,016,775**
+
+```
+O(24,o.archivesAvailableTo()&&o.appService.globals.sessData.recsInRoom?24:-1)
+function YCe(t,n){if(1&t){const e=Y();d(0,"li",31),x("click",function(){return D(e),E(g().onMainTabChange("presAreaTabs-recordings"))}),d(1,"a",59)(2,"div",12)(3,"div"),T(4,"i",60),d(5,"span",14),v(6,"Recordings"),u()()()()()}if(2&t){const e=g();m(),z("ngClass",ct(1,mo,"presAreaTabs-recordings"==e.selectedMainTab))}}
+```
+
+**Ours:** absent. Grepping `apps/room/src` for `recsInRoom`, `recordings-tab` or a `'recordings'`
+main tab returns nothing. Const 59 is the anchor
+(`["id","recordings-tab","data-bs-toggle","tab","data-bs-target","#recordings","role","tab","aria-controls","recordings","aria-selected","false",1,"nav-link",3,"ngClass"]`)
+and const 60 the icon, `[1,"fas","fa-file-video"]`. The tab sits between Notes and VideoPlayer in
+slot order, which is also where `PresentationArea`'s own pane-order note (`PA-08`) already says the
+recordings pane belongs.
+
+### MTS-04 — `z('hidden', o.hideScreens)` on the Screens `<li>` is not reproduced
+
+**MEASURED REFUSAL 2026-08-31.** The measurement is recorded at the code, in
+`MainTabStrip.svelte`'s header. `hideScreens` occurs exactly THREE times in the 2,891,205-byte
+bundle: `this.hideScreens=!1` in the component constructor at 1,954,414, and the two template reads
+at 2,016,430 (this tab) and 2,017,196 (its pane). Nothing else in the bundle mentions it.
+
+**And its four siblings are all assigned, which is what makes this a measurement rather than a
+guess.** `ngOnInit` at 1,955,678 sets `hideNotes`, `hideFiles`, `hasSwingTradeAlerts`,
+`hasDayTradeAlerts` and `hideStreams` — `this.hideStreams=!this.appService.globals.sessData.useMediaMTX`
+— and `hideScreens` is not among them. The flag is initialised false and never written, so the
+binding can never be true. Reproducing it here would add a prop and a gate no caller could open.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `missing-behaviour` · reference byte **2,016,417**
+
+```
+2&i&&(m(),z("hidden",o.appService.globals.viewerOnlyMode),m(),z("hidden",o.hideScreens),m(),z("ngClass",ct(46,mo,"presAreaTabs-screens"==o.selectedMainTab)),m(6),z("hidden",o.hideStreams),…
+```
+
+**Ours:** MainTabStrip.svelte's Screens `<li>` carries `role="presentation" class="nav-item"` and no
+`hidden`, where its Streams, Notes and Files siblings all carry one. The asymmetry is the
+reference's own and is now explained where it is visible.
+
+### MTS-05 — Seven `onkeydown` handlers that no keyboard could reach
+
+**HALF BUILT 2026-08-31.** The seven tab anchors are fixed; the two cogs are refused with the
+measurement recorded in `TabGearMenu.svelte`.
+
+`tabindex` on every anchor read `{mainTab === … ? undefined : -1}`. `undefined` omits the attribute
+in Svelte, and an `<a>` with no `href` and no non-negative `tabindex` is not focusable in any
+browser — so the SELECTED tab could not take focus and the other six were explicitly removed from
+the tab order. Every `onkeydown` in the strip was therefore unreachable code. It is `? 0 : -1` now,
+the roving tabindex the ARIA tabs pattern asks for, and `main-tab-strip-gates.svelte.test.ts` calls
+`.focus()` and asserts `document.activeElement`, then dispatches `Enter` and asserts the tab changed.
+
+**The two cog `<span>`s are NOT repaired, and the reason is a constraint rather than an omission.**
+A `<span>` with no `tabindex` is not focusable, and the only way to make one focusable is
+`tabindex="0"` plus a role — on an element that sits inside the tab's own `<a role="tab">`, which
+nests one interactive control inside another and is invalid whichever role is chosen. The reference
+has exactly that shape and delegates the keyboard to Bootstrap, whose source is not in the bundle,
+so there is nothing to transcribe and no rendered capture to check a repair against.
+
+**This whole affordance is OURS.** The reference has no `tabindex` anywhere in the strip and no
+keyboard handling whatsoever. What was wrong was shipping half of it.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `defect` · reference byte **1,994,264**
+
+```
+["id","screens-tab","data-bs-toggle","tab","data-bs-target","#screens","role","tab","aria-controls","screens","aria-selected","true",1,"nav-link",3,"ngClass"]
+```
+
+**Ours:** MainTabStrip.svelte:103,129,151,224,257,295,326 — seven `tabindex` expressions, each
+paired with an `onkeydown` that set `mainTab`. Const 5 above is the reference's screens anchor,
+decoded by value: it carries no `tabindex` at all, and neither does any of its seven siblings.
+
+### MTS-06 — `aria-selected` is derived here and hardcoded on all eight anchors upstream
+
+**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. Decoded by value from
+`app-presentationarea`'s consts table: const 5 (`screens-tab`), 9 (`streams-tab`), 61
+(`videoplayer-tab`), 63 (`swingAlerts-tab`) and 65 (`dayTradeAlerts-tab`) each carry a literal
+`"aria-selected","true"`; const 11 (`notes-tab`), 17 (the files anchor, which carries no id) and 59
+(`recordings-tab`) each carry a literal `"false"`. Nothing in the update block from 2,016,417 onward
+writes the attribute — the only per-tab binding is `ngClass`, `ct(46,mo,…)` with
+`mo=t=>({active:t})` at byte 1,916,345.
+
+So a room with both alert entitlements announces FIVE simultaneously-selected tabs to a screen
+reader and never announces the one actually showing. Reproducing it would reproduce a defect. Ours
+binds it to `mainTab === …` on all seven anchors, and `main-tab-strip-gates.svelte.test.ts` asserts
+exactly one tab answers `true` and that it is the one showing.
+
+**The precedent is this document's own**, twice: `FP-04` and `PAM-15` refuted the identical claim
+against `FilesPane` and `PostAlertModal` — "the reference genuinely hardcodes aria-selected and ours
+genuinely binds it, and the claim's own remedy, that the divergence should stay recorded as
+deliberate, is ALREADY recorded". It was not recorded for this surface, which is why this row exists
+and is closed rather than refuted.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `divergence` · reference byte **1,994,264**
+
+**Ours:** MainTabStrip.svelte, seven anchors, `aria-selected={mainTab === '…'}`. The eighth
+reference anchor is Recordings, which this room does not have — see MTS-03.
+
+### MTS-07 — The two tab cogs were one interaction with two implementations, and they disagreed
+
+**FIXED 2026-08-31.** One implementation now, `TabGearMenu.svelte`, and the symmetry is structural:
+the sibling menu to close is DERIVED from which cog this is, so a cog cannot be added that forgets
+to close the other one.
+
+Upstream neither cog carries a click handler. `data-bs-toggle="dropdown"` hands the open/close to
+Bootstrap, and both cogs sit inside an `<li>` whose own `x("click", …)` calls `onMainTabChange` —
+const 4 is `["role","presentation",1,"nav-item",3,"click","hidden"]`. One implementation, so the
+two behave identically by construction.
+
+This room has no Bootstrap dropdown behaviour, so each cog was hand-wired, and the two hand-wirings
+had drifted. Measured before the repair: the notes cog called `event.stopPropagation()`, which
+suppressed the very anchor handler that would have selected the Notes tab, and it did not close the
+Files menu; the files cog re-set `mainTab = 'files'` by hand AND called `menus.set('notes', false)`.
+So a member who clicked the notes cog stayed on whichever tab they were on and was shown a menu
+belonging to a tab they could not see, while the files cog did the right thing twice over.
+
+Three assertions per cog in `main-tab-strip-gates.svelte.test.ts`, driven against a REAL `RoomMenus`
+rather than a recording stub — a stub would have let the two go on disagreeing about which calls to
+make while faithfully recording both.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `divergence` · reference byte **1,916,736**
+
+```
+function KCe(t,n){if(1&t){const e=Y();d(0,"div",15)(1,"span",53),T(2,"i",54),u(),d(3,"ul",55)(4,"li",56),…
+ 53  ["id","dropdownMenuNotes","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]
+ 66  ["id","dropdownMenuFiles","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]
+```
+
+**Ours:** MainTabStrip.svelte:167-188 (notes) and :340-367 (files) before the change — twenty-six
+lines each, structurally identical and behaviourally different. Decoded in passing: const 55 labels
+the notes menu `aria-labelledby="dropdownMenuButton"`, an element that exists nowhere in the
+captured page, while const 67 labels the files menu with its own cog's id. Both are transcribed
+as-is and `TabGearMenu` takes `labelledBy` explicitly for exactly that reason.
+
+---
+
+## RoomOverlays.svelte
+
+7 gaps, read 2026-08-31. The surface is a LAYER rather than one reference component: the two
+connection overlays are nodes 7-10 of `app-room`'s template (selector block at 2,533,572, consts at
+2,533,197, template at 2,546,833), the delivery effects are `app-chat`'s `chatMsg` handler
+(1,431,196) and `app-roomscroller`'s `updateAlertMsg` handler (1,408,794), and the dialogs are
+`bootbox` calls in `app-presentationarea` (1,992,730, 1,992,250) and `app-chat` (1,445,719). All
+four regions were read end to end.
+
+This surface had no section in this register. It is not counted in the surfaces table above, which
+describes the two-verifier pass as it ran.
+
+### OVL-01 — The reconnect flash renders its two children in the wrong order and drops the reference's leading space
+
+**FIXED 2026-08-31.** `<i class="fas fa-check"></i>{' Conected\n'}` — the tick first, then the text
+node with the space that separates them, written as an expression because Svelte folds whitespace at
+element boundaries. The sibling overlay four lines above already used that idiom for
+`{' Reconnecting Chat... '}`; this element had never been given it.
+
+`overlay-delivery-contract.test.ts` extracts the text node with a regex and compares it, rather than
+asking whether the element contains a string. Its first draft asserted the element did not contain
+`Connected`, to pin upstream's one-n spelling, and failed on its own subject: the element's CLASS is
+`notConnectedOverlay`. That is the same substring-answered-by-a-longer-neighbour defect this
+repository has already met twice, caught this time by its own negative control before it shipped.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `wrong-markup` · reference byte **2,547,023**
+
+```
+H(7,iRe,3,0,"div",9),d(8,"div",10),T(9,"i",11),v(10," Conected\n"),u(),T(11,"app-user-info-modal")…
+ 10  ["id","connectedMsg",1,"notConnectedOverlay","animated","fadeIn"]
+ 11  [1,"fas","fa-check"]
+```
+
+**Ours:** RoomOverlays.svelte rendered `Conected<i class="fas fa-check"></i>` — the tick trailing the
+word, with no space anywhere, so the two ran together. `T` is `ɵɵelement` and `v` is `ɵɵtext`, so
+the compiled order is unambiguous. `connection-overlay-contract.test.ts` already asserted this
+element exists and that there are exactly two `notConnectedOverlay` classes; it asserted nothing
+about what is inside it.
+
+### OVL-02 — The Q&A arrival notice and the unread marker run in rooms that never bought Q&A on alerts
+
+**BUILT 2026-08-31.** One line, `if (!messageChrome.hasQaOnAlerts) return;`, placed before the
+effect reads a single arrival — so the toast, the `qaAlert` sound, the unread marker AND the Q&A
+reaction notices all stop together, which is what the reference's early return does.
+
+**Read off `messageChrome`, not `data.sessData`.** `buildMessageChrome` resolves
+`hasQAOnAlerts === true` once for the whole page (`room-message-chrome.ts:263`) and three components
+already read the answer; a second `data.sessData?.hasQAOnAlerts === true` here would be a second
+answer to one question, which is the failure that module exists to end. The contract test asserts
+the second read is absent as well as the gate being present.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**high** · `missing-behaviour` · reference byte **1,408,794**
+
+```
+if("alerts"!=this.logType||!this.appService.globals.sessData.hasQAOnAlerts)return;if(s.uid!==this.appService.globals.user.userXrefID&&!r){const f=s.isA?"answer":"question";for(let _ of o.qa)_.uid===this.appService.globals.user.userXrefID&&(…)}
+```
+
+**Ours:** the effect at RoomOverlays.svelte had no such gate. It called `unreadQaAlertIds.add(…)`
+and `deliverQaNotice(…)` for every fresh question and ran `questionReactionNotice` unconditionally.
+`unreadQA = !0` is set FURTHER DOWN the same upstream handler, past that return, so a room without
+the entitlement flashes nothing upstream either — and the flash is what the marker feeds. The room's
+own composer already refuses to draw the ask button without it (`O(1, !e.isQAMsg &&
+sessData.hasQAOnAlerts ? 1 : -1)`, byte 1,339,784, pinned by `qa-entitlement-contract.test.ts`),
+which is what makes this a leak rather than merely a difference: the notification path was open
+where the control path was closed.
+
+### OVL-03 — The chat ding had two implementations here, and the one in this file cited a gate that does not exist
+
+**FIXED 2026-08-31.** The effect and its `chatArrivals` tracker are gone; the mention ring it was
+accidentally covering moved to the mention effect, which is where the bundle puts it (OVL-04).
+
+**The comment above it was the finding.** It claimed: *"app-chat plays `pling` for an incoming chat
+message under exactly this gate: `preferences.doNotDisturbOn || (preferences.chatSoundOn &&
+soundEffectsService.pling.play())`"*. All EIGHT `pling.play()` sites in the bundle were read —
+1,218,923, 1,431,259, 1,431,911, 2,075,972, 2,207,439, 2,377,691, 2,378,343, 2,506,579 — and no site
+carries that gate. The two in `app-chat`'s `chatMsg` handler are the MENTION ring (1,431,259, inside
+`e.isMention &&`) and the followed-sender branch quoted below.
+
+**And the correct rule was already built.** `#lib/chat-arrival-sound.ts` transcribes it and
+`room/events.svelte.ts:861-876` calls it on the SSE arrival, where the sender's hash is in hand. So
+this effect was a second copy layered on the right one: a room with `dingOnNewMessage` off and
+nobody followed — upstream's SILENT case — rang on every message, and a room with it on rang twice.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**high** · `defect` · reference byte **1,431,911**
+
+```
+!this.appService.globals.preferences.doNotDisturbOn&&this.appService.globals.preferences.chatSoundOn){const{followedUsers:i}=this.appService.globals;try{i&&Object.keys(i).length>0&&i[e.avt].followChatStyle.playSound?this.soundEffectsService.pling.play():(this.appService.globals.playChatMessageSoundFor&&this.appService.globals.playChatMessageSoundFor.length>0&&this.appService.hashEmail(this.appService.globals.user.email)!==e.avt&&this.appService.globals.playChatMessageSoundFor.includes(e.avt)||this.appService.globals.sessData.dingOnNewMessage&&this.appService.hashEmail(this.appService.globals.user.email)!==e.avt)&&this.soundEffectsService.followed.play()}catch{…}
+```
+
+**Ours:** RoomOverlays.svelte held `const chatArrivals = new RoomArrivals<…>()` and an effect
+reading `chatArrivals.fresh(data.messages)` that played `pling` whenever any arrival was not the
+viewer's own. Three ways wrong at once: the wrong sound name for the ordinary case (`followed`, not
+`pling`), no per-sender condition at all, and a second delivery of a sound the event router had
+already decided. The tracker went with it — nothing else read it, so leaving it would have left a
+marker set growing per message for a reader that no longer exists.
+
+### OVL-04 — A mention plays no sound, and the popup preference silenced the sound as well as the popup
+
+**BUILT 2026-08-31.** The ring is `if (prefs.chatSoundOn) playSoundEffect('pling');`, placed after
+the Do Not Disturb return and BEFORE the `chatPopup` return, which is the reference's own nesting.
+One ring for a batch rather than one per mention, stated as ours at the code: upstream handles
+`chatMsg` one frame at a time, and `data.messages` reaches this component as a page.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `missing-behaviour` · reference byte **1,431,259**
+
+```
+this.appService.globals.preferences.doNotDisturbOn||(this.appService.globals.preferences.chatSoundOn&&this.soundEffectsService.pling.play(),this.appService.globals.preferences.chatPopup&&(this.alertService.info(e.txt,"Mention from @"+e.n,{enableHtml:!0}),window.Notification&&Notification.requestPermission().then(…)))
+```
+
+**Ours:** the mention effect read `if (prefs.doNotDisturbOn || !prefs.chatPopup) return;` — a single
+return on both preferences — under a comment that called it *"the outer gate on the whole block,
+sound and popup alike"*. They are two SIBLING gates under one Do Not Disturb: `chatSoundOn` decides
+the sound, `chatPopup` decides the toast and the OS notification. A member who had turned the popup
+off was therefore told nothing at all when named. It happened not to be silent in practice only
+because OVL-03's blanket ring was firing for every message including this one; fixing that alone
+would have made it silent, which is why the two rows are one change.
+
+### OVL-05 — The lightbox describes the image with a filename; the reference and this room's own other renderer both use the url
+
+**FIXED 2026-08-31.** `alt={url}`, in `ImageLightbox.svelte` — the component the lightbox was
+extracted into in the same change, so the one interesting decision it carries is argued in the file
+that makes it.
+
+Neither value is a good description of a picture and no rule this repository can apply would invent
+one: the image is a member's upload and nothing in the room knows what is in it. What settles it is
+that the filename was a preference substituted for a captured value, and that it disagreed with this
+room's OWN second renderer of the same image — `RoomModals.showImage` writes
+`<img src="${url}" alt="${url}" />` into the popped-out window (`room/modals.svelte.ts:295`). One
+image, two alt rules, neither of them the reference's.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `invented-value` · reference byte **1,992,730**
+
+```
+showImagePreview(e,i=""){e&&bootbox.dialog({title:i,message:`\n        <div class="text-center">\n          <img src="${e}"\n              class="img-fluid"\n               alt="${e}" />\n        </div>\n      `,size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download Image',className:"btn-primary btn-sm m-auto",callback:()=>(fetch(e)…,!1)}}})}
+```
+
+**Ours:** RoomOverlays.svelte computed
+`alt={modals.selectedImageUrl.substring(modals.selectedImageUrl.lastIndexOf('/') + 1)}`. Four
+reference call sites, all in `app-presentationarea` — 1,933,330, 1,936,798, 1,939,572, 1,943,143 —
+and none passes `i`, which is why the dialog's `.modal-title` renders empty here and should.
+
+### OVL-06 — The lightbox's download button sits in the body under an `<hr />`; where the reference puts it cannot be read from this checkout
+
+**MEASURED REFUSAL 2026-08-31.** The measurement is recorded in `ImageLightbox.svelte`.
+
+Upstream passes the button inside `buttons: { download: { label, className: "btn-primary btn-sm
+m-auto", … } }`, and it is **bootbox** that decides where a `buttons` entry lands in the DOM and what
+class list it ends up with. `window.bootbox` is a global in the captured page and its source is NOT
+in the 2,891,205-byte bundle — `bootbox` appears only as call sites. So `.modal-footer` versus the
+body, and whether `btn` is prepended to `btn-primary btn-sm m-auto`, are answerable only from a
+rendered DOM capture, and thirteen of the fourteen capture roots are absent from this checkout by
+design. `todo-next.md` states the same limit in general terms: a gap that turns on rendered geometry
+is not auditable here and must say so rather than be guessed.
+
+**What IS transcribed from those bytes and is now asserted:** the callback ends `…,!1)` — it returns
+false, which is bootbox's "do not dismiss" — so saving the image leaves the lightbox open. The
+button below closes nothing.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `divergence` · reference byte **1,992,730**
+
+**Ours:** `ImageLightbox.svelte` renders the button inside `.bootbox-body` after an `<hr />`, with
+`class="btn btn-primary btn-sm"`. Both the `<hr />` and the placement are this room's, are recorded
+as this room's in that file, and are evidence of nothing.
+
+### OVL-07 — Upstream raises the Q&A notice once per question the viewer asked, plus once more for a presenter; this room raises it once
+
+**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. `updateAlertMsg` runs two sibling
+blocks over the same event: a LOOP over `o.qa` that fires for every entry whose `uid` is the
+viewer's, and then a separate `user.isPresenter && (…)` block with the identical body. So a member
+who has asked three questions on an alert gets three toasts and three `qaAlert` sounds when a fourth
+arrives, and a presenter who has also asked gets four.
+
+Reproducing that would reproduce a defect: the notice says *who asked what on which alert*, and it
+says the same thing each time. `deliverQaNotice` in `RoomOverlays.svelte` resolves the audience once
+— never for your own post, otherwise every presenter plus anyone who has asked on that alert — and
+delivers once.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `defect` · reference byte **1,408,905**
+
+```
+for(let _ of o.qa)_.uid===this.appService.globals.user.userXrefID&&(this.appService.globals.preferences.doNotDisturbOn||(!l&&this.appService.globals.preferences.qaSoundOn&&this.soundEffectsService.qaAlert.play(),…),!l&&this.appService.globals.preferences.alertPopup&&this.alertService.info(`"${s.txt}" for alert: "${o.txt}" by ${o.n}`,`Alert ${f} from @${s.n}`),…);this.appService.globals.user.isPresenter&&(… the same body again …)
+```
+
+**Ours:** `deliverQaNotice` is called once per FRESH question, and it returns early unless the
+viewer is a presenter or has asked on that alert. The presenter branch at byte 1,409,538 is the
+duplicate — it repeats the loop body verbatim rather than being reached instead of it.
+
+---
 
 ---
 

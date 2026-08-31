@@ -253,20 +253,22 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
       why: 'the SAME badge element on a roster row — RS-02, which rendered the wrapper and never filled it. Bounded by the same `.user-badge-img` rule as the message-log twin above, and unsizeable for the same reason: the image is room configuration of unknown aspect.'
     }
   },
-  'lib/components/RoomOverlays.svelte': {
-    '{chatPastePreviewUrl}': {
+  /*
+    FOUR ENTRIES BECAME TWO on 2026-08-31, and the count is the finding rather than the bookkeeping.
+
+    `RoomOverlays.svelte` carried three pasted-screenshot previews — chat, swing, day-trade — which
+    were three transcriptions of ONE `bootbox.confirm`, and a lightbox. Both are components now, so
+    each image is described once instead of three and four times. That is the same argument this
+    catalog makes for itself: a reason repeated is a reason that goes stale in one of its copies.
+  */
+  'lib/components/ImagePasteConfirm.svelte': {
+    '{previewUrl}': {
       count: 1,
-      why: 'a pasted CHAT screenshot, bounded by `.img-fluid` plus an inline `max-height: 50vh` — the reference sets both on this one (`max-width:100%; max-height: 50vh`, byte 1,445,719) because the chat dialog is the only paste confirmation that also carries a message box beneath the picture.'
-    },
-    '{pastePreviewUrl}': {
-      count: 1,
-      why: 'a pasted swing-alert screenshot, bounded by `.img-fluid`.'
-    },
-    '{dayTradePastePreviewUrl}': {
-      count: 1,
-      why: 'a pasted day-trade screenshot, bounded by `.img-fluid`.'
-    },
-    '{modals.selectedImageUrl}': {
+      why: 'a pasted screenshot awaiting confirmation — chat, swing or day-trade, which are one dialog. Bounded by `.img-fluid` plus an inline `max-height: 50vh`, both of which the reference sets on it (`max-width:100%; max-height: 50vh`, bytes 1,445,719 and 1,992,250). The bytes are a clipboard image of unknown aspect, so no ratio can be written here that would not distort some of them.'
+    }
+  },
+  'lib/components/ImageLightbox.svelte': {
+    '{url}': {
       count: 1,
       why: 'the full-size image lightbox. `.imgur-modal img` bounds it at `max-height: calc(-150px + 100vh)`, and the modal is what the viewer is looking at - there is nothing below it to push.'
     }

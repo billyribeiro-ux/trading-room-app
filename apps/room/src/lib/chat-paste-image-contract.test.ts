@@ -51,6 +51,21 @@ const MAIN = readFileSync(new URL('./components/AlertChatArea.svelte', import.me
 const EXTRA = readFileSync(new URL('./components/ExtraChatPane.svelte', import.meta.url), 'utf8');
 const OVERLAYS = readFileSync(new URL('./components/RoomOverlays.svelte', import.meta.url), 'utf8');
 /*
+  The dialog BODY moved to `ImagePasteConfirm.svelte` on 2026-08-31, and the reason is this room's
+  own `dta-04`: `RoomOverlays` held THREE transcriptions of one `bootbox.confirm` — chat, swing,
+  day-trade — and two of them had shipped without `<h4>Upload this image?</h4>`, leaving an
+  unlabelled OK button over a picture. Three copies is three places for the question to go missing.
+
+  So the heading is asserted where it now lives and the WIRING is still asserted at the call site,
+  which keeps the two halves of this row separable: the shared dialog can be checked once, and
+  chat's own textarea — the only thing that differs between the three (byte 1,445,719) — is checked
+  in `RoomOverlays` where chat passes it.
+*/
+const PASTE_CONFIRM = readFileSync(
+  new URL('./components/ImagePasteConfirm.svelte', import.meta.url),
+  'utf8'
+);
+/*
   Read at MODULE scope, with the other three, and that is not stylistic. `beforeEach` below replaces
   the global `URL` with an object carrying stubbed `createObjectURL` / `revokeObjectURL` — so inside
   a test `new URL(...)` is no longer a constructor. Anything reading a file has to do it up here.
@@ -381,7 +396,7 @@ describe('the clipboard filter, in the component', () => {
     expect(overlaysCode).toContain('onconfirm={() => void composer.confirmImagePaste()}');
     expect(overlaysCode).toContain('onclose={() => composer.cancelImagePaste()}');
     expect(overlaysCode).toContain('bind:value={composer.pastedImageMessage}');
-    expect(overlaysCode).toContain('<h4>Upload this image?</h4>');
+    expect(PASTE_CONFIRM).toContain('<h4>Upload this image?</h4>');
     expect(overlaysCode).toContain('id="msg-text"');
   });
 });

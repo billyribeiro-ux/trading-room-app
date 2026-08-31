@@ -20,7 +20,6 @@
   */
   import { canShowRosterPrivateChat } from '#lib/roster-private-chat.js';
   import { RoomArrivals, RoomOrderedArrivals } from '#lib/room/arrivals.js';
-  import { downloadImage } from '#lib/download-image.js';
   import { ReactionArrivals } from '#lib/reaction-arrivals.js';
   import { chatReactionNotice, questionReactionNotice } from '#lib/room/reaction-notices.js';
   import { playSoundEffect } from '#lib/sound-effects.js';
@@ -31,6 +30,8 @@
   import type { ChatDisplayMode, ChatDisplaySurface } from '#lib/chat-display-mode.js';
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import GifConfirmDialog from '#lib/components/GifConfirmDialog.svelte';
+  import ImageLightbox from '#lib/components/ImageLightbox.svelte';
+  import ImagePasteConfirm from '#lib/components/ImagePasteConfirm.svelte';
   import ImageUploadDialog from '#lib/components/ImageUploadDialog.svelte';
   import ModalHost from '#lib/components/ModalHost.svelte';
   import RemoteAudioSinks from '#lib/components/RemoteAudioSinks.svelte';
@@ -268,11 +269,12 @@
     move it was waiting for, and the note on the page has been updated to say so rather than being
     silently dropped.
 
-    ## The four trackers are LOCAL, and that is the test that this is the right home
+    ## The trackers are LOCAL, and that is the test that this is the right home
 
-    `mentionArrivals`, `alertArrivals`, `qaArrivals` and `chatArrivals` had exactly one reader each —
-    their own effect — so they came across as local state rather than as props. State whose only
-    reader is one component belongs to that component; `PrivateChatPanel` is the recorded precedent.
+    `mentionArrivals`, `alertArrivals` and `qaArrivals` have exactly one reader each — their own
+    effect — so they came across as local state rather than as props. State whose only reader is one
+    component belongs to that component; `PrivateChatPanel` is the recorded precedent. A fourth,
+    `chatArrivals`, came with them and went on 2026-08-31; the note where it stood says why.
 
     `unreadQaAlertIds` did NOT, and so is a prop: `RoomFeeds` reads it for the unread badge and
     `RoomModals` clears it. It is the page's INSTANCE, not a copy — a `SvelteSet` handed over whole,
@@ -323,11 +325,35 @@
    */
   const alertArrivals = new RoomArrivals<(typeof data.alerts)[number]>();
 
-  // app-chat plays `pling` for an incoming chat message under exactly this gate:
-  //   preferences.doNotDisturbOn || (preferences.chatSoundOn && soundEffectsService.pling.play())
-  // Your own message does not ring, and one ring covers a batch that arrives together rather than
-  // one per message.
-  const chatArrivals = new RoomArrivals<(typeof data.messages)[number]>();
+  /*
+    ── THE PER-MESSAGE CHAT DING IS NOT HERE, AND THE COMMENT THAT SAID IT WAS QUOTED NOTHING ──
+
+    A `chatArrivals` tracker stood here with this claim above it: *"app-chat plays `pling` for an
+    incoming chat message under exactly this gate: `preferences.doNotDisturbOn ||
+    (preferences.chatSoundOn && soundEffectsService.pling.play())`"*, and an effect below rang for
+    every batch that satisfied it. Removed 2026-08-31, after reading **all eight** `pling.play()`
+    sites in the bundle. There is no such gate at any of them. The one nearest that shape is the
+    MENTION ring (byte 1,431,259), which is now where it belongs — in the mention effect above.
+
+    What app-chat actually does on a non-mention message is a three-way choice, byte 1,431,911:
+
+    ```js
+    !preferences.doNotDisturbOn && preferences.chatSoundOn && (() => { const {followedUsers}=globals;
+      try { followedUsers && Object.keys(followedUsers).length>0
+            && followedUsers[e.avt].followChatStyle.playSound ? soundEffects.pling.play()
+          : ( globals.playChatMessageSoundFor?.length>0 && hashEmail(user.email)!==e.avt
+                && globals.playChatMessageSoundFor.includes(e.avt)
+              || globals.sessData.dingOnNewMessage && hashEmail(user.email)!==e.avt
+            ) && soundEffects.followed.play() } catch { … } })()
+    ```
+
+    a followed sender, a per-member list, or the room-wide ding — and silence otherwise. That rule
+    is `#lib/chat-arrival-sound.ts` and it is ALREADY WIRED, on the SSE arrival in
+    `room/events.svelte.ts:861-876`, where the sender's hash is in hand. So this effect was a
+    SECOND, wrong copy layered on top of the right one: a room with `dingOnNewMessage` off and
+    nobody followed — upstream's silent case — rang on every message, and a room with it on rang
+    twice. One rule, one caller, and the caller is not this file.
+  */
 
   function deliverAlert(alert: {
     senderName: string;
@@ -387,14 +413,43 @@
     const fresh = mentionArrivals.fresh(data.messages);
     if (fresh.length === 0) return;
 
-    // `prefs.doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
-    if (prefs.doNotDisturbOn || !prefs.chatPopup) return;
+    /*
+      `prefs.doNotDisturbOn ||` — the outer gate on the whole block, sound and popup alike.
 
-    for (const item of fresh) {
-      // Your own message is never a mention of you, whatever it says.
-      if (item.senderId === data.user.id) continue;
-      if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;
+      `chatPopup` is NOT part of it, and the sentence above said "sound and popup alike" while the
+      next line returned on both. Byte 1,431,196:
 
+      ```js
+      preferences.doNotDisturbOn || (
+        preferences.chatSoundOn && soundEffectsService.pling.play(),        // 1,431,259
+        preferences.chatPopup && (alertService.info(e.txt, "Mention from @" + e.n, {enableHtml:!0}),
+                                  window.Notification && Notification.requestPermission()…))
+      ```
+
+      Two SIBLING gates under one Do Not Disturb: `chatSoundOn` decides the sound, `chatPopup`
+      decides the toast and the OS notification. Returning on `chatPopup` took the sound with it, so
+      a member who had turned the popup off was never told they had been named at all.
+    */
+    if (prefs.doNotDisturbOn) return;
+
+    const mentions = fresh.filter(
+      (item) =>
+        // Your own message is never a mention of you, whatever it says.
+        item.senderId !== data.user.id &&
+        isMentionOf(item.body, data.user.displayName, item.isAdmin === true)
+    );
+    if (mentions.length === 0) return;
+
+    /*
+      ONE ring for a batch, which is ours and is the same rule the alert delivery already applies:
+      upstream handles `chatMsg` one frame at a time, so five mentions arriving together ring five
+      times. `data.messages` reaches this component as a page, not as a frame, so the batch is what
+      there is to respond to.
+    */
+    if (prefs.chatSoundOn) playSoundEffect('pling');
+    if (!prefs.chatPopup) return;
+
+    for (const item of mentions) {
       const title = `Mention from @${item.senderName ?? 'Unknown'}`;
       /*
         `alertService.info(e.txt, "Mention from @" + e.n, { enableHtml: !0 })` — byte 1431320 of
@@ -531,6 +586,31 @@
   $effect(() => {
     const questions = data.alertQuestions;
 
+    /*
+      THE ENTITLEMENT, and it gated nothing here until 2026-08-31.
+
+      `updateAlertMsg` — the handler that raises every Q&A notice, sets the flash and plays the
+      sound — opens with a refusal, byte 1,408,794:
+
+      ```js
+      if ("alerts" != this.logType || !this.appService.globals.sessData.hasQAOnAlerts) return;
+      ```
+
+      so in a room that never bought Q&A on alerts NOTHING below it runs: no toast, no `qaAlert`,
+      and no `unreadQA` marker — that flag is set further down the same handler, past this return.
+      This effect had no such gate, so a room without the entitlement still flashed alerts and rang
+      for questions its own composer refuses to draw the button for
+      (`qa-entitlement-contract.test.ts`, and `O(1, !e.isQAMsg && sessData.hasQAOnAlerts ? 1 : -1)`
+      at byte 1,339,784).
+
+      READ OFF `messageChrome`, not from `data.sessData`, and that is the whole reason the chrome
+      exists: `buildMessageChrome` resolves `hasQAOnAlerts === true` once on the page and three
+      components already read the answer. A second `data.sessData?.hasQAOnAlerts === true` here
+      would be a second answer to the same question, which is the failure `room-message-chrome.ts`
+      was written to end.
+    */
+    if (!messageChrome.hasQaOnAlerts) return;
+
     // The first pass is whatever was already stored when the page loaded, not news, and
     // `RoomArrivals` returns nothing for it — a reader opening the room gets no toast per
     // historical question.
@@ -580,13 +660,6 @@
   });
 
   $effect(() => {
-    // ONE ring for a batch that arrives together, not one per message — `.some` is that rule, and
-    // it is why the sound is decided after the whole arrival is known rather than inside the loop.
-    const arrived = chatArrivals.fresh(data.messages);
-    const incoming = arrived.some((message) => message.senderId !== data.user.id);
-
-    if (incoming && !prefs.doNotDisturbOn && prefs.chatSoundOn) playSoundEffect('pling');
-
     /* USM-08 — MY messages only, and never my own reaction. See `reaction-notices.ts`. */
     chatReactionNotice(
       chatReactionArrivals.changes(data.messages),
@@ -628,6 +701,18 @@
 
   " Reconnecting Chat... " keeps its leading and trailing spaces, written as an expression because
   Svelte normalises whitespace at element boundaries.
+
+  ── AND THE SUCCESS FLASH HAD ITS TWO CHILDREN THE WRONG WAY ROUND ───────────────────────────
+
+  ```js
+  d(8,"div",10), T(9,"i",11), v(10," Conected\n"), u()               // byte 2,547,023
+  11  [1,"fas","fa-check"]
+  ```
+
+  `T` is `ɵɵelement` and `v` is `ɵɵtext`, so the ORDER is tick then sentence, and the sentence
+  opens with the space that separates them. This read `Conected<i class="fas fa-check"></i>` until
+  2026-08-31 — the tick trailing the word, and no space anywhere, which is why the two ran
+  together. Both halves come from the same four instructions and neither is a preference.
 -->
 {#if !roomEvents.connected}
   <div class="notConnectedOverlay animated fadeIn">
@@ -639,7 +724,7 @@
   class="notConnectedOverlay animated fadeIn"
   style={roomEvents.reconnectedFlash ? 'display: block;' : 'display: none;'}
 >
-  Conected<i class="fas fa-check"></i>
+  <i class="fas fa-check"></i>{' Conected\n'}
 </div>
 <!-- The close message takes NO new prop: `data`, `dialogs` and `prefs` are already here. The rule,
      and the six callbacks deleted under it on 2026-08-18, are in the props docblock above. -->
@@ -791,37 +876,29 @@
     chat — the surface a member actually uses — had no `paste` binding at all until 2026-08-30
     (`acA-02`).
 
-    `BootboxDialog` and not `ImageUploadDialog`, deliberately: the file is already chosen, and a
+    `ImagePasteConfirm` and not `ImageUploadDialog`, deliberately: the file is already chosen, and a
     dialog whose top half is a drop zone would invite a viewer to replace the thing they just pasted.
+    The dialog itself was three transcriptions of one control here until 2026-08-31; that file
+    carries the argument, and the textarea below is the only thing that differs between them.
   -->
 {#if composer.pastedImage}
   {const chatPastePreviewUrl = $derived(composer.pastedImage.previewUrl)}
-  <BootboxDialog
-    mode="confirm"
-    message=""
+  <ImagePasteConfirm
+    previewUrl={chatPastePreviewUrl}
     onclose={() => composer.cancelImagePaste()}
     onconfirm={() => void composer.confirmImagePaste()}
   >
-    <div class="text-center">
-      <h4>Upload this image?</h4>
-      <img
-        src={chatPastePreviewUrl}
-        class="img-fluid"
-        style="max-height: 50vh;"
-        alt="Pasted screenshot"
-      />
-      <div class="w-100 mt-3">
-        <!-- `id="msg-text"`, `rows="2"` and the placeholder are the reference's own, byte 1,445,719. -->
-        <textarea
-          class="form-control w-100"
-          rows="2"
-          id="msg-text"
-          name="msg-text"
-          placeholder="Enter your message"
-          bind:value={composer.pastedImageMessage}></textarea>
-      </div>
+    <div class="w-100 mt-3">
+      <!-- `id="msg-text"`, `rows="2"` and the placeholder are the reference's own, byte 1,445,719. -->
+      <textarea
+        class="form-control w-100"
+        rows="2"
+        id="msg-text"
+        name="msg-text"
+        placeholder="Enter your message"
+        bind:value={composer.pastedImageMessage}></textarea>
     </div>
-  </BootboxDialog>
+  </ImagePasteConfirm>
 {/if}
 {#if modals.modal === 'image-upload'}
   <ImageUploadDialog
@@ -859,38 +936,11 @@
   -->
 {#if swingAlerts.imagePaste}
   {const pastePreviewUrl = $derived(swingAlerts.imagePaste.previewUrl)}
-  <BootboxDialog
-    mode="confirm"
-    message=""
+  <ImagePasteConfirm
+    previewUrl={pastePreviewUrl}
     onclose={() => swingAlerts.closeImagePaste()?.resolve(null)}
     onconfirm={() => void swingAlerts.confirmImagePaste()}
-  >
-    <!--
-      `dta-04` — `<h4>Upload this image?</h4>` and the reference's own inline height.
-
-      ```js
-      bootbox.confirm({ message: '<div class="text-center"><h4>Upload this image?</h4>' +
-        '<img style="max-width:100%; max-height: 50vh;" src="' + a + '" /> </div>', … })
-                                                                  // bundle byte 1,992,250
-      ```
-
-      Without the question this is an unlabelled OK/Cancel over a picture: the presenter pasted, a
-      dialog appeared, and nothing on it says what OK does. The chat composer's twin has carried the
-      heading since it was built — these two were the copies that did not.
-
-      `max-height: 50vh` is inline upstream and inline here rather than folded into `.img-fluid`,
-      which is 70vh and is shared with the alert lightbox that WANTS the extra height.
-    -->
-    <div class="text-center">
-      <h4>Upload this image?</h4>
-      <img
-        src={pastePreviewUrl}
-        class="img-fluid"
-        style="max-height: 50vh;"
-        alt="Pasted screenshot"
-      />
-    </div>
-  </BootboxDialog>
+  />
 {/if}
 <!--
     `imgUpload('dayTrade')` — the day trade form's own upload dialog.
@@ -913,38 +963,11 @@
   -->
 {#if dayTradeAlerts.imagePaste}
   {const dayTradePastePreviewUrl = $derived(dayTradeAlerts.imagePaste.previewUrl)}
-  <BootboxDialog
-    mode="confirm"
-    message=""
+  <ImagePasteConfirm
+    previewUrl={dayTradePastePreviewUrl}
     onclose={() => dayTradeAlerts.closeImagePaste()?.resolve(null)}
     onconfirm={() => void dayTradeAlerts.confirmImagePaste()}
-  >
-    <!--
-      `dta-04` — `<h4>Upload this image?</h4>` and the reference's own inline height.
-
-      ```js
-      bootbox.confirm({ message: '<div class="text-center"><h4>Upload this image?</h4>' +
-        '<img style="max-width:100%; max-height: 50vh;" src="' + a + '" /> </div>', … })
-                                                                  // bundle byte 1,992,250
-      ```
-
-      Without the question this is an unlabelled OK/Cancel over a picture: the presenter pasted, a
-      dialog appeared, and nothing on it says what OK does. The chat composer's twin has carried the
-      heading since it was built — these two were the copies that did not.
-
-      `max-height: 50vh` is inline upstream and inline here rather than folded into `.img-fluid`,
-      which is 70vh and is shared with the alert lightbox that WANTS the extra height.
-    -->
-    <div class="text-center">
-      <h4>Upload this image?</h4>
-      <img
-        src={dayTradePastePreviewUrl}
-        class="img-fluid"
-        style="max-height: 50vh;"
-        alt="Pasted screenshot"
-      />
-    </div>
-  </BootboxDialog>
+  />
 {/if}
 {#if composer.pendingGifUrl}
   <GifConfirmDialog
@@ -1037,44 +1060,5 @@
   onresume={(id) => toasts.resume(id)}
 />
 {#if modals.selectedImageUrl}
-  <div
-    class="bootbox modal fade imgur-modal show"
-    tabindex="-1"
-    role="dialog"
-    aria-hidden="true"
-    style="display: block;"
-    onclick={(event) => {
-      if (event.target === event.currentTarget) modals.selectedImageUrl = null;
-    }}
-  >
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header border-0">
-          <!-- svelte-ignore a11y_missing_content -->
-          <h5 class="modal-title"></h5>
-          <button
-            type="button"
-            class="bootbox-close-button close btn-close"
-            aria-hidden="true"
-            aria-label="Close"
-            onclick={() => (modals.selectedImageUrl = null)}
-          ></button>
-        </div>
-        <div class="modal-body">
-          <div class="bootbox-body">
-            <img
-              src={modals.selectedImageUrl}
-              alt={modals.selectedImageUrl.substring(modals.selectedImageUrl.lastIndexOf('/') + 1)}
-            />
-            <hr />
-            <button
-              class="btn btn-primary btn-sm"
-              onclick={() => downloadImage(modals.selectedImageUrl as string)}
-              ><i class="fa fa-download"></i> Download Image</button
-            >
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <ImageLightbox url={modals.selectedImageUrl} onclose={() => (modals.selectedImageUrl = null)} />
 {/if}
