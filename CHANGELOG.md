@@ -1262,6 +1262,82 @@ needed it was paid for by handler code the change deleted.
 **Verified:** `pnpm run gate` in `apps/room`, exit code read from the log. `svelte-check` 0 errors,
 0 warnings. Not run: anything in `apps/controller` or `services/`, neither of which this change
 touches.
+### 2026-08-31 02:40 EDT — §NAV and §MSM: the navbar and the message kebab, read whole against the pinned v4 bundle
+
+**Runtime impact: YES.** Five user-visible changes, all in the room's chrome:
+
+1. **A member hearing the room's SoundCloud track can now stop it in their own browser.**
+   `onstopsoundcloudforme` existed and was reachable from exactly one element — the third entry of
+   the presenter's dropdown, inside `{#if isPresenter}` — so a member's only recourse was the master
+   volume, which silences the presenter with the music. The reference has a second item for exactly
+   this, `O(23, isPresenter || isNonPresenterAdmin || !scPlaying ? -1 : 23)` at bundle byte
+   2,488,684, and it was never built here (NAV-02).
+2. **In an `alwaysShowRoster` room the hamburger is gone**, as it is upstream: the setting sits on
+   the refusing side of BOTH sidebar-toggle conditions (byte 2,487,413), so the users counter is the
+   room's only remaining toggle — which is why that counter's handler is gated on the same setting.
+   This bar had the counter half and not this one, and the control it kept could close a sidebar the
+   room's own setting says is always shown (NAV-03).
+3. **The presenter's Start/Stop Recording icon pulses red while the room is recording**, if the owner
+   turned "Blinking REC?" on. `iPe` is bound once in 2,891,205 bytes, at byte 2,477,678, to that icon
+   — not to the `ul` this repository's comment claimed, and not to the `[ REC ]` badge (NAV-04).
+4. **Both device-launching spinners are `nav-link`s** (const 150), so they no longer sit unpadded and
+   shift the row when the microphone or camera finishes opening (NAV-07).
+5. **`Mark Answered ` and `Private Chat ` keep the trailing space the capture gives them** in all
+   four kebab menus; HTML whitespace folding had eaten both (MSM-06).
+
+**Read, not skimmed.** `U4e` (byte 2,484,831) and all four captured kebab menus were read end to end,
+and `app-room`'s 229-entry consts array plus both message components' tables were decoded **by
+value**, bracket-walking from `consts:[[`. Seventeen rows went into
+`docs/decoded/room-surface-audit-2026-08-30.md` — `NAV-01` to `NAV-11` and `MSM-01` to `MSM-06` — of
+which four are refusals with the measurement that justifies them:
+
+- The navbar's help link is **dead code in the reference**: `hasSTHelpLink` occurs three times in the
+  bundle, and its only two assignments are field initialisers — `app-room`'s own `=!1` at 2,497,854
+  and an unrelated login component's `=!0` at 1,189,005. Slot 9 can never render (NAV-01).
+- `recIndicatorStart` on the recording icon paints nothing: its only rule is
+  `app-room .recIndicatorStart a`, a descendant selector, and an `<i>` has no descendant `a`
+  (NAV-05).
+- `audioVolSlider=""` has no consumer at either end — no directive declares it and the only
+  stylesheet rule is a CLASS selector of the same name (NAV-11).
+- The Add Reaction tooltip repeats, byte for byte, the label rendered four characters to its right in
+  the same function (MSM-01).
+
+**And a false claim of ours was corrected.** `RoomNavbar.svelte`'s `blinkingRec` docblock said the
+reference binds `breathing-rec` "through a class MAP on the recording `ul`… Same element breathing,
+one level down." The byte offset it cited was right and the element was wrong, which is how it
+survived; `server/room-config-client.ts:249` had the same measurement stated correctly, so the
+repository held both records for as long as the prop has existed (NAV-06).
+
+**Two rows are BLOCKED on one line each, in files outside this change's scope**, and each names it:
+removing the `[ REC ]` badge's invented `breathing-rec` needs the assertion in
+`room-navbar-contract.test.ts` re-pointed at the presenter's icon (NAV-08), and adding the reminder's
+missing `!media.micMuted` term needs the literal gate string in `recording-reminder-contract.test.ts`
+updated with it (NAV-09).
+
+**Three components were born to pay for it.** `RoomNavbar.svelte` was at its declared ceiling, and
+`source-size-contract.test.ts` only moves a ceiling DOWN, so the seams were chosen by what no other
+contract test pins by source text: `NavbarSoundCloud.svelte` (both SoundCloud items, 194),
+`NavbarRecIndicator.svelte` (the three REC badges, 92) and `NavbarTipButton.svelte` (RS-09's navbar
+copy, 58). The bar is 1,168 lines, down from 1,172, and its ceiling went 1,173 -> 1,169.
+`MessageMenu.svelte` is 251, down from 252, and its ceiling went 253 -> 252.
+
+**Verified.** `apps/room`: `pnpm run gate`, green. Two new contract tests —
+`navbar-decoded-rows-contract.test.ts` (20 assertions) and
+`message-menu-entries-contract.test.ts` (15) — and every one of the six behaviours they guard had its
+negative control run: the hamburger gate widened to `{#if true}` (2 red), the listener gate widened to
+drop `!isPresenter` (2 red), `media.roomRecording &&` dropped from the icon's class map (1 red),
+`class="nav-link"` stripped from one spinner (1 red), the `{' '}` removed from `Mark Answered` (1
+red), a second `{' '}` added to `Private Chat` (1 red), and `aria-expanded` set to the captured
+literal (1 red). Two assertions were WRONG on their first run and were repaired as findings rather
+than tuned away: a slice bounded at `fa-dot-circle` was answered by the REC badge earlier in the same
+document, and `autoClose="outside"` is `autoclose="outside"` in the DOM.
+
+**Not verified:** 42 evidence-bound test files are excluded in this checkout — the reference-capture
+roots are gitignored — so the assertions in `dump-contract`, `screen-volume-contract` and their
+siblings that read `docs/source/**` did not run here. The seams above were chosen so that none of
+them needed to.
+
+---
 
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 

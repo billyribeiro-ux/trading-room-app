@@ -36,9 +36,7 @@
     /** The twelve gates, already resolved. See `messageMenuAllows`. */
     allows,
     menuOpen,
-    /**
-     * Which of the three captured trigger classes to render. See {@link TRIGGER_CLASS}.
-     */
+    /** Which of the three captured trigger classes to render. See {@link TRIGGER_CLASS}. */
     variant = 'regular',
     /** The background inversion the captured DOM puts on `.msgMenu`, or nothing. */
     style,
@@ -204,9 +202,10 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_missing_attribute -->
+    <!-- MSM-06 — `v(2,"\xa0\xa0Mark Answered ")` at byte 1,330,053: the trailing space is the capture's, in all four menus, and HTML folding ate it. Same for `Private Chat ` at 1,330,816. -->
     <a class="dropdown-item" onclick={() => onaction('answered')}
-      ><i class="fas fa-check"></i>&nbsp;&nbsp;Mark Answered
-    </a>
+      ><i class="fas fa-check"></i>&nbsp;&nbsp;Mark Answered{' '}</a
+    >
   {/if}
   {#if allows.reaction}
     <a
@@ -246,7 +245,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_missing_attribute -->
     <a class="dropdown-item" onclick={() => onaction('private')}
-      ><i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat
-    </a>
+      ><i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat{' '}</a
+    >
   {/if}
 </div>

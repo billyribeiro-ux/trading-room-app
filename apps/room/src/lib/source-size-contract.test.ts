@@ -1702,47 +1702,6 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the overlay layer - modal host, seven dialogs, toasts, the lightbox, delivery'
   },
   {
-    file: 'lib/components/SoundCloudMenu.svelte',
-    /*
-      CREATED 2026-08-30 at 121 lines, as NAV-02's half of an extraction the ratchet asked for.
-
-      `RoomNavbar.svelte` was exactly at its ceiling — 1173 of 1173 — and NAV-02 adds a control to
-      it. The rule for that is to extract, and the seam was not free to choose: eight contract tests
-      pin that file's markup by EXACT STRING (`recording-reminder-contract` on the reminder gate,
-      `mechanical-rename-contract` on two sentences inside the recording menu, `screen-volume-contract`
-      across the whole volume dropdown, `benzinga-navbar-contract`, `media-capture-contract`,
-      `session-control-audience-contract`, `dump-contract`, `mobile-restore-contract`). Mapping every
-      needle onto the file left the SoundCloud dropdown as the one region no assertion names, and
-      that is what moved.
-
-      **Worth recording as a property of the navbar rather than of this component**: a file whose
-      markup is pinned by string in eight places cannot be decomposed without touching those eight,
-      so its ceiling and its coverage now pull against each other. The next extraction there is a
-      conversation about the assertions, not about the seam.
-    */
-    max: 121,
-    why: "the presenter's SoundCloud dropdown; slot 22 of the navbar template"
-  },
-  {
-    file: 'lib/components/SoundCloudViewerStop.svelte',
-    /*
-      CREATED 2026-08-30 at 75 lines. NAV-02 itself: the single button a VIEWER gets to stop
-      room-wide music for themselves, which this room had nowhere because the only control that does
-      it lived inside the presenter's dropdown.
-
-      Two files rather than one branch because upstream is two template functions (`i4e`, `o4e`) and
-      because the navbar's presenter block has to stay one contiguous `{#if isPresenter}` — its own
-      docblock carries that argument, and `session-control-audience-contract.test.ts` is what makes
-      it binding.
-    */
-    /*
-      75 -> 90, 2026-08-31. NAV-02's argument arrived from `RoomNavbar.svelte`, where it was
-      restating a subject this file owns; the navbar fell by more than this rose.
-    */
-    max: 90,
-    why: 'the viewer-side SoundCloud stop; slot 23 of the navbar template'
-  },
-  {
     file: 'lib/components/PollSavedList.svelte',
     /*
       CREATED 2026-08-30 at 61 lines, to pay for POLL-01 and POLL-02 in `PollPanel.svelte`, which was
@@ -1838,7 +1797,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       renderers now differ in the label table as well as the trigger class, and BOTH are pinned
       lookups keyed by the same `variant`. A THIRD such divergence is the signal to stop sharing.
     */
-    max: 253,
+    /*
+      253 -> 252, 2026-08-31, and the line came back from a docblock that prettier had spread over
+      three lines for one sentence. What went IN is `MSM-06`: `Mark Answered` and `Private Chat`
+      carry a trailing space in all four captured menus (`v(2,"\xa0\xa0Mark Answered ")` at bundle
+      byte 1,330,053, `\xa0\xa0Private Chat ` at 1,330,816) and HTML folding had eaten both, so they
+      are `{' '}` now — the braces idiom `AGENTS.md` records as a standing exception.
+
+      The pass that found it read all four menus end to end and produced five more rows, every one of
+      which is a REFUSAL or a divergence rather than markup: they live in
+      `message-menu-entries-contract.test.ts`, which is where the reason for a thing NOT built goes
+      when the file has no room to carry it. That is a real constraint on this component, not a
+      formality — one line of headroom and no unpinned seam, because
+      `chat-display-mode-contract.test.ts` requires `TRIGGER_CLASS`'s three strings to stay in this
+      file's own code.
+    */
+    max: 252,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
   },
   {
@@ -6154,6 +6128,78 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {
+    file: 'lib/components/NavbarRecIndicator.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      The room's recording badge — slots 18, 19 and 20 of the navbar template `U4e`, consts 92/93/94.
+      92 lines for nine of markup, because the three arms carry four things a reader would otherwise
+      have to re-derive: the gates from `U4e`'s update block, why `[ REC ]` and the starting spinner
+      are mutually exclusive upstream by an explicit term where this room decides it by `{:else if}`
+      ORDER, why the tooltip is handed in whole rather than composed, and that `breathing-rec` on the
+      badge is OURS — the reference's one binding of `iPe` is on the presenter's recording icon.
+
+      If this number climbs, ask whether it has started DECIDING anything. It must not: it reads
+      `RoomMedia` and renders one `li`, and every control the bar carries is on the other side of
+      that line.
+    */
+    max: 93,
+    why: 'the three REC badges the whole room sees, and the one class that is ours'
+  },
+  {
+    file: 'lib/components/NavbarSoundCloud.svelte',
+    /*
+      195 -> 201 IN THE MERGE THAT CREATED IT, 2026-08-31, and the six lines are two corrections.
+
+      Not an established file growing. The 195 capped a version that lived for one commit on a
+      branch, and two of its properties were wrong when it met the rest of the repository:
+
+        the listener's id     it rendered `cssSoundCloudIcon`. Const 176 declares `id` twice and
+                              Angular's `setUpAttributes` (`H0`, bundle byte 16,054) calls
+                              `setAttribute` once per string pair with no de-duplication, so the
+                              SECOND wins. The first name never reaches the document.
+        its keyboard route    the arm had no `role`, `tabindex` or accessible name, so the only
+                              control that stops the room's music for one listener could not be
+                              reached from a keyboard. Those three attributes are this room's, and
+                              they were asserted here before this file existed.
+
+      Three attributes and three comment lines is the whole of it, and the argument that would
+      otherwise have made it longer was moved to `navbar-decoded-rows-contract.test.ts`, which is
+      what asserts it. From here it ratchets down like everything else.
+
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      BOTH of the reference's SoundCloud items — the presenter's dropdown (slot 22, const 96) and the
+      listener's stop-for-me control (slot 23, const 97), which this room had never built. 195 lines
+      for about 60 of markup: the rest is the `playing.gif` decision, which had to be made once and
+      is now made once for both arms, and const 176's two refusals — the duplicated `id` and the
+      `aria-haspopup`/`aria-expanded` pair that belong to a dropdown this element is not.
+
+      Two things to check if it climbs. Has it started deciding WHICH arm to render? It must not —
+      the reference's two gates are not each other's negation (`!scPlaying` is in one and not the
+      other), so the call site owns them and the component takes a literal variant. And has a third
+      variant appeared? That would mean the bar has a third SoundCloud item, and it does not.
+    */
+    max: 201,
+    why: 'both SoundCloud items in the top bar, and the one playing.gif decision behind them'
+  },
+  {
+    file: 'lib/components/NavbarTipButton.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
+
+      RS-09's NAVBAR copy — slot 14 of `U4e`, consts 139/140/35/36 — extracted from `RoomNavbar` in
+      the change that added `NAV-02` and `NAV-04`, because the bar was at its declared ceiling and
+      this was the largest region of it that no other contract test pins by source text.
+
+      58 lines for eleven of markup. What the rest buys is the `noopener,noreferrer` refusal:
+      `doTipToUser()` at byte 2,531,860 opens the owner-configured URL with two arguments and leaves
+      `window.opener` live, and that is a tabnabbing surface this room does not reproduce.
+    */
+    max: 59,
+    why: 'the navbar half of the tip button, and the opener refusal that is not the reference s'
+  },
+  {
     file: 'lib/components/RoomNavbar.svelte',
     /*
       922 -> 935, 2026-08-29, and the thirteen lines are a BROKEN IMAGE and its replacement.
@@ -6247,12 +6293,35 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       ceiling of 6,335. **The pair is eighty-five lines smaller than doing neither.**
     */
     /*
-      1,172 -> 1,169, 2026-08-31, and DOWN after a fix that first pushed it UP.
+      1,173 -> 1,169, 2026-08-31, and the drop is what a whole-region decode costs when the file is
+      already at its ceiling. Four rows went IN — `NAV-02` (the listener's SoundCloud control),
+      `NAV-03` (the hamburger's `alwaysShowRoster` gate), `NAV-04` (`breathing-rec` on the
+      presenter's recording icon) and `NAV-07` (`nav-link` on the two launching spinners) — and
+      three regions went OUT to pay for them, each to a file that now owns its reasoning:
+      `NavbarRecIndicator.svelte` (the three REC badges), `NavbarSoundCloud.svelte` (both SoundCloud
+      items) and `NavbarTipButton.svelte` (RS-09's navbar copy).
 
-      NAV-02's explanation was written here — seventeen lines on a control mounted in the wrong
-      block — and it belongs to `SoundCloudViewerStop.svelte`, which is the thing being explained.
-      Moved there, with four lines left pointing at it. Where a mount is part of a component's
-      correctness, the component is where a reader meets that, not the file that happens to host it.
+      The seams were chosen by what is PINNED, not by what is tidy. The recording dropdown, the
+      talking indicator, the volume panel, the mic and webcam controls and the Benzinga item are each
+      asserted against this file's source text by a contract test elsewhere — `recording-reminder`,
+      `dump`, `screen-volume`, `media-capture`, `mechanical-rename`, `benzinga-navbar` — so moving one
+      of them would have gone red in a file that batch was not scoped to edit. What was left unpinned
+      was exactly these three, and all three are self-contained.
+
+      ## A SECOND BATCH EXTRACTED THE SAME REGION IN PARALLEL, and this is the one that survived
+
+      An earlier audit the same day split the SoundCloud region two ways instead —
+      `SoundCloudMenu.svelte` and `SoundCloudViewerStop.svelte`, by audience rather than by feature —
+      and reached 1,169 by a different route. Both could not stand: keeping them would have put the
+      same markup in the tree twice.
+
+      This one survived on MEASUREMENT, not on taste. Its `RoomNavbar` also builds `NAV-04` and
+      `NAV-07`, which the other does not: the `breathing-rec` class on the presenter's record dot,
+      and `class="nav-link"` on the microphone and webcam launching spinners. Keeping the audience
+      split would have dropped two built behaviours to keep a seam, and a seam is not worth a
+      behaviour. The deleted pair's argument — that `NAV-02` is a row about those two controls being
+      confused, so one file holding both hosts the confusion it documents — is recorded here because
+      it is a real cost of this choice rather than a point against it.
     */
     max: 1169,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'

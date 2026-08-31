@@ -94,7 +94,16 @@ describe('the destination is checked, not trusted', () => {
 
 describe('both render sites', () => {
   const sidebar = readFileSync(new URL('./components/RoomSidebar.svelte', import.meta.url), 'utf8');
-  const navbar = readFileSync(new URL('./components/RoomNavbar.svelte', import.meta.url), 'utf8');
+  /*
+    The navbar's copy moved to `NavbarTipButton.svelte` on 2026-08-31 — one of three regions
+    extracted to pay for four `NAV-` rows while `RoomNavbar` sat at its ceiling. This reads the file
+    that OWNS the markup rather than the file that hosts the component, which is what these
+    assertions have always been about: a render site, wherever it lives.
+  */
+  const navbar = readFileSync(
+    new URL('./components/NavbarTipButton.svelte', import.meta.url),
+    'utf8'
+  );
   const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
   /*

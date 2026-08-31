@@ -70,7 +70,7 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 81 surfaces, measured
+## The inventory — all 82 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
@@ -79,7 +79,7 @@ guessed.
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,495 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,258 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,168 | no |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,168 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,064 | no |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | no |
@@ -107,42 +107,42 @@ guessed.
 | 31 | `lib/components/PrivateChatComposer.svelte` | 311 | no |
 | 32 | `lib/components/StreamTabs.svelte` | 304 | no |
 | 33 | `lib/components/RoomShell.svelte` | 268 | no |
-| 34 | `lib/components/MessageMenu.svelte` | 252 | no |
+| 34 | `lib/components/MessageMenu.svelte` | 251 | §MSM — 6 rows against all four captured kebab menus: 1 fixed, 1 already built, 2 measured refusals, 2 deliberate divergences. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 35 | `lib/components/SpeechRecoOverlay.svelte` | 246 | no |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
 | 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
 | 39 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
-| 40 | `lib/components/RichTextEditor.svelte` | 191 | no |
-| 41 | `lib/components/MessageBody.svelte` | 173 | no |
-| 42 | `lib/components/AlertQaAlertCard.svelte` | 170 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
-| 43 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
-| 44 | `lib/components/AlertQaComposer.svelte` | 166 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
-| 45 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
-| 46 | `lib/components/Modal.svelte` | 157 | no |
-| 47 | `lib/components/TabGearMenu.svelte` | 156 | no |
-| 48 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
-| 49 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
-| 50 | `lib/components/LogArchiveModals.svelte` | 147 | no |
-| 51 | `lib/components/BootboxDialog.svelte` | 145 | no |
-| 52 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
-| 53 | `lib/components/ChatArchivePane.svelte` | 143 | no |
-| 54 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 55 | `lib/components/ChatSearchBar.svelte` | 141 | no |
-| 56 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
-| 57 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
-| 58 | `lib/components/MobileRestorePane.svelte` | 130 | no |
-| 59 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 60 | `lib/components/WebcamStrip.svelte` | 124 | no |
-| 61 | `lib/components/SoundCloudMenu.svelte` | 114 | no |
+| 40 | `lib/components/NavbarSoundCloud.svelte` | 200 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
+| 41 | `lib/components/RichTextEditor.svelte` | 191 | no |
+| 42 | `lib/components/MessageBody.svelte` | 173 | no |
+| 43 | `lib/components/AlertQaAlertCard.svelte` | 170 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
+| 44 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
+| 45 | `lib/components/AlertQaComposer.svelte` | 166 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
+| 46 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
+| 47 | `lib/components/Modal.svelte` | 157 | no |
+| 48 | `lib/components/TabGearMenu.svelte` | 156 | no |
+| 49 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 50 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 51 | `lib/components/LogArchiveModals.svelte` | 147 | no |
+| 52 | `lib/components/BootboxDialog.svelte` | 145 | no |
+| 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
+| 54 | `lib/components/ChatArchivePane.svelte` | 143 | no |
+| 55 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 56 | `lib/components/ChatSearchBar.svelte` | 141 | no |
+| 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
+| 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
+| 59 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 60 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
+| 61 | `lib/components/WebcamStrip.svelte` | 124 | no |
 | 62 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 63 | `lib/components/RestreamPane.svelte` | 105 | no |
 | 64 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 65 | `lib/components/CloseSessionPane.svelte` | 104 | no |
 | 66 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 67 | `lib/components/ImageLightbox.svelte` | 94 | no |
-| 68 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 69 | `lib/components/SoundCloudViewerStop.svelte` | 89 | no |
+| 68 | `lib/components/NavbarRecIndicator.svelte` | 92 | §NAV — born 2026-08-31 out of `RoomNavbar`; the three REC badges, and where `breathing-rec` is not. |
+| 69 | `lib/components/RoomBranding.svelte` | 91 | no |
 | 70 | `lib/components/CompactMessageRow.svelte` | 77 | no |
 | 71 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
 | 72 | `lib/components/PositionsContainer.svelte` | 74 | no |
@@ -151,20 +151,21 @@ guessed.
 | 75 | `lib/components/ToastHost.svelte` | 64 | no |
 | 76 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
 | 77 | `lib/components/PollSavedList.svelte` | 59 | no |
-| 78 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 79 | `lib/components/PositionsControls.svelte` | 44 | no |
-| 80 | `routes/logout/+page.svelte` | 31 | no |
-| 81 | `routes/+layout.svelte` | 27 | no |
+| 78 | `lib/components/NavbarTipButton.svelte` | 58 | §NAV — born 2026-08-31 out of `RoomNavbar`; RS-09 s navbar copy and its `noopener` refusal. |
+| 79 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
+| 80 | `lib/components/PositionsControls.svelte` | 44 | no |
+| 81 | `routes/logout/+page.svelte` | 31 | no |
+| 82 | `routes/+layout.svelte` | 27 | no |
 
-**5 of 81 surfaces audited · 2,045 of 35,878 lines · 5.7%.**
+**10 of 82 surfaces audited · 3,814 of 36,024 lines · 10.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
 > behaviours confirmed present. **It does not re-score the table above, deliberately.** That list is
-> 81 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
+> 82 FILES; the register's is 18 SURFACES, and the two partitions do not line up — four of its
 > entries are slices of `ModalHost.svelte` alone. Marking rows audited from a differently-shaped list
 > is how a coverage number stops meaning anything, so the counts here are untouched and this row
-> stays 5 of 81 until a surface is read whole against a file in this table.
+> stays 10 of 82 until a surface is read whole against a file in this table.
 >
 > Its own headline number to keep is the **19% false-claim rate**: of 274 differences claimed by the
 > readers, 51 were refuted on verification — 32 already built here under another name, 19 resting on
