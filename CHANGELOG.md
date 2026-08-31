@@ -33,6 +33,45 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 14:59 UTC — The merged tree's first CI run found the two tests nobody had run since the owner cutover, and both were the tests being right
+
+**Runtime impact: NO** — one comment reworded, one assertion rebound, two provenance re-pins. No
+control flow moved, and in both cases the CODE was already correct; what was wrong was text about
+it.
+
+**How they survived to CI at all:** both defects sit in live-PostgreSQL tests, both were introduced
+by `4012eef` (the owner-cutover staging) AFTER the branch's last full local suite run, and no CI
+run ever executed the branch's later heads until PR #177's push. The gate did exactly its job on
+first contact.
+
+**Red #1, `the_runtime_role_preflight_resolves_exactly_one_name`:** the owner-cutover paragraph in
+`db/migrate.rs` QUOTED the forbidden two-name lookup shape verbatim — inside the sentence
+explaining why the new allow-list is not that shape. The contract scans the module's TEXT, comments
+included, so the quote itself turned it red; the actual posture query binds one name. Reworded to
+describe the shape in words. Same failure family as template syntax quoted in a Svelte comment
+(2026-08-30 entry below), now recorded on the Rust side too.
+
+**Red #2, `run_rejects_a_non_owner_before_creating_the_migration_ledger`:** found by reproducing
+CI's cluster locally rather than by a second 33-minute round trip. The rejection's `expected` field
+asserted the literal `ptr_clone`; the cutover made it the allow-list joined —
+`tradingroom or ptr_clone`. Now bound to `migrate::ACCEPTED_MIGRATOR_ROLES.join(" or ")` — the same
+bound-not-literal treatment the two assertions beside it received at the cutover, and the very
+staleness their comment records. The two `preflight_for_tests` literals beside it are correct and
+untouched: that entry point takes ONE name and echoes it back (read at `migrate.rs:421-440`).
+
+**The local reproduction, since the suite had never had one on this machine:** the repo's own
+`docker/postgres/10-provision-roles.sh` run against Homebrew PostgreSQL 16.13, owner role and
+database created as the postgres image would, `pg_hba` given two scram lines scoped to exactly the
+three dev roles (the unanimity preflight refuses a `trust` connection because nothing
+authenticated — which is it working), the chain applied through the `migrate` binary, and
+`api/fixtures/seed.sql` loaded — CI's steps, in CI's order.
+
+**Verified:** the ENTIRE api suite green locally against that cluster — 308 tests across 12 targets
+and the unit set, 0 failed, `--no-fail-fast` — plus `cargo clippy --all-targets --features testing
+-- -D warnings`, `cargo fmt --check`, and `verify-backend-provenance.mjs` PASS over the two moved
+pins (`migrate.rs` → `d264ec6e…`, `tests/migrations.rs` → `9afb6ebf…`, each with its dated
+paragraph).
+
 ### 2026-08-31 14:43 UTC — The Svelte MCP became available, and four rows that were blocked on it are closed
 
 **Runtime impact: YES**, on two counts: a native-HLS viewer no longer has their stream restarted for

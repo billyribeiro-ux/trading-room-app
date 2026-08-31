@@ -68,9 +68,12 @@ pub const BASELINE_SHA256: &str =
 /// `the_migrator_allow_list_requires_all_three_facts_to_name_the_same_role` is its negative control.
 ///
 /// `migration_reappliability.rs` asserts on this module's source that the runtime-role posture query
-/// never grows a second bound name again. That assertion is untouched and still passes: it names the
-/// `ORDER BY (runtime_role.rolname = $2) DESC` shape, which is the lookup, and the list below is not
-/// one.
+/// never grows a second bound name again. That assertion scans this FILE'S TEXT, comments included —
+/// so the shape it forbids is described here in words rather than quoted: a catalogue lookup that
+/// binds both role names and sorts by preference for the second bound parameter. The list below is
+/// not a lookup at all. An earlier revision of this paragraph quoted the forbidden text verbatim and
+/// turned the contract red from inside a comment — the same failure family as template syntax quoted
+/// in a Svelte comment, and the reason constructs are described rather than quoted here.
 pub const ACCEPTED_MIGRATOR_ROLES: [&str; 2] = [
     // The target name. Preferred, so a cluster that has cut over is the normal case rather than
     // the exception.
