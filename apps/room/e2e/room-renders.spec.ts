@@ -80,6 +80,59 @@ test.describe('the room opens and paints', () => {
     await expect(page).toHaveTitle(new RegExp(`E2E Room ${ROOM}`));
   });
 
+  test('the handoff email survives hydration, and the URL loses the token', async ({ page }) => {
+    /*
+      ── `TODO.md` ROW 8, TURNED FROM AN ANECDOTE INTO AN ASSERTION ─────────────────────────────
+
+      That row records a guest's pre-hydration email being *"RARELY discarded"* on `/session/[code]`
+      — once in nine runs, never in eight targeted repeats — with the field resolving first as the
+      SSR node and then as one with no `value` attribute: **replaced rather than hydrated.** It was
+      mitigated by CI retries and never reproduced, and nothing in this suite asserted the field at
+      all, so the only record of it was a sentence.
+
+      Now it is checked on every run. The value is read as the live DOM PROPERTY rather than as the
+      attribute, because that is what a user submits and what a replaced node loses: Svelte sets
+      `input.value` on the client and does not re-emit the attribute, so an attribute assertion here
+      would fail on a correctly hydrated field and pass on nothing useful.
+
+      The second half is the same page's other known defect, and they belong together because both
+      turn on the mount-time effect that strips the token: the address bar must lose `jwtSite` while
+      the field it seeded keeps its value. A regression that re-rendered the form would show up here
+      as an empty field, and a regression in the latch would show up as a token still in the URL.
+
+      ## The reproduction attempt, and what it measured
+
+      Row 8 named the likely condition: *"the load correlation suggests throttling the CPU or the
+      script release."* Both were tried on 2026-08-31 — twelve repeats on a machine at load average
+      12, then ten more with `Emulation.setCPUThrottlingRate` at **8x** through CDP. **Twenty-two
+      attempts, zero reproductions**, against the row's own eight.
+
+      That is not a proof of absence and this comment does not claim one. What it changes is who
+      finds it next: the field was asserted nowhere, so the only record was a sentence in a tracker.
+      It is asserted on every run now.
+
+      One consequence worth stating: `playwright.config.ts` retries twice in CI, which was the
+      mitigation while nothing tested this. A retry now turns a recurrence into a **flaky** result
+      rather than a red one — so a flaky mark on THIS spec is the reproduction row 8 asked for, and
+      should be read as a finding rather than as noise.
+    */
+    const email = 'row-eight@example.com';
+    await page.goto(handoffUrl(ROOM, { email, type: 'guest' }));
+
+    const field = page.locator('#login-email');
+    await expect(field).toHaveValue(email);
+
+    /* The strip is an effect, so it lands after paint; the assertion waits rather than sampling. */
+    await expect
+      .poll(() => new URL(page.url()).searchParams.has('jwtSite'), {
+        message: 'the mount-time effect must strip the handoff from the address bar'
+      })
+      .toBe(false);
+
+    /* And the field is STILL filled after the shallow navigation, which is the actual row-8 claim. */
+    await expect(field).toHaveValue(email);
+  });
+
   test('a REFUSED handoff does not open the room', async ({ page }) => {
     /*
       The negative half, and the reason this file is a test rather than a screenshot. A tampered

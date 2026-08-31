@@ -14,6 +14,23 @@ import { codeOf } from './source-comments';
  * and Enter-selects-first — so this file mounts the component rather than reading it. That is the
  * point: `EMOJI-07` is a DUPLICATE ID, and the only way to prove two instances no longer collide is
  * to have two instances.
+ *
+ * ## IF A CASE HERE EVER TIMES OUT AT 5,000 ms, IT IS THE INSTRUMENT — MEASURED 2026-08-31
+ *
+ * `EMOJI-07`'s two-picker case did, once, on a machine at load average 12. It runs in **2.3 s**
+ * unloaded, and the two obvious suspects were measured before anything was changed:
+ *
+ *   the per-instance dataset rebuild   **0.66 ms** over 1,818 entries
+ *   one full `mount` + `flushSync`     **0 ms**, committing 558 cells and 1,779 nodes
+ *
+ * So neither the component's data shape nor its render is the cost. What is left is jsdom TEARDOWN
+ * of a ~1,800-node tree, twice per case here and once everywhere else — an instrument cost that no
+ * change to the picker can reduce, and that does not exist in a browser.
+ *
+ * This paragraph is here so the next person who sees a red 5,000 ms does not spend an hour
+ * re-deriving it. Raise nothing and optimise nothing on the strength of that failure alone: re-run
+ * it on a quiet machine first, and if it is genuinely slower than the numbers above, something
+ * changed in the component and THAT is the finding.
  */
 
 const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf8');

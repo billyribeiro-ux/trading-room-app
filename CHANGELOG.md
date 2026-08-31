@@ -33,6 +33,76 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 02:56 UTC — Row 8 turned from an anecdote into an assertion, and the guest door was unreachable from the suite
+
+**Runtime impact: NO.** No product code changed. What changed is that a defect recorded only as a
+sentence is now checked on every browser run, and a door the suite could not open now opens.
+
+**`TODO.md` row 8 said a guest's pre-hydration email is *"RARELY discarded"* on the session page** —
+once in nine runs, never in eight targeted repeats, the field resolving first as the SSR node and
+then as one with no `value` attribute. It was mitigated by CI retries and **asserted nowhere**, so
+the only record of it was that sentence.
+
+**The reproduction the row asked for was attempted, with the condition the row named.** It said *"the
+load correlation suggests throttling the CPU or the script release"*. Both:
+
+| attempt | result |
+| --- | --- |
+| 12 repeats, machine at load average 12 | 12 passed |
+| 10 repeats, `Emulation.setCPUThrottlingRate` at **8x** via CDP | 10 passed |
+
+**Twenty-two attempts, zero reproductions**, against the row's own eight. That is not a proof of
+absence and neither the test nor the row claims one. What it changes is who finds it next.
+
+`room-renders.spec.ts` now drives a guest handoff and reads `#login-email` as the live DOM
+**property** — an attribute assertion would fail on a correctly hydrated field, because Svelte sets
+the property client-side and does not re-emit the attribute, which is also exactly why the original
+observation was phrased as "no `value` attribute". It re-asserts the value AFTER the mount-time
+effect strips `jwtSite` from the address bar, because both halves of that page turn on the same
+effect: the URL must lose the token while the field it seeded keeps its value.
+
+One consequence, stated so it is read correctly: `playwright.config.ts` retries twice, which was the
+mitigation while nothing tested this. A recurrence now surfaces as **flaky** rather than red — so a
+flaky mark on that spec is the reproduction row 8 asked for, and is a finding rather than noise.
+
+#### A defect found on the way in: the guest door was unreachable from the suite
+
+`e2e/handoff.ts` minted every token with `id: '1'`, and `handoff-token.ts:149` refuses
+`type === 'guest' && id !== ''` as `bad-claims` — a guest is not an account, and an id would be the
+beginning of one inheriting a membership. So a spec asking for `type: 'guest'` got a 403 and an error
+page, which reads as *"the room refused a valid guest"* rather than as *"this helper minted a token
+the rule forbids"*. The helper derives the default from the type now, so the rule is honoured by
+construction and the refusal itself stays testable.
+
+**The room's browser suite: 12 passed, `e2e-exit=0`** — the first run since three surface audits
+merged, and the only check that can see markup which type-checks, mounts and renders wrong.
+
+#### And an hour of investigation recorded so nobody repeats it
+
+`emoji-picker-contract.test.ts`'s two-picker case timed out at 5,000 ms during one gate run on a
+machine at load average 12. Before changing anything, the two obvious suspects were measured:
+
+| suspect | measured |
+| --- | --- |
+| the per-instance dataset rebuild (`flatMap` + `filter` + `Map` over the whole set) | **0.66 ms** over 1,818 entries |
+| one full `mount` + `flushSync` | **0 ms**, committing 558 cells and 1,779 nodes |
+
+Neither is the cost, so there was nothing in the picker to fix — the time is jsdom TEARDOWN of a
+~1,800-node tree, an instrument cost that does not exist in a browser. The numbers are now in that
+file's header with the instruction not to raise or optimise anything on the strength of one red
+5,000 ms, but to re-run it quiet first: **if it is genuinely slower than those numbers, something
+changed in the component and THAT is the finding.** The gate has since run green twice at load
+average 12.
+
+**Verified:** `pnpm run gate` in `apps/room` — 283 files, 4,802 passed, 1 skipped, `gate-exit=0`;
+`npx playwright test` — 12 passed, `e2e-exit=0`. Both exits read from logs.
+
+**Note for anyone running the browser suite in a container:** this one's pre-installed Chromium is
+build 1194 and `@playwright/test@1.62.1` wants 1234. `playwright.config.ts` already reads
+`PLAYWRIGHT_CHROMIUM_PATH`, so
+`PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npx playwright test`
+runs without a 200 MB download. CI installs the pinned build and is unaffected.
+
 ### 2026-08-31 02:20 UTC — Five System-tab cells with no producer, and a tracker row that prescribed the wrong build
 
 **Runtime impact: YES.** A presenter's user card now shows the address and the browser of a member
