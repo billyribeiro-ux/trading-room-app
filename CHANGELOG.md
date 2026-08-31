@@ -33,6 +33,43 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 13:10 UTC — The WordPress door proven shut, at the half that is not blocked
+
+**Runtime impact: NO** for this repository — the plugin is unchanged. What changes is that the step
+the integration exists for is no longer entirely unverified.
+
+`STAGING-TEST.md` §6 says of itself: *"this is the only step that proves entitlement is live rather
+than decorative. Everything else can pass with a permanently-open door."* `TODO.md` row Q had it
+blocked on a staging WooCommerce, and half of it genuinely is —
+`wc_memberships_get_user_active_memberships` and `wcs_get_users_subscriptions` come from **WooCommerce
+Memberships** and **WooCommerce Subscriptions**, both licensed products that cannot be installed here.
+
+**The plugin's own half is not blocked, and was never tested.** Every commerce call in
+`tradingroom_sso_entitlements()` sits behind `function_exists`, takes a plain object and calls
+documented methods on it — so stand-ins with those methods drive the REAL code path rather than a
+copy of it. `tests/entitlement-cases.php` does that under real PHP 8.4 across ten cases, and
+`sso-wordpress-contract.test.ts` pins its output. Same arrangement as `mint-golden-token.php` beside
+it, and for the same reason: CI needs no PHP, and a change on either side fails a test rather than a
+customer's login.
+
+**The finding is that the two cancellations are different mechanisms**, and one passing tells you
+nothing about the other:
+
+| | what WooCommerce does | what the plugin must do |
+| --- | --- | --- |
+| membership cancelled | omits it from the active list | nothing — it disappears |
+| subscription cancelled | **still returns it**, with a non-`active` status | filter on `has_status(['active'])` |
+
+**Two negative controls, both against the plugin itself.** Removing the `has_status` filter leaves a
+cancelled subscriber holding `monthly-room` — literally the permanently-open door §6 names. Removing
+the blank-dropping in `$clean` emits `''` as an entitlement, which would match an empty room filter.
+Each was regenerated through the PHP and seen red, then restored with the plugin's digest re-checked.
+
+**What this does NOT claim**, stated in the test and in the row: the stand-ins assert what those
+extensions RETURN, not that they return it. §6 against a real site is still the only thing that can
+confirm WooCommerce keeps that promise, so row Q stays open — narrowed from "an environment" to "the
+extensions' behaviour only".
+
 ### 2026-08-31 12:55 UTC — The Recordings tab, specified from the bundle, and one comment that was wrong twice
 
 **Runtime impact: NO.** Nothing is built. A blocked row stops being an investigation, and a stale

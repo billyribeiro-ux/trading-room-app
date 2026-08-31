@@ -270,3 +270,119 @@ describe('the plugin source still honours the contract', () => {
     expect(PLUGIN).toContain("if ( '' === $settings['controller'] || '' === $secret ) {");
   });
 });
+
+describe('the door closes when the subscription lapses — STAGING-TEST §6, at the plugin boundary', () => {
+  /**
+   * ── THE STEP THE WHOLE INTEGRATION EXISTS FOR, AND THE HALF OF IT THAT IS NOT BLOCKED ─────────
+   *
+   * `integrations/wordpress/STAGING-TEST.md` §6 says of itself: *"this is the only step that proves
+   * entitlement is live rather than decorative. Everything else can pass with a permanently-open
+   * door."* `TODO.md` row Q has it blocked on a staging WooCommerce, and it is —
+   * `wc_memberships_get_user_active_memberships` and `wcs_get_users_subscriptions` come from
+   * **WooCommerce Memberships** and **WooCommerce Subscriptions**, both licensed products.
+   *
+   * **The plugin's own half is not blocked.** Every commerce call in `tradingroom_sso_entitlements()`
+   * is behind `function_exists`, takes a plain object and calls documented methods on it, so a
+   * stand-in with those methods drives the REAL code path rather than a copy of it.
+   * `tests/entitlement-cases.php` does exactly that under real PHP 8.4, and this pins its output —
+   * the same arrangement `mint-golden-token.php` already uses, and for the same reason: CI needs no
+   * PHP, and a change to either side fails a test rather than a customer's login.
+   *
+   * ## The two cancellations are DIFFERENT mechanisms, and that is the finding
+   *
+   * A cancelled MEMBERSHIP is simply absent from the active list — the plugin's own comment relies on
+   * it — so the plugin does nothing and the entitlement disappears. A cancelled SUBSCRIPTION is still
+   * returned by `wcs_get_users_subscriptions`, carrying a status that is not `active`, so the plugin
+   * has to filter it and a missing filter would leave a lapsed member holding the product forever.
+   * Two cases below, deliberately separate, because one passing tells you nothing about the other.
+   *
+   * ## What this does NOT claim
+   *
+   * That WooCommerce behaves as the stand-ins do. The stand-ins assert what those extensions RETURN,
+   * not that they return it, and nothing here can confirm the extensions keep that promise. §6
+   * against a real site remains the only thing that can, and row Q stays open for it.
+   */
+  const CASES: Array<{
+    case: string;
+    entitlements: { memberships: string[]; products: string[]; permissions: string[] };
+  }> = JSON.parse(
+    readFileSync(
+      new URL('../../../../../integrations/wordpress/tradingroom-sso/tests/entitlement-cases.json', import.meta.url),
+      'utf8'
+    )
+  );
+
+  const held = (name: string) => {
+    const found = CASES.find((entry) => entry.case === name);
+    expect(found, `${name} is not in entitlement-cases.json — re-run the PHP`).toBeDefined();
+    return found!.entitlements;
+  };
+
+  it('read the cases at all — the vacuity floor', () => {
+    /* An empty or renamed fixture would make every `held(...)` below throw rather than assert. */
+    expect(CASES.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('admits a paid-up member with both a membership and a subscription', () => {
+    /* The baseline. Every refusal below is only meaningful against a case that is admitted. */
+    expect(held('active membership and active subscription')).toEqual({
+      memberships: ['pro-trader'],
+      products: ['monthly-room'],
+      permissions: []
+    });
+  });
+
+  it('drops the plan when the MEMBERSHIP is cancelled', () => {
+    const entitlements = held('membership cancelled: the plan is gone');
+    expect(entitlements.memberships).toEqual([]);
+    // The subscription is untouched, which is what makes this a test of one mechanism and not both.
+    expect(entitlements.products).toEqual(['monthly-room']);
+  });
+
+  it('drops the product when the SUBSCRIPTION is cancelled, though it is still returned', () => {
+    /*
+      The one a missing `has_status` check would fail. WooCommerce Subscriptions keeps returning a
+      cancelled subscription; only its status changes.
+    */
+    expect(held('subscription cancelled: still returned, wrong status').products).toEqual([]);
+  });
+
+  it('treats on-hold as not active either', () => {
+    /* `has_status( array( 'active' ) )` is an allow-list of one, so every other status refuses. */
+    expect(held('subscription on-hold is not active either').products).toEqual([]);
+  });
+
+  it('holds nothing at all once everything has lapsed', () => {
+    expect(held('everything lapsed')).toEqual({
+      memberships: [],
+      products: [],
+      permissions: []
+    });
+  });
+
+  it('skips malformed entries instead of emitting an empty slug', () => {
+    /*
+      A deleted plan and a removed product are both reachable in real data. Neither may fatal, and
+      neither may contribute `''` — an empty entitlement would match an empty room filter.
+    */
+    expect(held('a membership with no plan is skipped').memberships).toEqual(['pro-trader']);
+    expect(held('a line item with no product is skipped').products).toEqual(['monthly-room']);
+  });
+
+  it('trims, de-duplicates and drops blanks, preserving order', () => {
+    expect(held('duplicates and blanks are cleaned').memberships).toEqual(['pro-trader', 'founding']);
+  });
+
+  it('lets a site assert entitlements WooCommerce knows nothing about', () => {
+    expect(held("the permissions filter is the site's last word").permissions).toEqual(['vip']);
+  });
+
+  it('lets a filter REVOKE what WooCommerce reported', () => {
+    /*
+      Documented as "last word on memberships and products, for sites that need to add or remove
+      entries". A site that revokes this way must actually revoke — the removing direction is the one
+      worth asserting, because the adding direction fails visibly and this one fails open.
+    */
+    expect(held('a filter can take an entitlement away').memberships).toEqual([]);
+  });
+});
