@@ -341,6 +341,10 @@
   <div class="chat d-flex flex-column h-100" style="overflow-y: hidden;">
     <div class="bs-component">
       <nav class="navbar navbar-expand-lg navbar-light chat-nav p-1 chatHeader">
+        <!--
+          ECP-01 — j3e at byte 2,367,398, gated by O(5, 0 == o.chatTabs.length ? 5 : -1) at
+          2,399,848. The main column has carried this since acA-11; nbsp is the capture's \xa0.
+        -->
         <!-- svelte-ignore a11y_missing_attribute -->
         <a class="navbar-brand ml-1 mr-1"
           ><i class="fas fa-comment"></i>
@@ -367,25 +371,21 @@
               </a>
             </li>
           {/if}
-          <li class="nav-item mx-1">
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- ECP-03 — const 15 carries the click, const 16 does not. See the contract test. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <li class="nav-item mx-1" onclick={onsearch}>
             <!-- svelte-ignore a11y_missing_attribute -->
-            <a title="Search" class="nav-link p-0" onclick={onsearch}>
+            <a title="Search" class="nav-link p-0">
               <i class="fas fa-search"></i>
             </a>
           </li>
-          <li class="nav-item dropdown ml-2" style="position: static;">
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <li class="nav-item dropdown ml-2" style="position: static;" onclick={ontoggletoolbar}>
             <!-- svelte-ignore a11y_consider_explicit_label -->
             <!-- svelte-ignore a11y_missing_attribute -->
-            <a
-              aria-haspopup="true"
-              aria-expanded="false"
-              class="nav-link dropdown-toggle p-0"
-              onclick={ontoggletoolbar}
-            >
+            <a aria-haspopup="true" aria-expanded="false" class="nav-link dropdown-toggle p-0">
               <i title="Settings" class="fas fa-cog chat-header-gear"></i>
             </a>
           </li>

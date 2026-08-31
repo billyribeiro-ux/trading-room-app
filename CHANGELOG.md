@@ -183,6 +183,93 @@ decides what building the tab costs.
 That is the failure `CLAUDE.md`'s own checklist names: a comment claiming absence, written from a
 grep, surviving long enough that the next reader plans around it.
 
+### 2026-08-31 08:45 EDT — Room-surface audit batch 3: `RoomNavbar`, `RoomOverlays`, `ExtraChatPane`
+
+**Runtime impact: YES.** Six behaviour changes, all in the room: one navbar item reordered, one
+reminder gate narrowed, one overlay's two nodes swapped, two chat-header hit targets widened, one
+chat-header label restored, and two stylesheet fixes that make the second chat column and the image
+lightbox render as they were always meant to.
+
+Thirteen rows appended to `docs/decoded/room-surface-audit-2026-08-30.md` — `RNB-01…05`,
+`ROV-01…04`, `ECP-01…04` — each carrying its disposition and the sentence that keeps it out of the
+two-verifier pass's tables. Surfaces chosen from `todo-next.md`'s inventory: the three largest rows
+whose verdict is `no` and which are neither excluded nor already audited under another batch.
+`notes/CarouselDialog.svelte` (946 lines) is skipped despite still reading `no` in that table,
+because the register already holds an eight-row section for it from 2026-08-31; `todo-next.md` was
+read and not edited.
+
+**What was built or fixed:**
+
+- **`RNB-02`** — TAWK Support moved above the volume dropdown. `U4e`'s node list at bundle byte
+  2,485,567 is `(29,f4e,…,101)(30,m4e,…,102),d(31,"li",103)`, and consts 101/102/103 decode as
+  Session Control, TAWK Support and the `dropstart` volume item. A pure twenty-six-line move.
+- **`RNB-03`** — the "You are not recording!" reminder now reads `!media.micMuted`. The reference's
+  gate (byte 2,477,744) has five terms and this bar had three; a presenter with a muted microphone
+  was nagged for as long as the mute lasted. `micDisabled`, the fifth term, is deliberately NOT
+  added: the only thing that sets it (byte 2,503,063) clears `recordingReminder` in the same
+  statement, and `G11` records that this room has no producer for that event.
+- **`ROV-01`** — the three-second "Conected" flash renders its tick first and the captured string
+  ` Conected\n` second, which is `T(9,"i",11)` before `v(10,…)` at byte 2,547,023.
+- **`ROV-02`** — the image lightbox gets `text-align`, `max-width: 90%` and
+  `max-height: calc(100vh - 150px)`. The captured rules (byte 1,364,894) are scoped to the MESSAGE
+  component and this room renders the lightbox in the overlay layer, so all three selectors missed
+  and a tall screenshot took its own close button off the bottom of the viewport. Written into
+  `src/app.css` as `.bootbox.imgur-modal`, never into the generated
+  `captured-runtime-components.css`.
+- **`ECP-01`** — the second chat column shows `&nbsp;Chat` when the room has no channels, which
+  `acA-11` gave the main column and not this one (`j3e`, byte 2,367,398).
+- **`ECP-03`** — the search and settings toggles bind their click on the `<li>`, as consts 15 and 18
+  do and consts 16 and 19 do not (bytes 2,394,394 / 2,394,486 against 2,394,426 / 2,394,551). Third
+  instance of this shape after `acA-12` and `NP-02`.
+- **`ECP-04`** — nine `#textAreaHolder` rules in `src/app.css` now name `#textAreaHolderExtra` too.
+  Both composer holders are const 25 in their components and decode byte-identically (1,448,754 and
+  2,394,929); upstream survives the duplicate id through view encapsulation, this room diverged the
+  id and left the stylesheet behind, so the extra column's composer had no radius, margin,
+  min-height, max-height, focus ring, container query or dark theme.
+
+**What was refused or blocked, with the measurement:**
+
+- **`RNB-01`** — the Simpler Trading help link is NOT built. Its gate `hasSTHelpLink` occurs three
+  times in the whole bundle: two initialisers and one template read. `app-room` sets it `!1` (byte
+  2,497,849) and never assigns it, so upstream's own room never renders the control. Control:
+  `isTipEnabled`, a field in the same constructor, IS assigned at byte 2,509,182.
+- **`RNB-04` / `RNB-05`** — the Rec Preview gate and the Download Recording item are recorded as
+  deliberate divergences. `recPreviewLocation` has no producer here; `Download Recording` occurs
+  zero times in the bundle, against a passing control of `" Show Rec Preview"` at byte 2,475,265
+  from the same menu.
+- **`ROV-03`** — `openImageModal` has no declaration in `main.d1d09071be31f1ba.js`. Blocked rather
+  than concluded: `deployed-index.html` names three sibling chunks this checkout does not hold, and
+  a global installed by `scripts.*.js` is exactly that shape. Control: `showImagePreview`'s
+  definition IS found, at byte 1,992,730.
+- **`ROV-04`** and **`ECP-02`** — both blocked, and both by the same ratchet. All three components
+  were AT their `source-size-contract.test.ts` ceilings (1169/1169, 1081/1081, 640/640), and
+  `lib/room/events.svelte.ts` at 1017/1017, so every fix in this batch had to be line-neutral. A
+  backdrop element and a second connection field are lines, and ceilings only go down. Each row
+  names the extraction that unblocks it. **`ECP-02` is filed against BOTH chat columns**:
+  `AlertChatArea` quotes `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` in its own docblock and
+  implements only the second half, exactly as the extra column does, and its own audit section did
+  not catch it.
+
+**Verification.** `apps/room/src/lib/room-surface-audit-batch3-contract.test.ts` re-reads all forty
+citations at their bytes and asserts what each row now does — 71 tests, green. Five negative
+controls were run and each printed a single red assertion before being restored by copy: a
+length-preserving mutation of the pinned bundle at byte 2,487,900 (`hasSTHelpLink` →
+`hasSTHelpLinX`) failed the citation sweep and the occurrence count, and the bundle restored to
+`sha256sum -c sha256sums.txt` = OK on all three artifacts; length-preserving mutations of
+`RoomNavbar.svelte`, `RoomOverlays.svelte`, `ExtraChatPane.svelte` and `app.css` each failed exactly
+their own row's assertion. `pnpm run gate` was run in `apps/room`.
+
+**One number in the register was edited and it should not have been left alone.**
+`## Where the work stands` moved from `0 open · 251 closed · 251 rows` to `264`/`264`, because
+`room-surface-audit-counts.test.ts` parses that line and fails when it disagrees with the document.
+The running-total paragraph above it ("Twenty-eight rows have been appended…") is prose that no gate
+reads and was NOT touched.
+
+**The Svelte MCP was not available in this session** — no `list-sections`, `get-documentation` or
+`svelte-autofixer` tool was offered — so step 3 of the mandatory workflow could not be run on the
+three modified `.svelte` files. `pnpm run check` (svelte-check), `pnpm run lint` and
+`pnpm run format:check` were run in its place, and this is recorded rather than glossed.
+
 ### 2026-08-31 12:40 UTC — The coverage tracker was under-reporting by thirteen batches
 
 **Runtime impact: NO.** A number was wrong. Nothing shipped changes.

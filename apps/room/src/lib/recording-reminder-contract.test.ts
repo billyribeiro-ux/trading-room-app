@@ -51,9 +51,25 @@ describe('the recording reminder needs the owner AND the runtime flag', () => {
     expect(mediaClass).not.toContain('#recordingReminder = $derived');
   });
 
-  it('ANDs the policy into the banner gate rather than beside it', () => {
+  /**
+   * `RNB-03`, 2026-08-31 — the `micMuted` term, which this file's own docblock has quoted since it
+   * was written and this assertion did not require.
+   *
+   * The five-term gate is transcribed at the top of this file, `micMuted` included, and the
+   * assertion below pinned three of the five. A presenter with the microphone muted was therefore
+   * nagged "You are not recording!" for as long as the mute lasted, over the recording menu, and
+   * the test that would have caught it was quoting the answer two screens up. That is the shape
+   * `AGENTS.md` DPE rule 4 is about: a load-bearing claim in prose is a claim nothing checks.
+   *
+   * `micDisabled`, the remaining term, is deliberately NOT required. The only thing that raises it
+   * is the `audioServerDisableMic` subscriber at bundle byte 2,503,063, whose very next statement is
+   * `this.recordingReminder=!1` — so on the one path that can set the fourth term, the second is
+   * already false. `G11` records that this room has no producer for that event, so requiring it
+   * would model a signal we never receive in order to re-check something upstream has answered.
+   */
+  it('ANDs the policy AND the microphone into the banner gate rather than beside them', () => {
     expect(NAVBAR).toContain(
-      '{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}'
+      '{#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}'
     );
   });
 

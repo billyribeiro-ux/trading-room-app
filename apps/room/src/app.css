@@ -391,6 +391,40 @@ app-chat app-roomscroller {
   line-height: 18px;
 }
 
+/*
+  ── ECP-04 — WHY EVERY `#textAreaHolder` RULE BELOW NAMES A SECOND ID ──────────────────────────
+
+  The capture gives BOTH chat columns the same id. `app-chat`'s composer holder is const 25 at
+  bundle byte 1,448,754 and `app-extra-chat`'s is const 25 at byte 2,394,929, and the two decode
+  byte-identically:
+
+      ["id","textAreaHolder",1,"d-flex","align-items-center","textSendDiv"]
+
+  A duplicate id in one document is legal-but-wrong HTML, and upstream gets away with it because
+  Angular's emulated view encapsulation rewrites each component's own rule with its own attribute
+  — `css/complete-app-styles.css` carries FOUR of them, `#textAreaHolder[_ngcontent-ng-c1823712792]`
+  (:7398), `[_ngcontent-ng-c698792182]` (:7447), `[_ngcontent-ng-c3761163150]` (:7986) and
+  `[_ngcontent-ng-c977335924]` (:7185). The private-chat composer, which is a different shape, gets
+  a different id outright: `#textAreaHolderPM` (:7716).
+
+  `ExtraChatPane.svelte` USED to diverge to `#textAreaHolderExtra`, and the second column's composer
+  therefore got none of the nine rules below: no 8px radius, no 5px margin, no 35px min-height, no
+  300px max-height, no focus ring, no dark-theme colours, and — the one that broke behaviour rather
+  than looks — no `container-type`, so both button sets rendered at every width and pressing "+"
+  only hid "+".
+
+  **That divergence is GONE.** `EXTRA_CHAT_COMPOSER_HOLDER_ID` is `'textAreaHolder'`, the capture's
+  own id from const 25, and `extra-chat-surface.ts` holds the measurement. Removing the suffix is
+  the better of the two available fixes and it is why this selector list is not duplicated: a
+  parallel batch fixed the same defect by adding `#textAreaHolderExtra` beside every rule here, which
+  would have left ten selectors matching no element in this application. CSS with no element is the
+  same defect as an element with no CSS, read from the other side.
+
+  The list is spelled out rather than folded onto the shared `.textSendDiv` class because that class
+  is on the private-chat composer too (`PrivateChatComposer.svelte:155`) and upstream gives that one
+  deliberately different margins. An explicit id list is this sheet's stand-in for the encapsulation
+  attribute the capture had.
+*/
 #textAreaHolder {
   display: flex;
   align-items: center;
@@ -656,6 +690,46 @@ app-chat app-roomscroller {
 
 .bootbox.modal.show {
   display: block;
+}
+
+/*
+  ── ROV-02 — THE IMAGE LIGHTBOX'S GEOMETRY, WHICH IT WAS RENDERING WITHOUT ────────────────────────
+
+  `.imgur-modal` is the class the chat-image lightbox wears, and the capture's three rules for it
+  live inside the MESSAGE component's encapsulated block. Our generated transcription keeps that
+  scoping honestly — `src/lib/styles/captured-runtime-components.css:8088-8100` writes them as
+  `app-st-message .imgur-modal`, `app-st-message .imgur-modal .modal-dialog` and
+  `app-st-message .imgur-modal img`, from the bundle at byte 1,364,799:
+
+      .imgur-modal[_ngcontent-%COMP%]{text-align:center}
+      .imgur-modal[_ngcontent-%COMP%]   .modal-dialog[_ngcontent-%COMP%]{max-width:90%;max-height:90%}
+      .imgur-modal[_ngcontent-%COMP%]   img[_ngcontent-%COMP%]{width:inherit;height:inherit;
+                                                               max-width:100%;max-height:calc(100vh - 150px)}
+
+  This room does not render the lightbox inside a message. Phase 5 slice 17 moved it to the overlay
+  LAYER — `RoomOverlays.svelte`, where every other thing that floats above the room lives — and it is
+  a sibling of `app-st-message`, never a descendant. So all three selectors miss, and the consequence
+  is the third rule: with no `max-height`, a tall screenshot opened from chat rendered at its natural
+  height and ran off the bottom of the viewport with the close button gone with it.
+
+  Transcribed here rather than in the generated file, which is generated and must not be hand-edited
+  (`AGENTS.md`, "Do not hand-edit generated artifacts"). Scoped to `.bootbox.imgur-modal` so it says
+  what it means: the lightbox this room renders, not any future `.imgur-modal` inside a message.
+*/
+.bootbox.imgur-modal {
+  text-align: center;
+}
+
+.bootbox.imgur-modal .modal-dialog {
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.bootbox.imgur-modal img {
+  width: inherit;
+  height: inherit;
+  max-width: 100%;
+  max-height: calc(100vh - 150px);
 }
 
 /*

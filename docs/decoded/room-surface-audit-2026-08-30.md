@@ -177,7 +177,7 @@ as it ran.
 
 ## Where the work stands
 
-**0 open · 397 closed · 397 rows.**
+**0 open · 410 closed · 410 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -9438,3 +9438,357 @@ transcription and would have been "corrected" back by the next reader diffing ag
 executes both the synthesis and the alias rule the same `forEach` carries — including the case a
 prefix-only reading of `"default - "` gets wrong, which is a machine with one microphone labelled
 `Default - Headset` and no plain `Headset` beside it.
+## RoomNavbar.svelte
+
+Batch 3, read 2026-08-31, end to end against `U4e` — the room's top bar, 93 decls and 42 vars, byte
+2,484,831 — and the thirty-odd hoisted templates it calls. Five rows.
+
+`app-room`'s whole 229-entry `consts` table was decoded BY VALUE first, bracket-walking it from byte
+2,533,197 to 2,546,833 with `const-table.mjs`, and two of the five rows below exist only because it
+was decoded rather than looked up. Every citation is re-read at its byte by
+`apps/room/src/lib/room-surface-audit-batch3-contract.test.ts`, which is also where the long form of
+each argument lives: all three components in this batch were AT their `source-size-contract.test.ts`
+ceilings when it ran — 1169/1169, 1081/1081, 640/640 — and that ratchet only goes down, so the fixes
+had to be line-neutral and the reasoning had to go somewhere that has no ceiling.
+
+### RNB-01 — The navbar's Simpler Trading help link is missing, and it should stay missing
+
+**MEASURED REFUSAL 2026-08-31.** `U4e`'s node 9 is `H(9,MPe,2,0,"a",84)`, `MPe` at byte 2,472,793 is
+`d(0,"a",84),T(1,"i",138)`, and const 84 at byte 2,538,141 is
+`["href","https://intercom.help/simpler-trading/en/","target","_blank",1,"helpLink","mr-auto"]` — a
+question-mark anchor between the brand logo and the mobile-nav toggle. This bar has no such element,
+and `.helpLink` carries rules in the captured sheet (`css/complete-app-styles.css:7062` and `:7064`),
+which is the shape that normally means a control was dropped.
+
+**It was not dropped: the gate cannot be turned on.** `O(9, e.hasSTHelpLink ? 9 : -1)` sits at byte
+2,487,900, and `hasSTHelpLink` occurs exactly THREE times in the whole 2,891,205-byte bundle — the
+login component's `this.hasSTHelpLink=!0`, `app-room`'s `this.hasSTHelpLink=!1` at byte 2,497,849,
+and the template read above. The room component initialises it FALSE and never assigns it again, so
+the reference's own room renders this control never.
+
+The passing control is what makes that a measurement instead of a failed search: `isTipEnabled` is a
+field in the SAME constructor, initialised `!1` in the same statement list, and it IS assigned — from
+`sessData.tipMeBtnEnabled && …` at byte 2,509,182. The method finds an assignment when there is one.
+`RS-09` built the tip button on the strength of exactly that assignment; this row refuses the help
+link on the strength of its absence, and the two are the same reading.
+
+Nothing was deleted either. `.helpLink` never appears alone — it shares both of its rules with
+`.sidebar-menu` and `.users`, which this bar does render — so the selector is not dead CSS and
+removing it would be editing a captured sheet for a class that costs nothing.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-02 — TAWK Support renders after the volume dropdown; upstream it is the item before it
+
+**FIXED 2026-08-31.** `U4e`'s node list, byte 2,485,567:
+`(29,f4e,5,0,"li",101)(30,m4e,5,0,"li",102),d(31,"li",103)`. Decoded by value, const 101 (byte
+2,539,218) is the Session Control item, const 102 (byte 2,539,326) is `["title","TAWK Support",1,
+"nav-item"]` and const 103 (byte 2,539,364) is `[1,"nav-item","dropdown","dropstart"]` — the volume
+dropdown. So the captured order is Session Control, TAWK, Volume, Reload; this bar rendered Session
+Control, Volume, TAWK, Reload.
+
+Both orders draw the same six items and nothing was broken, which is why it survived six readings of
+this file. What differs is reach: `.navbar-nav` is `ml-auto`, so these items are laid out from the
+right edge, and a presenter going for support had to travel across the volume control to get there.
+
+A pure move — twenty-six lines lifted and re-inserted with no edit to any of them, and the file's
+line count unchanged at 1,168 — because the component is at its ceiling and because a reorder that
+also rewrites what it moves is two changes reviewed as one.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-03 — "You are not recording!" nagged a presenter whose microphone was muted
+
+**BUILT 2026-08-31.** The reminder's gate is five terms at byte 2,477,744 and this room had three:
+
+```js
+O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled ||
+     e.mediaService.micMuted || (!roomState.isRecordingPaused && roomState.isRecording) ? -1 : 5)
+```
+
+`micMuted` is the missing one and it is the point of the control. The reminder exists to catch a
+presenter who has started talking and forgotten to press record; a presenter with the microphone
+muted has not started talking, and got the bubble anyway, pinned over the recording menu, for as
+long as the mute lasted. `!media.micMuted` is now the third term of the `{#if}`, which stayed one
+line, which is what let it land at all.
+
+**`micDisabled` is deliberately not added, and that is a reading rather than a preference.** The only
+thing that sets it is the `audioServerDisableMic` subscriber at byte 2,503,063, and that handler's
+very next statement is `this.recordingReminder=!1` — so on the only path that can raise the fourth
+term, the second is already false. `G11` (`lib/room/local-capture.svelte.ts`) records that this room
+has no producer for that event, so building the term would model a signal we do not receive in order
+to re-check something the reference has already answered.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-04 — The Rec Preview item is offered after the recording stops, not while it runs
+
+**DELIBERATE DIVERGENCE 2026-08-31.** `KPe` at byte 2,475,295 is the reference's whole preview block —
+a `<li>` holding an `<hr class="dropdown-divider">`, then a `<li class="nav-item">` holding one of two
+anchors, `" Hide Rec Preview "` (byte 2,475,111) or `" Show Rec Preview"` (byte 2,475,265), whose
+asymmetric trailing spaces this room already transcribes character for character. Its gate, byte
+2,476,206, is `isRecording && sessData.recPreviewLocation`.
+
+`recPreviewLocation` is a URL the server pushes in a `setRecPreview` message — byte 1,023,752,
+`this.globals.sessData.recPreviewLocation=i.url` — pointing at a still frame the RECORDER refreshes
+once a second while it runs (byte 2,352,305 sets that interval). There is no such producer here;
+`lib/room/recording.ts:317` already records the refusal. So this room gates the same control on
+`media.recordedUrl`, which is the local blob and exists only once recording has stopped.
+
+Same control, different moment, and the later moment is the only one this room can honestly offer.
+Recorded rather than closed as "built", because a reader comparing the two gates will otherwise read
+ours as a mistake.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-05 — "Download Recording" has no counterpart anywhere in the bundle
+
+**DELIBERATE DIVERGENCE 2026-08-31.** The string `Download Recording` occurs ZERO times in 2,891,205
+bytes. That is measured, not grepped-and-shrugged: the sibling label `" Show Rec Preview"` from the
+very same menu occurs exactly once, at byte 2,475,265, so the method finds this menu's strings when
+they are there.
+
+The item is ours because the RECORDING is ours. Upstream records server-side — `YPe` is selected by
+`O(6, e.mediaService.useMTX || e.mediaService.mediaSoupService.recBotMethod ? 6 : 7)`, so the whole
+Start/Stop/Pause/Resume menu belongs to an MTX or record-bot path, and there is no blob in the
+browser to hand anybody. This room's `MediaRecorder` produces one, and without this item it is lost
+when the tab closes.
+
+Filed as a divergence rather than left implicit because "nothing exists without a consumer" cuts both
+ways: this control has one, and what it did not have was a record saying it is not transcribed from
+anything.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+---
+
+## RoomOverlays.svelte
+
+Batch 3, read 2026-08-31, against `app-room`'s own template body (byte 2,546,856) — nodes 7 to 36,
+which are the connection overlays and the twenty-six modal elements — and against the two image
+viewers the pinned bundle contains. Four rows, two of them fixed and two blocked, and what blocks
+both is the same ceiling: this file was 1081 of 1081 when the batch ran.
+
+### ROV-01 — The "Conected" flash renders its tick after the word; upstream renders it first
+
+**FIXED 2026-08-31.** `app-room`'s template at byte 2,547,023:
+
+```js
+H(7,iRe,3,0,"div",9),d(8,"div",10),T(9,"i",11),v(10," Conected\n"),u()
+```
+
+Node 9 is the icon and node 10 is the text, in that order. Const 10 (byte 2,533,614) is
+`["id","connectedMsg",1,"notConnectedOverlay","animated","fadeIn"]` and const 11 (byte 2,533,680) is
+`[1,"fas","fa-check"]`. So the reference paints a check mark and then the word, and the word is
+` Conected\n` — a leading space and a trailing newline.
+
+This room rendered `Conected<i class="fas fa-check"></i>` — the tick on the wrong side of a flash
+that is on screen for three seconds and cannot be re-read. Written as `{' Conected\n'}` for the same
+reason `G03` wrote ` Reconnecting Chat... ` as an expression one element up: Svelte normalises
+whitespace at element boundaries and the spacing is evidence, not formatting.
+
+The reference's misspelling stays, as it already did.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ROV-02 — The image lightbox had no maximum height, because its rules are scoped to a component it is not inside
+
+**FIXED 2026-08-31.** `.imgur-modal` carries three rules in the capture, and all three live inside the
+MESSAGE component's encapsulated block at byte 1,364,894:
+
+```css
+.imgur-modal[_ngcontent-%COMP%]{text-align:center}
+.imgur-modal[_ngcontent-%COMP%]   .modal-dialog[_ngcontent-%COMP%]{max-width:90%;max-height:90%}
+.imgur-modal[_ngcontent-%COMP%]   img[_ngcontent-%COMP%]{width:inherit;height:inherit;
+                                    max-width:100%;max-height:calc(100vh - 150px)}
+```
+
+The generated transcription keeps that scoping honestly —
+`src/lib/styles/captured-runtime-components.css:8088-8100` writes them as `app-st-message
+.imgur-modal …`. Phase 5 slice 17 moved this room's lightbox to the overlay LAYER, where it is a
+sibling of `app-st-message` and never a descendant, so every one of the three selectors missed.
+
+The third is the one a member notices. With no `max-height`, a tall screenshot opened from chat
+renders at its natural height and takes the close button off the bottom of the viewport with it —
+and the dismiss-on-backdrop-click handler is on the element they can no longer reach.
+
+Rewritten in `src/app.css`, not in the generated file, which is generated and must not be
+hand-edited. Scoped `.bootbox.imgur-modal` — three classes — so it beats Bootstrap's own single-class
+`.modal-lg` on the dialog without an `!important`. That is arithmetic, and `app.css` already records
+the same specificity reasoning for `above-note-modal` twenty lines up.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ROV-03 — The chat-image lightbox's own markup is not in the pinned chunk, so its shape cannot be settled here
+
+**BLOCKED 2026-08-31.** The handler that opens it is an inline attribute inside a template string at
+byte 1,326,388:
+
+```js
+`${l}<div class="img-container ${l?"d-none":""}" onclick="openImageModal(event,'${a}')"> …`
+```
+
+`openImageModal` occurs exactly ONCE in 2,891,205 bytes — that call — with no declaration anywhere,
+and no markup in the bundle wears `.imgur-modal`; the class appears only inside component
+stylesheets. So this chunk does not contain the viewer that handler opens.
+
+**That is not the same as saying it does not exist, and the distinction is the row.**
+`deployed-index.html` names four scripts — `runtime.b70e5d3ff558bfdf.js`,
+`polyfills.95db17d6d6f4b89d.js`, `scripts.38973a242454fb27.js` and
+`main.d1d09071be31f1ba.js` — and this checkout holds one of them. A global installed by
+`scripts.*.js` is exactly the shape `openImageModal` has. The passing control is `showImagePreview`,
+whose five occurrences include its own definition at byte 1,992,730, so a definition in THIS file
+would have been found.
+
+What unblocks it is the other three chunks. Until then, what this room renders was built against
+`showImagePreview` — a `bootbox.dialog({title, message, size:"large", buttons:{download:…}})`, the one
+image viewer the pinned bundle does contain — and ROV-02 and ROV-04 are the two places that choice
+shows.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ROV-04 — The lightbox calls itself a bootbox and renders no backdrop
+
+**BLOCKED 2026-08-31.** Every other dialog in this room gets one: `BootboxDialog.svelte:145` renders
+`<div class="modal-backdrop fade show"></div>` as its last node, because that is what bootbox emits
+and what `.modal-backdrop`'s `z-index: 1050` is for — `app.css` already writes those three z-indexes
+down. The lightbox wears `bootbox modal fade imgur-modal show` and has no backdrop at all, so it
+opens over an undimmed room; and `showImagePreview` at byte 1,992,730, the only image viewer the
+pinned bundle contains (see ROV-03), is a plain `bootbox.dialog({…})` and therefore has one.
+
+**Not built, and the reason is the ratchet rather than doubt.** A backdrop is an element, an element
+is a line, and `RoomOverlays.svelte` was at 1081 of 1081 with `source-size-contract.test.ts` ceilings
+only going down. It is blocked behind lifting the lightbox into its own component — 41 lines with its
+own dismiss handling, worth extracting on its own terms and not this batch's work. Recorded here so
+whoever does that extraction knows the one line to add on the way.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+---
+
+## ExtraChatPane.svelte
+
+Batch 3, read 2026-08-31, against `app-extra-chat` (selector at byte 2,393,623) end to end: its
+90-entry `consts` table decoded by value from byte 2,393,850, its template body at 2,399,258, and all
+ten of its hoisted sub-templates. Four rows.
+
+The second chat column is the surface where "the same component, one column over" keeps being not
+quite true. Three of the four rows below are behaviours the MAIN column already has and this one did
+not, and in every case the main column's copy is the passing control — which is a cheaper control
+than the bundle and was available the whole time.
+
+### ECP-01 — The second column has no name when the room has no chat channels
+
+**BUILT 2026-08-31.** The brand anchor is three nodes, byte 2,399,335:
+`T(4,"i",10), H(5,j3e,2,0,"span")(6,V3e,3,0,"span",11)` — the comment glyph, the label, the DND badge.
+`j3e` at byte 2,367,398 is `{1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}` and its gate is
+`O(5, 0 == o.chatTabs.length ? 5 : -1)` at byte 2,399,848.
+
+This is `acA-11`, one column over. The main pane has carried BOTH halves since that row — the label,
+and `ChatTabStrip` suppressing its own `<ul>` at zero tabs — and the extra column inherited the second
+half and not the first, because the tab strip is a shared component and the label is inline markup.
+So a room with no channels configured drew a comment glyph with the word "Chat" beside it on the left
+and a bare glyph on the right.
+
+`&nbsp;` rather than a space, because the capture is `\xa0` and a plain space is folded away by the
+surrounding whitespace. The control for this row is `AlertChatArea.svelte`, which contains the
+identical line.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ECP-02 — The composer/Chat Disabled swap reads only half of its gate, in BOTH columns
+
+**BLOCKED 2026-08-31.** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361: slot 23
+is the composer, slot 24 is the Chat Disabled block. `isConnected` starts TRUE (byte 2,375,326,
+`this.isConnected=!0,this.isMediaConnected=!1`) and is driven by two subscriptions — `socketDisconnected`
+sets it false at byte 2,376,472 and `socketConnected` sets it true. So upstream, a chat connection
+that drops takes the composer away and puts a lock and a reason in its place.
+
+Both of this room's chat columns gate on `chatEnabled` alone. Their docblocks quote the whole
+expression — `ExtraChatPane.svelte:80` and `AlertChatArea.svelte:144`, verbatim, `isConnected`
+included — and neither implements the first half, which is exactly the "comment claiming X while the
+next line does something else" the root standard asks a reviewer to check for. A member whose channel
+has dropped keeps a live-looking composer, types into it, presses Enter, and watches nothing happen,
+with only the small corner overlay `G03` built to explain it.
+
+**Not built, and the blocker is a starting value rather than a line budget.** The nearest thing this
+room has is `RoomEventStream.connected`, and it starts FALSE — deliberately, with its own docblock
+saying so, because the sidebar's "Chat" line has to read *not connected* before the first open.
+Gating the composer on it would print "Chat Disabled" on first paint, which upstream never does. The
+faithful build needs a second `$state` field that starts true and follows the same two events, and
+`lib/room/events.svelte.ts` was at 1017 of 1017.
+
+Recorded against BOTH columns on purpose. `AlertChatArea` has the identical gap and its own audit
+section did not find it; this batch's scope is the extra column, so the sibling is reported here
+rather than silently edited.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ECP-03 — The header's search and settings toggles bound their click on the anchor, not the list item
+
+**BUILT 2026-08-31.** Decoded by value from `app-extra-chat`'s own table, and the PAIRING is the row:
+
+```
+15 [1,"nav-item","mx-1",3,"click"]                                    @ 2,394,394
+16 ["title","Search",1,"nav-link","p-0"]                              @ 2,394,426
+18 [1,"nav-item","dropdown","ml-2",2,"position","static",3,"click"]   @ 2,394,486
+19 ["aria-haspopup","true","aria-expanded","false",1,"nav-link", … ]  @ 2,394,551
+```
+
+Consts 15 and 18 carry `3,"click"`; consts 16 and 19 declare no bindings at all. The template
+confirms it twice — `d(10,"li",15),x("click", … toggleChatToolbarSearchOnly())` at byte 2,399,435 and
+`d(13,"li",18),x("click", … toggleChatToolbar())` at byte 2,399,551 — the handler is on the list item
+and the anchor inside it is inert.
+
+This room had both handlers on the `<a>`, and the `<a>` is `p-0` while the `<li>` is not, so every
+pixel of the row's own box outside the glyph was dead in a header that gives that box real height.
+`acA-12` is the same finding on the alerts toolbar and `NP-02` on the notes tab strip; this is the
+third, so it is transcribed rather than re-argued.
+
+The a11y suppressions moved WITH the handler — `no_noninteractive_element_interactions` for a `<li>`
+where the anchor needed `no_static_element_interactions` — because a suppression that outlives the
+thing it suppresses is a lie no compiler can catch.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ECP-04 — One id in the capture, two here, and nine stylesheet rules that followed neither
+
+**FIXED 2026-08-31.** The two composer holders decode BYTE-IDENTICALLY. `app-chat`'s const 25 at byte
+1,448,754 and `app-extra-chat`'s const 25 at byte 2,394,929 are both:
+
+```js
+["id","textAreaHolder",1,"d-flex","align-items-center","textSendDiv"]
+```
+
+Upstream renders the same id twice and gets away with it because Angular's emulated view
+encapsulation rewrites each component's rule with its own attribute: `css/complete-app-styles.css`
+carries four `#textAreaHolder[_ngcontent-…]` variants (`:7185`, `:7398`, `:7447`, `:7986`) and gives
+the private-chat composer a different id outright, `#textAreaHolderPM` (`:7716`).
+
+`ExtraChatPane` diverged to `#textAreaHolderExtra`, and **that divergence is kept** — one element per
+id in one document is the better markup, and this room already renders `#textAreaHolder` twice
+(`AlertChatArea.svelte:1214` and `AlertQaModal.svelte:310`) without needing a third. What the
+divergence did not do is bring the stylesheet with it, and `src/app.css` is global rather than
+per-component, so the second column's composer matched NONE of the nine rules: no 8px radius, no 5px
+margin, no 35px min-height, no 300px max-height, no focus ring, no container query and no dark theme.
+Nothing failed; it simply looked like a different application beside the first column.
+
+Each of the nine selectors now names both ids, and the contract test sweeps them rather than listing
+them, so a tenth rule is covered by nobody remembering. `.textSendDiv` — which both holders wear —
+was deliberately not used as the shared hook, because the private-chat composer wears it too and
+upstream gives that one different margins on purpose.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*

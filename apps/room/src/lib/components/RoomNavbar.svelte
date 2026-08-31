@@ -661,7 +661,7 @@
             ></i>
             <span class="ml-2 mainNavItem">Start/Stop Recording</span>
           </a>
-          {#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}
+          {#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}
             <div class="recording-reminder">
               <span class="recording-reminder-arrow"></span>
               <span>You are not recording!</span>
@@ -901,6 +901,32 @@
           </a>
         </li>
       {/if}
+      <!--
+          `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
+          `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
+
+          Markup from the const table: 195 is
+          `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
+          `[1,'nav-link','d-flex','align-items-center']`, 196 is
+          `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
+          (`app-room.compiled.js:2050-2051, 2048, 1697`).
+
+          `tawkAvailable` carries a THIRD term the reference does not have: a configured
+          property id. See `#lib/tawk-support` — the reference's id is its own company's,
+          and a room with none configured shows no control rather than a control that opens
+          somebody else's support inbox.
+        -->
+      {#if tawkAvailable}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <li title="TAWK Support" class="nav-item" onclick={ontoggletawksupport}>
+          <!-- svelte-ignore a11y_missing_attribute -->
+          <a class="nav-link d-flex align-items-center">
+            <i class="fas fa-2x fa-question-circle"></i>
+            <span class="ml-2 mainNavItem">TAWK Support</span>
+          </a>
+        </li>
+      {/if}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <li class="nav-item dropdown dropstart" onclick={(event) => event.stopPropagation()}>
@@ -1128,32 +1154,6 @@
           </div>
         </div>
       </li>
-      <!--
-          `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
-          `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
-
-          Markup from the const table: 195 is
-          `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
-          `[1,'nav-link','d-flex','align-items-center']`, 196 is
-          `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
-          (`app-room.compiled.js:2050-2051, 2048, 1697`).
-
-          `tawkAvailable` carries a THIRD term the reference does not have: a configured
-          property id. See `#lib/tawk-support` — the reference's id is its own company's,
-          and a room with none configured shows no control rather than a control that opens
-          somebody else's support inbox.
-        -->
-      {#if tawkAvailable}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <li title="TAWK Support" class="nav-item" onclick={ontoggletawksupport}>
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a class="nav-link d-flex align-items-center">
-            <i class="fas fa-2x fa-question-circle"></i>
-            <span class="ml-2 mainNavItem">TAWK Support</span>
-          </a>
-        </li>
-      {/if}
       <li title="Reload" class="nav-item">
         <!-- svelte-ignore a11y_missing_attribute -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->

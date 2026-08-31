@@ -117,10 +117,16 @@ describe('XCP-01 — the composer holder wears the capture’s own id', () => {
       Measured rather than assumed, because "the classes are still there" was the reason the missing
       styling went unnoticed. `textSendDiv` IS in the markup — that is the positive half — and has
       no declaration block in either stylesheet this room ships.
+
+      READ WITHOUT COMMENTS, corrected 2026-08-31. The claim is "no declaration block", and the raw
+      form of it went red the moment a docblock in `app.css` NAMED the class while explaining why the
+      rules are keyed on the id instead. Prose describing an absence is not the absence ending — the
+      same rule `codeOf` exists for in the room's source tests, applied here to CSS.
     */
+    const declarations = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(PANE).toContain('textSendDiv');
-    expect(APP_CSS).not.toContain('.textSendDiv');
-    expect(CAPTURED_CSS).not.toContain('.textSendDiv');
+    expect(declarations(APP_CSS)).not.toContain('.textSendDiv');
+    expect(declarations(CAPTURED_CSS)).not.toContain('.textSendDiv');
   });
 });
 
