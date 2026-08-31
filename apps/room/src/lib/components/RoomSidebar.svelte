@@ -693,6 +693,22 @@
               <app-room-roster>
                 <div class="room-roster-list">
                   {#if sidebarOpen}
+                    <!--
+                      KEYED BY `user.id`, and upstream keys by `userXrefID` — the same identity
+                      here, which is worth writing down rather than leaving to be rediscovered.
+
+                      `m2e = (t, n) => n.userXrefID` at byte **2,032,733** is the reference's own
+                      track-by, passed to the repeater in `app-room-roster`'s template. This room
+                      sets `userXrefID: String(account.id)` at `+page.server.ts:208`, so the two
+                      select the same person and differ only in type.
+
+                      `RSG-04`. It matters because the equivalence is a PROPERTY OF THIS ROOM, not of
+                      the shape: the moment `userXrefID` becomes something the account does not
+                      derive — an external CRM id, an SSO subject — the key here silently stops
+                      being upstream's identity, and a roster row would be recreated where the
+                      reference reuses it. `roster-identity-contract.test.ts` asserts the derivation
+                      so that change cannot happen quietly.
+                    -->
                     {#each roster.display as user (user.id)}
                       <!--
                         Two gates and a class map, all of which were missing: the per-row

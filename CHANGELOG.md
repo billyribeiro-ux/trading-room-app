@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 00:40 UTC — The roster surface: complete behaviour, three citations pointing at the wrong code
+
+**Runtime impact: NO** — comments and one contract. The roster's behaviour was already right; what
+was wrong was every pointer to the evidence for it.
+
+`app-room-roster` (byte 2,038,159) was read end to end and all **24 consts decoded by value** against
+`RoomSidebar.svelte`. Twenty are present. The four that are not — `stars-container`, `stars-icon`,
+`stars-num`, `new-badge` — are `RS-03` and `RS-04`, both correctly BLOCKED on a server-side supply
+that does not exist (`e.data.years` and `e.isNew` are populated by nothing, anywhere).
+
+**Three citations were wrong, and all three are the shape that survives a review**: the sentence is
+true, the quoted code is right, and only the label beside it is wrong — so a reader who checks finds
+the claim correct and moves on. `SHL-06` and two in `screen-volume.ts` were the same error the same
+week, which is why these are now asserted rather than only corrected.
+
+- **`RSG-01`** the per-row visibility gate — a four-term expression deciding which members can see
+  which — was credited to `C2e`. `C2e` (byte 2,033,494) is the **Private Chat dropdown item**,
+  `x("click", … startPC(o))`. The gate is `E2e`, byte **2,035,701**.
+- **`RSG-02`** the `{regUser, presUser}` class map was credited to `u2e`. There is no `u2e =`
+  assignment in 2,891,205 bytes — but `function u2e(` DOES exist at byte 1,952,934, an unrelated
+  template in another component. So the citation pointed at real code that has nothing to do with
+  this, which is worse than pointing at nothing: looking it up confirmed it. The pure function is
+  `g2e`, byte **2,032,757**, applied by `D2e` at **2,035,468**.
+- **`RSG-03`** two citations named `docs/source/main.d6d3c112b59b7d0d.js`, an older build this
+  repository holds under no path, **while their offsets resolved correctly against the v4 bundle it
+  does hold**. The numbers had been re-derived at some point and the filename beside them had not —
+  the exact inverse of `SVC-02`, where the file was right and the numbers were one too high.
+
+**And one behavioural equivalence was undocumented.** `RSG-04`: upstream's track-by is
+`m2e = (t,n) => n.userXrefID` (byte 2,032,733); ours keys by `user.id`. They select the same person
+**only because** `+page.server.ts:208` sets `userXrefID: String(account.id)` — a property of this
+room, not of the shape. The moment that stops being a derivation, an external CRM id or an SSO
+subject, this key silently stops being the reference's identity and a roster row is recreated where
+upstream reuses it. Both ends are pinned now.
+
+**Verified — five negative controls, each red on its own assertion:** the `C2e` citation reinstated;
+the `u2e` one reinstated; a live citation to the absent bundle added above the record of its removal;
+`userXrefID` changed to derive from the email instead of the id; and the `stars-container` markup
+built without its supply, which is the "second node that can never render" the register refuses.
+
+Coverage: **44 of 85 surfaces, 18,690 of 37,465 lines, 49.9%**.
+
+Room gate exit 0: 307 test files / 5,613 passed / 1 skipped.
+
 ### 2026-09-01 00:10 UTC — The reply modal had all three of the Q&A modal's defects, and nothing had looked
 
 **Runtime impact: YES**, three ways. In the reply modal: the image button was drawn for every viewer

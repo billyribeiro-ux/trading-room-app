@@ -2570,7 +2570,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reference puts it first. RS-10 swaps Mobile App Info ahead of the tip button, which is the
       reference's own order: the thing the ROOM offers before the thing the PRESENTER asks for.
     */
-    max: 872,
+    /*
+      872 -> 888, 2026-08-31 (`RSG-04`). Sixteen lines, none of them code: the note over the roster's
+      `{#each}` explaining why keying by `user.id` is upstream's identity here.
+
+      It EARNS them, and the reason is that the equivalence is invisible. `m2e = (t,n) =>
+      n.userXrefID` (byte 2,032,733) is the reference's track-by; ours keys by `user.id`, and the two
+      select the same person only because `+page.server.ts:208` sets
+      `userXrefID: String(account.id)`. The moment that stops being a derivation — an external CRM
+      id, an SSO subject — this key silently stops being the reference's identity and a roster row is
+      recreated where upstream reuses it. Nothing else here would notice, so
+      `roster-identity-contract.test.ts` pins both ends and this says why.
+    */
+    max: 888,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
