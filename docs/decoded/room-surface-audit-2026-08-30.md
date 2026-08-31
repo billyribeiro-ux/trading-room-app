@@ -6434,7 +6434,11 @@ selectEmoji(e){console.log(e);let i=Ao("#textAreaTxtPM").val()+e.emoji.native;Ao
 
 ### PCC-09 — `inline-alert-key.ts` states, as its reason for existing, something the bundle refutes
 
-**BLOCKED 2026-08-31 02:15 UTC.** That module is outside this batch's scope. **The exact one-line change:** at `apps/room/src/lib/inline-alert-key.ts:30`, replace *"One column over, in the chat composer, **Shift+Enter is the newline**."* with *"One column over, in the chat composer, Shift+Enter is the same no-op; what differs is this box's SEND arm, which clears and re-heights where the five chat composers call `autoExpand`."* The module's CODE is correct and needs no change — only the sentence.
+**FIXED 2026-08-31.** The blocker was scope — the module belonged to another batch — and the module's CODE was always correct. Only the sentence was wrong, and it was the load-bearing kind: it is the argument a reader uses to decide which box behaves how, and it had already sent one batch's composer to a third answer.
+
+The paragraph now carries the decoded `onKey` at byte 1,439,821 and states what actually differs: `i.val(i.val())` is the SAME no-op both boxes perform, and the contrast that justifies a module is between their SEND arms, where the five chat composers call `autoExpand` and this one clears and re-heights.
+
+`chat-composer-key-contract.test.ts` held a TRIPWIRE for this — *"the claim being corrected is still on the page it has to be corrected on"*, asserting the presence of the refuted phrasing so the row could not be closed silently. It is re-dispositioned to assert the phrasing is GONE **and** the correction is present. Both halves are needed: absence alone would pass on a module that deleted the paragraph outright, which is the outcome this row exists to prevent — the whole finding is that the sentence is load-bearing, not that it is surplus. The negative control restored the refuted wording and printed its failure.
 
 **low** · `defect` · reference byte **1,439,821**
 

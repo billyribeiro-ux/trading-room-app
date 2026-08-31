@@ -119,6 +119,20 @@ introduced drew a suggestion.**
 `svelte-check` 1,574 files, 0 errors. **Not verified:** nothing was opened in a browser — the paste
 path is executed against the class and asserted as markup, not driven from a real clipboard.
 
+#### `PCC-09` in the same pass, and a tripwire that worked exactly as written
+
+`inline-alert-key.ts` gave, as the whole reason it exists as a module, a contrast the bundle
+refutes: *"one column over, in the chat composer, Shift+Enter is the newline"*. Byte 1,439,821 IS
+that composer and its shift arm is `i.val(i.val())` — the SAME no-op the alert box performs. What
+actually differs is the SEND arm. The module's CODE was always correct; only the sentence was
+wrong, and it is the load-bearing kind, having already sent one batch's composer to a third answer.
+
+`chat-composer-key-contract.test.ts` held a tripwire for it — asserting the PRESENCE of the refuted
+phrasing, so the row could not be closed silently. It fired, and is re-dispositioned to assert the
+phrasing is gone AND the correction is present. Both halves: absence alone would pass on a module
+that deleted the paragraph outright, which is the outcome the row exists to prevent. Control run,
+red printed.
+
 ### 2026-08-31 14:59 UTC — The merged tree's first CI run found the two tests nobody had run since the owner cutover, and both were the tests being right
 
 **Runtime impact: NO** — one comment reworded, one assertion rebound, two provenance re-pins. No
