@@ -44,6 +44,7 @@
     EXTRA_CHAT_EMOJI_POPOVER,
     EXTRA_CHAT_GIF_TRIGGER
   } from '#lib/extra-chat-surface.js';
+  import type { ChatMode } from '#lib/chat-mode.js';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { pastedImageFrom } from '#lib/pasted-image.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
@@ -92,8 +93,25 @@
     /** Already filtered to `tab` by the page, so this component never decides what it may show. */
     messages: RoomMessageItem[];
     doNotDisturbOn: boolean;
-    /** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`. */
+    /** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the SECOND half. */
     chatEnabled: boolean;
+    /**
+     * `ECP-02` — the FIRST half, which this column quoted above and did not implement.
+     *
+     * `isConnected` starts TRUE upstream (`this.isConnected=!0`, byte 2,375,326) and is driven by
+     * `socketDisconnected` (byte 2,376,472) and `socketConnected`. So a chat connection that drops
+     * takes the composer away and puts the lock and the reason in its place; here the composer stayed
+     * live, and a member typed into it, pressed Enter, and watched nothing happen.
+     *
+     * A separate prop rather than folded into `chatEnabled`, because upstream keeps them separate and
+     * they are asked separately: the private-chat refusal (`G13`, `if (!this.canPost)`) reads
+     * `chatEnabled` ALONE, so folding the channel state in would start refusing private messages on
+     * a dropped room channel — a behaviour the reference does not have.
+     *
+     * Defaults TRUE, which is the reference's own starting value and the only safe default: a column
+     * rendered without it must not announce that chat is off.
+     */
+    chatChannelUp?: boolean;
     /** `O(21, o.webinarMode ? 21 : -1)`. */
     webinarMode: boolean;
     selfMutedUntil: Date | null;
@@ -190,6 +208,21 @@
      * when the extended toolbar gained the first control it had to show.
      */
     ontoggletoolbar: () => void;
+    /**
+     * `ACA-06` — this column's two built toolbar controls, forwarded to `ChatSearchBar`.
+     *
+     * **There is no `ondetachchat` here, and that is the const tables' answer rather than a gap.**
+     * `app-extra-chat`'s extended section (`Q3e`, byte 2,369,619) carries Mod Only and Group Chat
+     * Control and STOPS. `app-chat` carries three const entries this component's table does not —
+     * 47 and 53, the two forms of the Detach button, and 54, its `fa-window-restore` icon — which
+     * is exactly the offset by which every const from 48 onward shifts between the two tables.
+     *
+     * Both are optional and their presence IS their gate, which is this column's own rule: it is
+     * handed each entitlement's RESULT and deliberately not `isPresenter`.
+     */
+    onchatarchive?: () => void;
+    chatMode?: ChatMode;
+    onchatmodechange?: (mode: ChatMode) => void;
     onimageupload: () => void;
     /**
      * `ACA-05` — a screenshot pasted into THIS column's composer.
@@ -236,6 +269,7 @@
     messages,
     doNotDisturbOn,
     chatEnabled,
+    chatChannelUp = true,
     webinarMode,
     selfMutedUntil,
     showPmButton,
@@ -270,6 +304,9 @@
     modOnly,
     onmodonly,
     ontoggletoolbar,
+    onchatarchive,
+    chatMode,
+    onchatmodechange,
     onimageupload,
     onpasteimage,
     onyoutube,
@@ -460,6 +497,9 @@
         extended={searchExtended}
         {modOnly}
         {onmodonly}
+        onarchive={onchatarchive}
+        {chatMode}
+        onchatmode={onchatmodechange}
       />
     {/if}
 
@@ -536,7 +576,7 @@
         </div>
       </div>
     {/if}
-    {#if !chatEnabled}
+    {#if !chatEnabled || !chatChannelUp}
       <div class="chatDisabled d-flex align-items-center">
         <h5 class="pl-3">
           <i class="fas fa-lock"></i> Chat Disabled

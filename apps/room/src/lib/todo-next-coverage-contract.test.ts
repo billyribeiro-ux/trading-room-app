@@ -191,6 +191,32 @@ describe('the headline totals match the rows', () => {
       audited.reduce((sum, row) => sum + (measured.get(row.path) ?? 0), 0)
     );
   });
+
+  it('and the PERCENTAGE, which was the one figure here nothing checked', () => {
+    /*
+      Added 2026-08-31, after four of the five numbers on that line were re-derived by this block and
+      the fifth was carried over by hand. That is the exact shape this whole file exists to catch —
+      the header above records the tracker once saying "19 of 82 surfaces audited · 16.1%" when the
+      truth was 32 and 31.4% — and it had reappeared one field to the right.
+
+      It is the LINE share and not the surface share, which is worth stating because the two are far
+      apart (40/83 is 48.2%; the lines are 44.6%) and either reads plausibly beside the same
+      sentence. Lines is the honest one: the surfaces differ by two orders of magnitude in size, so
+      counting files lets a run of small ones move the number without covering anything.
+
+      Rounded to one decimal, matching the format the regex above accepts, and compared as a string
+      so a headline that drifts by a tenth fails rather than passing on a float comparison nobody
+      wrote a tolerance for.
+    */
+    const auditedLines = rows
+      .filter((row) => row.verdict !== 'no')
+      .reduce((sum, row) => sum + (measured.get(row.path) ?? 0), 0);
+    const total = [...measured.values()].reduce((sum, lines) => sum + lines, 0);
+    expect(total, 'no surfaces measured, so the share below would divide by zero').toBeGreaterThan(
+      0
+    );
+    expect(stated![5]).toBe(((auditedLines / total) * 100).toFixed(1));
+  });
 });
 
 describe('a surface the register has read WHOLE is scored here', () => {

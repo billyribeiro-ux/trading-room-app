@@ -322,12 +322,28 @@ describe('QAM-10 and QAM-11 — the body is piped and the avatar knows its sende
     expect(declared).toContain('targetUrl?: string | null;');
     expect(declared).toContain('senderEmailHash?: string;');
 
-    /* And the dispatcher it exists for still resolves through exactly that field. */
-    const actions = readFileSync(
-      new URL('./room/message-actions.svelte.ts', import.meta.url),
+    /*
+      And the RENDERER it exists for still reads exactly that field.
+
+      RE-POINTED 2026-08-31 by `MSB-03`. This used to assert the DISPATCHER's guard —
+      `if (action === 'image' && item.targetUrl)` — which was the wrong place to make this row's
+      point and is now the wrong code besides. That guard resolved the url to open from the ROW, so a
+      click on an inline image inside a chat message hit a false guard and did nothing, and a click
+      inside an alert carrying an attachment opened the ATTACHMENT rather than the picture clicked.
+      The url travels with the click now, from whichever element was pressed.
+
+      What `QAM-10`/`QAM-11` actually need is unchanged and is what is asserted instead: the field is
+      declared on the modal's `targetMessage` shape (above), and the component that draws the
+      attachment reads it. If `targetUrl` ever stopped reaching the modal, this is still what fails —
+      by way of the renderer, which is the thing that was blocked, rather than by way of a dispatcher
+      branch that no longer decides anything.
+    */
+    const message = readFileSync(
+      new URL('./components/RoomMessage.svelte', import.meta.url),
       'utf8'
     );
-    expect(actions).toContain("if (action === 'image' && item.targetUrl)");
+    expect(message).toContain("{#if kind === 'alert' && item.targetUrl}");
+    expect(message).toContain("runAction('image', { url: item.targetUrl!, event })");
   });
 
   it('QAM-10 — the card renders the body through MessageBody, parsed as "chat"', () => {

@@ -92,3 +92,25 @@
     </div>
   </div>
 </div>
+<!--
+  `ROV-04` — the backdrop, which this dialog opened without for as long as it existed.
+
+  `showImagePreview` (byte 1,992,730) is a plain `bootbox.dialog({…})`, and bootbox emits a backdrop
+  with every dialog it opens — which is what `.modal-backdrop`'s `z-index: 1050` in the shipped
+  Bootstrap is for, against `.modal`'s 1055. Without it this dialog opened over an UNDIMMED room:
+  the one modal in the application whose whole job is to be looked at, and the only one you could see
+  the room through.
+
+  A SIBLING after the dialog, not a child, for two reasons that are both load-bearing. It is where
+  `BootboxDialog.svelte:145` puts its own, so the two dialogs in this room emit the same shape; and
+  `app.css:762` selects `.bootbox.modal.above-note-modal + .modal-backdrop` — an adjacent-sibling
+  combinator that a nested backdrop would silently fall out of. This lightbox does not take that
+  class today, so the rule does not apply to it now; putting the element anywhere else would mean it
+  could never apply.
+
+  No dismiss handler on it, also matching `BootboxDialog`. The backdrop paints BEHIND the dialog
+  element, which itself covers the viewport, so a click on the dimmed area lands on the dialog's own
+  `event.target === event.currentTarget` check above. A second handler here would be a control that
+  never receives an event.
+-->
+<div class="modal-backdrop fade show"></div>

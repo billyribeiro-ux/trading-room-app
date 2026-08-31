@@ -1,14 +1,16 @@
 import { isHttpError } from '@sveltejs/kit';
 
+import { isImageOpenPayload } from '#lib/image-open-payload.js';
 import { NO_REPORTS_FOUND } from '#lib/message-behavior.js';
 import { toggleReaction } from '#lib/reaction-toggle.js';
 import type {
   MessageAction,
+  MessageActionEvent,
   MessageActionItem,
   MessageReactionPayload,
-  TradeCopyPayload,
   ModalName,
-  ModalTargetUser
+  ModalTargetUser,
+  TradeCopyPayload
 } from '#lib/types.js';
 
 import type { RoomChat } from './chat.svelte';
@@ -573,7 +575,7 @@ export class RoomMessageActions {
     kind: 'alert' | 'chat',
     action: MessageAction,
     item: MessageActionItem,
-    payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload,
+    payload?: MessageActionEvent,
     /** True when the click came from the extra chat column — upstream's `extraChatMsg`. */
     fromExtraColumn = false,
     surface: 'log' | 'qa' = 'log'
@@ -643,8 +645,23 @@ export class RoomMessageActions {
       // one receiver rather than two calls a caller could make half of.
       this.#openPrivateChat(item.senderId);
     }
-    if (action === 'image' && item.targetUrl) {
-      this.#openImage(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
+    /*
+      `MSB-03` — the URL comes from the CLICK, never from the row.
+
+      Upstream writes it onto the element as it builds each container:
+      `onclick="openImageModal(event,'${a}')"` (byte 1,326,195), `a` being that image's own
+      sanitised URL. This read `item.targetUrl` instead — the alert's ATTACHMENT — so a click inside
+      a chat message resolved nothing and the guard swallowed it, and a click inside an alert that
+      also had an attachment opened the attachment rather than the picture that was clicked.
+
+      There is NO `item.targetUrl` fallback any more, deliberately. Both call sites name the URL
+      they are showing (`MessageBody` its segment's, `RoomMessage` the attachment's), so a fallback
+      would only ever fire for a caller that forgot to — and firing with the row's URL is exactly the
+      wrong-picture bug this row is about. A `payload` that is not an image open is a caller error,
+      and doing nothing is the honest response to it rather than opening something else.
+    */
+    if (action === 'image' && isImageOpenPayload(payload)) {
+      this.#openImage(payload.event, payload.url);
     }
     /*
       DELETION LEFT THIS CLASS ON 2026-08-30, for `room/message-delete.ts` — the confirm-copy

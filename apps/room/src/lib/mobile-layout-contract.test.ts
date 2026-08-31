@@ -6,9 +6,25 @@ import { describe, expect, it } from 'vitest';
   rather than restyling this one.
 
   `O(5, o.isMobileScreen ? 6 : 5)` (`app-room.full.js:4061`) picks between `j4e`
-  (`app-room.render-helpers.js:1616-1664`) and `K4e` (`:1783-1821`). Everything asserted below is
-  read out of those two functions and the const table at runtime, so a reference that says something
-  different tomorrow makes this file say so rather than quietly agree.
+  (`app-room.render-helpers.js:1616-1664`, the `app-room` capture — `K4e`/`nRe` in the pinned v4
+  bundle) and `K4e` (`:1783-1821`). Everything asserted below is read out of those two functions and
+  the const table at runtime, so a reference that says something different tomorrow makes this file
+  say so rather than quietly agree.
+
+  ## `SHL-06` — the two captures disagree about these names, and that is NOTED rather than resolved
+
+  `split.svelte.ts` carried the same naming and it was wrong THERE: it attributed the extra chat
+  column's gate to `K4e` when the gate it quotes is `nRe`'s. In the pinned v4 bundle the two are
+  distinct `as-split` wrappers whose third children are gated differently —
+  `K4e` (2,493,526) `O(3, e.hidePresentation ? -1 : 3)` against
+  `nRe` (2,496,317) `O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)`.
+
+  This file is NOT renamed to match, deliberately. Its assertions read `ROOM_COMPILED` out of the
+  `app-room` capture root, where the names it uses are the ones that hold; renaming its prose to a
+  different capture's symbols would leave every citation pointing at a file that does not use them.
+  It is also excluded on this checkout — one of the 42 — so neither its prose nor its assertions are
+  exercised here, which is exactly why the disagreement is written down rather than resolved in
+  favour of whichever capture the reader happens to have.
 
   What this file does NOT prove: that a browser draws the two trees. That is
   `scripts/verify-mobile-layout.mjs`, which renders both widths and measures them — and which is

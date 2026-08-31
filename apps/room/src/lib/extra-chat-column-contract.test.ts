@@ -291,6 +291,64 @@ describe('the component', () => {
   });
 });
 
+describe('ECP-02 — a dropped channel takes the composer away, in BOTH columns', () => {
+  /*
+    `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361 — slot 23 is the composer,
+    slot 24 is the Chat Disabled block.
+
+    Both columns gated on `chatEnabled` ALONE while their own docblocks quoted the whole expression
+    verbatim, `isConnected` included. That is the shape the root standard asks a reviewer to check
+    for — a comment claiming what the next line does not do — and its cost was a member whose channel
+    had dropped keeping a live-looking composer, typing into it, pressing Enter and watching nothing
+    happen, with only the small corner overlay `G03` built to explain it.
+
+    ASSERTED ON BOTH, in one block, on purpose. The row was raised against the extra column and found
+    the identical gap in the main one, whose own audit section had missed it. Two columns disagreeing
+    about one connection is worse than either gap alone, and a test that checks one is what lets the
+    pair drift — the same argument `trade-alert-pane-contract.test.ts` opens with.
+  */
+  it.each([
+    ['extra', () => paneCode],
+    ['main', () => paneMainCode]
+  ])('%s: the Chat Disabled block answers to the channel as well as the setting', (_name, read) => {
+    expect(read()).toContain('{#if !chatEnabled || !chatChannelUp}');
+  });
+
+  it.each([
+    ['extra', () => paneCode],
+    ['main', () => paneMainCode]
+  ])(
+    '%s: and the prop defaults TRUE, which is the reference s own starting value',
+    (_name, read) => {
+      /*
+      `this.isConnected=!0` (byte 2,375,326). The default is what a column rendered without the prop
+      falls back to, and `false` there would announce that chat is off in every such render — the
+      exact defect, arrived at from the other side.
+    */
+      expect(read()).toContain('chatChannelUp = true,');
+    }
+  );
+
+  it('the page feeds BOTH columns from the one stream that owns the channel', () => {
+    /*
+      Two call sites, one source. A second source — a second field, a prop threaded some other way —
+      is how the two columns come to disagree about whether the room is connected.
+    */
+    const fed = stripComments(PAGE).match(/chatChannelUp=\{roomEvents\.chatChannelUp\}/g) ?? [];
+    expect(fed).toHaveLength(2);
+  });
+
+  it('and it is NOT the sidebar s flag, which starts false and would blank the composer on load', () => {
+    /*
+      The merge that looks like a simplification and is a defect. `roomEvents.connected` answers
+      *has this channel ever opened?*; gating a composer on it prints "Chat Disabled" on first paint
+      for the duration of one connect. `events.svelte.test.ts` asserts the two flags disagree at that
+      instant; this is the guard that nobody later replaces one with the other here.
+    */
+    expect(stripComments(PAGE)).not.toContain('chatChannelUp={roomEvents.connected}');
+  });
+});
+
 describe('both columns share one pipeline, and that is the point', () => {
   it('the messages come from ONE function, parameterised by channel', () => {
     /*
@@ -657,5 +715,46 @@ describe('the second column follows its own messages', () => {
     // Neither reads the other's column: the extra pane cannot see the main chat's tab or flag.
     expect(paneCode).not.toContain('chat.tab');
     expect(paneCode).not.toContain('visibleChat');
+  });
+});
+
+describe("SHL-06 — the extra column's split gate is `nRe`'s, and the citation said `K4e`", () => {
+  /*
+    `split.svelte.ts` quoted the RIGHT gate under the WRONG function name, which is the shape that
+    survives review: the sentence is true and only the symbol is not, so a reader checking the claim
+    finds it correct and moves on.
+
+    Both are `as-split` wrappers with three `as-split-area` children, which is why the two were
+    confusable. Their third children are gated on different things, and that is the whole
+    correction — read out of the pinned bundle here rather than quoted, so a different capture turns
+    this red instead of leaving a comment quietly wrong again.
+
+    This test also exists because the other half of `SHL-06` — `mobile-layout-contract.test.ts` —
+    is one of the 42 excluded files, so nothing there can guard anything on this checkout.
+  */
+  const BUNDLE = readFileSync(
+    new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url),
+    'utf8'
+  );
+  const at = (offset: number, text: string) => BUNDLE.slice(offset, offset + text.length);
+
+  it('the two wrappers are where the correction says they are', () => {
+    expect(at(2_493_526, 'function K4e('), 'K4e moved').toBe('function K4e(');
+    expect(at(2_496_317, 'function nRe('), 'nRe moved').toBe('function nRe(');
+  });
+
+  it('and only `nRe` gates its third child on the extra column', () => {
+    /* The gate `split.svelte.ts` quotes, verbatim, in the function that actually carries it. */
+    expect(BUNDLE.slice(2_496_317, 2_496_950)).toContain(
+      'O(3,!e.hideChatAlerts&&e.appService.globals.preferences.extraChatColumn?3:-1)'
+    );
+    /* And `K4e`'s third child is a different question entirely. */
+    expect(BUNDLE.slice(2_493_526, 2_494_400)).toContain('O(3,e.hidePresentation?-1:3)');
+  });
+
+  it('so the module names `nRe`, with the offset, and no longer names `K4e` as the placer', () => {
+    const split = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
+    expect(split).toContain('**`nRe` (v4 byte 2,496,317)** places it as index 3');
+    expect(split, 'the wrong attribution came back').not.toContain('`K4e` places it as index 3');
   });
 });

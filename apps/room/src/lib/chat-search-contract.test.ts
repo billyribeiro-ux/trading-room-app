@@ -48,6 +48,18 @@ function codeOf(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 }
 
+/**
+ * `codeOf` PLUS HTML comments, for the `.svelte` sources `ACA-06` reads.
+ *
+ * The local `codeOf` above strips `/* *\/` and `//` only, which is everything a `.ts` file can
+ * hide a string in. A Svelte component hides them in `<!-- -->` as well, and every one of this
+ * repository's transcription docblocks quotes the const strings it transcribes — so an assertion
+ * that a class name is ABSENT would be answered by the paragraph explaining why it is absent.
+ */
+function stripAll(source: string): string {
+  return codeOf(source).replace(/<!--[\s\S]*?-->/g, '');
+}
+
 /** One exported symbol's body, bounded by the next `export`. */
 function bodyOf(source: string, declaration: string): string {
   const from = source.indexOf(declaration);
@@ -334,23 +346,86 @@ describe('ACA-06 — the four unbuilt toolbar controls, named by VALUE', () => {
     expect(1_423_265).toBeGreaterThan(1_423_104);
   });
 
-  it('none of the four is built, which is what makes this a gap rather than a defect', () => {
+  it('THREE of the four are built now, and the fourth is not — asserted both ways', () => {
     /*
-      Six names, zero hits across the app. Asserted so that building one of them without closing
-      `ACA-06` fails here — the row would otherwise stay open while the work was already done, which
-      is how a register comes to disagree with its own repository.
+      This assertion was written earlier the same day as `not.toContain` on all four names, with the
+      note that it existed *"so that building one of them without closing `ACA-06` fails here"*. It
+      fired on the build. This is it being closed rather than relaxed.
+
+      The three that are built keep their captured strings pinned; the one that is not keeps its
+      ABSENCE pinned, so the row cannot be marked done while a control is still missing and cannot
+      be reopened by somebody deleting one that exists.
     */
-    const app = readFileSync(
-      fileURLToPath(new URL('./components/ChatSearchBar.svelte', import.meta.url)),
-      'utf8'
-    );
-    for (const name of [
-      'group-chat-control',
-      'Detach Chat',
-      'addon-chat-save',
-      'addon-chat-archive'
-    ]) {
-      expect(app, `${name} appears in the bar's SOURCE`).not.toContain(`"${name}"`);
+    const bar = stripAll(readFileSync(`${ROOT}lib/components/ChatSearchBar.svelte`, 'utf8'));
+
+    /* Group Chat Control — const 46's class list, the button's label, and all three item labels. */
+    expect(bar).toContain('class="dropdown d-inline-block m-1 group-chat-control"');
+    expect(bar).toContain("{' Group Chat Control '}");
+    for (const label of ['Regular Group Chat', 'Webinar Mode', 'Disable Group Chat']) {
+      expect(bar, `the ${label} item is missing`).toContain(label);
     }
+    /*
+      `kw = t => ({ visible: t })` — all three ticks RENDERED, one made visible by a class. A
+      conditional would render a different DOM for the same state, so the class map is the assertion.
+    */
+    expect(bar).toContain("'fas fa-check-square me-1', { visible: chatMode === item.mode }");
+
+    /* Detach Chat — const 53's classes and const 54's icon. */
+    expect(bar).toContain('class="btn btn-outline-info btn-sm mx-1 mt-1"');
+    expect(bar).toContain('<i class="fas fa-window-restore"></i>');
+
+    /* Archive — const 41's classes and const 42's icon. */
+    expect(bar).toContain(
+      'class="btn btn-outline-secondary pl-2 pr-2 d-inline-flex archive-alert-input input-group-text"'
+    );
+    expect(bar).toContain('<i class="fas fa-trash"></i>');
+
+    /*
+      AND THE FOURTH IS STILL ABSENT. `downloadLog("chat")` at byte 1,415,703 opens a radio prompt
+      whose answer goes to `downloadLogType`, which awaits `invokeServerCommand("getAllLog", …)` —
+      a command this repository does not have. The button would open a dialog whose every option
+      fails, which is worse than no button. Blocked on a SERVER command, not on scope, and that is
+      the distinction this pair of assertions keeps.
+    */
+    expect(bar, 'the save button is built but getAllLog does not exist').not.toContain(
+      '"addon-chat-save"'
+    );
+    const app = readFileSync(`${ROOT}lib/components/AlertChatArea.svelte`, 'utf8');
+    expect(app, 'a getAllLog appeared — re-read ACA-06').not.toContain('getAllLog');
+  });
+
+  it('the three gates are resolved on the PAGE, and detach only for the main column', () => {
+    /*
+      Each control's gate is the PRESENCE of its handler, which is `ChatSearchBar`'s own rule: it is
+      handed each entitlement's result and never a raw flag. So the gates are asserted where they
+      are decided, and the shape matters more than the text — a boolean prop appearing beside any of
+      these handlers would mean one gate in two places.
+
+      `O(4, !isPresenter && !user.hasMic || isLimitedPresenter ? -1 : 4)` is written on its NEGATIVE
+      branch upstream and is reproduced by negating it rather than by re-deriving what it means.
+      Flipping a De Morgan by hand is how `acA-07`'s half-gate happened.
+    */
+    const page = stripAll(readFileSync(`${ROOT}routes/+page.svelte`, 'utf8'));
+    expect(page).toContain(
+      "isPresenter && !media.limitedPresenter ? () => modals.open('chat-logs') : undefined"
+    );
+    expect(page).toContain('(!isPresenter && data.user.hasMic !== true) || media.limitedPresenter');
+
+    /* Detach: main column only, and off in a detached window. */
+    expect(page).toContain('ondetachchat={chatOnlyMode ? undefined : () => alertsPane.detach()}');
+    const extraAt = page.indexOf('<ExtraChatPane');
+    expect(extraAt, 'the extra column must render').toBeGreaterThan(-1);
+    /*
+      BOTH bounds are locals and both are asserted, which `slice-anchor-contract.test.ts` refuses to
+      let this file grow past: an inlined `indexOf` as the end bound returns -1 when the marker moves,
+      `slice(at, -1)` yields almost the whole page, and the `not.toContain` below then passes over
+      text that has nothing to do with the extra column.
+    */
+    const extraEnd = page.indexOf('/>', extraAt);
+    expect(extraEnd, 'the extra column call must be closed').toBeGreaterThan(extraAt);
+    const extraCall = page.slice(extraAt, extraEnd);
+    expect(extraCall, 'the extra column must NOT be given a detach handler').not.toContain(
+      'ondetachchat'
+    );
   });
 });

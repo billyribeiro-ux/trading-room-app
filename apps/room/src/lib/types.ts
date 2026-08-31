@@ -459,5 +459,31 @@ export interface TradeCopyPayload {
   text: string;
 }
 
-/** What rides with a message action: a click, a reaction pill, or one copyable order. */
-export type MessageActionEvent = MouseEvent | MessageReactionPayload | TradeCopyPayload | undefined;
+/**
+ * `MSB-03` — WHICH image was clicked, travelling with the click that opened it.
+ *
+ * The reference puts the URL on the element: `onclick="openImageModal(event,'${a}')"` at bundle byte
+ * 1,326,195, where `a` is THAT image's own sanitised URL, written into the handler by `urlwrapImg`
+ * as it builds each container. So upstream every inline image knows its own address and the opener
+ * is told it.
+ *
+ * This room raised `onaction('image', event)` with no URL, and the handler resolved one from
+ * `item.targetUrl` — the ALERT's attachment, which is a different picture and often no picture at
+ * all. Two consequences, both measured on 2026-08-31: a member clicking an inline image inside a
+ * CHAT message got nothing, because that guard is false for every chat row; and a member clicking
+ * one inside an alert that also carries an attachment got the ATTACHMENT instead of the picture
+ * they had just clicked.
+ *
+ * The EVENT rides with the URL rather than being passed beside it, because `RoomModals.openImage`
+ * reads its modifier keys — shift, alt and the synthesised `ctrlClick` open the popped-out window
+ * instead of the lightbox. Splitting them into two parameters was the previous shape and is what
+ * allowed a call site to supply one and not the other.
+ */
+export interface ImageOpenPayload {
+  readonly url: string;
+  readonly event: MouseEvent;
+}
+
+/** What rides with a message action: a click, a reaction pill, one copyable order, or one image. */
+export type MessageActionEvent =
+  MouseEvent | MessageReactionPayload | TradeCopyPayload | ImageOpenPayload | undefined;

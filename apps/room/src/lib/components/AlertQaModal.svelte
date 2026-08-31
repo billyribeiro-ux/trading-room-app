@@ -7,10 +7,9 @@
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type {
     MessageAction,
+    MessageActionEvent,
     MessageActionItem,
-    MessageReactionPayload,
-    MessageReactions,
-    TradeCopyPayload
+    MessageReactions
   } from '#lib/types.js';
   import AlertQaAlertCard from './AlertQaAlertCard.svelte';
   import AlertQaComposer from './AlertQaComposer.svelte';
@@ -137,7 +136,7 @@
      * `onQaAction` beside it. The page holds the full `MessageActionItem` and dispatches there; this
      * modal only knows that a click happened.
      */
-    onAlertBodyAction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
+    onAlertBodyAction: (action: MessageAction, payload?: MessageActionEvent) => void;
     onclose: () => void;
     onQuestionSend: (body: string) => Promise<boolean>;
     /**
@@ -147,7 +146,7 @@
     onQaAction: (
       action: MessageAction,
       item: MessageActionItem,
-      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+      payload?: MessageActionEvent
     ) => void;
   } = $props();
 
@@ -285,7 +284,7 @@
   function runQaAction(
     action: MessageAction,
     item: MessageActionItem,
-    payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+    payload?: MessageActionEvent
   ) {
     if (action !== 'reaction') qaMenuQuestionId = null;
     if (action === 'mention') {

@@ -73,8 +73,24 @@
     mainTab: MainTab;
     /** `?vo=1` — a room reduced to the screen; the whole strip goes. */
     viewerOnlyMode: boolean;
-    /** The ROLE, decided on the page. Read only for the video-player tab's gate. */
+    /** The ROLE, decided on the page. Read for the video-player tab's gate and the notes cog's. */
     isPresenter: boolean;
+    /**
+     * `MTS-02` — the VIEWER's own authoring capability, and the second term of the notes cog's gate.
+     *
+     * `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`, byte 2,016,713 — the same
+     * shape as the files cog's gate above it, with a permission rather than a role as the second
+     * term. It is a PROP and not a re-derivation from anything already here, because nothing already
+     * here can answer it: `isPresenter` is a role and `hideNotes` is a room setting, and the
+     * capability is neither.
+     *
+     * Not folded into `noteGates.editorMounted`, which the page already computes and which
+     * `PresentationArea` already holds. That value is `notesEnabled && canEditNotes`, so using it
+     * would AND the room setting into the member's half of this gate and not the presenter's — a
+     * gate the reference does not have. The two questions are different and stay different; the
+     * strip's own `hidden={hideNotes}` is where the room setting is answered.
+     */
+    canEditNotes: boolean;
     /** `!sessData.useMediaMTX` — see `RoomGates.streamsHidden`. */
     hideStreams: boolean;
     /** "Hide Notes Section?" ORed with viewer-only mode — see `RoomGates.notesHidden`. */
@@ -95,6 +111,7 @@
     mainTab = $bindable('screens'),
     viewerOnlyMode,
     isPresenter,
+    canEditNotes,
     hideStreams,
     hideNotes,
     menus,
@@ -182,23 +199,34 @@
           <i id="noteChangeIndicator" class="fas fa-edit"></i><span class="mx-1">Notes</span>
         </div>
         <!--
-          `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)` — byte 2,016,713 — is
-          the gate this cog is missing, and it cannot be applied from here: `canEditNotes` is the
-          VIEWER's own capability and no prop of this component carries it. `RoomNotes.requestNewNote`
-          already refuses on `noteGates().editorMounted`, so pressing it does nothing for a member
-          who may not author — but a control whose only effect is nothing is exactly what the
-          reference declines to draw. The one-line repair is on the call site in
-          `PresentationArea.svelte`, and `main-tab-strip-gates.svelte.test.ts` names it.
+          `MTS-02` — `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`, byte
+          2,016,713. The gate this cog went without, now built.
+
+          `{#if}` and not `hidden`, which is the distinction this file exists to preserve: `-1` is
+          `ɵɵconditional`'s instantiate-nothing, and the files cog two `<li>`s down already reads it
+          that way. A capability that ships hidden markup has told the member the control exists.
+
+          It was NOT harmless while it was missing, and the old comment here undersold it by saying
+          so. `RoomNotes.requestNewNote` does refuse — it sets `newNoteOpen` from
+          `noteGates().editorMounted` — so a member who may not author got nothing when they pressed
+          it. A control whose only effect is nothing is precisely the shape the root standard names
+          outright, and the reference declines to draw it at all.
+
+          The gate is on the cog and NOT on the `<li>`: a member who may not author notes still has
+          the Notes tab, and still reads them. `hidden={hideNotes}` above is what takes the tab away,
+          and it answers a different question — the room's setting, not this viewer's permission.
         -->
-        <TabGearMenu
-          id="dropdownMenuNotes"
-          labelledBy="dropdownMenuButton"
-          wrapperClass="dropdown"
-          menu="notes"
-          {menus}
-          onselecttab={() => (mainTab = 'notes')}
-          mountItem={(list) => notes.mountNewNoteLink(list)}
-        />
+        {#if isPresenter || canEditNotes}
+          <TabGearMenu
+            id="dropdownMenuNotes"
+            labelledBy="dropdownMenuButton"
+            wrapperClass="dropdown"
+            menu="notes"
+            {menus}
+            onselecttab={() => (mainTab = 'notes')}
+            mountItem={(list) => notes.mountNewNoteLink(list)}
+          />
+        {/if}
       </div>
     </a>
   </li>

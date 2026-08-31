@@ -497,6 +497,7 @@
         bind:mainTab
         {viewerOnlyMode}
         {isPresenter}
+        canEditNotes={data.canEditNotes}
         {hideStreams}
         {hideNotes}
         {menus}

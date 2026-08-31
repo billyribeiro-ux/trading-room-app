@@ -3,7 +3,7 @@
   import { parseBodySegments } from '#lib/message-body-segments.js';
   import { ngbTooltipWith } from '#lib/ngb-tooltip.js';
   import { alertDateFormatter } from '#lib/message-formatters.js';
-  import type { MessageAction, TradeCopyPayload } from '#lib/types.js';
+  import type { MessageAction, MessageActionEvent } from '#lib/types.js';
 
   /**
    * `e3e` — the alert card the Q&A modal reproduces in its own header.
@@ -75,7 +75,8 @@
     } | null;
     chatGif?: boolean;
     copyTrades?: boolean;
-    onaction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
+    /* `MSB-03` — the shared union; this was the fourth local restatement of it. */
+    onaction: (action: MessageAction, payload?: MessageActionEvent) => void;
   } = $props();
 
   /**

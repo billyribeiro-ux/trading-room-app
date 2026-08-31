@@ -692,7 +692,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1733 -> 1734, 2026-08-31. One line: `ACA-05`'s `onpasteimage` for the extra column, naming its
       own target rather than defaulting to the main column's.
     */
-    max: 1734,
+    /*
+      1734 -> 1785, 2026-08-31. `ACA-06`'s three gates, resolved ONCE and spread into both columns,
+      plus the paragraph on why the object is declared AFTER `createRoom` rather than beside the
+      other `$derived`s: it reads `media.limitedPresenter`, and this repository has shipped a 500
+      from a declaration-before-dependency TWICE — `ModalHost`'s `activeConnectivityTab` and
+      `createRoom` itself, both invisible to lint and to the unit suite.
+
+      One object rather than three ternaries at each of two call sites, because two hand-written
+      copies is how the second column comes to disagree with the first about who may archive. Detach
+      is passed at the main call site alone, since its gate is `chatOnlyMode` and its control does
+      not exist in the extra column's const table at all.
+
+      Read out BY NAME at both call sites rather than spread, which is eleven of those lines.
+      `unfed-props-contract.test.ts` proves every prop has a supplier by finding it NAMED at a call
+      site, so a `{...spread}` silently removed six props from that guarantee — caught the moment it
+      was tried. Naming them keeps one definition and keeps every prop greppable.
+    */
+    /*
+      1796 -> 1798, 2026-08-31 (ECP-02). Two lines: `chatChannelUp={roomEvents.chatChannelUp}` at
+      each of the two chat columns. One source feeding both, by name — a second source is how the
+      columns come to disagree about whether the room is connected, and the contract counts these
+      two occurrences for that reason.
+    */
+    max: 1798,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -847,7 +870,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       count below the guard drops exactly that one. A future reader tidying two adjacent
       `payload.channel === 'chat'` blocks into one would move it, so the argument is at the code.
     */
-    max: 1017,
+    /*
+      1017 -> 1058, 2026-08-31 (ECP-02). Forty-one lines, of which FIVE are code: a second `$state`
+      field, its getter, and one assignment in each of the two handlers that already move the first.
+
+      TWO FIELDS FOR ONE CHANNEL, and the thirty-six lines of comment exist because that looks like
+      duplication and is not. `#roomEventsConnected` answers *has this channel ever opened?* and must
+      start FALSE, or the sidebar's "Chat" line claims a connection before the first open.
+      `#chatChannelUp` answers *has it DROPPED?* and must start TRUE, or every composer in the room
+      reads "Chat Disabled" on first paint for the duration of one connect. The reference has exactly
+      the second field with exactly that starting value — `this.isConnected=!0`, byte 2,375,326.
+
+      The difference between them is ONE initial value, which is precisely why a reader will try to
+      merge them. `events.svelte.test.ts` asserts they disagree at the same instant, before any event,
+      and `extra-chat-column-contract.test.ts` refuses `chatChannelUp={roomEvents.connected}` on the
+      page by name. Both were seen red.
+
+      If this number climbs, the thing to check is whether a THIRD answer about this channel has
+      appeared. Two are justified above; a third almost certainly is not.
+    */
+    max: 1058,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1821,8 +1863,33 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       174 -> 173, 2026-08-31 (MSB-01). The nested body's five hand-listed props became one spread,
       which is a line SHORTER as well as a prop that can no longer be forgotten — `extraChatMsg` was
       the one that had been. A ceiling that falls out of a fix is the shape this ratchet wants.
+
+      173 -> 187, 2026-08-31 (MSB-04). Fourteen lines, ONE of which is code: `chatGif = false,`
+      became `chatGif = true,`. The other thirteen are the docblock over it, and they are the whole
+      value of the change.
+
+      The declaration disagreed with `RoomMessage.svelte`, which is the boundary that receives this
+      preference and has always declared `true`, and with the reference's own blob (`chatGif:!0`).
+      It was UNREACHABLE — all eight `<MessageBody …>` call sites pass the value — which is exactly
+      why it was free to be wrong for a day, and exactly why deleting the fallback was the wrong
+      repair: Svelte's `$props` contract applies a fallback when the parent does not set the prop
+      *or sets it to `undefined`*, so one call site handing over an optional value reaches it, and
+      reached with `false` this component mutes every gif in the room behind a placeholder nobody
+      asked for. A defect that no current caller can trigger is still a defect aimed at the next one.
+
+      The comment records the direction of the failure, because a bare `= true` reads as arbitrary
+      and the next reader flipping it back would find nothing to stop them — `chat-gif-muted-contract`
+      now asserts BOTH declarations, which is the test half of the same pair.
+
+      187 -> 196, 2026-08-31 (MSB-03). Nine lines, of which ONE is the image container's handler:
+      the click now names the segment's own url instead of raising a bare event. That is what the
+      reference does — `urlwrapImg` writes each container's own url into its own handler at byte
+      1,326,195 — and without it the dispatcher resolved one from the ROW, so a click inside a chat
+      message did nothing and a click inside an alert opened the attachment rather than the picture.
+      The other eight are the note on `onaction`'s type, which is the shared `MessageActionEvent`
+      now rather than the fourth local restatement of two of its members.
     */
-    max: 173,
+    max: 196,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
@@ -1932,7 +1999,35 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       long now: it carries the whole decode, and `chat-search-contract.test.ts` pins all six offsets
       by value so the two docblocks cannot drift apart again.
     */
-    max: 171,
+    /*
+      171 -> 374, 2026-08-31, for THREE of `ACA-06`'s four controls: Archive Chat Messages, the Group
+      Chat Control dropdown and Detach Chat. The bar had rendered Mod Only and closed.
+
+      Two consts' worth of markup and a great deal of why. The three gates are the page's, so each
+      control's PRESENCE is its gate — a boolean beside a `() => void` would put one gate in two
+      places, which is this component's standing rule.
+
+      **Detach Chat is main-column only, and that is the const tables' answer rather than a choice.**
+      `app-extra-chat`'s extended section (`Q3e`, byte 2,369,619) carries Mod Only and Group Chat
+      Control and STOPS; `app-chat` carries three entries its table does not — 47 and 53, the two
+      forms of the button, and 54, its `fa-window-restore` icon — which is exactly the offset by
+      which every const from 48 onward shifts between the two tables.
+
+      **One divergence, and it is the substitution already argued twice here.** The capture's
+      dropdown item is `a` const 51 `[1,"dropdown-item"]` — an anchor with NO `href`, so upstream
+      these three items are unreachable by keyboard. A `<button class="dropdown-item">` carries the
+      click instead, styled identically by Bootstrap, and the handler moves one node in from the
+      `li` with it. `StreamTabs` keeps its anchor and that is not an inconsistency: its const 57 is
+      `['href','#',1,'dropdown-item']`, which is focusable.
+
+      **The fourth control is not built and the reason is a SERVER command, not scope.**
+      `downloadLog("chat")` at byte 1,415,703 opens a radio prompt over three ranges and hands the
+      answer to `downloadLogType`, which awaits `invokeServerCommand("getAllLog", …)`. `getAllLog`
+      returns zero hits in this repository, so the button would open a dialog whose every option
+      fails — worse than no button. The alerts column's twin exports rows the page already holds;
+      this one asks the server for history the page has never seen.
+    */
+    max: 374,
     why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
@@ -2046,7 +2141,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       text in the Q&A header. That is upstream's behaviour, it is surprising, and without the
       paragraph it is exactly the kind of thing a later reader "fixes".
     */
-    max: 244,
+    /*
+      244 -> 245, 2026-08-31 (MSB-03). One line: `onaction`'s payload is the shared
+      `MessageActionEvent` and carries a pointer to the row, rather than the local
+      `MouseEvent | TradeCopyPayload` it restated — one of four spellings of that union, all of them
+      places it could be extended without.
+    */
+    max: 245,
     why: 'the alert card the Q&A modal reproduces in its own header - `e3e`, called once'
   },
   {
@@ -2640,8 +2741,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1089 -> 1105, 2026-08-30. Sixteen lines at the `<ScreenPane>` call site: four new props for
       `SV-SP-02`/`03`, two callbacks for `SV-SP-04`, and the note recording that NO `volume` and no
       `muted` are passed any more and why that is the fix rather than an omission.
+
+      1105 -> 1106, 2026-08-31 (MTS-02). ONE line: `canEditNotes={data.canEditNotes}` in the
+      `<MainTabStrip …/>` props. The notes cog's gate is `isP || user.canEditNotes` (byte 2,016,713)
+      and the strip carried no prop that could answer the second term, so it drew the cog for
+      everyone. The value is read off `data`, which is where every authority answer in this room is
+      decided, and passed by NAME rather than through a spread — `unfed-props-contract` can only see
+      a supplier it can find spelled out.
     */
-    max: 1105,
+    max: 1106,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -2697,7 +2805,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       has one, `RoomOverlays`, and the room's other renderer of the same image is a popped-out
       window built by `RoomModals.showImage` — a different surface, deliberately not merged.
     */
-    max: 95,
+    /*
+      95 -> 117, 2026-08-31 (ROV-04). ONE line of markup — `<div class="modal-backdrop fade show">`
+      — and twenty-one of comment over it, and the ratio is the right way round for this file.
+
+      This dialog wore `bootbox modal fade imgur-modal show` and emitted no backdrop, so the one
+      modal in the room whose entire job is to be looked at was the only one you could see the room
+      through. `showImagePreview` (byte 1,992,730) is a plain `bootbox.dialog({…})` and bootbox
+      emits a backdrop with every dialog; `BootboxDialog.svelte:145` already did.
+
+      The comment is long because the element's POSITION is load-bearing and invisible: `app.css:762`
+      selects `.bootbox.modal.above-note-modal + .modal-backdrop`, an adjacent-sibling combinator, so
+      a backdrop moved inside the dialog to look tidier would still render and would silently stop
+      matching. That is precisely the "simplified back into the bug it was fixing" this ratchet's
+      comments exist to prevent, and the contract test asserts the ORDER rather than the presence for
+      the same reason — its negative control was the nested form, seen red.
+
+      The row this closes had recorded itself blocked behind extracting this very component out of
+      `RoomOverlays.svelte`. The extraction had already happened, for `dta-02`, on the same day.
+    */
+    max: 117,
     why: 'the imgur lightbox - one image, a download that does not dismiss, and one alt rule'
   },
   {
@@ -2743,8 +2870,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       two hand-wirings that had drifted apart — see that file. The room made by the extraction paid
       for the files cog's `{#if isPresenter}` gate (byte 2,017,076) and for the measurement of the
       one gate this strip deliberately does NOT reproduce, `z('hidden', o.hideScreens)`.
+
+      371 -> 399, 2026-08-31 (MTS-02). Twenty-eight lines, of which the CODE is four: a prop, its
+      entry in the destructure, and `{#if isPresenter || canEditNotes}` around the notes cog.
+
+      The rest is the two things this file's own header says must never be lost. First, why the
+      capability is a PROP and not `noteGates.editorMounted`, which the page already computes and
+      `PresentationArea` already holds: that value is `notesEnabled && canEditNotes`, so reusing it
+      would AND the room setting into the member's half of the gate and not the presenter's, which
+      is a gate the reference does not have. Second, why the gate is on the COG and not the `<li>` —
+      a member who may not author still reads notes, and `hidden={hideNotes}` one line up is where
+      the room's setting is answered.
+
+      The old comment at this site said the missing gate was mild because `requestNewNote` refuses
+      anyway. It is replaced rather than kept: a control whose only effect is nothing is the shape
+      the root standard names outright, and describing it as harmless is how it stayed.
     */
-    max: 371,
+    max: 399,
     why: 'ul#mainTabs - eight tabs, two dropdowns, and a byte citation on every gate'
   },
   {
@@ -3824,7 +3966,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       does the division `as-split` does for free, and a reader who does not know that reads the
       multiplication as noise and deletes it.
     */
-    max: 796,
+    /*
+      796 -> 809, 2026-08-31, for `SHL-06` — a citation that named the wrong function while quoting
+      the right gate, which is the shape that survives review: the sentence is true and only the
+      symbol is not, so a reader checking it finds it correct and moves on.
+
+      `K4e` (2,493,526) and `nRe` (2,496,317) are both `as-split` wrappers with three
+      `as-split-area` children, which is why they were confusable — and their third children are
+      gated on different things: `O(3, e.hidePresentation ? -1 : 3)` against
+      `O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)`. The gate this paragraph
+      quotes is the second one's.
+
+      Corrected with BOTH offsets rather than by swapping three letters, so the next reader can see
+      why the two were mistaken for each other. `extra-chat-column-contract.test.ts` asserts the
+      correction and both bundle facts, because the other half of `SHL-06` lives in one of the 42
+      excluded files and can guard nothing here.
+    */
+    max: 809,
     why: "the room's two nested splits and twenty derived geometry values"
   },
   /*
@@ -4149,7 +4307,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       modal hides on the image path and NOT on the text one, the URL goes first with the message
       appended, and the box is cleared only when a message travels.
     */
-    max: 857,
+    /*
+      857 -> 874, 2026-08-31 (MSB-03). Seventeen lines, of which THREE are the handler: the image
+      action now takes its url from the payload the click carries rather than from `item.targetUrl`.
+
+      The reference writes each container's own url into its own handler
+      (`onclick="openImageModal(event,'${a}')"`, byte 1,326,195) and this resolved one from the ROW
+      instead — the alert's ATTACHMENT — so a click inside a chat message hit a false guard and did
+      nothing, and a click inside an alert that also had an attachment opened the attachment rather
+      than the picture. The second is the worse one: something opens, so it looks like it works.
+
+      The rest is the note saying there is NO `item.targetUrl` fallback and why. Both call sites name
+      the url they are showing, so a fallback could only ever fire for a caller that forgot to — and
+      firing with the row's url is precisely the wrong-picture bug. Doing nothing is the honest
+      response to a caller error here.
+    */
+    max: 874,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -5734,7 +5907,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       a later consistency pass does not undo a measurement. `acA-11` adds the `&nbsp;Chat` label and
       says why it is `&nbsp;` and not a space.
     */
-    max: 1496,
+    /*
+      1496 -> 1523, 2026-08-31. `ACA-06`'s three controls forwarded to `ChatSearchBar`, with the note
+      on why they arrive as props rather than being derived from the flags this component already
+      holds: it holds two of the four terms those gates need, and re-deriving a gate from a subset
+      is how two answers to one question come to disagree.
+    */
+    /*
+      1523 -> 1533, 2026-08-31 (ECP-02), and this pane's gap was found by a row raised against the
+      OTHER column. Ten lines, two of them the gate. Its own docblock quoted the same expression with
+      the same missing half; the argument is in `ExtraChatPane.svelte` and this carries a pointer
+      rather than a second copy, because two columns are one behaviour and the reason they drifted is
+      that each was read alone.
+    */
+    max: 1533,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -5924,7 +6110,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `if(s)` block here where `app-chat`'s opens with it — behaviourally identical, and noted so a
       reader comparing the two copies does not think one was transcribed loosely.
     */
-    max: 722,
+    /*
+      722 -> 744, 2026-08-31. `ACA-06`'s TWO controls for this column — and the paragraph recording
+      that the third, Detach Chat, is absent by the const tables' own arithmetic rather than by
+      oversight. A reader finding two here and three in the main column needs that sentence.
+    */
+    /*
+      744 -> 762, 2026-08-31 (ECP-02). Eighteen lines, of which TWO are the gate: a `chatChannelUp`
+      prop and `{#if !chatEnabled || !chatChannelUp}`.
+
+      This column's own prop docblock has quoted `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`
+      verbatim since it was written, `isConnected` included, and the gate below it read `chatEnabled`
+      alone — a comment claiming what the next line does not do, which is the one thing the root
+      standard asks a reviewer to check for. A member whose channel had dropped kept a live-looking
+      composer, typed into it, pressed Enter and watched nothing happen.
+
+      The sixteen remaining lines argue why the prop is SEPARATE rather than folded into
+      `chatEnabled`: the private-chat refusal (`G13`, `if (!this.canPost)`) reads `chatEnabled` alone
+      upstream, so folding the channel in would start refusing private messages on a dropped room
+      channel — a behaviour the reference does not have. And why it defaults TRUE, which is the
+      reference's own `this.isConnected=!0` (byte 2,375,326) and the only safe default: `false` would
+      announce that chat is off in every render that omits the prop.
+    */
+    max: 762,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -6397,8 +6605,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `reactionStrip`, differing only by an inner gate that the container's own gate already implies
       (in the reference as well as here — `b_e`'s `O(36, …)` entails `g_e`'s `O(3, …)`). One snippet,
       three call sites.
+
+      1259 -> 1255, 2026-08-31 (MSB-03), and it falls because a DUPLICATION left rather than because
+      anything was extracted. Two interfaces at the top of this file — `MessageReactionPayload` and
+      `TradeCopyPayload` — were local re-declarations of types in `#lib/types.ts`, the second under a
+      comment saying so in as many words. They stayed structurally compatible by luck; the luck ran
+      out when `MessageActionEvent` gained a fourth member and this file could not describe it. The
+      prop and `runAction` both take the shared union now.
     */
-    max: 1259,
+    max: 1255,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { parseBodySegments, tickerColorStyle } from '#lib/message-body-segments.js';
   import MessageBody from '#lib/components/MessageBody.svelte';
-  import type { MessageAction, RoomMessageItem } from '#lib/types.js';
+  import type { MessageAction, MessageActionEvent, RoomMessageItem } from '#lib/types.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import type { EmojiDumpEntry } from '#lib/emoji-data.js';
   import { isMentionOf } from '#lib/mention.js';
@@ -27,14 +27,6 @@
   } from '#lib/message-renderer-differences.js';
 
   type MessageKind = 'alert' | 'chat';
-  interface MessageReactionPayload {
-    key: string;
-    emoji: string;
-  }
-  /** `#lib/types.ts`'s `TradeCopyPayload`, restated locally beside its sibling above. */
-  interface TradeCopyPayload {
-    text: string;
-  }
 
   interface Props {
     item: RoomMessageItem;
@@ -140,11 +132,18 @@
      */
     extraChatMsg?: boolean;
     ontoggle: (id: number) => void;
-    onaction: (
-      action: MessageAction,
-      item: RoomMessageItem,
-      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
-    ) => void;
+    /*
+      `MSB-03` — the payload is the SHARED `MessageActionEvent` now, and the two interfaces that used
+      to sit at the top of this file are gone.
+
+      They were local copies: `MessageReactionPayload` re-declared, and `TradeCopyPayload` re-declared
+      under a comment that said outright *"`#lib/types.ts`'s `TradeCopyPayload`, restated locally
+      beside its sibling above."* A duplication with its own note explaining that it is one is still
+      a duplication — it stayed structurally compatible by luck, and `MessageActionEvent` gaining a
+      fourth member is what ended the luck. Nothing here ever narrowed the payload; it only respelled
+      it.
+    */
+    onaction: (action: MessageAction, item: RoomMessageItem, payload?: MessageActionEvent) => void;
   }
 
   let {
@@ -399,10 +398,7 @@
     chat time only on the chat branch. Construction costs ~35x a `format()` call, and the objects
     are byte-identical every time because the locale and every option are literals.
   */
-  function runAction(
-    action: MessageAction,
-    payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
-  ) {
+  function runAction(action: MessageAction, payload?: MessageActionEvent) {
     onaction(action, item, payload);
   }
 
@@ -1187,7 +1183,7 @@
                       <div
                         class="img-container"
                         style={uploadWidthVariable(item.targetWidth)}
-                        onclick={(event) => runAction('image', event)}
+                        onclick={(event) => runAction('image', { url: item.targetUrl!, event })}
                       >
                         <!-- svelte-ignore a11y_missing_attribute -->
                         <img

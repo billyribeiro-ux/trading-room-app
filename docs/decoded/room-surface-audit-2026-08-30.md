@@ -3982,7 +3982,7 @@ function cMe(t,n){if(1&t){const e=Y();d(0,"div",25)(1,"div",59,3)(3,"div",60)(4,
 
 ### ACA-06 — The chat toolbar's extended section is missing all four of its controls, and `ChatSearchBar`'s own docblock names two of them wrongly
 
-**HALF BUILT 2026-08-31 — the CORRECTION is done, the four controls are not.**
+**HALF BUILT 2026-08-31 — the correction is done, three of the four controls are built, and the fourth is blocked on a server command.**
 
 The row has two halves and they were never the same size. The second — *"a separate one-line correction, in the same file"* — is done: both `ChatSearchBar.svelte` and `chat-search.svelte.ts` said the unbuilt controls were the save-chat and archive pair at `Y_e`/`Q_e`, node 4 and 5 of `X_e`, byte 1,423,265. **Four names and one offset were wrong**, in two files, and every one is now decoded by value:
 
@@ -3997,7 +3997,24 @@ The row has two halves and they were never the same size. The second — *"a sep
 
 `1,423,265` lands 161 bytes INSIDE `X_e`'s body, which is why the citation survived several readings — a spot-check finds the right neighbourhood and moves on. `chat-search-contract.test.ts` now opens all six offsets and reads each function's own signature back, and asserts the four control names appear nowhere in the bar's source, so building one without closing this row fails there. The control restoring the wrong offset printed its failure.
 
-**The four controls remain unbuilt**, and the row stays open on them. `acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
+**THREE of the four are BUILT 2026-08-31. The fourth is blocked on a SERVER COMMAND, which the row did not know.**
+
+| control | state |
+| --- | --- |
+| Archive Chat Messages | **built** — const 41/42, opens the `chat-logs` modal `RoomChatArchive` already backs |
+| Group Chat Control | **built** — const 46/48/49/50/51/52, all three items, `kw`'s tick |
+| Detach Chat | **built**, main column only — const 53/54 |
+| Save chat messages | **BLOCKED on `getAllLog`** |
+
+`downloadLog("chat")` at byte **1,415,703** is not the alerts twin. It opens a `bootbox.prompt` with `inputType:"radio"` over *"Entire chat history"* / *"Last 24 hours"* / *"Last 7 days"* and hands the answer to `downloadLogType`, which awaits `invokeServerCommand("getAllLog", {type, channel, limit}, {ackTimeoutMs:6e4})`. **`getAllLog` returns zero hits in this repository.** The button would open a dialog whose every option fails, which is worse than no button. The alerts column's twin exports the rows the page already holds; this one asks the server for history the page has never seen, which is why one was buildable and the other is not.
+
+**A fourth correction to this row.** It said *"the alerts column's Detach button is `detachAlerts`, a different command"*. `detachChat()` (byte 1,446,750) and `detachAlerts()` (byte 2,051,887) have **byte-identical bodies** — both emit `"detachChat"` on `appEventBus` and raise the same bootbox alert. Same action, two method names, so the chat toolbar's button calls the `alertsPane.detach()` this room already built.
+
+**One divergence, and it is the substitution already argued twice here.** The capture's dropdown item is `a` const 51 `[1,"dropdown-item"]` — an anchor with **no `href`**, so upstream these three items cannot be reached by keyboard at all. A `<button class="dropdown-item">` carries the click instead, Bootstrap styles both identically, and the handler moves one node in from the `li` with it. `StreamTabs` keeps its anchor and that is not an inconsistency: its const 57 is `['href','#',1,'dropdown-item']`, which IS focusable.
+
+The three gates are resolved on the page, once, for both columns, and each control's PRESENCE is its gate — `ChatSearchBar` is handed each entitlement's result and never a raw flag. `O(4, …)` is written on its negative branch upstream and is reproduced by negating it rather than by re-deriving what it means, because flipping a De Morgan by hand is how `acA-07`'s half-gate happened.
+
+`acA-04` built the Mod Only checkbox into that bar's extended section and left the rest. Decoding `J_e` (byte 1,423,745) and `X_e` (1,423,104) end to end gives the whole list, and the extended state is TWO independent slots rather than one — `O(9, showChatToolbarExtended ? 9 : -1)` inside the input group and `O(10, showChatToolbarExtended ? 10 : -1)` beneath it:
 
 * **Save chat messages** — `K_e` at 1,421,929, `span` const 38 (`id="addon-chat-save"`), click `It(18).downloadLog("chat")`. Inside the input group, beside the clear `×`. The ALERTS column's twin of this IS built.
 * **Archive Chat Messages** — `q_e` at 1,421,800, `div` const 41 (`id="addon-chat-archive"`), click `archiveOptions()`, gated `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)` — the same two-term gate `acA-07` restored on the alerts side.
@@ -4799,16 +4816,41 @@ check, unlike its notes twin which at least refuses inside `requestNewNote`.
 
 ### MTS-02 — The Notes cog has no gate; the reference instantiates it only for a presenter or a member who may author notes
 
-**BLOCKED 2026-08-31.** The gate cannot be applied from `MainTabStrip.svelte`: its eleven props
-carry `isPresenter` but nothing carrying the VIEWER's `canEditNotes`, and inventing a default is
-worse than leaving it — `false` takes the New Note cog away from a member who legitimately has it,
-`true` is no gate at all.
+**BUILT 2026-08-31 19:05 UTC.** `MainTabStrip.svelte` takes a `canEditNotes` prop, fed by name at
+`PresentationArea.svelte:500` as `canEditNotes={data.canEditNotes}`, and the cog is
+`{#if isPresenter || canEditNotes}` — the disjunction at byte 2,016,713, verbatim.
 
-**The one line that unblocks it:** `apps/room/src/lib/components/PresentationArea.svelte:507`, in the
-`<MainTabStrip … />` props between `{hideNotes}` and `{menus}`, add
-`canEditNotes={data.canEditNotes === true}` — `data.canEditNotes` is already on that component's
-`data` prop. Then `{#if isPresenter || canEditNotes}` around the `<TabGearMenu id="dropdownMenuNotes" …/>`,
-exactly as MTS-01 now has. That file is outside this task's editable set.
+**Two corrections to what this row prescribed, both small and both worth recording.**
+
+*It is not "the one line".* The row said to add the prop at the call site and the `{#if}` in the
+strip, which is two edits, and the prop did not exist on `MainTabStrip` — so it is three: a `Props`
+member, a destructure entry, and the call site. The same sentence had been copied into
+`main-tab-strip-gates.svelte.test.ts`, so the estimate was wrong in two places at once and is
+corrected in both.
+
+*`=== true` is dropped.* The row wrote `data.canEditNotes === true`. That idiom is this room's rule
+for `sessData`, which is JSON off the wire and typed loosely; `data.canEditNotes` is not that. It is
+`connectedUser.canEditNotes` at `+page.server.ts:677`, typed `boolean` by the load, so the comparison
+compares a boolean to `true` and reads as though the value were untrusted. Passed directly.
+
+**Not folded into `noteGates.editorMounted`, which was the tempting shortcut.** The page already
+computes it and `PresentationArea` already holds it — but it is `notesEnabled && canEditNotes`, so
+using it would AND the room's setting into the MEMBER's half of the gate and not the presenter's.
+That is a gate the reference does not have. The room setting is answered one line up by
+`hidden={hideNotes}` on the `<li>`, and the two questions stay separate.
+
+**The gate is on the COG, not the tab.** A member who may not author notes still has the Notes tab
+and still reads them. Slot 23 upstream is the cog.
+
+**Verified.** Four mount cases in `main-tab-strip-gates.svelte.test.ts` — all four corners of the
+disjunction — plus one asserting the Notes tab survives for a member without the permission. Three
+negative controls seen RED: `&&` for `||` (fails exactly the two MIXED corners, which are the two
+that describe real people — a Participant granted the tick, a Presenter denied it — and passes the
+presenter-only and nobody cases a thinner test would have stopped at); `isPresenter` alone, which is
+the exact bug `+page.server.ts:670-677` records having already been fixed once on the server side;
+and `hidden` in place of `{#if}`, which fails only the "no element, not a hidden one" half and is
+invisible to every source-text instrument in this repository. Ceilings raised with arguments at the
+entries: `MainTabStrip` 371 -> 399, `PresentationArea` 1105 -> 1106.
 
 This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.
@@ -4820,15 +4862,37 @@ O(23,o.isP||o.appService.globals.user.canEditNotes?23:-1)
 function KCe(t,n){if(1&t){const e=Y();d(0,"div",15)(1,"span",53),T(2,"i",54),u(),d(3,"ul",55)(4,"li",56),x("click",function(){return D(e),E(g().newNote())}),d(5,"a",57),T(6,"i",58),v(7," New Note"),u()()()()}}
 ```
 
-**Ours:** the cog is drawn for everybody. It is less severe than MTS-01 because the ACTION behind
-it already refuses — `RoomNotes.requestNewNote` sets `newNoteOpen` to `this.#noteGates().editorMounted`,
-so a member who may not author gets nothing when they press it. That is precisely the shape the
-root standard names, though: a control whose only effect is nothing. The reference declines to draw
-it at all.
+**Ours:** the cog was drawn for everybody, and the sentence that followed here — *"it is less severe
+than MTS-01 because the ACTION behind it already refuses"* — is the part of this row that was wrong
+in spirit and is left standing as the record of it. `RoomNotes.requestNewNote` does refuse, setting
+`newNoteOpen` from `#noteGates().editorMounted`, so a member who may not author got nothing when they
+pressed it. **A control whose only effect is nothing is not a milder defect than a missing gate; it
+is the specific shape the root standard names outright**, and calling it "less severe" is how it sat
+open. The reference declines to draw it at all, and so does this room now.
 
 ### MTS-03 — The Recordings tab does not exist here at all
 
-**BLOCKED 2026-08-31.** Not buildable from this component or from any file in this task's editable
+**BLOCKED — and on 2026-08-31 the REAL blocker was found by decoding the PANE rather than the tab. It is not structural.**
+
+This row lists three structural steps to unblock it. All three are real, and **all three together would still produce a tab that cannot work**, because of what the pane IS:
+
+```js
+function GSe(t,n){ if(1&t&&(d(0,"div",25), T(1,"iframe",140), …)),
+  2&t){ … z("src", Ct(2,2, e.getRecordingsUrl(), "resourceUrl"), Oa) } }     // byte 1,930,394
+
+getRecordingsUrl(){ return `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${sesionToken}` }
+                                                                            // byte 1,959,845
+```
+
+**The pane is a single `<iframe>` onto the archive service**, and that URL is character for character the one `G01`, `RS-06` and `presAreaTabs-recordings` already carry, all three quoting `launchRecordings()`'s `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}`.
+
+So this is a **FOURTH row on ONE blocker**, not a structural gap. Doing the three steps first would add a type member, a settings wire, a tab and a pane, none of which can function — and the pane would iframe a 404 **with a session token in its URL**, which is precisely the objection `G01` records against opening that page in a tab: *"worse than an inert item."*
+
+`main-tab-strip-gates.svelte.test.ts` pins both offsets, the shared endpoint, and the COUNT of rows in this register naming it — so if an archive service ever lands, the four are found together rather than one at a time, and closing one without re-reading the others fails there.
+
+The structural facts below remain true and are kept, because they are the work that follows the moment the service exists:
+
+Not buildable from this component or from any file in this task's editable
 set, and the block is structural rather than a missing prop: `MainTab` in `apps/room/src/lib/types.ts`
 has no `'recordings'` member, so `mainTab = 'recordings'` does not type-check, and
 `PresentationArea.svelte` has no `#recordings` pane (upstream const 25,
@@ -7359,7 +7423,27 @@ and why it stays.
 
 ### NAV-09 — The recording reminder is missing `!micMuted`, and the gate string is pinned
 
-**BLOCKED 2026-08-31.** The reference's condition has five terms and this bar carries three of them:
+**ALREADY BUILT — this row is a DUPLICATE of `RNB-03`, and it was stale within the same day.**
+Re-dispositioned 2026-08-31 18:25 UTC by reading both files rather than trusting the row.
+`RoomNavbar.svelte:667` reads
+
+```
+{#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}
+```
+
+and `recording-reminder-contract.test.ts:72` pins that exact string, `!media.micMuted` included, under
+a docblock that cites `RNB-03` and explains why the fifth term `micDisabled` is deliberately left
+out. Both edits the row prescribes were already made; nothing here was rebuilt.
+
+**Two rows for one defect is the finding worth keeping.** This row and `RNB-03` were written by
+different batches on the same day against the same five-term gate at the same reference byte, and
+neither cites the other — so the register had one defect open twice and would have had it fixed
+twice. `RNB-03` is the surviving entry because it is the one the code and the test cite by name.
+
+The original text follows, unedited, because the reasoning in it is correct and the byte offsets are
+the ones `RNB-03` also carries:
+
+**~~BLOCKED 2026-08-31.~~** The reference's condition has five terms and this bar carries three of them:
 
 ```js
 O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled
@@ -8105,9 +8189,16 @@ function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),…),2&t){const e=g(2);z("si
 
 ### SHL-06 — two sibling files carry the same misattribution, and both are outside this batch's scope
 
-**BLOCKED 2026-08-31 04:05 UTC.**
+**FIXED 2026-08-31 — both halves, in the two different ways they needed.**
+
+`split.svelte.ts` names `nRe` with its offset now, and carries the reason the two were confusable: `K4e` (2,493,526) and `nRe` (2,496,317) are both `as-split` wrappers with three `as-split-area` children, and their third children are gated on different things — `O(3, e.hidePresentation ? -1 : 3)` against `O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)`. The gate that paragraph quotes is the second one's. Corrected with BOTH offsets rather than by swapping three letters.
+
+`mobile-layout-contract.test.ts` is NOT renamed, which is the row's own prescription and the right one: its assertions read `ROOM_COMPILED` out of the `app-room` capture root, where the names it uses hold. Renaming its prose to a different capture's symbols would leave every citation pointing at a file that does not use them. It carries a NOTE recording that the two captures disagree, and why that is written down rather than resolved.
+
+**`extra-chat-column-contract.test.ts` asserts the correction**, because neither edited file could guard itself: one is prose, and the other is one of the 42 excluded files. Three assertions — both offsets, both third-child gates read out of the bundle, and the corrected sentence present with the wrong one absent. The control restoring the misattribution printed its failure.
+
 This row was ADDED after this document was committed, by the seventh batch.
-`lib/room/split.svelte.ts:423` reads *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
+`lib/room/split.svelte.ts:423` read *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
 preferences.extraChatColumn`"* — that gate is `nRe`'s; `K4e`'s third child is `hidePresentation ? -1
 : 3`. `lib/mobile-layout-contract.test.ts` repeats the naming in six places (`:5, :9, :79, :83,
 :116, :177`) together with the `app-room.render-helpers.js` line citations.
@@ -8214,7 +8305,8 @@ control — deleting `extraChatMsg` from the spread fails with
 
 ### MSB-03 — clicking an inline image opens the alert's attachment, or nothing at all
 
-**BLOCKED 2026-08-31 04:05 UTC.**
+**BUILT 2026-08-31 20:10 UTC.** The URL travels with the click now, from whichever element was
+pressed, which is what the reference does.
 This row was ADDED after this document was committed, by the seventh batch.
 The reference's container carries `onclick="openImageModal(event,'${a}')"`, where `a` is THAT
 image's own sanitised URL. Ours raises `onaction('image', event)`, and the handler is
@@ -8233,16 +8325,61 @@ image inside a CHAT message gets nothing — the guard is false and the handler 
 clicking one inside an alert that also has an attachment gets the ATTACHMENT rather than the picture
 they clicked.
 
-**What unblocks it, exactly one line**, in `apps/room/src/lib/types.ts`, extending the payload union
-at `:457` so the clicked URL can ride with the action:
+**The row's diagnosis was exact. Its prescription was one line short in one place and one design
+decision wrong in another, and both are worth recording.**
 
-```ts
-export type MessageActionEvent = MouseEvent | MessageReactionPayload | TradeCopyPayload | ImageOpenPayload | undefined;
-```
+*The union.* `ImageOpenPayload` is `{ url, event }`, not `{ url }`. The event has to ride INSIDE the
+payload because `RoomModals.openImage` reads its modifier keys — shift, alt and the synthesised
+`ctrlClick` open the popped-out window instead of the lightbox. Passing them side by side was the
+old shape, and it is what let a call site supply one and not the other.
 
-with `message-actions.svelte.ts:497` then preferring the payload's URL over `item.targetUrl`.
-Both files are outside this batch's editable scope, and the change cannot be made half — a payload
-type with no reader would be scaffolding, which DPE rule 3 forbids — so it is recorded whole.
+*The fallback.* The row said the handler should "prefer the payload's URL over `item.targetUrl`".
+There is **no `item.targetUrl` fallback**, deliberately. Both call sites name the URL they are
+showing, so a fallback could only ever fire for a caller that forgot to — and firing with the row's
+URL is exactly the wrong-picture bug this row is about. A payload that is not an image open is a
+caller error and opening nothing is the honest answer; a fallback would guarantee the defect comes
+back for the next call site anyone adds.
+
+**And the type error found a duplication the row could not have known about.** Adding a fourth member
+to `MessageActionEvent` broke compilation in FOUR places, because four boundaries had each restated
+the union locally instead of importing it: `RoomMessage.svelte` re-declared `MessageReactionPayload`
+and `TradeCopyPayload` outright — the second under a comment reading *"`#lib/types.ts`'s
+`TradeCopyPayload`, restated locally beside its sibling above"* — and `MessageBody`,
+`AlertQaAlertCard`, `AlertQaModal` and `ModalHost` each spelled two or three of its members inline.
+Only `AlertChatArea.svelte:277` was on the shared name. They stayed compatible by luck; the luck ran
+out here, which is the only reason it surfaced. All six are on `MessageActionEvent` now and
+`RoomMessage`'s ceiling FELL, 1259 -> 1255.
+
+**Verified, seven negative controls, each red on exactly its own assertion and green after restore.**
+
+*The dispatcher*, in `room/message-actions.svelte.test.ts` — four cases driven through
+`RoomMessageActions.handle` with a recording `openImage`: an inline image in a chat message (which
+used to do nothing at all); an alert carrying BOTH an attachment and an inline image, where the
+attachment URL is set precisely so a dispatcher still consulting the row would pass with the wrong
+picture; the modifier keys surviving the trip; and nothing opening when the payload is not an image
+open. Plus the guard's own unit cases against the three sibling members — `TradeCopyPayload` is the
+near miss, an object with one string field. Controls: the original handler restored (four red), a
+`targetUrl` fallback added (one red), the event dropped from the call (one red), the guard loosened
+to "is an object" (two red).
+
+*The call sites*, in `message-image-click.svelte.test.ts` — `MessageBody` MOUNTED and clicked, which
+is the half a dispatcher test cannot reach: every assertion in the dispatcher file would still pass
+with both components left exactly as they were. One image; **two** images in one body clicked in
+reverse order, which is the case that fails for anything resolving the URL from the message rather
+than the element; and the modifier keys. `RoomMessage`'s attachment site is asserted as text with the
+reason stated at the assertion — forty-odd props make a mount there a fixture larger than the
+assertion, and the behaviour either side of it is executed. Controls: each call site reverted to a
+bare `MouseEvent` (three red, then one red), and `MessageBody` resolving the URL from the segment
+LIST rather than the clicked segment (one red, on the two-image case alone, which is why that case
+exists).
+
+*One assertion elsewhere had to move.* `alert-qa-surface-contract.test.ts` pinned the old dispatcher
+guard as text under `QAM-10`/`QAM-11`. It asserts the renderer instead now — `targetUrl` declared on
+the modal's shape, and `RoomMessage` reading it — which is what those rows were actually blocked on;
+the dispatcher branch it used to name no longer decides anything.
+
+Ceilings: `message-actions.svelte.ts` 857 -> 874, `MessageBody.svelte` 187 -> 196,
+`AlertQaAlertCard.svelte` 244 -> 245, `RoomMessage.svelte` 1259 -> **1255**.
 
 **high** · `missing-behaviour` · reference byte **1,326,195**
 
@@ -8254,7 +8391,7 @@ onclick="openImageModal(event,'${a}')"
 
 ### MSB-04 — `chat-gif-muted-contract.test.ts` reads a file that no longer holds any of the four strings it asserts
 
-**BLOCKED 2026-08-31 04:05 UTC.**
+**FIXED 2026-08-31 18:20 UTC — and the prescribed one-line repair was WRONG, which is the finding.**
 This row was ADDED after this document was committed, by the seventh batch.
 That file's whole `describe('ours')` block reads `MESSAGE = readFileSync(new
 URL('./components/RoomMessage.svelte', …))` and asserts it contains `class="chat-gif-muted"`,
@@ -8271,15 +8408,50 @@ assertions fail. This is the same shape as the `room-message-render.test.ts` fin
 own header records: a test whose subject moved out from under it, kept out of sight by the exclusion
 banner.
 
-**What unblocks it, exactly one line**, at `chat-gif-muted-contract.test.ts:48`:
+**The row prescribed exactly one line**, at `chat-gif-muted-contract.test.ts:48` — re-point the
+single `MESSAGE` constant at `MessageBody.svelte` — and said *"all four strings are in that file
+verbatim … which is why re-pointing the constant is sufficient and nothing below it needs
+rewording."*
 
-```ts
-const MESSAGE = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
+**Measured before doing it, and it is not sufficient.** `grep -cF` over both files, per string:
+
+```
+RoomMessage=0 MessageBody=1  class="chat-gif-muted"
+RoomMessage=0 MessageBody=1  'click to hide' : 'gif muted, click to show'
+RoomMessage=0 MessageBody=1  return !chatGif && url.toLowerCase().includes('.gif');
+RoomMessage=0 MessageBody=1  { 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }
+RoomMessage=1 MessageBody=0  chatGif = true,
 ```
 
-All four strings are in that file verbatim, including the `isMutedGif` body and the `<img>` tag,
-which is why re-pointing the constant is sufficient and nothing below it needs rewording. It is a
-test file this batch did not create, so it is named rather than edited.
+There are **five** `messageCode` assertions in that block, not four — the row missed the `d-none`
+one — and a **sixth**, `expect(messageCode).toContain('chatGif = true,')` inside
+`it('defaults ON, matching the reference blob')`, which matches only `RoomMessage.svelte`. Moving the
+one constant would have fixed five assertions and silently broken the sixth, because a default is a
+property of the boundary that RECEIVES the preference and `RoomMessage` is still that boundary.
+
+**Fixed with two constants** — `MESSAGE` for the default, a new `BODY` for the five renderer
+assertions — each pointing at the file that owns its subject, which is the rule the file's own
+`PREFS_SOURCE` split already followed.
+
+**And the sixth assertion surfaced a real defect the row could not have known about.**
+`MessageBody.svelte:39` declared `chatGif = false,` — the opposite of `RoomMessage.svelte:181`'s
+`chatGif = true,` and the opposite of the reference's `chatGif:!0`. It was unreachable on the day:
+all **eight** `<MessageBody …>` call sites pass the value (`MessageBody.svelte:142` through
+`{...inherited}`, `RoomMessage.svelte` at :868/:871/:884/:1126/:1130/:1183, and
+`AlertQaAlertCard.svelte:236`). Unreachable is not harmless — Svelte's `$props` contract applies a
+fallback when the parent does not set the prop **or sets it to `undefined`**, so one call site
+handing over an optional value reaches it, and reached with `false` every gif in the room hides
+behind a placeholder nobody asked for. It is `true` now, in both declarations, and the test asserts
+both.
+
+**Verified.** The file reads `docs/source/`, so `gate/evidence-bound-tests.mjs` still excludes it on
+this checkout — it is one of the 42 — and it therefore **could not be run here**. The assertions were
+run instead through an identical throwaway harness reading only the two component files, and its
+negative controls were seen RED four ways: the pre-fix constant (fails on the first renderer
+assertion, which is the defect this row reports, reproduced); `chatGif = true,` reverted to `false`;
+`.gif` dropped from `isMutedGif`; `uploaded-img` renamed. Restored green after each. The harness was
+deleted; it is named here rather than kept, because it duplicates a file that already exists and
+only the owner's checkout can run the real one.
 
 **high** · `defect` · reference byte **1,326,195**
 
@@ -10135,18 +10307,42 @@ two-verifier pass the tables above describe, and therefore deliberately outside 
 
 ### ROV-04 — The lightbox calls itself a bootbox and renders no backdrop
 
-**BLOCKED 2026-08-31.** Every other dialog in this room gets one: `BootboxDialog.svelte:145` renders
+**BUILT 2026-08-31 18:40 UTC — and the blocker below was already gone when it was written down.**
+Every other dialog in this room gets one: `BootboxDialog.svelte:145` renders
 `<div class="modal-backdrop fade show"></div>` as its last node, because that is what bootbox emits
 and what `.modal-backdrop`'s `z-index: 1050` is for — `app.css` already writes those three z-indexes
 down. The lightbox wears `bootbox modal fade imgur-modal show` and has no backdrop at all, so it
 opens over an undimmed room; and `showImagePreview` at byte 1,992,730, the only image viewer the
 pinned bundle contains (see ROV-03), is a plain `bootbox.dialog({…})` and therefore has one.
 
-**Not built, and the reason is the ratchet rather than doubt.** A backdrop is an element, an element
-is a line, and `RoomOverlays.svelte` was at 1081 of 1081 with `source-size-contract.test.ts` ceilings
-only going down. It is blocked behind lifting the lightbox into its own component — 41 lines with its
-own dismiss handling, worth extracting on its own terms and not this batch's work. Recorded here so
-whoever does that extraction knows the one line to add on the way.
+**The recorded blocker was the ratchet, and it was STALE.** The row said a backdrop is an element,
+an element is a line, `RoomOverlays.svelte` was at 1081 of 1081, and so this was blocked behind
+lifting the lightbox into its own component — *"worth extracting on its own terms and not this
+batch's work."*
+
+**That extraction had already happened, the same day, for `dta-02`.**
+`src/lib/components/ImageLightbox.svelte` exists, is 94 lines, and carries
+`class="bootbox modal fade imgur-modal show"` at its root. Nothing was in the way of the one line
+the row was waiting on; the row simply was not re-read after the thing it was waiting for was done.
+
+**This is the second stale blocker in this register in one session** (`NAV-09` and `MTS-03` are the
+others, for different reasons), and the pattern is worth naming: *"blocked behind X"* goes stale the
+moment somebody does X for an unrelated reason, and nothing re-reads the row. **Measure the blocker,
+do not inherit it.**
+
+**Built as a SIBLING after the dialog, which is not cosmetic.** `app.css:762` selects
+`.bootbox.modal.above-note-modal + .modal-backdrop` — an adjacent-sibling combinator. A backdrop
+nested inside the dialog would render, would satisfy a `toContain`, and would fall silently out of
+that rule; `BootboxDialog.svelte:145` puts its own in the same place. The contract test therefore
+asserts the ORDER rather than the presence, and its negative control was the nested form, seen red.
+
+**Verified.** `room-surface-audit-batch3-contract.test.ts`'s ROV-04 block was INVERTED rather than
+deleted — it asserted the absence and now asserts the presence, the sibling ordering, and that
+`RoomOverlays` still emits no backdrop of its own (which now guards against a duplicate at the call
+site rather than recording the lightbox's gap). Three negative controls seen RED: the backdrop
+removed; the backdrop nested inside the dialog; a second backdrop added beside `<ImageLightbox />`.
+Green after each restore. `ImageLightbox.svelte`'s ratchet ceiling went 95 -> 117 with the argument
+at the entry.
 
 *This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
 two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -10186,7 +10382,7 @@ two-verifier pass the tables above describe, and therefore deliberately outside 
 
 ### ECP-02 — The composer/Chat Disabled swap reads only half of its gate, in BOTH columns
 
-**BLOCKED 2026-08-31.** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361: slot 23
+**BUILT 2026-08-31 20:45 UTC, in BOTH columns.** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361: slot 23
 is the composer, slot 24 is the Chat Disabled block. `isConnected` starts TRUE (byte 2,375,326,
 `this.isConnected=!0,this.isMediaConnected=!1`) and is driven by two subscriptions — `socketDisconnected`
 sets it false at byte 2,376,472 and `socketConnected` sets it true. So upstream, a chat connection
@@ -10199,16 +10395,45 @@ next line does something else" the root standard asks a reviewer to check for. A
 has dropped keeps a live-looking composer, types into it, presses Enter, and watches nothing happen,
 with only the small corner overlay `G03` built to explain it.
 
-**Not built, and the blocker is a starting value rather than a line budget.** The nearest thing this
-room has is `RoomEventStream.connected`, and it starts FALSE — deliberately, with its own docblock
-saying so, because the sidebar's "Chat" line has to read *not connected* before the first open.
-Gating the composer on it would print "Chat Disabled" on first paint, which upstream never does. The
-faithful build needs a second `$state` field that starts true and follows the same two events, and
-`lib/room/events.svelte.ts` was at 1017 of 1017.
+**The row's diagnosis was exactly right, including the design**, and it is worth saying so: it named
+the starting value as the real obstacle rather than the line budget, and named the fix as a second
+`$state` field starting true and following the same two events. That is what was built.
 
-Recorded against BOTH columns on purpose. `AlertChatArea` has the identical gap and its own audit
-section did not find it; this batch's scope is the extra column, so the sibling is reported here
-rather than silently edited.
+`RoomEventStream.chatChannelUp` starts TRUE, goes false on `error` and true on `open` — the two
+handlers that already move `#roomEventsConnected`, so the pair cannot drift. Both columns take it as
+a prop defaulting TRUE and gate `{#if !chatEnabled || !chatChannelUp}`; the page feeds both from the
+one stream, by name.
+
+**TWO FIELDS FOR ONE CHANNEL, which looks like duplication and is not.** `connected` answers *has
+this channel ever opened?* and must start FALSE, or the sidebar's "Chat" line claims a connection
+before the first open. `chatChannelUp` answers *has it DROPPED?* and must start TRUE, or every
+composer in the room reads "Chat Disabled" on first paint for the duration of one connect — which
+upstream never does. The difference between them is one initial value, which is precisely why a
+later reader will try to merge them, so both halves are asserted: `events.svelte.test.ts` proves the
+two disagree at the same instant before any event, and `extra-chat-column-contract.test.ts` refuses
+`chatChannelUp={roomEvents.connected}` on the page by name.
+
+**NOT folded into `chatEnabled`, and that is a reading rather than a preference.** Upstream keeps the
+two separate and asks them separately: the private-chat refusal (`G13`,
+`if (!this.canPost) return void bootbox.alert(…)`) reads `chatEnabled` ALONE. Folding the channel
+state in would start refusing private messages on a dropped room channel, which the reference does
+not do.
+
+**Both columns, in one change.** The row reported the sibling rather than silently editing it,
+because that batch's scope was the extra column. Fixing one and leaving the other is how the pair
+drifted in the first place, so the contract asserts both through one `it.each` — the same argument
+`trade-alert-pane-contract.test.ts` opens with.
+
+**Verified, seven negative controls, each red on exactly its own assertion and green after restore.**
+On the stream: the field started FALSE like its sibling (two red, including the disagree-at-the-same-
+instant case); a plain field instead of `$state` (one red — permanently correct at first paint and
+permanently wrong afterwards, which a getter hides completely); the drop no longer lowering it (two
+red). On the components and the page: each column reverted to `chatEnabled` alone (one red each,
+which is what proves the `it.each` is really running twice); the prop's default flipped to false (one
+red); and the page feeding `roomEvents.connected` instead (two red).
+
+Ceilings: `events.svelte.ts` 1017 -> 1058, `ExtraChatPane.svelte` 744 -> 762,
+`AlertChatArea.svelte` 1523 -> 1533, `+page.svelte` 1796 -> 1798.
 
 *This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
 two-verifier pass the tables above describe, and therefore deliberately outside them.*

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -71,14 +72,16 @@ import type { MainTab } from './types.js';
  *
  * ## What is NOT here, and what would unblock it
  *
- * **The notes cog's gate.** `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`,
- * byte 2,016,713 — the same shape as the files cog's, with the viewer's own authoring capability
- * as the second term. `MainTabStrip` receives no prop carrying it, and inventing a default is worse
- * than leaving it: `false` would take the New Note cog away from a member who legitimately has it,
- * `true` would be no gate at all. The one-line repair is at the call site —
- * `apps/room/src/lib/components/PresentationArea.svelte:507`, adding `canEditNotes={data.canEditNotes === true}`
- * to the `<MainTabStrip …/>` props — and then a `{#if isPresenter || canEditNotes}` here, exactly
- * as the files cog now has.
+ * **The notes cog's gate was here, and it is BUILT** — `MTS-02`, 2026-08-31; the block for it is
+ * below. `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`, byte 2,016,713, the
+ * same shape as the files cog's with the viewer's own authoring capability as the second term.
+ * `canEditNotes` is a prop of `MainTabStrip` now, fed by name at
+ * `PresentationArea.svelte:500` off `data`, which is where every authority answer in this room is
+ * decided; the gate is `{#if isPresenter || canEditNotes}` around the cog, not the `<li>`.
+ *
+ * The paragraph this replaces said the repair was one line at the call site. It was two — the prop
+ * did not exist — and the reason it is recorded rather than quietly corrected is that the same
+ * sentence had been copied into the register row, so the estimate was wrong in two places at once.
  *
  * **The Recordings tab.** `H(24, YCe, 7, 3, "li", 16)` under
  * `O(24, o.archivesAvailableTo() && o.appService.globals.sessData.recsInRoom ? 24 : -1)` at byte
@@ -103,6 +106,33 @@ import type { MainTab } from './types.js';
  * Recorded rather than quietly edited because it is the failure `CLAUDE.md`'s own checklist names:
  * a comment claiming something is absent, written from a grep, surviving long enough that the next
  * reader plans around it.
+ *
+ * ## `MTS-03`'s REAL blocker, found 2026-08-31 by decoding the pane rather than the tab
+ *
+ * Everything above is about the TAB, and the row it belongs to lists three structural steps to
+ * unblock it: widen `MainTab`, thread `recsInRoom`, add a `#recordings` pane. All three are real
+ * and **all three together would still produce a tab that cannot work**, because of what the pane
+ * IS:
+ *
+ * ```js
+ * function GSe(t,n){ if(1&t&&(d(0,"div",25), T(1,"iframe",140), …)),
+ *   2&t){ … z("src", Ct(2,2, e.getRecordingsUrl(), "resourceUrl"), Oa) } }   // byte 1,930,394
+ *
+ * getRecordingsUrl(){ return `${apiROOT}/sessions/v2/archives/recordings/`
+ *                            + `${sessionID}/${sesionToken}` }               // byte 1,959,845
+ * ```
+ *
+ * **The pane is a single `<iframe>` onto the archive service** — and that URL is character for
+ * character the one `G01`, `RS-06` and `presAreaTabs-recordings` are already BLOCKED on, all three
+ * quoting `launchRecordings()`'s `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}`.
+ *
+ * So `MTS-03` is a FOURTH row on one blocker, not a structural gap. Doing the three steps first
+ * would add a type member, a settings wire, a tab and a pane, none of which can function — and the
+ * pane would iframe a 404 **with a session token in its URL**, which is the same objection `G01`
+ * records for opening that page in a tab: *"worse than an inert item."*
+ *
+ * The assertion below pins the two offsets and the shared endpoint, so that if an archive service
+ * ever lands, the four rows are found together rather than one at a time.
  */
 
 type Stub = Record<string, unknown>;
@@ -121,7 +151,9 @@ const tradeAlerts = (enabled: boolean): Stub => ({ enabled });
  * stub that records calls would let the two cogs go on disagreeing about which calls to make while
  * the test recorded both faithfully.
  */
-function mountStrip(over: { isPresenter?: boolean; mainTab?: MainTab } = {}) {
+function mountStrip(
+  over: { isPresenter?: boolean; canEditNotes?: boolean; mainTab?: MainTab } = {}
+) {
   const host = document.createElement('div');
   document.body.append(host);
   const menus = new RoomMenus();
@@ -137,6 +169,13 @@ function mountStrip(over: { isPresenter?: boolean; mainTab?: MainTab } = {}) {
       },
       viewerOnlyMode: false,
       isPresenter: over.isPresenter ?? false,
+      /*
+        DEFAULTS FALSE, and that matters for every test above that does not name it: the notes cog
+        is now gated on `isPresenter || canEditNotes`, so a case passing neither is a member with no
+        authoring permission and must NOT get the cog. The MTS-07 cases pass `isPresenter: true`,
+        which is why they still find `#dropdownMenuNotes`.
+      */
+      canEditNotes: over.canEditNotes ?? false,
       hideStreams: false,
       hideNotes: false,
       menus,
@@ -153,7 +192,7 @@ function mountStrip(over: { isPresenter?: boolean; mainTab?: MainTab } = {}) {
 
 const mounted: { host: HTMLElement; component: Record<string, unknown> }[] = [];
 
-const strip = (over: { isPresenter?: boolean; mainTab?: MainTab } = {}) => {
+const strip = (over: { isPresenter?: boolean; canEditNotes?: boolean; mainTab?: MainTab } = {}) => {
   const result = mountStrip(over);
   mounted.push({ host: result.host, component: result.component as Record<string, unknown> });
   return result;
@@ -183,6 +222,54 @@ describe('MTS-01 — the files cog is instantiated only for a presenter', () => 
     expect(host.innerHTML).not.toContain('dropdownMenuFiles');
     // And the tab it sits on is still there — this gates the cog, not the Files tab.
     expect(host.querySelector('[data-bs-target="#files"]')).not.toBeNull();
+  });
+});
+
+describe('MTS-02 — the notes cog is instantiated for a presenter OR a member who may author', () => {
+  /*
+    `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`, byte 2,016,713.
+
+    A DISJUNCTION, and all four corners are asserted rather than the two that would look sufficient.
+    Either term alone drawing the cog is the behaviour; a gate that had been written `&&` passes a
+    presenter-only test and a nobody test and fails only on the two mixed corners, which are the two
+    that describe real people — a Participant the owner ticked `canEditNotes` for, and a Presenter in
+    a room where the tick was withheld. `+page.server.ts:677` records both as the bug that came from
+    deciding this from the ROLE.
+  */
+  it('draws it for a presenter with no authoring permission', () => {
+    const { host } = strip({ isPresenter: true, canEditNotes: false });
+    expect(host.querySelector('#dropdownMenuNotes')).not.toBeNull();
+  });
+
+  it('draws it for a MEMBER who has the permission — the corner a role check gets wrong', () => {
+    const { host } = strip({ isPresenter: false, canEditNotes: true });
+    expect(host.querySelector('#dropdownMenuNotes')).not.toBeNull();
+  });
+
+  it('draws it for a presenter who also has it', () => {
+    const { host } = strip({ isPresenter: true, canEditNotes: true });
+    expect(host.querySelector('#dropdownMenuNotes')).not.toBeNull();
+  });
+
+  it('and draws NOTHING for a member without it — no element, not a hidden one', () => {
+    const { host } = strip({ isPresenter: false, canEditNotes: false });
+    /*
+      Both halves, the same pair MTS-01 asserts for the files cog and for the same reason: `-1`
+      instantiates nothing, so the property is absence of the ELEMENT. A source-text grep cannot
+      tell that from `hidden`, which is the distinction `MainTabStrip`'s own header exists to keep.
+    */
+    expect(host.querySelector('#dropdownMenuNotes')).toBeNull();
+    expect(host.innerHTML).not.toContain('dropdownMenuNotes');
+  });
+
+  it('gates the COG and not the Notes tab — a member who cannot author still reads notes', () => {
+    /*
+      The gate upstream is on slot 23, which is the cog. The `<li>` is gated by `hidden` on the
+      ROOM's `hideNotes` setting, one line up and answering a different question. Moving this gate
+      onto the tab would take notes away from every member in the room.
+    */
+    const { host } = strip({ isPresenter: false, canEditNotes: false });
+    expect(host.querySelector('[data-bs-target="#notes"]')).not.toBeNull();
   });
 });
 
@@ -266,5 +353,68 @@ describe('MTS-07 — the two cogs do the same three things', () => {
     cog.click();
     flushSync();
     expect(menus.notes, 'a cog is a toggle, not an opener').toBe(false);
+  });
+});
+
+describe('MTS-03 — the Recordings pane is an iframe onto the archive service', () => {
+  /*
+    The row lists three structural steps to unblock this tab. They are real and they are not the
+    blocker: the pane those steps would create is one `<iframe>` whose `src` is the archive
+    endpoint three other rows are already blocked on.
+
+    Pinned here rather than left in prose because the whole value of the finding is that FOUR rows
+    share ONE blocker — and a shared blocker that is only written down in four separate places is
+    one that gets lifted three times.
+  */
+  /*
+    Paths are relative to the vitest cwd (`apps/room`), not to `import.meta.url`.
+
+    A `.svelte.test.ts` runs through the Svelte plugin, where `import.meta.url` is not a `file:`
+    URL — `fileURLToPath` throws `The URL must be of scheme file` on it, which is what the first
+    version of this block did. `trade-alert-pane-contract.test.ts` already reads its sources this
+    way for the same reason.
+  */
+  const BUNDLE = readFileSync('docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', 'utf8');
+
+  const at = (offset: number, text: string) => BUNDLE.slice(offset, offset + text.length);
+
+  it('the pane is a single iframe bound to getRecordingsUrl()', () => {
+    const pane = 'function GSe(t,n){if(1&t&&(d(0,"div",25),T(1,"iframe",140)';
+    expect(at(1_930_394, pane), 'GSe moved').toBe(pane);
+    /* One iframe and nothing else — the pane has no markup of its own to build. */
+    expect(BUNDLE.slice(1_930_394, 1_930_700)).toContain('e.getRecordingsUrl()');
+  });
+
+  it('and that URL is the SAME one G01, RS-06 and presAreaTabs-recordings are blocked on', () => {
+    const url =
+      'getRecordingsUrl(){return`${this.appService.globals.apiROOT}/sessions/v2/archives/recordings/${this.appService.globals.sessionID}/${this.appService.globals.sesionToken}`}';
+    expect(at(1_959_845, url), 'getRecordingsUrl moved').toBe(url);
+
+    /*
+      The register names that endpoint on every row that is blocked on it. Counting them is what
+      turns "four rows, one blocker" from a sentence into a fact that fails when it stops being
+      true — if a fifth row acquires the endpoint, or one of the four is closed without the others
+      being re-read, this number moves.
+
+      SIX mentions across FOUR rows: `G01` and `RS-06` name it once each in prose, `MTS-03` names it
+      twice — once as `getRecordingsUrl` and once quoting `launchRecordings`, which is how it shows
+      the two are the same string — and `presAreaTabs-recordings` carries it once more. The COUNT is
+      the assertion rather than the row names, because a row can be renamed and a string cannot be
+      miscounted.
+    */
+    const register = readFileSync('../../docs/decoded/room-surface-audit-2026-08-30.md', 'utf8');
+    expect(register.split('sessions/v2/archives/recordings').length - 1).toBe(6);
+  });
+
+  it('and NOTHING here is built toward it, which is what makes waiting correct', () => {
+    /*
+      The negative half. Adding the type member, the settings wire, the tab and the pane before the
+      service exists is scaffolding — four things that compile and cannot work — and the pane would
+      iframe a 404 carrying a session token, which is the objection `G01` already records.
+    */
+    const types = readFileSync('src/lib/types.ts', 'utf8');
+    expect(types, "MainTab gained 'recordings' — is the archive service live?").not.toContain(
+      "| 'recordings'"
+    );
   });
 });
