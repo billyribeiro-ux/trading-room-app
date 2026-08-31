@@ -98,6 +98,22 @@ const ALLOWED_PREFIXES = Object.freeze([
     itself once the rollout completes.
   */
   'services/api/migrations/0010_retire_ptr_clone_app.sql',
+  /*
+    The SOURCE contract over that same migration, and it arrived in the same commit — `d5e3391`
+    added `0010`, this allow-list entry's neighbour above, AND this file, but listed only the
+    migration. The result was a `main` that failed its own boundary two assertions at a time.
+
+    Its defence is the migration's defence, because it has no other subject: it reads
+    `0010_retire_ptr_clone_app.sql` and asserts the four properties that make dropping a LOGIN role
+    safe — the `0009` interlock, no CASCADE, the residue count, the DROP itself. Every one of those
+    assertions is a search for a literal that must appear in the SQL, so the name cannot be
+    paraphrased out of them. Assembling it from fragments was rejected for the reason
+    `verify-privacy-boundary.mjs` records: it hides the string from the very scanner that should see
+    it, which trades a visible tolerated use for an invisible one.
+
+    It deletes itself with the migration it guards, on the day the rollout completes.
+  */
+  'apps/controller/src/lib/retire-baseline-role-contract.test.ts',
   'services/api/tests/',
   '.github/workflows/backend-quality.yml',
   'apps/controller/scripts/verify-backend.mjs',
@@ -172,6 +188,13 @@ describe('the reference name never leaks into live code', () => {
       with it, on the day the rollout completes. That is the argument, and the CHANGELOG carries the
       evidence: three databases on a live PostgreSQL 16.13 cluster, including the refusal on one
       where `0009` had not run.
+
+      **40 -> 41 on 2026-08-31, and it is the same admission counted twice rather than a new one.**
+      The entry is `retire-baseline-role-contract.test.ts`, the source contract over that same
+      `0010`. `d5e3391` added the migration, the contract and this ceiling in one commit but listed
+      only the migration, so `main` went red on its own boundary — this completes that change rather
+      than widening it. The two entries share one subject and one expiry: when `0010` is deleted,
+      both go with it, and this ceiling returns to 39.
     */
     expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(41);
   });

@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 20:17 EDT — `main` was red on two independent things; both are fixed and both had a negative control
+
+**Runtime impact: NO** for the boundary half — one test file and four documented numbers. **YES** for
+the SBOM half only in that it unblocks the release-artifact gate; no shipped byte changes.
+
+`main` was failing two separate jobs at once, from two unrelated causes. Neither was diagnosed from
+the job name: each was reproduced locally first, and in both cases the first plausible explanation
+was wrong.
+
+**1. `Rust and PostgreSQL security contracts` — the runtime SBOM inventory.** Caused by PR #169,
+which merged while this check was still red. Re-resolving the runtime digest moved the base image,
+and the reviewed inventory is an exact list compared with `==`, so one extra entry fails it. Both
+digests were unpacked straight from the gcr.io registry — token, manifest index, amd64 manifest,
+every layer blob — and their `var/lib/dpkg/status.d` entries READ: `f7f8f729` carries the five
+reviewed packages, `1c2c046b` carries those same five at identical versions plus
+**`ca-certificates 20250419`**, and that single line is the whole diff. The old digest reproducing
+the reviewed five exactly is the control that shows the extraction is sound rather than the method
+being trusted. It does not weaken the Dockerfile note that no builder-owned CA file is copied into
+the runtime stage: nothing is copied, the store ships in the base now, and SQLx still uses the
+lockfile-pinned rustls/webpki roots. Controls: the amended rule rejects the old five, an injected
+`apk` artifact, and a wrong version.
+
+**2. `controller quality` — the naming boundary, and it was an INCOMPLETE CHANGE, not a new rule.**
+`d5e3391` added three things in one commit: `0010_retire_ptr_clone_app.sql`, the source contract
+`retire-baseline-role-contract.test.ts`, and the `naming-boundary.test.ts` update that admits the
+migration and raises the ceiling 39 → 40. It listed the migration and forgot the contract, so `main`
+failed its own boundary two assertions at a time — once for the allow-list, and once for the
+stricter product-surface rule that `ALLOWED_PREFIXES` deliberately does not reach.
+
+The contract earns its entry on the same argument the migration did, because it has no other
+subject: every one of its assertions is a search for a literal that must appear in that SQL, so the
+name cannot be paraphrased out. Assembling it from fragments was rejected for the reason
+`verify-privacy-boundary.mjs` records — that hides the string from the scanner that should see it,
+trading a visible tolerated use for an invisible one. Ceiling 40 → 41, and both entries expire
+together with `0010`.
+
+The product-surface exemption moved from `endsWith('naming-boundary.test.ts')` to two EXACT paths.
+That is a tightening in the same edit that admits the second file: the suffix would have matched
+that filename in any directory, and a blanket "any test file may" would have covered the next test
+that pastes a live connection string.
+
+**Negative control, and the first attempt at it was invalid.** A planted `ptr_clone_app` literal in
+`src/lib` did not trip the guard — because `filesNamingTheReference()` runs `git grep`, which only
+sees TRACKED files, and the probe was untracked. That is a fact about the probe, not the guard.
+Re-run with the probe staged, the guard fails both assertions and names the file; removed, 4/4
+green. Reporting the first result would have been a defect I manufactured.
+
+**One self-inflicted defect on the way, caught before CI.** The new ceiling paragraph was written
+after the block comment had already closed, leaving prose as loose tokens and a stray `*/`; the file
+stopped parsing and vitest reported "no tests" rather than a failure. Found by running it. The same
+family as the apostrophes that closed the jq string in the commit before this one.
+
+**The documented Vitest count moved again, 1070 → 1077 across 104 files**, because `d5e3391` added
+seven tests and moved no documented site — the same drift this gate exists to catch, now the third
+time it has caught it.
+
+**Verified:** controller **1077 tests across 104 files, all passing**; the count gate green across
+its four sites; lint and format clean; the release-artifact contract and its policy self-test both
+pass; `bash -n` clean on the build script.
+
 ### 2026-08-30 22:55 UTC — Chat composer keys, two navbar nodes, and six places the two message renderers disagree
 
 **Runtime impact: YES**, on both surfaces. Two components changed — `AlertChatArea.svelte` and
