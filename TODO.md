@@ -750,8 +750,10 @@ about `apps/room`.
 The room's own gap register is `docs/reference/room-component-gap-register.md`, and the work queue
 that goes with it is **`todo-next.md`** — deliberately a separate file, because this one is being
 edited concurrently by the decomposition work and two sessions writing one TODO is how a merge
-conflict eats a finding. **Read `todo-next.md`'s own header before treating it as a build spec: it
-covers 2 of 42 room surfaces, about 2.7% of the lines.** `NEW-TODO.md` covers Part 1 flaws in the
+conflict eats a finding. **Read `todo-next.md`'s own header before treating it as a build spec: as of
+2026-08-31 it covers 5 of 81 room surfaces, 2,045 of 35,905 lines — 5.7%. Those numbers are not
+copied here; `todo-next-coverage-contract.test.ts` measures every row against the file it names and
+the headline against the rows, so the tracker is checked rather than remembered.** `NEW-TODO.md` covers Part 1 flaws in the
 ORIGINAL that we deliberately do not reproduce.
 
 As of 2026-08-27: **66 CLOSED, 6 OPEN, 15 parked/won't-fix, 87 total.**
