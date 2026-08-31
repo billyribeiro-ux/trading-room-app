@@ -33,6 +33,42 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 06:12 UTC — every file path this app cites in a comment can now be opened, and a gate keeps it that way
+
+**Runtime impact: NO** — one contract, one citation corrected.
+
+The house style is to cite the file that owns a rule rather than restate it, which is what keeps one
+decision in one place. That makes a citation load-bearing: it is the reader's only route to the
+argument, and when it rots the argument becomes unreachable while the prose still reads as
+authoritative. **Every instance so far was found by somebody walking into it** — `TODO.md` row R
+naming `media-transport.svelte.ts` for a `contentHint` line with zero occurrences there,
+`missing-commands-triage.md`'s 44 stale pointers, and today's.
+
+`comment-path-citations-contract.test.ts` sweeps all of `apps/room/src`: **85 citations across more
+than twenty files, and after the correction below, zero that cannot be opened.** A path resolves
+against this app, the repository root, the sibling controller app, or the framework's own source
+under `node_modules` — ten citations read Svelte's and SvelteKit's internals by path, which is the
+strongest form a claim about framework behaviour can take, and every one of them opens. A citation
+into one of the 13 absent capture roots is exempt, and the list comes from
+`gate/evidence-bound-tests.mjs` rather than a second copy.
+
+**The one that was broken pointed OUT of the repository.** `handoff-token.test.ts`'s `mint` helper
+said it worked *"the same way `new-room-control/src/lib/server/room-handoff.ts` does"* — a path in one
+of the two sibling REFERENCE folders, naming a COPY of a file whose authority is in-tree at
+`apps/controller/src/lib/server/room-handoff.ts`. A reader following it left the repository to read
+something they already had. It now names `signHandoff` and the in-tree path.
+
+**The first draft of the sweep reported five phantoms and was fixed before it was believed.** Its
+pattern was unanchored, so it matched the `src/lib/…` TAIL of `apps/controller/src/lib/…` and then
+failed to resolve that against this app. All five "broken" citations were correct as written. A sweep
+whose first result is five phantoms is a sweep nobody trusts the sixth result of, so the pattern is
+anchored on the left and the false positives are recorded at it.
+
+**Verification.** Two negative controls, each seen RED and restored: a comment citing a file that does
+not exist (reported by path AND by the file citing it), and the resolution bases emptied to this app
+alone (15 framework and cross-app citations correctly fail). Room gate exit 0: svelte-check 1,594
+files / 0 errors / 0 warnings; 314 test files / 5,683 passed / 1 skipped.
+
 ### 2026-09-01 05:41 UTC — a docblock counted seventeen server actions in a file that exports none
 
 **Runtime impact: NO** — one comment corrected, one redundant comment removed, one finished tracker

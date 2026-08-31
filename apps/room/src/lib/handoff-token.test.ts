@@ -15,7 +15,15 @@ const NOW = 1_785_000_000;
 
 const b64 = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-/** Mints a token the same way `new-room-control/src/lib/server/room-handoff.ts` does. */
+/**
+ * Mints a token the same way `signHandoff` does in
+ * `apps/controller/src/lib/server/room-handoff.ts` — base64url header, base64url payload, and
+ * `signature()`'s HMAC-SHA256 over `header.payload`, base64url with the padding stripped.
+ *
+ * This cited `new-room-control/src/lib/server/room-handoff.ts` until 2026-08-31: a path in one of the
+ * two sibling REFERENCE folders, outside this repository, naming a COPY of a file whose authority is
+ * in-tree. A reader following it left the repository to read something they already had.
+ */
 function mint(
   payload: Record<string, unknown>,
   { secret = SECRET, header = { alg: 'HS256', typ: 'JWT' } } = {}
