@@ -33,6 +33,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 16:45 UTC — The Q&A header's alert body was raw text, and both rows were blocked by a declaration lagging its own data
+
+**Runtime impact: YES.** A `$TICKER` in the alert is coloured in the Q&A header now, a pasted URL is
+a link, an image URL renders as the image, and the sender's avatar falls back to THEIR gravatar
+rather than the hashless mystery-man every sender shared.
+
+`QAM-10` and `QAM-11` were filed `BLOCKED` on "one line in `ModalHost.svelte`", and the interesting
+part is what that line was. `RoomOverlays` passes `messageActions.selected` — a full
+`MessageActionItem`, on which `targetUrl` and `senderEmailHash` are both declared — into a
+`targetMessage` shape that named neither. **The values were present at runtime the whole time.** The
+rows were a declaration lagging its own data, and both close with the same widening.
+
+That mattered: `MessageBody` emits `image` clicks and `room/message-actions.svelte.ts` resolves them
+through `item.targetUrl`, so a piped body without it would have drawn an image whose click could not
+act — the control-with-no-effect this repository refuses, which is exactly why the earlier session
+left the body as raw text rather than half-building it.
+
+#### `"chat"`, not `"alerts"` — the one word the docblock is for
+
+```js
+z("innerHTML", parseLinks(parseSymbols(e.qaMsg.txt, "chat", e.qaMsg.avt, null),
+  preferences.chatGif, e.qaMsg._id, !1))                                  // byte 2,331,625
+```
+
+`parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the
+reference's own `"alerts" === i` — and this card is passed **`"chat"`**. So a `[{( … )}]` order that
+renders as a copyable trade in the log beneath the modal stays LITERAL text in the Q&A header. It is
+upstream's behaviour, it is surprising, and without the paragraph it is precisely the kind of detail
+a later reader "fixes". Asserted both ways: `kind: 'chat'` present, `kind: 'alert'` absent.
+
+#### Two preferences that did NOT become props
+
+`chatGif` and `copyTrades` are read off `messageChrome` at the `ModalHost` boundary rather than
+threaded from the page. That object is what every other body in this room already reads, and a
+second source for the same two preferences is how the Q&A header comes to disagree with the log
+sitting behind it.
+
+#### `||` and not `??`
+
+`e.qaMsg.pic || "https://secure.gravatar.com/avatar/" + e.qaMsg.avt + "?d=mm&s=50"` at byte
+2,331,038. An empty-string `pic` must fall through to the gravatar; `??` would keep the empty string
+and render a broken image. The control substituting `??` printed its failure.
+
+#### Evidence
+
+Three negative controls, each seen RED and restored: parsing as `'alert'`; `??` for `||`; and
+dropping `targetUrl` from the host shape. Two pre-existing tripwires fired on their own — the
+contract test asserted the ABSENCE of both fields, which was the measurement the two rows rested on.
+
+**Verified:** `apps/room` gate exit 0 — `format:check`, `lint`, `svelte-check` 1,574 files 0 errors,
+**301 test files / 5,495 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
+browser; the piped body is asserted as source and as segments, not as rendered pixels.
+
 ### 2026-08-31 16:20 UTC — Three more scope-blocked rows, and a register prescription that would have leaked a private answer into the room
 
 **Runtime impact: YES**, three ways. A presenter can send a video from the second chat column.

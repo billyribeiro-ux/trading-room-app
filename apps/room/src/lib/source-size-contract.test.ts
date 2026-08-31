@@ -1734,7 +1734,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       comment says it at the call site: this one's confirm reaches `sendAlertQAReply`, so sharing the
       chat composer's handler would post a presenter's answer to one member's question into the room.
     */
-    max: 1139,
+    /*
+      1139 -> 1149, 2026-08-31. `QAM-10`'s dispatch for the Q&A header card's piped body, with the
+      note on why the full `MessageActionItem` stays HERE: `messageActions.selected` is what
+      `targetMessage` already is, and handing the modal a narrow copy is what had blocked the row.
+    */
+    max: 1149,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1988,7 +1993,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       371 -> 394, 2026-08-31. `QAM-05`/`QAM-06`'s three props forwarded to the composer, and the
       note on why `isPresenter` and `canPostImages` are two props rather than one.
     */
-    max: 394,
+    /*
+      394 -> 409, 2026-08-31. `QAM-10`'s three forwards to the header card. `chatGif` and
+      `copyTrades` come off `messageChrome` at the `ModalHost` boundary rather than as new props
+      from the page — reading them from the object every other body in this room already reads is
+      what stops the Q&A header disagreeing with the log beneath it about the same two preferences.
+    */
+    max: 409,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its own open menu row and its wiring'
   },
   {
@@ -2001,7 +2012,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the ratchet's answer to that is an extraction; it is mostly the four `QAM` rows that live on
       its markup, two of them BLOCKED on a field `ModalHost` does not declare.
     */
-    max: 171,
+    /*
+      171 -> 244, 2026-08-31, for `QAM-10` and `QAM-11`, and the two rows were blocked on ONE thing:
+      a declaration that lagged its own data. `RoomOverlays` passes `messageActions.selected`, a full
+      `MessageActionItem` carrying both `targetUrl` and `senderEmailHash`; the host's `targetMessage`
+      shape named neither, so a body rendered here would have drawn an image whose click could not
+      act, and the avatar fell back to the hashless mystery-man every sender shares.
+
+      Most of the raise is the derivation's docblock, and it earns its lines on one word.
+      `parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the
+      reference's own `"alerts" === i` — and byte 2,331,625 passes **`"chat"`** for this card. So a
+      `[{( … )}]` order that renders as a copyable trade in the log beneath the modal stays LITERAL
+      text in the Q&A header. That is upstream's behaviour, it is surprising, and without the
+      paragraph it is exactly the kind of thing a later reader "fixes".
+    */
+    max: 244,
     why: 'the alert card the Q&A modal reproduces in its own header - `e3e`, called once'
   },
   {
@@ -3190,7 +3215,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `sessData.userUploads` is the other half of it and this component is not given that — a second
       answer to "may this viewer upload" is the shape `CLAUDE.md` refuses.
     */
-    max: 6888,
+    /*
+      6888 -> 6918, 2026-08-31. `QAM-10`/`QAM-11`: two fields on the `targetMessage` shape and one
+      dispatch prop, with the note that `chatGif` and `copyTrades` are deliberately NOT props beside
+      it — both are already on `messageChrome`, which this component receives, and reading them from
+      there is what stops the Q&A header disagreeing with every other body in the room.
+    */
+    max: 6918,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's

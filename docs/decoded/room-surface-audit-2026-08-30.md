@@ -6206,7 +6206,13 @@ whitespace folding both collapse.
 
 ### QAM-10 — the alert body in the header is rendered as plain text where the reference pipes it
 
-**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+**BUILT 2026-08-31.** The blocker was a DECLARATION LAGGING ITS OWN DATA, which is the finding rather than the fix: `RoomOverlays` passes `messageActions.selected`, a full `MessageActionItem` on which both `targetUrl` and `senderEmailHash` are declared, while `ModalHost`'s `targetMessage` shape named neither. Widening that shape closes this row and `QAM-11` at once.
+
+**`"chat"`, not `"alerts"`, is the surprising half and it is asserted rather than described.** `parseBodySegments` gates trade-order splitting on `copyTrades && kind === 'alert'` — the reference's own `"alerts" === i` — and byte 2,331,625 passes `"chat"` for this card. So a `[{( … )}]` order that renders as a copyable trade in the log beneath the modal stays LITERAL text in the Q&A header. Upstream's behaviour, reproduced, with the paragraph that stops a later reader "fixing" it.
+
+`chatGif` and `copyTrades` are read off `messageChrome` at the `ModalHost` boundary rather than threaded as new props from the page: that object is what every other body in this room already reads, and a second source for the same two preferences is how the Q&A header comes to disagree with the log beneath it.
+
+The contract test asserted the ABSENCE of both fields — the measurement the row rested on. Both flipped, which is this change's negative control already written; a third control (parsing as `'alert'`) went red on the `kind` assertion.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -6238,7 +6244,11 @@ and `copyTrades`, so the pipe's other two arguments are available; only the imag
 
 ### QAM-11 — the avatar fallback drops the sender's gravatar hash
 
-**BLOCKED 2026-08-31.** The same declaration as `QAM-10`, one field wider.
+**BUILT 2026-08-31, with `QAM-10` and by the same widening.** The avatar falls back to THAT sender's gravatar now — `e.qaMsg.pic || "https://secure.gravatar.com/avatar/" + e.qaMsg.avt + "?d=mm&s=50"`, byte 2,331,038 — rather than the hashless mystery-man every sender shared.
+
+`||` and not `??`, matching the capture: an empty-string `pic` must fall through to the gravatar, where `??` would keep the empty string and render a broken image. That is asserted, and the control substituting `??` printed its failure.
+
+The earlier note said an optional field here would be `undefined` at the type level while the value was present at runtime. That reading was half right — the mismatch was real, and the answer was to widen the shape at the HOST as well, which `QAM-10` needed anyway. It stays optional on the card because the card must still render when it is absent.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*

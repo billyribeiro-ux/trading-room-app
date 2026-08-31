@@ -55,6 +55,9 @@
     canPostImages,
     onimageupload,
     onimagepaste,
+    chatGif,
+    copyTrades,
+    onAlertBodyAction,
     onclose,
     onQuestionSend,
     onQaAction
@@ -123,6 +126,18 @@
     onimageupload: () => void;
     /** `QAM-06` — a screenshot pasted into the Q&A composer, with that box's own draft. */
     onimagepaste: (file: File, draft: string) => void;
+    /** `QAM-10` — `preferences.chatGif`, forwarded to the header card's piped body. */
+    chatGif: boolean;
+    /** `QAM-10` — `sessData.copyTrades`, the reference's own template discriminator. */
+    copyTrades: boolean;
+    /**
+     * `QAM-10` — a click inside the header card's body: an image, a link, a copied trade.
+     *
+     * It acts on the ALERT, not on a thread entry, which is why it is a separate callback from
+     * `onQaAction` beside it. The page holds the full `MessageActionItem` and dispatches there; this
+     * modal only knows that a click happened.
+     */
+    onAlertBodyAction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
     onclose: () => void;
     onQuestionSend: (body: string) => Promise<boolean>;
     /**
@@ -328,7 +343,7 @@
     footerClass="flex-nowrap"
   >
     {#snippet header()}
-      <AlertQaAlertCard alert={targetMessage} />
+      <AlertQaAlertCard alert={targetMessage} {chatGif} {copyTrades} onaction={onAlertBodyAction} />
     {/snippet}
     {#if qaQuestions.length === 0}
       <div class="my-2">There are no questions.</div>
