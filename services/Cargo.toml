@@ -13,25 +13,29 @@ members = ["media", "api"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.98"
 publish = false
 
 [workspace.dependencies]
-# Versions resolved from crates.io on 2026-07-31; these are the current latest.
+# Versions resolved from crates.io on 2026-08-30; these are the current latest.
 axum = { version = "0.8.9", features = ["ws", "macros"] }
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tower = "0.5.3"
 tower-http = { version = "0.7.0", features = ["trace", "timeout", "limit", "request-id", "catch-panic"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1"
-thiserror = "2.0.19"
+thiserror = "2.0.20"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
-uuid = { version = "1.24.0", features = ["v4", "serde"] }
-time = { version = "0.3.54", features = ["serde", "formatting"] }
-base64 = "0.22"
+uuid = { version = "1.26.0", features = ["v4", "serde"] }
+time = { version = "0.3.55", features = ["serde", "formatting"] }
+base64 = "0.23"
 ed25519-dalek = { version = "3.0.0", features = ["rand_core"] }
-sha2 = "0.10"
+# 0.11, not 0.10, because that is the line ed25519-dalek 3.0.0 itself depends on: its crates.io
+# dependency metadata (read 2026-08-30) declares `sha2 ^0.11`. Holding 0.10 here would put two
+# generations of the digest ecosystem in one tree, which is how `Digest` trait mismatches appear
+# at call sites that look correct.
+sha2 = "0.11"
 url = "2.5.8"
 
 [profile.release]

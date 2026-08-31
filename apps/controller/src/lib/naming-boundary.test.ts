@@ -163,7 +163,7 @@ describe('the reference name never leaks into live code', () => {
       that migration must continue to mean; it quotes the name because the migration's subject is
       removing it, and it leaves the list on the same day the migration does.
 
-      The first:** The entry
+      **The first:** The entry
       is `services/api/migrations/0010_retire_ptr_clone_app.sql`, whose SUBJECT is the reference
       name: it revokes every privilege `ptr_clone_app` holds in the database it runs on. It cannot
       be written without naming what it strips.
