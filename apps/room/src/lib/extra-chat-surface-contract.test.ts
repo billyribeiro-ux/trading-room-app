@@ -154,14 +154,34 @@ describe('XCP-03 and XCP-04 — what Enter does, defined once for both composers
     expect(at(2_386_309, alt)).toBe(alt);
   });
 
-  it('and the rule agrees with it', () => {
+  it('and the rule agrees with it — including that SHIFT does nothing', () => {
+    /*
+      ── THE THIRD OPINION, SETTLED BY THE BYTES DIRECTLY ABOVE ─────────────────────────────────
+
+      This case asserted `line-break` for BOTH modifiers until 2026-08-31, and the two lines that
+      refute it were sitting in the case immediately above it the whole time:
+
+        shift  `e.shiftKey?(i.val(i.val()),this.autoExpand(`      value assigned to ITSELF
+        alt    `e.altKey?(i.val(i.val()+"\n"),`                   value plus a newline
+
+      `i.val(i.val())` is a no-op. Only the ALT arm appends anything, and `preventDefault()` has
+      already run for every Enter — so Shift+Enter in the captured application inserts nothing and
+      sends nothing. Verified at three more offsets on the same day, character for character apart
+      from the jQuery alias and the element id: 1,439,821 (the room composer), 2,208,387 (private
+      chat), 2,386,131 (this column).
+
+      Two readers transcribed those exact bytes into two different rules; the transcription was
+      right both times and the SENTENCE beside it was wrong once. That is why the action is named
+      `swallow` rather than folded into `newline`: a name that describes doing nothing cannot be
+      confused with a name that describes inserting a character.
+    */
     const key = (over: Partial<{ shiftKey: boolean; altKey: boolean }> = {}) =>
       composerEnterAction({ key: 'Enter', shiftKey: false, altKey: false, ...over });
 
     expect(key()).toBe('send');
     /* The half that was wrong in the extra column: alt is a line break, not a send. */
-    expect(key({ altKey: true })).toBe('line-break');
-    expect(key({ shiftKey: true })).toBe('line-break');
+    expect(key({ altKey: true })).toBe('newline');
+    expect(key({ shiftKey: true })).toBe('swallow');
     expect(composerEnterAction({ key: 'a', shiftKey: false, altKey: false })).toBe('ignore');
   });
 

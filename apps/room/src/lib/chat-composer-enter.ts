@@ -1,77 +1,85 @@
 /**
- * What the Enter key does in a chat composer — ONE definition, because there were two and they
- * disagreed.
+ * What Enter does in a CHAT COMPOSER — decoded from all six `onKey` implementations in the pinned
+ * v4 bundle, by value, rather than from the one nearest the file being written.
  *
- * ## The reference branches three ways, not two
+ * ## The six, at their byte offsets in `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`
  *
- * Every composer in the captured application routes Enter through the same shape. `app-extra-chat`'s
- * copy is `onKey` at bundle byte **2,386,131**:
+ * | byte | textarea | component |
+ * | ---: | --- | --- |
+ * | 1,439,821 | `#textAreaTxt` | the main room chat composer |
+ * | 2,047,549 | `#textAreaAlertTxt` | the inline alert box |
+ * | 2,208,387 | `#textAreaTxtPM` | **private chat — this module's caller** |
+ * | 2,319,787 | `#textAreaReplyTxt` | the reply modal |
+ * | 2,336,560 | `#textAreaQATxt` | the alert Q&A modal |
+ * | 2,386,131 | `#textAreaTxtExtra` | the extra-chat column |
+ *
+ * Five of the six are the same three lines, character for character apart from the jQuery alias and
+ * the element id. This is the private composer's, at 2,208,387:
  *
  * ```js
- * onKey(e){if(13==e.keyCode){e.preventDefault(), … ;
- *   const i=ui("#textAreaTxtExtra");
- *   e.shiftKey ? (i.val(i.val()), this.autoExpand(e.target))
- *   : e.altKey ? (i.val(i.val()+"\n"), this.autoExpand(e.target))
- *   : (this.showEmojiChooser=!1, this.sendMessage(), this.autoExpand(e.target))}
- *   else …}
+ * onKey(e) {
+ *   if (13 == e.keyCode) {
+ *     e.preventDefault();
+ *     const i = Ao("#textAreaTxtPM");
+ *     e.shiftKey ? (i.val(i.val()), this.autoExpand(e.target))          // ← a NO-OP
+ *       : e.altKey ? (i.val(i.val() + "\n"), this.autoExpand(e.target)) // ← ALT+Enter
+ *       : (this.showEmojiChooser = !1, this.sendMessage(), this.autoExpand(e.target))
+ *   }
+ * }
  * ```
  *
- * and `app-alert-qa-modal`'s is the same branch, character for character apart from the field id, at
- * byte **2,336,560**. So the rule is: **Shift+Enter and Alt+Enter make a line break; a bare Enter
- * sends, and closes the emoji picker on its way.**
+ * | keys | outcome |
+ * | --- | --- |
+ * | Enter | close the emoji panel, SEND |
+ * | Alt + Enter | insert a newline |
+ * | **Shift + Enter** | **nothing** — the default is prevented and the value reassigned to itself |
  *
- * ## Why it is a module and not two functions
+ * ## Why this is a module and not four lines inside the component
  *
- * On 2026-08-31 the two composers this repository owns disagreed about it, in opposite directions:
+ * Because the repository has now held **three** different opinions about that middle row, and each
+ * of them was written by somebody who had read one composer and generalised.
  *
- * * `AlertQaModal.handleQaKeydown` had the alt case right (`if (event.shiftKey || event.altKey)
- *   return`) and carried a comment claiming the captured textarea *had no handler at all* — which
- *   the two offsets above refute.
- * * `ExtraChatPane.submitOnEnter` guarded on `event.shiftKey` alone, so **Alt+Enter sent the
- *   message** where the reference inserts a newline, and it left the emoji picker open across a
- *   send where `showEmojiChooser = !1` closes it.
+ * `PrivateChatComposer.svelte` treated Shift **and** Alt as the newline, so Shift+Enter put a line
+ * break in a box where the capture puts nothing. `inline-alert-key.ts` has the branch right for the
+ * box it owns, and its prose states — as the reason that box is different — that *"one column over,
+ * in the chat composer, Shift+Enter is the newline"*. That sentence is false: byte 1,439,821 is the
+ * chat composer and its shift arm is `i.val(i.val())`, the same no-op as the alert's. The odd one
+ * out is not the alert's Shift branch at all; it is the alert's SEND branch, which clears the box
+ * and resets its height where the five chat composers call `autoExpand` instead.
  *
- * Two implementations of one captured rule, each looking correct in isolation, is the exact shape
- * `room-message-chrome.ts` records for the three private-messaging gates: *"three implementations,
- * one of them unfed, and the disagreement was invisible because each looked right on its own."* One
- * function is what stops the third composer inheriting whichever half its author happened to read.
+ * A rule that three readers have each guessed differently is a rule that has to be executable.
  *
- * ## What it deliberately does NOT decide
+ * ## `'swallow'` and `'ignore'` are deliberately different answers
  *
- * The **line break itself**. `'line-break'` means *let the browser do it*: the caller returns
- * without calling `preventDefault`, so the character lands at the caret and the undo stack survives.
- * Upstream appends `"\n"` to the whole field value instead, which puts the break at the END no
- * matter where the caret was and discards undo — `AlertQaModal` had already argued that divergence
- * and it is kept here rather than re-argued at each call site.
- *
- * The **keydown/keyup choice**, which is also a divergence and also deliberate. Upstream listens on
- * `keyup` and binds a second handler to `keydown.enter` — `onKeydown(e){e.preventDefault()}`, byte
- * **2,386,566** — purely to stop the browser inserting a newline before the keyup arrives. One
- * handler on `keydown` reaches the same end state with no second binding to keep in step, and it
- * behaves better under key repeat. This function takes the event either way; the caller picks.
+ * Neither changes the text. The first must prevent the browser's default and the second must not —
+ * collapse them and Shift+Enter puts the newline back, which is the one behaviour this module
+ * exists to pin.
  */
 
-/**
- * `send` — a bare Enter: `preventDefault`, close the emoji picker, submit.
- * `line-break` — Shift or Alt is held: do nothing, and let the textarea insert the character.
- * `ignore` — not the Enter key at all.
- */
-export type ComposerEnterAction = 'send' | 'line-break' | 'ignore';
+/** The four outcomes. `'ignore'` is any key this composer does not claim. */
+export type ComposerEnterAction = 'send' | 'newline' | 'swallow' | 'ignore';
 
-/**
- * Structural rather than `KeyboardEvent`, so this is callable from a test without a DOM.
- *
- * Three fields and no more: reading the whole event here would let a caller pass something that
- * only looks like one, and `metaKey`/`ctrlKey` are deliberately absent because the reference tests
- * neither — a Ctrl+Enter sends, exactly as a bare Enter does.
- */
+/** The three fields of a `KeyboardEvent` this decision reads, and nothing else. */
 export interface ComposerEnterEvent {
   readonly key: string;
-  readonly shiftKey: boolean;
-  readonly altKey: boolean;
+  readonly shiftKey?: boolean;
+  readonly altKey?: boolean;
 }
 
+/**
+ * What this keystroke means in a chat composer.
+ *
+ * The order of the tests is the capture's own: `shiftKey` is asked FIRST, so Shift+Alt+Enter
+ * swallows rather than inserting a newline. That falls out of a nested ternary upstream and is
+ * preserved rather than tidied, because tidying it is how the branch drifted the first time.
+ */
 export function composerEnterAction(event: ComposerEnterEvent): ComposerEnterAction {
   if (event.key !== 'Enter') return 'ignore';
-  return event.shiftKey || event.altKey ? 'line-break' : 'send';
+  if (event.shiftKey) return 'swallow';
+  return event.altKey ? 'newline' : 'send';
+}
+
+/** Whether the browser's default must be prevented — every Enter, whatever it then does. */
+export function composerEnterPrevents(action: ComposerEnterAction): boolean {
+  return action !== 'ignore';
 }

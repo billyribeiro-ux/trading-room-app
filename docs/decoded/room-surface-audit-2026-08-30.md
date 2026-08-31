@@ -46,7 +46,7 @@ inside the document itself. The table describes the two-verifier pass **as it ra
 refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
 exactly as RM-25 belongs in the next paragraph and not in that table.
 
-**Eighty-one rows have been appended since this document was committed**, and none of them is
+**One hundred and one rows have been appended since this document was committed**, and none of them is
 folded into the totals above — those describe the two-verifier pass and should keep describing it.
 
 **Each such row says so at itself**, in one sentence, and that sentence is the whole mechanism:
@@ -63,7 +63,7 @@ marker.** The lesson RM-25 taught is still the cheaper half of the one UIM-03 te
 who decodes the table finds rows a reader who looks up the cited const cannot** — and this
 document's per-row byte offsets make the second reading the tempting one.
 
-**Fourteen of the eighty-one are the two surfaces added on 2026-08-31** — `MainTabStrip.svelte`
+**Fourteen of the hundred and one are the two surfaces added on 2026-08-31** — `MainTabStrip.svelte`
 (MTS-01 to MTS-07) and `RoomOverlays.svelte` (OVL-01 to OVL-07), read end to end at verified
 boundaries. Neither had a section here. **Three of those fourteen exist only because the consts
 tables were decoded by value rather than looked up** — MTS-04, MTS-06 and OVL-01 — which is RM-25's
@@ -88,6 +88,14 @@ thirteen `QAM-` rows — two further surfaces this document had no section for a
 its own body, in the fixed sentence `room-surface-audit-counts.test.ts` counts, and the surfaces
 table above is deliberately left at eighteen for the same reason.
 
+**Twenty more are `PrivateChatComposer.svelte`, `GiphyPicker.svelte` and `SpeechRecoOverlay.svelte`**
+— `PCC-`, `GIF-` and `SRO-`. The composer batch settled a rule two earlier readings had disagreed
+about: all six of the reference's `onKey` implementations were decoded by value, five are byte-
+identical apart from the jQuery alias and the element id, and **Shift+Enter is a no-op** —
+`i.val(i.val())` assigns the value to itself, while only the ALT arm appends a newline. Both earlier
+readings had transcribed those bytes correctly and one had described them wrongly, which is the
+failure this document exists to catch, occurring between two of its own batches.
+
 **These four batches landed in parallel and were merged one at a time**, which is why the running
 total lives in ONE paragraph — the first — and each batch paragraph says only what it read. Three of
 them arrived each carrying their own "N rows have therefore been appended" sentence, computed against
@@ -104,7 +112,7 @@ was found only by reading the bundle's `styles:` array.
 
 ## Where the work stands
 
-**0 open · 304 closed · 304 rows.**
+**0 open · 324 closed · 324 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -6221,6 +6229,334 @@ The mode itself is the ALERTS one, which is the reference's own choice — its `
 byte 2,335,599 is the same function the alerts log calls.
 
 ---
+
+## PrivateChatComposer.svelte
+
+Nine rows, read on 2026-08-31 against the pinned v4 bundle by bracket-walking `consts:[[` at byte
+2,214,572 to 2,219,021 — 79 entries, decoded by value — rather than by looking up the slots the
+existing rows name. Six of the nine are rows a slot lookup cannot produce.
+
+### PCC-01 — Shift+Enter inserts a newline here, and no composer in the bundle does that
+
+**FIXED 2026-08-31 02:15 UTC.** `chat-composer-enter.ts` now owns the branch, and
+`PrivateChatComposer.svelte` calls it: Shift+Enter SWALLOWS, Alt+Enter is the newline, plain Enter
+sends. Five negative controls, two of them on this row: flipping the swallow arm to `'newline'`
+reported `2 failed | 29 passed`, and restoring it `31 passed`.
+
+**high** · `divergence` · reference byte **2,208,387**
+
+```
+onKey(e){if(13==e.keyCode){e.preventDefault();const i=Ao("#textAreaTxtPM");e.shiftKey?(i.val(i.val()),this.autoExpand(e.target)):e.altKey?(i.val(i.val()+"\n"),this.autoExpand(e.target)):(this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target))}}
+```
+
+**Ours:** `PrivateChatComposer.svelte:172` read `if (event.shiftKey || event.altKey) { draft += '\n'; return; }` — one branch where the capture has two, so Shift+Enter put a line break into a box whose capture reassigns the value to itself and inserts nothing.
+
+**And this repository has now held three opinions about that one arm.** The bundle carries six `onKey` implementations and FIVE are the fragment above, character for character apart from the jQuery alias and the element id: 1,439,821 (`#textAreaTxt`, the main chat composer), 2,208,387 (`#textAreaTxtPM`), 2,319,787 (`#textAreaReplyTxt`), 2,336,560 (`#textAreaQATxt`), 2,386,131 (`#textAreaTxtExtra`). The count is asserted rather than quoted — `private-chat-composer-v4-contract.test.ts` splits the bundle on that fragment and requires exactly five. The sixth, 2,047,549, is the inline alert box, and `inline-alert-key.ts` has ITS branch right.
+
+**The lead this batch was given named `apps/room/src/lib/chat-composer-enter.ts` as an existing module and it does not exist in this checkout** — `ls` and `grep -rn "composer-enter" src` both return nothing, and nothing under `src/` imports such a name. So this row did not check ours against that module; it built it, from all six offsets, with the private composer as its consumer.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-02 — Sending does not close the emoji panel, and the capture closes it first
+
+**FIXED 2026-08-31 02:15 UTC.** The send arm sets `composerPopover = null` before `onsend()`, in that order, because that is the order upstream writes. **The negative control for this came back GREEN the first time and that is the useful part of the row**: deleting the line changed nothing, because the behaviour had been written and never guarded. Two source-and-bundle assertions were added and the control then reported `1 failed | 32 passed`, restoring to `33 passed`.
+
+**medium** · `missing-behaviour` · reference byte **2,208,387**
+
+```
+(this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target))
+```
+
+**Ours:** the plain-Enter arm called `onsend()` alone. `showEmojiChooser` is the emoji popover's own flag — `toggleEmojiPanel()` at 2,208,614 is the only other writer — so a member who opened the picker, typed and pressed Enter left an emoji-mart panel sitting over the conversation they had just sent to.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-03 — The webinar notice says nothing: the words "Webinar Mode" were never rendered
+
+**FIXED 2026-08-31 02:15 UTC.** `v(1," Webinar Mode ")` is transcribed, spaces and all, through the `{' … '}` idiom this repository already declines the autofixer's suggestion over. Negative control: mutating the string to `' Wbinar Mode '` reported `1 failed | 30 passed`; restored, `31 passed`.
+
+**high** · `missing-behaviour` · reference byte **2,197,4xx** (`lEe`, in the run-up to `app-privchat`)
+
+```
+function lEe(t,n){1&t&&(d(0,"div",53),v(1," Webinar Mode "),d(2,"span",61),T(3,"i",62),u(),T(4,"i"),u())}
+```
+
+**Ours:** `PrivateChatComposer.svelte:222-234` rendered `<span class="px-1 webinarMode">` containing only the question-mark icon. Const 53's own rule is `.webinarMode{background-color:#aaa;color:#000;width:100%}` at byte 2,220,062 — a full-width grey banner — so what a member in webinar mode actually saw was an empty grey strip with a question mark in it, and the explanation of why their messages were private to them was reachable only by hovering an unlabelled icon.
+
+**`T(4,"i")` is NOT transcribed.** It is the reference's own trailing `<i>` with no const, no class and no content; an element with no attributes and no children renders nothing, and copying it would be copying a typo. Recorded at the code so the next reader does not file it as a gap.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-04 — The webinar notice was inside the button column, after the textarea; the capture puts it first in the row
+
+**FIXED 2026-08-31 02:15 UTC.** It is now the first child of `div.d-flex.mx-0`, before the textarea's wrapper. Asserted by index comparison on the server-rendered string — the notice's offset must be below both the textarea's and the button column's — rather than by looking for the class, because a class assertion passes wherever the element ends up.
+
+**medium** · `divergence` · reference byte **2,198,563**
+
+```
+d(0,"div",50)(1,"div",52),H(2,lEe,5,0,"div",53),d(3,"div",54)(4,"textarea",55)
+```
+
+**Ours:** the `{#if webinarMode}` block sat inside `div.textAreaBtnsCol` — the three-icon column — which is where a 100%-wide grey banner is not a thing that belongs. `H(2,…)` is at index 2 of const 52's children and `d(3,"div",54)` at index 3, so the notice precedes the textarea wrapper; the button column is `d(5,"div",56)`, two elements later still.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-05 — `ml-2` and the tooltip were folded onto the icon; consts 61 and 62 keep them apart
+
+**FIXED 2026-08-31 02:15 UTC.** The tooltip and the margin are on a wrapping `<span class="ml-2">`, and the `<i>` carries `fas fa-question-circle` and nothing else — which is what `T(3,"i",62)` means.
+
+**low** · `wrong-constant` · reference byte **2,214,572** (consts 61 and 62, decoded by value)
+
+```
+61 ["placement","top","ngbTooltip","In webinar mode users only see their own chat messages, while Presenters see everyones messages...",1,"ml-2"]
+62 [1,"fas","fa-question-circle"]
+```
+
+**Ours:** `class="fas fa-question-circle ml-2"` with the `placement`/`ngbtooltip` spread on the same `<i>`. Two elements collapsed into one, so the tooltip's hover target was the 14px glyph rather than the span around it, and the margin moved from the wrapper to the icon.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-06 — The composer binds no `paste`, and the capture binds one straight to the image uploader
+
+**BLOCKED 2026-08-31 02:15 UTC.** The component cannot take an `onimagepaste` prop that nothing passes — that is the scaffolding DPE rule 3 exists to refuse — and `PrivateChatPanel.svelte` is outside this batch's scope. **The exact one-line change that unblocks it:** insert `onimagepaste={onimagepaste}` into the `<PrivateChatComposer … />` call at `apps/room/src/lib/components/PrivateChatPanel.svelte:513`, alongside the prop and forwarding handler that line needs.
+
+**medium** · `missing-control` · reference byte **2,212,274**
+
+```
+55 ["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true","placeholder","Type your message here...",1,"txt-area","form-control",3,"keyup","paste","focus"]
+x("keyup",…)("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus",…)
+```
+
+**Ours:** the textarea binds `oninput`, `onfocus` and `onkeydown` and no `onpaste`, so pasting a screenshot into a private conversation does nothing. `onImagePaste(e)` at 2,212,274 reads `clipboardData.items`, takes the first `image/*`, and opens the upload confirm pre-filled with whatever was already typed — `Ao("#textAreaTxtPM").val().trim()` becomes the dialog's message box. `RoomOverlays.svelte:633,647,664,679` has the same machinery for the swing and day-trade forms, so what is missing is the wiring rather than the capability.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-07 — The capture binds `keyup`; every composer in this room binds `keydown`
+
+**DELIBERATE DIVERGENCE 2026-08-31 02:15 UTC.** Const 55's binding section is `3,"keyup","paste","focus"` and it is not transcribed, for a reason this repository has already written down twice: `CarouselDialog.svelte:586-587` records `onkeydown` "rather than `onkeyup` so the Enter that confirms cannot also submit", and `AlertChatArea.svelte:985` binds `onkeydown` to a handler decoded from a `keyup` composer. Recorded here so the third reader does not file it as a gap.
+
+**low** · `divergence` · reference byte **2,214,572** (const 55, decoded by value)
+
+```
+3,"keyup","paste","focus"
+```
+
+**Ours:** `onkeydown`. The measurement that settles it: `preventDefault()` on `keyup` runs after the browser has already inserted the newline, so PCC-01's swallow arm — the reference's own `i.val(i.val())` — could not swallow anything on the event the reference binds. Matching the event would reproduce a defect and lose the branch, which is the definition this document gives the disposition.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-08 — The emoji panel closed after every glyph; the capture leaves it open
+
+**FIXED 2026-08-31 02:15 UTC.** `onselect` now forwards the glyph and nothing else. Negative control: putting `composerPopover = null` back into the handler reported `1 failed | 32 passed`; restored, `33 passed`.
+
+**medium** · `divergence` · reference byte **2,208,868**
+
+```
+selectEmoji(e){console.log(e);let i=Ao("#textAreaTxtPM").val()+e.emoji.native;Ao("#textAreaTxtPM").val(i),this.selectedEmoji=e.emoji}
+```
+
+**Ours:** the handler set `composerPopover = null` after each selection. `selectEmoji` appends and touches `showEmojiChooser` not at all, and const 57 carries `autoClose: "outside"` — ng-bootstrap's value for "a click inside does not dismiss" — so upstream a member picks three emoji with three clicks where this made them reopen a panel with a search box and nine category tabs twice over. The GIF picker is deliberately the other way round in the same file, because `sendGif` at 2,214,017 closes its popover before it does anything else.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-09 — `inline-alert-key.ts` states, as its reason for existing, something the bundle refutes
+
+**BLOCKED 2026-08-31 02:15 UTC.** That module is outside this batch's scope. **The exact one-line change:** at `apps/room/src/lib/inline-alert-key.ts:30`, replace *"One column over, in the chat composer, **Shift+Enter is the newline**."* with *"One column over, in the chat composer, Shift+Enter is the same no-op; what differs is this box's SEND arm, which clears and re-heights where the five chat composers call `autoExpand`."* The module's CODE is correct and needs no change — only the sentence.
+
+**low** · `defect` · reference byte **1,439,821**
+
+```
+onKey(e){if(13==e.keyCode){e.preventDefault(),this.showTyping&&this.refreshTypingStatus(!0);const i=li("#textAreaTxt");e.shiftKey?(i.val(i.val()),this.autoExpand(e.target)):e.altKey?(…)}
+```
+
+**Ours:** `inline-alert-key.ts:30` names the chat composer as the box where Shift+Enter inserts a newline, and offers that contrast as the whole reason the alert box needs a module. Byte 1,439,821 IS the chat composer and its shift arm is `i.val(i.val())`. The sentence is not decorative — it is the argument a reader uses to decide which box behaves how, and it sent this batch's composer to a third answer before the six offsets were read together.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## GiphyPicker.svelte
+
+Six rows, from decoding all four Giphy templates in the bundle rather than the one the file's own
+comment cites. Three of the six exist only because the other three tables were read.
+
+### GIF-01 — The private chat's picker is 400px tall in the capture and 700 here, and the rule that says so cannot reach it
+
+**FIXED 2026-08-31 02:15 UTC.** `GiphyPicker` takes `panelHeight`, applied inline so it outranks the class rule from wherever the portal lands; the default is the majority `700px` and `PrivateChatComposer` passes `400px`. Negative control: changing the default to `400px` reported `1 failed | 22 passed`; restored, `23 passed`.
+
+**medium** · `wrong-constant` · reference byte **2,224,360**
+
+```
+.giphy-search[_ngcontent-%COMP%]{width:400px;height:400px;border:2px solid var(--modal-content-bg-color);background-color:#fff;overflow:hidden}
+```
+
+**Ours:** one unscoped rule, `app.css:551`, at `height: 700px`. The bundle declares this selector six times and the distribution is asserted rather than sampled — the contract test matches every `.giphy-search[_ngcontent-%COMP%]{…}` and requires six, five of them `height:700px` and exactly one `height:400px`. The 400px one is `app-privchat`'s.
+
+**And this is the `app-extra-chat` finding in reverse, which is why it took decoding to see.** The correct rule IS shipped: `captured-runtime-components.css:6595` carries `app-privchat .giphy-search:not(:root) { height: 400px }`. It has never applied. Every captured `.giphy-search` rule in that file is prefixed with its host element, and `GiphyPicker.svelte` portals its `<ngb-popover-window>` into `document.body` — which is what const 65's `container: "body"` means — so the node is not a descendant of `app-privchat` at the moment those rules are matched. Thirteen host-scoped rules for this popover ship and none of them can ever match; the unscoped copy in `app.css` is what paints it, at the majority value.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-02 — Three of the four Giphy templates have no search button at all
+
+**BUILT 2026-08-31 02:15 UTC.** A `searchButton` prop, and `PrivateChatComposer` passes `false`. Negative control: flipping the composer to `searchButton={true}` reported `1 failed | 30 passed`; restored, `31 passed`.
+
+**medium** · `divergence` · reference byte **2,197,701**
+
+```
+d(12,"input",72),Ve("ngModelChange",…),u(),d(13,"span",73),x("click",function(){return D(e),E(g(4).clearSearchGiphy())}),T(14,"i",74),u()
+```
+
+**Ours:** the component renders a search span and a clear span on every surface. The POPOVER variants each build exactly ONE `input-group-text` span and it is the clear one — `d(13,"span",73)` in `app-privchat`'s `uEe` (2,197,701), `d(13,"span",84)` in `app-chat`'s `r0e` (1,425,589), `d(13,"span",81)` in `app-extra-chat`'s `sMe` (2,372,048). Only `app-note`'s MODAL, `L0e` at 1,467,000, builds two: `d(12,"span",88)` → `searchGiphy()` then `d(14,"span",88)` → `clearSearchGiphy()`. The component styles agree — `app-privchat`'s blob has a `.giphy-search .fa-times` rule and no `.fa-search` rule.
+
+**The default is `true` and that is deliberately NOT the majority**, which is the opposite of how the `hint` prop chose its default one field above. The reason is named at the code: the only other consumer is `notes/NoteEditor.svelte`, which IS the modal variant and is outside this batch's scope, so a majority default would have silently removed a control from the one surface whose capture has it.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-03 — The "two words diverge from the capture" note is refuted by the other three tables
+
+**FIXED 2026-08-31 02:15 UTC.** The comment is replaced by the four hosts' const pairs, and the contract test asserts each of them plus the two occurrence counts.
+
+**low** · `defect` · reference byte **2,214,572** (consts 73 and 74, decoded by value)
+
+```
+73 [1,"input-group-text","text-white",3,"click"]
+74 [1,"fa","fa-2x","fa-times"]
+```
+
+**Ours:** `GiphyPicker.svelte:162-167` recorded `text-white` for `text-dark` and an added `fa-2x` as two deliberate divergences, argued from `app-note`'s consts 88/89/90 and generalised. By value, `text-white` with `fa fa-2x fa-times` is what all three POPOVER hosts declare — `app-privchat` 73/74, `app-chat` 84/85, `app-extra-chat` 81/82 — and `text-dark` with a plain `fa fa-search` / `fa fa-times` belongs to the one MODAL. The component matched its capture exactly and the note said it did not, which is the shape that gets "corrected" into a real defect later. `[1,"input-group-text","text-white",3,"click"]` occurs three times in the bundle and `…"text-dark"…` once; both counts are asserted. The input's `border` class splits the same way — present on all three popover hosts, absent from `app-note`'s const 87 — and ours has it.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-04 — A non-2xx Giphy response was parsed as an empty result set
+
+**FIXED 2026-08-31 02:15 UTC.** `searchGiphy` in `giphy-search.ts` throws on `!response.ok`, so the failure reaches the `catch` that leaves the previous grid standing instead of arriving as "no matches".
+
+**medium** · `defect` · reference byte **2,213,709**
+
+```
+searchGiphy(){const e=b_()({https:!0,apiKey:this.appService.globals.giphy_api_key}),i=this.giphySearchTerm;P("searchGiphy search: "+i),e.search(i).then(o=>{console.log(o),this.giphyResults=o.data}).catch(console.error)}
+```
+
+**Ours:** `results = payload.data ?? []` after an unconditional `response.json()`. Giphy answers a bad or rate-limited key with `200`-shaped JSON carrying `{"meta":{"status":403,…}}` and no `data`, and `?? []` turned that into an empty grid — a key problem presenting as a vocabulary problem, silently, on a surface with no other error channel. This is the repository's own "fails loud, no silent fallbacks" rule rather than a reference behaviour; the reference's shape that IS preserved is the one that matters at the UI, which is that a rejected search does not blank what is already there.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-05 — The result images have no intrinsic box, so the grid reflows as each GIF decodes
+
+**FIXED 2026-08-31 02:15 UTC.** `imageBox` reads `width`/`height` off the rendition and answers `null` unless both parse as positive integers; the `<img>` takes them when it can and carries nothing when it cannot. Negative control: deleting the two attributes reported `1 failed | 23 passed`; restored, `24 passed`.
+
+**low** · `defect` · reference byte **2,214,572** (const 77, decoded by value)
+
+```
+77 [3,"dblclick","src"]
+```
+
+**Ours:** `<img src alt ondblclick>` with no `width`, no `height` and no `aspect-ratio`. The reference has none either — its only sizing is `app-privchat img { max-width: 100% }` — so this is a defect reproduced rather than introduced, and the standard this repository states in as many words ("`<img>` always carries width + height or an aspect-ratio. No layout shift") decides it the other way. The numbers are EXTERNAL and are treated as such: they are validated integers or they are absent, they change what the browser reserves rather than what it renders, and nothing downstream reads them.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-06 — The reference tracks results by `title`, and that key is deliberately not transcribed
+
+**MEASURED REFUSAL 2026-08-31 02:15 UTC.** The `{#each}` stays keyed by `id`, with the reason at the code and the reference's own trackBy asserted beside it.
+
+**low** · `divergence` · reference byte **2,214,572** (`KDe`, the track function bound at `ht(16,dEe,2,1,"li",76,KDe)`)
+
+```
+KDe=(t,n)=>n.title
+```
+
+**Ours:** `{#each results as result (result.id)}`. The measurement that justifies not matching: `KDe` is `n.title` for `app-privchat` and `y0e` is the same for `app-note`, and Giphy titles collide constantly — the empty string is among the commonest. Angular's `trackBy` answers a collision by reusing a node; Svelte answers a duplicate key by THROWING `each_key_duplicate`, which takes the whole picker down. So the two are not the same instruction wearing different names, and copying the reference's field would convert a cosmetic reuse decision into a crash. `id` is used as the least-colliding field the payload offers, and it decides which DOM node is reused and nothing else — what is sent is the URL the member double-clicked, and the server decides whether it may be posted.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## SpeechRecoOverlay.svelte
+
+Five rows. This surface was documented against a bundle that is not the pinned one and is not even
+present in this checkout, so every citation in it was unchecked by construction — `pnpm test` skips
+the file that reads it. Re-decoded here against `main.d1d09071be31f1ba.js`.
+
+### SRO-01 — Documented against an unpinned bundle whose const table is six entries shorter
+
+**FIXED 2026-08-31 02:15 UTC.** The component now cites the pinned bundle and its real indices, and `speech-reco-overlay-v4-contract.test.ts` asserts twenty of them by value against that file — a test that runs here, where the one reading `docs/source/` does not.
+
+**medium** · `defect` · reference byte **1,994,264** (`consts:[[`, bracket-walked to 2,014,221)
+
+```
+270 [1,"speech-reco-overlay"]   271 [1,"speech-reco-body"]   273 [1,"speech-reco-buttons"]
+289 ["type","button","title","Full Transcript History","aria-label","Full Transcript History",1,"speech-reco-history-btn",3,"click"]
+```
+
+**Ours:** `SpeechRecoOverlay.svelte:31-35` named `docs/source/main.d6d3c112b59b7d0d.js`, "286 entries", and "indices 264-285 for this overlay". The pinned table has **292** entries and the overlay's are **270-291** — the same table six entries shorter, so every index in the file was low by six. The rendered classes were right throughout; what was wrong was every footnote, and a footnote is the part a reader cannot reconstruct without the bundle open. `gate/evidence-bound-tests.mjs` excludes `speech-reco-overlay-render.test.ts` from this checkout because `docs/source/` is gitignored, so nothing was checking them either.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-02 — Two of the icon citations name other parts of `app-presentationarea` entirely
+
+**FIXED 2026-08-31 02:15 UTC.** The transcript button is const **289** with icon **79**, the history toggle **290** with icon **291**, the close button **276** with icon **92**. Negative control: restoring "button 270 + icon 93" reported `1 failed | 37 passed`; restored, `38 passed`.
+
+**low** · `defect` · reference byte **1,952,594**
+
+```
+d(0,"button",289),x("click",…openTranscriptPage()),T(1,"i",79)
+d(0,"button",290),x("click",…toggleSpeechRecoHistory(o)),T(1,"i",291)
+d(7,"button",276),x("click",…hideSpeechRecognition(o)),T(8,"i",92)
+```
+
+**Ours:** the file read "283 + icon 80 (`fa-external-link-alt`), 284 + icon 285 (`fa-history`), 270 + icon 93 (`fa-times`)". In the pinned table const **80** is `["title","Lock this screen?"]` and const **93** is the volume slider's attribute list — neither is an icon, and neither belongs to this overlay. This is worse than the uniform six-entry shift SRO-01 describes, because subtracting six does not recover it: a reader correcting for the shift lands on 74 and 87, which are the two history buttons' no-click variants. Both wrong consts are now asserted for what they ACTUALLY are, so the old citation cannot come back quietly.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-03 — The two dismissal clicks reach the presentation surface underneath
+
+**FIXED 2026-08-31 02:15 UTC.** `haltCaptionDismissal` calls `preventDefault()` and `stopPropagation()` before the close and history-toggle callbacks, and deliberately not before the transcript one. Negative control: reverting the close button to `onclick={onclose}` reported `1 failed | 37 passed`; restored, `38 passed`.
+
+**medium** · `missing-behaviour` · reference byte **1,957,104**
+
+```
+hideSpeechRecognition(e){e.preventDefault(),e.stopPropagation(),this.appService.globals.preferences.showSpeechRecoOverlay=!1,…}
+toggleSpeechRecoHistory(e){if(e.preventDefault(),e.stopPropagation(),…)}
+```
+
+**Ours:** `onclick={onclose}` and `onclick={ontogglehistory}`, with both props typed `() => void`, so the event was neither used by the component nor reachable by the parent. The overlay is `position: absolute; z-index: 9999` lying across the bottom of the presentation surface — its own captured rule — so every dismissal also landed as a click on whatever the presentation area does with clicks.
+
+**The transcript button is deliberately left alone**, and that asymmetry is the capture's: `x("click",function(){return D(e),E(g(2).openTranscriptPage())})` takes no event argument at all, because it opens a new window and has nothing to suppress. Suppressing there too would be tidiness overruling the capture on a control where the capture is explicit.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-04 — The single-line branch is a LOOP upstream and a single `{:else if}` here, and that is not a gap
+
+**ALREADY BUILT — verified by reading 2026-08-31 02:15 UTC, not rebuilt.** Recorded because the offset invites the opposite conclusion, and the reading that refutes it is one call deeper than the template.
+
+**low** · `divergence` · reference byte **1,951,573**
+
+```
+function s2e(t,n){… d(0,"div",277,1),x("scroll",…), ht(2,o2e,7,2,"div",278,BCe),u()} … pt(e.getSpeechRecognitionEntries())
+getSpeechRecognitionEntries(){return this.currentSpeechReco?[this.currentSpeechReco]:[]}   // byte 1,957,636
+```
+
+**Ours:** `{:else if current}` renders one `.speech-reco-line`. `s2e` is a `ht(…)` repeater over `getSpeechRecognitionEntries()`, which reads as a list and is not one — it is nought-or-one, always, so the loop emits exactly the DOM the single branch does. A reader who stops at the template files "the live caption is a list there and a line here"; the method one call away says otherwise, and both are now asserted so the refutation survives.
+
+**The other trackBy in this template IS transcribed and matches**: `UCe = (t,n) => n.timestamp` is the transcript's, and the history `{#each}` is keyed by `line.timestamp`. `BCe = (t,n) => n.sender` is the single-line loop's and has nothing to key.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-05 — All three overlay controls are `display: none` until the pointer hovers, and no keyboard can reach them
+
+**MEASURED REFUSAL 2026-08-31 02:15 UTC.** Not changed from this batch, and the measurement is what says why rather than a judgement about accessibility.
+
+**medium** · `defect` · reference byte **2,030,113** (within `app-presentationarea`'s `styles:` array, 2,018,629–2,032,208)
+
+```
+.speech-reco-buttons[_ngcontent-%COMP%]{display:none;gap:8px;pointer-events:auto;transition:display .2s ease}
+.speech-reco-overlay[_ngcontent-%COMP%]:hover   .speech-reco-buttons[_ngcontent-%COMP%]{display:flex}
+```
+
+**Ours:** the same two rules, shipped twice — `css/complete-app-styles.css:7880` and `:7882`, and `src/lib/styles/captured-runtime-components.css:7356` — and this component declares no styles of its own, so it inherits them. `display: none` removes an element from the tab order outright, so the close, history and transcript buttons cannot be focused, and `:focus-within` cannot rescue them because nothing inside the overlay is focusable while they are hidden. **The bundle contains no `:focus-within` arm for this selector; that absence is asserted, not assumed.**
+
+**Why it is refused rather than fixed here.** Making them reachable means replacing `display: none` with a `visibility`/`opacity` pair, which changes the captured geometry — the strip would occupy layout at all times — and both stylesheets that carry the rule are outside this batch's scope. **The one-line change that would unblock it:** in `apps/room/src/app.css`, add `.speech-reco-overlay:focus-within .speech-reco-buttons { display: flex }` AND change the base rule to keep the buttons in flow, which is two lines and a geometry decision, not one — which is precisely why it is recorded for the owner rather than made here. `PresentationArea.svelte`'s own PA-07 note assumes these buttons ARE in tab order; that assumption and this rule cannot both be true, and reconciling them is the next reader's first question.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+---
+
 
 ## The fifty-one refuted claims
 

@@ -1,21 +1,23 @@
 <script lang="ts">
+  import {
+    captionsVisible,
+    formatCaptionTime,
+    haltCaptionDismissal,
+    isAtBottom
+  } from '#lib/speech-reco-overlay.js';
+
   /**
    * Closed captions: the speech-recognition overlay that sits over the presentation area.
    *
-   * Every class here comes from `docs/source/components/app-presentationarea.component.css`, and
-   * all of it is already shipped - 49 rules in `captured-runtime-components.css`, 38 in
-   * `complete-app-styles.css` - so this component declares no styles of its own. The captured
-   * geometry it inherits:
-   *
-   *   .speech-reco-overlay      position:absolute; inset bottom/left/right 0; background #000c;
-   *                             padding 12px 20px; z-index 9999; max-height 40vh; min-height 48px;
-   *                             flex row; gap 12px
-   *   .speech-reco-overlay.history-mode   flex column; max-height 60vh; padding 16px 24px; gap 16px
-   *   .speech-reco-overlay.single-line    max-height: none
-   *   .speech-reco-text-wrapper max-height 3.5em, its own scrollbar
-   *   .speech-reco-line         22px/1.4 white  (20px, 16px, 14px at the narrower breakpoints)
-   *   .speech-reco-buttons      display:none, revealed by `.speech-reco-overlay:hover`
-   *   .speech-reco-close-btn / -history-btn   28x28 circle, 2px white border
+   * Every class here comes from `app-presentationarea`'s own `styles:` array — 38 `.speech-reco-*`
+   * rules, bracket-walked from `styles:[` at byte 2,018,629 to 2,032,208 of the pinned v4 bundle,
+   * inventoried in `speech-reco-overlay.ts` — and all of it is already shipped, twice:
+   * `css/complete-app-styles.css` carries the same 38 and
+   * `src/lib/styles/captured-runtime-components.css` re-scopes them under `app-presentationarea`.
+   * **Both reach this component**, because `PresentationArea.svelte` renders it INSIDE its
+   * `<app-presentationarea>` element rather than portaling it — which is not true of the GIF popover
+   * next door, and is why this component declares no styles of its own and that one now takes its
+   * height as a prop.
    *
    * Two separate switches gate captions, and they are not the same thing:
    *
@@ -26,16 +28,20 @@
    *                             SEES it. `isSpeechRecoOverlayEnabled()` reads it as
    *                             `null == e || !!e`, so absent means enabled.
    *
-   * ## Markup, decoded rather than guessed
+   * ## Markup, decoded rather than guessed — and RE-decoded against the pinned bundle
    *
-   * The compiled template is `r2e` / `e2e` / `i2e` / `Zwe` / `t2e` / `n2e` in
-   * `docs/source/main.d6d3c112b59b7d0d.js`, and its const table - 286 entries, indices 264-285 for
-   * this overlay - resolves every class and icon that used to be inferred here. An earlier version
-   * of this file recorded the icons as an honest gap ("the const table is not in the dump"); it is
-   * in the dump, and the resolved values are used below.
+   * The compiled template is `u2e` at byte 1,952,976, with `o2e` / `s2e` / `r2e` / `a2e` / `l2e` /
+   * `c2e` / `d2e` beneath it, and the const entries it uses are **270-291** of a 292-entry table.
+   *
+   * This file used to cite `main.d6d3c112b59b7d0d.js` — an earlier, unpinned dump — and its entries
+   * 264-285. Same table, six entries shorter, so every index here was low by six; two of the icons
+   * were misattributed on top of that, and the instruction names were that dump's. The rendered
+   * classes were right and the footnotes sent the reader to other components' consts.
+   * `speech-reco-overlay-v4-contract.test.ts` now asserts each one against the pinned file, so the
+   * next reader gets an offset that has been executed rather than a citation that was typed.
    */
   type Caption = {
-    /** Stable key. The capture tracks history by timestamp (`(t, n) => n.timestamp`). */
+    /** Stable key. `UCe = (t,n) => n.timestamp` is the capture's own trackBy for the transcript. */
     timestamp: number;
     sender: string;
     text: string;
@@ -70,36 +76,15 @@
     ontranscript
   }: Props = $props();
 
-  /**
-   * `hasSpeechRecognitionEntries()`:
-   *
-   * ```js
-   * const e = this.isSpeechRecoOverlayEnabled(), i = this.getSpeechRecognitionHistory().length;
-   * return !!e && (this.speechRecoHistoryMode ? i > 0 : this.showSpeechRecognition && !!this.currentSpeechReco)
-   * ```
-   *
-   * The viewer-preference half is the call site's own `{#if}`; what belongs here is the second
-   * half, and the two branches differ. This was a flat `{#if current}`, so opening the transcript
-   * on a room that had gone quiet closed the overlay outright - history mode does not need a live
-   * caption, it needs history.
-   */
-  const visible = $derived(historyMode ? history.length > 0 : Boolean(current));
+  const visible = $derived(captionsVisible(historyMode, history.length, Boolean(current)));
 
-  /**
-   * `speechRecoAutoScroll`, kept exactly as the capture computes it:
-   *
-   *   onSpeechRecoScroll(e) { const i = e.target;
-   *     i && (this.speechRecoAutoScroll = i.scrollHeight - i.scrollTop - i.clientHeight < 10) }
-   *
-   * so scrolling up to read pins the view, and scrolling back to the bottom re-arms it.
-   */
-  const AUTO_SCROLL_SLACK = 10;
+  /** `speechRecoAutoScroll`, kept exactly as the capture computes it — see the module. */
   let autoScroll = $state(true);
 
   function onScroll(event: Event) {
     const target = event.target as HTMLElement | null;
     if (!target) return;
-    autoScroll = target.scrollHeight - target.scrollTop - target.clientHeight < AUTO_SCROLL_SLACK;
+    autoScroll = isAtBottom(target);
   }
 
   /**
@@ -128,23 +113,11 @@
     void history.length;
     if (autoScroll) node.scrollTop = node.scrollHeight;
   }
-
-  /**
-   * `{{ entry.timestamp | date:'shortTime' }}`.
-   *
-   * Angular's `shortTime` is `h:mm a` - no leading zero on the hour. `hour: '2-digit'` renders
-   * "01:30 PM" where the capture renders "1:30 PM", so the hour is `numeric`.
-   */
-  const timeFormatter = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-  const formatTime = (timestamp: number) => timeFormatter.format(new Date(timestamp));
 </script>
 
 {#if visible}
   <!--
-    `Et("history-mode", speechRecoHistoryMode)("single-line", !speechRecoHistoryMode)` - the two
+    `Tt("history-mode", speechRecoHistoryMode)("single-line", !speechRecoHistoryMode)` - the two
     modifiers are exact complements. `single-line` was additionally conditioned on an empty history
     here, so a caption arriving after any transcript had accumulated lost `max-height: none` and got
     boxed into the 3.5em scroll area for no reason the capture shares.
@@ -156,10 +129,10 @@
       {#if historyMode}
         <div class="speech-reco-history" onscroll={onScroll} {@attach followTail}>
           {#each history as line (line.timestamp)}
-            <!-- `t2e`: time, then `.speech-reco-history-text` wrapping a `<strong>` sender and a
+            <!-- `r2e`: time, then `.speech-reco-history-text` wrapping a `<strong>` sender and a
                  sibling span whose text is prefixed with a non-breaking space. -->
             <div class="speech-reco-history-line">
-              <span class="speech-reco-history-time">{formatTime(line.timestamp)}</span>
+              <span class="speech-reco-history-time">{formatCaptionTime(line.timestamp)}</span>
               <span class="speech-reco-history-text">
                 <strong class="speech-reco-history-sender">{line.sender || 'Unknown'}:</strong>
                 <span>&nbsp;{line.text}</span>
@@ -167,7 +140,7 @@
             </div>
           {/each}
           <!--
-            `H(4, n2e, 8, 2, "div", 279)` with `O(4, e.currentSpeechReco ? 4 : -1)` - the live line
+            `H(4, a2e, 8, 2, "div", 285)` with `O(4, e.currentSpeechReco ? 4 : -1)` - the live line
             is a SEPARATE trailing row whose time reads the literal "now", not a history entry
             carrying a flag. Modelling it as a flag meant the in-progress caption either had to be
             pushed into the transcript early or went missing from history mode entirely.
@@ -183,12 +156,24 @@
           {/if}
         </div>
       {:else if current}
+        <!--
+          `s2e` is a `ht(...)` LOOP over `getSpeechRecognitionEntries()`, which reads as a list and
+          is not one:
+
+              getSpeechRecognitionEntries(){ return this.currentSpeechReco ? [this.currentSpeechReco] : [] }
+
+          — byte 1,957,636. Nought or one, always. So the single else-if branch below emits exactly
+          the DOM the loop does, and the loop is not transcribed. Recorded because the offset invites
+          the opposite conclusion, and a reader who files it as "the single-line branch is a list
+          there and a line here" has filed a gap that is not one. (Named in prose rather than quoted
+          as block syntax: a comment holding a Svelte block is an unclosed block to any parser that
+          reads the file, which `svelte-check` does not catch and a contract test has.)
+
+          `Zwe`/`o2e`: the icon and sender share a sticky header span so they stay pinned while a long
+          caption scrolls under them - that span was missing, which is why the speaker's name scrolled
+          away with the text.
+        -->
         <div class="speech-reco-text-wrapper" onscroll={onScroll} {@attach followTail}>
-          <!--
-            `Zwe`. The icon and sender share a sticky header span so they stay pinned while a long
-            caption scrolls under them - that span was missing, which is why the speaker's name
-            scrolled away with the text.
-          -->
           <div class="speech-reco-line">
             <span class="d-flex align-items-center position-sticky top-0">
               <i class="fas fa-closed-captioning speech-reco-icon me-1"></i>
@@ -203,10 +188,12 @@
     <!--
       Hidden until the overlay is hovered - `.speech-reco-buttons { display: none }` with
       `.speech-reco-overlay:hover .speech-reco-buttons { display: flex }`. `aria-pressed` on both
-      history buttons is the capture's own attribute (`Dt('aria-pressed', speechRecoHistoryMode)`).
+      history buttons is the capture's own attribute (`Et('aria-pressed', speechRecoHistoryMode)` in
+      `c2e` and `d2e`).
 
-      Titles, aria-labels and icons are const-table values, not guesses: 283 + icon 80
-      (`fa-external-link-alt`), 284 + icon 285 (`fa-history`), 270 + icon 93 (`fa-times`).
+      Titles, aria-labels and icons are const-table values from the PINNED bundle, not guesses:
+      button 289 + icon 79 (`fa-external-link-alt`), button 290 + icon 291 (`fa-history`),
+      button 276 + icon 92 (`fa-times`).
     -->
     <div class="speech-reco-buttons">
       {#if archivesAvailable}
@@ -234,7 +221,10 @@
           title="Speech Recognition History"
           aria-label="Speech Recognition History"
           aria-pressed={historyMode}
-          onclick={ontogglehistory}
+          onclick={(event) => {
+            haltCaptionDismissal(event);
+            ontogglehistory?.();
+          }}
         >
           <i class="fas fa-history"></i>
         </button>
@@ -244,7 +234,10 @@
         class="speech-reco-close-btn"
         title="Close Speech Recognition Overlay"
         aria-label="Close"
-        onclick={onclose}
+        onclick={(event) => {
+          haltCaptionDismissal(event);
+          onclose?.();
+        }}
       >
         <i class="fas fa-times"></i>
       </button>

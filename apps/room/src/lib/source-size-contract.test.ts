@@ -2218,7 +2218,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the note saying which half of upstream's method crosses and which this component binds
       declaratively.
     */
-    max: 335,
+    /*
+      335 -> 312, 2026-08-31, and DOWN is the only direction this entry has ever moved on its own
+      merits. The v4 audit batch added the webinar notice's label and its correct parent, the send
+      arm's `showEmojiChooser = !1`, and the three-way Enter branch — and paid for all of it by
+      moving two regions to the files that own them: `autoExpand` and its two paragraphs to
+      `private-composer-auto-expand.ts`, the Enter branch and the six `onKey` offsets to
+      `chat-composer-enter.ts`. The const transcription became assertions in
+      `private-chat-composer-v4-contract.test.ts` instead of a fenced block nothing checks.
+    */
+    max: 312,
     why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
@@ -5721,14 +5730,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/chat-composer-enter.ts',
     /*
-      DECLARED IN THE COMMIT THAT CREATED THE FILE, 2026-08-31.
+      DECLARED IN THE COMMIT THAT CREATED THE FILE, 2026-08-31 — TWICE, ON TWO BRANCHES.
 
-      What Enter does in a chat composer, once. It exists because the two composers this repository
-      owns disagreed about the same captured branch in opposite directions: the extra column sent on
-      Alt+Enter where byte 2,386,309 inserts a newline, and the Q&A composer carried a comment
-      claiming the captured field had no handler at all, which byte 2,336,560 refutes.
+      What Enter does in a chat composer, once. It exists because the composers this repository owns
+      disagreed about the same captured branch, and two parallel audits then created this module
+      independently and disagreed about it AGAIN. The merge is where that was settled, by reading the
+      bytes rather than either sentence:
+
+        `e.shiftKey?(i.val(i.val()),this.autoExpand(`      the value assigned to ITSELF — a no-op
+        `e.altKey?(i.val(i.val()+"\n"),`                   the value plus a newline
+
+      Verified at 1,439,821 (the room composer), 2,208,387 (private chat) and 2,386,131 (this
+      column), character for character apart from the jQuery alias and the element id. **Shift+Enter
+      does nothing**; only ALT inserts. One branch had described those same bytes as "both modifiers
+      make a line break", and its version of this file — and the ceiling of 78 that came with it —
+      described a rule the reference does not have.
+
+      78 -> 86 is therefore not a relaxation: it is the surviving file's own size. The version the
+      78 capped never shipped, and shortening the version that did would mean deleting the six-offset
+      table that is the reason it is right. From here it ratchets down like everything else.
     */
-    max: 78,
+    max: 86,
     why: 'the captured three-way Enter branch, defined once for both composers'
   },
   {
@@ -6387,7 +6409,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/SpeechRecoOverlay.svelte',
-    max: 254,
+    /*
+      254 -> 245, 2026-08-31. The v4 audit re-decoded this component against the PINNED bundle — its
+      const indices were the earlier dump's and six low — and added the `preventDefault` /
+      `stopPropagation` the two dismissal handlers make at bytes 1,957,104 and 1,957,875. The
+      auto-scroll slack, the `shortTime` formatter, the visibility predicate and that suppression
+      all moved to `speech-reco-overlay.ts`, which is what pays for the additions.
+    */
+    max: 247,
     why: 'the captions overlay and its transcript controls'
   },
   {

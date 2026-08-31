@@ -209,12 +209,15 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
   'lib/components/GifConfirmDialog.svelte': {
     '{url}': { count: 1, why: 'the chosen Giphy image, confirmed at `width: 100%` before sending.' }
   },
-  'lib/components/GiphyPicker.svelte': {
-    '{result.images.downsized_large.url}': {
-      count: 1,
-      why: 'a Giphy search result. Every result has a different aspect, and the grid is meant to reflow as they arrive.'
-    }
-  },
+  /*
+    `lib/components/GiphyPicker.svelte` LEFT this catalog on 2026-08-31, which is the direction an
+    entry here is supposed to move. Its `why` claimed the grid "is meant to reflow as they arrive";
+    the reference has no such intent recorded anywhere — its result image is const 77,
+    `[3,"dblclick","src"]`, with no box because the template gives it none, and the only sizing is
+    `app-privchat img { max-width: 100% }`. Giphy states each rendition's `width` and `height`, so
+    `imageBox` in `giphy-search.ts` validates them and the element now carries the pair whenever the
+    payload supplies usable integers. See GIF-05 in `docs/decoded/room-surface-audit-2026-08-30.md`.
+  */
   'lib/components/ImageUploadDialog.svelte': {
     '{preview}': {
       count: 1,

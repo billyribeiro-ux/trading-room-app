@@ -1158,6 +1158,61 @@ seen red. **The Svelte MCP was unavailable in this session, so `svelte-autofixer
 of the six touched or created `.svelte` files;** `svelte-check` and `eslint` were run in its place
 and that substitution is recorded rather than glossed.
 
+### 2026-08-30 22:29 EDT — Three room surfaces audited against the pinned v4 bundle: the private composer, the GIF picker and the captions overlay
+
+**Runtime impact: YES.** Six behaviours change in the browser and every one of them is a
+member-visible defect rather than a refactor:
+
+* **Shift+Enter in a private message no longer inserts a line break.** All six `onKey`
+  implementations in `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` were decoded together and
+  five are the same three-way branch — Shift SWALLOWS, Alt is the newline, plain Enter sends.
+  `PrivateChatComposer.svelte` treated Shift and Alt alike, so it matched none of them;
+  `chat-composer-enter.ts` now owns the branch with the six offsets beside it.
+* **The webinar-mode notice says "Webinar Mode".** `v(1," Webinar Mode ")` had never been
+  transcribed, so a member in webinar mode saw a full-width grey banner (`.webinarMode` is
+  `background:#aaa; width:100%`) containing a bare question mark, with the explanation reachable only
+  by hovering it. The notice also moved to the head of the composer row, where const 52's children
+  put it, from inside the three-icon button column.
+* **Sending a private message closes the emoji panel**, as the capture's send arm does before it
+  calls `sendMessage`; and **picking an emoji no longer closes it**, because `selectEmoji` never
+  touches the flag and const 57 carries `autoClose: "outside"`.
+* **The private chat's GIF picker is 400px tall, not 700.** The captured rule that says so ships in
+  `captured-runtime-components.css:6595` and has never applied: it is scoped
+  `app-privchat .giphy-search`, and the popover is portaled to `<body>` by `container: "body"`, so
+  none of its thirteen host-scoped rules can match. The unscoped fallback in `app.css` carries the
+  majority value. Height is now a prop, applied inline.
+* **The GIF picker's search magnifier is gone from the private composer.** Three of the four Giphy
+  templates in the bundle build exactly one `input-group-text` span and it is the CLEAR one; only
+  `app-note`'s modal builds two.
+* **Closing or toggling the captions overlay no longer clicks through to the presentation surface.**
+  `hideSpeechRecognition` and `toggleSpeechRecoHistory` both open with
+  `preventDefault(), stopPropagation()` at bytes 1,957,104 and 1,957,875; ours bound the callbacks
+  bare. The transcript button is deliberately left alone, because its handler takes no event.
+
+**Also fixed: three sets of citations that pointed at the wrong bytes.** `SpeechRecoOverlay.svelte`
+was documented against `main.d6d3c112b59b7d0d.js`, whose const table is six entries shorter than the
+pinned one, so every index in the file was low by six — and two icon citations were wrong even after
+that shift, naming `["title","Lock this screen?"]` and the volume slider. `GiphyPicker.svelte`
+recorded `text-white` and `fa-2x` as divergences from the capture; by value they are what all three
+POPOVER hosts declare, and the `text-dark` it was compared against belongs to the one MODAL. That
+file's own bundle is gitignored, so `gate/evidence-bound-tests.mjs` skips the test that reads it and
+nothing here was checking any of it.
+
+**What was run.** `pnpm run gate` in `apps/room`: `gate-exit=0`, `4557 passed | 1 skipped`. Twelve
+negative controls, each mutated, verified present in the file, run, and restored — one came back
+GREEN (deleting the emoji-panel close from the send arm changed nothing), which was a finding about
+the assertion rather than the code, and two assertions were added until it went red. The controller
+gate was NOT run: nothing under `apps/controller` changed, and the two of its tests that read root
+documents were run directly and passed. **The Svelte MCP was NOT available in this session** —
+`list-sections`, `get-documentation` and `svelte-autofixer` are not in the tool set — so
+`svelte-check`, `eslint` and this repository's own contract tests are what ran in their place, and
+that substitution is stated rather than implied.
+
+**Twenty rows appended to `docs/decoded/room-surface-audit-2026-08-30.md`** — PCC-01…09, GIF-01…06,
+SRO-01…05 — for three surfaces that had no section in it. Two are `BLOCKED` on a line each outside
+this batch's scope and both name the exact line. Ceilings in `source-size-contract.test.ts` moved
+DOWN for two of the three components (335 → 312, 254 → 247), paid for by five new modules under
+`src/lib/` that carry the extracted reasoning with the code.
 
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
