@@ -119,7 +119,14 @@ const ALLOWED_PREFIXES = Object.freeze([
   'apps/controller/scripts/verify-backend.mjs',
   'apps/controller/scripts/verify-backend-provenance.mjs',
   'apps/room/gate/verify-postgres-schema-artifacts.mjs',
-  'apps/controller/src/lib/naming-boundary.test.ts'
+  'apps/controller/src/lib/naming-boundary.test.ts',
+  /*
+    The contract that says what `0010` must continue to mean. It quotes the role name because the
+    migration's whole subject is removing it — and like this file, it is a test ABOUT the boundary
+    rather than code that crossed it. Exempted by exact name in the product-surface assertion below
+    too, for the reason recorded there.
+  */
+  'apps/controller/src/lib/retire-baseline-role-contract.test.ts'
 ]);
 
 /** Every tracked file containing a `ptr_clone` literal, as repository-relative paths. */
@@ -166,7 +173,12 @@ describe('the reference name never leaks into live code', () => {
       first value written here was a guess of 36 and this assertion caught it within seconds, which
       is a small but exact demonstration of why the ceiling is pinned at all.
 
-      **39 -> 40 on 2026-08-31, and it is the one kind of growth this rule should admit.** The entry
+      **39 -> 41 on 2026-08-31, and both entries are the one kind of growth this rule should
+      admit.** The second is `retire-baseline-role-contract.test.ts`, the contract that says what
+      that migration must continue to mean; it quotes the name because the migration's subject is
+      removing it, and it leaves the list on the same day the migration does.
+
+      The first:** The entry
       is `services/api/migrations/0010_retire_ptr_clone_app.sql`, whose SUBJECT is the reference
       name: it revokes everything `ptr_clone_app` holds and drops the role once the last database in
       the cluster has stopped granting to it. It cannot be written without naming what it removes.
@@ -188,36 +200,27 @@ describe('the reference name never leaks into live code', () => {
   });
 
   it('never permits an exception inside the running application code', () => {
-    // The room and controller applications have no business naming the reference at all: they do not
-    // talk to PostgreSQL as a role. An entry appearing under either `src/routes` or `src/lib`
-    // (outside this test) would mean the name reached the product surface.
     /*
-      The exemption is EXACT PATHS, not a `.test.ts` suffix, and that is the whole care in this rule.
+      The room and controller applications have no business naming the reference at all: they do not
+      talk to PostgreSQL as a role. An entry appearing under either `src/routes` or `src/lib`
+      (outside the two exemptions below) would mean the name reached the product surface.
 
-      `ALLOWED_PREFIXES` above does not reach here on purpose: this assertion is deliberately
-      stricter than the allow-list, so a prefix admitted for the database tier cannot buy its way
-      onto the product surface as a side effect. That means the two files under `src/` that may name
-      the reference have to be named here as well, and be argued for twice.
+      TWO FILES ARE EXEMPT, AND BOTH ARE TESTS ABOUT THE NAME ITSELF. This one, which has to quote
+      what it forbids; and `retire-baseline-role-contract.test.ts`, added 2026-08-31, which asserts
+      what `0010_retire_ptr_clone_app.sql` must continue to MEAN — the interlock, the absence of
+      CASCADE, the catalogue-exact residual count, the single tolerated failure.
 
-      Both are guards over the database tier rather than product code — this file, and the source
-      contract over `0010`, whose every assertion is a search for a literal that must appear in that
-      migration. Neither ships: no route imports them, no bundle contains them. A blanket
-      "any test file may" would have covered both in one line and also covered the next test that
-      pastes a live connection string, which is precisely the erosion the header warns about.
-
-      It was `endsWith('naming-boundary.test.ts')` until 2026-08-31 — a suffix that would have
-      matched that filename in ANY directory. Exact paths are narrower, so this is a tightening in
-      the same edit that admits the second file.
+      The exemption is by exact FILENAME rather than by a `.test.ts` suffix, deliberately. A suffix
+      rule would exempt every test in both applications at a stroke, and the rule this assertion
+      protects is that the name does not reach application code — a test in `src/lib` is application
+      code for that purpose. Two named files are two claims somebody can read and challenge; a
+      pattern is a hole.
     */
-    const DATABASE_TIER_GUARDS = Object.freeze([
-      'apps/controller/src/lib/naming-boundary.test.ts',
-      'apps/controller/src/lib/retire-baseline-role-contract.test.ts'
-    ]);
-
+    const EXEMPT = ['naming-boundary.test.ts', 'retire-baseline-role-contract.test.ts'];
     const productSurface = filesNamingTheReference().filter(
       (path) =>
         (path.startsWith('apps/room/src/') || path.startsWith('apps/controller/src/')) &&
-        !DATABASE_TIER_GUARDS.includes(path)
+        !EXEMPT.some((name) => path.endsWith(name))
     );
 
     expect(

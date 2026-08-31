@@ -295,3 +295,60 @@ The two writes needed no change: `savePoll` and `deleteSavedPoll` were already
 `role === 'staff' || role === 'admin'`, which is what `require_staff` enforces.
 
 ---
+
+---
+
+## Entry 2, closed and moved 2026-08-31 — the premise was retired by the owner, not by the work
+
+Its ask was to consolidate two working folders into one repository, and its whole argument was
+drift: _"`services/**` currently exists in both folders and has now diverged twice"_, with a
+recorded seam that _"has now failed to prevent the same defect twice"_.
+
+**There is no sync, in either direction, so there is no drift mechanism.**
+`apps/controller/scripts/verify-backend-provenance.mjs:122-128` records the search — `scripts`,
+`ops`, every per-app scripts directory, `.github`, the root manifest — finding none, and notes the
+owner confirming directly on **2026-08-12** that the siblings are reference only. The one script
+that mentions a sibling reads `.env` files and states at its own line 30 that `new-room-control` is
+_"read-only reference, not a config store for this project"_.
+
+So `services/**` is not provisional and will not be overwritten: **this repository is its
+authority**, which `CLAUDE.md` now states as the root standard after recording that the opposite
+rule "was false and cost real time".
+
+**Two entries were blocked on this one and both are unblocked by it.** Entry 1's remaining work was
+routed to "the source repository" and to root `TODO.md` item **P**, which no longer exists; its
+migration half shipped on 2026-08-31 as `0010_retire_ptr_clone_app.sql`, proven across three
+databases on a live cluster. Entry 5 said it _"depends on entry 2 — otherwise it targets whichever
+`services/` tree happens to be in front of you"_; there is one tree.
+
+Kept for the two divergence incidents it records, which are the reason the provenance verifier
+exists and are still the best account of what a recorded seam does and does not buy.
+
+## 2. Consolidate the two working folders into one repository
+
+**Status:** decided, not executed.
+
+`docs/decisions/0003-vercel-rust-postgresql-control-plane.md` in
+`new-room-control`, status **accepted**, dated 2026-08-02: "The product will use
+one source repository with independently deployable surfaces."
+
+`services/**` currently exists in both folders and has now diverged **twice**.
+
+The first time (08-02 to 08-03) it was 87 files against 93, 4 migrations against
+6, including two migrations that fix proven security drifts. Re-synced at
+`4297f9c` and fingerprinted in `services/SYNC-PROVENANCE.md`.
+
+The second time was found on 08-06, and this copy was the one that was ahead —
+twelve files, including `0008_room_events_tenant_keys.sql`, which pairs the
+tenant keys on the realtime fan-out table. So for as long as that drift stood,
+`new-room-control` was serving the unsafe copy while this file said it was the
+source of authority. Reconciled by promoting all twelve upstream and re-sealing
+at 98 files (`new-room-control` `fdb4f8c`).
+
+A recorded seam is not a fix, and it has now failed to prevent the same defect
+twice. The second occurrence is the argument for this entry, not a footnote to
+it.
+
+Blocks entry 1.
+
+---

@@ -141,6 +141,58 @@ Contracts: `chat-composer-key-contract.test.ts`, `alert-chat-nav-contract.test.t
 `message-renderer-differences-contract.test.ts` — 54 assertions, every bundle claim read from the
 pinned v4 file at run time rather than quoted. Eleven negative controls seen red.
 
+### 2026-08-31 02:40 UTC — Entry 2 closed by an owner ruling, and entry 5's own measurement had become self-referential
+
+**Runtime impact: NO.** Two register entries and one exemption. No `src` module or migration changed.
+
+**Entry 2 — "Consolidate the two working folders" — is archived, and no work closed it.** Its whole
+argument was drift: `services/**` existing in two folders and having *"now diverged twice"*, with a
+recorded seam that *"has now failed to prevent the same defect twice"*.
+
+There is no sync in either direction, so there is no drift mechanism.
+`verify-backend-provenance.mjs:122-128` records the search — `scripts`, `ops`, every per-app scripts
+directory, `.github`, the root manifest — finding none, and notes the owner confirming directly on
+**2026-08-12** that the siblings are reference only. The single script that mentions a sibling reads
+`.env` files and says at its own line 30 that `new-room-control` is *"read-only reference, not a
+config store for this project"*.
+
+It blocked two entries and unblocks both. Entry 1's remaining work was routed to "the source
+repository" and to root `TODO.md` item **P**, which no longer exists — and its migration half
+shipped 35 minutes ago. Entry 5 said it *"depends on entry 2 — otherwise it targets whichever
+`services/` tree happens to be in front of you"*. There is one tree.
+
+**Entry 5 — every number it carried was stale, and one had become self-referential.**
+
+| it said | measured |
+| --- | --- |
+| `grep -rn "/api/v1" src/` returns zero | **3 hits, and all three are PROSE** saying "zero `/api/v1` calls". Comment-stripped: **0** |
+| 20 SvelteKit form actions | **2**, both progressive-enhancement POSTs (`logout`, `session`). The other eighteen are remote functions |
+| 15 SQLite tables | **27** |
+| a 29-route Rust API | **37** |
+
+The grep is the one worth pausing on. It is a real measurement, quoted for weeks, that would now
+return three — and a reader checking it finds the number wrong and the conclusion right. **A
+measurement that matches this repository's own prose about the measurement is not a measurement.**
+
+The entry is not smaller for the conversion, and that is recorded too: eighteen `fetch('?/name')`
+strings — whose endpoint, argument type and failure meaning were agreements nothing checked —
+became eighteen typed commands with their own gates. The cutover has the same amount of work and
+better seams to move.
+
+**One exemption added, by exact name rather than by pattern.**
+`retire-baseline-role-contract.test.ts` names `ptr_clone_app`, and it lives in `src/lib`, which
+`naming-boundary.test.ts` reserves for product surface. It is exempt for the same reason that file
+exempts itself: a test ABOUT the boundary is not code that crossed it.
+
+Exempted by **exact filename**, and the negative control is why that matters. Widened to a `.test.ts`
+suffix, a planted `src/lib/zz-leak-probe.test.ts` containing the role name **passed** the
+product-surface assertion. It was still caught — by the allow-list assertion, which does not know
+about suffixes — so the two rules are genuine defence in depth rather than one rule written twice.
+Two named files are two claims somebody can read and challenge; a pattern is a hole.
+
+Allow-list ceiling **40 → 41**, with the argument at the code: both new entries leave the list on
+the day the rollout completes.
+
 ### 2026-08-31 02:05 UTC — `ptr_clone_app` is retired, and the live cluster taught the migration three things
 
 **Runtime impact: NO from this commit** — the migration ships, it has not been run against any
