@@ -33,6 +33,40 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 12:40 UTC — The coverage tracker was under-reporting by thirteen batches
+
+**Runtime impact: NO.** A number was wrong. Nothing shipped changes.
+
+`todo-next.md` said **19 of 82 surfaces audited · 16.1%**. The real figure is **32 · 31.4%**.
+Thirteen surfaces had a whole `##` section in `docs/decoded/room-surface-audit-2026-08-30.md` — read
+end to end, decoded by value, gated by contract tests — and a `no` in this table's verdict column:
+`AvDevicePane`, `CarouselDialog`, `GiphyPicker`, `MainTabStrip`, `NotesPane`, `PrivateChatComposer`,
+`RoomOverlays`, `ScheduledAlerts`, `ScreenVolumeControl`, `ScreenZoomControls`, `SpeechRecoOverlay`,
+`StreamTabs`, `VideoPlayer`.
+
+**Neither document was wrong on its own.** The register grew batch by batch, each batch landing on
+its own branch, and marking this table was a manual step at merge time that thirteen of them missed.
+A coverage number that moves only when somebody remembers to move it drifts DOWN — which is the safe
+direction and exactly why nobody noticed: the tracker was under-claiming, so every reading of it was
+pessimistic and nothing failed.
+
+**The split between what counts and what does not is taken from the document, not from judgement.**
+The blockquote above that table says the register *"does not re-score the table above,
+deliberately"*, because that pass's list is 18 SURFACES against this one's 82 FILES and the
+partitions do not line up — four of its entries are slices of `ModalHost.svelte` alone. That
+reasoning applies to the original two-verifier pass and not to the later batches, each of which read
+ONE file here whole. An original-pass section opens with the exact line `N verified gaps; M reference
+behaviours confirmed present.`, and nothing else does, so the rule is readable from the text rather
+than kept by hand. Nine sections are original; twenty-six are later batches.
+
+**The guard is the point, not the number.** `todo-next-coverage-contract.test.ts` now fails when a
+later-batch section names a file this table still marks `no`, and carries a counter-assertion so the
+rule cannot be "simplified" into scoring everything. Negative control: `VideoPlayer` reverted to
+`no` → *"these surfaces have a whole-file section in the v4 register and are still marked 'no'
+here"*, naming it.
+
+**Verified:** room gate 298 files, 5,101 passed, 1 skipped, `gate-exit=0`, read from the log.
+
 ### 2026-08-31 12:15 UTC — The Manage panel's "Max" figure gets a writer, four months late
 
 **Runtime impact: YES.** `recorded_max_capacity` has read 0 for every room since migration `0011`

@@ -192,3 +192,96 @@ describe('the headline totals match the rows', () => {
     );
   });
 });
+
+describe('a surface the register has read WHOLE is scored here', () => {
+  /*
+    ── THE DRIFT THIS CATCHES, MEASURED ────────────────────────────────────────────────────────────
+
+    On 2026-08-31 this tracker said **19 of 82 surfaces audited · 16.1%**. The real figure was **32 ·
+    31.4%**. Thirteen surfaces had a whole `##` section in
+    `docs/decoded/room-surface-audit-2026-08-30.md` — read end to end, decoded by value, gated by
+    contract tests — and a `no` in the verdict column here.
+
+    Nothing was wrong with either document on its own. The register grew batch by batch, each batch
+    landing on its own branch, and marking this table was a manual step at merge time that thirteen
+    of them missed. A coverage number that only ever moves when somebody remembers to move it is a
+    coverage number that drifts DOWN, which is the safe direction and the reason nobody noticed: the
+    tracker was under-claiming, so every reading of it was pessimistic and nothing failed.
+
+    ## Why the ORIGINAL pass is excluded, and how that is decided from the document
+
+    The blockquote above this table says the register *"does not re-score the table above,
+    deliberately"*, because that pass's list is 18 SURFACES against this one's 82 FILES and the two
+    partitions do not line up — four of its entries are slices of `ModalHost.svelte` alone.
+
+    That reasoning applies to the original two-verifier pass and not to the later batches, each of
+    which read ONE file here whole. So the split is taken from the document itself rather than from a
+    hand-kept list: an original-pass section opens with the exact line `N verified gaps; M reference
+    behaviours confirmed present.`, and nothing else does.
+  */
+  const AUDIT = readFileSync(
+    fileURLToPath(
+      new URL('../../../../docs/decoded/room-surface-audit-2026-08-30.md', import.meta.url)
+    ),
+    'utf8'
+  );
+
+  /** A section from the original two-verifier pass, which this table deliberately does not score. */
+  const ORIGINAL_PASS = /^\d+ verified gaps; \d+ reference behaviours confirmed present\.?$/;
+
+  const auditLines = AUDIT.split('\n');
+  const sections: Array<{ heading: string; original: boolean }> = [];
+  for (const [index, line] of auditLines.entries()) {
+    const heading = /^## ([A-Za-z0-9_/.-]+\.svelte)\s*$/.exec(line);
+    if (!heading) continue;
+    let at = index + 1;
+    while (at < auditLines.length && !auditLines[at].trim()) at += 1;
+    sections.push({
+      heading: heading[1],
+      original: ORIGINAL_PASS.test((auditLines[at] ?? '').trim())
+    });
+  }
+
+  it('found sections of both kinds — the vacuity floor', () => {
+    /*
+      Both halves, because either being empty makes the assertion below pass over nothing. An empty
+      `later` list would report that every whole-file read is scored because none was found.
+    */
+    expect(sections.filter((section) => section.original).length).toBeGreaterThan(5);
+    expect(sections.filter((section) => !section.original).length).toBeGreaterThan(15);
+  });
+
+  it('scores every later-batch surface that names a file in this table', () => {
+    const byBasename = new Map(rows.map((row) => [row.path.split('/').at(-1)!, row]));
+
+    const unscored = sections
+      .filter((section) => !section.original)
+      .map((section) => byBasename.get(section.heading.split('/').at(-1)!))
+      .filter((row) => row !== undefined && row.verdict === 'no')
+      .map((row) => row!.path);
+
+    expect(
+      unscored,
+      `these surfaces have a whole-file section in the v4 register and are still marked 'no' here. ` +
+        `Either the section is a partial read — in which case say so in its opening line — or this ` +
+        `table owes it a verdict. Thirteen accumulated before this assertion existed.`
+    ).toEqual([]);
+  });
+
+  it('does NOT require the original pass to be scored', () => {
+    /*
+      The counter-assertion, so the rule cannot be "simplified" into scoring everything. Those nine
+      sections are slices and groupings that do not line up with this table's files, and the
+      blockquote above says so; a future edit that scores them would be claiming coverage the pass
+      did not produce.
+    */
+    const originals = sections
+      .filter((section) => section.original)
+      .map((section) => section.heading);
+    expect(originals.length).toBeGreaterThan(0);
+    expect(
+      originals,
+      'the original-pass sections are identified by their own opening line, not by a hand-kept list'
+    ).toContain('RoomMessage.svelte');
+  });
+});
