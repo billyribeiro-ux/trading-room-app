@@ -9,7 +9,9 @@ import { editableText, isBlank, isEditableEmpty } from './editable-display';
   and the assertion below computes that total rather than restating it, because this line said 133
   while the assertion said 134 and both were sitting in the same file.
 
-  Reproduce with, against `scripts/collect-account-2026-08-08T20-19-23-396Z.json`:
+  Reproduce with, against `scripts/collect-account-2026-08-08T20-19-23-396Z.json` — a capture OUTPUT
+  that is not in this repository and never was (`git log --all` finds no commit adding it), so this
+  block records how the number was obtained rather than a step a reader can repeat here:
 
       captures['manage:tab:Settings'].nodes
         .filter(n => /editable-click/.test(n.class ?? ''))

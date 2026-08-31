@@ -4,7 +4,9 @@
  * ## Why this exists rather than a one-line `amount / 100`
  *
  * The reference does exactly that one-liner, and it is wrong. Read verbatim from the live bundle
- * (`evidence-dumps/TIER1-fetched/app.min.js`, offset 183815):
+ * (`evidence-dumps/manage-app-2026-08-31/app.min.js`, offset 183815 — this cited
+ * `TIER1-fetched/` until 2026-08-31, a directory that has never held this file; the OFFSET was right
+ * all along and `formatStripeAmount` is at exactly 183815 in the file named here):
  *
  *     $scope.formatStripeAmount = function (amount, currency) {
  *       if (undefined === amount || null === amount || isNaN(amount)) return '';

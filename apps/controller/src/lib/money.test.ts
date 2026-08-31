@@ -85,7 +85,7 @@ describe('formatMoney — ordinary two-decimal currencies', () => {
 
 describe('THE REFERENCE BUG — zero-decimal currencies are 100x low', () => {
   /*
-    evidence-dumps/TIER1-fetched/app.min.js @183815 divides by 100 UNCONDITIONALLY. Stripe sends
+    evidence-dumps/manage-app-2026-08-31/app.min.js @183815 divides by 100 UNCONDITIONALLY. Stripe sends
     zero-decimal currencies as whole units, so a ¥1,999 charge arrives as amount=1999.
   */
   it('the reference renders ¥1,999 as "19.99 JPY" — verified, not assumed', () => {

@@ -31,9 +31,14 @@ import { missingEvidenceRoots } from '../../gate/evidence-bound-tests.mjs';
  * positives by matching the `src/lib/…` TAIL of `apps/controller/src/lib/…` and then failing to
  * resolve it against this app. A sweep whose first result is five phantoms is a sweep nobody trusts
  * the sixth result of.
+ *
+ * **Anchored on the right too, and the extension order is load-bearing.** `js` matches inside `json`,
+ * so an unanchored alternation reads `…rects-tab.json` as `…rects-tab.js` and reports a file that is
+ * right there under a name nobody wrote. Longest-first plus `(?![\w-])` closes both halves. Measured
+ * on the controller's corpus, where that exact citation exists.
  */
 const CITATION =
-  /(?<![\w./-])(?:apps\/[\w-]+\/)?(?:src|gate|ops|e2e)\/[\w./-]+\.(?:ts|js|mjs|svelte|css|sql|json|md)/g;
+  /(?<![\w./-])(?:apps\/[\w-]+\/)?(?:src|gate|ops|e2e)\/[\w./-]+\.(?:mjs|json|svelte|html|css|sql|md|ts|js)(?![\w-])/g;
 
 /**
  * Where a citation may resolve, and every base is here for a stated reason.
@@ -81,7 +86,16 @@ interface Citation {
 
 const cited = (): Citation[] => {
   const found: Citation[] = [];
-  for (const file of globSync('src/**/*.{svelte,ts}')) {
+  /*
+    EXCLUDING THIS FILE, and the controller's copy of this sweep earned the exclusion the same day:
+    its docblock quotes a wrong path while explaining that it is wrong, and the sweep read that as a
+    broken citation. Any file whose subject is bad citations will quote bad citations. This one is
+    only lucky — it names `media-transport.svelte.ts` as a bare filename rather than a path — and
+    luck is not a reason to leave the trap open.
+  */
+  for (const file of globSync('src/**/*.{svelte,ts}').filter(
+    (path) => !path.includes('comment-path-citations')
+  )) {
     const source = readFileSync(file, 'utf8');
     for (const block of commentsIn(file, source))
       for (const match of block.matchAll(CITATION)) found.push({ path: match[0], from: file });

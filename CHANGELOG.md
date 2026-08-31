@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 06:48 UTC — the citation sweep ran on the controller and found four wrong pointers in one pass
+
+**Runtime impact: NO** — one contract per app, four citations corrected, two given the measurement
+they were missing.
+
+The room's sweep from thirty minutes ago was half a repository. Run against `apps/controller`, over
+55 citations, it found **four wrong pointers**:
+
+- **`money.ts` and `money.test.ts` cited the wrong directory for the Stripe formatter.**
+  `evidence-dumps/TIER1-fetched/app.min.js` has never held that file; the artifact is
+  `evidence-dumps/manage-app-2026-08-31/app.min.js`. **The offset was right all along** —
+  `formatStripeAmount` is at exactly 183,815 there, measured with `indexOf` over the file's bytes,
+  which is the strongest kind of correction: the citation was one directory wrong and everything it
+  claimed about the code was true.
+- **`room-config-boundary.test.ts` credited the seam probe's finding to its retired instrument.**
+  `scripts/room-config-seam-e2e.mjs` is what the probe had before it became
+  `apps/room/e2e/room-config-seam.spec.ts` — whose own docblock records that the script is absent.
+- **`api-docs.ts` carried `Regenerate: node scripts/extract-api-docs.mjs`.** No commit has ever added
+  that generator under any path, and `scripts/` here is fully in sync (0 untracked, 0
+  tracked-but-absent), so it is not an eviction like the room's. Measured, then said at the line.
+- **`editable-display.test.ts` said "Reproduce with" against a capture output never committed.**
+
+The last two, and two others, stay as PROVENANCE records — deleting a citation is not the same as
+fixing it, because the reader loses how the number was obtained. They are listed by name in
+`UNOPENABLE` with what was measured about each, and the case fails in both directions: a new
+unopenable citation fails, and one that becomes openable and is left listed fails too.
+
+**A bug in the sweep itself, found by the corpus it was run against.** `js` matches inside `json`, so
+an alternation with `js` before `json` and no right anchor read
+`…rects-tab_Branding_Logo_Landing_Page_.json` in `RichTextEditor.svelte` as a `.js` file and reported
+a stale pointer to a file that is right there under a name nobody wrote. Longest-extension-first plus
+`(?![\w-])` closes it, the room's committed copy was corrected the same way, and a case now guards
+the boundary directly.
+
+**And both sweeps read themselves.** The controller's docblock quotes the wrong path while explaining
+that it is wrong, so the sweep counted its own account of the bug as a fifth broken citation — the
+same self-reference that made `reference-const-coverage-contract`'s first split a tautology, from the
+other direction, on the same day. Any file whose subject is bad citations will quote bad citations.
+The room's copy was only lucky (it names a bare filename rather than a path) and is excluded now too.
+
+**Verification.** Four negative controls, each seen RED and restored: a new broken citation in each
+app, and on the controller an `UNOPENABLE` entry that resolves being left in the table. Controller
+gate exit 0 (103 files / 1,102 passed), room gate exit 0 (314 files / 5,683 passed).
+
 ### 2026-09-01 06:12 UTC — every file path this app cites in a comment can now be opened, and a gate keeps it that way
 
 **Runtime impact: NO** — one contract, one citation corrected.
