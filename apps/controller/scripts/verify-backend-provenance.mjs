@@ -68,9 +68,13 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   (`auth/password.rs` for password-hash 0.6, `auth/refresh.rs` for rand 0.10). Each is pinned
   individually in `DIVERGED_FROM_IMPORT` with its reason beside its hash, exactly as the rule above
   requires. Nothing became unsealed; seven seals moved from the aggregate onto their own lines.
+
+  Moved again 2026-08-31, 67 -> 66: `api/src/config.rs`, whose doc comment on `database_url` still
+  named `ptr_clone_app` as the role the runtime MUST authenticate as — the one role the startup check
+  beside it exists to REFUSE. Its own seal below, with the measurement.
 */
-const EXPECTED_UNTOUCHED_COUNT = 67;
-const EXPECTED_MANIFEST_SHA256 = '53150c809d96786080a39dae158f2311cd7f475ab76c27db1f257299298849a6';
+const EXPECTED_UNTOUCHED_COUNT = 66;
+const EXPECTED_MANIFEST_SHA256 = 'b0b2aef59bff70a51051edcf668287141e540c3c487f42f738f8e9f33b68e0c2';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -306,6 +310,31 @@ const DIVERGED_FROM_IMPORT = new Map([
     unchanged. Negative control: the version gate removed, the same 22023 back.
   */
   ['services/api/src/db/mod.rs', '149a07ad65c3bb7668f0b7c99f50ea5d399d6e48775b7002c6a562f6e9318537'],
+  /*
+    Diverged 2026-08-31 — ONE doc comment, and it named the role the code turns away.
+
+    `Config::database_url` carried *"MUST be the restricted, membership-free `ptr_clone_app` role"*.
+    By then `0009_rename_runtime_roles.sql` had renamed it, `db::EXPECTED_RUNTIME_ROLE` was
+    `tradingroom_app`, and `the_immutable_authentication_identity_is_required_and_parsed_exactly` in
+    `db/mod.rs` asserted that a connection authenticating as `ptr_clone_app` is REJECTED — the old
+    name is one of that test's negative fixtures. So the field's documentation instructed exactly the
+    configuration the process refuses to boot with.
+
+    Found by `TODO.md`'s runtime-role row, which deferred ~150 remaining `ptr_clone` occurrences in
+    `services/**` on the grounds that *"`services/**` is a mirror"* — a claim the root standard
+    records as false and costly. Measured instead: 138 occurrences, and all but this one are correct.
+    `docker/postgres/10-provision-roles.sh` must keep creating `ptr_clone_app` or migrations
+    `0001`–`0006` cannot grant to it; `compose.yml` sets the baseline role for provisioning and
+    `POSTGRES_RUNTIME_USER: tradingroom_app` beside it; `db/mod.rs` uses the old names as negative
+    fixtures; and the test and attestation files assert the pre-`0009` state on purpose.
+    `ops/naming-provenance.md` is the mapping and both names exist by design.
+
+    A comment only, so it cannot change behaviour. `cargo fmt --check` clean and
+    `cargo clippy -p tradingroom-api --lib -- -D warnings` clean on the pinned 1.98.0 toolchain;
+    `--all-targets` cannot run in that container because api's dev-dependency on `tradingroom-media`
+    builds `mediasoup-sys`'s C++ worker, which fails there.
+  */
+  ['services/api/src/config.rs', 'ac51a3adf24a66371fdd6c380d77289ae7865fa660b78b0f193ac210448dda61'],
   /*
     Re-pinned 2026-08-31 (PR #177, first live run of the merged tree):
     `run_rejects_a_non_owner_before_creating_the_migration_ledger` asserted the rejection's

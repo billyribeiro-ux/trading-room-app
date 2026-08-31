@@ -72,8 +72,25 @@ against unpublished captures. That is the same owner decision as row 5.
 (It read "Two" until 2026-08-23 while naming three files in the same sentence.)
 `apps/room/ops/privacy-baseline.txt:121-123` still baselines `rawEmail` findings in
 `alert-delete-e2e.mjs`, `audit-clean-app-room.mjs` and `media-screenshare-e2e.mjs`. Those addresses
-were replaced by `PTR_*_EMAIL` environment reads; the detector finds zero today. The verifier prints
-them under "baselined finding(s) are gone — run `--update` to shrink" rather than failing.
+were replaced by `PTR_*_EMAIL` environment reads.
+
+**This row said the verifier prints them under "baselined finding(s) are gone — run `--update` to
+shrink". Run 2026-08-31, it does not, and it must not.** It prints:
+
+> `[privacy] 81 baselined finding(s) are not visible from this checkout, which is missing 13 capture
+> root(s)… Do NOT run --update here. They are absent, not redacted. Shrinking the baseline would make
+> them read as NEW personal data on a checkout that has the captures.`
+
+The advice is **withheld whenever any capture root is missing** (`verify-privacy-boundary.mjs:185`),
+and in a clone one always is. The three files here are in the same bucket for a second reason:
+`apps/room/scripts/` holds **0 files** in this checkout and `git ls-files` returns **0** for it, so
+"redacted" and "absent" are indistinguishable from here regardless.
+
+**So this is not pending work for anyone reading this in a clone — it is an OWNER-MACHINE step**, and
+only there, where the captures resolve, `missingRoots` is empty and the three lines can be told apart
+from the other 81. Stated because the row read as an outstanding chore and the tool refuses it by
+design: `--update` from a clone would rewrite the baseline down to what a clone can see, and the next
+run on the owner's machine would report 81 findings as NEW personal data entering the repository.
 
 ---
 

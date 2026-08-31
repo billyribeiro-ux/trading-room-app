@@ -33,6 +33,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 05:06 UTC — a doc comment named the one database role the process refuses to boot with
+
+**Runtime impact: NO** — one Rust doc comment, one provenance pin moved, two tracker rows corrected.
+
+`Config::database_url` in `services/api/src/config.rs` carried *"MUST be the restricted,
+membership-free `ptr_clone_app` role so row-level security actually applies"*. By 2026-08-31
+`0009_rename_runtime_roles.sql` had renamed that role, `db::EXPECTED_RUNTIME_ROLE` was
+`tradingroom_app`, and `the_immutable_authentication_identity_is_required_and_parsed_exactly` in
+`db/mod.rs` asserted that a connection authenticating as `ptr_clone_app` is **rejected** — the old
+name is one of that test's own negative fixtures.
+
+**So the field's documentation instructed exactly the configuration the process refuses to start
+with.** That is the root standard's own example of a defect: a comment claiming X is checked that no
+longer matches the next line.
+
+**How it was found: by refusing a tracker's stated reason for not looking.** `apps/room/TODO.md`
+deferred "~150 live occurrences" of `ptr_clone` in `services/**` because *"`services/**` is a
+mirror"* — a claim the top of that very entry already records as FALSE, and which `CLAUDE.md` records
+as false and costly. A file whose header withdraws a claim while its body still states it is the
+"two cells disagreeing" failure that document names as its own worst. Counting settled it: **138
+occurrences, and 137 are correct** — `10-provision-roles.sh` must keep creating `ptr_clone_app` or
+migrations `0001`–`0006` cannot grant to it, `compose.yml` sets the baseline role for provisioning
+with `POSTGRES_RUNTIME_USER: tradingroom_app` beside it, `db/mod.rs` uses the old names as negative
+fixtures, and the test and attestation files assert the pre-`0009` state on purpose. The row's own
+figures for two files were also wrong: `tests/migrations.rs` is 45 not 43, `tests/tenancy.rs` is 6
+not 11.
+
+**The provenance verifier caught the edit, which is what it is for.** `verify-backend-provenance.mjs`
+failed on the aggregate manifest hash; the file left the aggregate for its own pin with the
+measurement beside its hash in the same commit, which is that verifier's own stated rule for how the
+number may move — **67 → 66 untouched, 32 diverged**.
+
+**A second tracker row instructed something its own tool refuses.** Root `TODO.md` said the three
+stale `privacy-baseline.txt:121-123` entries print under *"baselined finding(s) are gone — run
+`--update` to shrink"*. Run today, `verify-privacy-boundary.mjs` prints the opposite: *"Do NOT run
+--update here. They are absent, not redacted."* The advice is withheld whenever any capture root is
+missing, and in a clone one always is — and `apps/room/scripts/` holds 0 files here anyway, so
+"redacted" and "absent" cannot be told apart from this checkout at all. Recorded as an owner-machine
+step rather than an outstanding chore.
+
+**Verification, and what could not run.** `cargo fmt --check` clean and
+`cargo clippy -p tradingroom-api --lib -- -D warnings` clean on the pinned 1.98.0 toolchain — which
+had to be installed first, and failed to extract until 9.9 GB of `services/target` was deleted to get
+the disk under 99%. `--all-targets` **could not run**: api's dev-dependency on `tradingroom-media`
+builds `mediasoup-sys`'s C++ worker, which fails in this container. **The rust-analyzer MCP this
+repository requires for `.rs` work is not available in this session**, reported rather than worked
+around. Controller gate exit 0 (102 files / 1,099 passed), room gate exit 0 (313 files / 5,680
+passed).
+
 ### 2026-09-01 04:21 UTC — every remaining residual traced, and a measurement bug found while doing it
 
 **Runtime impact: NO** — verdicts recorded at the table, and one narrowing of how the sweep reads our
