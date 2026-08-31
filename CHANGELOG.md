@@ -33,6 +33,101 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 16:20 UTC — Three more scope-blocked rows, and a register prescription that would have leaked a private answer into the room
+
+**Runtime impact: YES**, three ways. A presenter can send a video from the second chat column.
+The Q&A image button acts instead of doing nothing, on the gate the reference uses. A screenshot
+pasted into a Q&A answer uploads and answers the thread.
+
+All three were filed `BLOCKED` and none was blocked on capability — each named the exact file it
+needed and each of those files belonged to a different parallel batch. Owning them together is the
+whole fix.
+
+#### `XCP-08` — the "Play YouTube For All" button, and a gate that had to stay singular
+
+`lMe` gates five children at byte 2,373,334 and the third is YouTube, on `isPresenter`. The main
+column drew it and the second column did not, so a presenter could send a video to the room from one
+chat column and not the other.
+
+**The prop is optional and its presence IS the gate.** `#lib/extra-chat-surface.ts` named this exact
+prop as the reason the row was blocked, and its argument decided the shape: this column is handed
+each entitlement's RESULT and deliberately not `isPresenter`, so a `boolean` beside a `() => void`
+would have put one gate in two places and let them disagree. `XCP-08` has left
+`EXTRA_CHAT_MEASURED_GAPS` and its measurement stayed behind — what the button must look like is
+what a later edit can get wrong.
+
+#### `QAM-05` — the register's prescribed one-line fix was WRONG, and that is the useful half
+
+The row proposed `onimageupload={() => composer.openImageUpload()}`, *"the same path both chat
+composers already use"*. **That path posts to CHAT.** Byte 2,338,987:
+
+```js
+s.appService.sendAlertQAReply(s.qaMsg._id, s.imggurUploadTxt), s.imggurUploadTxt="",
+yi("#alertQAModal").modal("hide")
+```
+
+It answers the THREAD and then hides the modal. Taking the prescription literally would have put a
+presenter's answer to one member's question into the room's public chat — the failure `RoomOverlays`
+already records for the swing form, with the worst blast radius of the five paste sites here.
+
+Built on `RoomMessageActions`, which already owns `sendAlertQuestion` and the selected alert, and
+which borrows only the room's raw uploader exactly as the private chat and both trade-alert panes
+do. Three upstream details, each executed rather than described:
+
+- **the modal hides on the image path and not on the text one** — `sendMessage` at byte 2,337,247
+  clears the box and calls `scrollToBottomQA()` and hides nothing;
+- **the URL goes first**, message appended;
+- **the box clears only when a message travels.**
+
+The button's second defect was its gate: `canPostImages` is `(isPresenter || sessData.userUploads)`
+at byte 2,334,626, so `isPresenter` was NARROWER and a room with member uploads on offered the
+button to nobody but presenters. Two props now, because the placeholder still asks the other
+question and collapsing them would re-create the narrow gate the moment somebody read the flag's
+name.
+
+`closeModal` is wired to `modals.closeActive()` rather than the `modals.modal = null` its two
+neighbouring ports use, and the difference is load-bearing: upstream's `modal("hide")` is what fires
+the `hidden.bs.modal` handler that deletes the alert's `unreadQA` marker, and `closeActive` is where
+that deletion lives here.
+
+#### `QAM-06` — the paste, through the same corrected path
+
+The draft travels with the file, because upstream's handler reads its own box
+(`a = yi("#textAreaQATxt").val().trim()`). Lifting the composer's state out to a grandparent would
+have moved state upward to serve one handler; handing the value over at the moment of the paste is
+the same information without the relocation, and it is what `AlertChatArea` already does for the
+inline alert box. Gated on `canPostImages`, which upstream's Q&A handler does not check — the same
+deliberate divergence `PCC-06` records.
+
+#### Five paste sites, five destinations
+
+`trade-alert-pane-contract.test.ts` counted three `ImagePasteConfirm` call sites this morning and
+counts five tonight, with five distinct confirm handlers AND five distinct message-box ids
+(`msg-text`, `msg-text-pc`, `msg-text-qa`, and none at all for the two alert forms, whose dialogs
+carry no message box). Its matcher is anchored on `…ImagePaste()` rather than on any `onconfirm`,
+because a pattern loose enough to count unrelated confirmations is a pattern that goes green on a
+sixth site sharing a handler.
+
+#### Evidence
+
+Six negative controls, each seen RED and restored: routing the Q&A image through the chat composer
+(the register's own prescription); hiding the modal on a refused reply; message-before-URL; making
+`onyoutube` required and gating on a flag; dropping the captured `data-bs-target`; and the two
+pre-existing tripwires (`{#if isPresenter}`, `not.toContain('onpaste')`, `not.toContain('play-youtube-modal')`)
+which fired on their own.
+
+`svelte-autofixer` on `AlertQaComposer.svelte`: **no issues and NO suggestions at all** —
+`require_another_tool_call_after_fixing: false`, the first component this session to come back
+completely clean.
+
+Two repo guards caught mistakes of mine on the way: `orphaned-comment-contract` refused a docblock I
+left stranded above another, and `slice-anchor-contract` refused a `BUNDLE.slice(BUNDLE.indexOf(…))`
+whose -1 would have made a `not.toContain` pass on a tail of the bundle. Both are fixed at the
+source rather than worked around.
+
+**Verified:** `apps/room` full suite **301 files / 5,493 passed / 1 skipped / exit 0**;
+`svelte-check` 1,574 files, 0 errors. **Not verified:** nothing was opened in a browser.
+
 ### 2026-08-31 15:35 UTC — Pasting a screenshot into a private conversation, and the row that was blocked only by who owned the file
 
 **Runtime impact: YES.** A screenshot pasted into the private composer did nothing at all. It

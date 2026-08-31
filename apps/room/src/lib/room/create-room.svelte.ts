@@ -875,6 +875,15 @@ export function createRoom(deps: RoomDeps) {
     session: () => data,
     ...messageActionsPort,
     openModal: (name) => modals.open(name),
+    /*
+      `closeActive()` and not `modals.modal = null`, which is what the two neighbours above use.
+
+      `QAM-05`'s image path is upstream's `yi("#alertQAModal").modal("hide")`, and Bootstrap's hide
+      is what fires the `hidden.bs.modal` handler that deletes the alert's `unreadQA` marker —
+      quoted in `modals.svelte.ts:167-172`. `closeActive` is where that deletion lives here, so
+      nulling the field directly would close the modal and leave the alert reading unread.
+    */
+    closeModal: () => modals.closeActive(),
     closeMessageMenu: () => menus.openMessageMenu(null),
     selectUser: (user) => (userActions.selectedMessageUser = user),
     patchEvidence: (item, patch) => feeds.patchEvidence(item, patch),

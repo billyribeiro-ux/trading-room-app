@@ -683,7 +683,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1730 -> 1731, 2026-08-31. One line: `PCC-06`'s `onimagepaste` wired to
       `privateChat.beginImagePaste`, beside the `onimageupload` it already passed.
     */
-    max: 1731,
+    /*
+      1731 -> 1733, 2026-08-31. Two lines: `XCP-08`'s `onyoutube` on the extra chat column, and
+      `canPostImages` forwarded to `RoomOverlays` for `QAM-05`. Both are the page answering an
+      authority question once, which is the only place this repository answers them.
+    */
+    max: 1733,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -1721,7 +1726,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The textarea is the reference's own and its id is the single thing that differs from the chat
       copy twenty lines above: `msg-text-pc`, not `msg-text`.
     */
-    max: 1092,
+    /*
+      1092 -> 1139, 2026-08-31, for `QAM-05`/`QAM-06`: the Q&A thread's own upload dialog and a FIFTH
+      `ImagePasteConfirm`, with the reference's own `msg-text-qa` textarea id.
+
+      A fifth instance for the sharpest version of the reason the other four are separate, and the
+      comment says it at the call site: this one's confirm reaches `sendAlertQAReply`, so sharing the
+      chat composer's handler would post a presenter's answer to one member's question into the room.
+    */
+    max: 1139,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -1971,7 +1984,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the reference's: `e3e` is a sub-template called once, and the footer is one subtree reading
       nothing the thread above it reads.
     */
-    max: 371,
+    /*
+      371 -> 394, 2026-08-31. `QAM-05`/`QAM-06`'s three props forwarded to the composer, and the
+      note on why `isPresenter` and `canPostImages` are two props rather than one.
+    */
+    max: 394,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its own open menu row and its wiring'
   },
   {
@@ -1997,7 +2014,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       picker and one button. It carries `QAM-04` — the correction of a comment that claimed the
       captured textarea had no handler, which const 17 at byte 2,342,104 refutes in three bindings.
     */
-    max: 167,
+    /*
+      167 -> 224, 2026-08-31. `QAM-05` and `QAM-06`, and the docblock is most of it because this
+      node had TWO defects and the second is invisible from the code.
+
+      **It did not act** — const 36 is a click binding and `l3e` (byte 2,333,483) wires it to
+      `imgUpload()`; this span carried no handler, which is the control-whose-only-effect-is-to-exist
+      `CLAUDE.md` names outright. **Its gate was the wrong value** — `canPostImages` is
+      `(isPresenter || sessData.userUploads)` at byte 2,334,626, so `isPresenter` was NARROWER and a
+      room with member uploads on offered this button to nobody but presenters.
+
+      Two props where one flag would have done, deliberately: `isPresenter` still drives the
+      placeholder, which is a different question with a different answer, and collapsing them would
+      have re-created the narrow gate the moment somebody read the flag's name.
+    */
+    max: 224,
     why: 'the Q&A thread composer - one field, one picker, one button, and one refuted claim'
   },
   {
@@ -3153,7 +3184,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every render — see `state-initializer-order-contract.test.ts`). Adding a move with live media
       state to that is how one reviewable change becomes none.
     */
-    max: 6869,
+    /*
+      6869 -> 6888, 2026-08-31. `QAM-05`/`QAM-06`: three props declared and forwarded. `canPostImages`
+      is PASSED rather than derived from the `isPresenter` this file computes, because
+      `sessData.userUploads` is the other half of it and this component is not given that — a second
+      answer to "may this viewer upload" is the shape `CLAUDE.md` refuses.
+    */
+    max: 6888,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4037,7 +4074,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       guard itself. A raise this size after an extraction that large is the honest record; shaving a
       comment to land on 706 would have been the dishonest one, and this file's header forbids it.
     */
-    max: 708,
+    /*
+      708 -> 857, 2026-08-31, for `QAM-05` and `QAM-06` — the Q&A thread's own image path, and the
+      raise is one docblock plus six small methods.
+
+      **The register's prescribed one-line fix was wrong and the docblock is where that is written
+      down.** `QAM-05` proposed `onimageupload={() => composer.openImageUpload()}`, "the same path
+      both chat composers already use". That path posts to CHAT. `doImggurUpload` on `app-alert-qa`
+      (byte 2,338,987) ends in `sendAlertQAReply(qaMsg._id, …)` and then `modal("hide")`, so taking
+      the prescription literally would have put a presenter's answer to one member's question into
+      the room's public chat — the failure `RoomOverlays` already records for the swing form, with
+      the worst blast radius of the five call sites.
+
+      They live on THIS class because it already owns `sendAlertQuestion` and the selected alert;
+      it borrows only the room's raw uploader, exactly as `RoomPrivateChat` and both trade-alert
+      panes do. Three upstream details that read backwards are recorded with their offsets: the
+      modal hides on the image path and NOT on the text one, the URL goes first with the message
+      appended, and the box is cleared only when a message travels.
+    */
+    max: 857,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -5389,7 +5444,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `user-notes-port.ts` and `chat-archive-port.ts` already have — and the seventh arrived inside
       it. Six option lines and an eight-line import block became one spread and one import.
     */
-    max: 1411,
+    /*
+      1411 -> 1420, 2026-08-31. `QAM-05`'s `closeModal` port, and the note on why it is
+      `modals.closeActive()` rather than the `modals.modal = null` its two neighbours use: upstream's
+      `modal("hide")` is what fires the `hidden.bs.modal` handler that deletes the alert's `unreadQA`
+      marker, and `closeActive` is where that deletion lives here.
+    */
+    max: 1420,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -5765,7 +5826,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       extraction itself." Nothing was shortened to hit the number; every relocated paragraph is in
       one of those two modules verbatim, and each is pointed at from the line it left.
     */
-    max: 640,
+    /*
+      640 -> 685, 2026-08-31, for `XCP-08` — the "Play YouTube For All" button, absent since this
+      column was built, so a presenter could send a video to the room from one chat column and not
+      the other.
+
+      **The prop is optional and its PRESENCE is the gate**, which is this column's own design
+      rather than a shortcut: it is handed each entitlement's RESULT and deliberately not
+      `isPresenter` (`#lib/extra-chat-surface.ts` carries that argument and named this very prop as
+      the reason the row was blocked). A `boolean` beside a `() => void` would have put one gate in
+      two places and let them disagree.
+    */
+    max: 685,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -5778,7 +5850,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       had no line to hold — including the three gaps it cannot close from inside itself: the absent
       YouTube button, the entire missing component stylesheet, and the `ngClass` this room refuses.
     */
-    max: 279,
+    /*
+      279 -> 309, 2026-08-31. `XCP-08` was BUILT and left `EXTRA_CHAT_MEASURED_GAPS`, and the
+      measurement stayed: what the button must look like is what a later edit can get wrong, so
+      deleting the citation when the gap closes is how a transcription drifts from its source with
+      nothing left to compare against. The paragraph that explained why it could not be built from
+      inside the component is now the paragraph explaining how its gate works.
+    */
+    max: 309,
     why: 'the second chat column`s decoded const tables and the decisions taken against them'
   },
   {

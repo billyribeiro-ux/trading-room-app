@@ -190,6 +190,26 @@
      */
     ontoggletoolbar: () => void;
     onimageupload: () => void;
+    /**
+     * `XCP-08` — "Play YouTube For All". **The presence of this handler IS the gate.**
+     *
+     * `lMe` at byte 2,373,038 resolves five children and gates them at 2,373,334:
+     * `O(2, canPostImages …)` image, `O(3, isPresenter …)` **YouTube**, `O(4, canPostImages …)` GIF,
+     * `O(5, …enableRTE && … && isPresenter …)` RTE. The main column drew the third and this one did
+     * not, so a presenter could send a video to the room from one chat column and not the other.
+     *
+     * Optional, and that is the whole design rather than convenience. This component is handed each
+     * entitlement's RESULT and deliberately NOT `isPresenter` — the argument is in
+     * `#lib/extra-chat-surface.ts`, which named exactly this prop as the reason `XCP-08` was
+     * blocked. A `boolean` beside a `() => void` would put the gate in two places and let them
+     * disagree; one nullable handler cannot. The page passes it or it does not, and the button
+     * renders exactly when it can act.
+     *
+     * Upstream's span carries no click handler at all — it is a Bootstrap `data-bs-target`, and
+     * this room's modal host is not Bootstrap-driven, which is the same substitution
+     * `AlertChatArea` makes with its own `onopenmodal`.
+     */
+    onyoutube?: () => void;
     onrte: () => void;
     onselectgif: (url: string) => void;
   };
@@ -238,6 +258,7 @@
     onmodonly,
     ontoggletoolbar,
     onimageupload,
+    onyoutube,
     onrte,
     onselectgif
   }: Props = $props();
@@ -584,10 +605,35 @@
                 {/if}
               {/if}
               <!--
-                `XCP-08` — the FOURTH button of this group, `iMe` at byte 2,371,656, is absent and
-                BLOCKED: it is a Bootstrap `data-bs-target` upstream and this room's modal host is
-                reached through a prop nothing passes here. `#lib/extra-chat-surface.ts` measures it.
+                `XCP-08` — `iMe` at byte 2,371,656. Const 68 is
+                `["data-bs-toggle","modal","data-bs-target","#play-youtube-modal",1,"textAreaBtns"]`
+                wrapped around const 71
+                `["ngbTooltip","Play YouTube For All","placement","left",1,"fas","fa-video"]`.
+
+                Both captured attributes are kept even though this room's modal host is not
+                Bootstrap-driven, exactly as the main column keeps them: they are what the capture
+                serves, and `onclick` is the substitution. Gated on the HANDLER, not on a flag — see
+                the prop.
               -->
+              {#if onyoutube}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <span
+                  data-bs-toggle="modal"
+                  data-bs-target="#play-youtube-modal"
+                  class="textAreaBtns"
+                  onclick={onyoutube}
+                >
+                  <i
+                    {...{ ngbtooltip: 'Play YouTube For All', placement: 'left' } as Record<
+                      string,
+                      string
+                    >}
+                    {@attach ngbTooltip}
+                    class="fas fa-video"
+                  ></i>
+                </span>
+              {/if}
               <!--
                 The RTE button is on THIS composer too: the reference puts `openRTEModal()` on
                 exactly two components, `app-chat` and `app-extra-chat`, and the extra one reads

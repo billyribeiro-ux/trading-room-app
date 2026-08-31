@@ -89,6 +89,15 @@ export class RoomMessageActions {
   readonly #editQuestion: (payload: { questionId: number; body: string }) => Promise<void>;
   readonly #replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
   readonly #openModal: (name: Exclude<ModalName, null>) => void;
+  /**
+   * `QAM-05` — closing the Q&A modal, which ONLY the image path does.
+   *
+   * `doImggurUpload` on `app-alert-qa` ends `…sendAlertQAReply(qaMsg._id, imggurUploadTxt),
+   * imggurUploadTxt="", yi("#alertQAModal").modal("hide")` at byte 2,338,987, where the TEXT reply
+   * beside it (`sendMessage`, byte 2,337,247) clears the box and calls `scrollToBottomQA()` and does
+   * not hide anything. That asymmetry is upstream's and is reproduced rather than smoothed.
+   */
+  readonly #closeModal: () => void;
   readonly #closeMessageMenu: () => void;
   readonly #selectUser: (user: ModalTargetUser) => void;
   readonly #patchEvidence: (item: MessageActionItem, patch: EvidencePatch) => void;
@@ -146,6 +155,8 @@ export class RoomMessageActions {
     editQuestion: (payload: { questionId: number; body: string }) => Promise<void>;
     replyMessage: (payload: { body: string; messageId: number }) => Promise<void>;
     openModal: (name: Exclude<ModalName, null>) => void;
+    /** `$("#alertQAModal").modal("hide")` — see the field. */
+    closeModal: () => void;
     closeMessageMenu: () => void;
     /** `RoomUserActions` owns who is selected; this tells it who was clicked. */
     selectUser: (user: ModalTargetUser) => void;
@@ -175,6 +186,7 @@ export class RoomMessageActions {
     this.#editQuestion = options.editQuestion;
     this.#replyMessage = options.replyMessage;
     this.#openModal = options.openModal;
+    this.#closeModal = options.closeModal;
     this.#closeMessageMenu = options.closeMessageMenu;
     this.#selectUser = options.selectUser;
     this.#patchEvidence = options.patchEvidence;
@@ -217,6 +229,143 @@ export class RoomMessageActions {
       (messageId) => this.#replyMessage({ body, messageId }),
       'Reply not sent.'
     );
+
+  /**
+   * ── `QAM-05` / `QAM-06` — an image answered into a Q&A thread ───────────────────────────────
+   *
+   * ## The register's prescribed one-line fix was WRONG, and the bundle is what says so
+   *
+   * `QAM-05` proposed `onimageupload={() => composer.openImageUpload()}` — *"the same path both
+   * chat composers already use"*. That path posts to CHAT. `doImggurUpload` on `app-alert-qa`
+   * (byte **2,338,987**) does not:
+   *
+   * ```js
+   * s.imggurUploadTxt += s.imggurUploadTxt && s.imggurUploadTxt.length>0 ? " "+F : F,
+   * o||(i&&(s.imggurUploadTxt+=" "+i, yi("#textAreaQATxt").val("")),
+   *     s.appService.sendAlertQAReply(s.qaMsg._id, s.imggurUploadTxt),
+   *     s.imggurUploadTxt="", yi("#alertQAModal").modal("hide")), r(_)
+   * ```
+   *
+   * It ends in **`sendAlertQAReply`**, against `qaMsg._id`. Taking the prescription literally would
+   * have put a presenter's answer to one member's question into the room's public chat — which is
+   * exactly the failure `RoomOverlays` already records for the swing form (*"routing the swing
+   * upload through the composer's handler would post the image into chat instead"*), with a worse
+   * blast radius. The row is corrected in the register.
+   *
+   * So these live HERE, on the class that already owns `sendAlertQuestion` and the selected alert,
+   * and they borrow only the room's raw uploader (`composer.uploadAlertFiles`) — the same seam
+   * `RoomPrivateChat` and both trade-alert panes use. Nothing about the chat POST path is reused.
+   *
+   * ## Three details that are upstream's and read backwards
+   *
+   * **The modal HIDES afterwards, and only on this path.** `sendMessage` for a text reply (byte
+   * **2,337,247**) clears the box and calls `scrollToBottomQA()`; it hides nothing. Only the image
+   * branch calls `modal("hide")`.
+   *
+   * **The URL goes FIRST**, with the typed message appended — `imggurUploadTxt += " " + i` after
+   * the link, not before it.
+   *
+   * **The box is cleared only when a message travels** (`i && (… , val(""))`), so a draft begun
+   * during a slow upload survives.
+   */
+  #qaImageUpload = $state(false);
+  #qaPastedImage = $state.raw<{ file: File; previewUrl: string } | null>(null);
+  #qaPastedImageMessage = $state('');
+
+  /** Whether the Q&A composer's upload dialog is on screen — `imgUpload()`, byte 2,337,470. */
+  get qaImageUpload(): boolean {
+    return this.#qaImageUpload;
+  }
+
+  /** The screenshot pasted into the Q&A composer, awaiting its confirmation. */
+  get qaPastedImage(): { file: File; previewUrl: string } | null {
+    return this.#qaPastedImage;
+  }
+
+  /** The message travelling with it — the dialog's `msg-text-qa` textarea. */
+  get qaPastedImageMessage(): string {
+    return this.#qaPastedImageMessage;
+  }
+
+  set qaPastedImageMessage(next: string) {
+    this.#qaPastedImageMessage = next;
+  }
+
+  beginQaImageUpload(): void {
+    this.#qaImageUpload = true;
+  }
+
+  cancelQaImageUpload(): void {
+    this.#qaImageUpload = false;
+  }
+
+  /**
+   * `imgUpload()` completed — ONE file, as the reference's own dialog allows.
+   *
+   * No message travels on this path: the reference's upload dialog has no message box (only the
+   * PASTE confirmation does), so `doImggurUpload` is called with `i` defaulting to `null` and the
+   * `i && (… val(""))` branch never runs. The composer is therefore NOT cleared here, which is why
+   * this does not simply call `#sendQaImage` with an empty string and hope.
+   */
+  async completeQaImageUpload(files: readonly File[]): Promise<void> {
+    this.#qaImageUpload = false;
+    const [file] = files;
+    if (!file) return;
+    await this.#sendQaImage(file, '');
+  }
+
+  /** `onImagePaste(e)` on the Q&A composer — byte 2,339,887. The LAST image item wins. */
+  beginQaImagePaste(file: File, draft: string): void {
+    this.cancelQaImagePaste();
+    this.#qaPastedImage = { file, previewUrl: URL.createObjectURL(file) };
+    /* `a = yi("#textAreaQATxt").val().trim()` — this composer's own box, trimmed. */
+    this.#qaPastedImageMessage = draft.trim();
+  }
+
+  cancelQaImagePaste(): void {
+    const pending = this.#qaPastedImage;
+    this.#qaPastedImage = null;
+    this.#qaPastedImageMessage = '';
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+  }
+
+  async confirmQaImagePaste(): Promise<void> {
+    const pending = this.#qaPastedImage;
+    if (!pending) return;
+    const message = this.#qaPastedImageMessage.trim();
+    this.#qaPastedImage = null;
+    this.#qaPastedImageMessage = '';
+    URL.revokeObjectURL(pending.previewUrl);
+    await this.#sendQaImage(pending.file, message);
+  }
+
+  /**
+   * Upload one file and answer the thread with it. Returns whether the reply travelled.
+   *
+   * The pending paste is taken and cleared by the caller BEFORE this awaits, so a presenter who
+   * starts typing during a slow upload keeps what they typed — the same rule `composer.svelte.ts`
+   * argues, and the reason the composed text is not routed through the box on its way out.
+   */
+  async #sendQaImage(file: File, message: string): Promise<boolean> {
+    let url: string | undefined;
+    try {
+      [url] = await this.#composer.uploadAlertFiles([file]);
+    } catch (cause) {
+      console.error(cause);
+      this.#dialogs.alert = 'Upload Failed...';
+      return false;
+    }
+    if (!url) {
+      this.#dialogs.alert = 'Upload Failed...';
+      return false;
+    }
+
+    /* `imggurUploadTxt += " " + i` AFTER the link, not before it. */
+    if (!(await this.sendAlertQuestion(message ? `${url} ${message}` : url))) return false;
+    /* `yi("#alertQAModal").modal("hide")` — the image path only. */
+    this.#closeModal();
+    return true;
+  }
 
   /** Which message the modals act on, or null when none has been clicked. */
   get selected(): MessageActionItem | null {

@@ -52,6 +52,9 @@
     presenterColors,
     displayMode,
     isPresenter,
+    canPostImages,
+    onimageupload,
+    onimagepaste,
     onclose,
     onQuestionSend,
     onQaAction
@@ -105,8 +108,21 @@
      * the thread drift from the log it belongs to.
      */
     displayMode: ChatDisplayMode;
-    /** Drives the composer's placeholder and the image button, which is `canPostImages` upstream. */
+    /**
+     * Drives the composer's placeholder — `o.appService.globals.isPresenter ? "Type your answer
+     * here..." : "Type your question here..."`, byte 2,344,220.
+     *
+     * It used to drive the image button too, and that was `QAM-05`'s second half: the reference
+     * gates that button on `canPostImages`, which is `(isPresenter || sessData.userUploads)`. Two
+     * questions, two props.
+     */
     isPresenter: boolean;
+    /** `QAM-05` — `(isPresenter || sessData.userUploads)`, byte 2,334,626. Forwarded, not derived. */
+    canPostImages: boolean;
+    /** `imgUpload()` — the Q&A thread's OWN upload path; see `RoomMessageActions`. */
+    onimageupload: () => void;
+    /** `QAM-06` — a screenshot pasted into the Q&A composer, with that box's own draft. */
+    onimagepaste: (file: File, draft: string) => void;
     onclose: () => void;
     onQuestionSend: (body: string) => Promise<boolean>;
     /**
@@ -364,7 +380,14 @@
       {/each}
     {/if}
     {#snippet footer()}
-      <AlertQaComposer bind:composer={qaComposer} {isPresenter} onsend={onQuestionSend} />
+      <AlertQaComposer
+        bind:composer={qaComposer}
+        {isPresenter}
+        {canPostImages}
+        {onimageupload}
+        {onimagepaste}
+        onsend={onQuestionSend}
+      />
     {/snippet}
   </Modal>
 </app-alert-qa-modal>

@@ -193,6 +193,19 @@
     onConfirm: (message: string, onconfirm: () => void) => void;
     onReplySend: (body: string) => Promise<boolean>;
     onQuestionSend: (body: string) => Promise<boolean>;
+    /**
+     * `QAM-05` — `(isPresenter || sessData.userUploads)`, byte 2,334,626.
+     *
+     * Passed in rather than derived from the `isPresenter` this component computes below, because
+     * `sessData.userUploads` is not among its props and inventing a second answer to "may this
+     * viewer upload" is the shape `CLAUDE.md` refuses. The page decides it once, for every composer
+     * in the room.
+     */
+    canPostImages: boolean;
+    /** `imgUpload()` on the Q&A modal — answers the thread, then hides it. Byte 2,338,987. */
+    onQaImageUpload: () => void;
+    /** `QAM-06` — a screenshot pasted into the Q&A composer, with that box's own draft. */
+    onQaImagePaste: (file: File, draft: string) => void;
     alertQuestions?: readonly {
       id: number;
       alertId: number;
@@ -651,6 +664,9 @@
     onConfirm,
     onReplySend,
     onQuestionSend,
+    canPostImages,
+    onQaImageUpload,
+    onQaImagePaste,
     alertQuestions = [],
     messageChrome,
     presenterColors,
@@ -5641,6 +5657,9 @@
   {presenterColors}
   displayMode={alertsDisplayMode}
   {isPresenter}
+  {canPostImages}
+  onimageupload={onQaImageUpload}
+  onimagepaste={onQaImagePaste}
   {onclose}
   {onQuestionSend}
   {onQaAction}

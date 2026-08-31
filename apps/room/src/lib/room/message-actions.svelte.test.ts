@@ -39,11 +39,22 @@ const item = (over: Partial<MessageActionItem> = {}): MessageActionItem =>
     ...over
   }) as MessageActionItem;
 
-const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
+const make = (
+  options: {
+    refuse?: boolean;
+    canUseRTE?: boolean;
+    /** What the room's raw uploader hands back, so `QAM-05`/`QAM-06` can be executed. */
+    uploadUrl?: string;
+  } = {}
+) => {
   const dialogs = new RoomDialogs();
   const toasts = new RoomToasts();
   const chat = new RoomChat({ extraColumnEnabled: () => true });
   const sent: unknown[] = [];
+  /** `QAM-05` / `QAM-06`: what reached the raw uploader, and what reached `askQuestion`. */
+  const uploaded: unknown[] = [];
+  const questionsAsked: { body: string; alertId: number }[] = [];
+  let modalClosed = 0;
   /*
     The Q&A thread's two commands land here rather than in `sent`, and keeping them apart is the
     assertion: `messageAction` must NEVER be called for a thread entry. A question id sent to that
@@ -61,7 +72,10 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
     chat,
     commands: {
       send: () => Promise.resolve(null),
-      uploadImage: () => Promise.resolve(''),
+      uploadImage: (payload: unknown) => (
+        uploaded.push(payload),
+        Promise.resolve(options.uploadUrl ?? '')
+      ),
       postAlert: () => Promise.resolve(null)
     },
     session: () => ({ sessData: { enableRTE: true }, sessionHandle: 'r' }),
@@ -86,7 +100,10 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
       options.refuse
         ? Promise.reject(new Error('refused'))
         : (sent.push(payload), Promise.resolve(null)),
-    askQuestion: () => Promise.resolve(),
+    askQuestion: (payload) =>
+      options.refuse
+        ? Promise.reject(new Error('refused'))
+        : (questionsAsked.push(payload), Promise.resolve()),
     reactToQuestion: (payload) =>
       options.refuse
         ? Promise.reject(new Error('refused'))
@@ -101,6 +118,7 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
         : (questionSends.push({ command: 'editQuestion', ...payload }), Promise.resolve()),
     replyMessage: () => Promise.resolve(),
     openModal: (name) => opened.push(name),
+    closeModal: () => (modalClosed += 1),
     closeMessageMenu: () => {},
     selectUser: (user) => selected.push(user),
     patchEvidence: (target, patch) => patches.push([target.evidenceKey ?? '', patch]),
@@ -126,6 +144,9 @@ const make = (options: { refuse?: boolean; canUseRTE?: boolean } = {}) => {
     toasts,
     composer,
     sent,
+    uploaded,
+    questionsAsked,
+    modalClosed: () => modalClosed,
     questionSends,
     patches,
     opened,
@@ -399,4 +420,139 @@ describe('RM-20 — the user modal s @Mention remembers which column opened it',
     expect(chat.extraComposer).toBe('@Ada ');
     expect(chat.composer).toBe('');
   });
+});
+
+describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
+  /*
+    The register's prescribed fix was `composer.openImageUpload()` — the CHAT path. `doImggurUpload`
+    on `app-alert-qa` (byte 2,338,987) ends in `sendAlertQAReply` against `qaMsg._id` and then
+    `modal("hide")`, so that prescription would have put a presenter's answer to one member's
+    question into the room's public chat. These execute the path that was actually built.
+
+    `URL.createObjectURL` is not in jsdom's `URL`, so it is stubbed AND the revocations are counted:
+    releasing the preview is half of what `cancelQaImagePaste` exists to do.
+  */
+  const withObjectUrl = async <T>(run: (revoked: string[]) => Promise<T>): Promise<T> => {
+    const revoked: string[] = [];
+    const url = URL as unknown as Record<string, unknown>;
+    const priorCreate = url.createObjectURL;
+    const priorRevoke = url.revokeObjectURL;
+    let issued = 0;
+    url.createObjectURL = () => `blob:qa-${(issued += 1)}`;
+    url.revokeObjectURL = (value: string) => revoked.push(value);
+    try {
+      return await run(revoked);
+    } finally {
+      url.createObjectURL = priorCreate;
+      url.revokeObjectURL = priorRevoke;
+    }
+  };
+
+  const png = (name = 'shot.png') => new File(['x'], name, { type: 'image/png' });
+
+  /**
+   * The modal acts on `selected`, which is set by the `question` action opening the thread.
+   *
+   * `'question'` and not `'qa'`: `'qa'` is the SURFACE a row was clicked on, `'question'` is the
+   * action that opens the thread from an alert. `svelte-check` caught the confusion — vitest does
+   * not type-check, so the wrong string ran green here and failed the gate.
+   */
+  const openQa = (options: Parameters<typeof make>[0] = {}) => {
+    const harness = make(options);
+    harness.actions.handle('alert', 'question', item({ id: 41 }), undefined, true);
+    return harness;
+  };
+
+  it('answers the THREAD, not the room chat, and hides the modal', () =>
+    withObjectUrl(async () => {
+      const harness = openQa({ uploadUrl: '/uploads/shot.png' });
+      harness.actions.beginQaImageUpload();
+      expect(harness.actions.qaImageUpload, 'the dialog opens').toBe(true);
+
+      await harness.actions.completeQaImageUpload([png()]);
+
+      expect(harness.actions.qaImageUpload, 'and closes').toBe(false);
+      expect(harness.uploaded, 'exactly one file reached the uploader').toHaveLength(1);
+      /* `sendAlertQAReply(qaMsg._id, …)` — against the SELECTED alert, through askQuestion. */
+      expect(harness.questionsAsked).toEqual([{ body: '/uploads/shot.png', alertId: 41 }]);
+      /* And NOTHING went to `messageAction`, which is where a chat post would have shown. */
+      expect(harness.sent).toEqual([]);
+      /* `yi("#alertQAModal").modal("hide")` — the image path only. */
+      expect(harness.modalClosed()).toBe(1);
+    }));
+
+  it('takes ONE file, as the reference s own dialog does', () =>
+    withObjectUrl(async () => {
+      const harness = openQa({ uploadUrl: '/uploads/a.png' });
+      await harness.actions.completeQaImageUpload([png('a.png'), png('b.png')]);
+      expect(harness.uploaded).toHaveLength(1);
+    }));
+
+  it('seeds the paste dialog from the composer s TRIMMED draft', () =>
+    withObjectUrl(async () => {
+      const harness = openQa();
+      /* Upstream reads its own box: `a = yi("#textAreaQATxt").val().trim()`. */
+      harness.actions.beginQaImagePaste(png(), '  here you go  ');
+      expect(harness.actions.qaPastedImageMessage).toBe('here you go');
+      expect(harness.actions.qaPastedImage?.previewUrl).toBe('blob:qa-1');
+    }));
+
+  it('sends the URL FIRST and appends the message', () =>
+    withObjectUrl(async () => {
+      const harness = openQa({ uploadUrl: '/uploads/shot.png' });
+      harness.actions.beginQaImagePaste(png(), 'here you go');
+      await harness.actions.confirmQaImagePaste();
+
+      /* `imggurUploadTxt += " " + i` AFTER the link — byte 2,338,987. */
+      expect(harness.questionsAsked).toEqual([
+        { body: '/uploads/shot.png here you go', alertId: 41 }
+      ]);
+      expect(harness.modalClosed()).toBe(1);
+    }));
+
+  it('replaces a second paste and RELEASES the first s preview', () =>
+    withObjectUrl(async (revoked) => {
+      const harness = openQa();
+      harness.actions.beginQaImagePaste(png('one.png'), '');
+      harness.actions.beginQaImagePaste(png('two.png'), '');
+      expect(revoked).toEqual(['blob:qa-1']);
+      expect(harness.actions.qaPastedImage?.file.name).toBe('two.png');
+    }));
+
+  it('cancelling releases the preview, sends nothing and leaves the modal open', () =>
+    withObjectUrl(async (revoked) => {
+      const harness = openQa({ uploadUrl: '/uploads/shot.png' });
+      harness.actions.beginQaImagePaste(png(), 'x');
+      harness.actions.cancelQaImagePaste();
+
+      expect(revoked).toEqual(['blob:qa-1']);
+      expect(harness.actions.qaPastedImage).toBeNull();
+      await harness.actions.confirmQaImagePaste();
+      expect(harness.questionsAsked).toEqual([]);
+      expect(harness.modalClosed()).toBe(0);
+    }));
+
+  it('says so when the upload fails, sends nothing and does NOT hide the modal', () =>
+    withObjectUrl(async () => {
+      /*
+        The modal staying open is the point of asserting it here. A failed upload that closed the
+        thread would take the presenter away from the question they were answering, and there would
+        be nothing on screen tying the alert to the failure.
+      */
+      const harness = openQa({ uploadUrl: '' });
+      await harness.actions.completeQaImageUpload([png()]);
+
+      expect(harness.dialogs.alert).toBe('Upload Failed...');
+      expect(harness.questionsAsked).toEqual([]);
+      expect(harness.modalClosed()).toBe(0);
+    }));
+
+  it('does not hide the modal when the REPLY is refused, either', () =>
+    withObjectUrl(async () => {
+      const harness = openQa({ uploadUrl: '/uploads/shot.png', refuse: true });
+      await harness.actions.completeQaImageUpload([png()]);
+
+      expect(harness.modalClosed()).toBe(0);
+      expect(harness.dialogs.alert).toBe('Question not sent.');
+    }));
 });

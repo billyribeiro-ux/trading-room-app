@@ -1,6 +1,7 @@
 <script lang="ts">
   import { composerEnterAction } from '#lib/chat-composer-enter.js';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import { pastedImageFrom } from '#lib/pasted-image.js';
   import EmojiPicker from './EmojiPicker.svelte';
 
   /**
@@ -28,11 +29,40 @@
      * "Type your question here..."` at byte 2,344,220. Same two strings, same condition.
      */
     isPresenter,
+    canPostImages,
+    onimageupload,
+    onimagepaste,
     /** Resolves true when the question was accepted, which is when the box is emptied. */
     onsend
   }: {
     composer: string;
     isPresenter: boolean;
+    /**
+     * `QAM-05` — the image button's REAL gate.
+     *
+     * `canPostImages` is set once in `ngOnInit` at byte **2,334,626** as
+     * `(this.isPresenter || sessData.userUploads) && (this.canPostImages = !0)`, and the button is
+     * `O(23, o.canPostImages ? 23 : -1)`. This node used to be gated on `isPresenter`, which is
+     * NARROWER: a room with member uploads on offers this to members upstream and offered it to
+     * nobody but presenters here.
+     *
+     * A separate prop from `isPresenter` rather than a re-derivation, because they are two
+     * different questions and the placeholder below still asks the first one. The page computes
+     * both, which is where every authority answer in this room is decided.
+     */
+    canPostImages: boolean;
+    /** `imgUpload()` — byte 2,337,470. Answers the thread with an image; see `QAM-05`. */
+    onimageupload: () => void;
+    /**
+     * `QAM-06` — a screenshot pasted into this box. `onImagePaste`, byte 2,339,887.
+     *
+     * The DRAFT travels with the file, because upstream's handler reads its own box:
+     * `a = yi("#textAreaQATxt").val().trim()`. Lifting `composer` out of this component so a
+     * grandparent could read it would move state upward to serve one handler; handing the value
+     * over at the moment of the paste is the same information without the relocation, and it is
+     * what `AlertChatArea` already does for the inline alert box's `oninlinealertimage`.
+     */
+    onimagepaste: (file: File, draft: string) => void;
     onsend: (body: string) => Promise<boolean>;
   } = $props();
 
@@ -77,6 +107,28 @@
     event.preventDefault();
     void send();
   }
+
+  /**
+   * `QAM-06` — const 17 declares `paste` (`3,"keyup","paste","placeholder"`, byte 2,342,103) and
+   * byte 2,343,759 binds it to `onImagePaste`. This box had no paste handler, so a screenshot
+   * pasted into a Q&A answer did nothing.
+   *
+   * `pastedImageFrom` is the shared rule and is used rather than a fourth copy of the loop — the
+   * reference's four `onImagePaste` implementations are the same loop, reassigning on every
+   * `image/*` with no `break`, so the LAST image wins.
+   *
+   * Gated on `canPostImages`, which upstream's Q&A handler does not check either — the same
+   * deliberate divergence `PrivateChatComposer` records and for the same reason: the button beside
+   * this box is gated on it, and two controls on one component disagreeing about one permission is
+   * the shape `CLAUDE.md` refuses. The server re-checks regardless.
+   *
+   * The default is NOT prevented: a paste of plain text still lands in the textarea.
+   */
+  function handleQaPaste(event: ClipboardEvent): void {
+    if (!canPostImages) return;
+    const image = pastedImageFrom(event.clipboardData?.items);
+    if (image) onimagepaste(image, composer);
+  }
 </script>
 
 <!--
@@ -97,6 +149,7 @@
         class="txt-area form-control border-0"
         placeholder={isPresenter ? 'Type your answer here...' : 'Type your question here...'}
         bind:value={composer}
+        onpaste={handleQaPaste}
         onkeydown={handleQaKeydown}></textarea>
     </div>
     <div
@@ -128,32 +181,36 @@
         at byte 2,344,277), which is why the captured reader-side footer carries only the emoji
         button.
 
-        `QAM-05` — TWO things about this button are wrong, and both are BLOCKED on the call site
-        rather than on this file.
+        `QAM-05` — TWO things about this button were wrong, and both are fixed.
 
-        **It does not act.** Const 36 of the modal's table (byte 2,341,450) is
+        **It did not act.** Const 36 of the modal's table (byte 2,341,450) is
         `[1,"textAreaBtns",3,"click"]` — a click binding — and `l3e` at byte 2,333,483 wires it to
-        `imgUpload()`. This span carries no handler at all, so a presenter clicking the image icon in
-        the Q&A footer gets nothing. That is the shape `CLAUDE.md` names outright: a control whose
-        only effect is to exist.
+        `imgUpload()`. This span carried no handler at all, so a presenter clicking the image icon in
+        the Q&A footer got nothing: the shape `CLAUDE.md` names outright, a control whose only effect
+        is to exist.
 
-        **Its gate is the wrong value.** `canPostImages` is set once in `ngOnInit` at byte 2,334,626
+        **Its gate was the wrong value.** `canPostImages` is set once in `ngOnInit` at byte 2,334,626
         as `(this.isPresenter || sessData.userUploads) && (this.canPostImages = !0)`, so a room with
-        member uploads on offers this to members. `isPresenter` narrows it to presenters only.
+        member uploads on offers this to members; `isPresenter` narrowed it to presenters only.
 
         `QAM-06` — const 17 (byte 2,342,103) also declares `paste`, bound at byte 2,343,759 to
-        `onImagePaste` (byte 2,339,887), so upstream a screenshot pasted into this box uploads and
-        posts. There is no paste handler here.
+        `onImagePaste` (byte 2,339,887). The textarea above binds it now.
 
-        All three need one thing this component is not given: a way to reach the upload path.
-        `ModalHost` renders the modal at :5636 and none of its props is an image handler, while
-        `composer.openImageUpload()` — the path the two chat composers use — is on the page beside
-        it. The exact one-line change is named in the audit register. Building the call locally
-        instead would put a second upload implementation inside a modal, which is how two of them
-        drift.
+        ## The register's prescribed fix was WRONG, and it is worth saying where
+
+        `QAM-05` proposed `onimageupload={() => composer.openImageUpload()}` — "the same path both
+        chat composers already use". **That path posts to CHAT.** `doImggurUpload` on `app-alert-qa`
+        (byte 2,338,987) ends in `sendAlertQAReply(qaMsg._id, …)` and then
+        `yi("#alertQAModal").modal("hide")`. Taking the prescription literally would have put a
+        presenter's answer to one member's question into the room's public chat. Both handlers reach
+        `RoomMessageActions` instead, which is the class that already owns `sendAlertQuestion`; it
+        borrows only the room's raw uploader, exactly as the private chat and both trade-alert panes
+        do.
       -->
-      {#if isPresenter}
-        <span class="textAreaBtns">
+      {#if canPostImages}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <span class="textAreaBtns" onclick={onimageupload}>
           <i
             {...{ ngbtooltip: 'Upload an Image', placement: 'left' } as Record<string, string>}
             {@attach ngbTooltip}

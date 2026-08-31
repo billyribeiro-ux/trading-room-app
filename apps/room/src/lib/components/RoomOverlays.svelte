@@ -124,6 +124,7 @@
 
     // Page state this layer renders from. Only these two are written back.
     isPresenter,
+    canPostImages,
     messageChrome,
     presenterColors,
     alertLabels,
@@ -184,6 +185,15 @@
     userActions: RoomUserActions<PageData['connectedUsers'][number]>;
     /** Resolved on the SERVER from `data.user.role`. Read here only to decide who gets a toast. */
     isPresenter: boolean;
+    /**
+     * `QAM-05` — `(isPresenter || sessData.userUploads)`, byte 2,334,626.
+     *
+     * The page's single answer, forwarded to `ModalHost` for the Q&A composer's image button. NOT
+     * derived from the `isPresenter` beside it: `sessData.userUploads` is the other half and this
+     * component is not given it, so re-deriving here would produce a narrower gate that quietly
+     * disagreed with the four composers the page already feeds from the same value.
+     */
+    canPostImages: boolean;
     /**
      * The chrome every rendered message shares, built ONCE on the page.
      *
@@ -811,6 +821,9 @@
   onConfirm={(message, onconfirm) => dialogs.confirm(message, onconfirm)}
   onReplySend={messageActions.sendReplyMessage}
   onQuestionSend={messageActions.sendAlertQuestion}
+  {canPostImages}
+  onQaImageUpload={() => messageActions.beginQaImageUpload()}
+  onQaImagePaste={(file, draft) => messageActions.beginQaImagePaste(file, draft)}
   alertQuestions={data.alertQuestions}
   {messageChrome}
   {presenterColors}
@@ -915,6 +928,40 @@
     onclose={() => privateChat.cancelImageUpload()}
     onupload={(files) => void privateChat.completeImageUpload(files)}
   />
+{/if}
+<!--
+  `QAM-05` / `QAM-06` — the Q&A thread's OWN upload and paste dialogs, and they are its own for the
+  sharpest version of the reason the others are separate.
+
+  `doImggurUpload` on `app-alert-qa` (byte 2,338,987) ends in
+  `sendAlertQAReply(qaMsg._id, imggurUploadTxt)` and then `yi("#alertQAModal").modal("hide")`. The
+  register's prescribed fix for `QAM-05` was `composer.openImageUpload()` — the CHAT path — which
+  would have posted a presenter's answer to one member's question into the room's public chat.
+-->
+{#if messageActions.qaImageUpload}
+  <ImageUploadDialog
+    onclose={() => messageActions.cancelQaImageUpload()}
+    onupload={(files) => void messageActions.completeQaImageUpload(files)}
+  />
+{/if}
+{#if messageActions.qaPastedImage}
+  {const qaPastePreviewUrl = $derived(messageActions.qaPastedImage.previewUrl)}
+  <ImagePasteConfirm
+    previewUrl={qaPastePreviewUrl}
+    onclose={() => messageActions.cancelQaImagePaste()}
+    onconfirm={() => void messageActions.confirmQaImagePaste()}
+  >
+    <div class="w-100 mt-3">
+      <!-- `id="msg-text-qa"` — byte 2,339,887. One character from the chat and private copies. -->
+      <textarea
+        class="form-control w-100"
+        rows="2"
+        id="msg-text-qa"
+        name="msg-text-qa"
+        placeholder="Enter your message"
+        bind:value={messageActions.qaPastedImageMessage}></textarea>
+    </div>
+  </ImagePasteConfirm>
 {/if}
 <!--
   `PCC-06` — the PASTE confirmation for the same conversation, and a FOURTH instance of this dialog
