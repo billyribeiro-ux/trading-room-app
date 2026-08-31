@@ -10382,7 +10382,7 @@ two-verifier pass the tables above describe, and therefore deliberately outside 
 
 ### ECP-02 — The composer/Chat Disabled swap reads only half of its gate, in BOTH columns
 
-**BLOCKED 2026-08-31.** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361: slot 23
+**BUILT 2026-08-31 20:45 UTC, in BOTH columns.** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361: slot 23
 is the composer, slot 24 is the Chat Disabled block. `isConnected` starts TRUE (byte 2,375,326,
 `this.isConnected=!0,this.isMediaConnected=!1`) and is driven by two subscriptions — `socketDisconnected`
 sets it false at byte 2,376,472 and `socketConnected` sets it true. So upstream, a chat connection
@@ -10395,16 +10395,45 @@ next line does something else" the root standard asks a reviewer to check for. A
 has dropped keeps a live-looking composer, types into it, presses Enter, and watches nothing happen,
 with only the small corner overlay `G03` built to explain it.
 
-**Not built, and the blocker is a starting value rather than a line budget.** The nearest thing this
-room has is `RoomEventStream.connected`, and it starts FALSE — deliberately, with its own docblock
-saying so, because the sidebar's "Chat" line has to read *not connected* before the first open.
-Gating the composer on it would print "Chat Disabled" on first paint, which upstream never does. The
-faithful build needs a second `$state` field that starts true and follows the same two events, and
-`lib/room/events.svelte.ts` was at 1017 of 1017.
+**The row's diagnosis was exactly right, including the design**, and it is worth saying so: it named
+the starting value as the real obstacle rather than the line budget, and named the fix as a second
+`$state` field starting true and following the same two events. That is what was built.
 
-Recorded against BOTH columns on purpose. `AlertChatArea` has the identical gap and its own audit
-section did not find it; this batch's scope is the extra column, so the sibling is reported here
-rather than silently edited.
+`RoomEventStream.chatChannelUp` starts TRUE, goes false on `error` and true on `open` — the two
+handlers that already move `#roomEventsConnected`, so the pair cannot drift. Both columns take it as
+a prop defaulting TRUE and gate `{#if !chatEnabled || !chatChannelUp}`; the page feeds both from the
+one stream, by name.
+
+**TWO FIELDS FOR ONE CHANNEL, which looks like duplication and is not.** `connected` answers *has
+this channel ever opened?* and must start FALSE, or the sidebar's "Chat" line claims a connection
+before the first open. `chatChannelUp` answers *has it DROPPED?* and must start TRUE, or every
+composer in the room reads "Chat Disabled" on first paint for the duration of one connect — which
+upstream never does. The difference between them is one initial value, which is precisely why a
+later reader will try to merge them, so both halves are asserted: `events.svelte.test.ts` proves the
+two disagree at the same instant before any event, and `extra-chat-column-contract.test.ts` refuses
+`chatChannelUp={roomEvents.connected}` on the page by name.
+
+**NOT folded into `chatEnabled`, and that is a reading rather than a preference.** Upstream keeps the
+two separate and asks them separately: the private-chat refusal (`G13`,
+`if (!this.canPost) return void bootbox.alert(…)`) reads `chatEnabled` ALONE. Folding the channel
+state in would start refusing private messages on a dropped room channel, which the reference does
+not do.
+
+**Both columns, in one change.** The row reported the sibling rather than silently editing it,
+because that batch's scope was the extra column. Fixing one and leaving the other is how the pair
+drifted in the first place, so the contract asserts both through one `it.each` — the same argument
+`trade-alert-pane-contract.test.ts` opens with.
+
+**Verified, seven negative controls, each red on exactly its own assertion and green after restore.**
+On the stream: the field started FALSE like its sibling (two red, including the disagree-at-the-same-
+instant case); a plain field instead of `$state` (one red — permanently correct at first paint and
+permanently wrong afterwards, which a getter hides completely); the drop no longer lowering it (two
+red). On the components and the page: each column reverted to `chatEnabled` alone (one red each,
+which is what proves the `it.each` is really running twice); the prop's default flipped to false (one
+red); and the page feeding `roomEvents.connected` instead (two red).
+
+Ceilings: `events.svelte.ts` 1017 -> 1058, `ExtraChatPane.svelte` 744 -> 762,
+`AlertChatArea.svelte` 1523 -> 1533, `+page.svelte` 1796 -> 1798.
 
 *This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
 two-verifier pass the tables above describe, and therefore deliberately outside them.*

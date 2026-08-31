@@ -93,8 +93,25 @@
     /** Already filtered to `tab` by the page, so this component never decides what it may show. */
     messages: RoomMessageItem[];
     doNotDisturbOn: boolean;
-    /** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`. */
+    /** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the SECOND half. */
     chatEnabled: boolean;
+    /**
+     * `ECP-02` — the FIRST half, which this column quoted above and did not implement.
+     *
+     * `isConnected` starts TRUE upstream (`this.isConnected=!0`, byte 2,375,326) and is driven by
+     * `socketDisconnected` (byte 2,376,472) and `socketConnected`. So a chat connection that drops
+     * takes the composer away and puts the lock and the reason in its place; here the composer stayed
+     * live, and a member typed into it, pressed Enter, and watched nothing happen.
+     *
+     * A separate prop rather than folded into `chatEnabled`, because upstream keeps them separate and
+     * they are asked separately: the private-chat refusal (`G13`, `if (!this.canPost)`) reads
+     * `chatEnabled` ALONE, so folding the channel state in would start refusing private messages on
+     * a dropped room channel — a behaviour the reference does not have.
+     *
+     * Defaults TRUE, which is the reference's own starting value and the only safe default: a column
+     * rendered without it must not announce that chat is off.
+     */
+    chatChannelUp?: boolean;
     /** `O(21, o.webinarMode ? 21 : -1)`. */
     webinarMode: boolean;
     selfMutedUntil: Date | null;
@@ -252,6 +269,7 @@
     messages,
     doNotDisturbOn,
     chatEnabled,
+    chatChannelUp = true,
     webinarMode,
     selfMutedUntil,
     showPmButton,
@@ -558,7 +576,7 @@
         </div>
       </div>
     {/if}
-    {#if !chatEnabled}
+    {#if !chatEnabled || !chatChannelUp}
       <div class="chatDisabled d-flex align-items-center">
         <h5 class="pl-3">
           <i class="fas fa-lock"></i> Chat Disabled

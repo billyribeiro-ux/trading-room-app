@@ -1385,6 +1385,7 @@
               {chatOnlyMode}
               {webinarMode}
               {chatEnabled}
+              chatChannelUp={roomEvents.chatChannelUp}
               {selfMutedUntil}
               {canPostImages}
               canUseRTE={composer.canUseRTE}
@@ -1539,6 +1540,7 @@
                 messages={feeds.visibleExtraChat}
                 doNotDisturbOn={prefs.doNotDisturbOn}
                 {chatEnabled}
+                chatChannelUp={roomEvents.chatChannelUp}
                 {webinarMode}
                 {selfMutedUntil}
                 showPmButton={gates.showPmButton}

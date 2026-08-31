@@ -259,7 +259,17 @@ describe('the client reads the ROW, never the broadcast', () => {
 describe('what each mode does', () => {
   it('`d` replaces the composer with the captured Chat Disabled block', () => {
     // `<div class="chatDisabled d-flex align-items-center"><h5 class="pl-3"><i class="fas fa-lock">`
-    expect(paneCode).toContain('{#if !chatEnabled}');
+    /*
+      RE-POINTED 2026-08-31 by `ECP-02`, which added the gate's OTHER half. The full expression
+      upstream is `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` (byte 2,400,361), and this pane
+      implemented only the second term; a dropped channel left a live-looking composer behind.
+
+      Asserted as the whole condition rather than loosened to a `toContain('chatEnabled')` that would
+      survive any rearrangement: what this case is about is that mode `d` reaches the Chat Disabled
+      block, and it reaches it through this expression. `extra-chat-column-contract.test.ts` owns the
+      connection half; this stays the mode's own assertion and simply names the line it now shares.
+    */
+    expect(paneCode).toContain('{#if !chatEnabled || !chatChannelUp}');
     expect(paneCode).toContain('<div class="chatDisabled d-flex align-items-center">');
     expect(paneCode).toContain('<h5 class="pl-3">');
     expect(paneCode).toContain('<i class="fas fa-lock"></i> Chat Disabled');

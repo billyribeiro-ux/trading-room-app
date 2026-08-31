@@ -581,34 +581,55 @@ describe('ECP-01 — the extra column names itself when there is no tab strip', 
  * dropped keeps a live-looking composer, types into it, presses Enter and watches nothing happen —
  * with only the small ` Reconnecting Chat... ` corner overlay to explain it.
  *
- * **NOT BUILT, and the honest reason is a starting value rather than a line budget.** This room's
- * nearest equivalent, `RoomEventStream.connected`, starts FALSE — its own docblock says so, and the
- * sidebar's "Chat" line depends on that, because a room that has not connected yet has not
- * connected. Gating the composer on it would print "Chat Disabled" on first paint, which upstream
- * never does. The faithful build needs a second field that starts true and follows the same two
- * events, and `lib/room/events.svelte.ts` is at 1017 of 1017.
+ * **BUILT 2026-08-31, and this block is INVERTED rather than deleted** — it asserted the absence and
+ * now asserts the presence. The row's diagnosis was exactly right, including the design: it named
+ * the STARTING VALUE as the real obstacle rather than the line budget, and named the fix as a second
+ * field starting true and following the same two events. That is what was built.
  *
- * Recorded against BOTH columns deliberately: `AlertChatArea` has the identical gap, its docblock
- * quotes the identical expression, and its own audit section did not catch it. This batch's scope
- * is the extra column, so the sibling is reported and not silently edited.
+ * `RoomEventStream.chatChannelUp` starts TRUE, goes false on `error` and true on `open` — the same
+ * two handlers that already move the sidebar's flag, so the pair cannot drift. Both columns take it
+ * as a prop defaulting TRUE and gate `{#if !chatEnabled || !chatChannelUp}`.
+ *
+ * TWO FIELDS FOR ONE CHANNEL, and the last case below is why. `connected` answers *has this ever
+ * opened?* and must start FALSE, or the sidebar claims a connection it does not have.
+ * `chatChannelUp` answers *has it DROPPED?* and must start TRUE, or every composer in the room reads
+ * "Chat Disabled" on first paint for the duration of one connect. The difference is one initial
+ * value, which is exactly why a later reader will try to merge them.
+ *
+ * Both columns, in one change. This block reported the sibling rather than silently editing it,
+ * because that batch's scope was the extra column — and fixing one while leaving the other is how
+ * the pair drifted to begin with.
  */
-describe('ECP-02 — the connection half of the composer gate, and where it is not', () => {
+describe('ECP-02 — the connection half of the composer gate, now built in both columns', () => {
   it('shows both columns quoting the whole expression', () => {
     const quoted = 'O(23, o.isConnected && o.chatEnabled ? 23 : 24)';
     expect(read('lib/components/ExtraChatPane.svelte')).toContain(quoted);
     expect(read('lib/components/AlertChatArea.svelte')).toContain(quoted);
   });
 
-  it('shows both columns implementing only the second half', () => {
-    expect(EXTRA_CHAT).toContain('{#if !chatEnabled}');
-    expect(MAIN_CHAT).toContain('{#if !chatEnabled}');
-    expect(EXTRA_CHAT).not.toContain('isConnected');
-    expect(MAIN_CHAT).not.toContain('isConnected');
+  it('and both implementing BOTH halves of it now', () => {
+    expect(EXTRA_CHAT).toContain('{#if !chatEnabled || !chatChannelUp}');
+    expect(MAIN_CHAT).toContain('{#if !chatEnabled || !chatChannelUp}');
+    /*
+      The prop defaults TRUE in both, which is `this.isConnected=!0` at byte 2,375,326. `false` here
+      would announce that chat is off in every render that omits the prop — the same defect arrived
+      at from the other side.
+    */
+    expect(EXTRA_CHAT).toContain('chatChannelUp = true,');
+    expect(MAIN_CHAT).toContain('chatChannelUp = true,');
   });
 
-  it('shows the field that would have to change, and that it starts false', () => {
+  it('and the stream carries TWO answers about one channel, which start differently', () => {
+    /*
+      Both, in one assertion, because the pair is the point: either starting value alone is wrong for
+      the other reader. `events.svelte.test.ts` executes the disagreement — reads both at the same
+      instant before any event — and this pins the declarations that produce it, so a merge cannot
+      pass by making them agree.
+    */
     expect(EVENTS).toContain('this.#roomEventsConnected = $state(false);');
+    expect(EVENTS).toContain('this.#chatChannelUp = $state(true);');
     expect(EVENTS).toContain('get connected(): boolean {');
+    expect(EVENTS).toContain('get chatChannelUp(): boolean {');
   });
 });
 

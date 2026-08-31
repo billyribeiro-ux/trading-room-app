@@ -33,6 +33,56 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 20:45 UTC — A dropped chat channel now takes the composer with it, in both columns
+
+**Runtime impact: YES.** A member whose chat channel dropped kept a live-looking composer. They
+typed into it, pressed Enter, and watched nothing happen — with only the small corner overlay `G03`
+to explain it. Both columns show the captured Chat Disabled block now, as the reference does.
+
+`O(23, o.isConnected && o.chatEnabled ? 23 : 24)`, bundle byte 2,400,361: slot 23 is the composer,
+slot 24 is the Chat Disabled block. **Both of this room's chat columns gated on `chatEnabled` alone
+while their own docblocks quoted the whole expression verbatim, `isConnected` included** — a comment
+claiming what the next line does not do, which is the one thing the root standard asks a reviewer to
+check for.
+
+`RoomEventStream.chatChannelUp` starts TRUE, goes false on `error` and true on `open`: the same two
+handlers that already move the sidebar's flag, so the pair cannot drift.
+
+**Two fields for one channel, which looks like duplication and is not.** `connected` answers *has
+this channel ever opened?* and must start FALSE, or the sidebar's "Chat" line claims a connection
+before the first open. `chatChannelUp` answers *has it dropped?* and must start TRUE, or every
+composer in the room reads "Chat Disabled" on first paint for the duration of one connect — which
+upstream never does. The reference has exactly the second field with exactly that starting value:
+`this.isConnected=!0` at byte 2,375,326.
+
+The difference between them is one initial value, which is precisely why a later reader will try to
+merge them, so both halves are pinned: `events.svelte.test.ts` proves the two disagree at the same
+instant before any event, and `extra-chat-column-contract.test.ts` refuses
+`chatChannelUp={roomEvents.connected}` on the page by name.
+
+**Not folded into `chatEnabled`, and that is a reading rather than a preference.** Upstream asks the
+two separately: the private-chat refusal (`G13`, `if (!this.canPost)`) reads `chatEnabled` alone.
+Folding the channel state in would start refusing private messages on a dropped room channel, which
+the reference does not do.
+
+**Both columns in one change.** The register row reported the main column's identical gap rather than
+silently editing it, because that batch's scope was the extra column — and fixing one while leaving
+the other is how the pair drifted to begin with. The contract asserts both through one `it.each`.
+
+**Verified — seven negative controls, each red on exactly its own assertion, green after restore.**
+On the stream: the field started FALSE like its sibling (two red, including the disagree-at-the-same-
+instant case); a plain field instead of `$state` (one red — permanently correct at first paint and
+permanently wrong afterwards, which a getter over a non-reactive field hides completely); the drop no
+longer lowering it (two red). On the components and the page: each column reverted to `chatEnabled`
+alone (one red each, which is also what proves the `it.each` really runs twice); the prop's default
+flipped to false (one red); the page feeding `roomEvents.connected` instead (two red).
+
+Svelte MCP: `svelte-autofixer` clean on the gate. rust-analyzer MCP: not used and not needed — no
+`.rs` file was touched.
+
+Ceilings raised with the argument at each entry: `events.svelte.ts` 1017 -> 1058,
+`ExtraChatPane.svelte` 744 -> 762, `AlertChatArea.svelte` 1523 -> 1533, `+page.svelte` 1796 -> 1798.
+
 ### 2026-08-31 20:10 UTC — The image that opens is the image that was clicked
 
 **Runtime impact: YES.** Clicking an inline image in a chat message did nothing at all. Clicking one

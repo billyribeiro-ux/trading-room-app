@@ -144,6 +144,15 @@
     webinarMode: boolean;
     /** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or Chat Disabled. */
     chatEnabled: boolean;
+    /**
+     * `ECP-02` — `isConnected`, the half of that expression this pane also quoted and did not build.
+     *
+     * The row was raised against the extra column and found the identical gap here; both are fixed
+     * together, because two columns disagreeing about one connection is worse than either gap alone.
+     * `ExtraChatPane.svelte` carries the full argument, including why this is not folded into
+     * `chatEnabled`. Defaults TRUE, matching `this.isConnected=!0` at byte 2,375,326.
+     */
+    chatChannelUp?: boolean;
     selfMutedUntil: Date | null;
     canPostImages: boolean;
     canUseRTE: boolean;
@@ -358,6 +367,7 @@
     chatOnlyMode,
     webinarMode,
     chatEnabled,
+    chatChannelUp = true,
     selfMutedUntil,
     canPostImages,
     canUseRTE,
@@ -1223,7 +1233,7 @@
                       refuses while a live row exists — so a muted member typed, pressed send, and
                       watched nothing happen with no explanation anywhere.
                     -->
-          {#if !chatEnabled}
+          {#if !chatEnabled || !chatChannelUp}
             <div class="chatDisabled d-flex align-items-center">
               <h5 class="pl-3">
                 <i class="fas fa-lock"></i> Chat Disabled

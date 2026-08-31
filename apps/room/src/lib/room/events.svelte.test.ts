@@ -237,6 +237,67 @@ describe('the connection flags carry their runes', () => {
   });
 });
 
+describe('ECP-02 — the composer s half of the channel starts UP and follows the same two events', () => {
+  /*
+    `this.isConnected=!0,this.isMediaConnected=!1` — `app-extra-chat`'s constructor, bundle byte
+    2,375,326 — then `socketDisconnected` at 2,376,472 sets it false and `socketConnected` sets it
+    true. It gates the composer: `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at 2,400,361.
+
+    TWO FIELDS FOR ONE CHANNEL, and this block is the argument for that. `connected` answers *has
+    this ever opened?* and `chatChannelUp` answers *has it dropped?*, and the difference is only the
+    starting value — which is exactly why one field could not serve both. The first assertion below
+    is the whole point: at the same instant, before any event, they disagree.
+  */
+  it('starts TRUE while the sidebar s flag starts false — the same instant, two answers', () => {
+    const { stream } = make();
+    stream.subscribe();
+    /*
+      The negative control for the merge that looks tempting. Gating the composer on `connected`
+      would print "Chat Disabled" on first paint, for the duration of one connect, in a room where
+      chat is perfectly fine; starting `connected` TRUE instead makes the sidebar report a
+      connection that has not happened.
+    */
+    expect(stream.chatChannelUp, 'a composer must not be taken away before the first open').toBe(
+      true
+    );
+    expect(stream.connected, 'and the sidebar must not claim a connection it does not have').toBe(
+      false
+    );
+  });
+
+  it('goes DOWN on the drop and back UP on the reconnect', () => {
+    const { stream } = make();
+    stream.subscribe();
+    const source = FakeEventSource.last;
+    source?.fire('open');
+    expect(stream.chatChannelUp).toBe(true);
+    source?.fire('error');
+    expect(stream.chatChannelUp, 'a dropped channel takes the composer with it').toBe(false);
+    source?.fire('open');
+    expect(stream.chatChannelUp, 'and the reconnect brings it back').toBe(true);
+  });
+
+  it('is a rune, so the composer actually re-renders rather than going stale on the first value', () => {
+    /*
+      The same assertion `connected` gets above, and it is not redundant: a plain field would give
+      `[true]` here — permanently correct at first paint and permanently wrong afterwards, which is
+      the failure mode a getter over a non-reactive field hides completely.
+    */
+    const { stream } = make();
+    stream.subscribe();
+    const source = FakeEventSource.last;
+    const seen = observe(
+      () => stream.chatChannelUp,
+      () => {
+        source?.fire('error');
+        flushSync();
+        source?.fire('open');
+      }
+    );
+    expect(seen).toEqual([true, false, true]);
+  });
+});
+
 describe('the flash is a RE-connection, never the first one', () => {
   it('stays down on the first open', () => {
     const { stream } = make();

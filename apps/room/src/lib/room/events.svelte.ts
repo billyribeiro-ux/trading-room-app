@@ -132,6 +132,8 @@ interface FollowStyleSource {
  */
 export class RoomEventStream<Entry> {
   #roomEventsConnected: boolean;
+  /** `ECP-02` — `isConnected`, which starts TRUE. See the constructor for why it is not the above. */
+  #chatChannelUp: boolean;
   #hasConnectedBefore: boolean;
   #reconnectedFlash: boolean;
   constructor(options: {
@@ -217,6 +219,29 @@ export class RoomEventStream<Entry> {
     this.#roomEventsConnected = $state(false);
 
     /**
+     * `ECP-02` — the same channel, asked a DIFFERENT question, which is why it is a second field
+     * and not a second reader of the one above.
+     *
+     * `#roomEventsConnected` answers *has this channel ever opened?* and therefore starts FALSE —
+     * its own docblock says so, because the sidebar's "Chat" line has to read *not connected*
+     * before the first open. This one answers *has this channel DROPPED?* and starts TRUE.
+     *
+     * The reference has exactly this field and exactly this starting value:
+     * `this.isConnected=!0,this.isMediaConnected=!1` in `app-extra-chat`'s constructor at bundle
+     * byte 2,375,326, driven false by `socketDisconnected` (byte 2,376,472) and true again by
+     * `socketConnected`. It gates the composer: `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`
+     * at byte 2,400,361 — slot 23 is the composer, slot 24 is the Chat Disabled block.
+     *
+     * **Sharing the first field was measured and refused, not skipped.** Gating the composer on it
+     * would print "Chat Disabled" on first paint, before the browser has had a chance to open
+     * anything — a room announcing its own chat is off for the duration of one connect, which
+     * upstream never does. Starting the first field TRUE instead breaks the sidebar the other way:
+     * it would report a connection that has not happened. Two questions, two answers, both driven
+     * by the same two events so they cannot drift.
+     */
+    this.#chatChannelUp = $state(true);
+
+    /**
      * The "Conected" flash and its one-shot guard — `app-room.full.js:2035-2041`.
      *
      * `hasConnectedBefore` is a plain `let`, not `$state`: nothing renders from it, it only decides
@@ -268,6 +293,18 @@ export class RoomEventStream<Entry> {
 
   get connected(): boolean {
     return this.#roomEventsConnected;
+  }
+
+  /**
+   * `ECP-02` — the composer's half of `o.isConnected && o.chatEnabled`.
+   *
+   * Both chat columns gated on `chatEnabled` alone while their docblocks quoted the whole expression
+   * verbatim, `isConnected` included — a comment claiming what the next line does not do, which is
+   * the one thing the root standard asks a reviewer to check for. A member whose channel had dropped
+   * kept a live-looking composer, typed into it, pressed Enter, and watched nothing happen.
+   */
+  get chatChannelUp(): boolean {
+    return this.#chatChannelUp;
   }
 
   /** The "Conected" overlay's own flag — the sidebar renders `display` straight off it. */
@@ -941,6 +978,8 @@ export class RoomEventStream<Entry> {
       */
       const isReconnect = this.#roomEventsConnected === false && this.#hasConnectedBefore;
       this.#roomEventsConnected = true;
+      // `ECP-02` — `socketConnected` sets `isConnected` back to true. Same event, second question.
+      this.#chatChannelUp = true;
       this.#hasConnectedBefore = true;
 
       if (!isReconnect) return;
@@ -959,6 +998,8 @@ export class RoomEventStream<Entry> {
       // EventSource reconnects on its own; log once rather than swallowing it entirely, because a
       // permanently dead channel looks exactly like a quiet room.
       this.#roomEventsConnected = false;
+      // `ECP-02` — `socketDisconnected` (byte 2,376,472). The composer goes with it.
+      this.#chatChannelUp = false;
       console.warn('[room-events] channel interrupted; the browser will retry');
     });
 

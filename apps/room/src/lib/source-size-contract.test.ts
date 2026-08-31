@@ -709,7 +709,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       site, so a `{...spread}` silently removed six props from that guarantee — caught the moment it
       was tried. Naming them keeps one definition and keeps every prop greppable.
     */
-    max: 1796,
+    /*
+      1796 -> 1798, 2026-08-31 (ECP-02). Two lines: `chatChannelUp={roomEvents.chatChannelUp}` at
+      each of the two chat columns. One source feeding both, by name — a second source is how the
+      columns come to disagree about whether the room is connected, and the contract counts these
+      two occurrences for that reason.
+    */
+    max: 1798,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -864,7 +870,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       count below the guard drops exactly that one. A future reader tidying two adjacent
       `payload.channel === 'chat'` blocks into one would move it, so the argument is at the code.
     */
-    max: 1017,
+    /*
+      1017 -> 1058, 2026-08-31 (ECP-02). Forty-one lines, of which FIVE are code: a second `$state`
+      field, its getter, and one assignment in each of the two handlers that already move the first.
+
+      TWO FIELDS FOR ONE CHANNEL, and the thirty-six lines of comment exist because that looks like
+      duplication and is not. `#roomEventsConnected` answers *has this channel ever opened?* and must
+      start FALSE, or the sidebar's "Chat" line claims a connection before the first open.
+      `#chatChannelUp` answers *has it DROPPED?* and must start TRUE, or every composer in the room
+      reads "Chat Disabled" on first paint for the duration of one connect. The reference has exactly
+      the second field with exactly that starting value — `this.isConnected=!0`, byte 2,375,326.
+
+      The difference between them is ONE initial value, which is precisely why a reader will try to
+      merge them. `events.svelte.test.ts` asserts they disagree at the same instant, before any event,
+      and `extra-chat-column-contract.test.ts` refuses `chatChannelUp={roomEvents.connected}` on the
+      page by name. Both were seen red.
+
+      If this number climbs, the thing to check is whether a THIRD answer about this channel has
+      appeared. Two are justified above; a third almost certainly is not.
+    */
+    max: 1058,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -5888,7 +5913,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       holds: it holds two of the four terms those gates need, and re-deriving a gate from a subset
       is how two answers to one question come to disagree.
     */
-    max: 1523,
+    /*
+      1523 -> 1533, 2026-08-31 (ECP-02), and this pane's gap was found by a row raised against the
+      OTHER column. Ten lines, two of them the gate. Its own docblock quoted the same expression with
+      the same missing half; the argument is in `ExtraChatPane.svelte` and this carries a pointer
+      rather than a second copy, because two columns are one behaviour and the reason they drifted is
+      that each was read alone.
+    */
+    max: 1533,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -6083,7 +6115,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that the third, Detach Chat, is absent by the const tables' own arithmetic rather than by
       oversight. A reader finding two here and three in the main column needs that sentence.
     */
-    max: 744,
+    /*
+      744 -> 762, 2026-08-31 (ECP-02). Eighteen lines, of which TWO are the gate: a `chatChannelUp`
+      prop and `{#if !chatEnabled || !chatChannelUp}`.
+
+      This column's own prop docblock has quoted `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`
+      verbatim since it was written, `isConnected` included, and the gate below it read `chatEnabled`
+      alone — a comment claiming what the next line does not do, which is the one thing the root
+      standard asks a reviewer to check for. A member whose channel had dropped kept a live-looking
+      composer, typed into it, pressed Enter and watched nothing happen.
+
+      The sixteen remaining lines argue why the prop is SEPARATE rather than folded into
+      `chatEnabled`: the private-chat refusal (`G13`, `if (!this.canPost)`) reads `chatEnabled` alone
+      upstream, so folding the channel in would start refusing private messages on a dropped room
+      channel — a behaviour the reference does not have. And why it defaults TRUE, which is the
+      reference's own `this.isConnected=!0` (byte 2,375,326) and the only safe default: `false` would
+      announce that chat is off in every render that omits the prop.
+    */
+    max: 762,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
