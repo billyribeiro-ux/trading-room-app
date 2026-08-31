@@ -271,10 +271,16 @@ const DIVERGED_FROM_IMPORT = new Map([
     `0010_retire_ptr_clone_app.sql` landed, with the reviewed-act paragraph that list requires. The
     attestor's own test caught the omission — the same way it caught `0009` shipping in `b9f775e`
     without the list being extended.
+
+    Re-pinned 2026-08-31 (PR #177 merge follow-up): `migration_ledger_mismatch` still said
+    `0001 through 0008` — TWO chain extensions stale, because an error string has no reader until
+    the attestation fails. Both range-naming messages are now named constants held against
+    `ATTESTED_MIGRATION_VERSIONS` by `the_prose_ranges_track_the_attested_chain`, whose negative
+    control was run red-then-green, so the next extension moves the prose or goes red.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '68ef62646046b56b236809f7cf4d9850b27e01c871172105ba00bf2e5dd3a894'
+    '607e1df8bfb387b531d6ef7b8efb81088bd4130ed1f40eeda1cd7186a123d13f'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test

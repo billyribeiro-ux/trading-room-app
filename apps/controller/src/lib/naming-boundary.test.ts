@@ -173,8 +173,9 @@ describe('the reference name never leaks into live code', () => {
       take itself off the list: the ROLE survives the chain deliberately, because dropping a
       cluster-global role stops the next database from starting its own chain. That is the argument,
       and the CHANGELOG carries the evidence: four databases on a live PostgreSQL 16.13 cluster,
-      including the refusal on one where `0009` had not run, and the convergence test that failed
-      against the version which did drop it.
+      the `0009` interlock refusing a database run to `0008` only — that one is in the earlier
+      three-database entry — and the convergence test that failed against the version which did
+      drop it.
     */
     expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(41);
   });

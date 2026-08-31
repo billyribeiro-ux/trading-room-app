@@ -33,6 +33,39 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 14:17 UTC — The attestor's ledger error named a chain two extensions old, and prose ranges now have a test
+
+**Runtime impact: NO** — an error string, a comment sentence, and a new unit test; no control flow
+moved. Found by the adversarial re-read of the PR #177 merge (entry below), then verified by hand.
+
+**The defect:** `migration_ledger_mismatch` in `postgres-release-attestation.rs` still said *"0001
+through 0008"* while the contract beside it pins `0001-0010` — stale through TWO chain extensions,
+because an error string has no reader until the attestation fails, which is exactly when a wrong
+range does its damage: it steers the operator toward the wrong chain length in the middle of a
+refused release. Fixed to `0010`, and both range-naming messages are now named constants —
+`EMBEDDED_MIGRATION_CONTRACT_MESSAGE`, `MIGRATION_LEDGER_MISMATCH_MESSAGE` — held against
+`ATTESTED_MIGRATION_VERSIONS` by a new unit test, `the_prose_ranges_track_the_attested_chain`, so
+the next extension moves the prose or goes red. **Negative control run:** the message flipped back
+to `0008` fails the test; restored, it passes.
+
+**Also fixed, one sentence in `naming-boundary.test.ts`:** the ceiling comment said the CHANGELOG
+holds *"four databases … including the refusal on one where `0009` had not run"*. Read against the
+entries, the four-database table's refusal (row B) is the migrate preflight on a fresh database;
+the `0009`-interlock refusal — a database run to `0008` only — lives in the earlier three-database
+entry. The sentence now says which refusal is where. Every fact was already in the CHANGELOG; the
+sentence had merged two tables.
+
+**The attestor's provenance pin moved** `68ef6264…` → `607e1df8…` with a dated paragraph in
+`verify-backend-provenance.mjs`, per the governed-edit rule for `services/**`.
+
+**Verified:** attestor unit tests 19/19 including the new one; the negative control red-then-green;
+`cargo fmt --check`, `cargo clippy --all-targets --features testing -- -D warnings`, rust-analyzer
+0 diagnostics; `verify-backend-provenance.mjs` PASS against the new pin; `naming-boundary.test.ts`
+4/4. **Deliberately NOT fixed:** `0010_retire_ptr_clone_app.sql`'s opening prose still says *"then
+drop it"* while its body stops before any drop — those bytes are ledger-pinned on the live cluster,
+editing a shipped migration is forbidden, and the contract test reads the CODE, which is drop-free.
+Recorded here instead.
+
 ### 2026-08-31 14:15 UTC — `main` merged into the audit branch: four real conflicts, and the migration decides three of them
 
 **Runtime impact: NO by itself.** The merge of `origin/main` (through PR #176) into
