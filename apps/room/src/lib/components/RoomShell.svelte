@@ -94,7 +94,7 @@
 
   /**
    * The other half of `onResize`, and the half that is easy to miss: crossing the threshold REFETCHES
-   * (`app-room.full.js:2987-2999`).
+   * (`onResize`, v4 byte 2,530,181 — the `app-room.full.js:2987-2999` this cited is not here).
    *
    * ```js
    * this.isMobileScreen = e.target.innerWidth <= 601;
@@ -118,13 +118,13 @@
    * `invalidate('room:data')` is all three commands at once here: the load registers
    * `depends('room:data')` (`+page.server.ts:124`) and returns the alerts and the messages together,
    * so there is no separate alerts request to make. The extra-chat emit has no counterpart because
-   * `prefs.extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened here.
+   * `feeds.visibleExtraChat` comes off the SAME load — one invalidate refreshes both columns.
    *
    * `lastThresholdActedOn` is a PLAIN variable, not `$state`: nothing renders from it, and making it
    * reactive would put a write to a tracked value inside the effect that reads it. It starts `null`
    * to mean "never measured", which is how the first paint on a phone avoids a refetch it does not
    * need — upstream gets the same effect from `isMobileScreen = onResizeChange = …` in one
-   * statement at init (`:1889`), so the two are equal before any resize can happen.
+   * statement in `ngOnInit` (byte 2,498,161), so the two are equal before any resize can happen.
    */
   let lastThresholdActedOn: boolean | null = null;
   let resizeRefetchTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
@@ -168,7 +168,7 @@
 
 <!--
   `z('ngClass', ut(5, QB, videoOnlyMode || chatOnlyMode || viewerOnlyMode))` with
-  `QB = (t) => ({'vh-100': t})` (`app-room.render-helpers.js:1639-1648, 11`).
+  `QB = t => ({'vh-100': t})` (v4 byte 2,466,015; the `ut(5, QB, …)` call is in `K4e`).
 
   It is the other half of hiding a column: with the chat and alerts gone the split has one
   child, and `.vh-100 { height: 100vh !important }`
@@ -206,26 +206,26 @@
   {/snippet}
 
   <!--
-  `O(5, o.isMobileScreen ? 6 : 5)` — `app-room.full.js:4061`. The 601px threshold does not
-  restyle this layout, it selects a DIFFERENT ONE: `K4e`
-  (`app-room.render-helpers.js:1783-1821`) against the desktop `j4e` (`:1616-1664`).
+  `O(5, o.isMobileScreen ? 6 : 5)`. The 601px threshold does not restyle this layout, it
+  selects a DIFFERENT ONE: `nRe` (v4 byte 2,496,317) against the desktop `K4e` (2,493,526).
 
-  What actually differs, read from those two functions and the const table rather than
-  inferred:
+  RE-CITED 2026-08-31 by decoding the const table BY VALUE. This block named `K4e` as the
+  PHONE's template and `j4e` as the desktop one, with `G4e`/`W4e` as its two areas; all four
+  are wrong. `K4e` IS the desktop split; `j4e` (2,490,857) is one `as-split-area` holding
+  `app-extra-chat`; `G4e`/`W4e` (2,492,523 / 2,492,690) are the Update Positions and
+  Show/Hide Positions buttons. They came from `app-room.render-helpers.js` — zero files here.
 
-    - the CHILD ORDER is reversed. `K4e` is presentation (`G4e`, node 1, gated
-      `O(1, hidePresentation ? -1 : 1)`), then chat/alerts (`W4e`, node 2,
-      `O(2, hideChatAlerts ? -1 : 2)`). `j4e` is chat/alerts (node 1), extra chat, then
+    - the CHILD ORDER is reversed. `nRe` is presentation (`Z4e`, node 1, gated
+      `O(1, hidePresentation ? -1 : 1)`), then chat/alerts (`eRe`, node 2,
+      `O(2, hideChatAlerts ? -1 : 2)`). `K4e` is chat/alerts (node 1), extra chat, then
       presentation (node 3). The gates are the same two flags either way, which is why
       they are written once here and read twice.
     - the split is VERTICAL as a static attribute, not a binding — const 224 carries
-      `'direction','vertical'` where const 8 carries `3,'direction'`. Handled by
-      `split.isHorizontal`.
+      `'direction','vertical'` where const 8 carries `3,'direction'`; `split.isHorizontal`.
     - there is NO `dragEnd`, so a mobile drag is never recorded. Handled in
       `RoomSplit.endDrag`, which returns no write on that path.
-    - the areas carry no `order`. Handled in `split.primaryAreaStyle` and
-      `split.presentationAreaStyle`, and it is why this block reorders the DOM instead of
-      restyling it.
+    - the phone's first two areas carry no `order` (consts 225/226 end `3,"size"`), which is why
+      this block reorders the DOM; the THIRD does — `tRe`, const 227, `orderChatAlerts()`.
 
   The gutter is a snippet for exactly that reason: on a phone it has to sit BETWEEN the two
   panes in document order, because there is no `order` property left to place it with.

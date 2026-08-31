@@ -46,16 +46,25 @@ inside the document itself. The table describes the two-verifier pass **as it ra
 refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
 exactly as RM-25 belongs in the next paragraph and not in that table.
 
-**One row was ADDED after this document was committed** — RM-25, found while building RM-11 and
-RM-12 by decoding the compact component's whole consts table rather than the entries those rows
-named. It is not folded into the totals above, which describe the two-verifier pass and should keep
-describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes
-the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
-byte offsets make the second reading the tempting one.
+**The first row was ADDED after this document was committed** — RM-25, found while building RM-11
+and RM-12 by decoding the compact component's whole consts table rather than the entries those rows
+named — and **twenty rows now stand outside the two-verifier pass**: RM-25, plus the nineteen the
+seventh batch appended on 2026-08-31 for `components/RoomShell.svelte` (SHL-01…06),
+`components/MessageBody.svelte` (MSB-01…07) and `components/RichTextEditor.svelte` (RTE-01…06),
+three surfaces this document named only in passing and, for the editor, not at all. None is folded
+into the totals above, which describe the two-verifier pass and should keep describing it. This is
+the ONE paragraph that counts them; earlier batches each added their own and every one was stale
+before the next batch finished, so a new sentence here is a defect rather than a record.
+
+The lesson is the cheaper half of the same one UIM-03 teaches: **a reader who decodes the table
+finds rows a reader who looks up the cited const cannot**, and this document's per-row byte offsets
+make the second reading the tempting one. The seventh batch is the sharpest instance of it so far —
+four of its nineteen rows are citations that name a function which EXISTS in the pinned bundle and
+is not the one the comment meant, so every one of them would have survived a lookup.
 
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 243 closed · 243 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4395,6 +4404,584 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
 
 ---
+
+---
+
+## components/RoomShell.svelte
+
+Six rows; the room's `as-split` element, its two layout effects and the child order it places. Read
+end to end against the pinned v4 bundle on 2026-08-31, decoding `app-room`'s 229-entry const table
+by value from its `decls:38,vars:9,consts:` header rather than looking up the indices the file cites.
+Four of the six are citation defects of OURS — none of them recoverable by reading the name the
+comment gave, because every one of those names resolves in the bundle to something plausible.
+
+### SHL-01 — `K4e` is named as the PHONE's template. In the pinned bundle it is the DESKTOP one, and `j4e`, `G4e`, `W4e` are not room splits at all
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The template comment read *"it selects a DIFFERENT ONE: `K4e`
+(`app-room.render-helpers.js:1783-1821`) against the desktop `j4e` (`:1616-1664`)"*, and listed the
+phone's two areas as `G4e` and `W4e`. Decoded against `main.d1d09071be31f1ba.js`, every one of those
+four names denotes something else:
+
+* `K4e` at **2,493,526** opens `d(0,"as-split",205)`, binds `x("dragEnd", … resizeEndPresentation)`
+  and `z("direction", e.directionRoom())`, and gates its children `hideChatAlerts ? -1 : 1` /
+  extra-chat / `hidePresentation ? -1 : 3`. That is the DESKTOP order, with a bound direction and a
+  recorded drag — the two properties the comment used to distinguish the phone's template from it.
+* the phone's template is **`nRe` at 2,496,317**: `d(0,"as-split",224)`, no `dragEnd`, no
+  `z("direction")`, children `hidePresentation ? -1 : 1` then `hideChatAlerts ? -1 : 2` then
+  `!hideChatAlerts && preferences.extraChatColumn ? 3 : -1`.
+* `j4e` at **2,490,857** is a single `as-split-area` (const 211) holding `app-extra-chat`.
+* `G4e` at **2,492,523** is the `Update Positions` button; `W4e` at **2,492,690** is the
+  `Show Positions` / `Hide Positions` toggle beside it.
+
+**Not a stale citation — an unverifiable one.** `app-room.render-helpers.js` has **zero files** in
+this repository (`find . -name app-room.render-helpers.js`), so the names were read from a capture
+root this checkout has never held, and nobody reading this repository alone could have checked them.
+They are consistent with each other in that other capture — `mobile-layout-contract.test.ts:177`
+records *"`j4e` binds dragEnd; `K4e` binds only gutterDblClick and dragStart"*, which is the same
+naming shifted by one build. Against the bundle this repository pins, they are wrong.
+
+**Why a slot lookup would have confirmed three of the four.** `K4e` really is a room split. `G4e`
+and `W4e` really are its neighbours in the file. A reader checking "is there a `K4e`, and is it an
+`as-split`?" gets yes twice and stops. Only walking the update block — which of the two has a
+`dragEnd` — separates them, and that is the assertion
+`shell-body-rte-reference-contract.test.ts` now makes: pointed at `K4e`, the phone's test fails on
+`the phone template acquired a dragEnd`, which is the negative control this row was closed on.
+
+**high** · `wrong-citation` · reference byte **2,496,317**
+
+```
+function nRe(t,n){if(1&t){const e=Y();d(0,"as-split",224),x("gutterDblClick",…)("dragStart",…),H(1,Z4e,5,5,"as-split-area",225)(2,eRe,6,3,"as-split-area",226)(3,tRe,4,4,"as-split-area",227),u()}if(2&t){…O(1,e.hidePresentation?-1:1),m(),O(2,e.hideChatAlerts?-1:2),m(),O(3,!e.hideChatAlerts&&e.appService.globals.preferences.extraChatColumn?3:-1)}}
+```
+
+**Ours:** RoomShell.svelte:208-231 now names `nRe`, `Z4e`, `eRe`, `tRe` and `K4e`, each with its v4
+byte offset, and records what the four old names actually are. The BEHAVIOUR the comment described
+was correct throughout and is unchanged — the child order, the gates and the vertical split all
+match `nRe`; only the labels on them were wrong.
+
+### SHL-02 — "the areas carry no `order`" is true of two of the phone's three areas, and the third binds one
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+Decoded by value, consts 225 and 226 end `3,"size"` —
+`["minSize","0",1,"presentation-box",3,"size"]` and `["minSize","0",1,"alert-chat-box",3,"size"]` —
+so presentation and chat/alerts genuinely take no `order` on a phone. Const **227** is
+`["minSize","0",1,"alert-chat-box",3,"size","order"]`, and `tRe` binds it:
+`z("size",e.chatAlertsSize)("order",e.orderChatAlerts())`.
+
+The sentence was written as a blanket rule about "the areas", which is the shape that gets carried
+into the next file — and it has been: `mobile-layout-contract.test.ts:116-118` repeats it as *"it
+follows the chat/alerts column in DOM order in both branches, which on mobile IS the layout because
+those areas carry no `order`"*. That is true of the pair it is reasoning about and false of the third.
+
+**low** · `wrong-constant` · reference byte **2,495,895**
+
+```
+function tRe(t,n){…d(0,"as-split-area",227)(1,"as-split",209),x("dragEnd",…resizeEndChat…)…z("size",e.chatAlertsSize)("order",e.orderChatAlerts())…}
+```
+
+**Ours:** RoomShell.svelte:227-228 now states the split — first two areas `3,"size"`, the third
+`("order", e.orderChatAlerts())` — and `shell-body-rte-reference-contract.test.ts` asserts consts
+225, 226 and 227 by value, so the two cannot be conflated again. Negative control: pointing the
+third-area assertion at const 226 fails with `expected [ …(3) ] to deeply equal [ …(4) ]`.
+
+### SHL-03 — "`prefs.extraChatColumn` has zero occurrences in this room" is false; it is a fully modelled preference
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The refetch effect's doc explained the missing `appHasFocusGetChatLogExtraChatColumn` emit with
+*"`prefs.extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened
+here."* Measured: it occurs at `create-room.svelte.ts:343` (`extraColumnEnabled: () =>
+prefs.extraChatColumn`) and `:432` (`extraChatColumnEnabled: …`), and `RoomPrefs` declares it, loads
+it, exposes it and writes it (`prefs.svelte.ts:101, 309, 587, 711`). This very component receives
+`extraChatColumnVisible`, which is derived from it.
+
+The omission it was excusing is not a gap either, which is why this is a comment fix rather than a
+build: the extra column renders `feeds.visibleExtraChat` (`+page.svelte:1480`), derived from the same
+load that `invalidate('room:data')` re-runs. One invalidate refreshes both columns, so there is no
+second request to make — the true reason, and a stronger one than the false claim it replaces.
+
+**medium** · `defect` · reference byte **2,530,181**
+
+```
+onResize(e){this.isMobileScreen=e.target.innerWidth<=601,…this.appService.guiEventBus.emit("appHasFocusGetChatLog"),this.appService.globals.preferences.extraChatColumn&&this.appService.guiEventBus.emit("appHasFocusGetChatLogExtraChatColumn"),this.appService.sendServerCommand("getAlertsLog",{page:0}),this.onResizeChange=this.isMobileScreen},500))}
+```
+
+**Ours:** RoomShell.svelte:118-121. A comment that says a value does not exist is the kind that stops
+the next reader looking, which is what made this worth a row rather than a silent edit.
+
+### SHL-04 — four citations name capture roots this repository does not hold
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+`app-room.full.js:2987-2999`, `app-room.full.js:4061`, `app-room.full.js:1889` and
+`app-room.render-helpers.js:1639-1648` were all cited as authorities. Neither file exists here — the
+`app-room` root is one of the thirteen gitignored capture roots `gate/evidence-bound-tests.mjs`
+reports missing on this checkout, and `render-helpers` is not a root at all.
+
+Every quoted BODY was checked against the pinned bundle and is verbatim correct, which is why this is
+a re-citation and not a correction: `onResize` is at **2,530,181** exactly as quoted (the capture's
+own `console.log("onResize event end")` is the only line the block omits);
+`this.isMobileScreen=this.onResizeChange=window.innerWidth<=601` is in `ngOnInit` at **2,498,161**;
+`QB=t=>({"vh-100":t})` is at **2,466,015**. The one non-bundle citation that survives untouched is
+`css/complete-app-styles.css:4992`, which is present and reads
+`.vh-100 { height: 100vh !important; }`.
+
+**medium** · `wrong-citation` · reference byte **2,466,015**
+
+```
+muted:t,"text-white":n}),QB=t=>({"vh-100":t});
+```
+
+**Ours:** RoomShell.svelte:97, 127, 171. `shell-body-rte-reference-contract.test.ts` asserts the file
+contains neither `app-room.render-helpers.js:` nor `` (`app-room.full.js: ``; negative control —
+re-inserting `app-room.render-helpers.js:1783-1821` fails with `a citation came back to
+app-room.render-helpers.js`.
+
+### SHL-05 — the phone's own size fields and its static inner split
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+The phone's areas take DIFFERENT size properties from the desktop's — `Z4e` binds
+`z("size",e.presAreaSizeMobile)` and `eRe` binds `z("size",e.chatAlertsSizeMobile)`, where `q4e` and
+`V4e` bind `presAreaSize` and `chatAlertsSize` — and `eRe`'s inner split is const **228**,
+`["direction","vertical","minSize","0"]`, a static vertical stack with no `dragEnd` where the
+desktop's inner split (const 209) has both a binding and a drag.
+
+Both are modelled. `RoomSplit` holds `#mobile` as a separate fraction from `#main`
+(`split.svelte.ts:332`, `:615`, `:642`), documents the reference's own 50/50 defaults at `:108`, and
+`#innerIsVertical` (`:319`) is `roomIsHorizontal || isMobileScreen` — the static vertical the phone's
+const carries. Nothing to build; recorded because a reader decoding these two functions will find the
+`Mobile` suffix and reasonably ask whether it reached this repository.
+
+**low** · `missing-behaviour` · reference byte **2,495,149**
+
+```
+function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),…),2&t){const e=g(2);z("size",e.presAreaSizeMobile),…}}
+```
+
+**Ours:** `lib/room/split.svelte.ts:102-130, 314-332`.
+
+### SHL-06 — two sibling files carry the same misattribution, and both are outside this batch's scope
+
+**BLOCKED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+`lib/room/split.svelte.ts:423` reads *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
+preferences.extraChatColumn`"* — that gate is `nRe`'s; `K4e`'s third child is `hidePresentation ? -1
+: 3`. `lib/mobile-layout-contract.test.ts` repeats the naming in six places (`:5, :9, :79, :83,
+:116, :177`) together with the `app-room.render-helpers.js` line citations.
+
+**What unblocks each, exactly one line.**
+`split.svelte.ts:423`: replace `` `K4e` places it as index 3, gated `` with
+`` `nRe` (v4 byte 2,496,317) places it as index 3, gated ``.
+`mobile-layout-contract.test.ts:9`: replace ``(`app-room.render-helpers.js:1616-1664`) and `K4e` (`:1783-1821`)`` with
+``(`app-room.render-helpers.js:1616-1664`, the `app-room` capture — `K4e`/`nRe` in the pinned v4 bundle)``.
+
+That second one is a naming NOTE rather than a rename, deliberately: that file's assertions read
+`ROOM_COMPILED` out of the `app-room` capture root, where the names it uses are the ones that hold.
+It is excluded on this checkout (one of 42), so neither its prose nor its assertions are exercised
+here — which is exactly why the disagreement between the two captures needs writing down rather than
+resolving in favour of whichever one the reader happens to have.
+
+**low** · `wrong-citation` · reference byte **2,495,895**
+
+```
+z("size",e.chatAlertsSize)("order",e.orderChatAlerts())
+```
+
+**Ours:** `lib/room/split.svelte.ts:423`, `lib/mobile-layout-contract.test.ts:5,9,79,83,116,177`.
+
+---
+
+## components/MessageBody.svelte
+
+Seven rows; the six segment kinds one parsed message body renders, read against `urlwrapImg`
+(byte 1,325,971) and `showChatGif` in `deployed-index.html:152`. **The first thing checked was the
+one this repository cares most about, and it came back clean:** no path from this component's input
+reaches a raw-html tag.
+
+### MSB-01 — no raw-html tag on any path from a message body to the DOM
+
+**ALREADY BUILT — verified by reading 2026-08-31, and now asserted.**
+This row was ADDED after this document was committed, by the seventh batch.
+Traced every one of the six segment kinds: `text` and `stock` emit text nodes; `label` emits a
+`<span>` whose class is a constant and whose `style` comes from `alertLabelBadgeStyle`; `link` and
+`image` put `segment.url` in `href` and `src`, which Svelte sets as ATTRIBUTES and which
+`CAPTURED_URL` (`message-body-segments.ts:65`) has already required to begin `http`, `https` or
+`ftp`; `trade` renders this component again over `segment.children`. `grep -c '@html'` over the file
+returns **0**, and over the whole of `apps/room/src` returns exactly one hit —
+`routes/session/+page.svelte:264`, where the value was sanitised on the SERVER by
+`sanitizeRoomDescription` and the comment above it says so.
+
+The reference does the opposite and needs to: it builds an HTML STRING and passes it through
+`bypassSecurityTrustHtml`, so `Sw.sanitize` is load-bearing there. Emitting real elements means
+message text can never be parsed as markup in the first place, which
+`message-body-segments.ts:94-97` already argued for; this row is the check that the argument still
+holds at the renderer.
+
+`shell-body-rte-reference-contract.test.ts` now asserts it rather than leaving it to a reading.
+Negative control: replacing `{:else}{segment.text}{/if}` with the raw-html form fails with
+`expected … not to match /\{@[h]tml/`.
+
+**high** · `defect` · reference byte **1,326,195**
+
+```
+let a=Sw.sanitize(e),l="";…return`${l}<div class="img-container ${l?"d-none":""}" onclick="openImageModal(event,'${a}')">                   <img class="uploaded-img" src="${a}"><br clear="both"/>\n                </div>`
+```
+
+**Ours:** MessageBody.svelte:106-172, and the assertion in
+`src/lib/shell-body-rte-reference-contract.test.ts`.
+
+### MSB-02 — a nested body was handed five of its six props, and `extraChatMsg` was the missing one
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+A `trade` segment wraps segments, so this component renders itself — and the recursive call listed
+`stockStyle`, `chatGif`, `messageId` and `onaction` and stopped. `extraChatMsg` is `urlwrapImg`'s
+fourth argument and its only effect is the placeholder id, so a gif inside a `[{( … )}]` order would
+have rendered `gif_<id>` while every sibling in the same body rendered `gifExtra_<id>` — which is
+RM-16 reintroduced one level down.
+
+The reference has ONE `s` for the whole body and cannot have two: `filterChatMessages` inserts the
+`<span class="tradeColor">` (byte 1,414,920) BEFORE `parseLinks` runs, so `urlwrapImg` sees the
+order's text with the same fourth argument as the text around it.
+
+**UNREACHABLE ON THE DAY IT WAS FOUND, and that is measured rather than used to close the row.**
+`extraChatMsg={true}` has exactly one call site in `apps/room/src` — `ExtraChatPane.svelte:441` —
+and that site is `kind="chat"`, while `parseBodySegments` emits a `trade` segment only when
+`context.kind === 'alert'`. So no body renders today with both a trade segment and the flag set. The
+defect fixed is therefore the SHAPE, not the symptom: a hand-kept prop list one level below the
+declaration is a list that goes stale silently, and it had. It is now one spread of everything but
+`segments`, which is also a line shorter — `source-size-contract` fell 174 → 173 on it.
+
+**medium** · `defect` · reference byte **1,326,195**
+
+```
+const c=s?`gifExtra_${o}`:`gif_${o}`;l=`<div class="chat-gif-muted" id="${c}" onclick=showChatGif('${c}')>gif muted, click to show</div>`
+```
+
+**One knock-on, named rather than left to be found:** `unfed-props-contract.test.ts:288` says
+*"`RoomMessageChrome` is the only spread in this tree today"*, and it no longer is. That file's
+assertions are unaffected — `supplied` is a UNION across call sites and `RoomMessage.svelte` still
+lists all six props explicitly — but the sentence is now false and is a one-line correction in a file
+this batch did not create.
+
+**Ours:** MessageBody.svelte:75-79 and :142. The contract derives the expected spread from the props
+destructure rather than listing it, so a seventh prop is covered without anyone remembering; negative
+control — deleting `extraChatMsg` from the spread fails with
+`expected [ 'chatGif', 'messageId', …(2) ] to deeply equal [ 'chatGif', 'extraChatMsg', …(3) ]`.
+
+### MSB-03 — clicking an inline image opens the alert's attachment, or nothing at all
+
+**BLOCKED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The reference's container carries `onclick="openImageModal(event,'${a}')"`, where `a` is THAT
+image's own sanitised URL. Ours raises `onaction('image', event)`, and the handler is
+`message-actions.svelte.ts:497-499`:
+
+```ts
+if (action === 'image' && item.targetUrl) {
+  this.#openImage(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
+}
+```
+
+`item.targetUrl` is the ALERT's attachment, not the clicked segment: it is populated from
+`alerts.targetUrl` (`lib/server/alert-log.ts:38,149`) and rendered only under
+`kind === 'alert' && item.targetUrl` (`RoomMessage.svelte:1185`). So a member clicking an inline
+image inside a CHAT message gets nothing — the guard is false and the handler returns — and a member
+clicking one inside an alert that also has an attachment gets the ATTACHMENT rather than the picture
+they clicked.
+
+**What unblocks it, exactly one line**, in `apps/room/src/lib/types.ts`, extending the payload union
+at `:457` so the clicked URL can ride with the action:
+
+```ts
+export type MessageActionEvent = MouseEvent | MessageReactionPayload | TradeCopyPayload | ImageOpenPayload | undefined;
+```
+
+with `message-actions.svelte.ts:497` then preferring the payload's URL over `item.targetUrl`.
+Both files are outside this batch's editable scope, and the change cannot be made half — a payload
+type with no reader would be scaffolding, which DPE rule 3 forbids — so it is recorded whole.
+
+**high** · `missing-behaviour` · reference byte **1,326,195**
+
+```
+onclick="openImageModal(event,'${a}')"
+```
+
+**Ours:** MessageBody.svelte:163-166, `lib/room/message-actions.svelte.ts:497-499`.
+
+### MSB-04 — `chat-gif-muted-contract.test.ts` reads a file that no longer holds any of the four strings it asserts
+
+**BLOCKED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+That file's whole `describe('ours')` block reads `MESSAGE = readFileSync(new
+URL('./components/RoomMessage.svelte', …))` and asserts it contains `class="chat-gif-muted"`,
+`'click to hide' : 'gif muted, click to show'`, `return !chatGif &&
+url.toLowerCase().includes('.gif');` and `<img class="uploaded-img" src={segment.url} />`. Measured
+with `grep -n 'chat-gif-muted\|click to hide\|isMutedGif\|uploaded-img' RoomMessage.svelte`: **none
+of the four is there.** All four moved to `MessageBody.svelte` when the segment renderer was
+extracted on 2026-08-30, and the constant did not move with them.
+
+**It is invisible here and red there.** The file also reads `docs/source/`, so
+`gate/evidence-bound-tests.mjs` excludes it on any checkout without the capture symlinks — it is one
+of the 42 this run reports skipping. On the owner's machine, where those resolve, four of its
+assertions fail. This is the same shape as the `room-message-render.test.ts` finding that module's
+own header records: a test whose subject moved out from under it, kept out of sight by the exclusion
+banner.
+
+**What unblocks it, exactly one line**, at `chat-gif-muted-contract.test.ts:48`:
+
+```ts
+const MESSAGE = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
+```
+
+All four strings are in that file verbatim, including the `isMutedGif` body and the `<img>` tag,
+which is why re-pointing the constant is sufficient and nothing below it needs rewording. It is a
+test file this batch did not create, so it is named rather than edited.
+
+**high** · `defect` · reference byte **1,326,195**
+
+```
+l=`<div class="chat-gif-muted" id="${c}" onclick=showChatGif('${c}')>gif muted, click to show</div>`
+```
+
+**Ours:** `src/lib/chat-gif-muted-contract.test.ts:48`, against
+`src/lib/components/MessageBody.svelte:155-172`.
+
+### MSB-05 — the gif reveal's two labels are the capture's, and `showChatGif` is not in any bundle
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`showChatGif` occurs exactly **once** in `main.d1d09071be31f1ba.js`, and that occurrence is inside
+the template string `urlwrapImg` builds — the function itself is defined nowhere in the bundle. It
+is in `deployed-index.html:152`, an inline page script:
+
+```js
+function showChatGif(id) {
+  const el = $(`#${id}`);
+  if (el.next().hasClass('d-none')) { el.text('click to hide'); el.next().toggleClass('d-none') }
+  else { el.text('gif muted, click to show').next().toggleClass('d-none') }
+}
+```
+
+So the placeholder's label really does swap, and `{revealedGifs[segment.url] ? 'click to hide' :
+'gif muted, click to show'}` is the capture's behaviour rather than an invention — which is worth
+recording because a reader searching only the bundle will find the string `showChatGif` with no
+definition and reasonably conclude the reveal is dead code. `openImageModal` is in the same script
+and is the same shape: one occurrence in the bundle, defined in the page.
+
+**low** · `missing-behaviour` · reference byte **1,326,281**
+
+```
+onclick=showChatGif('${c}')>gif muted, click to show</div>
+```
+
+**Ours:** MessageBody.svelte:161.
+
+### MSB-06 — `rel="noreferrer"` is ours, and `Sw.sanitize` is deliberately not reproduced
+
+**DELIBERATE DIVERGENCE — recorded 2026-08-31, not matched.**
+This row was ADDED after this document was committed, by the seventh batch.
+The reference's anchor is `'<a href="'+e+'" target="_blank" class="linkColor"
+onclick="event.stopPropagation()">'+Sw.sanitize(e)+"</a>"` — no `rel`, and the SANITISED url as the
+link TEXT beside the RAW one in `href`. Ours carries `rel="noreferrer"` and puts `segment.text` in
+the text position.
+
+Both differences are the same decision. `target="_blank"` with no `rel` hands the opened page a
+`window.opener` handle back into a room a member is logged into; reproducing that would reproduce a
+defect, which is what this disposition is for. And `Sw.sanitize` exists upstream because the string
+becomes markup — here it becomes a text node, so sanitising it would only mangle a URL a member can
+read, without removing any capability.
+
+**low** · `divergence` · reference byte **1,326,527**
+
+```
+return'<a href="'+e+'" target="_blank" class="linkColor" onclick="event.stopPropagation()">'+Sw.sanitize(e)+"</a>"
+```
+
+**Ours:** MessageBody.svelte:148-154.
+
+### MSB-07 — two muted gifs in one body still share a DOM id, exactly as upstream
+
+**MEASURED REFUSAL — read, measured, deliberately not changed 2026-08-31.**
+This row was ADDED after this document was committed, by the seventh batch.
+The placeholder id is built from the MESSAGE (`` const c = s ? `gifExtra_${o}` : `gif_${o}` ``), so
+a body carrying two `.gif` links renders two elements with one id. RM-16 fixed the two-COLUMNS half
+of this; the two-gifs-in-one-message half is untouched and is upstream's.
+
+**The measurement that justifies not changing it.** `document.getElementById` is called **zero**
+times against these ids in `apps/room/src` — the reveal is keyed by URL in `revealedGifs`, so the
+duplicate is inert here. Upstream it is not inert: `showChatGif(id)` resolves `$(`#${id}`)` and then
+walks `.next()`, so the capture's own reveal acts on whichever placeholder came first. Making ours
+unique — appending the segment index, say — would produce an id the captured stylesheet and the
+captured handler do not select on, for no behaviour this repository can observe. Recorded here so the
+next reader finds the measurement instead of repeating it.
+
+**low** · `divergence` · reference byte **1,326,195**
+
+```
+const c=s?`gifExtra_${o}`:`gif_${o}`
+```
+
+**Ours:** MessageBody.svelte:157.
+
+---
+
+## components/RichTextEditor.svelte
+
+Six rows. This surface had **zero mentions** anywhere in this document before 2026-08-31. Read end to
+end against `app-rich-text-editor` — the class at byte 1,224,523, its `rteConfig` literal at
+1,224,598, and its template's twelve-entry const table at 1,226,596.
+
+### RTE-01 — the placeholder never came back once the editor had been cleared
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The placeholder is drawn by `.ptr-rte-body:empty::before`, and `:empty` matches an element with no
+children at all — including no text node. A `contenteditable` region does not return to that state:
+every engine leaves a lone `<br>` behind so the caret has a line to sit on. So the placeholder
+showed on first open, and never again for the rest of the session once anybody typed and deleted.
+
+**Proven at runtime rather than argued.** The contract lifts the selector out of the component and
+runs it against real elements in jsdom. With `:empty` alone, a `div.ptr-rte-body` containing one
+`<br>` returns `false` from `matches()` — that is the negative control, and it is the defect itself.
+With the shipped selector it returns `true`, an element with text returns `false`, and an element
+containing `<b>hi</b>` returns `false`.
+
+The two shapes are not invented: `retriveRTEContent()` calls exactly these nothing —
+`("" === e || "<p><br></p>" === e || "<br>" === e || "<p></p>" === e) && (e = "")`. The two
+`<p>`-wrapped forms are summernote's own block wrapping and cannot occur in a bare `contenteditable`
+div, so the rule covers the two that can.
+
+`:global` is on the selector because the `<br>` is the BROWSER's — Svelte's CSS analysis cannot see
+an element no template writes, and pruned the rule as unused, which `svelte-check` reported as
+`Unused CSS selector ":has(> br:only-child)"` before the wrapper went on.
+
+**high** · `defect` · reference byte **1,226,086**
+
+```
+retriveRTEContent(){…let e="";try{e=ga("#msgTxtContainer")?.summernote("code")?.toString().trim()||""}catch{return""}return(""===e||"<p><br></p>"===e||"<br>"===e||"<p></p>"===e)&&(e=""),e}
+```
+
+**Ours:** RichTextEditor.svelte:171-177.
+
+### RTE-02 — the three-flag gate, asked twice
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`loadRTE()` refuses to CONSTRUCT the editor unless `sessData.enableRTE && preferences.enableRTE &&
+isPresenter`, and `retriveRTEContent()` asks the same three again before reading anything out of it
+— a second fence at send time, not a duplicate.
+
+Both halves are here. `composer.svelte.ts:209-213` resolves `canUseRTE` from the same three terms;
+`ModalHost.svelte:6763` renders the editor only under `{#if name === 'rich-text' && canUseRTE}`, so a
+shut gate produces no editor rather than a disabled one; and `sendRTE()`
+(`composer.svelte.ts:545-549`) recomputes `this.canUseRTE ? this.#rteDraft.trim() : ''`, which is the
+second fence in the same words. `isPresenter` reaches all of this from `data.user.role` on the
+server, never from the client.
+
+**high** · `missing-control` · reference byte **1,225,683**
+
+```
+loadRTE(){this.appService.globals.sessData.enableRTE&&this.appService.globals.preferences.enableRTE&&this.appService.globals.isPresenter&&(this.destroyRTE(),ga("#msgTxtContainer")?.summernote({...this.rteConfig}),ga("#msgTxtContainer")?.summernote("code",""))}
+```
+
+**Ours:** `lib/room/composer.svelte.ts:186-213, 545-549`; `ModalHost.svelte:6740-6763`.
+
+### RTE-03 — `destroyRTE()` replaces the host, and mount/unmount is the equivalent
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`destroyRTE()` tears summernote down and then `e.replaceWith('<div id="msgTxtContainer"></div>')` —
+the host element itself is thrown away and rebuilt empty, and both the Close button and the end of
+`sendMessage()` call it. Every open then calls `loadRTE()`, which starts with another `destroyRTE()`
+and ends with `summernote("code", "")`.
+
+Ours mounts the component under `{#if name === 'rich-text' && canUseRTE}` inside a `#msgTxtContainer`
+that is kept for exactly that reason, so closing the modal unmounts the editor and opening it mounts
+a fresh one whose `mountEditor` attachment focuses it. The id is structural rather than decorative
+and `ModalHost.svelte:6735-6744` says so.
+
+**low** · `missing-behaviour` · reference byte **1,225,943**
+
+```
+destroyRTE(){const e=ga("#msgTxtContainer");if(e.length){try{e.summernote("destroy")}catch{}e.replaceWith('<div id="msgTxtContainer"></div>')}}
+```
+
+**Ours:** `ModalHost.svelte:6722-6782`.
+
+### RTE-04 — the empty-message refusal, in the reference's own words
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`sendMessage()` opens `if(!e||""===e.trim())return P("Empty message. Please type a message..."),!1`,
+and `sendRTE()` raises that exact string through the dialog primitive (`composer.svelte.ts:549`).
+The four empty forms are `chat-html.ts:82` (`EMPTY_EDITOR_OUTPUT`), and `isEmptyChatHtml` widens
+them by stripping tags and `&nbsp;` — a deliberate divergence the composer's own doc argues for,
+because `<b></b>` passes the reference's four-string test and is then refused by the server with a
+400 the modal has nowhere to show.
+
+**medium** · `missing-control` · reference byte **1,225,257**
+
+```
+sendMessage(){let e=this.retriveRTEContent();if(!e||""===e.trim())return P("Empty message. Please type a message..."),!1;
+```
+
+**Ours:** `lib/room/composer.svelte.ts:521-560`; `lib/server/chat-html.ts:74-118`.
+
+### RTE-05 — the colour control is a swatch here and a summernote palette upstream, and the palette's markup is not in the capture
+
+**MEASURED REFUSAL — read, measured, deliberately not built 2026-08-31.**
+This row was ADDED after this document was committed, by the seventh batch.
+`rteConfig`'s toolbar declares `["color",["forecolor"]]`, which in summernote is a split button
+opening a two-tab colour palette. Ours is an `<input type="color">` in a Bootstrap label, and its
+`oninput` applies `foreColor` on every frame of a drag while `run()` calls `editor?.focus()` each
+time.
+
+**The measurement that justifies refusing rather than matching.** The palette's markup is not in this
+repository to match: over `main.d1d09071be31f1ba.js`, `note-color` — the class summernote renders the
+palette with — has **zero** occurrences, `note-btn` has **two**, and `forecolor` has **two**, both of
+them inside the `rteConfig` literal itself. So the only captured evidence for this control is the
+five-character config entry, which the component already reproduces exactly. Building a palette would
+mean inventing every colour, every tab label and every class in it — a value picked because it looked
+right, which is the thing this repository's standard names outright.
+
+The per-frame `oninput` is recorded, not fixed, for the same reason: changing it to `onchange` is a
+guess about which is closer to a palette pick, and neither can be checked against the capture or
+proven in a browser from this checkout. What IS asserted is the button SET — five `run(` calls and no
+sixth, so a control the captured config has no entry for cannot be added quietly.
+
+**low** · `divergence` · reference byte **1,224,598**
+
+```
+this.rteConfig={placeholder:"Type your message here...",minHeight:200,toolbar:[["font",["bold","italic","underline","clear"]],["color",["forecolor"]]],popover:{air:[]},dialogsInBody:!0,disableResizeEditor:!0}
+```
+
+**Ours:** RichTextEditor.svelte:127-138.
+
+### RTE-06 — Save or Send, chosen by `isEditing` over two embedded views
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+The modal has two entry points — `doRTEModal` (compose, carrying `channel` and an optional `txt`)
+and `doRTEModalEdit` (carrying `msg`) — and the primary button's label follows:
+`H(14,xue,2,0,"span")(15,Mue,2,0)` with `O(14,o.isEditing?14:15)`, where `xue` renders
+`<span>Save</span>` and `Mue` renders `<span>Send</span>`. `sendMessage()` branches the same way,
+into `editChatMessage {msgID, newMsg}` or `sendGrpChat(channel, e)`.
+
+All of it is here: `ModalHost.svelte:6777` renders the `<span>` pair under `rteIsEditing`, and
+`sendRTE()` branches into `#editMessage('chat', target, …)` or `sendBody(…)` on `#rteEditTarget`.
+The `<span>` is the capture's own wrapper and is kept rather than flattened.
+
+**low** · `missing-control` · reference byte **1,227,414**
+
+```
+d(13,"button",11),x("click",function(){return o.sendMessage()}),H(14,xue,2,0,"span")(15,Mue,2,0),u()…2&i&&(m(14),O(14,o.isEditing?14:15))
+```
+
+**Ours:** `ModalHost.svelte:6765-6780`; `lib/room/composer.svelte.ts:545-560`.
 
 ## The fifty-one refuted claims
 

@@ -90,11 +90,6 @@
     document.execCommand(command, false, argument);
     if (editor) value = editor.innerHTML;
   }
-
-  /** `clear` in the captured toolbar. `removeFormat` is execCommand's name for the same act. */
-  function clearFormatting() {
-    run('removeFormat');
-  }
 </script>
 
 <div class="ptr-rte">
@@ -119,11 +114,12 @@
       >
         <u>U</u>
       </button>
+      <!-- `clear` in the captured toolbar; `removeFormat` is execCommand's name for that act. -->
       <button
         type="button"
         class="btn btn-secondary"
         title="Remove formatting"
-        onclick={clearFormatting}
+        onclick={() => run('removeFormat')}
       >
         Clear
       </button>
@@ -171,8 +167,11 @@
     text-align: left;
   }
 
-  /* `contenteditable` has no placeholder attribute, so the empty state draws its own. */
-  .ptr-rte-body:empty::before {
+  /* No placeholder attribute on `contenteditable`, and EMPTY is two shapes: nothing, or the lone
+     `<br>` every engine leaves behind when a region is cleared — which is why `:empty` alone meant
+     the placeholder never came back. Both are `retriveRTEContent`'s own empty set. `:global`
+     because that `<br>` is the BROWSER's: Svelte cannot see it and prunes the selector as unused. */
+  :global(.ptr-rte-body:is(:empty, :has(> br:only-child)))::before {
     content: attr(data-placeholder);
     opacity: 0.6;
   }

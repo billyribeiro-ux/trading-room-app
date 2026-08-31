@@ -1732,8 +1732,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       (byte 1,326,195), because with the extra chat column on, the same message rendered in both
       panes produced two elements carrying one DOM id. Nothing here resolves anything through that
       id — the reveal is keyed by URL — so the duplicate was inert, and it was still a duplicate.
+
+      174 -> 173, 2026-08-31 (MSB-01). The nested body's five hand-listed props became one spread,
+      which is a line SHORTER as well as a prop that can no longer be forgotten — `extraChatMsg` was
+      the one that had been. A ceiling that falls out of a fix is the shape this ratchet wants.
     */
-    max: 174,
+    max: 173,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
@@ -5578,7 +5582,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/RichTextEditor.svelte',
-    max: 192,
+    /*
+      192 -> 191, 2026-08-31 (RTE-01). The placeholder rule grew the second empty shape a cleared
+      `contenteditable` actually takes, and `clearFormatting()` — a four-line wrapper around one
+      `run('removeFormat')` call, where its four sibling buttons already call `run` inline — went
+      back to the call site it had. Net one line down, which is the direction this list moves.
+    */
+    max: 191,
     why: 'the chat RTE, gated on three flags rather than one'
   },
   {

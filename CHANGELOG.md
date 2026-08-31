@@ -33,6 +33,67 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 00:35 EDT — RoomShell, MessageBody and RichTextEditor audited: four citations naming a bundle this repository has never held, and a placeholder that never came back
+
+**Runtime impact: YES, in two places, both small.**
+
+1. `RichTextEditor.svelte` — the composing placeholder ("Type your message here...") comes back after
+   the editor is cleared. It was drawn by `.ptr-rte-body:empty::before`, and `:empty` stops matching
+   the moment a `contenteditable` region is cleared, because every engine leaves a lone `<br>` behind
+   for the caret to sit on. So a presenter who typed anything and deleted it saw an empty grey box
+   for the rest of the session. The rule now also matches that shape, which is one of the four
+   `retriveRTEContent()` itself calls empty (`lib/server/chat-html.ts:82`). Proven in jsdom against
+   the shipped selector rather than argued: with `:empty` alone, a `div` holding one `<br>` returns
+   `false` from `matches()`.
+2. `MessageBody.svelte` — a body nested inside a `[{( … )}]` trade order now inherits `extraChatMsg`,
+   which it was not being handed. Its only effect is the muted-gif placeholder's id (`gifExtra_<id>`
+   against `gif_<id>`), and it is **unreachable today** — measured: `extraChatMsg={true}` has one
+   call site, `ExtraChatPane.svelte:441`, which is `kind="chat"`, and `parseBodySegments` emits a
+   `trade` segment only for `kind === 'alert'`. The five hand-listed props at that call site became
+   one spread of everything but `segments`, so a sixth cannot be forgotten the same way.
+
+**The rest is citations, and they are the finding.** `RoomShell.svelte` named `K4e` as the phone's
+template, `j4e` as the desktop one and `G4e`/`W4e` as the phone's two areas, citing
+`app-room.render-helpers.js` — a file with **zero** occurrences in this repository. Decoded against
+the pinned v4 bundle by walking `app-room`'s 229-entry const table by value: `K4e` (2,493,526) is the
+DESKTOP split, the phone's is `nRe` (2,496,317), `j4e` (2,490,857) is one `as-split-area` holding
+`app-extra-chat`, and `G4e`/`W4e` (2,492,523 / 2,492,690) are the Update Positions and Show/Hide
+Positions buttons. Three of the four would have survived a lookup — they are real functions and two
+of them are neighbours of the split — so only the update block separates them, which is why the new
+contract asserts on `dragEnd` and not on the name. Two further claims were false and are corrected:
+"the areas carry no `order`" (const 227 binds one) and "`prefs.extraChatColumn` has zero occurrences
+in this room" (`create-room.svelte.ts:343,432`; `prefs.svelte.ts:101,309,587,711`).
+
+**New gate.** `apps/room/src/lib/shell-body-rte-reference-contract.test.ts` — 18 assertions across
+the three surfaces, reading `apps/room/docs/source-v4-2026-08-15/` (tracked and SHA-256 pinned, so it
+runs on CI as well as locally) and decoding the const table with `const-table.mjs`. It also asserts
+that no raw-html tag appears anywhere in `MessageBody`, which is the highest-severity question on
+that surface and came back clean: every segment kind emits a text node or an attribute, and the one
+`{@html}` in `apps/room/src` is `routes/session/+page.svelte:264`, server-sanitised.
+
+**Ratchets moved DOWN, never up:** `MessageBody.svelte` 174 → 173 and `RichTextEditor.svelte`
+192 → 191 in `source-size-contract.test.ts`; `todo-next.md` goes from 2 to 5 of 72 surfaces audited.
+
+**Two rows are BLOCKED on one line each, both outside this batch's editable scope.**
+`chat-gif-muted-contract.test.ts:48` reads `RoomMessage.svelte` and asserts four strings that all
+moved to `MessageBody.svelte` on 2026-08-30 — that file is excluded on any checkout without the
+capture symlinks, so it is invisible here and **red on the owner's machine**; re-point that one
+constant. And `message-actions.svelte.ts:497` opens the ALERT's `targetUrl` when an inline image is
+clicked, so clicking an image inside a chat message does nothing at all; unblocking it needs an
+`ImageOpenPayload` member on the `MessageActionEvent` union at `types.ts:457`.
+
+**Verified:** `pnpm run gate` in `apps/room`. Thirteen negative controls, each mutated, verified as
+landed, run red, and restored — including pointing the phone's assertions at `K4e` (fails on
+`the phone template acquired a dragEnd`) and reverting the placeholder selector to `:empty` (fails
+with `expected false to be true`, which is the defect itself). **The Svelte MCP was NOT available in
+this session** — no `list-sections`, `get-documentation` or `svelte-autofixer` tool was offered —
+so `pnpm run check` (svelte-check: 0 errors, 0 warnings across 1,491 files) and `pnpm run lint` were
+run in its place, and that substitution is recorded rather than implied.
+
+Recorded as `## components/RoomShell.svelte` (SHL-01…06), `## components/MessageBody.svelte`
+(MSB-01…07) and `## components/RichTextEditor.svelte` (RTE-01…06) in
+`docs/decoded/room-surface-audit-2026-08-30.md`, which goes from 224 to 243 rows.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships

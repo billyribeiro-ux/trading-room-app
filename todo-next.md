@@ -108,13 +108,13 @@ guessed.
 | 32 | `lib/components/MessageMenu.svelte` | 252 | no |
 | 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
 | 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
-| 35 | `lib/components/RoomShell.svelte` | 268 | no |
+| 35 | `lib/components/RoomShell.svelte` | 268 | `## components/RoomShell.svelte` in the v4 register — 6 rows (SHL-01…06), 4 of them citation defects of ours. Read end to end 2026-08-31. |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
 | 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
-| 39 | `lib/components/RichTextEditor.svelte` | 191 | no |
+| 39 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
 | 40 | `lib/components/Modal.svelte` | 157 | no |
-| 41 | `lib/components/MessageBody.svelte` | 173 | no |
+| 41 | `lib/components/MessageBody.svelte` | 172 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
 | 42 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
 | 43 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
 | 44 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**5 of 72 surfaces audited · 1,702 of 34,935 lines · 4.9%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
