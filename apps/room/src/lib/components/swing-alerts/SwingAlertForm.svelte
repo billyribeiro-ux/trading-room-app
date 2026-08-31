@@ -54,7 +54,7 @@
   }: Props = $props();
 
   /**
-   * `x("paste", o => onImagePaste(o, "swing"))`, byte 1,992,250.
+   * `x("paste", o => onImagePaste(o, "swing"))`, the call site at byte 1,934,924.
    *
    * The handler keeps the LAST clipboard item whose type starts with `image` and ignores the rest,
    * which is what lets a paste carrying both a screenshot and its text URL resolve to the image.
@@ -176,7 +176,7 @@
         class="input-group-text bg-secondary border-secondary text-white img-upload-btn"
         onclick={onUploadImage}
       >
-        <i class="fas fa-image me-1"></i> Image
+        <i class="fas fa-image me-1"></i>{' Image '}
       </span>
     {/if}
     <!--
@@ -232,9 +232,9 @@
           class="form-check-input"
           bind:group={draft.direction}
         />
-        <label for="swingAlert-long" class="form-check-label text-success font-weight-bold">
-          Long
-        </label>
+        <label for="swingAlert-long" class="form-check-label text-success font-weight-bold"
+          >{' Long '}</label
+        >
       </div>
       <div class="form-check form-check-inline">
         <input
@@ -246,9 +246,9 @@
           class="form-check-input"
           bind:group={draft.direction}
         />
-        <label for="swingAlert-short" class="form-check-label text-danger font-weight-bold">
-          Short
-        </label>
+        <label for="swingAlert-short" class="form-check-label text-danger font-weight-bold"
+          >{' Short '}</label
+        >
       </div>
     </div>
     <!--
@@ -266,16 +266,16 @@
     <div class="text-end">
       <button type="button" class="btn btn-secondary btn-sm m-1" onclick={onCancel}>
         {#if draft.edit}
-          <i class="fas fa-trash me-1"></i>Discard
+          <i class="fas fa-trash me-1"></i>{'Discard '}
         {:else}
-          <i class="fas fa-times me-1"></i>Cancel
+          <i class="fas fa-times me-1"></i>{'Cancel '}
         {/if}
       </button>
       <button type="submit" class="btn btn-primary btn-sm m-1">
         {#if draft.edit}
-          <i class="fas fa-save me-1"></i>Save Changes
+          <i class="fas fa-save me-1"></i>{'Save Changes '}
         {:else}
-          <i class="fas fa-bell me-1"></i>Submit Alert
+          <i class="fas fa-bell me-1"></i>{'Submit Alert '}
         {/if}
       </button>
     </div>

@@ -64,7 +64,7 @@
   }: Props = $props();
 
   /**
-   * `x("paste", o => onImagePaste(o, "dayTrade"))`, the call site at byte 1,941,249.
+   * `x("paste", o => onImagePaste(o, "dayTrade"))`, the call site at byte 1,941,208.
    *
    * The discriminator string is `"dayTrade"` — camelCase, no hyphen, no capital D — and the shared
    * upload handler is deny-by-default on it: `"swing" === i ? … : "dayTrade" === i && (…)` at byte
@@ -192,7 +192,7 @@
         class="input-group-text bg-secondary border-secondary text-white img-upload-btn"
         onclick={onUploadImage}
       >
-        <i class="fas fa-image me-1"></i> Image
+        <i class="fas fa-image me-1"></i>{' Image '}
       </span>
     {/if}
     <!--
@@ -249,9 +249,9 @@
           class="form-check-input"
           bind:group={draft.direction}
         />
-        <label for="dayTradeAlert-long" class="form-check-label text-success font-weight-bold">
-          Long
-        </label>
+        <label for="dayTradeAlert-long" class="form-check-label text-success font-weight-bold"
+          >{' Long '}</label
+        >
       </div>
       <div class="form-check form-check-inline">
         <input
@@ -263,9 +263,9 @@
           class="form-check-input"
           bind:group={draft.direction}
         />
-        <label for="dayTradeAlert-short" class="form-check-label text-danger font-weight-bold">
-          Short
-        </label>
+        <label for="dayTradeAlert-short" class="form-check-label text-danger font-weight-bold"
+          >{' Short '}</label
+        >
       </div>
     </div>
     <!--
@@ -285,16 +285,16 @@
     <div class="text-end">
       <button type="button" class="btn btn-secondary btn-sm m-1" onclick={onCancel}>
         {#if draft.edit}
-          <i class="fas fa-trash me-1"></i>Discard
+          <i class="fas fa-trash me-1"></i>{'Discard '}
         {:else}
-          <i class="fas fa-times me-1"></i>Cancel
+          <i class="fas fa-times me-1"></i>{'Cancel '}
         {/if}
       </button>
       <button type="submit" class="btn btn-primary btn-sm m-1">
         {#if draft.edit}
-          <i class="fas fa-save me-1"></i>Save Changes
+          <i class="fas fa-save me-1"></i>{'Save Changes '}
         {:else}
-          <i class="fas fa-bell me-1"></i>Submit Alert
+          <i class="fas fa-bell me-1"></i>{'Submit Alert '}
         {/if}
       </button>
     </div>
