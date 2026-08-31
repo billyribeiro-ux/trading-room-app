@@ -6564,7 +6564,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       note recording that: a rule with two consumers and one implementation is how the second
       consumer ends up uncovered.
     */
-    max: 605,
+    /*
+      605 -> 667, 2026-08-31, for `STV-03` and `STV-06` — the two rows the audit filed BLOCKED on the
+      Svelte MCP, which is available for the first time in this session.
+
+      `STV-03` is the raise, and almost all of it is the argument rather than the code. The change is
+      one `$effect` becoming two; what needed writing down is WHY it cannot be one with a guard
+      inside it. Upstream carries `&& this.hls` on both of its reload paths and `this.hls` is null on
+      exactly one — iOS Safari's native HLS, where every number `getHlsConfig()` computes is consumed
+      by `new Hls(…)` and so provably cannot reach the viewer. Ours reloaded them anyway, costing
+      their buffered range and a jump to the live edge for a setting that could not apply. A single
+      effect reading both `videoSrc` and `bufferSizeLevel` cannot tell which dependency woke it, so
+      any guard written inside it suppresses the first load too — that sentence is the whole reason
+      the second effect exists, and it is the sentence a later "simplification" would delete.
+
+      Two further facts are recorded there because they are what make the split correct rather than
+      merely different, and neither is visible from the code: that `getHlsConfig()`'s read of
+      `bufferSizeLevel` sits after an `await` and so is NOT tracked (Svelte's `$effect` docs are
+      explicit), and that the new effect's first run is a no-op because `hls` is still null at mount
+      — a guard doing the work a `mounted` latch would otherwise have to, and stay in step with.
+
+      Twenty-one of the sixty-two lines are the three `svelte-autofixer` declines, written down
+      because this is the first session in which that tool could be run at all. One of them is not
+      stylistic: replacing `bind:this` with an attachment here would tear the `<video>` handle down
+      and rebuild it per effect re-run, which is precisely the behaviour `STV-05` measured and
+      refused to diverge from. A decline with its reason at the code is what stops that being
+      "tidied up" by the next reader holding the same suggestion.
+    */
+    max: 689,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {
@@ -6610,7 +6637,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       ONLY button. Two modules came out in the same commit — `flash-on-edit.ts` and
       `download-image.ts` — and the second took a method off `RoomModals` that never belonged there.
     */
-    max: 623,
+    /*
+      623 -> 638, 2026-08-31, for `DTP-02` — five `{' '}` mustaches and the measurement behind them,
+      the second of the two rows this pane had filed BLOCKED on the Svelte MCP.
+
+      Fifteen lines for five characters, and the ratio is the point. The reference writes six of the
+      row's eight cells with `ɵɵtextInterpolate` and exactly two with `ɵɵtextInterpolate1` — ours
+      honoured that split everywhere it mattered and lost it on those two, plus the heading's and the
+      empty state's block edges. The comment records which four of the heading's spaces survive
+      compilation and which two do not, so the next reader does not re-measure; and it states the
+      honest half — every one of the five is invisible on screen and is carried anyway, because
+      every capture comparison in this repository diffs RENDERED STRINGS.
+    */
+    max: 639,
     why: 'the day-trade alerts tab'
   },
   {
@@ -6637,7 +6676,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       two panes are one behaviour in two components, and the whole point of `dta-01` … `dta-04` is
       that all four rows were missing from BOTH.
     */
-    max: 578,
+    /*
+      578 -> 589, 2026-08-31. `SWP-01`, the swing half of `DTP-02` — the same five nodes, and eleven
+      lines rather than fifteen because the measurement and the rendered-string-versus-pixels split
+      are argued once, on the day pane, and pointed at from here.
+    */
+    max: 590,
     why: 'the swing alerts tab'
   },
   {

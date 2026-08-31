@@ -10314,7 +10314,7 @@ it is only the second reload that is dropped.
 
 ### STV-03 — The reload path has no `this.hls` guard, so a native-HLS viewer restarts their stream for a setting that cannot reach them
 
-**BLOCKED — read and measured 2026-08-31; what would unblock it is named below.**
+**BUILT 2026-08-31, by the session in which the Svelte MCP became available.**
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
@@ -10334,13 +10334,26 @@ again — a full reload to the live edge, losing the buffered range, for nothing
 also adds a fresh `loadedmetadata` listener each time and removes none, which is the `STV-05`
 mechanism arriving on a second path.
 
-**What blocks it is the fix's shape, not its size.** The guard cannot simply be added: the same
-`$effect` serves the FIRST load, where `hls` is legitimately null, and separating "a new stream must
-always load" from "a buffer change need not" means restructuring the effect's dependencies. That is
-a Svelte-semantics change — which `$effect` tracks what, and whether `untrack` belongs in it — and
-`CLAUDE.md` makes the Svelte MCP mandatory for exactly that class of question. **The MCP was not
-available in this session.** Unblocked by a session that has it; the reference's own guard is the
-target shape and both its byte offsets are above.
+**The fix's shape was the blocker, not its size, and the shape is one `$effect` becoming two.** The
+guard could not simply be added: the same effect served the FIRST load, where `hls` is legitimately
+null, so any guard written inside it would have suppressed that load too. Separating "a new stream
+must always load" from "a buffer change need not" is a Svelte-semantics question — which `$effect`
+tracks what — and `CLAUDE.md` makes the Svelte MCP mandatory for exactly that class of question.
+
+The load effect now reads `videoSrc` and the element; the buffer effect reads `bufferSizeLevel` and
+returns early when `hls` is null, which is upstream's own guard and upstream's own split
+(`ngAfterViewInit` loads unconditionally, the `ngOnInit` subscription reloads conditionally). Two
+facts settled from the official `$effect` documentation rather than assumed, and written at the
+code: `getHlsConfig()`'s read of `bufferSizeLevel` sits after `await import('hls.js')` and so is
+**not** tracked — *"values that are read asynchronously … will not be tracked"* — and the new
+effect's first run is a no-op because `hls` is still null at mount, so no `mounted` latch is needed.
+
+`svelte-autofixer` reports **no issues** on the result; its three suggestions are declined at the
+code with the reason, one of them load-bearing (see `STV-05` — an attachment in place of
+`bind:this` would rebuild the `<video>` handle per re-run and break the behaviour that row pinned).
+
+Two negative controls were run and both printed their failure: putting `bufferSizeLevel` back into
+the load effect went red, and removing the `hls` guard from the buffer effect went red.
 
 **medium** · `missing-behaviour` · reference byte **1,902,159**
 
@@ -10438,7 +10451,7 @@ load.
 
 ### STV-06 — The buffer button's trailing space is not rendered, measured on the compiler rather than the source
 
-**BLOCKED — read and measured 2026-08-31; what would unblock it is named below.**
+**BUILT 2026-08-31.**
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
@@ -10456,10 +10469,11 @@ and it is still carried, because every capture comparison in this repository dif
 and `apps/room/AGENTS.md` already argues the `{' Retry '}` idiom for exactly this. The fix is one
 character in a template: `Buffer: {bufferSizeName}` becomes `Buffer: {bufferSizeName}{' '}`.
 
-**Blocked on the same thing `DTF-01` was not**: that row was built by a session with the Svelte MCP,
-whose step 3 — `svelte-autofixer` until it returns nothing — is where the `{' '}` idiom is checked
-against `svelte/no-useless-mustaches` and the repository's two standing declines. The MCP was not
-available in this session, so the one-character change is named and not made.
+**Blocked on the same thing `DTF-01` was not**, and no longer: that row was built by a session with
+the Svelte MCP, whose step 3 — `svelte-autofixer` until it returns nothing — is where the `{' '}`
+idiom is checked against the repository's two standing declines. That MCP is available now, the
+decline was exercised (*"Unexpected mustache interpolation with a string literal value"*, refused
+for the reason `apps/room/AGENTS.md` gives), and the change is made.
 
 **low** · `divergence` · reference byte **1,910,654**
 
@@ -10694,7 +10708,7 @@ superseded number.
 
 ### DTP-02 — Five text nodes render without the reference's own leading and trailing spaces
 
-**BLOCKED — read and measured on the compiler 2026-08-31; what would unblock it is named below.**
+**BUILT 2026-08-31, measured on the compiler.**
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
@@ -10729,10 +10743,20 @@ edit icons precede it, none when they do not, because leading whitespace at a bl
 collapses in both. **Same pixels, different rendered string**, and the rendered string is what every
 capture comparison in this repository diffs.
 
-**Blocked on the same thing `STV-06` is.** The fix is five `{' '}` mustaches, which is the idiom
+**Unblocked by the same thing `STV-06` was.** The fix is five `{' '}` mustaches — the idiom
 `apps/room/AGENTS.md` records as one of the two `svelte-autofixer` suggestions this repository
-declines — and step 3 of the mandatory Svelte MCP workflow is where that decline is exercised. The
-MCP was not available in this session, so the five nodes are named, measured and left.
+declines, and step 3 of the mandatory Svelte MCP workflow is where that decline is exercised. That
+MCP is available now and all five are carried.
+
+The two INTERNAL spaces either side of the `<select>` are deliberately NOT wrapped: they survive
+compilation untouched, so a mustache around them would render a double space. That asymmetry is why
+this row names five nodes rather than "the heading", and
+`streaming-view-and-alert-panes-citation-contract.test.ts` now asserts the five it names and still
+asserts the ABSENCE of pads on the six `Ze` cells — which is the only direction the pair can now
+drift. Its four old assertions pinned the UNFIXED shape and its own comment said *"if somebody
+builds the row and adds `{' '}`, this flips and the two rows have to be re-dispositioned rather than
+silently contradicted"*; all four flipped together, which is this change's negative control already
+run.
 
 **low** · `divergence` · reference byte **1,943,655**
 
@@ -10887,9 +10911,9 @@ consts:[["alertForm","ngForm"],["speechRecoBody",""],[1,"mainPresentationAreaHol
 
 ### SWP-01 — Five text nodes render without the reference's own leading and trailing spaces
 
-**BLOCKED — read and measured on the compiler 2026-08-31.** The swing half of `DTP-02`; the
-reasoning, the compiler measurement and the honest split between the rendered string and the
-rendered pixels are recorded there and are not repeated.
+**BUILT 2026-08-31, measured on the compiler.** The swing half of `DTP-02`; the reasoning, the
+compiler measurement and the honest split between the rendered string and the rendered pixels are
+recorded there and are not repeated.
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces

@@ -365,7 +365,13 @@ async fn run_rejects_a_non_owner_before_creating_the_migration_ledger() {
             session_role,
             current_role,
         } => {
-            assert_eq!(expected, "ptr_clone");
+            // The accepted MIGRATOR identities, exactly as `run`'s preflight announces them.
+            // Bound to the allow-list rather than a literal: this line said only `ptr_clone` and
+            // went red on the first live run after the owner cutover staged a second accepted
+            // name — the very staleness the comment below records catching once already for the
+            // runtime role. The two `preflight_for_tests` cases further down keep their literal,
+            // correctly: they hand the preflight ONE owner name and assert it is echoed back.
+            assert_eq!(expected, migrate::ACCEPTED_MIGRATOR_ROLES.join(" or "));
             // The connected identity is the RUNTIME role, whatever it is currently named. Bound to
             // the constant rather than a literal, because these two went stale the moment the
             // runtime role was cut over and asserted a role nothing connects as.

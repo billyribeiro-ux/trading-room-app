@@ -306,7 +306,16 @@ const DIVERGED_FROM_IMPORT = new Map([
     unchanged. Negative control: the version gate removed, the same 22023 back.
   */
   ['services/api/src/db/mod.rs', '149a07ad65c3bb7668f0b7c99f50ea5d399d6e48775b7002c6a562f6e9318537'],
-  ['services/api/tests/migrations.rs', 'b4e46a6a7b8d10e8317ef5d549d6ef289ba97d7b817c925bdfb1be48f43750ad'],
+  /*
+    Re-pinned 2026-08-31 (PR #177, first live run of the merged tree):
+    `run_rejects_a_non_owner_before_creating_the_migration_ledger` asserted the rejection's
+    `expected` field equalled the literal `ptr_clone`, while the owner cutover had made it the
+    allow-list joined — `tradingroom or ptr_clone`. It now binds to
+    `migrate::ACCEPTED_MIGRATOR_ROLES.join(" or ")`, the same bound-not-literal treatment the two
+    assertions beside it already had; the two `preflight_for_tests` cases keep their literal
+    correctly, because that entry point takes ONE name and echoes it back.
+  */
+  ['services/api/tests/migrations.rs', '9afb6ebfcd27953bacbdb75ecf68366c35631352b7b5218895ef36f01ad9ee1e'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -326,8 +335,15 @@ const DIVERGED_FROM_IMPORT = new Map([
     on a live PG 16.13 cluster through the `migrate` binary: `session_user=tradingroom,
     current_user=ptr_clone` -> exit 1. The negative control rewrote it as "each fact is in the list"
     and turned the unanimity test red on all four impersonation rows.
+
+    Re-pinned 2026-08-31 (PR #177, first CI run of the merged tree): the owner-cutover paragraph in
+    this module QUOTED the two-name lookup shape verbatim while explaining why the allow-list is not
+    it — and `the_runtime_role_preflight_resolves_exactly_one_name` scans this file's TEXT, comments
+    included, so the quote itself turned the contract red. The comment now describes the shape in
+    words. Same failure family as template syntax quoted in a Svelte comment; the code was never the
+    two-name lookup.
   */
-  ['services/api/src/db/migrate.rs', '6057a6e5c9dfa8bf149b4c57954329bdc6d652224cb4bade027e4a96f3af9487'],
+  ['services/api/src/db/migrate.rs', 'd264ec6e7cf0e9790a0dd271876775896f127c897d89cb48db07cb7ed98bdad0'],
   /*
     Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half
     missed. Each was an untouched import until now, and each leaves the aggregate for its own pin
