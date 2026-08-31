@@ -70,7 +70,7 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 64 surfaces, measured
+## The inventory — all 72 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
@@ -104,7 +104,7 @@ guessed.
 | 28 | `lib/components/StreamTabs.svelte` | 305 | no |
 | 29 | `lib/components/ScreenTabs.svelte` | 341 | no |
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
-| 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
+| 31 | `lib/components/ScreenShareMenu.svelte` | 203 | no |
 | 32 | `lib/components/MessageMenu.svelte` | 252 | no |
 | 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
 | 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
@@ -115,7 +115,7 @@ guessed.
 | 39 | `lib/components/RichTextEditor.svelte` | 191 | no |
 | 40 | `lib/components/Modal.svelte` | 157 | no |
 | 41 | `lib/components/MessageBody.svelte` | 173 | no |
-| 42 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 42 | `lib/components/notes/NoteTabContent.svelte` | 134 | no |
 | 43 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
 | 44 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
 | 45 | `lib/components/BootboxDialog.svelte` | 145 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**2 of 72 surfaces audited · 1,072 of 34,908 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -151,7 +151,7 @@ guessed.
 | 60 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 61 | `routes/logout/+page.svelte` | 31 | no |
 | 62 | `routes/+layout.svelte` | 27 | no |
-| 63 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
+| 63 | `lib/components/FollowChatStylePane.svelte` | 152 | no |
 | 64 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 65 | `lib/components/LogArchiveModals.svelte` | 147 | no |
 | 66 | `lib/components/ChatArchivePane.svelte` | 143 | no |
@@ -160,7 +160,7 @@ guessed.
 | 69 | `lib/components/RestreamPane.svelte` | 105 | no |
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
-| 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 72 | `lib/components/AlertSendReportModal.svelte` | 161 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two

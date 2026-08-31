@@ -33,6 +33,77 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 04:40 EDT — Four room surfaces audited against the pinned v4 bundle: 13 rows, of which two keyboard traps and a one-pixel username
+
+**Runtime impact: YES.** Three of the thirteen change what the room serves.
+
+1. **A followed member's username could render at one pixel, permanently.** `FollowChatStylePane`'s
+   Text Size box was `bind:value` on `<input type="number">`. Svelte's numeric binding writes `null`
+   for an empty box (`to_number`, `node_modules/svelte/src/internal/client/dom/elements/bindings/
+   input.js:287-289`), `FollowChatStyle.fontSize` is typed `number`, and `message-styles.ts:123`
+   interpolates `${fontSize + 1}px` — and `null + 1` is `1`, not `NaN`. So clearing the field and
+   pressing Save changes persisted the `null` into `followedUsers` and drew that person's name at
+   1px on every message from then on. The box now writes through `nextFollowChatFontSize`, which
+   keeps the last good value and refuses only what `font-size` cannot express. The reference has the
+   same hole (const 113 is a bare two-way `ngModel` with no `min`), so this is recorded as a
+   deliberate divergence rather than a missing behaviour.
+2. **Two menus were mouse-only.** The navbar's Start/Stop Screen Sharing dropdown had no focusable
+   element in it at all — the trigger is an `<a>` with no `href`, every row is an `<li>` wrapping an
+   `aria-hidden` anchor — and the note tab's gear is a bare `dropdown-toggle` span with no `role`,
+   no `tabindex` and no text. Both are survivable upstream because Bootstrap's dropdown plugin
+   adopts them; `bootstrap-dropdown-contract.test.ts` measures that no app here depends on
+   `bootstrap`, so both were unreachable without a mouse. `role`, `tabindex`, `aria-label` and an
+   Enter/Space handler on each, on the precedent `GiphyPicker` and `ScreenTabs` already set.
+   `aria-hidden` stays on the captured anchors; with the name now on the list item it stops the
+   label being announced twice rather than hiding it.
+3. **The Welcome Mat marker was an invented value.** Const 122 of `app-presentationarea` is a green
+   `badge badge-success mx-1 p-0` span carrying a whole sentence — "This note is the Welcome Mat,
+   and will be shown by default when noboby is presenting", the capture's misspelling included. What
+   was rendered was `<i class="fas fa-home mx-1" title="Welcome Mat">`: no badge, and a two-word
+   title that occurs **zero times** in the 2,891,205-byte bundle. The badge is now painted and the
+   tooltip is real, through `#lib/ngb-tooltip.js`.
+
+**The other ten rows are refusals, blocks and corrections, each with its measurement.** The alert
+report modal's three (ASR-1/2/3) add no code: the reference component's stylesheet is thirteen rules
+of which eleven target elements RPT-01's refusal means cannot exist here and two already hold;
+`aria-labelledby` names the dialog's own id, so it has no accessible name — and so do **ten of this
+room's twenty-two `<Modal>` call sites**, nine of them in files this pass does not own, which is why
+one was not repaired alone; and nothing focuses the dialog on open, **BLOCKED on one line**:
+`Modal.svelte:95`, `if (open) return;` → `if (open) { node.focus(); return; }`, one line for all 22
+dialogs.
+
+**Four byte offsets in `ScreenShareMenu`'s own entry table were 47 to 100 too high**, and every one
+landed INSIDE the function it named — `a4e` 2,479,514→2,479,414, `l4e` 2,479,700→2,479,632, `c4e`
+2,479,924→2,479,832, `d4e` 2,480,060→2,480,013 — so opening any of them showed plausible code from
+the right template and confirmed the citation to anyone who checked it that way. A fifth, in
+`FollowChatStylePane`'s UIM-16 comment, was out by four. Only `indexOf('function a4e(')` settles it.
+Every const index cited by all four components was re-derived by bracket-walking the owning
+component's `consts:[[` table BY VALUE and every one was correct, which is worth recording beside
+the offsets: a recent pass found three components whose const indices were each one too high, and
+the lesson generalises in neither direction.
+
+**Three modules and three test files came out of it, because three of the four components were
+sitting exactly on their `source-size-contract` ceilings and the ratchet's answer to that is to
+extract.** `lib/screen-share-menu.ts`, `lib/follow-chat-style.ts` and
+`lib/components/notes/note-tab-chrome.ts` carry the props, the measurements and the handlers;
+`screen-share-menu-contract.test.ts`, `note-tab-content-contract.test.ts` and
+`follow-chat-style.test.ts` are the gates. All four ceilings went DOWN: 171→154, 165→162, 151→135,
+208→204.
+
+**Verified:** `pnpm run gate` in `apps/room`, green. **Sixteen negative controls**, each mutated,
+the mutation verified as landed, run, seen RED, and restored by file copy — including the one that
+caught this pass's own error: the first control script restored with `git checkout --`, which
+reverted four in-progress components to HEAD. The register's counts test also went red on arrival
+(237 vs 235) because two marker sentences had wrapped across a line, which is the check working.
+
+**Not verified:** nothing in this change was run in a browser. The 1px username is demonstrated
+against `resolveMessageStyles` directly rather than against a rendered room, and the two keyboard
+paths are asserted as markup rather than driven with a real Tab key.
+
+`docs/decoded/room-surface-audit-2026-08-30.md` gains four `## ` sections (FCS-, ASR-, NTC-, SSM-)
+and its single running-total paragraph and disposition line move to **0 open · 237 closed · 237
+rows**. `todo-next.md`'s inventory is re-measured for the four files it names.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships

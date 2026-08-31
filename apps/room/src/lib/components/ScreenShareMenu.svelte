@@ -1,4 +1,7 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+  import { activateOnKey, type ScreenShareMenuProps } from '#lib/screen-share-menu.js';
+
   /**
    * The navbar's Start/Stop Screen Sharing dropdown — the whole control, and everything in it.
    *
@@ -17,33 +20,39 @@
    * | --- | --- | --- |
    * | Share Screen | `d(6,"li",185)` | always |
    * | OBS / XSPLIT / Share Virtual Cam | `d(10,"li",186)` | always |
-   * | OBS / RTMP / Stream / Restream | `a4e`, byte 2,479,514 | `sessData.useMediaMTX` |
-   * | Stop Sharing All Screens | `l4e`, byte 2,479,700 | `isScreenSharing` |
-   * | Reopen Screenshare Preview | `c4e`, byte 2,479,924 | `isScreenSharing` |
-   * | Stop Sharing {screenName} | `d4e`, byte 2,480,060 | one per local screen |
+   * | OBS / RTMP / Stream / Restream | `a4e`, byte 2,479,414 | `sessData.useMediaMTX` |
+   * | Stop Sharing All Screens | `l4e`, byte 2,479,632 | `isScreenSharing` |
+   * | Reopen Screenshare Preview | `c4e`, byte 2,479,832 | `isScreenSharing` |
+   * | Stop Sharing {screenName} | `d4e`, byte 2,480,013 | one per local screen |
+   *
+   * **Those four byte offsets were each 47 to 100 too high until 2026-08-31** (2,479,514 /
+   * 2,479,700 / 2,479,924 / 2,480,060), and every one of them landed INSIDE the function it named
+   * rather than outside it — which is why nobody caught them: opening the offset shows plausible
+   * code from the right template. `indexOf('function a4e(')` is what settles it, and the numbers
+   * above are that. The const indices in the same table were re-checked the same way and were all
+   * correct: 115, 158, 163, 185, 186, 187 and 188 are exactly what a by-value bracket-walk of
+   * `app-room`'s consts table (`consts:[` at byte 2,533,190, 229 entries) hands back.
    *
    * The DIVIDERS are not decoration and are placed where the capture places them: `a4e` opens with
    * one, `l4e` opens with two, and `c4e` closes with one. Read as a group they are what separates
    * "start something" from "stop something" in a menu that does both.
+   *
+   * ## The four attributes on each row that the capture does not have
+   *
+   * `role`, `tabindex`, `aria-label` and the Enter/Space handler. Every entry upstream is a click
+   * on an `<li>` wrapping an `aria-hidden` anchor with no `href`, so nothing in this control was
+   * focusable and nothing in it had a name. The measurement, the precedent and the reason
+   * `aria-hidden` stays are in `#lib/screen-share-menu.js`, beside the props; SSM-2 (why all six
+   * clicks sit on the `<li>` where the capture splits them three and three) and SSM-3 (that none of
+   * the six is inert upstream, unlike four of the stream tab's) are there too.
    */
-  export type LocalScreen = { readonly id: string; readonly screenName: string };
-
   let {
-    /** `mediaService.isScreenSharing` — three of the six entries are behind it. */
     screenSharing,
-    /** `menus.screen`; the navbar owns which top-level menu is open, because only one may be. */
     menuOpen,
-    /*
-      The three captured labels, passed rather than restated. `virtualCamText` is
-      ' OBS / XSPLIT/ Share Virtual Cam' — the spacing and the missing space after the second slash
-      are the reference's, and one of them has already been the source of a bug here.
-    */
     shareScreenText,
     virtualCamText,
     stopSharingAllText,
-    /** `sessData.useMediaMTX`. */
     streamingTabAvailable,
-    /** The screens THIS browser is sharing; upstream's `screenProducers` map. */
     localScreens,
     ontoggle,
     onpromptforscreenname,
@@ -51,22 +60,30 @@
     onopenstreamingtab,
     onreopenpreview,
     onstoplocalscreen
-  }: {
-    screenSharing: boolean;
-    menuOpen: boolean;
-    shareScreenText: string;
-    virtualCamText: string;
-    stopSharingAllText: string;
-    streamingTabAvailable: boolean;
-    localScreens: readonly LocalScreen[];
-    ontoggle: () => void;
-    onpromptforscreenname: (source: 'screen' | 'camera') => void;
-    onstopscreensharing: () => void;
-    onopenstreamingtab: () => void;
-    onreopenpreview: () => void;
-    onstoplocalscreen: (producerId: string) => void;
-  } = $props();
+  }: ScreenShareMenuProps = $props();
 </script>
+
+<!--
+  One row of the menu, six times. Why the label keeps the capture's spaces while `aria-label` trims
+  them, and why the badge is an optional render rather than a conditional block, are in
+  `screen-share-menu-contract.test.ts` — which is also what fails if a seventh row is written
+  longhand beside this snippet instead of through it.
+-->
+{#snippet entry(label: string, title: string | undefined, run: () => void, badge?: Snippet)}
+  <li
+    {title}
+    role="menuitem"
+    tabindex="0"
+    aria-label={label.trim()}
+    onclick={run}
+    onkeydown={(event) => activateOnKey(event, run)}
+  >
+    <!-- svelte-ignore a11y_missing_attribute -->
+    <a aria-hidden="true">{label}{@render badge?.()}</a>
+  </li>
+{/snippet}
+
+{#snippet newBadge()}<span class="badge text-bg-danger ms-1">New</span>{/snippet}
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -75,10 +92,10 @@
   class="screen-sharing nav-item dropdown"
   onclick={(event) => event.stopPropagation()}
 >
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <a
     id="dropdownScreenSharing"
+    role="button"
+    tabindex="0"
     data-bs-toggle="dropdown"
     aria-haspopup="true"
     aria-expanded={menuOpen}
@@ -87,29 +104,23 @@
       { muted: !screenSharing, 'text-white': screenSharing }
     ]}
     onclick={() => ontoggle()}
+    onkeydown={(event) => activateOnKey(event, ontoggle)}
   >
     <i class="fas fa-2x fa-desktop"></i>
     <span class="ml-2 mainNavItem">Start/Stop Screen Sharing</span>
   </a>
   <ul
+    role="menu"
     aria-labelledby="dropdownScreenSharing"
     data-bs-popper={menuOpen ? 'static' : undefined}
     class={['screen-options-start-screen dropdown-menu dropdown-menu-end', { show: menuOpen }]}
     style={menuOpen ? 'display: block;' : undefined}
   >
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <li title="(Regular Bandwidth) ** RECOMMENDED" onclick={() => onpromptforscreenname('screen')}>
-      <!-- svelte-ignore a11y_missing_attribute -->
-      <a aria-hidden="true">{shareScreenText}</a>
-    </li>
+    {@render entry(shareScreenText, '(Regular Bandwidth) ** RECOMMENDED', () =>
+      onpromptforscreenname('screen')
+    )}
     <div class="dropdown-divider"></div>
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <li title="OBS" onclick={() => onpromptforscreenname('camera')}>
-      <!-- svelte-ignore a11y_missing_attribute -->
-      <a aria-hidden="true">{virtualCamText}</a>
-    </li>
+    {@render entry(virtualCamText, 'OBS', () => onpromptforscreenname('camera'))}
     <!--
         `e4e` in the capture, verbatim - TWO dividers, then a bare `li > a` with no
         icon, bound to `mediaService.stopSharingAll()`:
@@ -123,7 +134,7 @@
         reachable through a remote `mutescreens` command from a presenter.
       -->
     <!--
-      G05 — ` OBS / RTMP / Stream / Restream `, `a4e` at byte 2,479,514, gated
+      G05 — ` OBS / RTMP / Stream / Restream `, `a4e` at byte 2,479,414, gated
       `O(13, sessData.useMediaMTX ? 13 : -1)`.
 
       ```js
@@ -144,26 +155,19 @@
     -->
     {#if streamingTabAvailable}
       <div class="dropdown-divider"></div>
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <li title="OBS / RTMP / Stream / Restream" onclick={onopenstreamingtab}>
-        <!-- svelte-ignore a11y_missing_attribute -->
-        <a aria-hidden="true"
-          >{' OBS / RTMP / Stream / Restream '}<span class="badge text-bg-danger ms-1">New</span></a
-        >
-      </li>
+      {@render entry(
+        ' OBS / RTMP / Stream / Restream ',
+        'OBS / RTMP / Stream / Restream',
+        onopenstreamingtab,
+        newBadge
+      )}
     {/if}
     {#if screenSharing}
       <div class="dropdown-divider"></div>
       <div class="dropdown-divider"></div>
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <li onclick={onstopscreensharing}>
-        <!-- svelte-ignore a11y_missing_attribute -->
-        <a aria-hidden="true">{stopSharingAllText}</a>
-      </li>
+      {@render entry(stopSharingAllText, undefined, onstopscreensharing)}
       <!--
-        G06 — ` Reopen Screenshare Preview`, `c4e` at byte 2,479,924, gated on the same
+        G06 — ` Reopen Screenshare Preview`, `c4e` at byte 2,479,832, gated on the same
         `isScreenSharing`. Its divider comes AFTER the item, which is why it is written here
         and not folded into the pair above.
 
@@ -174,16 +178,11 @@
         `if (!mediaService.isScreenSharing) return !1; emit("reopenPreviewWindow")`
         (byte 2,519,083); the gate is the same one this branch already carries.
       -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <li onclick={onreopenpreview}>
-        <!-- svelte-ignore a11y_missing_attribute -->
-        <a aria-hidden="true">{' Reopen Screenshare Preview'}</a>
-      </li>
+      {@render entry(' Reopen Screenshare Preview', undefined, onreopenpreview)}
       <div class="dropdown-divider"></div>
     {/if}
     <!--
-      G07 — one ` Stop Sharing {screenName}` per screen, `d4e` at byte 2,480,060, repeated
+      G07 — one ` Stop Sharing {screenName}` per screen, `d4e` at byte 2,480,013, repeated
       over `mediaSoupService.screenProducers` — the LOCAL producer map, so a presenter sees
       their own shares and never anyone else's.
 
@@ -196,12 +195,9 @@
       identity, unlike the body segments next door.
     -->
     {#each localScreens as screen (screen.id)}
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <li onclick={() => onstoplocalscreen(screen.id)}>
-        <!-- svelte-ignore a11y_missing_attribute -->
-        <a aria-hidden="true">{` Stop Sharing ${screen.screenName}`}</a>
-      </li>
+      {@render entry(` Stop Sharing ${screen.screenName}`, undefined, () =>
+        onstoplocalscreen(screen.id)
+      )}
     {/each}
   </ul>
 </li>

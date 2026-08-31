@@ -41,6 +41,13 @@ import { RoomNotes } from './room/notes.svelte.js';
 
 const NOTES_PANE = readFileSync('src/lib/components/notes/NotesPane.svelte', 'utf8');
 const TAB_CONTENT = readFileSync('src/lib/components/notes/NoteTabContent.svelte', 'utf8');
+/**
+ * The tab's props moved to `note-tab-chrome.ts` on 2026-08-31, when NTC-1/2/3 took the component to
+ * its size ceiling. The two assertions below that read a PROP DECLARATION read that file; the one
+ * that reads the CALL still reads the markup. Splitting them is the point — the guarantee is "the
+ * menu item calls a prop of its own", and both halves of it have to stay findable.
+ */
+const TAB_PROPS = readFileSync('src/lib/components/notes/note-tab-chrome.ts', 'utf8');
 const EDITOR = readFileSync('src/lib/components/notes/NoteEditor.svelte', 'utf8');
 const COMMANDS = readFileSync('src/routes/presenter-commands.remote.ts', 'utf8');
 const EVENTS = readFileSync('src/lib/room/events.svelte.ts', 'utf8');
@@ -106,16 +113,16 @@ describe('the wiring that made it a lie is gone', () => {
       makes the two acts distinguishable at the call site.
     */
     expect(TAB_CONTENT, 'the menu item must call its own prop').toContain(
-      'activate(event, onBringEveryone)'
+      "{@render menuItem(' Bring everyone here', 'fa-eye', onBringEveryone)}"
     );
-    expect(TAB_CONTENT.includes('readonly onBringEveryone: () => void;')).toBe(true);
+    expect(TAB_PROPS.includes('readonly onBringEveryone: () => void;')).toBe(true);
     /*
       And `onSelect` is GONE from this component, which eslint found once the menu item stopped using
       it: the prop existed for that one mis-wired consumer and had no other reader. The tab CLICK
       belongs to `NotesPane`, which owns the anchor.
     */
     expect(
-      TAB_CONTENT.includes('readonly onSelect:'),
+      TAB_PROPS.includes('readonly onSelect:') || TAB_CONTENT.includes('readonly onSelect:'),
       'a prop nothing reads is dead scaffolding'
     ).toBe(false);
   });

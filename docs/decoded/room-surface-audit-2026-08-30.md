@@ -53,9 +53,20 @@ describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **
 the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
 byte offsets make the second reading the tempting one.
 
+**Fourteen rows now stand outside that pass, and this paragraph is the only place their number is
+stated.** RM-25 was the first; thirteen more arrived on 2026-08-31 with four further surfaces —
+`FollowChatStylePane` (3), `AlertSendReportModal` (3), `notes/NoteTabContent` (3) and
+`ScreenShareMenu` (4). Each carries the same marker sentence in its own body, so the disposition line
+below is derived from the rows rather than asserted beside them, and
+`room-surface-audit-counts.test.ts` fails in either direction if the two disagree. Earlier batches
+each appended a total of their own; every one was stale the moment the next batch landed, which is
+why there is one paragraph here and not six. The four new surfaces are deliberately NOT in the
+per-surface table above, for the same reason RM-25 is not: that table describes the two-verifier pass
+as it ran.
+
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 237 closed · 237 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4395,6 +4406,377 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
 
 ---
+
+---
+
+## FollowChatStylePane.svelte
+
+Read end to end 2026-08-31 against `vTe` (byte 2,068,821) and consts 100-126 of
+`app-user-info-modal`, bracket-walked BY VALUE out of that component's own table (`consts:[` at byte
+2,087,748, 131 entries). Twenty-three of the twenty-four elements matched byte for byte — the five
+field rows, `[1,"py-2"]` at 12, `["title","Chat Color Mode",1,"pb-2"]` at 102,
+`G2e=(t,n,e)=>({"background-color":t,color:n,"font-size":e})` for the preview's three properties,
+`TB=t=>({color:t})` for the two colour-only ones, `[1,"fw-bold"]` at 120. Three rows came out of
+it, and the first is a defect of OURS rather than a difference.
+
+### FCS-1 — the Text Size box could write `null`, and `null + 1` is 1: an emptied field saved a followed member's username at one pixel
+
+**FIXED 2026-08-31.** This row was ADDED after this document was committed.
+
+`bind:value` on `<input type="number">` does not refuse an empty box and does not write a string: it
+writes `null`. Svelte 5.56.10, `to_number` at
+`node_modules/svelte/src/internal/client/dom/elements/bindings/input.js:287-289` —
+`value === '' ? null : +value`. `FollowChatStyle.fontSize` is declared `number` at `lib/types.ts:59`,
+so nothing in the type system, `svelte-check` or eslint sees the lie.
+
+What that `null` does is not a missing style, and that is the whole row.
+`lib/message-styles.ts` interpolates the field three times for every message from that followed
+member: `:120` `font-size: ${fontSize}px` → `nullpx`, dropped by the parser; `:126`
+`${fontSize - 2}px` → `-2px`, dropped; and **`:123` `${fontSize + 1}px` → `1px`, because `null + 1`
+is `1` in JavaScript and not `NaN`.** That line is the username. `ModalHost.svelte:3338` persists the
+object as it stands, so the `null` outlives the modal and every subsequent message from that person
+renders their name at one pixel.
+
+**A DELIBERATE DIVERGENCE, because the reference has the same hole.** Const 113 is
+`["type","number","name","follow-chat-text-size","value","followChatStyle.fontSize","id",
+"follow-chat-text-size",1,"form-check-input",3,"ngModelChange","ngModel"]` — a two-way `ngModel` with
+no `min`, no `max` and no validator, and Angular's number accessor writes `null` for an empty box
+exactly as Svelte does. Matching it would reproduce the defect.
+
+The pane now binds `value` one way and writes back through `nextFollowChatFontSize`, which keeps the
+last good value and refuses only what `font-size` itself cannot express — a non-number, and anything
+at or below zero, since zero would put the username line back at 1px through the same `+ 1`. No
+maximum is invented, because the reference has none. `follow-chat-style.test.ts` demonstrates the
+`1px` first, on `resolveMessageStyles` directly, and then that the coercion prevents it.
+
+**reference byte 2,094,127** (const 113, consumed at `(24,"input",113)` inside `vTe`)
+
+```
+["type","number","name","follow-chat-text-size","value","followChatStyle.fontSize","id","follow-chat-text-size",1,"form-check-input",3,"ngModelChange","ngModel"]
+```
+
+**Ours:** FollowChatStylePane.svelte:85-96 (`value={style.fontSize}` + `oninput`), the rule and the
+whole measurement at `lib/follow-chat-style.ts`, the demonstration and the coercion's cases at
+`lib/follow-chat-style.test.ts`.
+
+### FCS-2 — the chat-sound label's on/off word is a `<span>` in the capture and was bare text here
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+`d(29,"label",117), v(30," Chat sound "), H(31,_Te,2,0,"span")(32,bTe,2,0)`, and the two templates
+are `function _Te(t,n){1&t&&(d(0,"span"),v(1,"on"),u())}` and its `off` twin at bytes 2,068,718 and
+2,068,769. Ours rendered `Chat sound {…}` with no element around the word. Nothing styles that span
+today, which is why this is `low` rather than a defect — but it is one element of captured DOM, it
+costs nothing, and a rule that ever targets it would have had nothing to target.
+
+**reference byte 2,068,718**
+
+```
+function _Te(t,n){1&t&&(d(0,"span"),v(1,"on"),u())}function bTe(t,n){1&t&&(d(0,"span"),v(1,"off"),u())}
+```
+
+**Ours:** FollowChatStylePane.svelte:104 now renders `Chat sound <span>{…}</span>`.
+
+### FCS-3 — the pane's UIM-16 citation was four bytes into the node it named
+
+**FIXED 2026-08-31.** This row was ADDED after this document was committed.
+
+The comment carrying `fw-bold` said "Read at bundle byte 2,070,269: `d(36,"strong",120),
+v(37,"Username:")`". `d(36,` actually begins at **2,070,265**; 2,070,269 lands on the `strong`
+inside it. The const index it cites is correct — 120 really is `[1,"fw-bold"]` in that table, checked
+by bracket-walking rather than by counting — which is the useful half of this row: the same pass
+found four offsets in `ScreenShareMenu` that were 47 to 100 out (SSM-4), and the ONE checked here was
+out by four. An offset that lands inside the thing it names reads as correct to anybody who opens it.
+
+**reference byte 2,070,265**
+
+```
+d(33,"div",118)(34,"div")(35,"div",119)(36,"strong",120),v(37,"Username:")
+```
+
+**Ours:** FollowChatStylePane.svelte:114, corrected in place.
+
+---
+
+## AlertSendReportModal.svelte
+
+Read end to end 2026-08-31: `selectors:[["app-alert-send-report-modal"]]` at byte 2,413,823, its
+consts table bracket-walked from `consts:[` at 2,413,870 (39 entries), the template, the class and
+the `styles:[…]` array. RPT-01 through RPT-08 already dispositioned the report itself; these three
+rows are everything else the component carries, and all three are refusals or blocks. Nothing was
+built, and the reason each was not is a measurement.
+
+### ASR-1 — the reference component's stylesheet is thirteen rules, eleven of them for elements that cannot exist here
+
+**MEASURED REFUSAL 2026-08-31.** This row was ADDED after this document was committed.
+
+Eleven of the thirteen are scoped to `.list-group`, `.list-group-item`, `.list-group-item:hover`,
+`.report-header`, `.report-header-container`, `.report-body`, `#search-select-addon`, `.form-select`,
+`.failed-reason`, `.sent-time` and `#pie-container` — every one an element RPT-01's refusal means
+this room does not render, so transcribing them would be eleven rules matching zero elements.
+
+The other two are `.modal-dialog`, and both already hold. `{width:100%;max-width:800px}` is
+`app.css:1524` (`#alert-send-report-modal > .modal-dialog { max-width: 800px }`), and `width:auto` on
+a block box with no padding or border resolves to the same used width as `width:100%`.
+`{overflow-y:initial!important}` restates that property's own initial value, and nothing in this
+room's `.modal-dialog` rule sets `overflow-y` at all.
+
+**reference byte 2,416,190**
+
+```
+.modal-dialog[_ngcontent-%COMP%]{overflow-y:initial!important}.modal-dialog[_ngcontent-%COMP%]{width:100%;max-width:800px}
+```
+
+**Ours:** nothing added. `alert-report-modal-contract.test.ts` counts the thirteen rules in the
+bundle, names seven of the eleven orphan selectors, asserts none of them is rendered here, and
+asserts the 800px rule is still in `app.css` — so if the refusal's premise ever expires the count
+goes red rather than the rules silently being missing.
+
+### ASR-2 — `aria-labelledby` names the dialog's own id, so the dialog has no accessible name; ten of this room's twenty-two dialogs are the same shape
+
+**MEASURED REFUSAL 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 0 is
+`["id","alert-send-report-modal","tabIndex","-1","role","dialog","aria-labelledby","alert-send-report-modal","aria-hidden","true",1,"modal","fade"]`.
+`aria-labelledby` points at the element it is on; the accessible-name computation's recursion guard
+drops a self-reference, so a screen reader announces a nameless `role="dialog"`. Ours reproduces it
+attribute for attribute, because it is the capture.
+
+**NOT repaired, and the reason is a count rather than a shrug.** Measured across `lib/components`:
+**22 `<Modal>` call sites; 9 pass a distinct `titleId`; 10 — including this one — are the same
+self-reference.** Nine of those ten are in `ModalHost.svelte` and `LogArchiveModals.svelte`, which
+this pass does not own. Repairing one of ten trades a captured-value divergence for an inconsistency
+across the room's dialogs. The fix is one `titleId` per site, in one change, by somebody who owns all
+three files; the count is pinned so that "ten" cannot quietly become "eleven".
+
+**reference byte 2,413,878**
+
+```
+["id","alert-send-report-modal","tabIndex","-1","role","dialog","aria-labelledby","alert-send-report-modal","aria-hidden","true",1,"modal","fade"]
+```
+
+**Ours:** AlertSendReportModal.svelte:59-62 unchanged; the three assertions are in
+`alert-report-modal-contract.test.ts`.
+
+### ASR-3 — nothing focuses this dialog when it opens, because Bootstrap's modal plugin did that upstream
+
+**BLOCKED 2026-08-31, on one line in a file this pass does not own.**
+This row was ADDED after this document was committed.
+
+Upstream the dialog is adopted by Bootstrap's modal plugin, which calls `_element.focus()` on show.
+This room ships no Bootstrap JavaScript at all — `bootstrap-dropdown-contract.test.ts` holds that
+premise for every app in the repository — and `Modal.svelte`'s only focus management is
+`releaseFocusWhenClosed`, which blurs on CLOSE. So opening the report modal leaves focus wherever it
+was, behind an `inert` boundary that is about to move.
+
+**The exact change: `apps/room/src/lib/components/Modal.svelte:95`, `if (open) return;` becomes
+`if (open) { node.focus(); return; }`.** The root already carries `tabindex="-1"`, so it is
+programmatically focusable, and the attachment that line lives in already runs on every change of
+`open`. It is one line for all 22 dialogs in this room, which is exactly why it should not be applied
+to one of them from inside this pass.
+
+**reference byte 2,413,878** (const 0's `tabIndex","-1"`, the attribute that makes the fix possible)
+
+**Ours:** `Modal.svelte:93-99`. `alert-report-modal-contract.test.ts` asserts the absence, so the day
+the line is added the assertion goes red and this row closes.
+
+---
+
+## notes/NoteTabContent.svelte
+
+Read end to end 2026-08-31 against `app-presentationarea`, whose consts table was bracket-walked BY
+VALUE from `consts:[` at byte 1,994,257 (294 entries) rather than looked up by slot, against the tab
+template `jSe` (1,928,605), the gear menu `USe` (1,927,567) and the badge `BSe` (1,927,509). The
+dirty pen (const 123), the rename anchor (124), the trailing space on the tab name
+(`Ne("",e.name," ")`) and all six menu labels matched. Three rows came out of it.
+
+### NTC-1 — the Welcome Mat marker is a green badge carrying a whole sentence; ours was a grey icon carrying two invented words
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 122 is
+`["placement","bottom","ngbTooltip","This note is the Welcome Mat, and will be shown by default when noboby is presenting",1,"badge","badge-success","mx-1","p-0"]`
+and its template is `function BSe(t,n){1&t&&(d(0,"span",122),T(1,"i",125),u())}`, where const 125 is a
+bare `[1,"fas","fa-home"]` — so the `mx-1` belongs to the badge and not to the icon.
+
+Ours rendered `<i class="fas fa-home mx-1" title="Welcome Mat">`. Two things were wrong and both are
+visible. The badge classes were absent, so the marker was an unpainted grey house where the reference
+paints a green pill (`css/complete-app-styles.css`: `.badge-success { background-color: rgb(0, 188,
+140) }`). And `title="Welcome Mat"` is an INVENTED VALUE: `"Welcome Mat"` as a quoted literal occurs
+**zero** times in the 2,891,205-byte bundle and `"title","Welcome Mat"` occurs zero times, while the
+bare words occur twelve times and every one is inside a longer sentence. So the one place the room
+explains what a Welcome Mat DOES said two words instead.
+
+The reference's own misspelling of "nobody" is kept, and the tooltip is paired with
+`{@attach ngbTooltip}` — `ngbtooltip` is an Angular directive that does nothing in a browser, which
+is the defect `#lib/ngb-tooltip.js` exists for.
+
+**reference byte 2,002,332** (const 122 in the table) / **1,927,509** (`BSe`)
+
+```
+function BSe(t,n){1&t&&(d(0,"span",122),T(1,"i",125),u())}
+```
+
+**Ours:** NoteTabContent.svelte:59-68; the constant and the measurement at
+`components/notes/note-tab-chrome.ts`; asserted by `note-tab-content-contract.test.ts`.
+
+### NTC-2 — the gear had no keyboard path, so every note action behind it was mouse-only
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 126 is
+`["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]` —
+a `<span>` whose only child is an `<i>`, with no `role`, no `tabindex` and no text. Upstream that is
+survivable because Bootstrap's dropdown plugin adopts the element and gives it keyboard behaviour.
+`bootstrap-dropdown-contract.test.ts` measures that **no app in this repository depends on
+`bootstrap`**, so the attribute is inert here and the span was simply unreachable: Edit Note, Rename
+Note, Bring everyone here, both Welcome Mat items and Delete could be reached with a mouse and by
+nothing else, on a tab strip a presenter drives while talking.
+
+`role="button"`, `tabindex="0"`, `aria-label="Note options"` and an Enter/Space handler are OURS, on
+the precedent `GiphyPicker` and `ScreenTabs` already set for the identical shape. The captured
+`data-bs-toggle` stays beside them; this is an addition, not a replacement.
+
+**reference byte 2,002,666**
+
+```
+["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]
+```
+
+**Ours:** NoteTabContent.svelte:99-110, with `notes-pane-render.test.ts` asserting the rendered
+attribute order and `note-tab-content-contract.test.ts` asserting all four cannot be dropped later as
+"not in the reference".
+
+### NTC-3 — the capture freezes one id on every note tab's gear, which is a duplicate id per open note
+
+**DELIBERATE DIVERGENCE 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 126 names every gear `dropdownMenuNote`, and const 127 —
+`["aria-labelledby","dropdownMenuNote",1,"dropdown-menu"]` — points every menu's label at that same
+literal. Two open notes are two elements sharing one id in one document, and both menus resolve their
+label to the FIRST gear. `aria-expanded="false"` is frozen for the same reason: Bootstrap's plugin
+rewrote it at runtime, and nothing rewrites it here.
+
+Ours binds `id={menuId}` / `aria-labelledby={menuId}` from `NotesPane`'s
+`` `${componentId}-note-menu-${note.id}` `` and `aria-expanded={menuOpen}` from the state that
+actually opens the menu. Recorded rather than matched: reproducing it would reproduce a defect.
+
+**reference byte 2,002,764**
+
+```
+["aria-labelledby","dropdownMenuNote",1,"dropdown-menu"]
+```
+
+**Ours:** NoteTabContent.svelte:100/111; asserted by `note-tab-content-contract.test.ts`.
+
+---
+
+## ScreenShareMenu.svelte
+
+Read end to end 2026-08-31 against `u4e` (byte 2,480,269) and its four child templates in `app-room`,
+whose consts table was bracket-walked BY VALUE from `consts:[` at byte 2,533,190 (229 entries). Every
+const index the component cited — 99, 108, 115, 158, 163, 182, 184, 185, 186, 187, 188 — was correct;
+every BYTE OFFSET it cited was not. Four rows.
+
+### SSM-1 — the whole control had no focusable element in it, so a presenter could neither open the menu nor reach one entry from the keyboard
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+Every row upstream is `<li title=… (click)=…><a aria-hidden="true">label</a></li>` — consts 185, 186
+and 187 carry the click and const 158 is a bare `["aria-hidden","true"]` — and the trigger is const
+182, an `<a>` with `data-bs-toggle="dropdown"` and no `href`. Transcribed faithfully that is a control
+in which **nothing is focusable and nothing has a name**: an `<a>` without `href` is out of the tab
+order, an `<li>` is never in it, and the only text-bearing node in each row is explicitly hidden from
+assistive technology. Bootstrap's dropdown plugin covers it upstream; this room ships none, so the
+navbar button that starts and stops a presenter's broadcast was mouse-only end to end.
+
+`role="menu"` on the list, and `role="menuitem"`, `tabindex="0"`, `aria-label` and an Enter/Space
+handler on each row and on the trigger. `aria-hidden` STAYS on every anchor — it is captured, and
+with the name now on the `<li>` it stops the label being announced twice rather than hiding it. The
+six rows became ONE snippet in the same change, because four attributes repeated six times are four
+attributes that will be missing from the seventh.
+
+**reference byte 2,544,009** (const 182 in the table) / **2,480,269** (`u4e`)
+
+```
+["id","dropdownScreenSharing","data-bs-toggle","dropdown","aria-haspopup","true","aria-expanded","false",1,"nav-link","dropdown-toggle","d-flex","align-items-center",3,"ngClass"]
+```
+
+**Ours:** ScreenShareMenu.svelte:71-115; the argument and the key handler at
+`lib/screen-share-menu.ts`; asserted by `screen-share-menu-contract.test.ts`.
+
+### SSM-2 — the capture splits the six clicks three on the `<li>` and three on the `<a>`; all six sit on the `<li>` here
+
+**DELIBERATE DIVERGENCE 2026-08-31.** This row was ADDED after this document was committed.
+
+Consts 185, 186 and 187 each end `3,"click"`, so Share Screen, OBS / XSPLIT and OBS / RTMP carry the
+handler on the list item. `l4e`, `c4e` and `d4e` instead do `d(2,"li")(3,"a",163)`, where const 163 is
+`["aria-hidden","true",3,"click"]` — the handler on the anchor.
+
+Measured: `.dropdown-menu li` has no rule of its own in `css/complete-app-styles.css`, and these
+anchors are not `.dropdown-item` — they are bare inline `<a>` with no `href`, so an anchor's box is
+exactly its text. Upstream's "Stop Sharing All Screens" is therefore clickable on its words and dead
+on the rest of the row, while "Share Screen" two entries above is clickable across the whole row.
+Reproducing the split would reproduce a hit-target bug, and it would also put the focusable element
+SSM-1 adds onto the one node `aria-hidden` is on.
+
+**reference byte 2,479,632**
+
+```
+function l4e(t,n){if(1&t){const e=Y();T(0,"div",115)(1,"div",115),d(2,"li")(3,"a",163),x("click",function(){return D(e),E(g(3).mediaService.stopSharingAll())}),v(4," Stop Sharing All Screens"),u()()}}
+```
+
+**Ours:** the one `entry` snippet at ScreenShareMenu.svelte:71-83, `onclick={run}` on the `<li>`.
+
+### SSM-3 — none of the six entries is inert upstream, unlike four of the stream tab's
+
+**MEASURED REFUSAL 2026-08-31 — nothing to build.**
+This row was ADDED after this document was committed.
+
+The `StreamTabs` pass found four controls in that tab that are inert UPSTREAM: a forced eye badge
+with no writer, a lock badge with no writer, a `toggleLockScreenMTX` whose body is
+`console.error("TODO: …")`, and a "Bring everyone here" whose `focusOnScreen` no receiver resolves.
+This menu was checked against that class before any of its entries was treated as a gap, and none of
+the six is in it. Upstream each reaches a real body — `mediaService.startScreenSharing`,
+`mediaService.stopSharingAll`, `mediaService.stopSharingProducer`, `openStreamingTab()` and
+`reopenPreviewWindow()`, each occurring more than once in the bundle, so each has a definition as
+well as a call — and the 2,000 bytes around the four templates contain no `TODO` at all. Here all six
+callbacks arrive from `routes/+page.svelte` (`:1203`, `:1204`, `:1223`, `:1224`, `:1225`) and land on
+a real implementation.
+
+**reference byte 2,479,414**
+
+```
+function a4e(t,n){if(1&t){const e=Y();T(0,"div",115),d(1,"li",187),x("click",function(){return D(e),E(g(3).openStreamingTab())}),d(2,"a",158),v(3," OBS / RTMP / Stream / Restream "),d(4,"span",188),v(5,"New"),u()()()}}
+```
+
+**Ours:** nothing added; the check itself is asserted in `screen-share-menu-contract.test.ts`.
+
+### SSM-4 — all four template byte offsets in the component's own entry table were 47 to 100 too high, and every one landed inside the function it named
+
+**FIXED 2026-08-31.** This row was ADDED after this document was committed.
+
+| cited | actual | out by |
+| --- | ---: | ---: |
+| `a4e` 2,479,514 | **2,479,414** | 100 |
+| `l4e` 2,479,700 | **2,479,632** | 68 |
+| `c4e` 2,479,924 | **2,479,832** | 92 |
+| `d4e` 2,480,060 | **2,480,013** | 47 |
+
+The shape is the reason this is a row and not a typo. Not one of the four is out far enough to leave
+the function it names, so opening any of them shows plausible code from the right template and
+confirms the citation to anybody who checks it that way. Only `indexOf('function a4e(')` settles it.
+The CONST indices in the same table were re-checked the same way and were all correct, which is worth
+recording beside the offsets: a recent pass found three components whose const indices were each one
+too high, and the lesson generalises in neither direction — every citation has to be re-derived, not
+spot-checked.
+
+**reference byte 2,479,414**
+
+**Ours:** ScreenShareMenu.svelte:20-34, corrected in place with the four wrong numbers kept in the
+sentence that says they were wrong. `screen-share-menu-contract.test.ts` asserts all four `indexOf`
+results and that each wrong number appears exactly once, so neither the correction nor its record can
+drift back.
 
 ## The fifty-one refuted claims
 

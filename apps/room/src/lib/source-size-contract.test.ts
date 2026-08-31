@@ -1356,7 +1356,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       Nothing to extract: this file IS the extraction, and one attribute does not warrant a second.
     */
-    max: 171,
+    /*
+      171 -> 154, 2026-08-31, FCS-1. The Text Size box stopped being a `bind:value` — Svelte's
+      numeric binding writes `null` for an empty field and `null + 1` is `1`, so clearing it saved
+      a followed member's username at one pixel — and the props, the `$bindable` argument and that
+      whole measurement left for `#lib/follow-chat-style.js`, which is where the coercion they
+      govern now lives. The file grew by the input's four lines and shrank by thirty-three.
+    */
+    max: 154,
     why: 'the follow-chat colour and size editor - five inputs, a live example, three callbacks'
   },
   {
@@ -1378,7 +1385,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       stand exactly here when they do — which is the whole argument for the explanation living with
       the surface rather than in the host that opens it.
     */
-    max: 165,
+    /*
+      165 -> 162, 2026-08-31. ASR-1/2/3 added an eight-line pointer and the argument itself went to
+      `alert-report-modal-contract.test.ts`: the reference stylesheet's thirteen rules, the
+      self-referential `aria-labelledby` shared by ten of this room's twenty-two dialogs, and the
+      focus-on-open that is one line of `Modal.svelte` away. Eleven lines of prose left the file
+      with them.
+    */
+    max: 162,
     why: 'the alert-report modal — one honest notice, and the measurement that decided against six controls'
   },
   {
@@ -1703,7 +1717,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       acquired knowledge of the OTHER top-level menus? `menuOpen` is one boolean because the navbar
       owns which menu is open; a second such prop means that ownership has leaked.
     */
-    max: 208,
+    /*
+      208 -> 204, 2026-08-31, SSM-1: `role`/`tabindex`/`aria-label` and an Enter/Space handler on a
+      control that had no focusable element in it at all, with the six rows folded into one snippet
+      so a seventh cannot arrive without them. The props, the argument and the key handler left for
+      `#lib/screen-share-menu.js`, and the four template byte offsets in the entry table were each
+      47 to 100 too high and are corrected. The trigger's `a11y_missing_attribute` ignore went with
+      them: `role="button"` satisfies the rule its missing `href` used to break, and eslint's
+      `no-unused-svelte-ignore` is what noticed.
+    */
+    max: 204,
     why: 'the navbar screen-sharing dropdown; six entries and the four gates between them'
   },
   {
@@ -6092,7 +6115,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/notes/NoteTabContent.svelte',
-    max: 151,
+    /*
+      151 -> 146, 2026-08-31, NTC-1/2/3: the Welcome Mat badge and its captured sentence, four
+      attributes that make the gear reachable, and the six menu rows folded into one snippet.
+      `note-tab-chrome.ts` came out in the same change carrying the constant, the two activations,
+      the rename attachment and the measurements behind all three rows.
+    */
+    max: 135,
     why: 'one note tab and its read-only view'
   },
   {
