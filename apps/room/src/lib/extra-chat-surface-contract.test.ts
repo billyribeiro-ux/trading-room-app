@@ -177,7 +177,11 @@ describe('XCP-03 and XCP-04 — what Enter does, defined once for both composers
   it('and a send closes the emoji picker, which is the send branch’s first act', () => {
     const send = 'this.showEmojiChooser=!1,this.sendMessage()';
     expect(at(2_386_367, send)).toBe(send);
-    const handler = PANE.slice(PANE.indexOf('function submitOnEnter'));
+    const handlerAt = PANE.indexOf('function submitOnEnter');
+    expect(handlerAt, 'the Enter handler was renamed; this slice guards nothing').toBeGreaterThan(
+      -1
+    );
+    const handler = PANE.slice(handlerAt);
     expect(handler.slice(0, 200)).toContain('emojiOpen = false;');
   });
 });

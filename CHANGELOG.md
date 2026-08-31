@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 01:30 UTC — Four parallel audits merged, and the three counts they each kept privately
+
+**Runtime impact: YES** — via the three audits merged, not via this entry. Fifty-three rows across
+seven surfaces (`MainTabStrip`, `RoomOverlays`, `VideoPlayer`, `ScheduledAlerts`, `AvDevicePane`,
+`ExtraChatPane`, `AlertQaModal`), each with its own CHANGELOG entry above. What is recorded here is
+what the MERGE cost, because that is the part no single branch could see.
+
+**Three trackers each held a number that was true only in the branch that wrote it.**
+
+`docs/decoded/room-surface-audit-2026-08-30.md` arrived with three separate paragraphs, one per
+agent, each ending *"N rows have therefore been appended since this document was committed"* — 18,
+23 and 42 — computed against the document as it stood in that worktree. All three were stale the
+moment a second branch merged. The running total now lives in ONE paragraph and each batch paragraph
+says only what it read; the marker count (**81**) is the only figure that cannot disagree with
+itself, and `room-surface-audit-counts.test.ts` is what reads it. **0 open · 304 closed · 304 rows.**
+
+`todo-next.md`'s inventory had grown by appending: rows 1-62 above a blockquote and rows "60"-"72"
+below it, so three numbers appeared twice, while the heading said *"all 64 surfaces"* and the totals
+said 75. It is one ranked table now, every row measured from the file it names — **81 surfaces,
+35,905 lines, 5 audited** — and the blockquote's own "62 FILES" and "2 of 62" follow the same count.
+`todo-next-coverage-contract.test.ts` caught every one of those, which is the whole reason it exists.
+
+**Three audited verdicts were nearly lost in the merge, and were recovered by measurement rather
+than by memory.** Resolving `todo-next.md` by taking one side discards the other side's verdict
+cells silently — the table still parses, the contract still passes, and three surfaces quietly read
+"no" again. Recovered by reading the verdict column out of all three worktree branches and keeping
+any non-`no` cell: `ExtraChatPane`, `AlertQaAlertCard`, `AlertQaComposer`, plus `AlertQaModal`'s
+`§QAM` sentence. Its stale *"Ours is 358 lines"* went with it — the lines column says 370.
+
+**`slice-anchor-contract.test.ts` went red at 144 against a ceiling of 142, and the ceiling went
+DOWN.** The three new inlined slices — two in `alert-qa-surface-contract.test.ts`, one in
+`extra-chat-surface-contract.test.ts` — are now bound to locals and asserted, which is exactly what
+that file's own failure message prescribes, and the count landed at **141**. A ratchet raised to
+admit new work stops being a ratchet.
+
+**Verified:** `pnpm run gate` in both apps, each exit read from a log — room **281 files, 4,788
+passed, 1 skipped**; controller **99 files, 1,057 passed, 21 skipped**; both `gate-exit=0`.
+
+**Not verified:** all three agents reported the Svelte MCP unavailable in their sessions, so
+`svelte-autofixer` was not run on any of the fourteen `.svelte` files they touched or created.
+`svelte-check` (0 errors, 0 warnings), `eslint` and `prettier` ran in its place. It is stated here as
+well as in their own entries because a substitution recorded only in the branch that made it is the
+kind of thing a merge loses.
+
 ### 2026-08-31 00:57 UTC — The retirement migration dropped a cluster-global role, and this repository's own convergence test refused it
 
 **Runtime impact: NO from this commit** — nothing here has been run against a deployed database.

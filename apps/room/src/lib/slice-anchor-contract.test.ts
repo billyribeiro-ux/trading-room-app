@@ -211,12 +211,17 @@ describe('a slice bound by indexOf asserts that indexOf found something', () => 
     */
     const inlined = scans.reduce((sum, s) => sum + s.inlined, 0);
     /*
-      142 measured on 2026-08-17. Not a target and not a debt to pay down in one go — a ceiling, in
-      the same spirit as `source-size-contract`'s. It may only go DOWN.
+      142 measured on 2026-08-17; **141 on 2026-08-31**. Not a target and not a debt to pay down in
+      one go — a ceiling, in the same spirit as `source-size-contract`'s. It may only go DOWN.
+
+      It went down by being paid rather than raised. Three surface audits merged on 2026-08-31
+      arrived with three new inlined slices and took the count to 144; the fix is the one this
+      message prescribes, and applying it to all three landed one below where the ceiling stood.
+      A ratchet that is raised to admit new work stops being a ratchet.
     */
     expect(
       inlined,
       'a slice inlining its own indexOf cannot be guarded by this file; bind the position to a local and assert it instead'
-    ).toBeLessThanOrEqual(142);
+    ).toBeLessThanOrEqual(141);
   });
 });

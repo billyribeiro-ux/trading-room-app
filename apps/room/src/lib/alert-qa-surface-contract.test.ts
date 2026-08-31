@@ -237,8 +237,19 @@ describe('QAM-10 and QAM-11 — the two BLOCKED rows, and what blocks them', () 
       them, while the image dispatcher resolves through exactly that field.
     */
     const host = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
-    const shape = host.slice(host.indexOf('    targetMessage: {'));
-    const declared = shape.slice(0, shape.indexOf('} | null;'));
+    /*
+      Bound to locals and asserted rather than inlined, which `slice-anchor-contract.test.ts` is the
+      file about: a moved marker makes `indexOf` return -1, `slice(-1)` yields one character, and
+      the two NEGATIVE assertions below then pass against that character while proving nothing.
+    */
+    const shapeAt = host.indexOf('    targetMessage: {');
+    expect(shapeAt, 'the targetMessage shape moved out of ModalHost').toBeGreaterThan(-1);
+    const shape = host.slice(shapeAt);
+
+    const shapeEnd = shape.indexOf('} | null;');
+    expect(shapeEnd, 'the targetMessage shape is no longer a nullable object').toBeGreaterThan(-1);
+    const declared = shape.slice(0, shapeEnd);
+
     expect(declared, 'the targetMessage shape was not found').toContain(
       'senderAvatarUrl?: string;'
     );
