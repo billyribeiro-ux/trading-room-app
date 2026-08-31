@@ -196,6 +196,48 @@ Two things have changed about that statement since it was written, and both narr
    audit. An audit of a moving file needs the revision recorded beside it, which the rows above now
    do.
 
+## 3. The per-surface audit is now a SWEEP, and it runs on every invocation
+
+Added 2026-08-31 21:40 UTC.
+
+The method in the paragraph above — *transcribe every const by value, then measure ours* — was
+carried out by hand three times in a week (`PollPanel`, the roster, `PrivateChatPanel`) and found
+something real each time. It is also the same twenty lines of work every time, and forty surfaces at
+three a session is a fortnight of measuring the repository as it was on the day each run happened.
+
+`apps/room/src/lib/reference-const-coverage-contract.test.ts` now performs it over **all 51
+components the pinned v4 bundle declares**, on every run, and pins the answer. Three exclusions, each
+derived from the bundle rather than hand-listed: Angular template reference variables (the leading
+run of two-string entries), attribute and listener NAMES (by position inside the entry), and the 242
+framework identifiers gathered from every `selectors:` and `inputs:` in the bundle.
+
+**Measured on the day: 51 components, 33 fully covered, 146 values not present in this room.**
+
+| group | components | what it is |
+| --- | ---: | --- |
+| not built at all | `app-session-transcript` (28) | the whole component — container, header, date picker, pagination, entries. **Named in no tracker row before this sweep** |
+| out of scope by decision | `app-session-login` (32) | forgot/change password, the Gmail/Facebook/Gravatar avatar chooser, reCAPTCHA, supported-browsers. Account management lives on the CONTROLLER |
+| Bootstrap's data API, replaced by state | `app-session-control-modal` (13), `app-user-info-modal` (10), `app-closed-session-page` (3), `app-note` (3) | every `#`-prefixed value is a `data-bs-target`. The pane it names is usually built; the SELECTOR has no counterpart |
+| real gaps on built surfaces | `app-alert-send-report-modal` (15), `app-post-alert-modal` (7), the two log modals (6 each), `app-room` (6), `app-user-settings-modal` (5), `app-presentationarea` (5), `app-rec-preview` (2), `app-chat` + `app-extra-chat` (1 each), `app-screenshare-view` (2), `app-poll-modal` (1) | the work this sweep found |
+
+Two findings inside that table are worth stating on their own:
+
+- **`app-room` is missing four ASSETS a built feature draws** — `/assets/images/notalking.png` and
+  `nolevelsImg` (the roster's not-talking indicator), `/assets/images/playing.gif` and
+  `cssSoundCloudIcon` — plus the navbar's Intercom help link.
+- **Two of the residuals are reference DEFECTS and are correctly not transcribed.** The reference
+  writes `value="followChatStyle.color"` and four siblings as STATIC attributes where a binding was
+  meant, so those colour inputs ship with the literal text of an expression; and
+  `data-ng-dblclick="fullScreen()"` on the webcam screen is an AngularJS 1 attribute in an Angular 17
+  template, which no runtime reads.
+
+**The comment stripping in that file is load-bearing and its own case proves it on every run.** This
+repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where
+the real number is **146**: twenty-four values were "covered" by nothing but a docblock quoting the
+reference at them. Three negative controls were run — a covered value removed from our source, a
+listed gap closed and left in the table, and the stripping itself disabled — and all three went red
+for the stated reason.
+
 ---
 
 # ⛔⛔ PHASE RULE — DOCUMENT ONLY. DO NOT BUILD. ⛔⛔

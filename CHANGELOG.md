@@ -33,6 +33,56 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 02:12 UTC — the per-surface const audit became a sweep over all 51 reference components
+
+**Runtime impact: NO** — one contract test, one tracker section. No shipping file changed.
+
+The audit method `todo-next.md` prescribes — decode a reference component's `consts:` table by value,
+then measure ours — had been run by hand three times in a week and found something real each time. It
+is also the same twenty lines of work every time, and forty surfaces at three a session measures the
+repository as it was on the day each run happened. `reference-const-coverage-contract.test.ts` now
+runs it over **all 51 components the pinned v4 bundle declares**, on every invocation.
+
+**51 components, 33 fully covered, 146 values this room does not ship** — every one of them named in
+the file, grouped by what it is, and pinned. The table is a ratchet that fails in BOTH directions: a
+value lost from this room appears as a new residual, and a gap closed but left listed appears as a
+stale entry.
+
+**All three exclusions are derived from the bundle, not hand-written.** A hand-maintained deny-list is
+how a sweep quietly stops measuring, and the first draft of this file had one — forty-eight "boring"
+names. It is replaced by: Angular template reference variables, taken as the leading run of two-string
+entries; attribute and listener NAMES, skipped for where they sit inside an entry rather than for what
+they are called; and 242 framework identifiers read out of every `selectors:` and `inputs:` in the
+bundle. `ngForm` is in none of the 242 — its selector is written as an element match — and the
+template-ref rule catches it instead, which is why all three exist and none is a safety net.
+
+**What it found that no tracker row had:**
+
+- **`app-session-transcript` is not built at all.** Eighty values, twenty-eight absent, and the absent
+  ones are the entire component.
+- **`app-room` is missing four ASSETS a built feature draws** — the roster's not-talking indicator
+  (`nolevelsImg`, `/assets/images/notalking.png`) and the SoundCloud icon's id and playing gif — plus
+  the navbar's Intercom help link.
+- **Two residuals are reference DEFECTS, correctly not transcribed.** Five colour inputs in
+  `app-user-info-modal` carry `value="followChatStyle.color"` as a STATIC attribute where a binding
+  was meant, so they ship with the literal text of an expression; and `data-ng-dblclick="fullScreen()"`
+  on the webcam screen is an AngularJS 1 attribute in an Angular 17 template that no runtime reads.
+
+**The comment stripping is load-bearing, and the file measures that rather than asserting it.** This
+repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where
+the real number is **146**: twenty-four values were "covered" by nothing but a docblock quoting the
+reference at them. A case runs both sweeps on every invocation and fails if they ever agree —
+`captured-css-ancestor-contract.test.ts` learned the same lesson from a control that came back green,
+and this file was written knowing it and still had to measure it to believe the size of it.
+
+**Verification.** Three negative controls, each seen RED and restored: `pmToolbar` removed from
+`PrivateChatPanel.svelte` (three cases failed, naming `app-privchat`); a listed gap closed with a
+throwaway module holding `transcript-container` (failed as a stale entry); and the stripping disabled
+(failed on all three totals). The first attempt at the first control **passed green and was
+investigated rather than repaired** — the mutation renamed `pmToolbar` to `pmToolbarZZ`, which still
+contains the original as a substring, so the sweep's `includes` still found it. Room gate run before
+the push.
+
 ### 2026-09-01 01:35 UTC — PrivateChatPanel audited: 79 consts, and four the reference itself never reads
 
 **Runtime impact: NO** — one contract. The panel was already complete; nothing running said so.
