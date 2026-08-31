@@ -4,7 +4,7 @@
 
     ## The transcription, verbatim
 
-    Template function `$4e` at bundle byte 2,492,150, with its consts resolved from the component's
+    Template function `$4e` at bundle byte 2,492,174, with its consts resolved from the component's
     own `consts:` array at 2,533,190:
 
         213  ['animated', 'fadeIn', 'mod-msg-container']

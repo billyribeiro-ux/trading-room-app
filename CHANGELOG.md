@@ -33,6 +33,57 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 01:10 UTC — Wrong-symbol citations became a measurement instead of a discovery
+
+**Runtime impact: NO** — one contract, three offsets made exact.
+
+Five citations in one week named the wrong minified symbol while quoting the right code:
+
+| claimed | actually | what the claimed symbol really is |
+| --- | --- | --- |
+| `K4e` | `nRe` | an `as-split` wrapper — a real sibling with the same shape (`SHL-06`) |
+| `hSe` | `pSe` | one icon, not the three-way chooser (`SVC-02`) |
+| `bSe` | `vSe` | the slider row, which builds no ids (`SVC-03`) |
+| `C2e` | `E2e` | the Private Chat dropdown ITEM (`RSG-01`) |
+| `u2e` | `g2e` | a template in a DIFFERENT component (`RSG-02`) |
+
+Every one names real code, which is what makes the class dangerous rather than untidy: a citation
+pointing at nothing is found the first time somebody looks it up. Five in a week is a pattern, and
+the answer to a pattern is a measurement.
+
+**`reference-citation-contract.test.ts` sweeps every `symbol` + `byte N` pair in the app** — 84 of
+them — and checks the one falsifiable claim each makes: *that byte is code belonging to that symbol.*
+Either the symbol sits at the byte (a use site) or the byte lies inside its body, between its
+declaration and the next.
+
+**Measured result: all 84 resolve, after three were made exact.** `E0e`, `O0e` and `$4e` were cited
+20–34 bytes BEFORE the functions they name, pointing into the tail of the preceding one. Corrected to
+the declaration byte rather than the rule loosened to admit them.
+
+**Two things the sweep cannot do, both stated at the code rather than left to be assumed.** It cannot
+check a citation that gives a symbol without an offset — `SVC-02`'s and `RSG-02`'s originals were of
+that shape and this would not have caught them, which is an argument for pairing symbol with byte as
+the house style. And it cannot separate a symbol DEFINED at a byte from one merely REFERENCED there:
+`hSe` appears inside `pSe`'s body as a slot argument, so that one still passes. A sweep whose limits
+are not written down gets read as covering more than it does, so the limit has its own assertion.
+
+**The rule's own logic is exercised against the real defects**, because a guard nobody has seen work
+is a guard nobody can trust: `K4e`/`nRe`, `C2e`/`E2e` and `bSe`/`vSe` are checked as
+flag-then-pass pairs, and the `hSe`/`pSe` case is asserted as the known miss.
+
+**An earlier draft was measurably useless and the controls said so.** It allowed the symbol anywhere
+within ±400 bytes of the offset — and at that width **three of the five known-wrong citations
+passed**, because minified siblings sit a few hundred bytes apart. The window is ±40 now, with
+containment doing the rest.
+
+Two negative controls, red then green: `C2e` reinstated against `E2e`'s byte, and `E0e` given a
+neighbouring function's offset.
+
+One eslint finding worth recording: the separator class held a literal non-breaking space and
+`no-irregular-whitespace` failed the gate. It is `\u00a0`/`\u202f` escapes now — the same 84 pairs.
+
+Room gate exit 0: 308 test files / 5,618 passed / 1 skipped.
+
 ### 2026-09-01 00:40 UTC — The roster surface: complete behaviour, three citations pointing at the wrong code
 
 **Runtime impact: NO** — comments and one contract. The roster's behaviour was already right; what
