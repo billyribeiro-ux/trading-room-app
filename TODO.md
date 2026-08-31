@@ -72,8 +72,25 @@ against unpublished captures. That is the same owner decision as row 5.
 (It read "Two" until 2026-08-23 while naming three files in the same sentence.)
 `apps/room/ops/privacy-baseline.txt:121-123` still baselines `rawEmail` findings in
 `alert-delete-e2e.mjs`, `audit-clean-app-room.mjs` and `media-screenshare-e2e.mjs`. Those addresses
-were replaced by `PTR_*_EMAIL` environment reads; the detector finds zero today. The verifier prints
-them under "baselined finding(s) are gone — run `--update` to shrink" rather than failing.
+were replaced by `PTR_*_EMAIL` environment reads.
+
+**This row said the verifier prints them under "baselined finding(s) are gone — run `--update` to
+shrink". Run 2026-08-31, it does not, and it must not.** It prints:
+
+> `[privacy] 81 baselined finding(s) are not visible from this checkout, which is missing 13 capture
+> root(s)… Do NOT run --update here. They are absent, not redacted. Shrinking the baseline would make
+> them read as NEW personal data on a checkout that has the captures.`
+
+The advice is **withheld whenever any capture root is missing** (`verify-privacy-boundary.mjs:185`),
+and in a clone one always is. The three files here are in the same bucket for a second reason:
+`apps/room/scripts/` holds **0 files** in this checkout and `git ls-files` returns **0** for it, so
+"redacted" and "absent" are indistinguishable from here regardless.
+
+**So this is not pending work for anyone reading this in a clone — it is an OWNER-MACHINE step**, and
+only there, where the captures resolve, `missingRoots` is empty and the three lines can be told apart
+from the other 81. Stated because the row read as an outstanding chore and the tool refuses it by
+design: `--update` from a clone would rewrite the baseline down to what a clone can see, and the next
+run on the owner's machine would report 81 findings as NEW personal data entering the repository.
 
 ---
 
@@ -887,17 +904,6 @@ build from what came back.
   it differently. **Standing instruction: render Download, not Share, and cite T5-18 at the code.** If
   a real share URL is ever captured, that is a NEW row rather than a reopening — the omission was
   correct for the evidence that existed.
-
----
-
-## Not an evidence gap — missing work, recorded so it is not lost
-
-| # | what | severity |
-| --- | --- | --- |
-render, asserting that the six broadcast controls behind the single `{#if isPresenter}` are ABSENT for
-a member and PRESENT for a presenter, with a positive control so the absence assertions cannot pass
-against a render that produced nothing. Negative control seen RED on three cases by widening that gate
-to `{#if true}`. Nothing remains of this row. Its FIRST item — the missing browser check — was closed on 2026-08-28 and this row is corrected 2026-08-29; its second was corrected on 2026-08-17 and again on 2026-08-28 when `RoomNavbar` gained its mount test. (was:) Corrected 2026-08-23 — three of the four named here are now covered: `RoomSidebar` and `AlertChatArea` by client `mount` in their own `.svelte.test.ts` files, and `PresentationArea` by SSR `render` inside `main-tab-strip-contract.test.ts`, which is why a scan by FILENAME misses it. **The sentence that used to stand here — that `AlertChatArea` cannot be tested because jsdom reports `scrollHeight`/`offsetHeight` as `0`, "a real limit rather than a backlog item" — is DELETED because the repository refuted it.** `AlertChatArea.svelte.test.ts:8-25` records the retraction in its own words: the follow behaviour "was written down as blocked on an instrument limit" and "the 'needs Playwright' note was pessimism". A tracker that declares a closed gap impossible is worse than one that omits it. (was:) **five of the six extracted panes have no mount test.** Phase 2 named this its real deliverable — "a pane can be MOUNTED… each remaining component gets the same treatment" — and `PrivateChatPanel.test.ts` is still the only one, so `RoomSidebar`, `RoomNavbar`, `AlertChatArea`, `PresentationArea` and `FilesPane` are asserted on as source text. jsdom has no layout, so even those cannot prove a panel is draggable or positioned where the capture puts it. **THE RULE THE WHOLE PHASE EARNED, which outlives the line counts: migrate the tests with the code, and re-point every `not.toContain` at the file that now owns the thing.** A positive assertion fails loudly when a region moves; a negative one starts passing for the wrong reason. That has now happened four times in this repository — `exactAlerts`, `chat-mode-contract.test.ts`, and twice in `screen-volume-contract.test.ts` | **MEDIUM — the standard is being met; the verification is not** |
 
 ---
 

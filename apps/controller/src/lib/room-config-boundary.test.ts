@@ -247,7 +247,10 @@ describe('the allow-list itself', () => {
 
       This map is a statement of intent, not proof — it agreed with itself while `hideAppInfo` and
       `hasBenzingaNews` sat on the list with no consumer anywhere in the room. What caught that was
-      `scripts/room-config-seam-e2e.mjs` flipping one and watching nothing happen.
+      `apps/room/e2e/room-config-seam.spec.ts` flipping one and watching nothing happen. This named
+      `scripts/room-config-seam-e2e.mjs` until 2026-08-31 — the instrument that probe originally had,
+      which `git ls-files` returns 0 for and which the spec's own docblock records as the reason it
+      exists. Citing a file nobody can open is citing nothing.
     */
     const consumers: Record<string, string> = {
       /*

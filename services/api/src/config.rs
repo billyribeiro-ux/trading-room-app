@@ -65,9 +65,20 @@ fn parse<T: std::str::FromStr>(
 // credential leak.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Config {
-    /// Runtime credentials. MUST be the restricted, membership-free `ptr_clone_app` role so
+    /// Runtime credentials. MUST be the restricted, membership-free `tradingroom_app` role so
     /// row-level security actually applies. Enforced at startup, not by convention - see
     /// [`crate::db::Db::assert_runtime_role_is_restricted`].
+    ///
+    /// **This said `ptr_clone_app` until 2026-08-31, and by then the code REFUSED that role.**
+    /// `0009_rename_runtime_roles.sql` renamed it, `db::EXPECTED_RUNTIME_ROLE` is
+    /// `tradingroom_app`, and `the_immutable_authentication_identity_is_required_and_parsed_exactly`
+    /// asserts that a connection authenticating as `ptr_clone_app` is rejected — so this doc comment
+    /// named the one role the startup check exists to turn away.
+    ///
+    /// The old name is still correct elsewhere in this tree and that is what made the staleness hard
+    /// to see: `docker/postgres/10-provision-roles.sh` must keep creating `ptr_clone_app` or
+    /// migrations `0001`–`0006` cannot grant to it, and `db/mod.rs` uses it as a NEGATIVE fixture.
+    /// `ops/naming-provenance.md` is the mapping; both names exist on purpose.
     pub database_url: String,
     pub bind_address: String,
     pub db_pool_max: u32,

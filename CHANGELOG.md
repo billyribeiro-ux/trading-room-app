@@ -33,6 +33,176 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 06:48 UTC — the citation sweep ran on the controller and found four wrong pointers in one pass
+
+**Runtime impact: NO** — one contract per app, four citations corrected, two given the measurement
+they were missing.
+
+The room's sweep from thirty minutes ago was half a repository. Run against `apps/controller`, over
+55 citations, it found **four wrong pointers**:
+
+- **`money.ts` and `money.test.ts` cited the wrong directory for the Stripe formatter.**
+  `evidence-dumps/TIER1-fetched/app.min.js` has never held that file; the artifact is
+  `evidence-dumps/manage-app-2026-08-31/app.min.js`. **The offset was right all along** —
+  `formatStripeAmount` is at exactly 183,815 there, measured with `indexOf` over the file's bytes,
+  which is the strongest kind of correction: the citation was one directory wrong and everything it
+  claimed about the code was true.
+- **`room-config-boundary.test.ts` credited the seam probe's finding to its retired instrument.**
+  `scripts/room-config-seam-e2e.mjs` is what the probe had before it became
+  `apps/room/e2e/room-config-seam.spec.ts` — whose own docblock records that the script is absent.
+- **`api-docs.ts` carried `Regenerate: node scripts/extract-api-docs.mjs`.** No commit has ever added
+  that generator under any path, and `scripts/` here is fully in sync (0 untracked, 0
+  tracked-but-absent), so it is not an eviction like the room's. Measured, then said at the line.
+- **`editable-display.test.ts` said "Reproduce with" against a capture output never committed.**
+
+The last two, and two others, stay as PROVENANCE records — deleting a citation is not the same as
+fixing it, because the reader loses how the number was obtained. They are listed by name in
+`UNOPENABLE` with what was measured about each, and the case fails in both directions: a new
+unopenable citation fails, and one that becomes openable and is left listed fails too.
+
+**A bug in the sweep itself, found by the corpus it was run against.** `js` matches inside `json`, so
+an alternation with `js` before `json` and no right anchor read
+`…rects-tab_Branding_Logo_Landing_Page_.json` in `RichTextEditor.svelte` as a `.js` file and reported
+a stale pointer to a file that is right there under a name nobody wrote. Longest-extension-first plus
+`(?![\w-])` closes it, the room's committed copy was corrected the same way, and a case now guards
+the boundary directly.
+
+**And both sweeps read themselves.** The controller's docblock quotes the wrong path while explaining
+that it is wrong, so the sweep counted its own account of the bug as a fifth broken citation — the
+same self-reference that made `reference-const-coverage-contract`'s first split a tautology, from the
+other direction, on the same day. Any file whose subject is bad citations will quote bad citations.
+The room's copy was only lucky (it names a bare filename rather than a path) and is excluded now too.
+
+**Verification.** Four negative controls, each seen RED and restored: a new broken citation in each
+app, and on the controller an `UNOPENABLE` entry that resolves being left in the table. Controller
+gate exit 0 (103 files / 1,102 passed), room gate exit 0 (314 files / 5,683 passed).
+
+### 2026-09-01 06:12 UTC — every file path this app cites in a comment can now be opened, and a gate keeps it that way
+
+**Runtime impact: NO** — one contract, one citation corrected.
+
+The house style is to cite the file that owns a rule rather than restate it, which is what keeps one
+decision in one place. That makes a citation load-bearing: it is the reader's only route to the
+argument, and when it rots the argument becomes unreachable while the prose still reads as
+authoritative. **Every instance so far was found by somebody walking into it** — `TODO.md` row R
+naming `media-transport.svelte.ts` for a `contentHint` line with zero occurrences there,
+`missing-commands-triage.md`'s 44 stale pointers, and today's.
+
+`comment-path-citations-contract.test.ts` sweeps all of `apps/room/src`: **85 citations across more
+than twenty files, and after the correction below, zero that cannot be opened.** A path resolves
+against this app, the repository root, the sibling controller app, or the framework's own source
+under `node_modules` — ten citations read Svelte's and SvelteKit's internals by path, which is the
+strongest form a claim about framework behaviour can take, and every one of them opens. A citation
+into one of the 13 absent capture roots is exempt, and the list comes from
+`gate/evidence-bound-tests.mjs` rather than a second copy.
+
+**The one that was broken pointed OUT of the repository.** `handoff-token.test.ts`'s `mint` helper
+said it worked *"the same way `new-room-control/src/lib/server/room-handoff.ts` does"* — a path in one
+of the two sibling REFERENCE folders, naming a COPY of a file whose authority is in-tree at
+`apps/controller/src/lib/server/room-handoff.ts`. A reader following it left the repository to read
+something they already had. It now names `signHandoff` and the in-tree path.
+
+**The first draft of the sweep reported five phantoms and was fixed before it was believed.** Its
+pattern was unanchored, so it matched the `src/lib/…` TAIL of `apps/controller/src/lib/…` and then
+failed to resolve that against this app. All five "broken" citations were correct as written. A sweep
+whose first result is five phantoms is a sweep nobody trusts the sixth result of, so the pattern is
+anchored on the left and the false positives are recorded at it.
+
+**Verification.** Two negative controls, each seen RED and restored: a comment citing a file that does
+not exist (reported by path AND by the file citing it), and the resolution bases emptied to this app
+alone (15 framework and cross-app citations correctly fail). Room gate exit 0: svelte-check 1,594
+files / 0 errors / 0 warnings; 314 test files / 5,683 passed / 1 skipped.
+
+### 2026-09-01 05:41 UTC — a docblock counted seventeen server actions in a file that exports none
+
+**Runtime impact: NO** — one comment corrected, one redundant comment removed, one finished tracker
+section deleted.
+
+`routes/+page.server.ts`'s role-reconciliation note read *"`/session` writes it once, at entry.
+**Seventeen server actions** then authorise against it"*. Measured 2026-08-31: that file exports
+`export const actions` **zero** times, and both contracts that watch it (`chat-mode-contract` and
+`remote-call-sites-contract`) already assert the absence. Every one of the seventeen had become a
+remote function — the migration `TODO.md` row **AG** asked for, and it is finished. The only two
+`actions` exports left in `src/routes` are `logout` and `session`: the entry and exit forms, which is
+what a form action is for.
+
+The mechanism the note describes is still exactly right — the authority just does not live where the
+sentence said. `presenterRoom()` reads `requireUser(locals).role`, the field written four lines
+below it. **No count replaced the old one**, which is the doctrine
+`setting-coverage-contract.test.ts` already states about itself: a count in prose beside the thing it
+counts is the copy nobody updates.
+
+**The size ratchet refused the correction, and made it better.** `+page.server.ts` sat at 1,002
+against a ceiling of 1,003, so a nine-line note was nine lines too many, and the instruction is
+extract rather than raise. What came out was a paragraph that had become redundant: a tombstone
+explaining that `remotePresCommand`'s docblock outlived its export by eleven days *"because the
+orphan gate policed `+page.svelte` and `lib/room/*` and this is neither"*. That gate now walks all of
+`src`, and its own docblock records this very file's orphan as one of the sixteen the widening found.
+The lesson is enforced where it belongs; the prose copy was the stale one. Net growth: **zero**.
+
+**And one tracker section was deleted, because it was finished and structurally broken.** Root
+`TODO.md`'s *"Not an evidence gap — missing work"* held a table header, a separator, and then a body
+that was not a table row at all — it began mid-sentence with *"render, asserting that…"*, its opening
+cells lost in some earlier edit. Its own text ended *"Nothing remains of this row."* All three things
+it claimed were verified before deleting it: the `room-e2e` Playwright job exists
+(`quality.yml:386`), `RoomNavbar.svelte.test.ts` exists, and `room-navbar-render.test.ts` asserts the
+six broadcast controls absent for a member and present for a presenter with an explicit positive
+control. A section headed "recorded so it is not lost" that had lost its own first cell is the
+clearest possible argument for the rule this repository already has: a row that is done is deleted.
+
+Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
+skipped. Controller's `evidence-gap-register-counts.test.ts` re-run against the edited `TODO.md`: 4
+passed.
+
+### 2026-09-01 05:06 UTC — a doc comment named the one database role the process refuses to boot with
+
+**Runtime impact: NO** — one Rust doc comment, one provenance pin moved, two tracker rows corrected.
+
+`Config::database_url` in `services/api/src/config.rs` carried *"MUST be the restricted,
+membership-free `ptr_clone_app` role so row-level security actually applies"*. By 2026-08-31
+`0009_rename_runtime_roles.sql` had renamed that role, `db::EXPECTED_RUNTIME_ROLE` was
+`tradingroom_app`, and `the_immutable_authentication_identity_is_required_and_parsed_exactly` in
+`db/mod.rs` asserted that a connection authenticating as `ptr_clone_app` is **rejected** — the old
+name is one of that test's own negative fixtures.
+
+**So the field's documentation instructed exactly the configuration the process refuses to start
+with.** That is the root standard's own example of a defect: a comment claiming X is checked that no
+longer matches the next line.
+
+**How it was found: by refusing a tracker's stated reason for not looking.** `apps/room/TODO.md`
+deferred "~150 live occurrences" of `ptr_clone` in `services/**` because *"`services/**` is a
+mirror"* — a claim the top of that very entry already records as FALSE, and which `CLAUDE.md` records
+as false and costly. A file whose header withdraws a claim while its body still states it is the
+"two cells disagreeing" failure that document names as its own worst. Counting settled it: **138
+occurrences, and 137 are correct** — `10-provision-roles.sh` must keep creating `ptr_clone_app` or
+migrations `0001`–`0006` cannot grant to it, `compose.yml` sets the baseline role for provisioning
+with `POSTGRES_RUNTIME_USER: tradingroom_app` beside it, `db/mod.rs` uses the old names as negative
+fixtures, and the test and attestation files assert the pre-`0009` state on purpose. The row's own
+figures for two files were also wrong: `tests/migrations.rs` is 45 not 43, `tests/tenancy.rs` is 6
+not 11.
+
+**The provenance verifier caught the edit, which is what it is for.** `verify-backend-provenance.mjs`
+failed on the aggregate manifest hash; the file left the aggregate for its own pin with the
+measurement beside its hash in the same commit, which is that verifier's own stated rule for how the
+number may move — **67 → 66 untouched, 32 diverged**.
+
+**A second tracker row instructed something its own tool refuses.** Root `TODO.md` said the three
+stale `privacy-baseline.txt:121-123` entries print under *"baselined finding(s) are gone — run
+`--update` to shrink"*. Run today, `verify-privacy-boundary.mjs` prints the opposite: *"Do NOT run
+--update here. They are absent, not redacted."* The advice is withheld whenever any capture root is
+missing, and in a clone one always is — and `apps/room/scripts/` holds 0 files here anyway, so
+"redacted" and "absent" cannot be told apart from this checkout at all. Recorded as an owner-machine
+step rather than an outstanding chore.
+
+**Verification, and what could not run.** `cargo fmt --check` clean and
+`cargo clippy -p tradingroom-api --lib -- -D warnings` clean on the pinned 1.98.0 toolchain — which
+had to be installed first, and failed to extract until 9.9 GB of `services/target` was deleted to get
+the disk under 99%. `--all-targets` **could not run**: api's dev-dependency on `tradingroom-media`
+builds `mediasoup-sys`'s C++ worker, which fails in this container. **The rust-analyzer MCP this
+repository requires for `.rs` work is not available in this session**, reported rather than worked
+around. Controller gate exit 0 (102 files / 1,099 passed), room gate exit 0 (313 files / 5,680
+passed).
+
 ### 2026-09-01 04:21 UTC — every remaining residual traced, and a measurement bug found while doing it
 
 **Runtime impact: NO** — verdicts recorded at the table, and one narrowing of how the sweep reads our

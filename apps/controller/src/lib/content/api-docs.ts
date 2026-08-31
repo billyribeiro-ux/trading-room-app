@@ -8,7 +8,12 @@
  * sanitiser the landing-page editor uses, so this file being edited by hand
  * cannot introduce script into the page.
  *
- * Regenerate: node scripts/extract-api-docs.mjs
+ * Regenerate: `node scripts/extract-api-docs.mjs` — **which is not in this repository and never has
+ * been.** `git log --all` finds no commit that ever added it under any path, and `scripts/` here is
+ * fully tracked (0 untracked, 0 tracked-but-absent), so it is not an eviction like
+ * `apps/room/scripts/`. Measured 2026-08-31 rather than assumed. The generated HTML below is the
+ * artifact; regenerating it needs the generator restored or rewritten, and until then this line is a
+ * record of provenance and not an instruction anybody can follow.
  */
 export const API_DOCS_HTML = `<h1>Sessions API Documentation</h1>
 <h2>Overview</h2>

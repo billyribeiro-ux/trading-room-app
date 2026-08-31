@@ -157,12 +157,50 @@ the applied migrations, the provisioning script that must keep creating `ptr_clo
 migrations to apply, the evidence verifier, and the historical documents. RLS policies need nothing:
 targets are stored by OID, not by name.
 
-**What is left: ~150 live occurrences**, all inside `services/**` — connection defaults, the
-release-attestation expected values, and the role-name assertions in `tests/migrations.rs` (43) and
-`tests/tenancy.rs` (11). Deliberately not done from this repository: `services/**` is a mirror, this
-entry itself says to do it "at the source repository, as its own dedicated change", that tree has
-already diverged twice, and every one of those assertions is a runtime check needing a provisioned
-cluster to verify. Tracked with the rest of the mirror promotion as root `TODO.md` item **P**.
+**This paragraph said "~150 live occurrences" remained and deferred them because "`services/**` is a
+mirror" — a reason the top of this very entry already records as FALSE. Counted 2026-08-31.**
+
+A file whose header withdraws a claim while its body still states it is the shape this document names
+elsewhere as its own worst failure: two cells describing one thing and disagreeing. The count settles
+it.
+
+**138 occurrences of `ptr_clone` across `services/**`, and 137 of them are correct.**
+
+| file                                          | count | why the old name stays                                                                     |
+| --------------------------------------------- | ----: | ------------------------------------------------------------------------------------------ |
+| `api/tests/migrations.rs`                     |    45 | asserts the pre-`0009` state, which is the state those migrations create                   |
+| `api/src/bin/postgres-release-attestation.rs` |    26 | expected values for a release attestation of the baseline chain                            |
+| `api/src/db/migrate.rs`                       |    23 | the preflight that requires the baseline role before `0001` runs                           |
+| `docker/postgres/10-provision-roles.sh`       |    11 | **must keep creating `ptr_clone_app`**, or `0001`–`0006` cannot grant to it — trap 2 below |
+| `api/tests/migration_reappliability.rs`       |    10 | convergence across the rename                                                              |
+| `api/tests/tenancy.rs`                        |     6 | the tenancy fences as `0001` builds them                                                   |
+| `api/src/bin/migrate.rs`                      |     4 | prose describing that preflight                                                            |
+| `compose.yml`                                 |     3 | the baseline role for provisioning; `POSTGRES_RUNTIME_USER` is `tradingroom_app` beside it |
+| six test files                                |     9 | fixtures and support                                                                       |
+| `api/src/db/mod.rs`                           |     2 | **negative fixtures** — the two strings the runtime-role check must REJECT                 |
+
+(This row's own figures for two of them — `tests/migrations.rs` at 43 and `tests/tenancy.rs` at 11 —
+were both wrong. They are 45 and 6.)
+
+**The one occurrence that was wrong is FIXED, 2026-08-31.** `api/src/config.rs`'s doc comment on
+`database_url` read _"MUST be the restricted, membership-free `ptr_clone_app` role"_.
+`db::EXPECTED_RUNTIME_ROLE` is `tradingroom_app`, and
+`the_immutable_authentication_identity_is_required_and_parsed_exactly` asserts that a connection
+authenticating as `ptr_clone_app` is **rejected** — the old name is one of that test's negative
+fixtures. The field's documentation instructed exactly the configuration the process refuses to boot
+with, which is the root standard's own example of a defect: a comment claiming X is checked that no
+longer matches the next line.
+
+The file left `verify-backend-provenance.mjs`'s aggregate for its own pin, with the measurement beside
+its hash, in the same commit — that verifier's own stated rule for how its number may move (67 → 66).
+`cargo fmt --check` clean; `cargo clippy -p tradingroom-api --lib -- -D warnings` clean on the pinned
+1.98.0 toolchain. **`--all-targets` could not run:** api's dev-dependency on `tradingroom-media`
+builds `mediasoup-sys`'s C++ worker, which fails in this container. **The rust-analyzer MCP this
+repository requires for `.rs` work is not available in this session**, and that is reported rather
+than worked around.
+
+So what is left of this entry is the OWNER role and the database name, below — an operator step, and
+nothing that can be done from a repository at all.
 
 The original write-up is kept below, because its four traps are still the reason this is careful
 work — and trap 3's answer changed: neither role exists in the local cluster any more, so
