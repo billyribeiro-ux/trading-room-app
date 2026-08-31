@@ -4845,7 +4845,27 @@ it at all.
 
 ### MTS-03 — The Recordings tab does not exist here at all
 
-**BLOCKED 2026-08-31.** Not buildable from this component or from any file in this task's editable
+**BLOCKED — and on 2026-08-31 the REAL blocker was found by decoding the PANE rather than the tab. It is not structural.**
+
+This row lists three structural steps to unblock it. All three are real, and **all three together would still produce a tab that cannot work**, because of what the pane IS:
+
+```js
+function GSe(t,n){ if(1&t&&(d(0,"div",25), T(1,"iframe",140), …)),
+  2&t){ … z("src", Ct(2,2, e.getRecordingsUrl(), "resourceUrl"), Oa) } }     // byte 1,930,394
+
+getRecordingsUrl(){ return `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${sesionToken}` }
+                                                                            // byte 1,959,845
+```
+
+**The pane is a single `<iframe>` onto the archive service**, and that URL is character for character the one `G01`, `RS-06` and `presAreaTabs-recordings` already carry, all three quoting `launchRecordings()`'s `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}`.
+
+So this is a **FOURTH row on ONE blocker**, not a structural gap. Doing the three steps first would add a type member, a settings wire, a tab and a pane, none of which can function — and the pane would iframe a 404 **with a session token in its URL**, which is precisely the objection `G01` records against opening that page in a tab: *"worse than an inert item."*
+
+`main-tab-strip-gates.svelte.test.ts` pins both offsets, the shared endpoint, and the COUNT of rows in this register naming it — so if an archive service ever lands, the four are found together rather than one at a time, and closing one without re-reading the others fails there.
+
+The structural facts below remain true and are kept, because they are the work that follows the moment the service exists:
+
+Not buildable from this component or from any file in this task's editable
 set, and the block is structural rather than a missing prop: `MainTab` in `apps/room/src/lib/types.ts`
 has no `'recordings'` member, so `mainTab = 'recordings'` does not type-check, and
 `PresentationArea.svelte` has no `#recordings` pane (upstream const 25,

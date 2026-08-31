@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -103,6 +104,33 @@ import type { MainTab } from './types.js';
  * Recorded rather than quietly edited because it is the failure `CLAUDE.md`'s own checklist names:
  * a comment claiming something is absent, written from a grep, surviving long enough that the next
  * reader plans around it.
+ *
+ * ## `MTS-03`'s REAL blocker, found 2026-08-31 by decoding the pane rather than the tab
+ *
+ * Everything above is about the TAB, and the row it belongs to lists three structural steps to
+ * unblock it: widen `MainTab`, thread `recsInRoom`, add a `#recordings` pane. All three are real
+ * and **all three together would still produce a tab that cannot work**, because of what the pane
+ * IS:
+ *
+ * ```js
+ * function GSe(t,n){ if(1&t&&(d(0,"div",25), T(1,"iframe",140), …)),
+ *   2&t){ … z("src", Ct(2,2, e.getRecordingsUrl(), "resourceUrl"), Oa) } }   // byte 1,930,394
+ *
+ * getRecordingsUrl(){ return `${apiROOT}/sessions/v2/archives/recordings/`
+ *                            + `${sessionID}/${sesionToken}` }               // byte 1,959,845
+ * ```
+ *
+ * **The pane is a single `<iframe>` onto the archive service** — and that URL is character for
+ * character the one `G01`, `RS-06` and `presAreaTabs-recordings` are already BLOCKED on, all three
+ * quoting `launchRecordings()`'s `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}`.
+ *
+ * So `MTS-03` is a FOURTH row on one blocker, not a structural gap. Doing the three steps first
+ * would add a type member, a settings wire, a tab and a pane, none of which can function — and the
+ * pane would iframe a 404 **with a session token in its URL**, which is the same objection `G01`
+ * records for opening that page in a tab: *"worse than an inert item."*
+ *
+ * The assertion below pins the two offsets and the shared endpoint, so that if an archive service
+ * ever lands, the four rows are found together rather than one at a time.
  */
 
 type Stub = Record<string, unknown>;
@@ -266,5 +294,68 @@ describe('MTS-07 — the two cogs do the same three things', () => {
     cog.click();
     flushSync();
     expect(menus.notes, 'a cog is a toggle, not an opener').toBe(false);
+  });
+});
+
+describe('MTS-03 — the Recordings pane is an iframe onto the archive service', () => {
+  /*
+    The row lists three structural steps to unblock this tab. They are real and they are not the
+    blocker: the pane those steps would create is one `<iframe>` whose `src` is the archive
+    endpoint three other rows are already blocked on.
+
+    Pinned here rather than left in prose because the whole value of the finding is that FOUR rows
+    share ONE blocker — and a shared blocker that is only written down in four separate places is
+    one that gets lifted three times.
+  */
+  /*
+    Paths are relative to the vitest cwd (`apps/room`), not to `import.meta.url`.
+
+    A `.svelte.test.ts` runs through the Svelte plugin, where `import.meta.url` is not a `file:`
+    URL — `fileURLToPath` throws `The URL must be of scheme file` on it, which is what the first
+    version of this block did. `trade-alert-pane-contract.test.ts` already reads its sources this
+    way for the same reason.
+  */
+  const BUNDLE = readFileSync('docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', 'utf8');
+
+  const at = (offset: number, text: string) => BUNDLE.slice(offset, offset + text.length);
+
+  it('the pane is a single iframe bound to getRecordingsUrl()', () => {
+    const pane = 'function GSe(t,n){if(1&t&&(d(0,"div",25),T(1,"iframe",140)';
+    expect(at(1_930_394, pane), 'GSe moved').toBe(pane);
+    /* One iframe and nothing else — the pane has no markup of its own to build. */
+    expect(BUNDLE.slice(1_930_394, 1_930_700)).toContain('e.getRecordingsUrl()');
+  });
+
+  it('and that URL is the SAME one G01, RS-06 and presAreaTabs-recordings are blocked on', () => {
+    const url =
+      'getRecordingsUrl(){return`${this.appService.globals.apiROOT}/sessions/v2/archives/recordings/${this.appService.globals.sessionID}/${this.appService.globals.sesionToken}`}';
+    expect(at(1_959_845, url), 'getRecordingsUrl moved').toBe(url);
+
+    /*
+      The register names that endpoint on every row that is blocked on it. Counting them is what
+      turns "four rows, one blocker" from a sentence into a fact that fails when it stops being
+      true — if a fifth row acquires the endpoint, or one of the four is closed without the others
+      being re-read, this number moves.
+
+      SIX mentions across FOUR rows: `G01` and `RS-06` name it once each in prose, `MTS-03` names it
+      twice — once as `getRecordingsUrl` and once quoting `launchRecordings`, which is how it shows
+      the two are the same string — and `presAreaTabs-recordings` carries it once more. The COUNT is
+      the assertion rather than the row names, because a row can be renamed and a string cannot be
+      miscounted.
+    */
+    const register = readFileSync('../../docs/decoded/room-surface-audit-2026-08-30.md', 'utf8');
+    expect(register.split('sessions/v2/archives/recordings').length - 1).toBe(6);
+  });
+
+  it('and NOTHING here is built toward it, which is what makes waiting correct', () => {
+    /*
+      The negative half. Adding the type member, the settings wire, the tab and the pane before the
+      service exists is scaffolding — four things that compile and cannot work — and the pane would
+      iframe a 404 carrying a session token, which is the objection `G01` already records.
+    */
+    const types = readFileSync('src/lib/types.ts', 'utf8');
+    expect(types, "MainTab gained 'recordings' — is the archive service live?").not.toContain(
+      "| 'recordings'"
+    );
   });
 });

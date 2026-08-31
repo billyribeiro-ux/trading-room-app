@@ -33,6 +33,60 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 19:00 UTC — MTS-03's blocker was not the three things it named, and four rows turn out to share one
+
+**Runtime impact: NO** — one docblock, three assertions, and a row re-dispositioned. Nothing was
+built, and that is the finding.
+
+`MTS-03` filed the Recordings tab as BLOCKED on a **structural** gap and named three steps to unblock
+it: widen `MainTab`, thread `recsInRoom` through the load, add a `#recordings` pane to
+`PresentationArea`. All three are real. **All three together would still produce a tab that cannot
+work**, and the reason is what the pane IS:
+
+```js
+function GSe(t,n){ if(1&t&&(d(0,"div",25), T(1,"iframe",140), …)),
+  2&t){ … z("src", Ct(2,2, e.getRecordingsUrl(), "resourceUrl"), Oa) } }     // byte 1,930,394
+
+getRecordingsUrl(){ return `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${sesionToken}` }
+                                                                            // byte 1,959,845
+```
+
+**The pane is a single `<iframe>` onto the archive service.** That URL is character for character
+the one `G01`, `RS-06` and `presAreaTabs-recordings` already carry — all three quoting
+`launchRecordings()`'s `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}`.
+
+So this is a **fourth row on one blocker**, not a structural gap. Building the three steps first
+would add a type member, a settings wire, a tab and a pane, none of which can function — and the
+pane would iframe a 404 **with a session token in its URL**, which is exactly the objection `G01`
+already records against opening that page in a tab: *"worse than an inert item."*
+
+#### Why this is worth a commit that builds nothing
+
+Four rows, one blocker, and until now nothing connected them. A shared blocker written down in four
+separate places is one that gets lifted three times — somebody stands the archive service up, closes
+`G01`, and the other three stay open because nobody re-read them.
+
+`main-tab-strip-gates.svelte.test.ts` now pins both byte offsets, the endpoint string, **and the
+count of mentions in the register** (six across four rows). If a fifth row acquires the endpoint, or
+one of the four is closed without the others being re-read, that number moves and the test says so.
+The count is the assertion rather than the row names, because a row can be renamed and a string
+cannot be miscounted.
+
+It also asserts the NEGATIVE: `MainTab` must not gain `'recordings'`. Adding it before the service
+exists is scaffolding — four things that compile and cannot work — and that assertion is what
+refuses it.
+
+#### One incidental correction
+
+The first version of the new block used `fileURLToPath(new URL(…, import.meta.url))`, which throws
+`The URL must be of scheme file` in a `.svelte.test.ts`: those run through the Svelte plugin, where
+`import.meta.url` is not a `file:` URL. Paths are cwd-relative now, as
+`trade-alert-pane-contract.test.ts` already does for the same reason, and the note is at the code.
+
+**Evidence:** two negative controls seen RED and restored — adding `| 'recordings'` to `MainTab`, and
+shifting the `getRecordingsUrl` offset by one byte. Room gate exit 0 — `svelte-check` 1,574 files 0
+errors 0 warnings, **301 test files / 5,508 passed / 1 skipped**, build.
+
 ### 2026-08-31 18:40 UTC — Three of the chat toolbar's four controls, and the fourth blocked on a command that does not exist
 
 **Runtime impact: YES.** The chat toolbar's extended section rendered a Mod Only checkbox and
