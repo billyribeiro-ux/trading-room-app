@@ -33,6 +33,54 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-30 20:45 EDT — Two fixes for the same defect collided, and the attestor still pins `0001-0009`
+
+**Runtime impact: NO.** One allow-list entry removed as a duplicate, one attested version range
+extended, one provenance pin moved. No shipped byte changes.
+
+**1. `controller quality` is red on `expected 42 to be less than or equal to 41`, and the cause is a
+COLLISION rather than a new admission.** `9f4c8fc` and `7a38465` fixed the same defect —
+`d5e3391` adding `retire-baseline-role-contract.test.ts` without allow-listing it — independently
+and within the hour. Each added the entry and each raised the ceiling. The merge concatenated both
+additions instead of recognising one entry, so `ALLOWED_PREFIXES` holds **42 entries of which 41 are
+unique**, `retire-baseline-role-contract.test.ts` twice.
+
+The fix is to delete the duplicate, NOT to raise the ceiling to 42 — the ceiling of 41 is correct and
+raising it would record a growth that never happened. `9f4c8fc` landed first, so its entry and its
+comment stay and the later duplicate goes; the file is back to 41 unique entries and its guard is
+4/4. Nothing about the boundary itself changes, and this is the second time in one evening that the
+`d5e3391` omission has cost a red gate — the first fixing it twice, the second being that the two
+fixes met.
+
+**2. `main` is LATENTLY red on the release attestor, and its own CI says otherwise.**
+`ATTESTED_MIGRATION_VERSIONS` pins `0001-0009`; `d5e3391` shipped `0010` without moving it, so
+`the_embedded_migration_pin_matches_the_migrations_on_disk` fails with
+`embedded_migration_contract_changed`. `main`'s latest Backend quality run reports **success**, and
+that success is empty: steps 21 and 22 — Clippy and "Run all Rust tests against real row-level
+security" — were **skipped**, because that push touched no `services/**` path and the job is
+scoped. The failure fires on the next backend-scoped push. A green tick over skipped steps is the
+kind of evidence this repository does not accept, and it is why this was chased rather than trusted.
+
+That constant's doc comment already records `0009` doing exactly this — *"`main` went red until
+somebody looked"* — so it is a REVIEWED-ACT gate and the answer is to read the migration, not bump
+a number. `0010_retire_ptr_clone_app.sql` was read end to end and earns it on `0009`'s terms, each
+checked in the SQL rather than taken from its prose: forward-only and idempotent, returning early
+when the role is gone; it **fails CLOSED**, refusing unless `tradingroom_app` is already named by an
+RLS policy, because dropping the baseline role on a database that never ran `0009` would leave every
+tenant read empty; no `CASCADE` in either branch; residue counted from `pg_catalog` across seven ACL
+classes and asserted zero before the drop, with column ACLs read from `pg_attribute.attacl` rather
+than the view that reports 922 where 26 exist; and exactly one tolerated SQLSTATE, `2BP01`, meaning
+another database in the cluster still grants — announced with what finishes it, not swallowed.
+
+Extended to `0001-0010`. The attestor's suite goes 16-passed-1-failed to **17 passed**. The binary is
+individually pinned, so `verify-backend-provenance` moved in the same change per its own rule.
+
+**Verified:** naming boundary 4/4 with 41 unique entries; attestor 17/17; `cargo fmt --check` clean
+and `clippy --workspace --all-targets --features testing -- -D warnings` clean; provenance PASS
+(67 untouched + 31 diverged + 3 authored here); migration integrity **10 pinned migrations**;
+controller **1077 tests across 104 files**; the documented-count gate green across its four sites;
+lint and format clean.
+
 ### 2026-08-30 20:17 EDT — `main` was red on two independent things; both are fixed and both had a negative control
 
 **Runtime impact: NO** for the boundary half — one test file and four documented numbers. **YES** for
