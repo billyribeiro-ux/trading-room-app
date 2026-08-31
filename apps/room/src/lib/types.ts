@@ -75,8 +75,14 @@ export interface ModalTargetUser extends ManagedChatUser {
   email?: string;
   loggedIn?: string | Date | null;
   location?: string;
-  ip?: string;
-  userAgent?: string;
+  /*
+    `string | null` rather than just `string`, because `RoomUserDetail.decorate` spreads the server's
+    answer over this object and the server answers `null` for a member who is not connected right
+    now. Without the null the spread could not clear a stale address from an earlier roster row,
+    which is the one value this cell must never show.
+  */
+  ip?: string | null;
+  userAgent?: string | null;
   appVersion?: string;
   streamServer?: string;
   serverId?: string;

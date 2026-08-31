@@ -477,8 +477,45 @@ const subscribers = new Map<string, Map<Subscriber, ListenerContext>>();
  * step with this one at four sites, and the failure of that pattern is silent: a stale entry means
  * a closed connection's entitlement outliving it.
  */
+export type ConnectionFacts = {
+  /** `privData.ip` — the peer address SvelteKit reports for the request that opened the stream. */
+  readonly address: string;
+  /** `privData.uaStr` — the `User-Agent` header on that same request. */
+  readonly userAgent: string;
+};
+
+/**
+ * What the SERVER observed about one connection, as opposed to what its client says about itself.
+ *
+ * ── WHY THIS IS ON THE HUB AND NOT ON THE WIRE ───────────────────────────────────────────────
+ *
+ * The reference's user card fills these from `socketService.getUserInfo(uid, rid, socketID, …)`
+ * (bundle byte 1,159,275) — an invoke naming a live SOCKET, answered by the server that holds it.
+ * The member's own browser is never asked, and it could not answer: a page has no way to learn its
+ * own public address, and a `User-Agent` a client reports is a string it chose.
+ *
+ * So the same facts are taken from the same place here: the request that opened the SSE stream.
+ * `getClientAddress()` and the request headers are the server's own observation of the connection,
+ * which is `CLAUDE.md`'s rule — an authority decision is made on the server from data the server
+ * owns — applied to telemetry rather than to permission.
+ *
+ * Unknown rather than absent, and never an empty string, so a reader downstream never has to
+ * distinguish "no connection" from "a connection that reported nothing".
+ */
+export const UNKNOWN_CONNECTION: ConnectionFacts = {
+  address: 'unknown',
+  userAgent: 'unknown'
+};
+
 type ListenerContext = {
   user: RosterUser | null;
+  /*
+    Set once when the stream opens and never patched. A connection's address and user agent cannot
+    change without a new connection, so unlike `user` — which `patchRosterUser` rewrites as
+    permissions move — there is nothing here for a later frame to update, and a setter would only
+    create a path for a client to overwrite the server's own observation.
+  */
+  connection: ConnectionFacts;
   /*
     Resolved on the SERVER when the stream opens, from the room's configuration and this member's
     badges — never asserted by the client. `memberChatChannels` is the one function that answers it,
@@ -511,7 +548,13 @@ export function subscribeToRoom(
     than to "everything": a caller that forgets to resolve them withholds a badge channel, which is
     the direction a mistake here has to fail in.
   */
-  chatChannels: readonly string[] = BUILT_IN_CHAT_TABS
+  chatChannels: readonly string[] = BUILT_IN_CHAT_TABS,
+  /*
+    Defaults to `UNKNOWN_CONNECTION` rather than being required, for the same reason `chatChannels`
+    defaults to the built-in pair: a caller that does not supply it withholds a fact, which is the
+    direction a mistake here has to fail in. Every test double takes this default.
+  */
+  connection: ConnectionFacts = UNKNOWN_CONNECTION
 ): () => void {
   let listeners = subscribers.get(room);
   if (!listeners) {
@@ -531,7 +574,7 @@ export function subscribeToRoom(
     and the reference's payload is `{nick, userXrefID}`.
   */
   const alreadyHere = user !== null && heldBy(listeners, user.id);
-  listeners.set(listener, { user, chatChannels: new Set(chatChannels) });
+  listeners.set(listener, { user, chatChannels: new Set(chatChannels), connection });
   if (user !== null && !alreadyHere) {
     publishToRoom(room, {
       channel: 'roster',
@@ -633,6 +676,51 @@ export function roomRoster(room: string): RosterUser[] {
     if (user && !byId.has(user.id)) byId.set(user.id, user);
   }
   return [...byId.values()];
+}
+
+/**
+ * What the server observed about a member's LIVE connections to this room, newest map order first.
+ *
+ * ── THE FIVE CELLS THIS EXISTS FOR ───────────────────────────────────────────────────────────
+ *
+ * `ModalHost.svelte`'s System tab renders `targetUser.ip`, `.userAgent`, `.appVersion`,
+ * `.streamServer` and `.serverId`. Measured 2026-08-31: **none of the five had a producer anywhere
+ * in this room** — one consumer each, one declaration each on `ModalTargetUser`, and nothing that
+ * ever assigned them. Every one read `n/a` for everybody, always, on every path. That is the same
+ * defect `server/user-detail.ts` was written to close for `loggedIn` and `email`, and it is the
+ * socket half of the reference's `userInfo` that `TODO.md` row 9 tracks.
+ *
+ * TWO of the five are answered here, and three are not, which is recorded rather than filled in:
+ *
+ *   `ip` / `userAgent`  the server's own observation of the connection — this function
+ *   `appVersion`        upstream's `data.cver`, a build string only the CLIENT knows. It would have
+ *                       to be reported by the browser, and a member debugging badly can report any
+ *                       string they like — which is the one thing that makes the cell worthless to
+ *                       the presenter reading it. Not built, and not invented.
+ *   `streamServer`      the media plane. Blocked on a `STREAM_SERVER_MTX` host, the same blocker
+ *   `serverId`          `TODO.md` rows X, AC and R carry.
+ *
+ * `location` (upstream's `privData.locStr`) is the sixth and needs a geo-IP service this repository
+ * does not have; that is an owner decision about an external dependency, not a reading.
+ *
+ * ## Returns null for somebody who is not here
+ *
+ * Presence is what this hub knows and nothing else. A member who has closed the tab has no
+ * connection to describe, and answering with the LAST one would be reporting a fact about the past
+ * as though it were current — which is exactly what the presenter opening this card is trying not
+ * to be told.
+ *
+ * One connection is returned rather than all of them, matching `roomRoster`'s own dedupe: two tabs
+ * are one person, and the card has one row per fact. Insertion order, so it is the FIRST connection
+ * this person still holds — stable across a re-render, which a "most recent" rule would not be.
+ */
+export function liveConnectionFor(room: string, userId: number): ConnectionFacts | null {
+  const listeners = subscribers.get(room);
+  if (!listeners) return null;
+  for (const { user, connection } of listeners.values()) {
+    if (user?.id === userId) return connection;
+  }
+  return null;
 }
 
 /**

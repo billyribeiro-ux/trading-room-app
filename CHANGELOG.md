@@ -33,6 +33,97 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 02:20 UTC — Five System-tab cells with no producer, and a tracker row that prescribed the wrong build
+
+**Runtime impact: YES.** A presenter's user card now shows the address and the browser of a member
+who is connected. Two cells that have rendered `n/a` for everybody since the modal was written.
+
+**`TODO.md` row 9 said the last half of `userInfo` was "Blocked on nothing; not built" and described
+it as *"a round trip to a peer … the same shape as `getDebugLog`/`debugLogResp`"*. Read at verified
+boundaries, it is not that shape at all:**
+
+```js
+a ? o.socketService.getUserInfo(s, r, a, l, c) : o.getUserInfoDB(s, r)    // byte 1,159,275
+this.socket.invoke("invokeCmd", {cmd:"userInfo", uid, rid, socketID, …})  // byte 1,026,474
+case "userInfo": if (!xe.user && !xe.userXref) continue; …                // byte   996,456
+```
+
+`socketID` names a live SOCKET and the SERVER holding it answers. The `privCmdsIn` case is **the
+answer arriving at the asker**, not a request arriving at the target — this channel's one RESPONSE.
+The member's browser is never involved and could not be: a page cannot learn its own public address.
+Building the prescribed peer round trip would have been inventing a protocol the reference has not
+got, and asking a browser for a fact it does not hold.
+
+**What the branch actually delivers is five cells, and not one of them had a producer.**
+`ModalHost.svelte` renders `targetUser.ip`, `.userAgent`, `.appVersion`, `.streamServer` and
+`.serverId` — each declared once on `ModalTargetUser`, consumed once, assigned nowhere. `n/a` for
+everybody, always, on every path. The same defect `server/user-detail.ts` was written to close for
+`loggedIn` and `email`, five more times over.
+
+#### Two are built, from facts the server observes
+
+`ip` and `userAgent` come from the request that opened the SSE stream — `getClientAddress()` and the
+`User-Agent` header — recorded on the hub's `ListenerContext` when the stream opens and read back by
+`liveConnectionFor`. They ride the existing presenter-only, room-scoped `user-detail` endpoint, so
+`RoomUserDetail.decorate` fills the cells **with no client change at all**.
+
+A FOURTH argument to `subscribeToRoom` rather than a field on `RosterUser`, and that is the whole
+design: the roster is fanned out to other browsers, so an address on it would travel to the room.
+The user agent is `.slice(0, 512)` at the boundary — it is attacker-controlled text that lands in a
+presenter's table cell.
+
+#### Three are NOT, and the reason for each is measured
+
+| cell | why not |
+| --- | --- |
+| `appVersion` | upstream's `data.cver`, which only the CLIENT knows. It would have to be self-reported, and a member whose browser is misbehaving can report any string — precisely the case the cell exists for |
+| `streamServer` | the media plane, blocked on a `STREAM_SERVER_MTX` host — rows X, AC and R |
+| `serverId` | the same blocker |
+
+`location` (`privData.locStr`, byte 2,061,069) is a sixth and needs a geo-IP service. That is an
+owner decision about an external dependency, not a reading.
+
+A contract case fails if any of the three acquires a producer, so the next engineer to wire one has
+to say where the value came from rather than the cell quietly starting to show something.
+
+#### Two negative controls came back GREEN, and each found a hole in my own assertions
+
+**The roster-wire assertion was passing on somebody else's guarantee.** Written with a MEMBER as the
+recipient, the mutation that put the address on `locStr` did not fail it — because
+`publishRosterToRoom` already redacts `locStr` for members. The assertion could not tell "not on the
+wire" from "on the wire and this recipient may not have it". It now uses a PRESENTER recipient, who
+is redacted nothing, plus a second positive control asserting that presenter really does receive the
+unredacted roster. Red on the same mutation afterwards.
+
+**`liveConnectionFor` has two ways of saying no, and only one was ever reached.** Mutating the
+loop-exhausted `return null` to `return UNKNOWN_CONNECTION` changed nothing: `subscribeToRoom`'s
+cleanup deletes a room's map once it empties, so both null cases were taking the early return. The
+loop-exhausted path is the one a REAL room takes — somebody is always connected and the question is
+about somebody who is not — and it now has its own case. Red on the same mutation afterwards.
+
+#### Two ceilings went DOWN, both by extracting rather than by trimming prose
+
+- `lib/room/user-detail.ts` **123 → 121.** `UserDetail` was declared here AND in
+  `server/user-detail.ts`, agreeing by hand until the server started answering two more fields. One
+  declaration now, in `lib/user-detail-shape.ts`, imported by both ends. A type has no runtime, so a
+  shared module crosses that boundary without pulling anything through it.
+- `lib/room/private-commands.ts` **345 → 338.** The quoted case table left — eleven byte offsets in
+  a comment under the instruction *"re-run the count rather than trust the sentence"*, which nothing
+  ever re-ran: the paragraph beside it said FIVE-and-THREE-left for the whole of the time three of
+  the five had already shipped. `priv-cmds-census-contract.test.ts` is that re-run. It asserts each
+  case label at its recorded byte in the pinned bundle, counts the branches in the module itself,
+  and makes every case without one name where the behaviour lives instead. Three controls seen red:
+  a wrong offset, a branch removed, and a `userInfo` branch added.
+
+`git diff --unified=0 … | grep 'max:'` shows exactly two changed lines, both down.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **283 files, 4,802 passed,
+1 skipped, gate-exit=0**. `svelte-check` 0 errors, 0 warnings.
+
+**Not verified:** the Svelte MCP is not exposed in this session, so `svelte-autofixer` did not run.
+No `.svelte` file changed in this entry — the modal's markup was already there, which is the whole
+finding — so `svelte-check`, `eslint` and `prettier` cover what did.
+
 ### 2026-08-31 02:00 UTC — The API could not start against PostgreSQL 16, and the whole backend suite is green for the first time
 
 **Runtime impact: YES, on any deployment not already on PostgreSQL 17.**

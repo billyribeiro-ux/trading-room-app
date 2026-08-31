@@ -1,3 +1,4 @@
+import type { UserDetail } from '../user-detail-shape';
 import { SvelteMap } from 'svelte/reactivity';
 
 import type { ModalTargetUser } from '#lib/types.js';
@@ -40,11 +41,8 @@ import type { ModalTargetUser } from '#lib/types.js';
   `#asked` is what stops a second request, not a second copy of SvelteKit's cache.
 */
 
-/** The private half of an account's card, as `routes/user-detail.remote.ts` answers it. */
-export interface UserDetail {
-  readonly email: string;
-  readonly loggedIn: string | null;
-}
+/* Declared once, in `#lib/user-detail-shape.ts`, and imported by the server end as well. */
+export type { UserDetail };
 
 export class RoomUserDetail {
   /**

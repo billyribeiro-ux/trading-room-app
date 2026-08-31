@@ -4243,11 +4243,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/user-detail.ts',
     /*
+      123 -> 121 on 2026-08-31, DOWN because the shape moved out: `UserDetail` was declared here and
+      again in `server/user-detail.ts`, and the two agreed by hand until the server started answering
+      `ip` and `userAgent`. One declaration now, in `lib/user-detail-shape.ts`, imported by both.
+
       Created 2026-08-30. Most of it is the account of what the reference does — the `getUserInfoDB`
       branch, the two divergences taken deliberately, and the declined `SvelteSet`. The class itself
       is three members. A climb here means the client started deciding something.
     */
-    max: 123,
+    max: 121,
     why: 'the answers to the offline user lookup, held for the life of the page'
   },
   {
@@ -4929,6 +4933,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   {
     file: 'lib/room/private-commands.ts',
     /*
+      345 -> 338, 2026-08-31, and DOWN — which is what the paragraphs below promised would happen.
+
+      The quoted case table left. It was eleven byte offsets in a comment under an instruction to the
+      reader, *"re-run the count rather than trust the sentence"*, and nothing ever re-ran it: the
+      paragraph beside it said FIVE-and-THREE-left for the whole of the time three of the five had
+      already shipped. `priv-cmds-census-contract.test.ts` re-runs it against the pinned bundle now —
+      each label asserted at its byte, the branches counted in the module itself, and the three cases
+      without a branch each naming where the behaviour lives instead. The module points at it and no
+      longer holds an inventory it cannot verify.
+
       THE ADDRESSED CHANNEL, created 2026-08-23 and capped in the same commit.
 
       Every `/privCmdsIn/` command, taken whole out of `RoomEventStream` — which routes six channels,
@@ -5018,7 +5032,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       for existing is a divergence from the capture, and a divergence with no recorded WHY is the
       one that gets "simplified" back.
     */
-    max: 345,
+    max: 338,
     why: 'every command addressed to one member, behind one addressing gate'
   },
   {
