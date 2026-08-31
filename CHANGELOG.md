@@ -33,6 +33,99 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 03:30 UTC — Three more surface audits merged, and two of them had to be reconciled against each other
+
+**Runtime impact: YES** — via the fifty-one rows merged, each with its own entry. What is recorded
+here is what the MERGES cost, because that is the part no branch could see.
+
+Seven surfaces, three batches: `PrivateChatComposer` + `GiphyPicker` + `SpeechRecoOverlay` (20 rows),
+`ScreenZoomControls` + `ScreenVolumeControl` + `StreamTabs` (14), `RoomNavbar` + `MessageMenu` (17).
+The register stands at **0 open · 355 closed · 355 rows**, and `todo-next.md` at **10 of 82 surfaces,
+3,814 of 36,024 lines**, both measured rather than copied.
+
+#### Two batches wrote the same module and disagreed about what it does
+
+`chat-composer-enter.ts` was created independently on two branches. Both transcribed the same bytes;
+one described them as *"Shift+Enter and Alt+Enter make a line break"* and the other as *"Shift+Enter
+is a NO-OP"*. The bytes settle it, at three offsets — 1,439,821 (the room composer), 2,208,387
+(private chat), 2,386,131 (the extra column), character for character apart from the jQuery alias
+and the element id:
+
+```js
+e.shiftKey ? (i.val(i.val()), this.autoExpand(e.target))            // the value assigned to ITSELF
+  : e.altKey ? (i.val(i.val() + "\n"), this.autoExpand(e.target))   // the value plus a newline
+  : (this.showEmojiChooser = !1, this.sendMessage(), …)
+```
+
+`i.val(i.val())` is a no-op and `preventDefault()` has already run, so **Shift+Enter in the captured
+application inserts nothing and sends nothing.** The surviving module names that action `swallow`
+rather than folding it into `newline`, precisely so the two cannot be confused again, and
+`extra-chat-surface-contract.test.ts` — which had encoded the wrong rule — now asserts the measured
+one. Its own case above it had been quoting the refuting bytes the whole time.
+
+#### Two batches extracted the same region, and the choice was made on behaviour
+
+The navbar's SoundCloud region was split by AUDIENCE on one branch (`SoundCloudMenu` +
+`SoundCloudViewerStop`) and by FEATURE on another (`NavbarSoundCloud`). Both reached the same 1,169
+ceiling. The feature split survived because its `RoomNavbar` also builds **NAV-04** (`breathing-rec`
+on the presenter's record dot) and **NAV-07** (`class="nav-link"` on the two launching spinners),
+which the other does not — **a seam is not worth two behaviours.** The audience split's argument is
+recorded at the ceiling as a real cost of the choice rather than dismissed.
+
+Merging it then surfaced two errors IN it, both settled from the bytes:
+
+- Its listener arm rendered `id="cssSoundCloudIcon"`, on the reasoning that const 176 declares `id`
+  twice and *"a browser keeps the first"*. That is the HTML PARSER's rule for markup, and a const
+  array is not parsed: Angular's `setUpAttributes` (`H0`, bundle byte **16,054**) loops the array and
+  calls `setAttribute` once per string pair with no de-duplication, so the **second** wins. The
+  assertion demanding the first was demanding an attribute the reference overwrites before paint.
+- Correcting it to `soundcloudDropdown` then made that string useless as the needle for *"the
+  listener arm is absent for a presenter"* — the presenter's dropdown carries the same id, so the
+  assertion was answered by the very element it was meant to distinguish from. The needle is const
+  97's own title now, one word apart from const 96's and not a substring of it.
+
+The deleted pair's keyboard route came back with it: `role="button"`, `tabindex="0"` and
+`aria-label="Stop Playing For Me"` are this room's addition to an anchor that upstream leaves with no
+href, no text and no name, and they are asserted so they cannot be dropped later as "not in the
+reference".
+
+#### Three contract tests were re-pointed, and one had the wrong kind of floor
+
+`tip-button-contract` and `sidebar-tip-single-render-contract` read `RoomNavbar.svelte` for markup
+that moved to `NavbarTipButton.svelte`; both now read the file that OWNS the markup, which is what
+they were always about. The second's vacuity floor was `length > 5_000` — a byte count, which failed
+a 2,731-byte file that is exactly right because it IS the extraction. It asserts the subject is
+present instead.
+
+#### The measured refusals are worth naming, because three of them are dead code upstream
+
+`hasSTHelpLink` occurs three times in 2,891,205 bytes and the only assignment setting it true is on
+the LOGIN component, so the room's help link can never render. `recIndicatorStart`'s one rule is a
+descendant selector an `<i>` cannot match. `audioVolSlider` is a CLASS rule written against an
+ATTRIBUTE. Building any of them would have been reproducing dead code — and the screen batch found
+the same class of error three more times: **every const index those three components cited from 66
+upward was one too high**, because the citations named a capture root this repository does not hold,
+and the neighbours are plausible enough that a slot lookup would have confirmed each one.
+
+#### Ceilings
+
+Two swapped out (121, 90 — the deleted pair) and three in (93, 201, 59 — the three that survived).
+`NavbarSoundCloud` went 195 → 201 **inside the merge that created it**, for the corrected id and the
+three accessibility attributes; the argument that would otherwise have made it longer moved to the
+contract that asserts it. `chat-composer-enter` went 78 → 86 the same way: the 78 capped a version
+that never shipped and described a rule the reference does not have. Both are recorded at the entry
+as what they are rather than as relaxations.
+
+**Verified:** `pnpm run gate` in `apps/room` — **290 files, 5,002 passed, 1 skipped**; in
+`apps/controller` — 99 files, 1,057 passed, 21 skipped; `npx playwright test` — **12 passed**. All
+three exits read from logs, all `0`.
+
+**Not verified:** all three agents reported the Svelte MCP unavailable in their sessions, so
+`svelte-autofixer` did not run on any component they touched or created. `svelte-check` (0 errors,
+0 warnings), `eslint` and `prettier` ran in its place, and it is recorded here as well as in their
+own entries because a substitution noted only in the branch that made it is the kind of thing a
+merge loses.
+
 ### 2026-08-31 02:56 UTC — Row 8 turned from an anecdote into an assertion, and the guest door was unreachable from the suite
 
 **Runtime impact: NO.** No product code changed. What changed is that a defect recorded only as a
