@@ -169,10 +169,14 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
   /*
     Reconcile the stored role with the controller, on every load.
 
-    `/session` writes it once, at entry. Seventeen server actions then authorise against it — and a
-    session can be open for hours. Without this, an owner demoting somebody in the controller
-    changes nothing until that person happens to re-enter the room: they keep Archives, Get Random
-    User, posting alerts, running polls and every presenter command in the meantime.
+    `/session` writes it once, at entry. `presenterRoom()` then authorises every presenter-gated call
+    against it, reading the field written four lines below — and a session can be open for hours.
+    Without this, an owner demoting somebody in the controller changes nothing until that person
+    re-enters the room: they keep Archives, alerts, polls and every presenter command meanwhile.
+
+    This said "Seventeen server actions then authorise against it" until 2026-08-31, by which time
+    this file exported NONE — every one was a remote function (row AG). A count in prose beside the
+    thing it counts is the copy nobody updates, so there is none here now.
 
     A write only when it differs, so an unchanged role costs nothing. The same reconciliation
     handles a ban that lands mid-session, and a room CLOSING under somebody: `hooks.server.ts`
@@ -876,13 +880,9 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
   joined them — and is now reached by the "Force Reload" button that used to raise a fixed alert
   and send nothing. Removing it took the actions export from nineteen to eighteen.
 
-  The `remotePresCommand` docblock sat here until 2026-08-26 describing an action this file has not
-  exported for eleven days, immediately above this note explaining that the OTHER one had left.
-  Nothing saw it, because the orphan gate policed `+page.svelte` and `lib/room/*` and this is
-  neither. Its content is not lost: the deny-by-default enum is argued at `presenterCommand`
-  itself, and the peer-side mapping — `mutemic` -> `muteMic()`, `mutecam` -> `stopCam()`,
-  `mutescreens` -> `stopSharingAll()`, which is why this is a command and not a mutation — is
-  recorded verbatim on `revokePermission` in `ModalHost.svelte`, next to the checkboxes that send it.
+  `remotePresCommand`'s own docblock outlived it here by eleven days; that lesson now lives where it
+  is enforced, in `orphaned-comment-contract`, which walks all of `src`. Its content moved with it —
+  the enum to `presenterCommand`, the peer-side mapping to `revokePermission` in `ModalHost.svelte`.
 */
 
 /**

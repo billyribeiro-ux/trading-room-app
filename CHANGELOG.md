@@ -33,6 +33,47 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 05:41 UTC — a docblock counted seventeen server actions in a file that exports none
+
+**Runtime impact: NO** — one comment corrected, one redundant comment removed, one finished tracker
+section deleted.
+
+`routes/+page.server.ts`'s role-reconciliation note read *"`/session` writes it once, at entry.
+**Seventeen server actions** then authorise against it"*. Measured 2026-08-31: that file exports
+`export const actions` **zero** times, and both contracts that watch it (`chat-mode-contract` and
+`remote-call-sites-contract`) already assert the absence. Every one of the seventeen had become a
+remote function — the migration `TODO.md` row **AG** asked for, and it is finished. The only two
+`actions` exports left in `src/routes` are `logout` and `session`: the entry and exit forms, which is
+what a form action is for.
+
+The mechanism the note describes is still exactly right — the authority just does not live where the
+sentence said. `presenterRoom()` reads `requireUser(locals).role`, the field written four lines
+below it. **No count replaced the old one**, which is the doctrine
+`setting-coverage-contract.test.ts` already states about itself: a count in prose beside the thing it
+counts is the copy nobody updates.
+
+**The size ratchet refused the correction, and made it better.** `+page.server.ts` sat at 1,002
+against a ceiling of 1,003, so a nine-line note was nine lines too many, and the instruction is
+extract rather than raise. What came out was a paragraph that had become redundant: a tombstone
+explaining that `remotePresCommand`'s docblock outlived its export by eleven days *"because the
+orphan gate policed `+page.svelte` and `lib/room/*` and this is neither"*. That gate now walks all of
+`src`, and its own docblock records this very file's orphan as one of the sixteen the widening found.
+The lesson is enforced where it belongs; the prose copy was the stale one. Net growth: **zero**.
+
+**And one tracker section was deleted, because it was finished and structurally broken.** Root
+`TODO.md`'s *"Not an evidence gap — missing work"* held a table header, a separator, and then a body
+that was not a table row at all — it began mid-sentence with *"render, asserting that…"*, its opening
+cells lost in some earlier edit. Its own text ended *"Nothing remains of this row."* All three things
+it claimed were verified before deleting it: the `room-e2e` Playwright job exists
+(`quality.yml:386`), `RoomNavbar.svelte.test.ts` exists, and `room-navbar-render.test.ts` asserts the
+six broadcast controls absent for a member and present for a presenter with an explicit positive
+control. A section headed "recorded so it is not lost" that had lost its own first cell is the
+clearest possible argument for the rule this repository already has: a row that is done is deleted.
+
+Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
+skipped. Controller's `evidence-gap-register-counts.test.ts` re-run against the edited `TODO.md`: 4
+passed.
+
 ### 2026-09-01 05:06 UTC — a doc comment named the one database role the process refuses to boot with
 
 **Runtime impact: NO** — one Rust doc comment, one provenance pin moved, two tracker rows corrected.
