@@ -53,9 +53,24 @@ describing it. The lesson is the cheaper half of the same one UIM-03 teaches: **
 the table finds rows a reader who looks up the cited const cannot**, and this document's per-row
 byte offsets make the second reading the tempting one.
 
+**Seventeen more were appended on 2026-08-31**, in the three sections at the foot of this document —
+`VideoPlayer.svelte`, `ScheduledAlerts.svelte` and `AvDevicePane.svelte`, none of which had a section
+here before. Eighteen rows now stand outside the two-verifier pass: RM-25 and those seventeen. They
+are deliberately NOT folded into the tables above, for the reason the two paragraphs above give, and
+they are countable rather than asserted — every one of them carries the same sentence in its body,
+and `room-surface-audit-counts.test.ts` requires the document to hold exactly `223 + <that count>`
+rows. A row appended without the sentence, or a sentence written without a row, fails it.
+
+**The three surfaces were chosen because they had NO section here at all**, and two of them proved
+the point RM-25 makes about which reading finds what. `SCH-02` is the sharpest case: a decode from
+2026-08-15 had reached that exact `ngClass` and stopped, writing *"The class NAMES are in the const
+table and were not read; do not guess them."* They are not in the const table — Angular compiles a
+multi-key `ngClass` into a shared factory beside the template functions — which is why looking where
+the note said to look found nothing, and why the note survived two weeks.
+
 ## Where the work stands
 
-**0 open · 224 closed · 224 rows.**
+**0 open · 241 closed · 241 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4455,3 +4470,589 @@ here first.
 | EMOJI-13 | Stored skin tone is read with Number() + a 1..6 clamp rather than JSON.parse | `already-built` | The behaviour is implemented, and it is observably identical to the reference across the entire domain of values the reference itself can produce. WHAT I READ IN OUR SOURCE - apps/room/src/lib/components/EmojiPicker.svelte:421-422 — the restore-on-open read: `const storedSkin = Number(storage()?.getItem(`${NAMESPACE}.s… |
 | EMOJI-14 | Reaction chip text omits the reference's trailing space | `not-in-reference` | The quoted bytes exist but do not support a gap. Two findings. |
 
+
+---
+
+## VideoPlayer.svelte
+
+Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860,
+the six template functions `WSe` / `qSe` / `KSe` / `YSe` / `QSe` / `XSe` at 1,930,621–1,931,900, the
+three that render the player itself (`ewe` / `twe` / `nwe` / `iwe`) at 1,932,050–1,932,850, and the
+room component's own consts table walked BY VALUE from its opening bracket at byte 1,994,264 —
+entries 140 to 163 are this surface, at bytes 2,003,464 to 2,003,940.
+
+Six differences. Four reference behaviours the reader looked for and found already present are worth
+naming, because a list of only gaps reads as though nothing works: the per-item `Play For All` gate
+(`O(5, videoPlayerUrl || videoPlayerUrl === e ? -1 : 5)`) is dead upstream — the whole list is behind
+`O(1, videoPlayerUrl ? 2 : 1)` in `owe`, so ours being an outer `{#if}` is the same thing; the
+`<video>` and `<iframe>` attribute sets match consts 160 and 163 exactly; `loadVideos()` is
+presenter-gated at byte 1,967,675 and so is ours; and `stopVideoForAll(e)` really does interpolate
+its verb into the question and then send the same bare command either way, which is what this file's
+`requestStopVideo` already says.
+
+### VID-01 — Both "Play For All" dialogs are hand-rolled `.bootbox.modal` markup, so neither has a backdrop, a focus move, or a focus restore
+
+**FIXED 2026-08-31.** Routed through `BootboxDialog.svelte` with its `footer` snippet — the primitive
+this repository already models `bootbox.dialog` with, and the same shape `RoomOverlays` uses for
+`randomUser()`'s two-button dialog. Passing `footer` REPLACES the default OK, so the reference's own
+button set is the dialog's only control, which is the property `dta-02` records for the alert-pane
+lightbox.
+
+**A copy of a primitive is a copy that stops tracking it, and these two had already stopped.** About
+ninety lines of `<div class="bootbox modal fade show">` were transcribed by hand, and the three
+things the copy was missing are the three that are not markup: no `.modal-backdrop`, so the room
+stayed clickable behind a dialog that asserts `aria-modal="true"`; no focus move and no focus
+restore, so a keyboard user's focus stayed on the Play For All button they had just left, behind the
+dialog; and no `bootbox-alert` class, which is what the captured stylesheet and every other dialog in
+this room are keyed on.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `defect` · reference byte **1,980,807**
+
+```
+playVideoForAll(e){bootbox.dialog({title:"Video",message:"<p>Do you want to play this video at a specific time?",buttons:{cancel:{label:"Cancel",className:"btn-danger",callback:()=>{console.log("Cancel clicked")}},noclose:{label:"Choose time?",className:"btn-success",callback:()=>{bootbox.dialog({title:"Choose time:",message:"<p><input type='datetime-local' id='video-start-datetime' name='video-start-datetime' class='form-control' /></p>",buttons:{cancel:{label:"Cancel",className:"btn-danger",…},ok:{label:"Send",className:"btn-primary",callback:()=>{…}}}})}},ok:{label:"Play now",className:"btn-primary",callback:()=>{…}}}})}
+```
+
+**Ours:** VideoPlayer.svelte:317-413 (before) rendered the two dialogs as literal `<div class="bootbox
+modal fade show" style="display: block;">` blocks with their own `.modal-dialog` / `.modal-content` /
+`.modal-header` / `.modal-footer` scaffolding, while `BootboxDialog.svelte` — imported by this same
+file three lines above for the alert and the confirm — renders `<div class="modal-backdrop fade
+show">`, moves focus to `.bootbox-accept` on mount and restores the previous focus on teardown, and
+carries the `bootbox-{mode}` class. Verified as rendered rather than as source:
+`room-surface-audit-2026-08-31-contract.test.ts` drives the `+` button, the Play For All button and
+the Choose time? button and asserts a `.modal-backdrop` behind each dialog, the reference's three
+button labels in the reference's order, and no default OK beside them.
+
+### VID-02 — Both pending-video blocks read `m-2`; const 141 is `m-4`, and `m-2` is the const the "No videos." state uses
+
+**BUILT 2026-08-31.** Const 141 is `[1,"m-4"]` at byte 2,003,492 and is taken by BOTH `d(0,"div",141)`
+in `WSe` (the " Video URL: " block) and `d(1,"div",141)` in `qSe` (the " Video scheduled for: " block).
+
+**The pair is what makes it more than a number.** Const 146 is `[1,"m-2"]` at byte 2,003,720, and it
+is the "No videos." div — the LIST state, which the pending block replaces. Upstream the pending
+notice indents further than the list precisely because it is not one; ours drew both at the same
+inset, so the two states looked like two rows of one thing.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `wrong-constant` · reference byte **2,003,492**
+
+```
+[1,"m-4"],[1,"mx-2"],["type","button","title","Remove For All",1,"btn","btn-danger","btn-sm","ms-4",3,"click"],[1,"fa","fa-trash","mr-2"],[1,"w-100","d-flex","justify-content-between","align-items-center","m-2","border-bottom"],[1,"m-2"],
+```
+
+**Ours:** VideoPlayer.svelte:186 and :195 (before) both read `<div class="m-2">`. The index was not
+guessed: the consts table was walked bracket by bracket from `consts:[[` at byte 1,994,257, and
+entries 138–166 printed by value, which is how 141 and 146 were separated at all — the two are ten
+bytes apart in the table and both are one-class arrays.
+
+### VID-03 — The `<strong>` holding the pending url carries no class; const 142 is `mx-2`
+
+**BUILT 2026-08-31.** `d(2,"strong",142)` in `WSe` at byte 1,930,621, and 142 is `[1,"mx-2"]` at byte
+2,003,502 — the SAME const the "Video scheduled for:" `<span>` already used here, which is what makes
+the omission visible: one of the two consumers of const 142 had it and the other did not.
+
+Cosmetic, and small: without it the url butts straight against the "Video URL:" label.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `wrong-constant` · reference byte **1,930,621**
+
+```
+function WSe(t,n){if(1&t&&(d(0,"div",141),v(1," Video URL: "),d(2,"strong",142),v(3),u()(),d(4,"p"),v(5," IMPORTANT: The video URL needs to be a link to an mp4 video hosted on a website or something like S3, not a YouTube/Vimeo etc... "),u()),2&t){const e=g(5);m(3),Ze(e.scheduledVideo.videoURL)}}
+```
+
+**Ours:** VideoPlayer.svelte:188 (before) `<strong>{scheduledVideo.videoURL}</strong>`, against
+VideoPlayer.svelte:196 `<span class="mx-2">` on the date twelve lines below it.
+
+### VID-04 — The IMPORTANT paragraph is nested inside the url block; `u()()` puts it outside
+
+**BUILT 2026-08-31.** Same bytes as VID-03 and the same read: `d(0,"div",141)` … `u()()` closes the
+`strong` AND the `div`, and only then does `d(4,"p")` open. The paragraph is a SIBLING of the block.
+
+**Not only nesting.** Nested inside a `m-4` div the paragraph inherited the indent and read as a
+caption on the url — as though the warning were about that url in particular. As a sibling it is a
+statement about the feature, which is what its text actually says: *"The video URL needs to be a link
+to an mp4 video hosted on a website or something like S3."* The assertion measures `closest('div.m-4')`
+rather than searching for the text near the div, because nesting is what differs and a window that
+happens to contain the right text is not containment — the lesson `av-device-pane-contract.test.ts`
+already records at `elementAt`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **1,930,621**
+
+```
+d(0,"div",141),v(1," Video URL: "),d(2,"strong",142),v(3),u()(),d(4,"p"),v(5," IMPORTANT:
+```
+
+**Ours:** VideoPlayer.svelte:186-193 (before) opened `<div class="m-2">`, put the `<strong>` and then
+the whole `<p>` inside it, and closed the div after the paragraph.
+
+### VID-05 — The scheduled time builds a fresh `Intl.DateTimeFormat` per call, in the VIEWER's locale; the pipe is `date:'medium'`, which resolves `en-US` for every viewer upstream
+
+**FIXED 2026-08-31.** `mediumDate` from `#lib/message-formatters.js` — the room's own `date:'medium'`,
+already there, already pinned to `en-US`, and already built once at module scope.
+
+**Two defects, and the locale one is the one that could not be seen from this file.** Angular resolves
+`date:'medium'` against `LOCALE_ID`, and this bundle never calls `registerLocaleData`: the only
+occurrence of that name in all 2,891,205 bytes is inside Angular's own *"Missing extra locale data"*
+error string at byte 147,099. So the reference renders `Aug 31, 2026, 5:04:00 PM` for every viewer on
+earth, and passing `undefined` here rendered `31.08.2026, 17:04:00` for some of them. The other half
+is the one `#lib/message-formatters.ts` and `#lib/short-when.ts` were each written for: constructing
+an `Intl.DateTimeFormat` is a locale-data lookup, and this one ran on every render of the pending
+line.
+
+**Its `Invalid Date` guard went with it, deliberately.** The only writer of `videoPlayTime` is
+`scheduleVideoForAll` in `#lib/room/broadcasts.svelte.ts`, which refuses to arm an unparseable value
+(`if (!Number.isFinite(delay)) return`). A guard against a state its own writer cannot produce is a
+claim that the writer might.
+
+**And its control came back GREEN, which is recorded rather than repaired.** Restoring the
+`undefined`-locale formatter left the format assertion passing — on a box whose default locale IS
+`en-US`, both spellings render the same string. The locale is pinned by the second assertion (*"builds
+no formatter of its own"*), which went red on the same mutation; the division is written into the test.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **1,930,918**
+
+```
+function qSe(t,n){if(1&t){const e=Y();H(0,WSe,6,1),d(1,"div",141),v(2," Video scheduled for: "),d(3,"span",142),v(4),Xe(5,"date"),u()(),d(6,"button",143),x("click",function(){return D(e),E(g(4).stopVideoForAll("remove"))}),T(7,"i",144),v(8," Remove Scheduled Video "),u()}if(2&t){const e=g(4);O(0,e.scheduledVideo.videoURL?0:-1),m(4),Ze(Ct(5,2,e.scheduledVideo.videoPlayTime,"medium"))}}
+```
+
+**Ours:** VideoPlayer.svelte:167-179 (before) — `formatScheduledDate` called
+`new Intl.DateTimeFormat(undefined, {year:'numeric',month:'short',day:'numeric',hour:'numeric',
+minute:'2-digit',second:'2-digit'})` inside the function body. `mediumDateFormatter` at
+`apps/room/src/lib/message-formatters.ts:73` is the same option set plus `hour12: true`, pinned to
+`en-US`, and its own docblock records that it was moved out of `+page.svelte` for exactly this
+reason — this file was the fifth copy of the mistake it was extracted to end.
+
+### VID-06 — The reference's `videoseries` playlist URL is unreachable; ours reproduced the unreachable branch, with no record of why and no test on the four refusal sentences
+
+**MEASURED REFUSAL 2026-08-31 — the branch is reproduced by NOT being written, and the measurement is
+at the code.** `if(!o||!r) return void bootbox.alert("The youtube link seems wrong.")` demands BOTH a
+video id and a `list=`, and the ternary two characters later branches on the video id alone. Anything
+reaching the ternary has both, so `https://www.youtube.com/embed/videoseries?list=…` cannot be
+produced by any input: a YouTube url with a playlist and no video id is refused by the guard above it,
+and one with both is rendered as the single video. A presenter pasting a pure playlist link gets *"The
+youtube link seems wrong."*
+
+**Writing the arm would answer a question the reference has not answered.** So `#lib/video-list.ts`
+does not build the playlist url at all, and `video-list-contract.test.ts` asserts the REFUSAL rather
+than what the arm would return — including `expect(JSON.stringify(result)).not.toContain('videoseries')`
+— so the day somebody relaxes the guard, the test names the decision they have just taken.
+
+**The reason for the module is the other half of the row.** The four refusal sentences are every one
+of them a transcription, and the only way to reach them was to mount the component and drive an input,
+so none had ever been executed. They are pure now, and the ORDER is executed with them: emptiness is
+tested before the scheme (a blank field is told it is blank), and the duplicate test runs AFTER the
+normalisation, so `watch?v=X&list=Y` and the embed url it becomes are one entry rather than two rows
+that play the same video.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **1,979,830**
+
+```
+if(!o||!r)return void bootbox.alert("The youtube link seems wrong.");o?e=`https://www.youtube.com/embed/${o}?autoplay=1`:r&&(e=`https://www.youtube.com/embed/videoseries?list=${r}&autoplay=1&loop=1&rel=0`)
+```
+
+**Ours:** VideoPlayer.svelte:104-114 (before) carried `if (!videoId || !playlistId) { … } if (videoId)
+{ … } else if (playlistId) { … }` — the same unreachable arm, under a comment reading only *"This
+restrictive two-part guard is present in the compiled source"*, which records the guard and not the
+consequence. `#lib/video-list.ts` now carries both, and the two YouTube patterns stay character for
+character what the capture has, escapes included.
+
+---
+
+## ScheduledAlerts.svelte
+
+Read end to end on 2026-08-31 against the v4 bundle. The surface is two reference components:
+`app-scheduled-alerts-modal` whole — class at byte 2,406,725, template at 2,408,380, consts walked BY
+VALUE from byte 2,407,518 (17 entries), component styles at 2,409,000 — and the send-later fields
+inside `app-post-alert-modal`, template function `QTe` at byte 2,120,600 with its buttons `XTe` /
+`JTe` / `ZTe` / `tDe` at 2,121,700–2,122,050.
+
+Seven differences. Reference behaviours confirmed present and NOT re-litigated: the repeat select's
+three labels and their wire values (PAM-07), the timezone note and its underline (PAM-09), the
+`Ignore weekends?` wording and its `daily`-only gate (PAM-08), the confirm-before-schedule and its
+`Alert scheduled OK.` (PAM-11), the `showSendLater` mutual exclusion with Post Alert (PAM-05), and the
+`date:'short'` cell, which `#lib/short-when.ts` has served since 2026-08-30.
+
+### SCH-01 — Remove deletes a scheduled alert on the click; the reference asks first, and quotes the alert
+
+**BUILT 2026-08-31.** `removeScheduledAlertQuestion` in `#lib/scheduled-alert-table.ts`, asked through
+the pane's existing `onconfirm` prop — the room's own dialog primitive, the same one PAM-11 uses two
+functions above and for the same recorded reason: this pane does not own the dialog stack.
+
+**The most expensive kind of missing confirmation.** A presenter who meant to press Remove on the
+09:30 row and hit the 09:35 one destroyed an alert with no undo, no record of what it said, and no way
+to know which one had gone — the table simply came back one row shorter. Those are the presenter's own
+unsent words, and quoting the TEXT is what makes the answer checkable, exactly as PAM-11 quotes the
+date.
+
+`docs/decoded/alert-scheduler-filter-labels.md` already recorded the punctuation and said to reproduce
+it verbatim — *"a full stop and a space before `text:`, and no closing question mark"* — and the test
+asserts both, including `not.toContain('?')`, because a missing question mark is what a well-meaning
+edit adds back.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**high** · `missing-control` · reference byte **2,407,145**
+
+```
+removeScheduledAlert(e){bootbox.confirm("Are you sure you want to delete this alert by "+e.alert.n+". text: "+e.alert.txt,i=>{i&&this.appService.sendServerCommand("removeScheduledAlert",{scheduledAlertID:e._id})})}
+```
+
+**Ours:** ScheduledAlerts.svelte:243 (before) `<td><button type="button" onclick={() => remove(row.id)}>Remove</button></td>`,
+calling `remove(id)` at ScheduledAlerts.svelte:158-165, which goes straight to the
+`removeScheduledAlert` command. Grep over apps/room/src for `delete this alert` returned zero hits.
+The server refuses correctly (`removeScheduledAlert` is presenter-gated and room-scoped, 404 on a
+foreign row) — so the hole was never authorisation, only the absence of a question.
+
+### SCH-02 — The repeat cell renders bare text; the reference draws a coloured pill, and its three class names had been explicitly left unread
+
+**BUILT 2026-08-31.** `REPEAT_BADGE_CLASS` in `#lib/scheduled-alert-table.ts`, read at byte 2,406,323.
+
+**This row exists because a previous decode said in as many words that it stopped here.**
+`docs/decoded/alert-scheduler-filter-labels.md` decoded this table on 2026-08-15 and wrote: *"The
+repeat `span` carries a three-way `ngClass` keyed on, in order: `"" === e.repeat || !e.repeat`,
+`"daily" === e.repeat`, `"weekly" === e.repeat`. **The class NAMES are in the const table and were not
+read; do not guess them.**"* They are not in the const table, which is why looking there found
+nothing: Angular compiles a multi-key `ngClass` object literal into a shared pure-function factory
+beside the template functions, and `mMe` is that factory.
+
+**Red on "off" is the one nobody would have guessed.** A reader predicting a palette puts grey there.
+Upstream spends its loudest colour on the alert that is NOT going to repeat — the state a presenter
+most needs to pick out of a table of otherwise identical rows, because that one fires once and is then
+gone.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `missing-behaviour` · reference byte **2,406,323**
+
+```
+const fMe=(t,n)=>n.sendOn,mMe=(t,n,e)=>({"text-bg-danger":t,"text-bg-info":n,"text-bg-warning":e});function gMe(t,n){1&t&&(d(0,"span",14),v(1,"no weekends"),u())}
+```
+
+**Ours:** ScheduledAlerts.svelte:236 (before) `{row.repeat || 'off'}` as bare text in the cell, with no
+`<span>` at all — so const 13 `[1,"badge","rounded-pill",3,"ngClass"]` (byte 2,408,102) had no
+counterpart either. The positional call is read at byte 2,406,725:
+`z("ngClass",$a(9,mMe,""===e.repeat||!e.repeat,"daily"===e.repeat,"weekly"===e.repeat))`, which is what
+makes the mapping unambiguous rather than inferred.
+
+### SCH-03 — Two column headers are renamed and the fifth is empty; scope is absent, and the date cell is a `<td>` where upstream uses a row header
+
+**BUILT 2026-08-31.** `Date / Time · Sender · Alert · Repeat · Actions`, `scope="col"` on all five, and
+the date cell as `<th scope="row" class="alert-date-time-th">`.
+
+**The empty header is the half that is not cosmetic.** A `<th></th>` is a column a screen reader
+announces as nothing, and the cells under it are buttons that destroy things. `scope` is the
+reference's own on both axes and is what tells a reader which header a cell belongs to; the date is a
+row header upstream because in a table where the sender, the text and the repeat can all repeat, the
+time is the only value that identifies the row.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `divergence` · reference byte **2,408,380**
+
+```
+d(7,"div",6)(8,"table",7)(9,"thead")(10,"tr")(11,"th",8),v(12,"Date / Time"),u(),d(13,"th",8),v(14,"Sender"),u(),d(15,"th",8),v(16,"Alert"),u(),d(17,"th",8),v(18,"Repeat"),u(),d(19,"th",8),v(20,"Actions"),u()()(),d(21,"tbody"),ht(22,_Me,16,13,"tr",9,fMe),u()()()
+```
+
+**Ours:** ScheduledAlerts.svelte:229 (before)
+`<tr><th>Sends</th><th>By</th><th>Alert</th><th>Repeat</th><th></th></tr>` and
+ScheduledAlerts.svelte:234 `<td>{shortDate(row.sendOn)}</td>`. Consts 8 `["scope","col"]` (byte
+2,407,945) and 12 `["scope","row",1,"alert-date-time-th"]` (byte 2,408,063) had no counterpart
+anywhere in the file.
+
+### SCH-04 — The "no weekends" badge is an invented yellow; the reference's is `text-bg-secondary`, rounded, and `ms-1`
+
+**BUILT 2026-08-31.** Const 14 is `[1,"badge","rounded-pill","text-bg-secondary","ms-1"]` at byte
+2,408,141.
+
+**A colour picked because it looked right is the shape `CLAUDE.md` names outright**, and this was one:
+`background: #f0c040` appears nowhere in the bundle and nowhere else in this repository. Beside a
+repeat pill that is now `text-bg-info`, a hand-mixed amber read as a third state rather than as a
+qualifier on the second — which it is, being rendered only for a daily series.
+
+The gate on it was already right and stays as it was: `"daily"===e.repeat&&e.ignoreWeekends`, not the
+flag alone. The test covers the case that separates those two by giving row three `weekly` WITH
+`ignoreWeekends` set.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `invented-value` · reference byte **2,408,141**
+
+```
+[1,"badge","rounded-pill","text-bg-secondary","ms-1"],[1,"btn","btn-outline-danger","btn-sm","remove-scheduled-alert-btn",3,"click"],[1,"fas","fa-trash"]
+```
+
+**Ours:** ScheduledAlerts.svelte:240 (before) `<span class="badge">no weekends</span>`, with a scoped
+rule at ScheduledAlerts.svelte:349-354 reading `padding: 0 0.3rem; border-radius: 3px; background:
+#f0c040; font-size: 0.7rem`.
+
+### SCH-05 — Remove has no icon and no button classes, and the two component styles the reference ships with this table are absent
+
+**BUILT 2026-08-31.** `btn btn-outline-danger btn-sm remove-scheduled-alert-btn`, `<i class="fas
+fa-trash">`, and the label with the capture's own surrounding spaces (`v(15," Remove ")`, written as
+`{' Remove '}` per the idiom `AGENTS.md` records). The two rules are the reference's own, shipped in
+the same `ɵcmp`.
+
+**The one destructive control in the table looked like every other button in the pane**, which is what
+made SCH-01's missing confirmation cost what it did — nothing about the control said it was the
+dangerous one. `width: 88px` and `min-width: 150px` are not decoration either: they are what stops the
+button reflowing and the date wrapping as rows arrive and are removed, in a table whose row count
+changes under the reader.
+
+`!important` is dropped because in a scoped sheet nothing is competing with these two, and
+`font-weight: inherit` is added on the row header: a `<th>` is bold by default and this one is a
+timestamp, not a heading a reader scans.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `missing-control` · reference byte **2,409,000**
+
+```
+styles:[".remove-scheduled-alert-btn[_ngcontent-%COMP%]{width:88px!important}.alert-date-time-th[_ngcontent-%COMP%]{min-width:150px!important}"]
+```
+
+**Ours:** ScheduledAlerts.svelte:243 (before) `<button type="button" onclick={() => remove(row.id)}>Remove</button>`
+— no `class`, no icon, and `remove-scheduled-alert-btn` / `alert-date-time-th` returned zero hits
+across all of apps/room.
+
+### SCH-06 — "See Scheduled Alerts" is offered unconditionally; the reference gates it on `scheduledAlerts.length > 0`
+
+**MEASURED REFUSAL 2026-08-31, with the measurement here rather than at the code, because building it
+would mean building the thing this pane deliberately does not do.** The gate is real —
+`O(68, showSendLater && scheduledAlerts.length > 0 && hasAlertScheduler ? 68 : -1)` at byte 2,139,315,
+transcribed into `PostAlertModal.svelte`'s own comment at line 606 — and upstream can afford it because
+it FETCHES ON SESSION LOAD: `globals.sessData.hasAlertScheduler && this.send("getScheduledAlerts", null)`
+at byte 1,009,797, so `globals.scheduledAlerts` has a length before anybody opens the composer.
+
+**This pane fetches on request**, which its own comment states as the reference's shape for the
+BUTTON (`manageScheduledAlerts()` is a click and not a load) and which `listScheduledAlerts` enforces
+as a presenter-gated `query`. To gate the button on the count, the count would have to be fetched when
+the composer opens — a presenter-gated round trip on every alert anybody starts writing, for a control
+that answers "nothing is scheduled" a moment later anyway, and for a room's pending alerts, which the
+remote module records as *"what a presenter intends to say and has not said yet."*
+
+**Unblocked by** a decision to fetch the list on session load as upstream does — at which point the
+gate is one term, and the empty state below it becomes unreachable rather than merely rare.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **2,139,315**
+
+```
+O(68,e.showSendLater&&e.appService.globals.scheduledAlerts.length>0&&e.appService.globals.sessData.hasAlertScheduler?68:-1)
+```
+
+**Ours:** ScheduledAlerts.svelte:216-218 renders the manage toggle with no gate but `disabled` never
+set, and `refresh()` is called only from `toggleManage()`. `pending` starts `[]` and is not asked for
+until the button is pressed, so a length gate here would hide the button in exactly the state where
+the answer is unknown rather than zero — a control that is absent because nothing has looked is worse
+than one that opens onto "Nothing is scheduled."
+
+### SCH-07 — The modal chrome — `modal-xl`, `table table-striped text-white`, the "Manage Scheduled Alerts" title and the Close footer — is not reproduced
+
+**DELIBERATE DIVERGENCE 2026-08-31; the argument already lives in the component and is not restated
+here.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
+`ScheduledAlertsTable.svelte`'s header records why drawing a row is not the part of that decision
+being revisited. The chrome is what the merge costs: a pane embedded in `PostAlertModal`'s body cannot
+carry a second modal's dialog, title bar and Close button, because there is no second modal.
+
+`table-striped` and `text-white` go with it for a reason worth naming separately: both are Bootstrap
+globals styling a table that is now inside a SCOPED sheet, and the room already runs two Bootstrap
+generations on two surfaces (recorded in `todo-next.md`). Borrowing a global table skin into a scoped
+component is how the row-striping in one modal starts depending on which generation loaded.
+
+The two rules that are NOT chrome — `remove-scheduled-alert-btn` and `alert-date-time-th` — were built
+rather than refused, and are SCH-05.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **2,407,518**
+
+```
+consts:[["id","scheduledAlertsModal","tabindex","-1","aria-labelledby","scheduledAlertsModalLabel","aria-hidden","true",1,"modal","fade","text-white"],[1,"modal-dialog","modal-xl"],[1,"modal-content"],[1,"modal-header"],["id","scheduledAlertsModalLabel",1,"modal-title"],["type","button","data-bs-dismiss","modal","aria-label","Close",1,"btn-close","btn-close-white"],[1,"modal-body"],[1,"table","table-striped","text-white","w-100"]
+```
+
+**Ours:** `ScheduledAlertsTable.svelte` renders `<div class="scroll"><table>` with a scoped sheet, and
+`ScheduledAlerts.svelte:225` renders the whole block inline inside `PostAlertModal`'s body. Note that
+`PAM-06` in this document already closed the related half — the "See Scheduled Alerts" control and the
+`#scheduledAlertsModal` id — as `already-built` under a documented rename, so this row is the STYLING
+that the rename left behind, not the control.
+
+---
+
+## AvDevicePane.svelte
+
+Read end to end on 2026-08-31 against the v4 bundle: `loadDevices` at bytes 2,162,037–2,165,010,
+`onAudioDeviceChange` / `onVideoDeviceChange` / `submitNewDevices` / `setNewDevices` /
+`getDeviceLabel` at 2,160,900–2,162,037, the presenter template functions `dDe` / `uDe` / `hDe` /
+`pDe` / `fDe` / `mDe` / `gDe` / `_De` / `bDe` / `vDe` at 2,141,500–2,142,600, and
+`app-session-control-modal`'s consts walked BY VALUE from byte 2,175,472 — entries 44–60 and 88–104
+are this pane.
+
+**Four differences, and this section deliberately does not restate the ModalHost ones.** SC-02, SC-03,
+SC-09, SC-10, SC-11, SC-14, SC-15, SC-16 and SC-17 in the `ModalHost: session-control modal` section
+above already cover the fabricated seed devices, the inert `audioDeviceID`, the Retry button, the
+"Please connect…" fallbacks, the checkbox seeding, the non-presenter body, the Refresh disable and
+spinner, the loading alert class, and the presenter gate. Every one was re-read here and none has
+regressed; the markup matches consts 46–60 and 95–104 attribute for attribute, including the two
+crossed-out icons and the `for`/`aria-label` pairs. What follows is what those rows did not reach:
+the enumeration itself.
+
+The connectivity / AV-test modal was read first, as instructed. `CONN-01` to `CONN-07` cover its tabs,
+its title and its presenter gates; none of them touches this pane's device rules, and this pane is
+rendered from BOTH modals (`ModalHost.svelte:5112` and `:5500`), which is why the rows are filed here
+rather than under either modal.
+
+### AVD-01 — `loadDevices` does not empty the lists first, so a Refresh after a device is unplugged keeps offering the device that has gone
+
+**FIXED 2026-08-31.** `audioDevices = []` / `videoDevices = []` before the enumeration, which is where
+the reference puts them: they are the first statement of its own `loadDevices`, byte 2,162,037.
+
+**This is the same defect for the opposite gesture.** `if (nextAudio.length) audioDevices = nextAudio`
+does the right thing for a member who plugs a device IN and exactly the wrong thing for one who pulls
+a device OUT: the enumeration finds none, the assignment is skipped, and the pane keeps the previous
+list — still selected, with the green `fa-check-circle` "Selected:" tick beside it. `AvDevicePane` is
+where `audioDeviceID` is chosen and `audioCaptureConstraints` builds `deviceId: { exact: … }` from it
+(`#lib/capture-settings.ts`), and `exact` is the one constraint shape that FAILS rather than
+substituting — so the pane's confident display and the capture's refusal disagreed, with only the
+capture being right.
+
+**It also makes SC-10 reachable from a state it could not be reached from.** "Please connect audio
+devices." was previously only ever the first frame; it is now the answer to unplugging one, which is
+what makes that row true rather than merely correct.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `defect` · reference byte **2,162,037**
+
+```
+loadDevices(){var e=this;this.devicesLoading=!0,this.devicesLoadError="",this.audioDevicesList=[],this.videoDevicesList=[],
+```
+
+**Ours:** AvDevicePane.svelte:130-141 (before) — `if (nextAudio.length) { audioDevices = nextAudio; … }`
+and the video twin, with no clearing anywhere in the function; `devicesLoadError` was set only when
+BOTH lists came back empty, so a member with a working camera and no microphone got no message and a
+stale microphone list. Asserted as source rather than driven, for the reason
+`av-device-pane-contract.test.ts` already gives about `navigator.mediaDevices` under jsdom, and the
+negative half is asserted too — the guarded-assignment shape is refused by pattern.
+
+### AVD-02 — When the pane falls back to the first device it does not save that choice; the reference persists it
+
+**FIXED 2026-08-31.** `resolveSelectedDevice` in `#lib/device-enumeration.ts` returns `fellBack`, and
+the pane writes the preference only on that — which is the reference's `s ||`, byte 2,163,287.
+
+**The select's `onchange` was the only writer, and a fallback is not a change event.** So the
+"Selected:" line named one microphone while `capture.audioDeviceId` still named the one that had gone;
+the pane looked like it had resolved the problem and the capture kept failing on it, with `exact`, for
+the reason AVD-01 gives. This is the same class of defect `#lib/capture-settings.ts` was written for —
+a control whose value nothing reads — one level in: a value the control never wrote.
+
+**Written only when it fell back.** `onPreferenceChange` is a server write, so re-saving the
+already-saved value would be one request per Refresh press that changes nothing, and the reference's
+`s ||` is precisely that guard. Both directions are asserted, and both mutations were seen red — the
+write removed, and the write made unconditional.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `defect` · reference byte **2,163,287**
+
+```
+e.audioDevicesList.length>0){const s=e.audioDevicesList.some(r=>r.deviceId===e.appService.globals.audioDeviceID);e.currentAudioDevice=s?e.appService.globals.audioDeviceID:e.audioDevicesList[0].deviceId,s||(e.appService.globals.audioDeviceID=e.currentAudioDevice,e.appService.localstorage.set("audioDeviceID",e.currentAudioDevice),P(`Set default audio device: ${e.currentAudioDevice}`))}
+```
+
+**Ours:** AvDevicePane.svelte:132-140 (before) assigned `currentAudioDevice = nextAudio[0].deviceId`
+and `currentVideoDevice = nextVideo[0].deviceId` with no call to `onPreferenceChange` on either path;
+the only call sites were the two `onchange` handlers at AvDevicePane.svelte:243 and :268.
+
+### AVD-03 — The failure message has four arms; the reference has five, and the missing one is `NotSupportedError`
+
+**BUILT 2026-08-31.** `deviceEnumerationMessage` in `#lib/device-enumeration.ts`, all five arms, each
+with its own test.
+
+**The missing arm is the one nobody would notice missing.** `NotSupportedError` is what `getUserMedia`
+throws where the API exists but the requested capture does not, so it fell through to `Error loading
+devices: <whatever the browser said>` — a sentence with no next step in it, where all four of its
+siblings name one. Every error this pane can raise is TRANSIENT, which is the argument SC-09 already
+makes at the Retry button sitting inside the alert; an arm that produces a sentence nobody can act on
+is that argument's blind spot.
+
+Our pre-flight guard (`if (!navigator.mediaDevices?.enumerateDevices)`) already used that exact
+sentence and stays — it is an addition the reference does not have, and it now agrees with the arm
+rather than being the only place the sentence appears.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `missing-behaviour` · reference byte **2,164,760**
+
+```
+e.devicesLoadError="NotFoundError"===i.name?"No audio or video devices found. Please connect a microphone and/or camera.":"NotAllowedError"===i.name?"Permission denied. Please allow access to your microphone and camera in your browser settings.":"NotSupportedError"===i.name?"Your browser does not support device enumeration. Please use a modern browser.":"SecurityError"===i.name?"Security error. Please ensure the page is loaded over HTTPS.":`Error loading devices: ${i.message||"Unknown error"}`
+```
+
+**Ours:** AvDevicePane.svelte:152-161 (before) — a four-way ternary on `NotFoundError`,
+`NotAllowedError`, `SecurityError` and the default, casting the caught value with `error as
+DOMException` (which is an assertion about a value nothing checked; the module reads `name` off an
+`instanceof Error` instead and falls through otherwise).
+
+### AVD-04 — The dropdown shows a BLANK row for an unlabelled device upstream; the reference builds the label it needs and then throws it away
+
+**DELIBERATE DIVERGENCE 2026-08-31 — matching the reference here would reproduce a defect, and the
+measurement is recorded at `labelFor` in `#lib/device-enumeration.ts`.**
+
+The reference computes the label, byte 2,162,800:
+
+`let r=s.label;(null==r||""===r)&&(r=\`${s.kind} (${s.deviceId.substring(0,8)}...)\`)`
+
+and then never uses it in the dropdown. Read the rest of that `forEach`: `r` feeds the `"default - "`
+duplicate test and a `console.log`, and the value pushed onto `audioDevicesList` is the RAW `s`. The
+option template renders `e.label` (`Ne(" ",e.label," ")`, byte 2,141,984). So a device the browser has
+not labelled — which is every device before permission is granted, and the exact state this pane opens
+in — appears as a blank entry that can be selected and names nothing.
+
+**A dropdown of blank rows is a control that cannot be operated**, and the reference had already
+written the sentence that fixes it. Using it is one line, and it is the same judgement `selectedDeviceLabel`
+records for the "Selected:" line: this pane deliberately enumerates late, so the unlabelled state is
+normal here in a way it is not upstream.
+
+One addition of ours goes with it: an empty `deviceId` yields `unknown` rather than `substring`'s
+bare `...`, which names nothing either.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **2,162,800**
+
+```
+o.forEach(s=>{let r=s.label;(null==r||""===r)&&(r=`${s.kind} (${s.deviceId.substring(0,8)}...)`);const a="default"===s.deviceId||"communications"===s.deviceId;let l=!1;if(r.toLowerCase().startsWith("default - ")){const h=r.substring(10);l=o.some(f=>f.kind===s.kind&&f.label===h&&f.deviceId!==s.deviceId)}const c=a||l;"audioinput"!=s.kind||c?"videoinput"==s.kind&&!c&&e.videoDevicesList.push(s):e.audioDevicesList.push(s)
+```
+
+**Ours:** the synthesised label was already used — AvDevicePane.svelte:126-131 (before) had it inline
+in `toOption` — but nothing recorded that upstream discards it, so the divergence read as a
+transcription and would have been "corrected" back by the next reader diffing against `e.label`. It is
+`#lib/device-enumeration.ts` now, with the measurement, and `device-enumeration-contract.test.ts`
+executes both the synthesis and the alias rule the same `forEach` carries — including the case a
+prefix-only reading of `"default - "` gets wrong, which is a machine with one microphone labelled
+`Default - Headset` and no plain `Headset` beside it.

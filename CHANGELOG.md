@@ -33,6 +33,74 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 00:45 EDT — Three unaudited Svelte surfaces read against the v4 bundle: VideoPlayer, ScheduledAlerts, AvDevicePane
+
+**Runtime impact: YES.** Seventeen rows, thirteen of them built or fixed. The four that a user meets
+first:
+
+* **A scheduled alert can no longer be deleted by a misclick.** `ScheduledAlerts`' Remove went
+  straight to the command; the reference asks first and quotes the alert
+  (`"Are you sure you want to delete this alert by " + n + ". text: " + txt`, byte 2,407,145). Those
+  are the presenter's own unsent words, and there was no undo and no record of what had gone.
+* **`AvDevicePane` kept offering a microphone that had been unplugged.** `loadDevices` only assigned
+  a list when the enumeration came back non-empty, where the reference EMPTIES both lists first (byte
+  2,162,037). Because `audioCaptureConstraints` asks for the saved id with `exact`, the pane showed a
+  green tick beside a device the capture was already failing on.
+* **A fallback device choice is now saved.** When the saved id is absent the pane picks the first one;
+  the reference persists that (`s || localstorage.set("audioDeviceID", …)`, byte 2,163,287) and this
+  did not, so the "Selected:" line and the saved preference disagreed after every unplug.
+* **`VideoPlayer`'s two "Play For All" dialogs had no backdrop and no focus handling.** They were
+  ninety lines of hand-copied bootbox markup beside `BootboxDialog`, which this same file already
+  imports for its alert and its confirm.
+
+The rest are constants and markup read out of the bundle's own consts tables BY VALUE rather than by
+slot number: `m-4` and `mx-2` on the pending-video blocks (consts 141/142, bytes 2,003,492 and
+2,003,502), the IMPORTANT paragraph as a sibling rather than a child, the manage table's five column
+headers and its `scope` attributes, and the repeat pill.
+
+**`SCH-02` is the one worth naming.** `docs/decoded/alert-scheduler-filter-labels.md` decoded that
+table on 2026-08-15 and stopped at the `ngClass`, writing *"The class NAMES are in the const table and
+were not read; do not guess them."* They are NOT in the const table — Angular compiles a multi-key
+`ngClass` object literal into a shared pure-function factory beside the template functions — which is
+why looking where the note said to look found nothing, and why the note stood for two weeks. They are
+`text-bg-danger` / `text-bg-info` / `text-bg-warning` at byte 2,406,323, and red on "off" is the one
+nobody would have guessed.
+
+**Also fixed, and it is a real per-render cost:** `VideoPlayer` built a fresh `Intl.DateTimeFormat`
+on every render of the pending line, in the VIEWER's locale. The bundle never calls
+`registerLocaleData` — its only occurrence in 2,891,205 bytes is inside Angular's own error string at
+byte 147,099 — so `date:'medium'` resolves `en-US` for every viewer upstream. `mediumDate` in
+`#lib/message-formatters.ts` was already both of those things and was the fifth copy of the mistake it
+had been extracted to end.
+
+**One refusal with the measurement recorded:** the reference gates "See Scheduled Alerts" on
+`scheduledAlerts.length > 0`, which it can afford because it fetches the list on SESSION LOAD (byte
+1,009,797). This room fetches on request, and gating on a count nothing has asked for would hide the
+button in exactly the state where the answer is unknown rather than zero. `SCH-06` names what would
+unblock it.
+
+**Four modules and one component came out, and three ceilings went DOWN**, which is the ratchet
+working as designed: `#lib/device-enumeration.ts`, `#lib/video-list.ts`,
+`#lib/scheduled-alert-table.ts` and `lib/components/ScheduledAlertsTable.svelte`. The reason is not
+line count — it is that the five captured failure sentences, the four captured refusal sentences, the
+duplicate-device rules and the two badge values were the pieces NOTHING could execute, exactly as
+`av-device-pane-contract.test.ts` says in its own prose about `navigator.mediaDevices` under jsdom.
+`AvDevicePane` 343 → 339, `ScheduledAlerts` 357 → 320, `VideoPlayer` 414 → 412; all three grew
+behaviour and came out smaller.
+
+`docs/decoded/room-surface-audit-2026-08-30.md` gains three sections and seventeen rows, each carrying
+the sentence that keeps `room-surface-audit-counts.test.ts` honest; the header reads
+`0 open · 241 closed · 241 rows`. Fifty-five assertions across three new contract files, every
+negative control seen red — and one seen GREEN and recorded rather than repaired: the `date:'medium'`
+FORMAT assertion cannot distinguish a pinned `en-US` from a viewer default on a box whose default is
+`en-US`, so the locale is pinned by a second assertion and the division is written into the test.
+
+**The Svelte MCP was NOT available in this session** — no `list-sections`, no `get-documentation`, no
+`svelte-autofixer`. `CLAUDE.md` makes it mandatory on every `.svelte` change, so this is a gap in the
+process rather than in the result, and it is stated here rather than left to be assumed. What ran in
+its place: `svelte-check` (1,498 files, 0 errors, 0 warnings), `eslint`, `prettier --check` and the
+full `pnpm run gate` — exit 0, 267 test files, 4,523 passing.
+
 ### 2026-08-30 18:20 EDT — PR #163 could not merge: no CI ran on its heads, and GitHub called three clean merges CONFLICTING
 
 **Runtime impact: YES when merged — via the content it carries, not this entry.** The merge ships

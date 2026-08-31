@@ -96,7 +96,7 @@ guessed.
 | 20 | `lib/components/notes/NotesPane.svelte` | 521 | no |
 | 21 | `lib/components/PrivateChatPanel.svelte` | 520 | no |
 | 22 | `lib/components/ScreenPane.svelte` | 669 | no |
-| 23 | `lib/components/VideoPlayer.svelte` | 413 | no |
+| 23 | `lib/components/VideoPlayer.svelte` | 411 | no |
 | 24 | `lib/components/MainTabStrip.svelte` | 371 | no |
 | 25 | `lib/components/AlertQaModal.svelte` | 371 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Ours is 358 lines. |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | no |
@@ -106,7 +106,7 @@ guessed.
 | 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
 | 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
 | 32 | `lib/components/MessageMenu.svelte` | 252 | no |
-| 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
+| 33 | `lib/components/ScheduledAlerts.svelte` | 319 | no |
 | 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
 | 35 | `lib/components/RoomShell.svelte` | 268 | no |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**2 of 73 surfaces audited · 1,072 of 35,057 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -155,12 +155,13 @@ guessed.
 | 64 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 65 | `lib/components/LogArchiveModals.svelte` | 147 | no |
 | 66 | `lib/components/ChatArchivePane.svelte` | 143 | no |
-| 67 | `lib/components/AvDevicePane.svelte` | 342 | no |
+| 67 | `lib/components/AvDevicePane.svelte` | 338 | no |
 | 68 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 69 | `lib/components/RestreamPane.svelte` | 105 | no |
 | 70 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 71 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 72 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
+| 73 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
 ## The honest scoping statement
 
 To make this file a complete build spec, **each unaudited surface needs the treatment the two
