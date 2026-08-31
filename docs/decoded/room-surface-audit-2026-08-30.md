@@ -8142,9 +8142,16 @@ function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),…),2&t){const e=g(2);z("si
 
 ### SHL-06 — two sibling files carry the same misattribution, and both are outside this batch's scope
 
-**BLOCKED 2026-08-31 04:05 UTC.**
+**FIXED 2026-08-31 — both halves, in the two different ways they needed.**
+
+`split.svelte.ts` names `nRe` with its offset now, and carries the reason the two were confusable: `K4e` (2,493,526) and `nRe` (2,496,317) are both `as-split` wrappers with three `as-split-area` children, and their third children are gated on different things — `O(3, e.hidePresentation ? -1 : 3)` against `O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)`. The gate that paragraph quotes is the second one's. Corrected with BOTH offsets rather than by swapping three letters.
+
+`mobile-layout-contract.test.ts` is NOT renamed, which is the row's own prescription and the right one: its assertions read `ROOM_COMPILED` out of the `app-room` capture root, where the names it uses hold. Renaming its prose to a different capture's symbols would leave every citation pointing at a file that does not use them. It carries a NOTE recording that the two captures disagree, and why that is written down rather than resolved.
+
+**`extra-chat-column-contract.test.ts` asserts the correction**, because neither edited file could guard itself: one is prose, and the other is one of the 42 excluded files. Three assertions — both offsets, both third-child gates read out of the bundle, and the corrected sentence present with the wrong one absent. The control restoring the misattribution printed its failure.
+
 This row was ADDED after this document was committed, by the seventh batch.
-`lib/room/split.svelte.ts:423` reads *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
+`lib/room/split.svelte.ts:423` read *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
 preferences.extraChatColumn`"* — that gate is `nRe`'s; `K4e`'s third child is `hidePresentation ? -1
 : 3`. `lib/mobile-layout-contract.test.ts` repeats the naming in six places (`:5, :9, :79, :83,
 :116, :177`) together with the `app-room.render-helpers.js` line citations.

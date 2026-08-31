@@ -659,3 +659,44 @@ describe('the second column follows its own messages', () => {
     expect(paneCode).not.toContain('visibleChat');
   });
 });
+
+describe("SHL-06 — the extra column's split gate is `nRe`'s, and the citation said `K4e`", () => {
+  /*
+    `split.svelte.ts` quoted the RIGHT gate under the WRONG function name, which is the shape that
+    survives review: the sentence is true and only the symbol is not, so a reader checking the claim
+    finds it correct and moves on.
+
+    Both are `as-split` wrappers with three `as-split-area` children, which is why the two were
+    confusable. Their third children are gated on different things, and that is the whole
+    correction — read out of the pinned bundle here rather than quoted, so a different capture turns
+    this red instead of leaving a comment quietly wrong again.
+
+    This test also exists because the other half of `SHL-06` — `mobile-layout-contract.test.ts` —
+    is one of the 42 excluded files, so nothing there can guard anything on this checkout.
+  */
+  const BUNDLE = readFileSync(
+    new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url),
+    'utf8'
+  );
+  const at = (offset: number, text: string) => BUNDLE.slice(offset, offset + text.length);
+
+  it('the two wrappers are where the correction says they are', () => {
+    expect(at(2_493_526, 'function K4e('), 'K4e moved').toBe('function K4e(');
+    expect(at(2_496_317, 'function nRe('), 'nRe moved').toBe('function nRe(');
+  });
+
+  it('and only `nRe` gates its third child on the extra column', () => {
+    /* The gate `split.svelte.ts` quotes, verbatim, in the function that actually carries it. */
+    expect(BUNDLE.slice(2_496_317, 2_496_950)).toContain(
+      'O(3,!e.hideChatAlerts&&e.appService.globals.preferences.extraChatColumn?3:-1)'
+    );
+    /* And `K4e`'s third child is a different question entirely. */
+    expect(BUNDLE.slice(2_493_526, 2_494_400)).toContain('O(3,e.hidePresentation?-1:3)');
+  });
+
+  it('so the module names `nRe`, with the offset, and no longer names `K4e` as the placer', () => {
+    const split = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
+    expect(split).toContain('**`nRe` (v4 byte 2,496,317)** places it as index 3');
+    expect(split, 'the wrong attribution came back').not.toContain('`K4e` places it as index 3');
+  });
+});

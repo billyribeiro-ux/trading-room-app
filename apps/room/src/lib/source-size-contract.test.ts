@@ -3869,7 +3869,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       does the division `as-split` does for free, and a reader who does not know that reads the
       multiplication as noise and deletes it.
     */
-    max: 796,
+    /*
+      796 -> 809, 2026-08-31, for `SHL-06` — a citation that named the wrong function while quoting
+      the right gate, which is the shape that survives review: the sentence is true and only the
+      symbol is not, so a reader checking it finds it correct and moves on.
+
+      `K4e` (2,493,526) and `nRe` (2,496,317) are both `as-split` wrappers with three
+      `as-split-area` children, which is why they were confusable — and their third children are
+      gated on different things: `O(3, e.hidePresentation ? -1 : 3)` against
+      `O(3, !e.hideChatAlerts && preferences.extraChatColumn ? 3 : -1)`. The gate this paragraph
+      quotes is the second one's.
+
+      Corrected with BOTH offsets rather than by swapping three letters, so the next reader can see
+      why the two were mistaken for each other. `extra-chat-column-contract.test.ts` asserts the
+      correction and both bundle facts, because the other half of `SHL-06` lives in one of the 42
+      excluded files and can guard nothing here.
+    */
+    max: 809,
     why: "the room's two nested splits and twenty derived geometry values"
   },
   /*

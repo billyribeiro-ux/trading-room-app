@@ -420,11 +420,24 @@ export class RoomSplit {
   /**
    * The extra chat column, as its own area.
    *
-   * `K4e` places it as index 3, gated `!e.hideChatAlerts && preferences.extraChatColumn`, and `q4e`
-   * gives it `size = chatAlertsSize` — the same width as the chat/alerts column it sits beside,
-   * which is why this reads `#primaryColumn` rather than computing a third number. The order puts
-   * it after that column, which is what `orderChatAlerts()` resolves to when the extra column is
-   * present.
+   * **`nRe` (v4 byte 2,496,317)** places it as index 3, gated
+   * `!e.hideChatAlerts && preferences.extraChatColumn`, and `q4e` gives it
+   * `size = chatAlertsSize` — the same width as the chat/alerts column it sits beside, which is why
+   * this reads `#primaryColumn` rather than computing a third number. The order puts it after that
+   * column, which is what `orderChatAlerts()` resolves to when the extra column is present.
+   *
+   * `SHL-06` — **this said `K4e` and that was the wrong function.** Both are `as-split` wrappers
+   * with three `as-split-area` children, which is why the misattribution read plausibly, and their
+   * third children are gated on DIFFERENT things:
+   *
+   * ```js
+   * K4e (2,493,526)  O(3, e.hidePresentation ? -1 : 3)
+   * nRe (2,496,317)  O(3, !e.hideChatAlerts && e.appService.globals.preferences.extraChatColumn ? 3 : -1)
+   * ```
+   *
+   * The gate quoted in this paragraph is `nRe`'s, verbatim. A citation naming the wrong function
+   * while quoting the right gate is the shape that survives review — the sentence is true and only
+   * the name is not — so it is corrected with both offsets rather than by swapping three letters.
    */
   #extraChatAreaStyle = $derived(
     this.#isMobileScreen

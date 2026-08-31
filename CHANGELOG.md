@@ -33,6 +33,47 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 19:20 UTC — A citation that named the wrong function while quoting the right gate
+
+**Runtime impact: NO** — one docblock corrected, one note added, three assertions.
+
+`split.svelte.ts` said *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
+preferences.extraChatColumn`"*. The gate is quoted correctly. The function is not.
+
+**That is the shape that survives review**: the sentence is true and only the symbol is wrong, so a
+reader checking the claim finds it correct and moves on. `K4e` and `nRe` are both `as-split`
+wrappers with three `as-split-area` children — which is why they were confusable — and their third
+children are gated on entirely different things:
+
+```js
+K4e (2,493,526)  O(3, e.hidePresentation ? -1 : 3)
+nRe (2,496,317)  O(3, !e.hideChatAlerts && e.appService.globals.preferences.extraChatColumn ? 3 : -1)
+```
+
+Corrected with BOTH offsets rather than by swapping three letters, so the next reader can see why
+the two were mistaken for each other.
+
+#### The second half is deliberately NOT renamed
+
+`mobile-layout-contract.test.ts` repeats the naming in six places, and renaming it would be wrong:
+its assertions read `ROOM_COMPILED` out of the `app-room` capture root, where the names it uses are
+the ones that hold. Pointing its prose at a different capture's symbols would leave every citation
+naming a file that does not use them. It carries a note that the two captures disagree, and why that
+is written down rather than resolved in favour of whichever one the reader happens to have.
+
+#### Neither edited file could guard itself
+
+One is prose in a module; the other is one of the 42 excluded files. So the correction is asserted
+from `extra-chat-column-contract.test.ts`, which runs: both offsets, both third-child gates read out
+of the pinned bundle, and the corrected sentence present with the wrong one absent.
+
+That third assertion is the one that matters. A comment correction with no test is a comment
+correction that gets reverted by the next person who "remembers" the old name.
+
+**Evidence:** the control restoring the misattribution printed
+`expected … to contain '**\`nRe\` (v4 byte 2,496,317)** places …'`. Room gate exit 0 —
+`svelte-check` 1,574 files 0 errors 0 warnings, **301 test files / 5,511 passed / 1 skipped**, build.
+
 ### 2026-08-31 19:00 UTC — MTS-03's blocker was not the three things it named, and four rows turn out to share one
 
 **Runtime impact: NO** — one docblock, three assertions, and a row re-dispositioned. Nothing was
