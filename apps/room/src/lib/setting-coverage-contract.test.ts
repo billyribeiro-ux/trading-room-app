@@ -176,9 +176,34 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'openLoginLink',
   'authMode',
   'enableDiscord',
-  'playChatMessageSoundFor',
-  'description',
   'isLocked',
+  'playChatMessageSoundFor',
+  /*
+    THE CHANNEL CLUSTER — five names, one function, added 2026-08-31.
+
+    They were invisible to this list until then, and not because nobody looked: `referenceReads`
+    counted `sessData.<name>` and these are read in `processSessData`, BEFORE the object is
+    `sessData`, off the minifier's own local. Six settings, zero hits, for as long as the instrument
+    has existed. The sixth is `hasChannelTabs`, which is now WIRED and therefore not on this list —
+    this room had been shipping an Off Topic tab to rooms whose owners had turned it off.
+
+    The reference builds its whole strip in that one function, and its channel model is WIDER than
+    this room's in a way that decides what building these costs:
+
+      main          always            type "r"    renamable by altGenChannelName
+      offTopic      hasChannelTabs    type "r"    renamable by altOffTopicChannelName   <- wired
+      adminChat     hasAdminOnlyChannel  type "po"
+      extraAdminChannels   comma-split   type "p"
+      extraRegChannels     comma-split   type "r"
+
+    THREE types where this room has one. So these are not four more pushes onto a list; they are a
+    channel-model change, and `docs/decoded/missing-settings-triage.md` is where each is dispositioned.
+  */
+  'altGenChannelName',
+  'altOffTopicChannelName',
+  'description',
+  'extraAdminChannels',
+  'extraRegChannels',
   'needPasswordForUserNotes',
   'obsStreamKey',
   'recordChat',
@@ -187,6 +212,7 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'backupClusterID',
   'banIPList',
   'h264Enabled',
+  'hasAdminOnlyChannel',
   'linkedRoomAlerts',
   'modAdminLoginList',
   'twillioApiSID'

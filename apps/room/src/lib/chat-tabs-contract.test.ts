@@ -487,3 +487,63 @@ describe('the page load reads only this member’s channels', () => {
     expect(read).toBeGreaterThan(at);
   });
 });
+
+describe('Off Topic is a room SETTING, not a constant', () => {
+  /**
+   * ── A TAB EVERY ROOM SHOWED, THAT ONLY SOME ROOMS ASKED FOR ────────────────────────────────────
+   *
+   * The reference builds its tab list in one function (pinned bundle, bytes 1,146,625-1,147,200) and
+   * **only `main` is unconditional** there: Off Topic is behind `hasChannelTabs`, the admin channel
+   * behind `hasAdminOnlyChannel`, and two comma-separated lists behind their own settings.
+   *
+   * This room shipped both built-ins unconditionally. So a room whose owner had turned Off Topic OFF
+   * still showed it — the mirror of the dead-control rule: not a control that does nothing, but a
+   * control nobody asked for.
+   *
+   * It was never an argued divergence and it was never noticed. `hasChannelTabs` had **zero
+   * occurrences anywhere in `apps/room/src`**, and it was found on 2026-08-31 by measuring which of
+   * the settings schema's 165 unwired entries the reference actually reads — 28 of them, against
+   * three passing controls — and diffing that against what the repository already recorded. Seven
+   * were unrecorded, and six of the seven were this one function.
+   */
+  it('shows Off Topic when the room says so', () => {
+    expect(chatTabsForMember(null, [], false, true)).toEqual(['main', 'off-topic']);
+  });
+
+  it('HIDES it when the owner turned it off', () => {
+    /* The behaviour that did not exist before 2026-08-31: the setting was ignored entirely. */
+    expect(chatTabsForMember(null, [], false, false)).toEqual(['main']);
+  });
+
+  it('treats ABSENT as true, which is the captured default', () => {
+    /*
+      THE ASSERTION THAT MAKES THIS SAFE TO SHIP. `room-settings-profile.ts:55` captures the default
+      as on, and this room has behaved as `true` for every room since the tab existed — so absence
+      cannot mean "off" without silently removing a tab from every room that never stored the
+      setting. A regression dressed as a fix is exactly what this asserts against.
+    */
+    expect(chatTabsForMember(null, [], false, undefined)).toEqual(['main', 'off-topic']);
+    expect(chatTabsForMember(null, [], false)).toEqual(['main', 'off-topic']);
+  });
+
+  it('never hides `main`, whatever the setting says', () => {
+    /*
+      `main` is unconditional upstream and must stay unconditional here: it is the channel every
+      message without a tab lands in, and `messages.room` is keyed on it. A room with no main channel
+      is a room with no chat.
+    */
+    for (const setting of [true, false, undefined]) {
+      expect(chatTabsForMember(null, [], false, setting)).toContain('main');
+    }
+  });
+
+  it('still resolves badge channels when Off Topic is off', () => {
+    /*
+      The two are independent, and a filter written across the whole list rather than the one entry
+      would take the badge tabs with it. That is the shape of mistake this catches.
+    */
+    const raw = JSON.stringify([{ name: 'vip', badges: [] }]);
+    expect(chatTabsForMember(raw, [], false, false)).toEqual(['main', 'vip']);
+    expect(chatTabsForMember(raw, [], false, true)).toEqual(['main', 'off-topic', 'vip']);
+  });
+});

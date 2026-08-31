@@ -563,6 +563,15 @@ export interface RoomSessionSettings {
    */
   chatTabsWithBadges?: string;
   /**
+   * "OffTopic Channels/Tabs" — whether this room HAS an Off Topic channel.
+   *
+   * Optional, and **absent means TRUE**: `room-settings-profile.ts:55` captures the default as on,
+   * and this room shipped the tab unconditionally until 2026-08-31, so every existing room has been
+   * behaving as `true`. Reading absence as `false` would silently remove a tab from every room that
+   * has never stored the setting. `chatTabsForMember` is where that default lives, once.
+   */
+  hasChannelTabs?: boolean;
+  /**
    * "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with
    * it.
    *

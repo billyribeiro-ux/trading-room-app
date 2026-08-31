@@ -44,7 +44,9 @@ export async function memberChatChannels(
   return chatTabsForMember(
     config.settings?.chatTabsWithBadges,
     badges.map((badge) => String(badge)),
-    isPresenterRole(user.role)
+    isPresenterRole(user.role),
+    // Passed through RAW. What `undefined` means is decided once, in `chatTabsForMember`.
+    config.settings?.hasChannelTabs
   );
 }
 

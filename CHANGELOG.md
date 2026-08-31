@@ -33,6 +33,81 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 13:50 UTC — A tab every room showed that only some rooms asked for
+
+**Runtime impact: YES.** A room whose owner had switched Off Topic off was shown it anyway, for as
+long as the tab has existed.
+
+The reference builds its entire chat-tab strip in ONE expression, and **only `main` is
+unconditional** there (pinned bundle, bytes 1,146,625-1,147,200):
+
+```js
+globals.chatTabs = []
+globals.chatTabs.push(e.altGenChannelName ? {…, name:"main"} : {displayName:"Main Chat", …})
+e.hasChannelTabs      && globals.chatTabs.push(e.altOffTopicChannelName ? … : {displayName:"Off Topic", …})
+e.hasAdminOnlyChannel && globals.chatTabs.push({displayName:"Admins", name:"adminChat", type:"po"})
+e.extraAdminChannels  && e.extraAdminChannels.split(",").forEach(r => …type:"p")
+e.extraRegChannels    && e.extraRegChannels.split(",").forEach(r => …type:"r")
+```
+
+This room shipped both built-ins unconditionally. That is the **mirror of the dead-control rule** —
+not a control that does nothing, but a control nobody asked for — and it was never an argued
+divergence: `hasChannelTabs` had **zero occurrences anywhere in `apps/room/src`**.
+
+**ABSENT MEANS TRUE, and that is the load-bearing half of the fix.** The captured default is on, and
+this room has behaved as `true` for every room since the tab existed. Reading absence as `false`
+would have removed a tab from every room that never stored the setting — a silent regression dressed
+as a fix. The negative control for it broke three unrelated assertions across the file, which is what
+that would have looked like in production.
+
+## How it was found: the instrument had a blind spot
+
+`audit-setting-coverage.mjs` exists to answer *which settings does the reference read that we do
+not*. Its rule is `sessData.<name>`, deliberately strict and well argued — the bare name matches far
+too much in a 2.9 MB bundle. **It returned zero for six settings the reference demonstrably reads**,
+because they are read in `processSessData`, before the object is `sessData` at all, off the
+minifier's own local. The function's own log string names it, and the same expression proves what the
+local is: `i.globals.sessData.badgesH = e.badgesH`.
+
+Found by counting bare names as a **cross-check** and reading every difference — 28 against the
+instrument's 21, seven unrecorded, six of them one function.
+
+The widening is bounded to that initialiser rather than to `.<name>` anywhere, and there is a live
+reason: `strictBrowserMode` has two property reads in the bundle and **zero** inside
+`processSessData` — it is a component field on the login screen, and a bare-name rule would have put
+it on a list of work. The region is a window over minified source, so the contract asserts its edges
+by CONTENT rather than trusting an offset.
+
+The other five — `altGenChannelName`, `altOffTopicChannelName`, `hasAdminOnlyChannel`,
+`extraAdminChannels`, `extraRegChannels` — are dispositioned in `missing-settings-triage.md` under
+the existing FEATURE heading, deliberately not as a new one. They are **one piece of work, not five**:
+the reference has three channel types (`r`, `p`, `po`) where this room has one, so there is nowhere
+for a type to live and building them touches the SSE hub, the chat log and the archive sweep. Two
+things the capture does not answer are named: the owner-typed name is pushed unsanitised as both
+`displayName` and `name` (this room already refuses a badge channel that collides with a built-in,
+and the same rule has to apply), and nothing says what `po` distinguishes from `p`.
+
+## Eleven guards refused the change until each was updated
+
+Worth listing, because it is what "built for the next twenty years" looks like from the inside. One
+behaviour change, and the repository would not accept it until: the extractor's reviewed wired-set
+and its size tripwire; the verifier's independent `EXPECTED_WIRED_SETTINGS`; the count claim in
+`README.md`, `OUTSTANDING.md`, `ARCHITECTURE.md`, `admin-surface.md`, `v5.md` and `TODO.md`; the
+unwired half of each of those sentences; `admin-surface.md`'s wired roster; the verifier's own
+explanatory note; and `room-config-boundary`'s consumer map, which demands every crossing setting
+name the code that reads it.
+
+**One hand-edit was rejected outright and correctly**: `room-settings-schema.ts` is GENERATED, and
+setting `wired: true` there by hand failed `schema:verify` with a digest mismatch. The seam is the
+extractor's reviewed list, which is where the decision belongs.
+
+`CHANGELOG.md`'s own earlier entries still say "104 of 269" and are deliberately left: a dated entry
+records what was true on its date.
+
+**Verified:** room gate 298 files, 5,106 passed, 1 skipped, `gate-exit=0`; controller gate 102 files,
+1,099 passed, 21 skipped, `gate-exit=0`. Both read from their logs. Three negative controls on the
+gate itself, each isolating one assertion.
+
 ### 2026-08-31 13:10 UTC — The WordPress door proven shut, at the half that is not blocked
 
 **Runtime impact: NO** for this repository — the plugin is unchanged. What changes is that the step
