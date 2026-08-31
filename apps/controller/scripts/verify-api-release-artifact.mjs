@@ -754,6 +754,10 @@ async function verifyContract() {
     'runtime filesystem contains a forbidden shell, package manager, loader, glibc, libgcc, or Perl path',
     'runtime OCI SBOM differs from the exact reviewed static-distroless package inventory',
     '{ "name": "base-files", "version": "13.8+deb13u6" }',
+    // Added 2026-08-30 with the runtime digest. Asserted here so the inventory cannot quietly lose
+    // an entry the base image actually ships; both digests were unpacked from the registry and
+    // their dpkg status entries compared, and this line is the whole diff between them.
+    '{ "name": "ca-certificates", "version": "20250419" }',
     '{ "name": "tzdata-legacy", "version": "2026b-0+deb13u1" }',
     "docker image inspect --format '{{.Os}}/{{.Architecture}}'",
     'assert_static_elf',

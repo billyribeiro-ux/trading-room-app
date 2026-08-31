@@ -510,6 +510,25 @@ libunwind.a, libc.a, crtendS.o, crtn.o are **byte-identical** to the pinned valu
 `1.98.0-x86_64-unknown-linux-musl`, `rustc` reports `release: 1.98.0`, and the packages are still
 musl-dev 1.2.6-r2 and libgcc-static 15.2.0-r5. Only the FROM, toolchain and sysroot lines moved.
 
+**The runtime SBOM inventory gained a sixth package, and CI is what found it.** The reviewed
+static-distroless inventory is an exact list — `sort_by(.name)` compared with `==`, so one extra
+entry fails it — and the first CI run of this branch failed on precisely that: `runtime OCI SBOM
+differs from the exact reviewed static-distroless package inventory`. It was real, and it was caused
+by this change: re-resolving the runtime digest moved the base image. Both digests were then
+unpacked straight from the gcr.io registry, layer blobs and all, and their `var/lib/dpkg/status.d`
+entries read: `f7f8f729` carries the five reviewed packages; `1c2c046b` carries those same five at
+identical versions **plus `ca-certificates 20250419`**. The diff between the two inventories is that
+single line and nothing else — the old digest reproducing the reviewed five exactly is also what
+proves the extraction method, rather than the method being taken on trust. The list is now six, in
+the build script, the verifier fragment and the evidence document. It does not weaken the
+Dockerfile's guarantee that no builder-owned CA file is copied into the runtime stage: nothing is
+copied, the store simply ships in the base now, and SQLx still uses the lockfile-pinned
+rustls/webpki roots. Negative controls were run on the changed rule — it rejects the old five, an
+injected `apk` artifact, and a wrong version — because a gate that cannot fail is worse than none.
+One self-inflicted defect on the way, caught by `bash -n` before it reached CI: the jq program is a
+single-quoted shell string, and the apostrophes in the first draft of that comment closed it. The
+comment now says so, and carries no apostrophes.
+
 **`verify-backend-provenance` re-pinned per its own rule, 74 → 67.** Seven files that had been
 untouched imports left the aggregate for individual pins — both crate manifests, the workspace
 manifest, `rust-toolchain.toml`, the api Dockerfile, and the two source files above — each with its
