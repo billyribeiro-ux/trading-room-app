@@ -1519,6 +1519,7 @@
                 onmodonly={(next) => chat.setModOnly('extra', next)}
                 ontoggletoolbar={() => chat.search.toggleExtended('extra')}
                 onimageupload={() => composer.openImageUpload()}
+                onyoutube={isPresenter ? () => modals.open('youtube') : undefined}
                 onrte={() => composer.openExtraRTE()}
                 onselectgif={(url) => composer.selectGif('', url)}
             />
@@ -1621,6 +1622,7 @@
       {alerts}
       {debugLog}
       {isPresenter}
+      {canPostImages}
       {unreadQaAlertIds}
       {broadcasts}
       {composer}

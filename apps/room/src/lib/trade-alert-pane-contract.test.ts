@@ -126,33 +126,55 @@ describe('dta-04 — the paste confirm asks its question', () => {
     expect(confirm.match(/style="max-height: 50vh;"/g)?.length).toBe(1);
   });
 
-  it('and all FOUR pastes still reach it, each with its own handler', () => {
+  it('and all FIVE pastes still reach it, each with its own handler', () => {
     /*
       The half the count used to buy. Each call site keeps its OWN `onconfirm`, because
       `doImggurUpload` dispatches on a feature name deny-by-default (byte 1,992,037) — sharing one
       handler is how an image meant for a form is posted into chat.
 
-      THREE became FOUR on 2026-08-31, with `PCC-06`: the private composer gained the `paste` binding
-      the reference has had all along, and its confirmation is a fourth instance for exactly the
-      reason the other three are separate. `onImagePaste` on `app-privchat` ends in
-      `doImggurUpload(s, c)` -> `sendPrivChat` (byte 2,211,249), so routing a private paste through
-      the chat composer's handler would post the screenshot into the ROOM rather than to one person.
-      That is the same failure the comment above describes, with the worst blast radius of the four.
+      THREE became FIVE on 2026-08-31, in two rows on the same day, and each one is a distinct
+      destination rather than a copy:
 
-      The count is kept — rather than dropped as brittle — precisely because it is what fails when a
-      fifth call site is added without its own handler, which is the only way this can go wrong.
+        - `PCC-06` — `onImagePaste` on `app-privchat` ends in `doImggurUpload(s, c)` ->
+          `sendPrivChat` (byte 2,211,249). Routing a private paste through the chat composer's
+          handler would post the screenshot into the ROOM rather than to one person.
+        - `QAM-06` — `onImagePaste` on `app-alert-qa` ends in `sendAlertQAReply(qaMsg._id, …)` and
+          then `modal("hide")` (byte 2,338,987). The register's prescribed fix for its twin
+          `QAM-05` was the chat path, and it would have put a presenter's answer to one member's
+          question into the room's public chat.
+
+      Five destinations, five handlers. The count is kept — rather than dropped as brittle —
+      precisely because it is what fails when a sixth call site is added without its own handler,
+      which is the only way this can go wrong.
     */
     const overlays = code('src/lib/components/RoomOverlays.svelte');
-    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(4);
+    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(5);
     expect(overlays).toContain('onconfirm={() => void composer.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void swingAlerts.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void dayTradeAlerts.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void privateChat.confirmImagePaste()}');
+    expect(overlays).toContain('onconfirm={() => void messageActions.confirmQaImagePaste()}');
 
-    /* Four instances, four DISTINCT confirm handlers — no two call sites sharing one. */
-    const handlers =
-      overlays.match(/onconfirm=\{\(\) => void (\w+)\.confirmImagePaste\(\)\}/g) ?? [];
-    expect(new Set(handlers).size).toBe(4);
+    /*
+      Five instances, five DISTINCT confirm handlers — no two call sites sharing one.
+
+      Anchored on `…ImagePaste()` rather than on any `onconfirm`: this file also renders unrelated
+      confirmations, and a pattern loose enough to count those is a pattern that would go green on
+      a sixth paste site sharing a handler with the fifth, because some other dialog happened to
+      make the total come out right.
+    */
+    const handlers = overlays.match(/onconfirm=\{\(\) => void [\w.]*ImagePaste\(\)\}/g) ?? [];
+    expect(handlers).toHaveLength(5);
+    expect(new Set(handlers).size).toBe(5);
+
+    /*
+      And five DISTINCT message-box ids, which is the other half of "not a copy": the reference
+      gives each surface its own (`msg-text`, `msg-text-pc`, `msg-text-qa`), and the two alert forms
+      have none at all because their dialogs carry no message box.
+    */
+    for (const id of ['id="msg-text"', 'id="msg-text-pc"', 'id="msg-text-qa"']) {
+      expect(overlays.match(new RegExp(id.replace(/"/g, '"'), 'g'))?.length).toBe(1);
+    }
   });
 });
 

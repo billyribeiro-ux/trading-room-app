@@ -114,14 +114,22 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
 };
 
 /**
- * ## The three measured gaps this column carries that are NOT fixable from its own file
+ * ## The measured gaps this column carries, and the one that stopped being one
  *
  * Recorded here rather than in the component because the component has no line to spare and because
- * each one is a fact about the captured surface, which is what this module is for. All three are
- * `BLOCKED` rows in `docs/decoded/room-surface-audit-2026-08-30.md`, and
- * `extra-chat-surface-contract.test.ts` measures them so they cannot quietly stop being true.
+ * each one is a fact about the captured surface, which is what this module is for.
+ * `extra-chat-surface-contract.test.ts` measures every one so they cannot quietly stop being true —
+ * and `EXTRA_CHAT_MEASURED_GAPS` below is the list a reader should trust, because it is asserted.
  *
- * ### `XCP-08` — the "Play YouTube For All" button is absent
+ * There were three. `XCP-08` was built on 2026-08-31 and left the list; its measurement stays,
+ * because what the button must look like is what a later edit can get wrong. `XCP-07` and `XCP-09`
+ * are still `BLOCKED` rows in `docs/decoded/room-surface-audit-2026-08-30.md`.
+ *
+ * ### `XCP-08` — the "Play YouTube For All" button, BUILT 2026-08-31
+ *
+ * Kept in full below rather than deleted, because the measurement is what the next reader needs in
+ * order to check the button still matches — and because the paragraph explaining why it could not
+ * be built from inside the component is now the paragraph explaining how the gate works.
  *
  * `lMe` at byte **2,373,038** is this column's expanded button set, and it resolves five children.
  * The gates are at byte **2,373,334**: `O(2, canPostImages …)` image, `O(3, isPresenter …)`
@@ -132,12 +140,20 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * The main column draws it and this one does not, so a presenter can send a video to the room from
  * one chat column and not from the other.
  *
- * It cannot be built from inside the component. The reference's span carries no click handler at
- * all — it is a Bootstrap `data-bs-target` — and this room's `Modal` is not Bootstrap-driven, so
- * `AlertChatArea` reaches the modal host through an `onopenmodal` prop the page supplies. Nothing
- * in the `<ExtraChatPane>` call opens a modal. Adding an optional handler and a branch here first
- * would be a prop with no caller, which is the scaffolding rule this repository has already paid
- * for once.
+ * It could not be built from inside the component, and the reason is now the design. The
+ * reference's span carries no click handler at all — it is a Bootstrap `data-bs-target` — and this
+ * room's `Modal` is not Bootstrap-driven, so `AlertChatArea` reaches the modal host through an
+ * `onopenmodal` prop the page supplies. Nothing in the `<ExtraChatPane>` call opened a modal, and
+ * adding an optional handler and a branch here first would have been a prop with no caller, which
+ * is the scaffolding rule this repository has already paid for once.
+ *
+ * The page passes it now, as `onyoutube={isPresenter ? () => modals.open('youtube') : undefined}`,
+ * and the component renders the button `{#if onyoutube}`. **The presence of the handler IS the
+ * gate**, which is the only shape consistent with the paragraph below: this column is handed each
+ * entitlement's RESULT and deliberately not `isPresenter`, so a `boolean` prop beside a
+ * `() => void` would have put one gate in two places and let them disagree. Both captured
+ * attributes — `data-bs-toggle` and `data-bs-target` — are kept, exactly as the main column keeps
+ * them: they are what the capture serves, and `onclick` is the substitution.
  *
  * ### `XCP-09` — this column has NO transcribed stylesheet at all
  *
@@ -167,8 +183,21 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * `settings-preference-wiring-contract.test.ts` already measured and refused, because
  * `chat-uploaded-img-sm` has no rule in any of the 52 stylesheets this repository holds. Binding it
  * would switch on a class name nothing reads.
+ *
+ * ### `XCP-08` LEFT THIS LIST on 2026-08-31, and that is what the list is for
+ *
+ * It sat here as a third gap *"this column cannot close from its own file"*, and that was true of
+ * the FILE and false of the repository: the blocker was that nothing in the `<ExtraChatPane>` call
+ * opened a modal, so an optional handler added first would have been a prop with no caller. One
+ * session owning the page and the component together closes it — the page passes `onyoutube` now,
+ * and the button is gated on the HANDLER rather than on a flag, which is this column's own design
+ * (see the `isPresenter` note below) rather than a shortcut.
+ *
+ * The two that remain are not of that kind. Neither is a scope problem, and no amount of owning
+ * more files closes either: `XCP-07` needs a stylesheet rule that no capture here has ever
+ * contained, and `XCP-09` needs a re-capture of a component this room has never dumped.
  */
-export const EXTRA_CHAT_MEASURED_GAPS = ['XCP-07', 'XCP-08', 'XCP-09'] as const;
+export const EXTRA_CHAT_MEASURED_GAPS = ['XCP-07', 'XCP-09'] as const;
 
 /**
  * ## Decisions RELOCATED from `ExtraChatPane.svelte`, verbatim, on 2026-08-31
@@ -197,8 +226,9 @@ export const EXTRA_CHAT_MEASURED_GAPS = ['XCP-07', 'XCP-08', 'XCP-09'] as const;
  * `canPostImages`, `canUseRTE` — which is the better shape: authority is decided in one place
  * instead of re-derived per component. Passing the raw flag as well meant a second input that no
  * line read, and a future reader could have gated something on it directly and quietly disagreed
- * with the parent. It is also why `XCP-08` above is BLOCKED rather than buildable: the YouTube
- * button's gate is `isPresenter`, and this component is deliberately not told.
+ * with the parent. It is also what decided `XCP-08`'s shape above: the YouTube button's gate is
+ * `isPresenter`, this component is deliberately not told, and so the gate arrives as the handler's
+ * own presence rather than as a second flag.
  *
  * ### The `follow` prop is the PAGE's instance, and the effect that reads it lives in the component
  *

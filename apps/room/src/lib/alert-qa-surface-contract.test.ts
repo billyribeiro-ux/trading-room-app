@@ -37,6 +37,9 @@ const COMPOSER_RAW = read('./components/AlertQaComposer.svelte');
 const CAPTURED_CSS = read('./styles/captured-runtime-components.css');
 const BUNDLE = read('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js');
 
+/** Where `QAM-05`'s two handlers are wired, and where the register's wrong prescription would show. */
+const OVERLAYS = codeOf('components/RoomOverlays.svelte', read('./components/RoomOverlays.svelte'));
+
 /** See the same helper in `extra-chat-surface-contract.test.ts` for why the length is derived. */
 const at = (offset: number, expected: string) => BUNDLE.slice(offset, offset + expected.length);
 
@@ -159,7 +162,7 @@ describe('QAM-04 — the claim that the captured textarea had no handler was fal
   });
 });
 
-describe('QAM-05 and QAM-06 — the image button does not act, and there is no paste handler', () => {
+describe('QAM-05 and QAM-06 — the image button acts, and the box takes a paste', () => {
   it('the reference wires the button to `imgUpload`', () => {
     const l3e =
       'function l3e(t,n){if(1&t){const e=Y();d(0,"span",36),x("click",function(){return D(e),E(g().imgUpload())})';
@@ -173,14 +176,73 @@ describe('QAM-05 and QAM-06 — the image button does not act, and there is no p
     expect(at(2_334_626, init)).toBe(init);
   });
 
-  it('so the span is drawn and is honestly recorded as inert', () => {
-    /* Positive first: the button IS rendered, which is what makes the absent handler a defect. */
+  it('and ours now acts, on the WIDER gate, with the paste bound beside it', () => {
+    /*
+      RE-DISPOSITIONED 2026-08-31. This used to assert `{#if isPresenter}` and
+      `not.toContain('onpaste')` — a pair of tripwires holding the row open so it could not be
+      closed silently. Both fired the moment it was built, which is this change's negative control
+      already written.
+
+      The gate is the half worth restating. `canPostImages` is `(isPresenter || userUploads)`, so
+      `isPresenter` was NARROWER: a room with member uploads on offers this button to members
+      upstream and offered it to nobody but presenters here. Asserting the absence of `isPresenter`
+      around this node is what stops the narrow gate coming back — the prop still exists on the
+      component and still drives the placeholder, which is a different question.
+    */
     expect(COMPOSER).toContain("ngbtooltip: 'Upload an Image'");
-    expect(COMPOSER).toContain('{#if isPresenter}');
     expect(COMPOSER_RAW).toContain('QAM-05');
     expect(COMPOSER_RAW).toContain('QAM-06');
-    /* And no paste handler, which is the other half of the same blocked row. */
-    expect(COMPOSER).not.toContain('onpaste');
+
+    expect(COMPOSER).toContain('{#if canPostImages}');
+    expect(COMPOSER).toContain('onclick={onimageupload}');
+    expect(COMPOSER).toContain('onpaste={handleQaPaste}');
+
+    /*
+      The placeholder still asks the OTHER question, and it is the ONLY thing in the template that
+      asks it. Counted over the template rather than the whole file, because the prop's declaration
+      and its destructure are two more occurrences that say nothing about gating — a whole-file
+      count would have to be edited every time the props list moves, which is how a number stops
+      meaning anything.
+    */
+    const templateAt = COMPOSER.indexOf('</script>');
+    expect(templateAt, 'the component must have a script block').toBeGreaterThan(0);
+    const template = COMPOSER.slice(templateAt);
+    expect(template).toContain(
+      "placeholder={isPresenter ? 'Type your answer here...' : 'Type your question here...'}"
+    );
+    expect(template.split('isPresenter').length - 1).toBe(1);
+  });
+
+  it('routes BOTH to the Q&A reply path, not to the chat composer — the register said otherwise', () => {
+    /*
+      THE ROW'S PRESCRIBED ONE-LINE FIX WAS WRONG, AND THIS IS WHERE THAT IS PINNED.
+
+      `QAM-05` proposed `onimageupload={() => composer.openImageUpload()}` — "the same path both
+      chat composers already use". That path posts to CHAT. `doImggurUpload` on `app-alert-qa` ends
+      in `sendAlertQAReply` against `qaMsg._id` and then hides the modal, so taking the prescription
+      literally would have put a presenter's answer to one member's question into the room's public
+      chat — the same failure `RoomOverlays` records for the swing form, with a worse blast radius.
+
+      Asserted on the bundle AND on the wiring, because either alone is weak: the bundle half proves
+      what upstream does, and the `RoomOverlays` half proves ours does not reach `composer`.
+    */
+    const tail =
+      's.appService.sendAlertQAReply(s.qaMsg._id,s.imggurUploadTxt),s.imggurUploadTxt="",yi("#alertQAModal").modal("hide")';
+    expect(BUNDLE).toContain(tail);
+
+    /* A TEXT reply hides nothing — the asymmetry is upstream's and is reproduced. */
+    const textReply =
+      'this.appService.sendAlertQAReply(this.qaMsg._id,e),yi("#textAreaQATxt").val(""),this.scrollToBottomQA()';
+    expect(BUNDLE).toContain(textReply);
+    expect(textReply).not.toContain('modal("hide")');
+
+    expect(OVERLAYS).toContain('onQaImageUpload={() => messageActions.beginQaImageUpload()}');
+    expect(OVERLAYS).toContain(
+      'onQaImagePaste={(file, draft) => messageActions.beginQaImagePaste(file, draft)}'
+    );
+    /* Neither reaches the chat composer's upload. */
+    expect(OVERLAYS).not.toContain('onQaImageUpload={() => composer.');
+    expect(OVERLAYS).not.toContain('onQaImagePaste={() => composer.');
   });
 });
 

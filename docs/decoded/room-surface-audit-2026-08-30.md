@@ -5859,7 +5859,13 @@ and no `class`. `B3e` at byte **2,367,305** is `t=>({"chat-uploaded-img-sm":t})`
 
 ### XCP-08 — the "Play YouTube For All" button is absent from this composer
 
-**BLOCKED 2026-08-31.** One line in `routes/+page.svelte` unblocks it, named below.
+**BUILT 2026-08-31.** The blocker was scope: nothing in the `<ExtraChatPane>` call opened a modal, so an optional handler added inside the component first would have been a prop with no caller — the scaffolding rule this repository has already paid for once.
+
+**The prop is optional and its PRESENCE is the gate**, which is this column's own design rather than a shortcut. `#lib/extra-chat-surface.ts` names this very prop as the reason the row was blocked: the component is handed each entitlement's RESULT and deliberately NOT `isPresenter`, so a `boolean` beside a `() => void` would have put one gate in two places and let them disagree. The page passes `onyoutube={isPresenter ? () => modals.open('youtube') : undefined}` and the button renders `{#if onyoutube}`.
+
+Both captured attributes are kept — `data-bs-toggle="modal"` and `data-bs-target="#play-youtube-modal"` — exactly as the main column keeps them: they are what the capture serves and `onclick` is the substitution, since this room's modal host is not Bootstrap-driven.
+
+`XCP-08` has left `EXTRA_CHAT_MEASURED_GAPS`, and its measurement stayed behind: what the button must look like is what a later edit can get wrong. `extra-chat-surface-contract.test.ts` held `not.toContain('play-youtube-modal')` as a tripwire; it fired, which is this change's negative control already written, and is re-dispositioned to assert the markup, the tooltip const and the gate's shape. A second control — making the prop required and gating on a flag — went red too.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -6059,7 +6065,22 @@ lives in `AlertQaComposer.svelte` with the measurement. The Enter rule itself mo
 
 ### QAM-05 — the image-upload button has no click handler, and its gate is narrower than the reference's
 
-**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+**BUILT 2026-08-31 — and THIS ROW'S PRESCRIBED FIX WAS WRONG, which is the more useful half of the entry.**
+
+The row proposed `onimageupload={() => composer.openImageUpload()}`, *"the same path both chat composers already use"*. **That path posts to CHAT.** `doImggurUpload` on `app-alert-qa` at byte **2,338,987** ends:
+
+```js
+s.appService.sendAlertQAReply(s.qaMsg._id, s.imggurUploadTxt), s.imggurUploadTxt="",
+yi("#alertQAModal").modal("hide")
+```
+
+It answers the THREAD and then hides the modal. Taking the prescription literally would have put a presenter's answer to one member's question into the room's public chat — the same failure `RoomOverlays` records for the swing form (*"routing the swing upload through the composer's handler would post the image into chat instead"*), with the worst blast radius of the five paste sites in this room.
+
+Built on `RoomMessageActions` instead, which already owns `sendAlertQuestion` and the selected alert; it borrows only the room's raw uploader, exactly as `RoomPrivateChat` and both trade-alert panes do. Three upstream details are reproduced and each is executed rather than described: **the modal hides on the image path and not on the text one** (`sendMessage` at byte 2,337,247 clears the box and scrolls), **the URL goes first with the message appended**, and **the box is cleared only when a message travels**.
+
+The gate is widened to `canPostImages` as the row asked. `isPresenter` stays on the component and still drives the placeholder, which is a different question — collapsing the two would re-create the narrow gate the moment somebody read the flag's name.
+
+`alert-qa-surface-contract.test.ts` held two tripwires, `{#if isPresenter}` and `not.toContain('onpaste')`; both fired. Three further controls were run — routing through the chat composer, hiding the modal on a refusal, and message-before-URL — and each printed its failure.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -6089,7 +6110,9 @@ the row cannot go green by the button disappearing.
 
 ### QAM-06 — pasting an image into the Q&A composer does nothing
 
-**BLOCKED 2026-08-31.** The same line as `QAM-05` unblocks it.
+**BUILT 2026-08-31, with `QAM-05` and through the same corrected path.** The textarea binds `onpaste` now; `pastedImageFrom` is the shared rule rather than a fourth copy of the loop, and the DRAFT travels with the file because upstream's handler reads its own box (`a = yi("#textAreaQATxt").val().trim()`). The confirmation is a fifth `ImagePasteConfirm` with the reference's own `msg-text-qa` textarea id — one character from the chat and private copies, and a different destination from both.
+
+Gated on `canPostImages`, which upstream's Q&A handler does not check — the same deliberate divergence `PCC-06` records, for the same reason: the button beside this box is gated on it, and two controls on one component disagreeing about one permission is the shape `CLAUDE.md` refuses.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*

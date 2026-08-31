@@ -280,10 +280,24 @@ describe('XCP-06 — the const numbers are read against THIS component’s table
   });
 });
 
-describe('XCP-07, XCP-08, XCP-09 — the three gaps this column cannot close from its own file', () => {
-  it('names all three where the component points, so none can go quiet', () => {
-    expect([...EXTRA_CHAT_MEASURED_GAPS]).toEqual(['XCP-07', 'XCP-08', 'XCP-09']);
+describe('XCP-07 and XCP-09 — the gaps this column cannot close from its own file', () => {
+  it('names both where the component points, so neither can go quiet', () => {
+    /*
+      THREE BECAME TWO on 2026-08-31. `XCP-08` left this set when it was built, and the shrinking is
+      the assertion doing its job rather than being relaxed: the list is what the component points
+      at, so a row that is no longer a gap must not stay in it — a "measured gap" that has been
+      closed is a comment telling the next reader to go and build something that already exists.
+
+      The two that remain are not of `XCP-08`'s kind. Its blocker was SCOPE — nothing in the
+      `<ExtraChatPane>` call opened a modal, so an optional handler would have been a prop with no
+      caller. `XCP-07` needs a stylesheet rule no capture here has ever contained and `XCP-09` needs
+      a re-capture of a component this room has never dumped; neither can be closed by owning more
+      files.
+    */
+    expect([...EXTRA_CHAT_MEASURED_GAPS]).toEqual(['XCP-07', 'XCP-09']);
     for (const row of EXTRA_CHAT_MEASURED_GAPS) expect(SURFACE).toContain(row);
+    /* And the one that left is still DOCUMENTED there — the measurement outlives the gap. */
+    expect(SURFACE).toContain('XCP-08');
   });
 
   it('XCP-07 — the `ngClass` exists in the reference and the class it names has no rule here', () => {
@@ -295,15 +309,41 @@ describe('XCP-07, XCP-08, XCP-09 — the three gaps this column cannot close fro
     expect(CAPTURED_CSS).not.toContain('chat-uploaded-img-sm');
   });
 
-  it('XCP-08 — the YouTube button is in the reference and not in this column', () => {
+  it('XCP-08 — the YouTube button is in the reference AND now in this column', () => {
+    /*
+      RE-DISPOSITIONED 2026-08-31. The last line used to be `not.toContain('play-youtube-modal')` —
+      a tripwire pinning the gap open so it could not be closed silently. It fired the moment the
+      button was added, which is the negative control for this change already written.
+
+      The reference half is unchanged and deliberately kept: what the button must LOOK like is the
+      thing a future edit can get wrong, and deleting the measurement when the gap closes is how a
+      transcription drifts from its source with nothing left to compare against.
+    */
     const iMe = 'function iMe(t,n){1&t&&(d(0,"span",68),T(1,"i",71),u())}';
     expect(at(2_371_656, iMe)).toBe(iMe);
     const table = BUNDLE.slice(2_393_850, 2_393_850 + 8_000);
     expect(table).toContain('"data-bs-target","#play-youtube-modal"');
     expect(table).toContain('["ngbTooltip","Play YouTube For All","placement","left"');
-    /* Positive first: the pane draws the buttons either side of the missing one. */
+    /* Positive first: the pane draws the buttons either side of it. */
     expect(PANE).toContain('{...EXTRA_CHAT_GIF_TRIGGER}');
-    expect(PANE).not.toContain('play-youtube-modal');
+
+    /* Both captured attributes, and the tooltip const, transcribed rather than approximated. */
+    expect(PANE).toContain('data-bs-toggle="modal"');
+    expect(PANE).toContain('data-bs-target="#play-youtube-modal"');
+    expect(PANE).toContain("ngbtooltip: 'Play YouTube For All', placement: 'left'");
+    expect(PANE).toContain('class="fas fa-video"');
+
+    /*
+      THE GATE, and this is the half that matters more than the markup.
+
+      `O(3, isPresenter …)` at byte 2,373,334 gates it on the presenter flag — which this component
+      is deliberately NOT given, because it is handed each entitlement's result instead. So the gate
+      is the handler's own presence, and there must be no second flag to disagree with it: the
+      button renders `{#if onyoutube}` and the prop is optional.
+    */
+    expect(PANE).toContain('onyoutube?: () => void;');
+    expect(PANE).toContain('{#if onyoutube}');
+    expect(PANE).not.toContain('isPresenter');
   });
 
   it('XCP-09 — the component ships 5,818 bytes of styles that this room has never transcribed', () => {
