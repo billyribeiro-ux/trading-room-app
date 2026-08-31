@@ -95,7 +95,7 @@ guessed.
 | 19 | `lib/components/FilesPane.svelte` | 585 | no |
 | 20 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 589 | `## SwingAlertsPane.svelte` in the v4 register — **6 rows. |
 | 21 | `lib/components/notes/NotesPane.svelte` | 524 | `## NotesPane.svelte` in the v4 register — 4 rows, read against `zSe` (byte 1,930,173) — the notes pane inside `app-presentationarea` — and its |
-| 22 | `lib/components/PrivateChatPanel.svelte` | 524 | no |
+| 22 | `lib/components/PrivateChatPanel.svelte` | 524 | `private-chat-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-privchat` (byte 2,214,520), all 79 consts decoded BY VALUE and swept app-wide. 75 values ship; the 4 absent are Angular template REFS the reference itself never reads, by name or through `It(n)`. All seven update-block gates built. |
 | 23 | `lib/components/VideoPlayer.svelte` | 411 | `## VideoPlayer.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860, |
 | 24 | `lib/components/AlertQaModal.svelte` | 407 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
 | 25 | `lib/components/MainTabStrip.svelte` | 398 | `## MainTabStrip.svelte` in the v4 register — 7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts |
@@ -160,7 +160,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**44 of 85 surfaces audited · 18,690 of 37,465 lines · 49.9%.**
+**45 of 85 surfaces audited · 19,214 of 37,465 lines · 51.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

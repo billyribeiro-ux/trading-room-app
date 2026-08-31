@@ -33,6 +33,40 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 01:35 UTC — PrivateChatPanel audited: 79 consts, and four the reference itself never reads
+
+**Runtime impact: NO** — one contract. The panel was already complete; nothing running said so.
+
+`app-privchat` (byte 2,214,520) was read end to end and all **79 consts decoded by value**, swept
+against everything this app ships rather than against one file — the panel's parts are separate
+components here (the composer, the emoji picker, the giphy picker each left it), so a per-file sweep
+would have reported every one of their consts as missing.
+
+**Seventy-five values ship.** The four that do not are Angular TEMPLATE REFERENCE VARIABLES —
+`["searchTermTxtPM",""]`, `["emojiPanelDiv",""]`, `["giphyPickerPop","ngbPopover"]`,
+`["giphyPicker",""]` — a construct Svelte has no counterpart for.
+
+**And they are dead in the reference too, which is the finding rather than the excuse.** Excluding
+four values from a completeness sweep is exactly how a sweep starts hiding things, so the exclusion
+is measured rather than argued from the shape: each name occurs in the bundle ONLY inside a `consts:`
+declaration, none is read by name, and the panel's template calls `It(n)` — Angular's positional ref
+read — **zero times**. `app-chat` and `app-extra-chat` declare the same four, so the panel inherited
+them from the shared chat-surface shape and uses none. Same category as `hideScreens`, the flag
+`MainTabStrip` records as unable to ever be true: reference machinery that exists and does nothing.
+
+The seven gates of the update block are transcribed as a list and checked as built — the DND badge,
+the three `currUser` conditionals, the PM toolbar, `pmLogsOnRight`, and the chat-tabs strip. A gate
+that quietly stops being evaluated is invisible: the markup still renders, just always or never.
+
+**Verified — three negative controls, red then green:** a const value dropped (the sweep named it,
+`const 46: privchatUnread`); the DND gate removed; and a REAL value added to the template-ref
+exclusion list, which fails with *"chatTabs is read by name somewhere"* — the control that proves the
+exclusion cannot be widened to hide a live behaviour.
+
+Coverage: **45 of 85 surfaces, 19,214 of 37,465 lines, 51.3%** — past half.
+
+Room gate exit 0: 309 test files / 5,626 passed / 1 skipped.
+
 ### 2026-09-01 01:10 UTC — Wrong-symbol citations became a measurement instead of a discovery
 
 **Runtime impact: NO** — one contract, three offsets made exact.
