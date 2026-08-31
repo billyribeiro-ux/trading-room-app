@@ -98,22 +98,6 @@ const ALLOWED_PREFIXES = Object.freeze([
     itself once the rollout completes.
   */
   'services/api/migrations/0010_retire_ptr_clone_app.sql',
-  /*
-    The SOURCE contract over that same migration, and it arrived in the same commit — `d5e3391`
-    added `0010`, this allow-list entry's neighbour above, AND this file, but listed only the
-    migration. The result was a `main` that failed its own boundary two assertions at a time.
-
-    Its defence is the migration's defence, because it has no other subject: it reads
-    `0010_retire_ptr_clone_app.sql` and asserts the four properties that make dropping a LOGIN role
-    safe — the `0009` interlock, no CASCADE, the residue count, the DROP itself. Every one of those
-    assertions is a search for a literal that must appear in the SQL, so the name cannot be
-    paraphrased out of them. Assembling it from fragments was rejected for the reason
-    `verify-privacy-boundary.mjs` records: it hides the string from the very scanner that should see
-    it, which trades a visible tolerated use for an invisible one.
-
-    It deletes itself with the migration it guards, on the day the rollout completes.
-  */
-  'apps/controller/src/lib/retire-baseline-role-contract.test.ts',
   'services/api/tests/',
   '.github/workflows/backend-quality.yml',
   'apps/controller/scripts/verify-backend.mjs',

@@ -254,7 +254,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '04eaa8613989ebe0e7f4764d43bb730290b5185bb97bd8446aa1579d007ade51'
+    'a8df58ae8b19031c383816b90a392294126a433fa05f6c7e01ad7bed6b01f8cd'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test

@@ -1023,7 +1023,38 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 ///
 /// `0009` shipped in `b9f775e` without this list being extended, which is exactly the reviewed-act
 /// gate working: `main` went red until somebody looked.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+///
+/// **Extended to `0001-0010` on 2026-08-30, and it happened the same way a second time.** `0010`
+/// shipped in `d5e3391` without this list moving, so `main` went red again — the same commit also
+/// left its own contract test out of `naming-boundary.test.ts`. The gate is not being worked around
+/// here; it is being answered, and the answer required reading the migration rather than trusting
+/// that a test elsewhere had.
+///
+/// `0010_retire_ptr_clone_app.sql` revokes everything the baseline role holds and then drops it. It
+/// is reviewed on exactly the terms `0009` was, and each of these was read in the SQL rather than
+/// taken from its prose:
+///
+/// - **Forward-only and idempotent.** A new numbered file; it edits no shipped migration, and it
+///   returns early with a notice when the role is already gone.
+/// - **It fails CLOSED, and that is the whole point.** It refuses unless `tradingroom_app` is
+///   already named by at least one RLS policy — that is, unless `0009` has taken effect on THIS
+///   database. Dropping the baseline role on a database that had not run `0009` would leave it with
+///   no identity the policies admit and every tenant read returning nothing.
+/// - **No `CASCADE`, in either branch.** Cascade would remove dependencies the migration has not
+///   enumerated, in databases it cannot see.
+/// - **Residue is counted, not assumed.** Seven ACL classes read from `pg_catalog` — database,
+///   namespace, class, attribute, proc, type, default-acl — and a non-zero count raises rather than
+///   forcing the drop. Column ACLs come from `pg_attribute.attacl`, not
+///   `information_schema.column_privileges`, which reflects table grants onto every column and
+///   reported 922 where 26 exist.
+/// - **Exactly one tolerated failure**, `dependent_objects_still_exist` (SQLSTATE 2BP01), meaning
+///   another database in the cluster still grants to the role. It is announced with what finishes
+///   it, not swallowed; everything else propagates.
+///
+/// The role is cluster-global while the ledger is per-database, so this converges only when the last
+/// database has run it — which is why it is a migration and not an operator step, and why `0001`
+/// re-creating the role on every new database does not defeat it.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1037,7 +1068,7 @@ fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
 
     Err(AttestationError::new(
         "embedded_migration_contract_changed",
-        "the attestor is pinned to repository migration versions 0001 through 0009",
+        "the attestor is pinned to repository migration versions 0001 through 0010",
     ))
 }
 
