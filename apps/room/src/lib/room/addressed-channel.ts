@@ -27,8 +27,21 @@ export function addressedChannelFor(deps: {
   viewerId: () => number;
   /** ONE instance, shared with the presenter's two buttons — see `RoomChatMute`. */
   chatMute: RoomChatMute;
-  /** The room's single dialog host: `alertThen` for the reloads, `alert` for the kick's message. */
-  dialogs: { alertThen: (message: string, ondismiss: () => void) => void; alert: string | null };
+  /**
+   * The room's single dialog host, NARROWED to `alertThen` on 2026-08-31.
+   *
+   * It used to read `{ alertThen; alert }`, and `alert` was here for exactly one caller: the kick,
+   * which now replaces the page instead (see `kicked` below). A field nothing reads is the shape
+   * this repository refuses outright, so it went with its consumer rather than being left in place
+   * "in case" — the next receiver that needs an alert can widen this back and will have a reason to.
+   */
+  dialogs: { alertThen: (message: string, ondismiss: () => void) => void };
+  /**
+   * A presenter kicked this member: the message, and the page swap it belongs to.
+   *
+   * Separate from `dialogs` above, which is what it replaced. See the `kicked` wiring below.
+   */
+  kicked: (message: string) => void;
   /** Audio only — narrower than a session restart on purpose. See `reconnectAudio`. */
   reconnectAudio: () => Promise<void>;
   /**
@@ -59,10 +72,25 @@ export function addressedChannelFor(deps: {
     // Byte 2597102, verbatim. Why `alertThen` and not `confirm` is on `RoomDialogs.alertThen`.
     forceReloadRequested: () =>
       deps.dialogs.alertThen('You need to reload this page to continue', () => location.reload()),
-    // The presenter's own message, as text. No page swap — see `kickUser` above.
-    kicked: (message: string) => {
-      deps.dialogs.alert = message;
-    },
+    /*
+      THE PAGE SWAP, and it replaced a dialog. This read `deps.dialogs.alert = message` under the
+      comment *"No page swap — see `kickUser` above"*, which was the honest record of a gap;
+      `TODO.md` row 6 carried it as its one residual and `private-commands.ts` named the component.
+
+      A dialog is the wrong shape here and not merely a smaller one. It is DISMISSIBLE, and what
+      sits behind it is a room whose stream this same frame has just closed — so the member read
+      the message, pressed OK, and was left looking at a frozen room with nothing on screen saying
+      why. That is worse than showing nothing, because the room then looks broken rather than closed
+      to them. Upstream replaces the page and the page stays replaced (`currPage = "kicked"`, byte
+      2,596,772).
+
+      The message is passed through UNTOUCHED, including an empty one. `private-commands.ts` sends
+      `''` when the frame carries no `msg`, and `KickedPage`'s own fallback is the reference's
+      `"kicked"` — but an empty string is not absent, and substituting a default for it here would
+      invent a message the presenter did not send. What upstream does with an empty `kickedMsg` is
+      render an empty `h2`, which is a page that says the room is gone without claiming a reason.
+    */
+    kicked: deps.kicked,
     reconnectAudio: deps.reconnectAudio,
     collectDebugLog: deps.debugLog.collect,
     sendDebugLog: deps.debugLog.send,

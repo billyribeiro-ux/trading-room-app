@@ -714,8 +714,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       each of the two chat columns. One source feeding both, by name — a second source is how the
       columns come to disagree about whether the room is connected, and the contract counts these
       two occurrences for that reason.
+
+      1798 -> 1838, 2026-08-31 (`TODO.md` row 6). The kicked page: one import, one dep, a nineteen-
+      line `$state.raw` declaration, a fourteen-line note at the branch, and the four lines of the
+      branch itself. The `{:else}` re-indents 600 lines of markup and adds none of them.
+
+      THIS CEILING PUSHED BACK AND THE CHANGE MOVED, which is the ratchet doing its job rather than
+      being paid off. The first version put the whole decode of `IRe` — upstream's five-way page
+      switch, its arms and their byte offsets — at the branch, and landed at 1852. That decode is
+      about `app-root` and about the component occupying arm 2, so it went to
+      `KickedPage.svelte`'s own docblock with a pointer left here. Fifteen lines came off the
+      largest file in the app and landed on a 106-line one, and the citation now has ONE home
+      instead of two that could disagree.
+
+      What is left here is what only the page can say: that this is `{#if}` and not `hidden`, and
+      that the `<audio id="webcam">` sink stays OUTSIDE the branch because `app-root`'s own template
+      makes it a sibling of the switch (byte 2,602,869).
     */
-    max: 1798,
+    max: 1838,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -2789,6 +2805,36 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 77,
     why: 'the "Upload this image?" confirm - one dialog that was three transcriptions'
+  },
+  {
+    file: 'lib/components/KickedPage.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — and this test is what asked for it. `every
+      component is discovered and capped` failed the moment the file appeared, named it, and would
+      not go green until it had a number. That is the second time this repository has been TOLD about
+      an uncapped component rather than finding one by accident.
+
+      107 lines, of which the MARKUP IS FIVE and the style rule is four. Everything else is the
+      decode, and the ratio is correct for this file rather than slack to grow into.
+
+      The component upstream is four declarations, one variable, three consts and one CSS rule
+      (byte 2,561,780) — so small that the interesting content is all in what surrounds it: which
+      arm of `app-root`'s five-way switch it occupies and why only two of those five are modelled
+      here; why a page swap replaced a dismissible dialog (`TODO.md` row 6's one residual); that
+      `d-flex-column` is not a Bootstrap class and is transcribed anyway; that `vertical-align` on
+      a block element is inert in the reference too; and that TWO different defaults exist upstream
+      — the component's `"kicked"` and the host's `"Kicked"` — neither normally reached.
+
+      Fifteen of those lines arrived on the day it was written, moved OFF `+page.svelte` when this
+      file's own ceiling pushed back on putting the switch decode at the branch. That is the trade
+      this ratchet exists to force, and it landed the citation beside its subject.
+
+      If this number climbs, the thing to check is whether it has grown a DECISION. It renders one
+      string and reads no gate; a prop that is an entitlement, or any branch at all beyond the
+      fallback, is the signal that the page's job has started leaking into it.
+    */
+    max: 107,
+    why: 'the page a kicked member is left on - five elements, and the decode that says why'
   },
   {
     file: 'lib/components/ImageLightbox.svelte',
@@ -5133,7 +5179,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       local `invalidateAll()` while promising a command had gone out, and two wrote a preference and
       told nobody — which is the evidence that the seam is real rather than a line-count exercise.
     */
-    max: 106,
+    max: 107,
     why: 'the session acts that send; the four that only write a preference are a table'
   },
   {
@@ -5276,7 +5322,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       this file says a raise is a conversation. THE WHOLE ARGUMENT IS ON `private-commands.ts`, where
       the largest share of it landed; this entry carries its part of the same change.
     */
-    max: 74,
+    /*
+      74 -> 102, 2026-08-31 (`TODO.md` row 6). Twenty-eight lines, of which the code is a NET ZERO:
+      one dep added, one removed, and `kicked` changed from a two-line arrow to a pass-through.
+
+      The kick used to set `dialogs.alert` — a DISMISSIBLE box over a room whose stream the same
+      frame had just closed, so the member read the message, pressed OK, and was left looking at a
+      frozen room with nothing saying why. That is worse than showing nothing, because the room then
+      looks broken rather than closed to them. It is a page swap now, which is what the reference
+      does and what `private-commands.ts` had recorded as missing since it was written.
+
+      `dialogs` NARROWED with it: the type was `{ alertThen; alert }` and `alert` had exactly one
+      caller, this one. It went with its consumer rather than being left "in case", because a field
+      nothing reads is the shape the root standard refuses outright.
+
+      If this number climbs, the thing to check is whether a callback here has started DECIDING
+      something. Every one is a hand-off: this module routes a frame to a receiver the page owns,
+      and the moment one of them contains a policy it has stopped being a channel.
+    */
+    max: 102,
     why: 'builds RoomPrivateCommands with the callbacks its commands need; kept out of the factory'
   },
   {
@@ -5696,7 +5760,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `modal("hide")` is what fires the `hidden.bs.modal` handler that deletes the alert's `unreadQA`
       marker, and `closeActive` is where that deletion lives here.
     */
-    max: 1420,
+    /*
+      1420 -> 1435, 2026-08-31 (`TODO.md` row 6). Fifteen lines, of which ONE is code: `kicked` is
+      forwarded from the page into `addressedChannelFor`. The other fourteen say why it is the
+      PAGE's and not this module's — upstream the kick sets `currPage = "kicked"` on the app root,
+      and which of `app-room` / `app-kicked-page` renders is decided one level above either of
+      them. Nothing this file owns can make that choice.
+    */
+    max: 1435,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.
@@ -5969,7 +6040,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       opened empty on a room with a destination already set, and two buttons that wrote the room's
       restream URL as the pressing viewer's own preference, which nothing read.
     */
-    max: 106,
+    max: 107,
     why: 'the Restream tab - one seeded value, the rtmp validation, and the room-level write'
   },
   {

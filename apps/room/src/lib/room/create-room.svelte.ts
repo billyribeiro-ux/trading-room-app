@@ -206,6 +206,20 @@ export interface RoomDeps {
   pushCaptionHistory: (caption: Caption) => void;
   chatMissedWhileHidden: () => void;
   hidePreviewWindows: () => void;
+  /**
+   * A presenter kicked this member — the message, for the page that replaces the room.
+   *
+   * `TODO.md` row 6's one residual, and the PAGE's for the reason every receiver in this block is:
+   * upstream this is `currPage = "kicked"` on the app root
+   * (`subscribe("kickPage", oe => { this.kickedMsg = oe, this.currPage = "kicked" })`, byte
+   * 2,596,772), and which of `app-room` / `app-kicked-page` renders is decided one level above
+   * either of them. Nothing this module owns can make that choice.
+   *
+   * It REPLACES a dialog rather than adding to one. `addressed-channel.ts` used to set
+   * `dialogs.alert`, which is dismissible over a room whose stream has just closed — the member
+   * pressed OK and was left staring at a frozen room with nothing saying why. See `KickedPage`.
+   */
+  kicked: (message: string) => void;
 
   // ── Plain values. Not reactive, so they cross as themselves.
   mtx: MtxStreamTabs;
@@ -1078,6 +1092,7 @@ export function createRoom(deps: RoomDeps) {
       viewerId: () => data.user.id,
       chatMute: userActions.chatMute,
       dialogs,
+      kicked: deps.kicked,
       reconnectAudio: () => mediaTransport.reconnectAudio(),
       /*
         The console buffer, and the two directions of `getDebugLog`.

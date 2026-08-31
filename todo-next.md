@@ -75,7 +75,7 @@ guessed.
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,916 | no |
-| 2 | `routes/+page.svelte` | 1,797 | no |
+| 2 | `routes/+page.svelte` | 1,837 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,532 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,254 | no |
@@ -157,8 +157,9 @@ guessed.
 | 81 | `routes/logout/+page.svelte` | 31 | no |
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
+| 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 
-**40 of 83 surfaces audited · 16,562 of 37,113 lines · 44.6%.**
+**41 of 84 surfaces audited · 16,668 of 37,259 lines · 44.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

@@ -33,6 +33,77 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 22:00 UTC — The kicked page, and TODO.md's twelve-row table is empty
+
+**Runtime impact: YES.** A kicked member used to get a DISMISSIBLE dialog over a room whose stream
+the same frame had just closed. They read the message, pressed OK, and were left staring at a frozen
+room with nothing on screen saying why — which is worse than showing nothing, because the room then
+looks broken rather than closed to them. The page is replaced now, and it stays replaced.
+
+`app-kicked-page` is in the pinned bundle and was decoded whole (byte 2,561,780): four declarations,
+one variable, three consts, one CSS rule. `TODO.md` row 6 had carried it as its one residual and
+`private-commands.ts` had named it in those words — *"upstream sets `currPage="kicked"` and renders
+`app-kicked-page`. This room has none."*
+
+Three things in the decode were worth transcribing rather than tidying. **`d-flex-column` is not a
+Bootstrap class** — Bootstrap's is `flex-column` — so the row stays horizontal and the heading is
+centred across rather than down; reproduced, because "fixing" it would leave this page matching no
+capture at all. **`vertical-align: middle` on a block element** is inert in the reference too.
+**Two different defaults exist upstream** and neither is normally reached: the component's own
+`"kicked"` and the host's `"Kicked"`; both are kept, because choosing between them would be a
+decision with no evidence behind it.
+
+**The `<audio id="webcam">` stays outside the branch, and that is evidenced rather than assumed.**
+`app-root`'s template is three declarations — `T(0,"router-outlet"), H(1,IRe,5,1), T(2,"audio",0)`
+at byte 2,602,869 — so the sink is a sibling of the page switch and survives every arm upstream too.
+Putting it inside the `{:else}` would have been a divergence nothing else here would have caught.
+
+**The ratchet pushed back and the change moved.** The first version put the whole decode of `IRe`,
+upstream's five-way page switch, at the branch in `+page.svelte` — the largest file in the app —
+and landed at 1852 against a 1798 ceiling. That decode is about `app-root` and about the component
+occupying arm 2, so it went into `KickedPage.svelte`'s own docblock with a pointer left behind.
+Fifteen lines came off the biggest file, and the citation now has one home instead of two that could
+disagree. `every component is discovered and capped` then refused the new file until it had a number
+— the second time this repository has been TOLD about an uncapped component rather than finding one
+by accident.
+
+**`TODO.md`'s "OPEN RIGHT NOW" table is deleted.** It held twelve rows and every one was done; the
+kicked page was the only line in it still describing unbuilt work. The header's own rule says how
+that ends — *"A row that is DONE is deleted, never struck through … Two places describing the same
+thing is how one of them goes stale."* Each row was verified against the code before removal, not
+taken on its own say-so.
+
+Nothing in it was lost. The four controls that are inert and are NOT work keep their reasons at
+`INERT_ACTIONS`; `permsChangeReload`'s missing capture is named at `dialogs.svelte.ts:90` and
+`user-actions.svelte.ts:866`; row 9's analysis is in the audit register with its byte offsets.
+
+**The disposition census moved with them, and moving it caught me committing the exact error it
+exists to prevent.** The census belongs on the code it describes, so it is in `user-action-intent.ts`
+now beside the buckets, and the contract reads one file instead of two. I copied the number from the
+contract's own explanatory prose — *"Measured 2026-08-29: 39 dispatched"*, itself already superseded
+— instead of measuring. `counts the dispatched actions correctly` went red with `expected 39 to be
+38` on the first run. The correct figure is **38 dispatched, 4 inert, 2 carrying a fixed alert**, and
+the slip is recorded at the census rather than quietly fixed, because it is the same failure the
+paragraphs beside it describe. A census taken from a neighbouring sentence is not a census.
+
+That contract also went red when the table was deleted, which is the behaviour it was written for
+arriving from an unplanned direction: a document-reading test whose document goes away must fail
+loudly, not quietly stop checking anything.
+
+**Verified — eight negative controls, each red on its own assertion, green after restore.** The
+dialog reinstated; `d-flex-column` "corrected" to Bootstrap's spelling; an empty message falling back
+to the default; `hidden` in place of `{#if}`, which renders the kicked page BESIDE a live room; the
+audio sink pulled inside the branch; `$state` in place of `$state.raw`; the census drifted by one;
+and the census sentence reworded out of a checkable shape.
+
+Svelte MCP: `get-documentation` on `{#if}` and scoped styles before the branch and the component;
+`svelte-autofixer` clean on `KickedPage.svelte`. rust-analyzer MCP: not used and not needed — no
+`.rs` file was touched.
+
+Ceilings: `KickedPage.svelte` declared at 107; `+page.svelte` 1798 -> 1838;
+`addressed-channel.ts` 74 -> 102 (net-zero code — one dep added, one removed);
+`create-room.svelte.ts` 1420 -> 1435.
+
 ### 2026-08-31 21:15 UTC — Thirteen citations that pointed at nothing, and the two that named the wrong function
 
 **Runtime impact: NO** — comments only. The values `screen-volume.ts` ships were correct throughout;
