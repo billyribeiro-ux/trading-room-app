@@ -33,6 +33,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 04:10 UTC — Five legacy declaration tags the controller's own migration missed
+
+**Runtime impact: NO in practice, and the reason it is not YES is luck rather than design.**
+`{@const}` and `{const x = $derived(y)}` both compile to a derived, so the five sites behaved
+correctly. What was missing was the guard that stops the NEXT edit reaching for the wrong
+replacement — and the wrong replacement is the obvious one.
+
+Found by sweeping both apps for every construct `CLAUDE.md` forbids, rather than by anything
+failing:
+
+| construct | room | controller |
+| --- | ---: | ---: |
+| `{@const }` | 0 | **5** |
+| `export let ` | 0 | 0 |
+| `on:event` | 0 | 0 |
+| `$:` | 0 | 0 |
+| `<slot` | 0 | 0 |
+| `createEventDispatcher` | 0 | 0 |
+| `svelte:component` | 0 | 0 |
+
+The room's one `on:` hit is `.mute-unmute-button:hover` in a stylesheet — a false positive, checked
+rather than counted.
+
+**The five had survived this app's own migration.** The rooms page already carries three
+`{const x = $derived(y)}` at lines 2160, 2180 and 2190, so the pass happened and stopped short:
+`TapeSection.svelte` kept `sparks[i]` and `sparkDelta(series)` inside its `{#each}`, and the rooms
+page kept `dontTouch(name)` in a snippet and `settingHelp(def)` in two `{#each}` loops. All five read
+state, which is exactly the case the wrong replacement breaks.
+
+**`apps/controller/src/lib/declaration-tag-contract.test.ts` is new, and it is a deliberate second
+copy.** The room has had this guard since 2026-08-30 with twelve sites migrated; a rule enforced in
+one app and merely believed in the other is a rule that holds in one app. The two are not shared
+because a vitest project cannot import across app boundaries here and a shared helper would have to
+live in a package neither app owns.
+
+It re-runs the measurement rather than quoting it, because the compiler is the authority and can
+change:
+
+```
+{@const d = n * 2}            ->  derived: true
+{const d = n * 2}             ->  derived: FALSE
+{const d = $derived(n * 2)}   ->  derived: true
+```
+
+A bare `{const}` is evaluated when its block is created and never again — a class of bug no type
+check, lint rule or `svelte-check` run can see, and one that shows up only as a number that stops
+moving.
+
+**Two negative controls, each RED and restored:** the legacy tag reintroduced, and then the bare form
+substituted for it — which is the mistake the guard exists for, and which the first control alone
+would not catch.
+
+#### Two other sweeps, both measured, both finding nothing to do
+
+`$state` vs `$state.raw`: 123 room files hold **2** `$state([])`/`$state({})` declarations and
+**zero** of them are candidates for `$state.raw` — every one is mutated in place, which is what
+`$state` is for. 73 `$state.raw<` declarations are already in the room. The discipline is applied;
+there was nothing to fix and nothing worth guarding beyond the per-site contracts that already exist.
+
+phosphor-svelte: **zero** imports in either app, and zero `@phosphor-icons/*`. The room draws Font
+Awesome classes from the reference. A guard for a library neither app uses would be the "config
+nothing reads" this repository removes rather than adds, so none was written.
+
+**Verified:** `pnpm run gate` in `apps/controller`, exit read from a log — **100 files, 1,063 passed,
+21 skipped, gate-exit=0**.
+
 ### 2026-08-31 03:55 UTC — A census over every remote function, written the day it was already true
 
 **Runtime impact: NO.** No door changed. What changed is that a door shipped without a gate now

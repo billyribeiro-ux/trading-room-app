@@ -871,7 +871,7 @@
   the first two (the presence of `def.help` is exactly what separates them), `dtNote` the third.
 -->
 {#snippet dtField(name: string)}
-  {@const def = dontTouch(name)}
+  {const def = $derived(dontTouch(name))}
   <label class="col-sm-2 control-label" for={`mg-${def.name}`}>{def.label ?? def.name}</label>
   <span id={`mg-${def.name}`}>
     <Editable {def} value={settingValue(def.name)} />
@@ -2838,7 +2838,7 @@ Please click this link to attend: ______ unique link will be here_____
                   </p>
 
                   {#each settingsBeforeApiSecret as def (def.name)}
-                    {@const help = settingHelp(def)}
+                    {const help = $derived(settingHelp(def))}
                     <p class="form-control-static">
                       <!--
                         NO `for`, AND NO WRAPPER around the editable.
@@ -2941,7 +2941,7 @@ Please click this link to attend: ______ unique link will be here_____
 
                   <!-- the settings the reference lists BELOW the docs link, starting at slackPostURL -->
                   {#each settingsAfterApiSecret as def (def.name)}
-                    {@const help = settingHelp(def)}
+                    {const help = $derived(settingHelp(def))}
                     <p class="form-control-static">
                       <!-- same bare label and unwrapped editable as the loop above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->

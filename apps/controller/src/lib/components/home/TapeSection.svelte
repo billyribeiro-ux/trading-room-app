@@ -187,8 +187,8 @@
 
       <div class="sparks">
         {#each TAPE_SPARKLINE_SYMBOLS as symbol, i (symbol)}
-          {@const series = sparks[i]}
-          {@const delta = sparkDelta(series)}
+          {const series = $derived(sparks[i])}
+          {const delta = $derived(sparkDelta(series))}
           <div class="spark-chip">
             <div class="spark-meta">
               <span class="spark-symbol">{symbol}</span>
