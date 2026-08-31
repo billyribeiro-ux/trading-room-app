@@ -257,35 +257,6 @@ top of a `services/` sync that is hours old.
 
 ---
 
-## 2. Consolidate the two working folders into one repository
-
-**Status:** decided, not executed.
-
-`docs/decisions/0003-vercel-rust-postgresql-control-plane.md` in
-`new-room-control`, status **accepted**, dated 2026-08-02: "The product will use
-one source repository with independently deployable surfaces."
-
-`services/**` currently exists in both folders and has now diverged **twice**.
-
-The first time (08-02 to 08-03) it was 87 files against 93, 4 migrations against
-6, including two migrations that fix proven security drifts. Re-synced at
-`4297f9c` and fingerprinted in `services/SYNC-PROVENANCE.md`.
-
-The second time was found on 08-06, and this copy was the one that was ahead —
-twelve files, including `0008_room_events_tenant_keys.sql`, which pairs the
-tenant keys on the realtime fan-out table. So for as long as that drift stood,
-`new-room-control` was serving the unsafe copy while this file said it was the
-source of authority. Reconciled by promoting all twelve upstream and re-sealing
-at 98 files (`new-room-control` `fdb4f8c`).
-
-A recorded seam is not a fix, and it has now failed to prevent the same defect
-twice. The second occurrence is the argument for this entry, not a footnote to
-it.
-
-Blocks entry 1.
-
----
-
 ## 4. Media: prove the path, not just the boundary
 
 **Status:** open. Detail in `docs/PRODUCT-OVERVIEW.md` §8.1.
@@ -306,13 +277,31 @@ already moved to Hetzner on 08-09, and the Lightsail instance was **deleted 2026
 
 ## 5. Wire the room to the API and delete SQLite
 
-**Status:** open. Detail in `docs/PRODUCT-OVERVIEW.md` §9.
+**Status:** open, and re-measured 2026-08-31 — **every number this entry carried was stale, and one
+of them had quietly become self-referential.**
 
-`grep -rn "/api/v1" src/` returns zero. The room runs on 20 SvelteKit form
-actions over 15 SQLite tables while a 29-route Rust API sits unused.
+| the entry said                         | measured 2026-08-31                                                                                                                                                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `grep -rn "/api/v1" src/` returns zero | **3 hits — and all three are PROSE saying "zero `/api/v1` calls"**. Stripped of comments: **0**. The claim is intact; its measurement now matches the documentation of itself                                                                              |
+| 20 SvelteKit form actions              | **2**, and neither is a JS dispatcher: `routes/logout` and `routes/session`, both progressive-enhancement form POSTs. The other eighteen became remote functions on 2026-08-30; `routes/+page.server.ts` exports none and a contract asserts the empty set |
+| 15 SQLite tables                       | **27**                                                                                                                                                                                                                                                     |
+| a 29-route Rust API                    | **37** routes                                                                                                                                                                                                                                              |
 
-Depends on entry 2 — otherwise it targets whichever `services/` tree happens to
-be in front of you.
+That grep is the entry worth pausing on. It is a real measurement that has been quoted for weeks and
+would now return three, and a reader checking it would find the number wrong and the conclusion
+right. **A measurement that matches this repository's own prose about the measurement is not a
+measurement.** Comment-stripped is the form to use, which is the rule `codeOf` exists for.
+
+**No longer depends on entry 2.** That entry rested on `services/**` being a mirror that drifts, and
+`verify-backend-provenance.mjs:122-128` searched for a sync in either direction, found none, and
+records the owner confirming on 2026-08-12 that the siblings are reference only. There is no second
+tree to target: this repository is `services/**`'s authority.
+
+**What the conversion changed about the size of this entry, and it is not smaller.** Eighteen form
+actions became eighteen remote functions, each a typed command with its own gate — so the cutover
+now has eighteen well-defined seams to move rather than eighteen `fetch('?/name')` strings whose
+endpoint, argument type and failure meaning were all agreements nothing checked. The work is the
+same; what it is made of is better.
 
 ### 2026-08-05: the room now has a realtime channel, and it is process-local
 
