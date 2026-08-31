@@ -566,12 +566,12 @@ describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
   it('answers the THREAD, not the room chat, and hides the modal', () =>
     withObjectUrl(async () => {
       const harness = openQa({ uploadUrl: '/uploads/shot.png' });
-      harness.actions.beginQaImageUpload();
-      expect(harness.actions.qaImageUpload, 'the dialog opens').toBe(true);
+      harness.actions.qaImage.beginUpload();
+      expect(harness.actions.qaImage.uploadOpen, 'the dialog opens').toBe(true);
 
-      await harness.actions.completeQaImageUpload([png()]);
+      await harness.actions.qaImage.complete([png()]);
 
-      expect(harness.actions.qaImageUpload, 'and closes').toBe(false);
+      expect(harness.actions.qaImage.uploadOpen, 'and closes').toBe(false);
       expect(harness.uploaded, 'exactly one file reached the uploader').toHaveLength(1);
       /* `sendAlertQAReply(qaMsg._id, …)` — against the SELECTED alert, through askQuestion. */
       expect(harness.questionsAsked).toEqual([{ body: '/uploads/shot.png', alertId: 41 }]);
@@ -584,7 +584,7 @@ describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
   it('takes ONE file, as the reference s own dialog does', () =>
     withObjectUrl(async () => {
       const harness = openQa({ uploadUrl: '/uploads/a.png' });
-      await harness.actions.completeQaImageUpload([png('a.png'), png('b.png')]);
+      await harness.actions.qaImage.complete([png('a.png'), png('b.png')]);
       expect(harness.uploaded).toHaveLength(1);
     }));
 
@@ -592,16 +592,16 @@ describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
     withObjectUrl(async () => {
       const harness = openQa();
       /* Upstream reads its own box: `a = yi("#textAreaQATxt").val().trim()`. */
-      harness.actions.beginQaImagePaste(png(), '  here you go  ');
-      expect(harness.actions.qaPastedImageMessage).toBe('here you go');
-      expect(harness.actions.qaPastedImage?.previewUrl).toBe('blob:qa-1');
+      harness.actions.qaImage.begin(png(), '  here you go  ');
+      expect(harness.actions.qaImage.message).toBe('here you go');
+      expect(harness.actions.qaImage.pasted?.previewUrl).toBe('blob:qa-1');
     }));
 
   it('sends the URL FIRST and appends the message', () =>
     withObjectUrl(async () => {
       const harness = openQa({ uploadUrl: '/uploads/shot.png' });
-      harness.actions.beginQaImagePaste(png(), 'here you go');
-      await harness.actions.confirmQaImagePaste();
+      harness.actions.qaImage.begin(png(), 'here you go');
+      await harness.actions.qaImage.confirm();
 
       /* `imggurUploadTxt += " " + i` AFTER the link — byte 2,338,987. */
       expect(harness.questionsAsked).toEqual([
@@ -613,21 +613,21 @@ describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
   it('replaces a second paste and RELEASES the first s preview', () =>
     withObjectUrl(async (revoked) => {
       const harness = openQa();
-      harness.actions.beginQaImagePaste(png('one.png'), '');
-      harness.actions.beginQaImagePaste(png('two.png'), '');
+      harness.actions.qaImage.begin(png('one.png'), '');
+      harness.actions.qaImage.begin(png('two.png'), '');
       expect(revoked).toEqual(['blob:qa-1']);
-      expect(harness.actions.qaPastedImage?.file.name).toBe('two.png');
+      expect(harness.actions.qaImage.pasted?.file.name).toBe('two.png');
     }));
 
   it('cancelling releases the preview, sends nothing and leaves the modal open', () =>
     withObjectUrl(async (revoked) => {
       const harness = openQa({ uploadUrl: '/uploads/shot.png' });
-      harness.actions.beginQaImagePaste(png(), 'x');
-      harness.actions.cancelQaImagePaste();
+      harness.actions.qaImage.begin(png(), 'x');
+      harness.actions.qaImage.cancel();
 
       expect(revoked).toEqual(['blob:qa-1']);
-      expect(harness.actions.qaPastedImage).toBeNull();
-      await harness.actions.confirmQaImagePaste();
+      expect(harness.actions.qaImage.pasted).toBeNull();
+      await harness.actions.qaImage.confirm();
       expect(harness.questionsAsked).toEqual([]);
       expect(harness.modalClosed()).toBe(0);
     }));
@@ -640,7 +640,7 @@ describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
         be nothing on screen tying the alert to the failure.
       */
       const harness = openQa({ uploadUrl: '' });
-      await harness.actions.completeQaImageUpload([png()]);
+      await harness.actions.qaImage.complete([png()]);
 
       expect(harness.dialogs.alert).toBe('Upload Failed...');
       expect(harness.questionsAsked).toEqual([]);
@@ -650,7 +650,7 @@ describe('QAM-05 / QAM-06 — an image answered into a Q&A thread', () => {
   it('does not hide the modal when the REPLY is refused, either', () =>
     withObjectUrl(async () => {
       const harness = openQa({ uploadUrl: '/uploads/shot.png', refuse: true });
-      await harness.actions.completeQaImageUpload([png()]);
+      await harness.actions.qaImage.complete([png()]);
 
       expect(harness.modalClosed()).toBe(0);
       expect(harness.dialogs.alert).toBe('Question not sent.');

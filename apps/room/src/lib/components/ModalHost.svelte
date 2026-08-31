@@ -7,10 +7,10 @@
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
   import CloseSessionPane from './CloseSessionPane.svelte';
+  import ReplyModal from './ReplyModal.svelte';
   import SessionHistoryPane from './SessionHistoryPane.svelte';
   import ReactionPrefsPane from './ReactionPrefsPane.svelte';
   import RestreamPane from './RestreamPane.svelte';
-  import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { searchAlerts } from '../../routes/alerts-search.remote';
   import { ALERT_SEARCH_LIMIT } from '#lib/alert-search-limit.js';
   import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
@@ -55,7 +55,6 @@
   import AlertQaModal from './AlertQaModal.svelte';
   import AlertSendReportModal from './AlertSendReportModal.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
-  import EmojiPicker from './EmojiPicker.svelte';
   import MobileRestorePane from './MobileRestorePane.svelte';
   import UserNotesPane from './UserNotesPane.svelte';
   import LogArchiveModals from './LogArchiveModals.svelte';
@@ -201,6 +200,24 @@
      * in the room.
      */
     canPostImages: boolean;
+    /**
+     * `RPL-02` — the reply modal's image button, which had no handler at all.
+     *
+     * Const 21 is `[1,"textAreaBtns",3,"click"]` and `$xe` (byte 2,318,013) wires it to
+     * `imgUpload()` (byte 2,320,688). This room drew the icon and bound nothing, so a presenter
+     * clicking it in the reply modal got exactly nothing — the control-with-no-effect the root
+     * standard names outright.
+     */
+    onReplyImageUpload: () => void;
+    /**
+     * `RPL-03` — a screenshot pasted into the reply box. `onImagePaste`, byte 2,323,300.
+     *
+     * The DRAFT travels with the file, because upstream's handler reads its own box:
+     * `a = go("#textAreaReplyTxt").val().trim()`. The same shape `onQaImagePaste` carries and for
+     * the same reason — handing the value over at the moment of the paste is the information a
+     * grandparent would otherwise have to hold state to obtain.
+     */
+    onReplyImagePaste: (file: File, draft: string) => void;
     /** `imgUpload()` on the Q&A modal — answers the thread, then hides it. Byte 2,338,987. */
     onQaImageUpload: () => void;
     /** `QAM-06` — a screenshot pasted into the Q&A composer, with that box's own draft. */
@@ -690,6 +707,8 @@
     onReplySend,
     onQuestionSend,
     canPostImages,
+    onReplyImageUpload,
+    onReplyImagePaste,
     onQaImageUpload,
     onQaImagePaste,
     onQaAlertBodyAction,
@@ -1035,8 +1054,6 @@
     fontSize: 14,
     playSound: true
   });
-  let replyComposer = $state('');
-  let replyEmojiOpen = $state(false);
   let youtubeURL = $state('');
   let ytVideoList = $state<Array<{ title: string; url: string }>>([]);
   let youtubePromptOpen = $state(false);
@@ -2342,25 +2359,6 @@
     ytVideoList.push({ title, url: youtubeURL });
     persistYoutubeList();
     youtubeAlert = 'Youtube video url is saved successfully.';
-  }
-
-  async function sendReply() {
-    const body = replyComposer.trim();
-    if (!body) return;
-    if (await onReplySend(body)) {
-      replyComposer = '';
-      replyEmojiOpen = false;
-      onclose();
-    }
-  }
-
-  // Same defect as the Q&A composer had, and the same fix: preventDefault() ran before the
-  // modifier check, so Shift+Enter was swallowed instead of inserting a line break.
-  function handleReplyKeydown(event: KeyboardEvent) {
-    if (event.key !== 'Enter') return;
-    if (event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    void sendReply();
   }
 
   /**
@@ -5601,80 +5599,20 @@
     {/snippet}
   </Modal>
 </app-mobile-app-info-modal>
-<app-reply-modal>
-  <Modal
-    id="replyModal"
-    open={name === 'reply'}
-    ariaLabelledby="replyLabel"
-    rootRole={null}
-    dialogRole={null}
-    title=":"
-    titleId="replyLabel"
-    titleClass="modal-title"
-    {onclose}
-  >
-    {#snippet header()}
-      <h5 id="replyLabel" class="modal-title">
-        <span class="do-private-reply"
-          ><strong>{targetMessage?.senderName ?? ''}:</strong>
-          <div>{targetMessage?.body ?? ''}</div></span
-        >
-      </h5>
-    {/snippet}
-    <div class="flex-fill d-flex mx-0">
-      <div class="px-0 flex-fill">
-        <textarea
-          name="txt-area"
-          id="textAreaReplyTxt"
-          rows="1"
-          spellcheck="true"
-          placeholder="Type your message here.."
-          class="txt-area form-control border-0"
-          bind:value={replyComposer}
-          onkeydown={handleReplyKeydown}></textarea>
-      </div>
-      <div
-        class="justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol"
-      >
-        <span
-          {...{
-            placement: 'auto',
-            container: 'body',
-            autoclose: 'outside',
-            popoverclass: 'popOverDiv'
-          } as Record<string, string>}
-          class="textAreaBtns"
-          aria-describedby={replyEmojiOpen ? 'ngb-popover-reply-emoji' : undefined}
-          onclick={() => (replyEmojiOpen = !replyEmojiOpen)}
-        >
-          <i
-            {...{ placement: 'left', ngbtooltip: 'Add Emojis' } as Record<string, string>}
-            {@attach ngbTooltip}
-            class="far fa-smile"
-          ></i>
-        </span>
-        {#if replyEmojiOpen}
-          <EmojiPicker
-            popoverId="ngb-popover-reply-emoji"
-            onselect={(glyph) => (replyComposer += glyph)}
-          />
-        {/if}
-        <span class="textAreaBtns">
-          <i
-            {...{ ngbtooltip: 'Upload an Image', placement: 'left' } as Record<string, string>}
-            {@attach ngbTooltip}
-            class="fas fa-image"
-          ></i>
-        </span>
-      </div>
-    </div>
-    {#snippet footer()}
-      <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
-        Close
-      </button>
-    {/snippet}
-  </Modal>
-</app-reply-modal>
+<!--
+  `app-reply-modal` left this file on 2026-08-31 for `ReplyModal.svelte`, when `RPL-01`…`RPL-03` put
+  it over its ceiling. Ninety-four lines of markup and four functions went with it; what stayed is
+  the call, because which modal is showing is this host's one job.
+-->
+<ReplyModal
+  {name}
+  {targetMessage}
+  {canPostImages}
+  {onReplyImageUpload}
+  {onReplyImagePaste}
+  {onReplySend}
+  {onclose}
+/>
 <AlertQaModal
   open={name === 'qa'}
   {targetMessage}

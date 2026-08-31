@@ -33,6 +33,70 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 00:10 UTC — The reply modal had all three of the Q&A modal's defects, and nothing had looked
+
+**Runtime impact: YES**, three ways. In the reply modal: the image button was drawn for every viewer
+including one in a room where uploads are off; it did nothing when clicked; and a pasted screenshot
+did nothing at all.
+
+`RPL-01`…`RPL-03` are the same three `QAM-05` and `QAM-06` were, one modal over. They were found by
+decoding `app-reply-modal` (byte 2,324,180) as part of the surface audit — not by a row asking, and
+not by anything looking at the neighbour of a component fixed the same day.
+
+```
+O(19, o.canPostImages ? 19 : -1)                                      the gate
+(isPresenter || sessData.userUploads) && (canPostImages = !0)         byte 2,319,080
+[1,"textAreaBtns",3,"click"] → $xe → imgUpload()                      bytes 2,318,013 / 2,320,688
+const 13 ends 3,"keyup","paste" → onImagePaste                        byte 2,323,300
+```
+
+**Its destination is neither neighbour's**, which is the part worth getting right: `doImggurUpload`
+here ends in `sendChatReply(msg.c, imggurUploadTxt, msg.txt, msg.n, msg._id, null)` then
+`$("#replyModal").modal("hide")` (byte 2,322,349). `QAM-05`'s prescribed fix was "the same path both
+chat composers already use" and would have posted a Q&A answer into public chat; the identical trap
+sits one component away here.
+
+**Two ratchets pushed back and both changes are better for it.**
+
+`message-actions.svelte.ts` hit 1,025 against a ceiling of 874 with the second copy of the image
+lifecycle in place — and the two blocks differed in exactly one expression each. Both are
+`PendingImagePost` instances now (`room/image-post.svelte.ts`), which holds the state, the object-URL
+discipline, the upload, the failure message and the composed body's order, with the DESTINATION
+injected. That file **fell to 785**, 89 lines below where it started, while gaining a feature. The
+injection is the correctness argument rather than the line count: a shared lifecycle keeps the four
+destinations apart, a shared handler is what mixes them.
+
+`ModalHost.svelte` then hit 6,997 against 6,918, so `app-reply-modal` left for `ReplyModal.svelte` —
+94 lines of markup and four functions, a natural seam and the same one `AlertQaModal` and
+`CloseSessionPane` were taken along. **ModalHost fell to 6,854.**
+
+**Three contracts caught things on the way, each doing exactly its job:**
+
+- `trade-alert-pane-contract` went red with `expected 6 to be 5` the moment the sixth paste site
+  landed. Its own comment had predicted that: *"it is what fails when a sixth call site is added
+  without its own handler"*. Updated rather than loosened — a count relaxed the first time it fires
+  was never a guard.
+- `unbound-method-contract` refused `PendingImagePost` until it was registered, for the **fifth** time
+  catching a class that arrived by extraction out of one already listed. `confirm` and `complete` are
+  the ones to watch: handed over as `onconfirm={qaImage.confirm}` they lose `this` and the failure is
+  an image silently not sent.
+- `orphaned-comment-contract` caught a Q&A docblock left sitting above the reply prop that displaced
+  its declaration.
+
+**Verified — ten negative controls across the two files, each red on its own assertion:** the gate
+removed; the handler removed; the paste binding removed; the reply image routed to the Q&A sender
+(the QAM-05 trap, reproduced deliberately); both instances handed the SAME destination; the sender
+clearing the draft as well as the close (two answers for one field); the host no longer mounting the
+component; and the three re-run after the extraction.
+
+One measurement worth recording: the contract's closing anchor was `'</app-reply-modal>'` and failed
+on formatted output, because prettier wraps a long closing tag as `</app-reply-modal\n>`. It matches
+`'</app-reply-modal'` now.
+
+Coverage: **43 of 85 surfaces, 17,803 of 37,449 lines, 47.5%**.
+
+Room gate exit 0: 306 test files / 5,600 passed / 1 skipped.
+
 ### 2026-08-31 23:20 UTC — Thirty style-scoping ancestors, twenty of them asserted by nothing
 
 **Runtime impact: NO** — one new contract. What it guards is a defect class that ships silently.

@@ -1801,7 +1801,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       note on why the full `MessageActionItem` stays HERE: `messageActions.selected` is what
       `targetMessage` already is, and handing the modal a narrow copy is what had blocked the row.
     */
-    max: 1149,
+    /*
+      1149 -> 1184, 2026-08-31 (`RPL-02`/`RPL-03`). Thirty-five lines: a SIXTH `ImagePasteConfirm`
+      and a second `ImageUploadDialog`, for the reply modal.
+
+      A sixth instance rather than a shared one, for the reason the five before it are separate:
+      `doImggurUpload` dispatches on a feature name deny-by-default (byte 1,992,037) and this one
+      ends in `sendChatReply(…, msg._id, null)` (byte 2,322,349). `trade-alert-pane-contract` counts
+      them and went red with `expected 6 to be 5` the moment this landed — which is exactly what its
+      own comment predicted would happen when a sixth arrived.
+    */
+    max: 1184,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -3429,7 +3439,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       it — both are already on `messageChrome`, which this component receives, and reading them from
       there is what stops the Q&A header disagreeing with every other body in the room.
     */
-    max: 6918,
+    /*
+      6918 -> 6857, 2026-08-31 (`RPL-01`…`RPL-03`), and it FELL because the ceiling refused the
+      growth first. The three defects added 79 lines and landed at 6,997; `app-reply-modal` then left
+      for `ReplyModal.svelte` — 94 lines of markup and four functions — which is a natural seam and
+      the same one `AlertQaModal`, `CloseSessionPane` and `LogArchiveModals` were taken along.
+
+      Upstream it IS a component: `selectors:[["app-reply-modal"]]` at byte 2,324,180, 23 declarations
+      and 4 variables. It owns one composer and one picker and reads nothing this host reads, so the
+      only thing that stayed is the call — which modal is showing is this file's one job.
+    */
+    max: 6857,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4368,7 +4388,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       firing with the row's url is precisely the wrong-picture bug. Doing nothing is the honest
       response to a caller error here.
     */
-    max: 874,
+    /*
+      874 -> 786, 2026-08-31, and it FELL by 88 while gaining a whole feature.
+
+      `RPL-01`…`RPL-03` needed the Q&A image path again for the reply modal. Written out, the second
+      copy put this file at 1,025 — and the two blocks differed in exactly one expression each. Both
+      are `PendingImagePost` instances now (`room/image-post.svelte.ts`): the shared class holds the
+      state, the object-URL discipline, the upload, the failure message and the composed body's
+      order, and each instance is handed its own DESTINATION.
+
+      That injection is the correctness argument, not the line count. `doImggurUpload` dispatches on
+      a feature name deny-by-default and every site ends somewhere different; a shared handler is
+      what mixes them, which is the mistake `QAM-05`'s prescribed fix would have made.
+    */
+    max: 786,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -4534,6 +4567,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 851,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
+  },
+  {
+    file: 'lib/room/image-post.svelte.ts',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — and this test asked for it, refusing the module
+      until it had a number. Gate 0b makes ceilings mandatory per discovered `lib/room/*.svelte.ts`.
+
+      177 lines, of which the CODE is about fifty: three fields, four small methods and one private
+      send. The rest is the argument, and the ratio is right for this file rather than slack to grow
+      into — because what it holds is a lifecycle four surfaces share while pointing four different
+      ways, and the whole risk it manages is somebody deciding the destinations could be shared too.
+
+      It exists because `RPL-01`…`RPL-03` needed the Q&A image path a second time and
+      `message-actions.svelte.ts` hit its ceiling with the copy in place. Extracting instead took
+      that file from 1,025 to 785.
+
+      If this number climbs, the thing to check is whether it has grown a DESTINATION. It must not:
+      `post` is injected precisely so this class cannot send anywhere on its own, and a branch here
+      that decides where an image goes is the failure `QAM-05`'s prescribed fix would have been.
+    */
+    max: 177,
+    why: 'one image, uploaded and posted somewhere - the lifecycle four surfaces share'
   },
   {
     file: 'lib/room/kicks.ts',
@@ -6452,6 +6507,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 191,
     why: 'the chat RTE, gated on three flags rather than one'
+  },
+  {
+    file: 'lib/components/ReplyModal.svelte',
+    /*
+      DECLARED IN THE COMMIT THAT CREATED THE FILE — `every component is discovered and capped`
+      refused it until it had a number, which is the third time this repository has been TOLD about
+      an uncapped component rather than finding one by accident.
+
+      218 lines, of which the markup is ninety-four and the script's CODE is about thirty: two state
+      fields and four small functions. It left `ModalHost.svelte` when `RPL-01`…`RPL-03` put that
+      file over its own ceiling, and it is a natural seam rather than a slice made to fit a number —
+      upstream it is a whole component (`selectors:[["app-reply-modal"]]`, byte 2,324,180, 23
+      declarations and 4 variables), it owns one composer and one picker, and it reads nothing the
+      host reads.
+
+      If this number climbs, the thing to check is whether it has grown a DESTINATION. Where a reply
+      or an image goes is not this component's business: it raises `onReplySend` and
+      `onReplyImagePaste` and the page decides. A branch here that picks a sender is the mistake
+      `QAM-05`'s prescribed fix would have been, one component over.
+    */
+    max: 218,
+    why: 'the public reply to one message - its composer, its picker and its image path'
   },
   {
     file: 'lib/components/RoomBranding.svelte',
