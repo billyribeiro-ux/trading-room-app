@@ -70,22 +70,22 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 83 surfaces, measured
+## The inventory — all 86 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,916 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,854 | no |
 | 2 | `routes/+page.svelte` | 1,837 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,532 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,254 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,171 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,105 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
-| 8 | `lib/components/RoomOverlays.svelte` | 1,148 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
+| 8 | `lib/components/RoomOverlays.svelte` | 1,183 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
 | 11 | `lib/components/PollPanel.svelte` | 883 | `poll-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-poll-modal` (selector at byte 2,112,472), all 53 consts decoded BY VALUE and swept against `PollPanel` + `PollSavedList`. ZERO gaps; one recorded divergence (the loader's `../../assets/` path). The finding is the `app-poll-modal` ANCESTOR: all 17 style rules are scoped to it in the generated sheet, so deleting the wrapper unstyles the panel with nothing else noticing. |
-| 12 | `lib/components/RoomSidebar.svelte` | 871 | no |
+| 12 | `lib/components/RoomSidebar.svelte` | 887 | `roster-identity-contract.test.ts` — read end to end 2026-08-31 against `app-room-roster` (byte 2,038,159), all 24 consts decoded BY VALUE. Twenty built; the four absent are `RS-03`/`RS-04`, blocked on a server-side supply. Three CITATIONS were wrong (`C2e`→`E2e`, `u2e`→`g2e`, and a bundle this repo does not hold) and the `{#each}` key's equivalence to upstream's `userXrefID` was unrecorded. |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
 | 14 | `lib/components/ScreenPane.svelte` | 671 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
 | 15 | `lib/components/PostAlertModal.svelte` | 656 | no |
@@ -95,7 +95,7 @@ guessed.
 | 19 | `lib/components/FilesPane.svelte` | 585 | no |
 | 20 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 589 | `## SwingAlertsPane.svelte` in the v4 register — **6 rows. |
 | 21 | `lib/components/notes/NotesPane.svelte` | 524 | `## NotesPane.svelte` in the v4 register — 4 rows, read against `zSe` (byte 1,930,173) — the notes pane inside `app-presentationarea` — and its |
-| 22 | `lib/components/PrivateChatPanel.svelte` | 524 | no |
+| 22 | `lib/components/PrivateChatPanel.svelte` | 524 | `private-chat-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-privchat` (byte 2,214,520), all 79 consts decoded BY VALUE and swept app-wide. 75 values ship; the 4 absent are Angular template REFS the reference itself never reads, by name or through `It(n)`. All seven update-block gates built. |
 | 23 | `lib/components/VideoPlayer.svelte` | 411 | `## VideoPlayer.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860, |
 | 24 | `lib/components/AlertQaModal.svelte` | 407 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
 | 25 | `lib/components/MainTabStrip.svelte` | 398 | `## MainTabStrip.svelte` in the v4 register — 7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts |
@@ -124,11 +124,12 @@ guessed.
 | 48 | `lib/components/TabGearMenu.svelte` | 156 | no |
 | 49 | `lib/components/AlertSendReportModal.svelte` | 161 | `## AlertSendReportModal.svelte` in the v4 register — 3 rows (ASR-01…03) read end to end 2026-08-31: 2 measured refusals, 1 blocked on a one-line change in `Modal.svelte` that this pass did not own. |
 | 50 | `lib/components/notes/NoteTabContent.svelte` | 134 | `## notes/NoteTabContent.svelte` in the v4 register — 3 rows (NTC-01…03) read end to end 2026-08-31. NTC-01 removed an INVENTED value: `title="Welcome Mat"` occurs 0 times in the 2,891,205-byte bundle. |
-| 51 | `lib/components/LogArchiveModals.svelte` | 147 | no |
+| 51 | `lib/components/LogArchiveModals.svelte` | 206 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 52 | `lib/components/BootboxDialog.svelte` | 145 | no |
 | 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
-| 54 | `lib/components/ChatArchivePane.svelte` | 143 | no |
+| 54 | `lib/components/ChatArchivePane.svelte` | 169 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 55 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 86 | `lib/components/ChatArchiveLogPane.svelte` | 227 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 56 | `lib/components/ChatSearchBar.svelte` | 373 | no |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -158,8 +159,9 @@ guessed.
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
+| 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**42 of 84 surfaces audited · 17,551 of 37,259 lines · 47.1%.**
+**48 of 86 surfaces audited · 19,816 of 37,777 lines · 52.5%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
@@ -194,6 +196,133 @@ Two things have changed about that statement since it was written, and both narr
 2. **Both audited rows are now partly stale**, because the audited files kept changing after the
    audit. An audit of a moving file needs the revision recorded beside it, which the rows above now
    do.
+
+## 3. The per-surface audit is now a SWEEP, and it runs on every invocation
+
+Added 2026-08-31 21:40 UTC.
+
+The method in the paragraph above — *transcribe every const by value, then measure ours* — was
+carried out by hand three times in a week (`PollPanel`, the roster, `PrivateChatPanel`) and found
+something real each time. It is also the same twenty lines of work every time, and forty surfaces at
+three a session is a fortnight of measuring the repository as it was on the day each run happened.
+
+`apps/room/src/lib/reference-const-coverage-contract.test.ts` now performs it over **all 51
+components the pinned v4 bundle declares**, on every run, and pins the answer. Three exclusions, each
+derived from the bundle rather than hand-listed: Angular template reference variables (the leading
+run of two-string entries), attribute and listener NAMES (by position inside the entry), and the 242
+framework identifiers gathered from every `selectors:` and `inputs:` in the bundle.
+
+**Measured on the day: 51 components, 33 fully covered, 146 values not present in this room.**
+
+| group | components | what it is |
+| --- | ---: | --- |
+| not built at all | `app-session-transcript` (28) | the whole component — container, header, date picker, pagination, entries. **Named in no tracker row before this sweep** |
+| out of scope by decision | `app-session-login` (32) | forgot/change password, the Gmail/Facebook/Gravatar avatar chooser, reCAPTCHA, supported-browsers. Account management lives on the CONTROLLER |
+| Bootstrap's data API, replaced by state | `app-session-control-modal` (13), `app-user-info-modal` (10), `app-closed-session-page` (3), `app-note` (3) | every `#`-prefixed value is a `data-bs-target`. The pane it names is usually built; the SELECTOR has no counterpart |
+| real gaps on built surfaces | `app-alert-send-report-modal` (15), `app-post-alert-modal` (7), the two log modals (6 each), `app-room` (6), `app-user-settings-modal` (5), `app-presentationarea` (5), `app-rec-preview` (2), `app-chat` + `app-extra-chat` (1 each), `app-screenshare-view` (2), `app-poll-modal` (1) | the work this sweep found |
+
+### A residual is not the same thing as work, and the file measures the difference
+
+The fourth group was first written as *"the work this sweep found"*. Checking that before saying it is
+what corrected it. **Of the 146 residuals, 38 are already argued somewhere in this repository** — in a
+docblock or a contract test — and the sweep rediscovered them rather than finding them. **108 are named
+nowhere and have not been looked at by anyone.** That 108 is a FLOOR: the split is a substring search,
+so a short generic value can be counted as examined by an incidental mention, which can only inflate
+the examined side.
+
+`app-room` is the clearest case and the strongest thing the sweep says about itself: **all six of its
+residuals are recorded refusals, and none is a false alarm**, on the surface that has been read
+hardest here.
+
+- the Intercom help link is **`RNB-01`** — a control whose gate nothing can turn on. `hasSTHelpLink`
+  occurs three times in the whole bundle and the only occurrence inside `app-room` sets it FALSE.
+- `nolevelsImg` / `/assets/images/notalking.png` are **`G08`** in `RoomNavbar.svelte` — the idle
+  waveform, refused because `presenterTalking` is a live audio-activity signal from a server this room
+  does not have.
+- `cssSoundCloudIcon` / `/assets/images/playing.gif` are argued in `NavbarSoundCloud.svelte` — the
+  const carries `id` twice and Angular keeps the second, and the gif is not in this repository.
+
+Two more residuals are **reference DEFECTS, correctly not transcribed**: five colour inputs carry
+`value="followChatStyle.color"` as a STATIC attribute where a binding was meant, so they ship with the
+literal text of an expression; and `data-ng-dblclick="fullScreen()"` on the webcam screen is an
+AngularJS 1 attribute in an Angular 17 template that no runtime reads.
+
+### Worked since, and what each turned out to be
+
+**The two log modals — 12 of the 12 CLOSED, by building the feature they belonged to.** All six values
+in each were one view: `toggleShowLogs`, the archived-log viewer, which this room had never built. It
+could sweep an archive and restore one and could not look inside either. Built 2026-08-31 —
+`readChatArchiveLog`, `RoomChatArchiveLog`, `ChatArchiveLogPane.svelte`, nine negative controls. Three
+of `app-alert-send-report-modal`'s went with them: `search-addon`, `Enter search term` and `btn-ligth`
+were shared. **146 residuals to 130, 33 fully-covered components to 35.**
+
+**`app-session-transcript` — 27 values, and it is an OWNER DECISION, not work.** The component (byte
+2,611,020) is a standalone page opened in its own window: it reads `token` and `name` off the location
+hash, posts `transcriptWindowClosing` back to `window.opener`, and pages a date-filtered archive
+through `getSessionTranscripts(token, {startDate, page, limit})` at 300 rows a page. What it renders is
+a stored history of everything anybody SAID in a session.
+
+This room relays captions and stores none of them, deliberately, at BOTH layers — `room/recording.ts`
+sends each result down the signalling socket, and `services/media/src/server.rs` handles
+`sendSpeechReco` by checking `may_produce`, bounding the text and calling `notify_room`, with no write
+anywhere. So building the viewer means first deciding to record every spoken word of every session to
+disk, which in a multi-tenant fintech application is a retention, consent and jurisdiction question and
+is the owner's. **⛔ OWNER DECISION — not started, and deliberately.**
+
+**`app-post-alert-modal` — 7 values, traced, none of them work.** `#scheduledAlertsModal` is a
+`data-bs-target`. `alert-text-label` and `alert-dont-cross-post-label` are the ids of "Text this out?"
+(`VTe`, byte 2,118,282, model `sendText`) and "Don't cross post to linked alert rooms" (`WTe`, byte
+2,119,672, model `dontCrossPost`) — both in `direct-evidence-contract.ts`'s `hiddenCapabilityBranches`,
+and the features behind them (Twilio SMS, linked-room fan-out) are blocked outright.
+`sendLaterAsEmail`/`sendLaterAsNick` are `PAM-10`'s refusal: upstream's form lets a presenter post
+under someone else's name and address. `alert-send-later-time` and `ignoreWeekendsChk` are ids this
+room does not need, because ours WRAPS each input in its label rather than pairing them by id — a
+better association, and the only one of the seven that had no reason on record anywhere.
+
+### Every remaining component traced, 2026-08-31. None of it is unexamined work.
+
+`app-session-control-modal` (13) — ten `data-bs-target`s, plus `streaming-link-playyer` (the id of the
+Stream Player tab's readonly link field, inside a feature `ModalHost.svelte` REFUSES at length because
+`playerURL` comes from the reference's server and the page it links to is an anonymous view of one
+room's screenshares) and `audioID`/`videoID` (Angular `ngModel` binding keys; ours carry the ids and
+`label for`, which is the half that does anything).
+
+`app-user-info-modal` (10) — four tab targets and one modal target, and the panes all exist:
+`ModalHost.svelte` carries `id="nav-info"`, `nav-system`, `nav-options`, `nav-notes`. Plus the five
+`followChatStyle.*` values, which are the reference's own defect — static attributes where a binding
+was meant.
+
+`app-note` (3) — `ariaLabelledBy` strings handed to `modalService.open(...)`. These dialogs name
+themselves with `role="dialog"` plus `aria-label` instead, recorded in `CarouselDialog.svelte` and
+measured in `note-file-browser-chrome-contract.test.ts`.
+
+`app-rec-preview` (2) — the id and class of the `<video>` in the reference's IN-PAGE preview card.
+Ours is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a server-supplied
+`recPreviewLocation` and there is no such URL here.
+
+`app-screenshare-view` (2) — `#ffcc00` is the inline colour on the local-preview invitation, which
+`SP2-04` measured as unreachable in this application; `fullScreen()` is an AngularJS 1 attribute in an
+Angular 17 template.
+
+`app-closed-session-page` (3) — the Bootstrap navbar collapse toggler and the id it names.
+
+`app-alert-send-report-modal` (12) — the `RPT-*` refusal, enumerated as orphans in its own contract.
+
+`app-session-login` (32) — account management, which lives on the CONTROLLER.
+
+**One measurement bug was found and fixed while doing this.** `app-presentationarea`'s 258-character
+tooltip was reported missing and ships on two surfaces: both `ScreenTabs.svelte` and
+`StreamTabs.svelte` carry it as three literals joined by `+`, and the sweep looked for the whole value
+as one substring. The sweep now rejoins `' + '` concatenations — the smallest transformation that
+fixes it, and one whose only risk is hiding a true gap rather than inventing coverage. Exactly one
+residual moved. **129 residuals, 35 components fully covered.**
+
+**The comment stripping in that file is load-bearing and its own case proves it on every run.** This
+repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where
+the real number is **146**: twenty-four values were "covered" by nothing but a docblock quoting the
+reference at them. Three negative controls were run — a covered value removed from our source, a
+listed gap closed and left in the table, and the stripping itself disabled — and all three went red
+for the stated reason.
 
 ---
 

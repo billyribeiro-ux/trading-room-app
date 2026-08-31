@@ -33,6 +33,450 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 04:21 UTC — every remaining residual traced, and a measurement bug found while doing it
+
+**Runtime impact: NO** — verdicts recorded at the table, and one narrowing of how the sweep reads our
+source. No shipping file changed.
+
+**A false GAP, and the fix is narrower than the bug.** `app-presentationarea`'s const 74 is a
+258-character tooltip and the sweep reported it missing. It ships on TWO surfaces: `ScreenTabs.svelte`
+and `StreamTabs.svelte` both carry it verbatim, as three literals joined by `+`, because one line of
+258 characters is not what prettier leaves behind. The sweep looked for the whole value as a substring
+and never found it — so the gap map named as unfinished a string that renders on two bars.
+
+The sweep now rejoins `' + '` concatenations. Deliberately the smallest transformation that fixes it:
+a quote, a `+`, and the next quote, with whitespace between, so it cannot reach across a variable or a
+template hole. What it CAN do in principle is glue two unrelated adjacent literals into a spurious
+match — the risk it carries is hiding a true gap, never inventing coverage. Measured: exactly one
+residual moved, and it was this tooltip. **130 residuals to 129.** Negative control: with the rejoin
+made an identity function, three cases go red.
+
+**The other eight components were traced value by value, and none of them is unexamined work.**
+
+- `app-session-control-modal` (13) — ten `data-bs-target`s, plus `streaming-link-playyer`, the id of
+  the Stream Player tab's readonly link field, inside a feature `ModalHost.svelte` refuses at length
+  because `playerURL` comes from the reference's server and the page it links to is an anonymous view
+  of one room's screenshares; plus `audioID`/`videoID`, which are Angular `ngModel` binding keys where
+  ours carry the ids and the `label for`.
+- `app-user-info-modal` (10) — four tab targets and one modal target whose PANES all exist here, plus
+  the five `followChatStyle.*` values that are the reference's own static-attribute defect.
+- `app-note` (3) — `ariaLabelledBy` strings; these dialogs name themselves with `role="dialog"` plus
+  `aria-label`, already recorded in `CarouselDialog.svelte`.
+- `app-rec-preview` (2) — the id and class of the `<video>` in the reference's IN-PAGE preview card.
+  Ours is a separate window, argued in `room/recording.ts`, because there is no server-supplied
+  `recPreviewLocation` here.
+- `app-screenshare-view` (2) — `#ffcc00` is the local-preview invitation's colour, which `SP2-04`
+  measured as unreachable in this application.
+- `app-closed-session-page` (3) — the Bootstrap navbar collapse toggler and the id it names.
+- `app-alert-send-report-modal` (12) — the `RPT-*` refusal, enumerated as orphans in its own contract.
+- `app-session-login` (32) — account management, which lives on the controller.
+
+Each verdict is written at its own entry in the table rather than in a summary, so the next reader
+finds it beside the values it explains.
+
+Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
+skipped.
+
+### 2026-09-01 03:52 UTC — two more residual blocks traced: one owner decision, one already-argued set
+
+**Runtime impact: NO** — findings recorded at the code and in the tracker. No shipping file changed.
+
+**`app-session-transcript`, 27 values — an OWNER DECISION, and deliberately not started.** The
+component at bundle byte 2,611,020 is a standalone page opened in its own window: it reads `token` and
+`name` off the location hash, posts `transcriptWindowClosing` back to `window.opener`, and pages a
+date-filtered archive through `getSessionTranscripts(token, {startDate, page, limit})` at 300 rows a
+page. What it renders is a stored history of everything anybody SAID in a session.
+
+This room relays captions and stores none of them, deliberately, at BOTH layers — `room/recording.ts`
+sends each result down the signalling socket, and `services/media/src/server.rs` handles
+`sendSpeechReco` by checking `may_produce`, bounding the text and calling `notify_room`, with no write
+anywhere. Building the viewer means first deciding to record every spoken word of every session to
+disk, which in a multi-tenant fintech application is a retention, consent and jurisdiction question and
+belongs to the owner rather than to a sweep closing a gap. The values stay listed with that reason
+rather than being built or quietly excluded.
+
+**`app-post-alert-modal`, 7 values — traced, and none is work.** `#scheduledAlertsModal` is a
+`data-bs-target`. `alert-text-label` and `alert-dont-cross-post-label` are the ids of "Text this out?"
+(`VTe`, byte 2,118,282, model `sendText`) and "Don't cross post to linked alert rooms" (`WTe`, byte
+2,119,672, model `dontCrossPost`) — both in `hiddenCapabilityBranches`, and the features behind them,
+Twilio SMS and the linked-room fan-out, are blocked outright. `sendLaterAsEmail` and `sendLaterAsNick`
+are `PAM-10`'s refusal, because upstream's form lets a presenter post under someone else's name and
+address.
+
+**One of the seven had no reason on record anywhere, and now does.** `alert-send-later-time` and
+`ignoreWeekendsChk` are ids this room does not need: upstream pairs each control with a separate
+`label for`, and ours WRAPS the input inside its label, which associates them without an id at all. A
+better association rather than a missing one — but nothing said so, so a reader of the gap map would
+have taken it for unfinished work, which is exactly the mistake the previous entry corrected.
+
+Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
+skipped.
+
+### 2026-09-01 03:24 UTC — the archived chat log can be READ, which is the half of the archive that was never built
+
+**Runtime impact: YES** — a new presenter-only remote query, a new view inside the chat-logs modal,
+and a second reader over `messages`. No existing read path changed behaviour.
+
+## How the surface was found
+
+Not by reading. The const sweep committed ninety minutes earlier reported six values missing from
+`app-chat-logs-modal` and the same six from `app-alert-logs-modal` — `log-header-container`,
+`log-header`, `search-addon`, `Enter search term`, `btn-ligth`, `fa-box-open`. All twelve belong to
+ONE view: `toggleShowLogs`, the modal's second half.
+
+**This room could sweep an archive and could restore one, and could not look inside either.** That is
+the one thing a presenter standing at that dialog wants before restoring anything, and no tracker row
+had it.
+
+## What was built
+
+`readChatArchiveLog` (upstream's `getArchiveLog {id}`), `RoomChatArchiveLog`, and
+`ChatArchiveLogPane.svelte` — Back, a search over the log, Download Log, a presenter-only Unarchive,
+and the messages. Transcribed from `jxe` at bundle byte **2,309,873**, consts 17–37 of the table at
+**2,305,566**, and `downloadLog()` at **2,304,904**, each offset opened by the contract rather than
+trusted.
+
+**A second row builder, and the argument for why it is safe.** `chatRows` has always ended
+`and(isNull(messages.archiveId), where)` so the live exclusion is stated once and cannot be dropped by
+a call site — its own comment says forgetting it ships "a whole feature, green and inert". The
+archived reader could not be a flag on it without putting that decision back at every call site. So
+the projection was split out as `chatQuery`, which nothing outside the module can reach, and
+`archivedChatRows` matches on an archive ID — and a live row's `archiveId` is NULL, which `=` never
+matches. The two are disjoint by construction, in both directions.
+
+**That argument is right in principle and could be wrong in a dialect, so it is executed.**
+`chat-archive-read.test.ts` builds one table holding all four combinations — live and archived, this
+room and another — and runs both readers over it. The live page returns only the live message; the
+archived read returns only the archived ones, oldest-first; another room's archive id returns nothing
+and its lookup refuses identically to a missing one, so the refusal is not an oracle over which ids
+exist elsewhere.
+
+**Stricter than the reference, deliberately.** Upstream renders the viewer for anyone who reaches the
+modal and gates only Unarchive on `isPresenter`. The whole read is `presenterRoom()` here: an archive
+is every member's messages swept by an administrator, and a member who could read one could read a
+channel swept before they joined. The projection is also narrower than a live message's — no
+`bodyHtml`, no reply context, and no `senderEmailHash`, which is derived from an address.
+
+## Three divergences, recorded rather than smoothed
+
+- **Consts 24 and 25 carry the same `id`.** Two elements with `id="search-addon"` in one modal, with
+  the input's `aria-describedby` naming it — so upstream's description resolves to whichever the
+  browser finds first. One id here; the clear control is a button with a label.
+- **`btn-ligth` is upstream's typo for `btn-light` and is transcribed anyway.** It matches no rule in
+  `app.css` or the captured sheet, which means it matched nothing upstream either.
+- **The rows are `app-st-compactmessage`, not `app-st-message`.** The full component brings
+  reactions, the menu, replies and colours, every one inert over an archive nobody can act on, and
+  the compact row already owns the link split and the time format.
+
+The component's own Angular `styles:[…]` came with it. They are in NEITHER sheet here — the generated
+one is a capture of the global stylesheet and never saw them — so without them all four class names
+would have been classes with no CSS.
+
+## The read is bounded, and says so when the bound bites
+
+`CHAT_ARCHIVE_LOG_LIMIT` is 2,000. Upstream has no limit: it assigns `o.data.logArr` whole. When the
+limit bites, the viewer says which messages are on screen and that the search covers only those —
+`alert-toolbar-search-scope.ts` argues at length that a filter over a window nobody was told about is
+worse than no filter.
+
+## Verification
+
+Nine negative controls, each seen RED and restored. Three on the runtime class: the previous log
+cleared after the await instead of before, the search no longer ending when the box empties, and
+Download Log writing the filtered view. Three on the source contract: a residual value dropped from
+the markup, the room dropped from the archived predicate, and the read no longer presenter-gated.
+Three on the database: the room predicate dropped, the archived read reversed, and the live builder's
+exclusion removed.
+
+**One of the nine passed GREEN and was investigated rather than repaired.** Deleting
+`log-header-container` from the element's `class` attribute left the case passing, because the
+component's own `<style>` block still declares `.log-header-container` and `codeOf` keeps stylesheets
+— they are code, not prose. A case written to assert a value is RENDERED was passing on a value that
+was only STYLED. It now strips the style block, and the styles are asserted separately by name.
+
+The size ratchet refused the change three times and each refusal produced the better arrangement: the
+viewer is its own component and its own class rather than more of `LogArchiveModals` and
+`RoomChatArchive`. The two raises that remained are argued at their entries.
+
+**Not opened in a browser.** The room's Playwright job needs a server and a seeded database; what ran
+is the gate. Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files /
+5,680 passed / 1 skipped.
+
+The const sweep's own table moved with it, which is what a ratchet is for: **146 residuals to 130, 33
+fully-covered components to 35.** Three of the drop are `app-alert-send-report-modal`'s, which shared
+`search-addon`, `Enter search term` and `btn-ligth` with the log modals.
+
+### 2026-09-01 02:38 UTC — a residual is not the same thing as work, and the sweep now measures the difference
+
+**Runtime impact: NO** — two cases and a corrected note on the contract added forty minutes earlier.
+
+That entry called `app-room`'s six residuals *"four ASSETS a built feature draws"* and the group they
+sit in *"the work this sweep found"*. **Both were wrong, and checking them before building anything is
+what found it.** All six are recorded refusals with an argument already at the code: the Intercom help
+link is `RNB-01`, a control whose gate nothing in the bundle can turn on; `nolevelsImg` and
+`notalking.png` are `G08`, the idle waveform refused for want of a server-side activity signal; and
+`cssSoundCloudIcon` and `playing.gif` are the two SoundCloud const decisions in
+`NavbarSoundCloud.svelte`. **Zero false alarms on the most audited surface in the room** is the
+strongest thing the sweep has to say about itself, and it is the opposite of what the entry claimed.
+
+So the split is measured instead of asserted. **Of 146 residuals, 38 are already argued somewhere in
+this repository and 108 are named nowhere.** The 108 is a FLOOR and the case says why: it is a
+substring search, so a short generic value can be counted as examined by an incidental mention, which
+can only inflate the examined side, never the unexamined one.
+
+**The first version of that measurement was a tautology and was believed for about a minute.** Every
+residual is written out in the contract's own table, so reading the repository back reported 145 of 146
+as already examined — and the one exception only because it is redacted. The corpus now excludes this
+file, and the negative control is that exclusion: removed, the case fails with `expected 145 to have a
+length of 38`.
+
+`app-alert-send-report-modal`'s fifteen and the chat columns' `Save chat messages` were traced the same
+way and cited at the entry — the `RPT-*` refusal, enumerated as orphans in its own contract, and
+`ACA-06` in `ChatSearchBar.svelte`.
+
+### 2026-09-01 02:12 UTC — the per-surface const audit became a sweep over all 51 reference components
+
+**Runtime impact: NO** — one contract test, one tracker section. No shipping file changed.
+
+The audit method `todo-next.md` prescribes — decode a reference component's `consts:` table by value,
+then measure ours — had been run by hand three times in a week and found something real each time. It
+is also the same twenty lines of work every time, and forty surfaces at three a session measures the
+repository as it was on the day each run happened. `reference-const-coverage-contract.test.ts` now
+runs it over **all 51 components the pinned v4 bundle declares**, on every invocation.
+
+**51 components, 33 fully covered, 146 values this room does not ship** — every one of them named in
+the file, grouped by what it is, and pinned. The table is a ratchet that fails in BOTH directions: a
+value lost from this room appears as a new residual, and a gap closed but left listed appears as a
+stale entry.
+
+**All three exclusions are derived from the bundle, not hand-written.** A hand-maintained deny-list is
+how a sweep quietly stops measuring, and the first draft of this file had one — forty-eight "boring"
+names. It is replaced by: Angular template reference variables, taken as the leading run of two-string
+entries; attribute and listener NAMES, skipped for where they sit inside an entry rather than for what
+they are called; and 242 framework identifiers read out of every `selectors:` and `inputs:` in the
+bundle. `ngForm` is in none of the 242 — its selector is written as an element match — and the
+template-ref rule catches it instead, which is why all three exist and none is a safety net.
+
+**What it found that no tracker row had:**
+
+- **`app-session-transcript` is not built at all.** Eighty values, twenty-eight absent, and the absent
+  ones are the entire component.
+- **`app-room` is missing four ASSETS a built feature draws** — the roster's not-talking indicator
+  (`nolevelsImg`, `/assets/images/notalking.png`) and the SoundCloud icon's id and playing gif — plus
+  the navbar's Intercom help link.
+- **Two residuals are reference DEFECTS, correctly not transcribed.** Five colour inputs in
+  `app-user-info-modal` carry `value="followChatStyle.color"` as a STATIC attribute where a binding
+  was meant, so they ship with the literal text of an expression; and `data-ng-dblclick="fullScreen()"`
+  on the webcam screen is an AngularJS 1 attribute in an Angular 17 template that no runtime reads.
+
+**The comment stripping is load-bearing, and the file measures that rather than asserting it.** This
+repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where
+the real number is **146**: twenty-four values were "covered" by nothing but a docblock quoting the
+reference at them. A case runs both sweeps on every invocation and fails if they ever agree —
+`captured-css-ancestor-contract.test.ts` learned the same lesson from a control that came back green,
+and this file was written knowing it and still had to measure it to believe the size of it.
+
+**Verification.** Three negative controls, each seen RED and restored: `pmToolbar` removed from
+`PrivateChatPanel.svelte` (three cases failed, naming `app-privchat`); a listed gap closed with a
+throwaway module holding `transcript-container` (failed as a stale entry); and the stripping disabled
+(failed on all three totals). The first attempt at the first control **passed green and was
+investigated rather than repaired** — the mutation renamed `pmToolbar` to `pmToolbarZZ`, which still
+contains the original as a substring, so the sweep's `includes` still found it. Room gate run before
+the push.
+
+### 2026-09-01 01:35 UTC — PrivateChatPanel audited: 79 consts, and four the reference itself never reads
+
+**Runtime impact: NO** — one contract. The panel was already complete; nothing running said so.
+
+`app-privchat` (byte 2,214,520) was read end to end and all **79 consts decoded by value**, swept
+against everything this app ships rather than against one file — the panel's parts are separate
+components here (the composer, the emoji picker, the giphy picker each left it), so a per-file sweep
+would have reported every one of their consts as missing.
+
+**Seventy-five values ship.** The four that do not are Angular TEMPLATE REFERENCE VARIABLES —
+`["searchTermTxtPM",""]`, `["emojiPanelDiv",""]`, `["giphyPickerPop","ngbPopover"]`,
+`["giphyPicker",""]` — a construct Svelte has no counterpart for.
+
+**And they are dead in the reference too, which is the finding rather than the excuse.** Excluding
+four values from a completeness sweep is exactly how a sweep starts hiding things, so the exclusion
+is measured rather than argued from the shape: each name occurs in the bundle ONLY inside a `consts:`
+declaration, none is read by name, and the panel's template calls `It(n)` — Angular's positional ref
+read — **zero times**. `app-chat` and `app-extra-chat` declare the same four, so the panel inherited
+them from the shared chat-surface shape and uses none. Same category as `hideScreens`, the flag
+`MainTabStrip` records as unable to ever be true: reference machinery that exists and does nothing.
+
+The seven gates of the update block are transcribed as a list and checked as built — the DND badge,
+the three `currUser` conditionals, the PM toolbar, `pmLogsOnRight`, and the chat-tabs strip. A gate
+that quietly stops being evaluated is invisible: the markup still renders, just always or never.
+
+**Verified — three negative controls, red then green:** a const value dropped (the sweep named it,
+`const 46: privchatUnread`); the DND gate removed; and a REAL value added to the template-ref
+exclusion list, which fails with *"chatTabs is read by name somewhere"* — the control that proves the
+exclusion cannot be widened to hide a live behaviour.
+
+Coverage: **45 of 85 surfaces, 19,214 of 37,465 lines, 51.3%** — past half.
+
+Room gate exit 0: 309 test files / 5,626 passed / 1 skipped.
+
+### 2026-09-01 01:10 UTC — Wrong-symbol citations became a measurement instead of a discovery
+
+**Runtime impact: NO** — one contract, three offsets made exact.
+
+Five citations in one week named the wrong minified symbol while quoting the right code:
+
+| claimed | actually | what the claimed symbol really is |
+| --- | --- | --- |
+| `K4e` | `nRe` | an `as-split` wrapper — a real sibling with the same shape (`SHL-06`) |
+| `hSe` | `pSe` | one icon, not the three-way chooser (`SVC-02`) |
+| `bSe` | `vSe` | the slider row, which builds no ids (`SVC-03`) |
+| `C2e` | `E2e` | the Private Chat dropdown ITEM (`RSG-01`) |
+| `u2e` | `g2e` | a template in a DIFFERENT component (`RSG-02`) |
+
+Every one names real code, which is what makes the class dangerous rather than untidy: a citation
+pointing at nothing is found the first time somebody looks it up. Five in a week is a pattern, and
+the answer to a pattern is a measurement.
+
+**`reference-citation-contract.test.ts` sweeps every `symbol` + `byte N` pair in the app** — 84 of
+them — and checks the one falsifiable claim each makes: *that byte is code belonging to that symbol.*
+Either the symbol sits at the byte (a use site) or the byte lies inside its body, between its
+declaration and the next.
+
+**Measured result: all 84 resolve, after three were made exact.** `E0e`, `O0e` and `$4e` were cited
+20–34 bytes BEFORE the functions they name, pointing into the tail of the preceding one. Corrected to
+the declaration byte rather than the rule loosened to admit them.
+
+**Two things the sweep cannot do, both stated at the code rather than left to be assumed.** It cannot
+check a citation that gives a symbol without an offset — `SVC-02`'s and `RSG-02`'s originals were of
+that shape and this would not have caught them, which is an argument for pairing symbol with byte as
+the house style. And it cannot separate a symbol DEFINED at a byte from one merely REFERENCED there:
+`hSe` appears inside `pSe`'s body as a slot argument, so that one still passes. A sweep whose limits
+are not written down gets read as covering more than it does, so the limit has its own assertion.
+
+**The rule's own logic is exercised against the real defects**, because a guard nobody has seen work
+is a guard nobody can trust: `K4e`/`nRe`, `C2e`/`E2e` and `bSe`/`vSe` are checked as
+flag-then-pass pairs, and the `hSe`/`pSe` case is asserted as the known miss.
+
+**An earlier draft was measurably useless and the controls said so.** It allowed the symbol anywhere
+within ±400 bytes of the offset — and at that width **three of the five known-wrong citations
+passed**, because minified siblings sit a few hundred bytes apart. The window is ±40 now, with
+containment doing the rest.
+
+Two negative controls, red then green: `C2e` reinstated against `E2e`'s byte, and `E0e` given a
+neighbouring function's offset.
+
+One eslint finding worth recording: the separator class held a literal non-breaking space and
+`no-irregular-whitespace` failed the gate. It is `\u00a0`/`\u202f` escapes now — the same 84 pairs.
+
+Room gate exit 0: 308 test files / 5,618 passed / 1 skipped.
+
+### 2026-09-01 00:40 UTC — The roster surface: complete behaviour, three citations pointing at the wrong code
+
+**Runtime impact: NO** — comments and one contract. The roster's behaviour was already right; what
+was wrong was every pointer to the evidence for it.
+
+`app-room-roster` (byte 2,038,159) was read end to end and all **24 consts decoded by value** against
+`RoomSidebar.svelte`. Twenty are present. The four that are not — `stars-container`, `stars-icon`,
+`stars-num`, `new-badge` — are `RS-03` and `RS-04`, both correctly BLOCKED on a server-side supply
+that does not exist (`e.data.years` and `e.isNew` are populated by nothing, anywhere).
+
+**Three citations were wrong, and all three are the shape that survives a review**: the sentence is
+true, the quoted code is right, and only the label beside it is wrong — so a reader who checks finds
+the claim correct and moves on. `SHL-06` and two in `screen-volume.ts` were the same error the same
+week, which is why these are now asserted rather than only corrected.
+
+- **`RSG-01`** the per-row visibility gate — a four-term expression deciding which members can see
+  which — was credited to `C2e`. `C2e` (byte 2,033,494) is the **Private Chat dropdown item**,
+  `x("click", … startPC(o))`. The gate is `E2e`, byte **2,035,701**.
+- **`RSG-02`** the `{regUser, presUser}` class map was credited to `u2e`. There is no `u2e =`
+  assignment in 2,891,205 bytes — but `function u2e(` DOES exist at byte 1,952,934, an unrelated
+  template in another component. So the citation pointed at real code that has nothing to do with
+  this, which is worse than pointing at nothing: looking it up confirmed it. The pure function is
+  `g2e`, byte **2,032,757**, applied by `D2e` at **2,035,468**.
+- **`RSG-03`** two citations named `docs/source/main.d6d3c112b59b7d0d.js`, an older build this
+  repository holds under no path, **while their offsets resolved correctly against the v4 bundle it
+  does hold**. The numbers had been re-derived at some point and the filename beside them had not —
+  the exact inverse of `SVC-02`, where the file was right and the numbers were one too high.
+
+**And one behavioural equivalence was undocumented.** `RSG-04`: upstream's track-by is
+`m2e = (t,n) => n.userXrefID` (byte 2,032,733); ours keys by `user.id`. They select the same person
+**only because** `+page.server.ts:208` sets `userXrefID: String(account.id)` — a property of this
+room, not of the shape. The moment that stops being a derivation, an external CRM id or an SSO
+subject, this key silently stops being the reference's identity and a roster row is recreated where
+upstream reuses it. Both ends are pinned now.
+
+**Verified — five negative controls, each red on its own assertion:** the `C2e` citation reinstated;
+the `u2e` one reinstated; a live citation to the absent bundle added above the record of its removal;
+`userXrefID` changed to derive from the email instead of the id; and the `stars-container` markup
+built without its supply, which is the "second node that can never render" the register refuses.
+
+Coverage: **44 of 85 surfaces, 18,690 of 37,465 lines, 49.9%**.
+
+Room gate exit 0: 307 test files / 5,613 passed / 1 skipped.
+
+### 2026-09-01 00:10 UTC — The reply modal had all three of the Q&A modal's defects, and nothing had looked
+
+**Runtime impact: YES**, three ways. In the reply modal: the image button was drawn for every viewer
+including one in a room where uploads are off; it did nothing when clicked; and a pasted screenshot
+did nothing at all.
+
+`RPL-01`…`RPL-03` are the same three `QAM-05` and `QAM-06` were, one modal over. They were found by
+decoding `app-reply-modal` (byte 2,324,180) as part of the surface audit — not by a row asking, and
+not by anything looking at the neighbour of a component fixed the same day.
+
+```
+O(19, o.canPostImages ? 19 : -1)                                      the gate
+(isPresenter || sessData.userUploads) && (canPostImages = !0)         byte 2,319,080
+[1,"textAreaBtns",3,"click"] → $xe → imgUpload()                      bytes 2,318,013 / 2,320,688
+const 13 ends 3,"keyup","paste" → onImagePaste                        byte 2,323,300
+```
+
+**Its destination is neither neighbour's**, which is the part worth getting right: `doImggurUpload`
+here ends in `sendChatReply(msg.c, imggurUploadTxt, msg.txt, msg.n, msg._id, null)` then
+`$("#replyModal").modal("hide")` (byte 2,322,349). `QAM-05`'s prescribed fix was "the same path both
+chat composers already use" and would have posted a Q&A answer into public chat; the identical trap
+sits one component away here.
+
+**Two ratchets pushed back and both changes are better for it.**
+
+`message-actions.svelte.ts` hit 1,025 against a ceiling of 874 with the second copy of the image
+lifecycle in place — and the two blocks differed in exactly one expression each. Both are
+`PendingImagePost` instances now (`room/image-post.svelte.ts`), which holds the state, the object-URL
+discipline, the upload, the failure message and the composed body's order, with the DESTINATION
+injected. That file **fell to 785**, 89 lines below where it started, while gaining a feature. The
+injection is the correctness argument rather than the line count: a shared lifecycle keeps the four
+destinations apart, a shared handler is what mixes them.
+
+`ModalHost.svelte` then hit 6,997 against 6,918, so `app-reply-modal` left for `ReplyModal.svelte` —
+94 lines of markup and four functions, a natural seam and the same one `AlertQaModal` and
+`CloseSessionPane` were taken along. **ModalHost fell to 6,854.**
+
+**Three contracts caught things on the way, each doing exactly its job:**
+
+- `trade-alert-pane-contract` went red with `expected 6 to be 5` the moment the sixth paste site
+  landed. Its own comment had predicted that: *"it is what fails when a sixth call site is added
+  without its own handler"*. Updated rather than loosened — a count relaxed the first time it fires
+  was never a guard.
+- `unbound-method-contract` refused `PendingImagePost` until it was registered, for the **fifth** time
+  catching a class that arrived by extraction out of one already listed. `confirm` and `complete` are
+  the ones to watch: handed over as `onconfirm={qaImage.confirm}` they lose `this` and the failure is
+  an image silently not sent.
+- `orphaned-comment-contract` caught a Q&A docblock left sitting above the reply prop that displaced
+  its declaration.
+
+**Verified — ten negative controls across the two files, each red on its own assertion:** the gate
+removed; the handler removed; the paste binding removed; the reply image routed to the Q&A sender
+(the QAM-05 trap, reproduced deliberately); both instances handed the SAME destination; the sender
+clearing the draft as well as the close (two answers for one field); the host no longer mounting the
+component; and the three re-run after the extraction.
+
+One measurement worth recording: the contract's closing anchor was `'</app-reply-modal>'` and failed
+on formatted output, because prettier wraps a long closing tag as `</app-reply-modal\n>`. It matches
+`'</app-reply-modal'` now.
+
+Coverage: **43 of 85 surfaces, 17,803 of 37,449 lines, 47.5%**.
+
+Room gate exit 0: 306 test files / 5,600 passed / 1 skipped.
+
 ### 2026-08-31 23:20 UTC — Thirty style-scoping ancestors, twenty of them asserted by nothing
 
 **Runtime impact: NO** — one new contract. What it guards is a defect class that ships silently.

@@ -554,7 +554,7 @@
               </div>
             {:else}
               <!--
-                  `E0e` — byte 1,462,300. Const 54 the group, 55/56 the `Image *` label, 57 the
+                  `E0e` — byte 1,462,334. Const 54 the group, 55/56 the `Image *` label, 57 the
                   button line, 58 the hidden file input, 59/60 the Upload label, 61/62 Browse,
                   63 the separator, 64 the input group, 65 the staged URL box, 66/67 the check.
 
@@ -675,7 +675,7 @@
 </div>
 
 <!--
-  ── THE IMAGE BROWSER — `O0e`, byte 1,466,205 ────────────────────────────────────────────────────
+  ── THE IMAGE BROWSER — `O0e`, byte 1,466,225 ────────────────────────────────────────────────────
 
   A presenter who had already uploaded an image through Files had no way to reach it from a carousel
   slide: the row offered a bare URL box and nothing else (`note-editor-file-browser-modal`).

@@ -10,10 +10,12 @@ import { RoomTradeAlerts } from './trade-alerts.svelte';
 import { RoomComposer } from './composer.svelte';
 import { RoomFeeds } from './feeds.svelte';
 import { RoomMessageActions } from './message-actions.svelte';
+import { PendingImagePost } from './image-post.svelte';
 import { RoomMessageDeletion } from './message-delete';
 import { RoomNotesAccess } from './notes-access.svelte';
 import { RoomAdminNotes } from './admin-notes';
 import { RoomChatArchive } from './chat-archive.svelte';
+import { RoomChatArchiveLog } from './chat-archive-log.svelte';
 import { RoomUserNotes } from './user-notes.svelte';
 import { RoomEventStream } from './events.svelte';
 import { RoomGates } from './gates';
@@ -120,10 +122,26 @@ const INSTANCES: Record<string, new (...args: never[]) => object> = {
     row — would lose `this` and take `#dialogs`, `#checkAlertDeletePassword` and the whole password
     gate with it.
   */
+  /*
+    Added 2026-08-31 with `RPL-01`…`RPL-03`, and — for the fifth time — because this file's own
+    completeness check ASKED rather than because anybody remembered.
+
+    Same arrival as the two above it: by extraction out of a class already listed.
+    `RoomMessageActions` owned the Q&A image path; `RPL-03` needed the identical lifecycle for the
+    reply modal, the ratchet refused the second copy, and both became `PendingImagePost` instances —
+    so its methods went from covered to uncovered by a move that changed no behaviour at all.
+
+    `confirm` and `complete` are the ones to watch. `RoomOverlays` calls them as
+    `messageActions.qaImage.confirm()` today; handed over as `onconfirm={messageActions.qaImage.confirm}`
+    they would lose `this` and take the upload, the destination and the object-URL revoke with them —
+    and the failure would be an image silently not sent, which is the quietest kind here.
+  */
+  qaImage: PendingImagePost,
   messageDeletion: RoomMessageDeletion,
   notesAccess: RoomNotesAccess,
   adminNotes: RoomAdminNotes,
   chatArchive: RoomChatArchive,
+  chatArchiveLog: RoomChatArchiveLog,
   userNotes: RoomUserNotes,
   screens: RoomScreens,
   mediaTransport: RoomMediaTransport,

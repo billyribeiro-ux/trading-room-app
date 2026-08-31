@@ -822,8 +822,10 @@
   onReplySend={messageActions.sendReplyMessage}
   onQuestionSend={messageActions.sendAlertQuestion}
   {canPostImages}
-  onQaImageUpload={() => messageActions.beginQaImageUpload()}
-  onQaImagePaste={(file, draft) => messageActions.beginQaImagePaste(file, draft)}
+  onQaImageUpload={() => messageActions.qaImage.beginUpload()}
+  onQaImagePaste={(file, draft) => messageActions.qaImage.begin(file, draft)}
+  onReplyImageUpload={() => messageActions.replyImage.beginUpload()}
+  onReplyImagePaste={(file, draft) => messageActions.replyImage.begin(file, draft)}
   onQaAlertBodyAction={(action, payload) => {
     /*
       `QAM-10` — the header card's body acts on the ALERT, and the full `MessageActionItem` lives
@@ -948,18 +950,51 @@
   register's prescribed fix for `QAM-05` was `composer.openImageUpload()` — the CHAT path — which
   would have posted a presenter's answer to one member's question into the room's public chat.
 -->
-{#if messageActions.qaImageUpload}
+{#if messageActions.qaImage.uploadOpen}
   <ImageUploadDialog
-    onclose={() => messageActions.cancelQaImageUpload()}
-    onupload={(files) => void messageActions.completeQaImageUpload(files)}
+    onclose={() => messageActions.qaImage.cancelUpload()}
+    onupload={(files) => void messageActions.qaImage.complete(files)}
   />
 {/if}
-{#if messageActions.qaPastedImage}
-  {const qaPastePreviewUrl = $derived(messageActions.qaPastedImage.previewUrl)}
+<!--
+  `RPL-02` / `RPL-03` — the REPLY modal's own pair, and a SIXTH instance of this dialog for exactly
+  the reason the five above are separate. `doImggurUpload` on `app-reply-modal` (byte 2,322,349) ends
+  in `sendChatReply(msg.c, imggurUploadTxt, msg.txt, msg.n, msg._id, null)` and then
+  `$("#replyModal").modal("hide")` — a public reply against one message, which is neither the Q&A
+  thread's destination nor chat's.
+
+  The textarea id is `msg-text-reply` (byte 2,323,720), one word from the other four.
+-->
+{#if messageActions.replyImage.uploadOpen}
+  <ImageUploadDialog
+    onclose={() => messageActions.replyImage.cancelUpload()}
+    onupload={(files) => void messageActions.replyImage.complete(files)}
+  />
+{/if}
+{#if messageActions.replyImage.pasted}
+  {const replyPastePreviewUrl = $derived(messageActions.replyImage.pasted.previewUrl)}
+  <ImagePasteConfirm
+    previewUrl={replyPastePreviewUrl}
+    onclose={() => messageActions.replyImage.cancel()}
+    onconfirm={() => void messageActions.replyImage.confirm()}
+  >
+    <div class="w-100 mt-3">
+      <textarea
+        class="form-control w-100"
+        rows="2"
+        id="msg-text-reply"
+        name="msg-text-reply"
+        placeholder="Enter your message"
+        bind:value={messageActions.replyImage.message}></textarea>
+    </div>
+  </ImagePasteConfirm>
+{/if}
+{#if messageActions.qaImage.pasted}
+  {const qaPastePreviewUrl = $derived(messageActions.qaImage.pasted.previewUrl)}
   <ImagePasteConfirm
     previewUrl={qaPastePreviewUrl}
-    onclose={() => messageActions.cancelQaImagePaste()}
-    onconfirm={() => void messageActions.confirmQaImagePaste()}
+    onclose={() => messageActions.qaImage.cancel()}
+    onconfirm={() => void messageActions.qaImage.confirm()}
   >
     <div class="w-100 mt-3">
       <!-- `id="msg-text-qa"` — byte 2,339,887. One character from the chat and private copies. -->
@@ -969,7 +1004,7 @@
         id="msg-text-qa"
         name="msg-text-qa"
         placeholder="Enter your message"
-        bind:value={messageActions.qaPastedImageMessage}></textarea>
+        bind:value={messageActions.qaImage.message}></textarea>
     </div>
   </ImagePasteConfirm>
 {/if}

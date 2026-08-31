@@ -1,8 +1,11 @@
 <script lang="ts">
   import Modal from './Modal.svelte';
+  import ChatArchiveLogPane from './ChatArchiveLogPane.svelte';
   import ChatArchivePane from './ChatArchivePane.svelte';
   import { RoomChatArchive } from '#lib/room/chat-archive.svelte.js';
+  import { RoomChatArchiveLog } from '#lib/room/chat-archive-log.svelte.js';
   import { chatArchivePort } from '#lib/room/chat-archive-port.js';
+  import { readChatArchiveLog } from '../../routes/chat-archive.remote';
   import type { ModalName } from '#lib/types.js';
 
   /**
@@ -42,9 +45,17 @@
     onclose: () => void;
     onAlert: (message: string) => void;
     onConfirm: (message: string, onconfirm: () => void) => void;
+    /**
+     * `O(17, e.appService.globals.isPresenter ? 17 : -1)` — Unarchive inside the log viewer.
+     *
+     * A PROP and not a re-derivation. Every authority answer in this room is decided on the page and
+     * passed down, and the server re-checks: `readChatArchiveLog` and `unarchiveChatLogCommand` are
+     * both `presenterRoom()`, so this decides what is DRAWN and nothing else.
+     */
+    isPresenter: boolean;
   }
 
-  const { name, onclose, onAlert, onConfirm }: Props = $props();
+  const { name, onclose, onAlert, onConfirm, isPresenter }: Props = $props();
 
   /**
    * THE HOLDER IS CONSTRUCTED HERE, and the ratchet is what argued for it.
@@ -86,9 +97,32 @@
    */
   let channel = $state('');
 
+  /**
+   * The log VIEWER — `toggleShowLogs`, the other half of this modal. See `chat-archive-log.svelte.ts`.
+   *
+   * One remote function rather than a port object, because it makes one call. Constructed here for
+   * the same reason `archive` is: the only component that uses it owns it, and nothing between the
+   * page and here knows it exists.
+   */
+  const log = new RoomChatArchiveLog((archiveId) => readChatArchiveLog({ archiveId }));
+
   $effect(() => {
     if (name !== 'chat-logs') return;
     void archive.reload();
+  });
+
+  /*
+    Closing the modal returns it to the LIST.
+
+    Upstream does this from the other side — `guiEventBus.subscribe("doAlertsLogsModal", () => {
+    this.showLogs = !1; this.clearInput() })`, byte 2,311,000 — because its modal is opened by an
+    event rather than by a name. Here the name IS the state, so the same rule reads as: while this
+    modal is not showing, there is no log open. Without it, reopening the archive browser lands
+    straight back inside whichever log was last read, which is not where the Close button suggested
+    it was going.
+  */
+  $effect(() => {
+    if (name !== 'chat-logs') log.back();
   });
 </script>
 
@@ -105,17 +139,42 @@
       Was a hardcoded "There are no archived chats at this time" and a `Reload Log List` button with
       no `onclick` — a control whose only effect was being drawn. See `ChatArchivePane.svelte`.
     -->
-    <ChatArchivePane
-      archives={archive.archives}
-      channels={archive.channels}
-      bind:channel
-      loading={archive.loading}
-      error={archive.error}
-      onreload={() => void archive.reload()}
-      onarchiveall={() => archive.archiveAll()}
-      onarchiveolder={(value) => archive.archiveOlderThan(value)}
-      onrestore={(entry) => archive.restore(entry)}
-    />
+    {#if log.archive || log.loading || log.error}
+      <!--
+        `O(9, o.showLogs ? -1 : 9)` and its three siblings: the list and the viewer are ALTERNATIVES,
+        never both. `log.archive` alone is not the gate — a read in flight has no archive yet, and
+        falling back to the list for the length of a round trip would flash the view the presenter
+        just left.
+      -->
+      <ChatArchiveLogPane
+        {log}
+        {isPresenter}
+        onrestore={() => {
+          const open = log.archive;
+          if (!open) return;
+          /*
+            The list's own `restore`, so there is one confirm string and one send. It reloads the
+            list on success, and this returns to it — restoring the archive you are reading leaves
+            nothing to read.
+          */
+          archive.restore(open);
+          log.back();
+        }}
+      />
+    {:else}
+      <ChatArchivePane
+        archives={archive.archives}
+        channels={archive.channels}
+        bind:channel
+        loading={archive.loading}
+        error={archive.error}
+        onreload={() => void archive.reload()}
+        onarchiveall={() => archive.archiveAll()}
+        onarchiveolder={(value) => archive.archiveOlderThan(value)}
+        onrestore={(entry) => archive.restore(entry)}
+        onopen={(entry) => void log.open(entry)}
+      />
+    {/if}
     {#snippet footer()}
       <button type="button" data-bs-dismiss="modal" class="btn btn-secondary" onclick={onclose}>
         Close

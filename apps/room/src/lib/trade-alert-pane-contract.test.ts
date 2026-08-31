@@ -126,14 +126,14 @@ describe('dta-04 — the paste confirm asks its question', () => {
     expect(confirm.match(/style="max-height: 50vh;"/g)?.length).toBe(1);
   });
 
-  it('and all FIVE pastes still reach it, each with its own handler', () => {
+  it('and all SIX pastes still reach it, each with its own handler', () => {
     /*
       The half the count used to buy. Each call site keeps its OWN `onconfirm`, because
       `doImggurUpload` dispatches on a feature name deny-by-default (byte 1,992,037) — sharing one
       handler is how an image meant for a form is posted into chat.
 
-      THREE became FIVE on 2026-08-31, in two rows on the same day, and each one is a distinct
-      destination rather than a copy:
+      THREE became FIVE and then SIX on 2026-08-31, and each one is a distinct destination rather
+      than a copy:
 
         - `PCC-06` — `onImagePaste` on `app-privchat` ends in `doImggurUpload(s, c)` ->
           `sendPrivChat` (byte 2,211,249). Routing a private paste through the chat composer's
@@ -143,17 +143,25 @@ describe('dta-04 — the paste confirm asks its question', () => {
           `QAM-05` was the chat path, and it would have put a presenter's answer to one member's
           question into the room's public chat.
 
-      Five destinations, five handlers. The count is kept — rather than dropped as brittle —
-      precisely because it is what fails when a sixth call site is added without its own handler,
-      which is the only way this can go wrong.
+        - `RPL-03` — `onImagePaste` on `app-reply-modal` ends in `doImggurUpload(s, c)` ->
+          `sendChatReply(msg.c, …, msg._id, null)` and then `$("#replyModal").modal("hide")`
+          (byte 2,322,349). A public reply against ONE message: not the Q&A thread's destination and
+          not chat's.
+
+      Six destinations, six handlers. **The count did its job on the day the sixth arrived**: this
+      case went red with `expected 6 to be 5` the moment `RPL-03` was wired, which is exactly the
+      failure it was kept for — the comment above predicted *"it is what fails when a sixth call site
+      is added"* and then that is what happened. Updated rather than loosened, because a count that
+      is relaxed the first time it fires was never a guard.
     */
     const overlays = code('src/lib/components/RoomOverlays.svelte');
-    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(5);
+    expect(overlays.match(/<ImagePasteConfirm/g)?.length).toBe(6);
     expect(overlays).toContain('onconfirm={() => void composer.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void swingAlerts.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void dayTradeAlerts.confirmImagePaste()}');
     expect(overlays).toContain('onconfirm={() => void privateChat.confirmImagePaste()}');
-    expect(overlays).toContain('onconfirm={() => void messageActions.confirmQaImagePaste()}');
+    expect(overlays).toContain('onconfirm={() => void messageActions.qaImage.confirm()}');
+    expect(overlays).toContain('onconfirm={() => void messageActions.replyImage.confirm()}');
 
     /*
       Five instances, five DISTINCT confirm handlers — no two call sites sharing one.
@@ -163,16 +171,30 @@ describe('dta-04 — the paste confirm asks its question', () => {
       a sixth paste site sharing a handler with the fifth, because some other dialog happened to
       make the total come out right.
     */
-    const handlers = overlays.match(/onconfirm=\{\(\) => void [\w.]*ImagePaste\(\)\}/g) ?? [];
-    expect(handlers).toHaveLength(5);
-    expect(new Set(handlers).size).toBe(5);
+    /*
+      RE-POINTED 2026-08-31: the Q&A and reply paths became `PendingImagePost` instances when the
+      ratchet refused the second copy of one lifecycle, so their handlers are `qaImage.confirm()` and
+      `replyImage.confirm()` rather than `confirmQaImagePaste()`. The pattern widened to match both
+      spellings, and it is still anchored on `confirm` — loose enough to count an unrelated dialog is
+      loose enough to pass on a sixth paste site sharing a fifth's handler.
+    */
+    const handlers =
+      overlays.match(/onconfirm=\{\(\) => void [\w.]*(?:ImagePaste\(\)|Image\.confirm\(\))\}/g) ??
+      [];
+    expect(handlers).toHaveLength(6);
+    expect(new Set(handlers).size).toBe(6);
 
     /*
       And five DISTINCT message-box ids, which is the other half of "not a copy": the reference
       gives each surface its own (`msg-text`, `msg-text-pc`, `msg-text-qa`), and the two alert forms
       have none at all because their dialogs carry no message box.
     */
-    for (const id of ['id="msg-text"', 'id="msg-text-pc"', 'id="msg-text-qa"']) {
+    for (const id of [
+      'id="msg-text"',
+      'id="msg-text-pc"',
+      'id="msg-text-qa"',
+      'id="msg-text-reply"'
+    ]) {
       expect(overlays.match(new RegExp(id.replace(/"/g, '"'), 'g'))?.length).toBe(1);
     }
   });

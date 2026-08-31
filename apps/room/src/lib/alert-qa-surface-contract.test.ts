@@ -236,9 +236,15 @@ describe('QAM-05 and QAM-06 — the image button acts, and the box takes a paste
     expect(BUNDLE).toContain(textReply);
     expect(textReply).not.toContain('modal("hide")');
 
-    expect(OVERLAYS).toContain('onQaImageUpload={() => messageActions.beginQaImageUpload()}');
+    /*
+      RE-POINTED 2026-08-31. The Q&A image path became a `PendingImagePost` instance when `RPL-03`
+      needed the identical lifecycle for the reply modal and the ratchet refused the second copy —
+      `beginQaImageUpload()` is `qaImage.beginUpload()` now. The GUARANTEE is unchanged and is the
+      two `not.toContain`s below: whatever the method is called, it must not be the chat composer's.
+    */
+    expect(OVERLAYS).toContain('onQaImageUpload={() => messageActions.qaImage.beginUpload()}');
     expect(OVERLAYS).toContain(
-      'onQaImagePaste={(file, draft) => messageActions.beginQaImagePaste(file, draft)}'
+      'onQaImagePaste={(file, draft) => messageActions.qaImage.begin(file, draft)}'
     );
     /* Neither reaches the chat composer's upload. */
     expect(OVERLAYS).not.toContain('onQaImageUpload={() => composer.');

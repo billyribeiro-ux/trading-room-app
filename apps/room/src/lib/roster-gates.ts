@@ -1,7 +1,8 @@
 /**
  * The sidebar roster's gates and list transforms, decoded from the shipped bundle.
  *
- * Every function here is a transcription of something in `docs/source/main.d6d3c112b59b7d0d.js`,
+ * Every function here is a transcription of something in the pinned v4 bundle,
+ * `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` — 2,891,205 bytes, SHA-256 `40796ca8…`,
  * cited at its definition. They live outside `+page.svelte` for one reason: a gate that is only
  * reachable by rendering a 8000-line component is a gate nobody tests, and these are precisely the
  * predicates that decide whether one member can see another.
@@ -84,7 +85,13 @@ export function rosterCountVisibleTo(viewer: RosterViewer, session: RosterSessio
 }
 
 /**
- * The per-row gate, from `app-room-roster`'s `C2e`:
+ * The per-row gate, from `app-room-roster`'s `E2e` — byte **2,035,701**.
+ *
+ * `RSG-01`, 2026-08-31: this said `C2e`, and the code quoted below is right while the symbol is not.
+ * `C2e` (byte 2,033,494) is the Private Chat dropdown ITEM — `d(0,"a",14), x("click", … startPC(o))`
+ * — a different template in the same component. That is the shape that survives a review: a reader
+ * checking the claim finds the expression correct and moves on. `SHL-06` and two in
+ * `screen-volume.ts` were the same error, which is why this one is asserted rather than just fixed.
  *
  * ```js
  * O(1, sessData.onlyPresentersVisibleToViewers && (e.isP || e.hasAdminChat)
@@ -114,7 +121,13 @@ export function rosterRowVisible(
 }
 
 /**
- * `Kn(2, u2e, !e.isP, e.isP || e.hasAdminChat)` with `u2e = (t, n) => ({regUser: t, presUser: n})`.
+ * `Kn(2, g2e, !e.isP, e.isP || e.hasAdminChat)` with `g2e = (t, n) => ({regUser: t, presUser: n})`
+ * — the pure function at byte **2,032,757**, applied by `D2e` at byte **2,035,468**.
+ *
+ * `RSG-02`, 2026-08-31: this named `u2e`, and there is no `u2e =` assignment anywhere in the
+ * 2,891,205-byte bundle. `function u2e(` DOES exist, at byte 1,952,934, and it is an unrelated
+ * template in another component — so the citation pointed at real code that has nothing to do with
+ * this, which is worse than pointing at nothing.
  *
  * Not mutually exclusive: an admin-chat account that is not a presenter carries BOTH classes.
  */
@@ -315,8 +328,13 @@ export interface MediaPermissions {
 /**
  * `isP` as the reference computes it when it joins the media server.
  *
- * Transcribed byte-for-byte from `docs/source/main.d6d3c112b59b7d0d.js` at offset 1075893, the
- * single `connectToRoom` emit in the bundle:
+ * Transcribed byte-for-byte at offset **1,075,893** of the pinned v4 bundle
+ * (`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`), the single `connectToRoom` emit in it:
+ *
+ * `RSG-03`: this named `docs/source/main.d6d3c112b59b7d0d.js`, an OLDER build that is in this
+ * repository under no path — so a reader following it opened nothing. The OFFSET was right all
+ * along and resolves correctly against the bundle this repository does hold, which is the whole
+ * trap: the numbers were re-derived at some point and the filename beside them was not.
  *
  * ```js
  * i.socket.emit("cmd", {

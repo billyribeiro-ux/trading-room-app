@@ -4,6 +4,10 @@ const rawEmailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const decodedIdentityClaimPattern =
   /"(?:email|name|displayName|display_name|fullName|full_name|firstName|first_name|lastName|last_name|given_name|family_name|preferred_username)"\s*:\s*"(?!\[[A-Z0-9_]+\])[^"\r\n]{1,320}"/i;
 
+/**
+ * @param {string} content
+ * @returns {number}
+ */
 export function countEncodedIdentityPayloads(content) {
   let count = 0;
   for (const match of content.matchAll(encodedPayloadPattern)) {
@@ -12,6 +16,10 @@ export function countEncodedIdentityPayloads(content) {
   return count;
 }
 
+/**
+ * @param {string} content
+ * @returns {{ redacted: string, replacements: number }}
+ */
 export function redactEncodedIdentityPayloads(content) {
   let replacements = 0;
   const redacted = content.replace(encodedPayloadPattern, (candidate) => {
@@ -22,6 +30,10 @@ export function redactEncodedIdentityPayloads(content) {
   return { redacted, replacements };
 }
 
+/**
+ * @param {string} content
+ * @returns {string[]}
+ */
 export function findUnsafeRawEmails(content) {
   const unsafe = [];
   for (const match of content.matchAll(rawEmailPattern)) {
@@ -32,10 +44,19 @@ export function findUnsafeRawEmails(content) {
   return unsafe;
 }
 
+/**
+ * @param {string} content
+ * @returns {number}
+ */
 export function countUnsafeRawEmails(content) {
   return findUnsafeRawEmails(content).length;
 }
 
+/**
+ * @param {string} content
+ * @param {(candidate: string) => string} replacementFor
+ * @returns {{ redacted: string, replacements: number }}
+ */
 export function replaceUnsafeRawEmails(content, replacementFor) {
   let replacements = 0;
   const redacted = content.replace(rawEmailPattern, (candidate, offset, input) => {
@@ -46,6 +67,10 @@ export function replaceUnsafeRawEmails(content, replacementFor) {
   return { redacted, replacements };
 }
 
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
 function containsDecodedIdentity(candidate) {
   // A complete JWT carries identity claims in its second segment. Captured
   // evidence also contains truncated one-segment payloads, so inspect up to the
@@ -59,6 +84,10 @@ function containsDecodedIdentity(candidate) {
   return false;
 }
 
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
 function isSafeTestEmail(candidate) {
   const domain = candidate.slice(candidate.lastIndexOf('@') + 1).toLowerCase();
   return (
@@ -73,6 +102,12 @@ function isSafeTestEmail(candidate) {
   );
 }
 
+/**
+ * @param {string} candidate
+ * @param {string} content
+ * @param {number} offset
+ * @returns {boolean}
+ */
 function isAssetFilename(candidate, content, offset) {
   return (
     content[offset - 1] === '/' &&

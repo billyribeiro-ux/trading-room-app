@@ -38,6 +38,15 @@
     onarchiveall: () => void;
     onarchiveolder: (value: string) => void;
     onrestore: (archive: ChatArchiveView) => void;
+    /**
+     * `toggleShowLogs(entry)` — open this archive's log.
+     *
+     * The reference puts the click on the ROW (const 14, `[1,"list-group-item",
+     * "list-group-item-action",3,"click"]`) and this does too, which is why `onrestore` below stops
+     * propagation: a row that both opened and restored on one click would restore the archive a
+     * presenter was trying to look at first.
+     */
+    onopen: (archive: ChatArchiveView) => void;
   }
 
   let {
@@ -49,7 +58,8 @@
     onreload,
     onarchiveall,
     onarchiveolder,
-    onrestore
+    onrestore,
+    onopen
   }: Props = $props();
 
   /*
@@ -120,19 +130,35 @@
   {:else}
     <ul class="list-group">
       {#each archives as archive (archive.id)}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <span>
+        <li
+          class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+        >
+          <!--
+            A BUTTON and not a clickable `li`. Upstream carries `list-group-item-action`, which is
+            Bootstrap's class for a list row that behaves like a control, and then puts the handler on
+            the `li` itself — so the row is reachable by mouse and by nothing else. The class stays
+            because it is what styles the hover; the element under it is the one a keyboard can reach.
+          -->
+          <button
+            type="button"
+            class="btn btn-link text-start p-0 text-reset text-decoration-none"
+            onclick={() => onopen(archive)}
+          >
             <strong>{day.format(new Date(archive.olderThan))}</strong>
             and older &middot; {archive.messageCount} message{archive.messageCount === 1 ? '' : 's'}
             &middot; {archive.channel}
             <small class="d-block text-muted"
               >archived {shortWhen.format(new Date(archive.archivedAt))}</small
             >
-          </span>
+          </button>
           <button
             type="button"
             class="btn btn-sm btn-outline-light"
-            onclick={() => onrestore(archive)}
+            onclick={(event) => {
+              /* See `onopen`: the row opens the log, so this must not do both. */
+              event.stopPropagation();
+              onrestore(archive);
+            }}
           >
             Unarchive
           </button>

@@ -74,6 +74,31 @@ export interface ChatArchiveView {
 }
 
 /**
+ * One message of an archived log, as the viewer reads it.
+ *
+ * NARROWER than a live message on purpose. A live one carries reactions, reply context, colours,
+ * `bodyHtml` and the sender's avatar hash because the room renders all of it; an archived log is
+ * read-only history where nothing can be reacted to or replied to, so the rest would be fields with
+ * no consumer — and one of them, the avatar hash, is derived from an address, so the narrow
+ * projection is also the smaller disclosure.
+ */
+export interface ChatArchiveMessage {
+  readonly id: number;
+  readonly senderName: string;
+  readonly body: string;
+  readonly isAdmin: boolean;
+  readonly createdAt: Date;
+}
+
+/** One archived log, opened. The archive's own row travels with it so the header can name it. */
+export interface ChatArchiveLog {
+  readonly archive: ChatArchiveView;
+  readonly messages: readonly ChatArchiveMessage[];
+  /** The log is longer than the read limit. The viewer says so rather than hiding it. */
+  readonly truncated: boolean;
+}
+
+/**
  * The most archives this room will list for one room.
  *
  * The reference has no limit — `logDates` is whatever its server answers and the modal scrolls. An
@@ -102,6 +127,32 @@ export function listChatArchivesFor(room: string): ChatArchiveView[] {
       olderThan: row.olderThan.getTime(),
       archivedAt: row.archivedAt.getTime()
     }));
+}
+
+/**
+ * ONE archive of this room, by id — or `null`, which the caller turns into a 404.
+ *
+ * The room is in the predicate rather than checked afterwards, so "not this room's" and "no longer
+ * there" are the SAME answer and the refusal cannot be used to ask whether a given archive id exists
+ * somewhere else. That is the same rule `chat-channels.ts` states for badge channels: a thing this
+ * account cannot see must be indistinguishable from a thing that was never there.
+ *
+ * A primary-key read, so no limit and no order — the shape the list's cap exists for does not arise.
+ */
+export function chatArchiveById(room: string, archiveId: number): ChatArchiveView | null {
+  const row = db
+    .select({
+      id: chatArchives.id,
+      channel: chatArchives.channel,
+      olderThan: chatArchives.olderThan,
+      archivedAt: chatArchives.archivedAt,
+      messageCount: chatArchives.messageCount
+    })
+    .from(chatArchives)
+    .where(and(eq(chatArchives.id, archiveId), eq(chatArchives.roomShortCode, room)))
+    .get();
+  if (!row) return null;
+  return { ...row, olderThan: row.olderThan.getTime(), archivedAt: row.archivedAt.getTime() };
 }
 
 /**
