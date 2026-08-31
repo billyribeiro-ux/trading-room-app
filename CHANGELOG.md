@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 02:00 UTC — The API could not start against PostgreSQL 16, and the whole backend suite is green for the first time
+
+**Runtime impact: YES, on any deployment not already on PostgreSQL 17.**
+
+`Db::assert_runtime_role_is_restricted` is the check that gates the API BINDING to its database: it
+verifies the runtime role's posture and that its object ACLs match the reviewed SQL surface. Its
+query names eight table privileges, and one of them — `MAINTAIN` — exists only from PostgreSQL 17.
+
+`has_table_privilege` **RAISES** `22023 unrecognized privilege type` on a name the server does not
+know; it does not answer false. So on 16 the whole check errored, and the API refused to start with:
+
+```text
+migration 0006 must satisfy the pre-bind ACL check:
+  unrecognized privilege type: "MAINTAIN" at line 1708
+```
+
+— a message about a privilege name, from a check whose subject is the runtime role. Measured through
+that exact function against PostgreSQL 16.13 on 2026-08-31.
+
+**The fix is a version gate in the SQL, and it is not a relaxation.** Below 17 the privilege does
+not exist, so it cannot be granted and no role can hold it: there is nothing for the omitted row to
+have caught. `services/compose.yml` pins `postgres:17`, where the second arm is always taken and the
+check is exactly what it was. `services/api/tests/migrations.rs` carries the same gate, plus a
+`maintain_is_supported` helper that asserts the REASON it is skipping rather than skipping quietly —
+if a future PostgreSQL renames or renumbers the privilege, that fails on the mismatch instead of
+silently stopping checking.
+
+#### And the same test was asserting the reviewed surface of the wrong role
+
+`runtime_object_privileges_match_the_current_api_sql_surface` hardcoded `ptr_clone_app` into its two
+privilege helpers, from when that was the only role holding anything. `0009` mirrored the reviewed
+surface at COLUMN precision onto `tradingroom_app` — the role the API authenticates as, and the one
+this test's own name means by "runtime" — and `0010` revoked the baseline role's copy. So the test
+was asserting the runtime surface of a role that no longer has it, and never checking the role that
+does.
+
+Both roles now, and the second claim is the retirement's own:
+
+| role | claim |
+| --- | --- |
+| `tradingroom_app` | holds EXACTLY the reviewed surface |
+| `ptr_clone_app` | holds NOTHING — no relation-wide privilege, no column ACL |
+
+Measured on a live cluster with the whole chain applied: `tradingroom_app` holds
+`enterprises.id: SELECT` at column scope and nothing else on the three protected tables;
+`ptr_clone_app` holds none of the four privileges on any of their columns. The baseline half is
+asked only when the role is present, because `has_table_privilege` errors on an unknown role and the
+migration documents an operator `DROP ROLE`.
+
+A comment saying the live-SQL half connects "as a real ptr_clone_app connection" went with it —
+`runtime_url()` has pointed at `tradingroom_app` since 2026-08-15, so that comment made a reader
+believe the wrong role was being exercised.
+
+#### Negative controls, each seen RED and restored
+
+- `MAINTAIN_MINIMUM_VERSION` lowered to 150000, so the gate claims 16 supports it → *"this server
+  reports 150000+ but does not know MAINTAIN"*, the arm written for exactly that.
+- the version gate deleted from `RUNTIME_OBJECT_PRIVILEGES_SQL` → the same `22023` back, through the
+  production function.
+
+#### The result
+
+```text
+cargo test -p tradingroom-api --features testing   →  exit 0
+303 passed, 0 failed, across 17 targets
+```
+
+The suite has never been fully green before. The last standing failure was this one, and it had been
+reported as an environment limitation — *"`MAINTAIN` is a PG17 privilege on a 16.13 cluster"* — which
+was true and was not the whole story: the same hardcoded name is in the code path that binds the API
+to the database.
+
+Re-pinned in `verify-backend-provenance.mjs`, which is what a `services/**` edit requires:
+`services/api/src/db/mod.rs` and `services/api/tests/migrations.rs`, each with the reason at the pin.
+
+**Not verified:** `cargo clippy --all-targets` still cannot run here — `mediasoup-sys` fetches
+libsrtp from github and the agent proxy answers 403 — so linting was `cargo clippy -p tradingroom-api
+--lib --features testing -- -D warnings`, clean. `postgres-release-attestation.rs:88` and `:1427`
+carry their own hardcoded `MAINTAIN`; they run against the deployed server, which is pinned to 17, so
+they are correct there and are deliberately not changed.
+
 ### 2026-08-31 01:40 UTC — Three tracker rows that described work already shipped
 
 **Runtime impact: NO.** No behaviour changed. What changed is that three rows and two docblocks

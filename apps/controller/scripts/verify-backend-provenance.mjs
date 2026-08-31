@@ -235,8 +235,19 @@ const DIVERGED_FROM_IMPORT = new Map([
   // and PostgreSQL reports a nonexistent role as `28P01 password authentication failed`, naming the
   // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
-  ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
-  ['services/api/tests/migrations.rs', '319d7865f8241cc599bdf55d73745cfce084cfc5df12135d7690dfb032fa7795'],
+  /*
+    Re-pinned 2026-08-31: `RUNTIME_OBJECT_PRIVILEGES_SQL` names `MAINTAIN` only where the server has
+    it. `has_table_privilege` RAISES `22023 unrecognized privilege type` on a name the server does
+    not know, and this query gates the API BINDING to the database — so on PostgreSQL 16 the API
+    refused to start with "unrecognized privilege type: MAINTAIN" rather than anything about its
+    runtime role. Measured through that function on 16.13.
+
+    Not a relaxation, which is why it is safe: below 17 the privilege does not exist, cannot be
+    granted, and cannot be held. `services/compose.yml` pins `postgres:17`, where the check is
+    unchanged. Negative control: the version gate removed, the same 22023 back.
+  */
+  ['services/api/src/db/mod.rs', '149a07ad65c3bb7668f0b7c99f50ea5d399d6e48775b7002c6a562f6e9318537'],
+  ['services/api/tests/migrations.rs', 'b4e46a6a7b8d10e8317ef5d549d6ef289ba97d7b817c925bdfb1be48f43750ad'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
