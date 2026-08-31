@@ -42,7 +42,7 @@
     /**
      * `sessData.hasDayTradeAlerts`. False renders NOTHING — not a hidden pane.
      *
-     * `O(49, o.hasDayTradeAlerts ? 49 : -1)` at byte 2,017,748, where `-1` is `ɵɵconditional`'s
+     * `O(49, o.hasDayTradeAlerts ? 49 : -1)` at byte 2,017,741, where `-1` is `ɵɵconditional`'s
      * "instantiate nothing". That distinction matters: `hidden` markup is still in the DOM, still
      * readable in view-source, and still tells a member the feature exists. This is an entitlement,
      * so it emits no trace at all.
@@ -272,7 +272,7 @@
   <div class="day-trade-alerts-container m-2">
     <!--
       The heading is ONE `<h4>` with the months `<select>` inline in the sentence, not a heading
-      beside a control: `v(4," Latest Day Trade Alerts (Last ")` at byte 1,945,235, the select, then
+      beside a control: `v(4," Latest Day Trade Alerts (Last ")` at byte 1,945,231, the select, then
       `v(8," Months) ")`. Both text nodes carry a leading and a trailing space.
 
       Note the wording: "Latest Day Trade Alerts", where the TAB says the shorter "Day Trades". The

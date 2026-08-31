@@ -163,9 +163,22 @@ column_privilege_types(privilege_type) AS (
     SELECT unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'REFERENCES'])
 ),
 table_privilege_types(privilege_type) AS (
+    -- MAINTAIN exists from PostgreSQL 17 (VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH).
+    -- `has_table_privilege` RAISES `22023 unrecognized privilege type` on a name the server does
+    -- not know, so naming it unconditionally makes this whole check ERROR on 16 rather than answer
+    -- -- and this check gates the API binding to the database, so the API refused to start with
+    -- "unrecognized privilege type: MAINTAIN" instead of anything about its runtime role. Measured
+    -- on PostgreSQL 16.13 on 2026-08-31, through this exact function.
+    --
+    -- The version gate is NOT a relaxation, and that is the whole reason it is safe: below 17 the
+    -- privilege does not exist, so it cannot be granted, so a role cannot hold it. There is nothing
+    -- for the omitted row to have caught. `services/compose.yml` pins `postgres:17`, where the
+    -- second arm is always taken and this check is exactly what it was.
     SELECT unnest(ARRAY[
-        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN'
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
     ])
+    UNION ALL
+    SELECT 'MAINTAIN' WHERE current_setting('server_version_num')::int >= 170000
 )
 SELECT
     NOT EXISTS (

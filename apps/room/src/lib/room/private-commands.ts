@@ -9,25 +9,18 @@ import type { RoomChatMute } from './chat-mute';
  * not: every frame here names a single member, and what makes each safe is the same test. That test
  * is the subject, and it now happens ONCE — see below.
  *
- * The upstream switch has ELEVEN cases (bundle bytes 995,800-997,400, read whole rather than
- * searched, and re-enumerated on 2026-08-29 to settle this paragraph by measurement):
+ * The upstream switch has ELEVEN cases, EIGHT of which have a branch here, plus `forceStopScreen`,
+ * which upstream has no case for at all.
  *
- * ```
- * 995896 forceReload   995969 remoteRestartAudio   996041 getDebugLog   996120 debugLogResp
- * 996187 kickUser      996261 muteChat             996320 unmuteChat    996376 remotePresCommand
- * 996456 userInfo      996699 updateProfilePic     996894 getRoster
- * ```
- *
- * **EIGHT have a branch here**, plus `forceStopScreen`, which upstream has no case for at all. The
- * three without one are not addressed frames: `remotePresCommand` rides the `cmds` channel and
- * `getRoster` lives in `RoomRoster`, both built.
- *
- * **ONE IS LEFT: `userInfo`** — a feature rather than a branch. Its frame carries `notesArr`,
- * `privData` and `badges`, needing a user-detail lookup this room has no endpoint for; `TODO.md`
- * row 9 has the audit, and is not repeated here because an inventory in two places goes stale in
- * one of them. This paragraph said FIVE-and-THREE-left until 2026-08-29, written before three of
- * the eight were built — the same staleness it warns about, one paragraph above the warning, which
- * is why the case list is quoted with offsets: **re-run the count rather than trust the sentence.**
+ * **Those numbers are not quoted here any more, and that is the point.** They used to be, as a table
+ * of byte offsets under an instruction to the reader — *"re-run the count rather than trust the
+ * sentence"* — and nothing ever re-ran it: the paragraph said FIVE-and-THREE-left for the whole of
+ * the time three of the five had already shipped. `priv-cmds-census-contract.test.ts` is that re-run.
+ * It asserts each case label at its recorded byte in the pinned bundle, counts the branches in THIS
+ * file, and names where each of the three without one lives instead — `remotePresCommand` on the
+ * `cmds` channel, `getRoster` in `RoomRoster`, and `userInfo`, which is this channel's one RESPONSE
+ * and is therefore a remote function here rather than a frame. The bytes behind that last one are in
+ * `server/connection-facts-contract.test.ts`.
  *
  * One constraint belongs in code rather than in a register, because it is about this gate:
  * **`debugLogResp` could not be ported as written.** Upstream replies `{requestor: xe.requestor}` —

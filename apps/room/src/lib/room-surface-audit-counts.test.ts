@@ -214,7 +214,29 @@ describe('the two-verifier pass states its own arithmetic', () => {
 
   it('lists exactly that many refuted claims under it', () => {
     const heading = REFUTED_HEADING.exec(AUDIT);
-    const section = AUDIT.slice(heading!.index);
+    /*
+      ## Bounded at the NEXT `## ` heading, and it used to run to the end of the file
+
+      "Under it" means the refuted section, not the rest of the document. Slicing to EOF was
+      correct only for as long as the refuted table happened to be the last thing in the file, and
+      that stopped being true the moment a surface was appended below it: on 2026-08-31 the three
+      sections for `StreamingView`, `DayTradeAlertsPane` and `SwingAlertsPane` arrived carrying
+      markdown TABLES of their own — a per-member byte map and a decoded `consts` table — and
+      forty-eight of their rows were counted as refuted claims. The document was right and the
+      count was wrong, which is the one direction this file exists to prevent.
+
+      The end anchor is bound to a local and checked, for the reason the surfaces-table parser
+      below states in full: `indexOf` answers -1 on failure, -1 is a valid `slice` argument, and a
+      slice with an inlined `indexOf` silently becomes "to the last character" instead of throwing.
+      Here that silence is exactly the bug being fixed, so it is asserted rather than assumed —
+      with the refuted section allowed to be last, which it was until today.
+    */
+    const from = heading!.index;
+    const next = AUDIT.indexOf('\n## ', from + 1);
+    const section = AUDIT.slice(from, next === -1 ? AUDIT.length : next);
+    expect(section.startsWith('## The '), 'the refuted section slice lost its own heading').toBe(
+      true
+    );
     /* Table BODY rows only — the header row and the `| --- |` rule are not claims. */
     const listed = section
       .split('\n')

@@ -181,3 +181,70 @@ fn the_runtime_role_preflight_resolves_exactly_one_name() {
          must look up exactly the role it was asked about, so that an absent role is an error."
     );
 }
+
+/// The ledger read that decides whether an absent `ptr_clone_app` is a refusal or the end state.
+///
+/// ── THE DEFECT THIS CLOSES, MEASURED ON A LIVE CLUSTER ──────────────────────────────────────
+///
+/// `0010_retire_ptr_clone_app.sql` drops the baseline role once the last database in the cluster has
+/// revoked it. Until 2026-08-31 the migration preflight required that role UNCONDITIONALLY, so the
+/// next run of the `migrate` binary against a database that had already applied the whole chain —
+/// the ordinary shape of a deploy — exited 1:
+///
+/// ```text
+/// migrate failed: migration preflight requires preprovisioned runtime role ptr_clone_app;
+///                 run the role provisioner before migrations
+/// ```
+///
+/// The retirement and the fence could not both stand. `db::migrate::baseline_role_absence_policy`
+/// resolves it on the only evidence that distinguishes the two states: whether `0001` — whose
+/// forensic branch is the entire thing the fence guards — has already been applied on THIS database.
+/// SQLx never re-executes a recorded migration, so where it has, that branch cannot run.
+///
+/// ── WHY THIS TEST AND NOT ONLY THE UNIT TEST ────────────────────────────────────────────────
+///
+/// The policy is a pure `const fn` and `db::migrate::tests` asserts all four of its cells. What that
+/// cannot reach is the READ: a query that answered `true` on a database which has not applied `0001`
+/// would disarm the fence completely while every pure test stayed green. So both directions are
+/// asserted here against a real database, on the same scratch database, before and after.
+#[tokio::test]
+async fn the_baseline_ledger_read_answers_false_before_the_chain_and_true_after() {
+    let scratch = Scratch::create().await;
+    let pool = scratch.pool().await;
+
+    /*
+      BEFORE. `_sqlx_migrations` does not exist yet on a scratch database, which is the case that
+      made two queries necessary rather than one: a relation name is resolved at PARSE time, so a
+      single guarded statement still fails with `relation does not exist` here.
+    */
+    assert!(
+        !migrate::baseline_migration_is_applied_for_tests(&pool)
+            .await
+            .expect("read the ledger on a database that has no ledger"),
+        "a database with no ledger at all must answer false, or the fence is disarmed on exactly \
+         the databases where 0001 is still about to run"
+    );
+
+    migrate::run(&pool).await.expect("migrations apply");
+
+    /*
+      AFTER. The same database, the same query, the other answer — and this is the answer that lets
+      the retirement converge instead of blocking every future deploy.
+    */
+    assert!(
+        migrate::baseline_migration_is_applied_for_tests(&pool)
+            .await
+            .expect("read the ledger on a migrated database"),
+        "after the chain has run, version 1 is recorded successful and the read must say so"
+    );
+
+    assert!(
+        ledger(&pool)
+            .await
+            .iter()
+            .any(|(version, success)| *version == migrate::BASELINE_VERSION && *success),
+        "the read is only meaningful if the ledger really carries a successful baseline row"
+    );
+
+    scratch.finish(pool).await;
+}

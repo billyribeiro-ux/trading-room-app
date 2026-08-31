@@ -1,6 +1,7 @@
 <script lang="ts">
-  import SoundCloudMenu from '#lib/components/SoundCloudMenu.svelte';
-  import SoundCloudViewerStop from '#lib/components/SoundCloudViewerStop.svelte';
+  import NavbarRecIndicator from '#lib/components/NavbarRecIndicator.svelte';
+  import NavbarSoundCloud from '#lib/components/NavbarSoundCloud.svelte';
+  import NavbarTipButton from '#lib/components/NavbarTipButton.svelte';
   import ScreenShareMenu from '#lib/components/ScreenShareMenu.svelte';
   import type { TipButton } from '#lib/tip-button.js';
   import type { RoomMedia, TalkingUser } from '#lib/room/media.svelte.js';
@@ -145,40 +146,30 @@
      */
     hideWebcamForRoom: boolean;
     /**
-     * "Blinking REC?" — whether the recording badge breathes while recording.
+     * "Blinking REC?" — the owner's switch, and it drives TWO elements here.
      *
-     * ## NAV-04 — THE ELEMENT NAMED HERE WAS THE WRONG ONE, and the class is on a different VIEWER
+     * ## CORRECTED 2026-08-31, by decoding the consts table rather than the slot number
      *
-     * This paragraph used to say the reference binds `breathing-rec` *"through a class MAP on the
-     * recording `ul`"*. It does not, and re-measuring the cited offset is what showed it:
+     * This docblock said the reference binds `breathing-rec` "through a class MAP on the recording
+     * `ul`", and that was wrong about the element. `iPe = (t, n) => ({ 'breathing-rec': t,
+     * recIndicatorStart: n })` is at byte 2,465,900 and is bound exactly ONCE in the bundle, at byte
+     * 2,477,678, inside `t4e`:
      *
      * ```js
-     * function t4e(t,n){ … d(0,"li",95)(1,"a",152), T(2,"i",153), … }        // byte 2,477,354
-     * m(), z("ngClass", ct(4, KB, !e.mediaService.isScreenSharing)),          // node 1, the <a>
-     * m(), z("ngClass", Kn(6, iPe,
-     *          roomState.isRecording && sessData.blinkingRec,
-     *          e.isRecordingStarting))                                       // node 2, the <i>
-     * const iPe = (t,n) => ({"breathing-rec": t, recIndicatorStart: n});      // byte 2,465,900
+     * m(),  z("ngClass", ct(4, KB, !isScreenSharing)),                        // index 1 = a[152]
+     * m(),  z("ngClass", Kn(6, iPe, roomState.isRecording && sessData.blinkingRec,
+     *                              isRecordingStarting)),                     // index 2 = i[153]
+     * 153 [1,"far","fa-2x","fa-dot-circle",3,"ngClass"]
      * ```
      *
-     * Byte 2,477,678 lands inside that second binding, and the `m()` walk before it reaches node 2,
-     * which const 153 declares as `[1,"far","fa-2x","fa-dot-circle",3,"ngClass"]` — the record dot
-     * INSIDE the presenter's recording dropdown. There is no `ul` at that index; the menu is slot 6.
+     * Index 2 is the `<i class="far fa-2x fa-dot-circle">` inside the PRESENTER's Start/Stop
+     * Recording anchor — not the `ul` and not the room-wide `[ REC ]` badge. `NAV-04` builds it
+     * there. The badge's own copy is ours; `NavbarRecIndicator.svelte` carries that record and
+     * `NAV-08` names the one line that blocks removing it.
      *
-     * That is not a one-level-down difference, it is a different audience. `.breathing-rec` is
-     * `animation: 5s … breathing; color: red !important` in `captured-runtime-components.css`, and
-     * upstream it pulses on a control **only a presenter is served**, while the `[ REC ]` badge
-     * every member sees (`UPe`, const 93) stays still. Here the class is on that badge, so the whole
-     * room gets a red pulsing indicator where upstream only the person who can stop the recording
-     * does.
-     *
-     * **NOT MOVED, and the reason is a file this change may not touch.**
-     * `room-navbar-contract.test.ts` asserts `breathing-rec` on a render whose `isPresenter` is
-     * false. Moving the class into the presenter block turns that assertion red, and a change that
-     * needs a test rewritten to pass is a change that has to be proposed rather than made. What
-     * would unblock it is named in that test's own terms: give the *"breathes the REC badge only
-     * when the room asked for it"* case `isPresenter: true`, and point its needle at the recording
-     * dropdown's icon rather than at the badge.
+     * `.breathing-rec` is a real rule — a 5s `scale` pulse plus `color: red !important`,
+     * `captured-runtime-components.css:4281` — so on that icon it is what a presenter looks at while
+     * the room is recording.
      */
     blinkingRec: boolean;
     onpromptforscreenname: (source: 'screen' | 'camera') => void;
@@ -312,20 +303,33 @@
 
 <nav class="navbar navbar-expand-md navbar-dark fixed-top mainAppNav" style="">
   <!--
-    ── NAV-01 — A ROOM THAT ALWAYS SHOWS THE ROSTER HAS NO HAMBURGER ────────────────────────────
+    ── NAV-03 — THE HAMBURGER IS REMOVED ENTIRELY IN AN `alwaysShowRoster` ROOM ──────────────────
+
+    Two slots, not one, and neither survives the setting. From `U4e`'s update block at byte
+    2,487,413, with the consts read by walking `consts:[[` at byte 2,533,197:
 
     ```js
-    O(1, e.showSidebar && !e.alwaysShowRoster ? 1 : -1)   // DPe, "Close Sidebar", const 133
-    O(2, e.showSidebar || e.alwaysShowRoster ? -1 : 2)    // EPe, "Open Sidebar",  const 135
+    H(1,DPe,2,0,"span",77)(2,EPe,2,0,"span",78)
+    77 ["title","Close Sidebar",1,"sidebar-menu","active-icon"]     // DPe: fa-arrow-left, const 133/134
+    78 ["title","Open Sidebar",1,"sidebar-menu"]                    // EPe: fa-bars,       const 135/136
+
+    O(1, showSidebar && !alwaysShowRoster ? 1 : -1)
+    O(2, showSidebar || alwaysShowRoster ? -1 : 2)
     ```
 
-    Byte 2,487,413, the first two slots of `U4e`. Read together the two gates leave a THIRD state
-    this room did not have: `alwaysShowRoster` removes both, at any value of `showSidebar`. That is
-    the interlock for the counter's own handler below, which G12 already built as
-    `alwaysShowRoster && (showSidebar = !showSidebar, …)` — upstream hands the toggle to exactly one
-    element, and this room had it on two. Argued in full as NAV-01 in
-    `docs/decoded/room-surface-audit-2026-08-30.md`; the one span with two ternaries is unchanged
-    and stays, because DPe and EPe differ only in icon and title.
+    `alwaysShowRoster` appears in BOTH, on the refusing side of each: with the setting on, slot 1 is
+    -1 because of `!alwaysShowRoster` and slot 2 is -1 because of `|| alwaysShowRoster`. So the
+    control is not merely stuck open — it is absent, and the ONLY sidebar toggle left in that room is
+    the users counter beside it, whose handler is `alwaysShowRoster && (showSidebar = !showSidebar,
+    …)` and therefore only works in exactly that room. The two are complementary halves of one
+    decision, and this bar had the second half and not the first.
+
+    What that cost: in a room with the setting on we rendered a control the reference removes, and it
+    could close a sidebar the room's own setting says is always shown.
+
+    The two spans stay ONE element here, as they already were — the pair differs only in title and
+    icon, both of which this file already writes as a ternary on `sidebarOpen`, and `DPe`/`EPe` are
+    the compiler splitting a `@if`/`@else` rather than two authored elements.
   -->
   {#if !alwaysShowRoster}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -459,8 +463,8 @@
 
         — and that asset is not in this repository. `find -iname "*benzinga*"` returns nothing.
         Transcribing it faithfully would put a broken image in the navbar of every room with
-        Benzinga on and no custom logo, which is exactly the `playing.gif` defect fixed further
-        down this same file.
+        Benzinga on and no custom logo, which is exactly the `playing.gif` defect fixed the same
+        way in `NavbarSoundCloud.svelte`, where that markup now lives.
 
         The sidebar's answer was an icon-and-text fallback, because ITS capture has one to copy
         (const 52, `fas fa-newspaper`, plus the words "Benzinga News"). This one has no such branch
@@ -469,41 +473,11 @@
         so the feature is reachable either way. Restore the second copy by adding the asset.
       -->
       <!--
-        ── RS-09 — THE TIP BUTTON IS RENDERED TWICE UPSTREAM, and we had one of them ──────────────
-
-        ```js
-        function APe(t,n){ … d(0,"li",139), x("click", () => doTipToUser()),
-                             d(1,"a",140), T(2,"i",35), d(3,"span",36), v(4) …
-                           xn("title", sessData.tipMeBtnTxt), Ze(sessData.tipMeBtnTxt) }
-        O(14, e.isTipEnabled ? 14 : -1)          // byte 2,487,938, immediately before Benzinga
-        139 [1,"nav-item",3,"click","title"]
-        140 [1,"d-flex","align-items-center","btn","btn-primary","btn-sm"]
-        ```
-
-        `aPe` (byte 2,466,601) is the SIDEBAR's copy and this room has it; this is the navbar's, and
-        `tip-button.ts` was written expecting both — its own docblock says *"the two call sites read
-        `tip.visible`"* while only one existed. The label is bound to the `title` AND to the text,
-        which is upstream's doubling on both copies.
-
-        The `<li>` carries the click here where the sidebar's `<button>` does, so the whole item is
-        the target rather than the button inside it. That is const 139's `3,"click"` and not a
-        choice; `role`/`tabindex`/`onkeydown` are ours, for the reason every other captured
-        click-on-a-non-control in this file carries them.
+        RS-09 — the navbar's tip button, slot 14 of `U4e` and the reference's second copy of the
+        feature. Its consts, its click shape and the `noopener` refusal moved into
+        `NavbarTipButton.svelte` on 2026-08-31 with the markup.
       -->
-      {#if tip.visible}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <li
-          class="nav-item"
-          title={tip.label}
-          onclick={() => window.open(tip.url, '_blank', 'noopener,noreferrer')}
-        >
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a class="d-flex align-items-center btn btn-primary btn-sm">
-            <i class="fas fa-dollar-sign"></i><span class="ms-1">{tip.label}</span>
-          </a>
-        </li>
-      {/if}
+      <NavbarTipButton {tip} />
       {#if benzinga.visible && benzinga.logoUrl}
         <li class="nav-item animated fadeIn benzinga-li">
           <a
@@ -622,53 +596,19 @@
         </li>
       {/if}
       <!--
-          The room's recording badge, for EVERYONE - this reports state, it does not change
-          it, so it is deliberately outside the presenter block below.
-
-          Consts 92/93/94, and the gating from the update block:
-            O(6, isRecording && !isRecordingPaused ? 6 : -1)   -> [ REC ]
-            O(8, isRecordingPaused && isRecording ? 8 : -1)    -> [ REC PAUSED]
-            recIndicatorStart                                  -> spinner + REC, while starting
-
-          Driven by `media.roomRecording`, which the server pushes. It used to be gated on
-          `media.recording` - this browser's own MediaRecorder - so it only ever appeared for the
-          presenter doing the media.recording, and every member saw nothing.
-
-          The tooltip is the one part that IS member-aware, and only to hide the file name:
-            (sessData.dontShowRecInfoToUsers && !isPresenter) || !roomState.recName
-              ? '' : 'Recording to: ' + decodedRecName()
+          The room's recording badge, for EVERYONE - this reports state, it does not change it, so
+          it is deliberately outside the presenter block below. Slots 18, 19 and 20 of `U4e`, whose
+          three consts, three gates and one recorded divergence moved WITH the markup into
+          `NavbarRecIndicator.svelte` on 2026-08-31 rather than being left behind as a comment about
+          something no longer in this file.
         -->
-      {#if media.roomRecordingPaused && media.roomRecording}
-        <li class="nav-item recIndicator animated flash">
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a>[ REC PAUSED]</a>
-        </li>
-      {:else if media.roomRecording}
-        <li class={['nav-item recIndicator animated fadeIn', { 'breathing-rec': blinkingRec }]}>
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a title={recordingTooltip}>[ REC ]</a>
-        </li>
-      {:else if media.roomRecordingStarting}
-        <li class="nav-item recIndicatorStart">
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a class="nav-link"><i class="fas fa-spinner fa-spin"></i> REC </a>
-        </li>
-      {/if}
+      <NavbarRecIndicator {media} {blinkingRec} {recordingTooltip} />
       <!--
           Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
           session control - drive what the room sends to everyone, so they are presenter-only.
           A reader keeps the Volume dropdown and Reload below, plus the talking and REC
           indicators above, which report state rather than change it.
         -->
-      <!--
-        NAV-02, slot 23 — `O(23, isPresenter || isNonPresenterAdmin || !e.scPlaying ? -1 : 23)` at
-        byte 2,488,684, the exact negation of `SoundCloudMenu`'s gate below. It sits OUTSIDE the
-        presenter block deliberately and `SoundCloudViewerStop.svelte` records why, along with what
-        it cost while it did not.
-      -->
-      {#if !isPresenter && media.soundCloudPlaying}
-        <SoundCloudViewerStop {onstopsoundcloudforme} />
-      {/if}
       {#if isPresenter}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -690,10 +630,38 @@
             ]}
             onclick={() => ontoggletopmenu('recording')}
           >
-            <i class="far fa-2x fa-dot-circle"></i>
+            <!--
+              ── NAV-04 — THE ICON IS WHERE `breathing-rec` ACTUALLY GOES ────────────────────────
+
+              `z("ngClass", Kn(6, iPe, roomState.isRecording && sessData.blinkingRec,
+              isRecordingStarting))` at byte 2,477,678, applied to element index 2 of `t4e` — this
+              `<i>`, const 153 `[1,"far","fa-2x","fa-dot-circle",3,"ngClass"]`. `iPe` is
+              `(t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })`, byte 2,465,900, and it is
+              bound in exactly one place in 2,891,205 bytes: this one.
+
+              So the reference's blinking REC is a PRESENTER's cue on their own recording button —
+              `.breathing-rec` is a 5s scale pulse plus `color: red !important`
+              (`captured-runtime-components.css:4281`) — and it was absent here entirely. The prop's
+              docblock said the class map was on the recording `ul`; it is not, and the correction is
+              recorded there.
+
+              **The second half of `iPe` is a MEASURED REFUSAL, NAV-05.** `recIndicatorStart` is not
+              worn here. Its only rule anywhere is `app-room .recIndicatorStart a` — a DESCENDANT
+              selector, `captured-runtime-components.css:988` — and an `<i>` with no children has no
+              descendant `a`, so the class would paint nothing. Const 94 puts the same name on the
+              starting badge's `li`, which does have the `a` the rule needs, and that is where this
+              room already wears it. Adding it here would be a class with no CSS, which this
+              repository refuses by name.
+            -->
+            <i
+              class={[
+                'far fa-2x fa-dot-circle',
+                { 'breathing-rec': media.roomRecording && blinkingRec }
+              ]}
+            ></i>
             <span class="ml-2 mainNavItem">Start/Stop Recording</span>
           </a>
-          {#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}
+          {#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}
             <div class="recording-reminder">
               <span class="recording-reminder-arrow"></span>
               <span>You are not recording!</span>
@@ -780,10 +748,16 @@
             {/if}
           </ul>
         </li>
-        <SoundCloudMenu
-          playing={media.soundCloudPlaying}
-          menuOpen={menus.soundcloud}
-          ontoggle={() => ontoggletopmenu('soundcloud')}
+        <!--
+          The presenter's SoundCloud dropdown — slot 22 of `U4e`, const 96. The markup, the three
+          entries and the `playing.gif` decision moved into `NavbarSoundCloud.svelte` on 2026-08-31
+          with the LISTENER's copy (slot 23, `NAV-02`), which this bar never had.
+        -->
+        <NavbarSoundCloud
+          variant="presenter"
+          {media}
+          {menus}
+          {ontoggletopmenu}
           {onpromptforsoundcloud}
           {onstopsoundcloud}
           {onstopsoundcloudforme}
@@ -816,9 +790,17 @@
           </li>
         {:else}
           <li class="nav-item">
+            <!--
+              NAV-07 — `class="nav-link"`, const 150. Both launching spinners are
+              `d(0,"li",19)(1,"a",150), T(2,"i",181)` — `r4e` at byte 2,479,346 and `p4e` at
+              2,481,414, identical bodies — where const 19 is `[1,"nav-item"]`, 150 is
+              `[1,"nav-link"]` and 181 is `[1,"fas","fa-2x","fa-spinner","fa-spin"]`. The `<a>` was
+              bare here, so the spinner sat without the padding and line-height every other item in
+              this bar gets from `.nav-link`, and jumped position the moment the device opened.
+            -->
             <!-- svelte-ignore a11y_consider_explicit_label -->
             <!-- svelte-ignore a11y_missing_attribute -->
-            <a><i class="fas fa-2x fa-spinner fa-spin"></i></a>
+            <a class="nav-link"><i class="fas fa-2x fa-spinner fa-spin"></i></a>
           </li>
         {/if}
         <ScreenShareMenu
@@ -853,11 +835,29 @@
           </li>
         {:else}
           <li class="nav-item">
+            <!-- NAV-07 — `p4e`, byte 2,481,414: the same three elements as the mic spinner above. -->
             <!-- svelte-ignore a11y_consider_explicit_label -->
             <!-- svelte-ignore a11y_missing_attribute -->
-            <a><i class="fas fa-2x fa-spinner fa-spin"></i></a>
+            <a class="nav-link"><i class="fas fa-2x fa-spinner fa-spin"></i></a>
           </li>
         {/if}
+      {/if}
+      <!--
+        NAV-02 — the LISTENER's SoundCloud control, slot 23 of `U4e` and never built here. The gate
+        is the call site's because the reference's two slots are not each other's negation; the
+        offsets, the term this room drops and what its absence cost are at the arm itself, in
+        `NavbarSoundCloud.svelte`.
+      -->
+      {#if !isPresenter && media.soundCloudPlaying}
+        <NavbarSoundCloud
+          variant="listener"
+          {media}
+          {menus}
+          {ontoggletopmenu}
+          {onpromptforsoundcloud}
+          {onstopsoundcloud}
+          {onstopsoundcloudforme}
+        />
       {/if}
       <!--
         ── SC-14 — SESSION CONTROL IS NOT PLAIN `isPresenter` ──────────────────────────────────
@@ -898,6 +898,32 @@
           <a class="nav-link d-flex align-items-center">
             <i class="fas fa-2x fa-cog"></i>
             <span class="ml-2 mainNavItem">Session Control</span>
+          </a>
+        </li>
+      {/if}
+      <!--
+          `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
+          `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
+
+          Markup from the const table: 195 is
+          `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
+          `[1,'nav-link','d-flex','align-items-center']`, 196 is
+          `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
+          (`app-room.compiled.js:2050-2051, 2048, 1697`).
+
+          `tawkAvailable` carries a THIRD term the reference does not have: a configured
+          property id. See `#lib/tawk-support` — the reference's id is its own company's,
+          and a room with none configured shows no control rather than a control that opens
+          somebody else's support inbox.
+        -->
+      {#if tawkAvailable}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <li title="TAWK Support" class="nav-item" onclick={ontoggletawksupport}>
+          <!-- svelte-ignore a11y_missing_attribute -->
+          <a class="nav-link d-flex align-items-center">
+            <i class="fas fa-2x fa-question-circle"></i>
+            <span class="ml-2 mainNavItem">TAWK Support</span>
           </a>
         </li>
       {/if}
@@ -1128,32 +1154,6 @@
           </div>
         </div>
       </li>
-      <!--
-          `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
-          `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
-
-          Markup from the const table: 195 is
-          `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
-          `[1,'nav-link','d-flex','align-items-center']`, 196 is
-          `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
-          (`app-room.compiled.js:2050-2051, 2048, 1697`).
-
-          `tawkAvailable` carries a THIRD term the reference does not have: a configured
-          property id. See `#lib/tawk-support` — the reference's id is its own company's,
-          and a room with none configured shows no control rather than a control that opens
-          somebody else's support inbox.
-        -->
-      {#if tawkAvailable}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <li title="TAWK Support" class="nav-item" onclick={ontoggletawksupport}>
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a class="nav-link d-flex align-items-center">
-            <i class="fas fa-2x fa-question-circle"></i>
-            <span class="ml-2 mainNavItem">TAWK Support</span>
-          </a>
-        </li>
-      {/if}
       <li title="Reload" class="nav-item">
         <!-- svelte-ignore a11y_missing_attribute -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->

@@ -95,6 +95,29 @@ export function declaredSettings(schema) {
 }
 
 /**
+ * The reference's session-data INITIALISER, where the settings object is still a local.
+ *
+ * `processSessData` is the function that receives the room's settings and copies them onto
+ * `globals.sessData`. Inside it the object is the minifier's own local — `e` in the pinned bundle —
+ * so every read there is `e.<name>` and NOT `sessData.<name>`. Its own log string names it, and the
+ * same expression proves what `e` is: `i.globals.sessData.badgesH = e.badgesH`.
+ *
+ * A WINDOW rather than a parsed function body, and that is a deliberate limit: the bundle is minified
+ * to one line, so there is no cheap correct way to find a function's end, and a brace-matcher over
+ * 2.9 MB of minified JavaScript is a parser nobody will maintain. The window is checked instead —
+ * `setting-coverage-contract.test.ts` asserts by CONTENT that it contains the chat-tab builder and
+ * does not reach `strictBrowserMode`, so a bundle change that moves the region fails an assertion
+ * that names it rather than silently returning zero.
+ *
+ * @param {string} bundle
+ * @returns {string}
+ */
+export function sessionInitialiserRegion(bundle) {
+  const at = bundle.indexOf('processSessData');
+  return at === -1 ? '' : bundle.slice(Math.max(0, at - 4_000), at + 8_000);
+}
+
+/**
  * How many times the reference's room client reads one setting off its session data.
  *
  * `sessData.<name>` and nothing looser. The bare name matches far too much — `name`, `description`
@@ -102,12 +125,37 @@ export function declaredSettings(schema) {
  * over-matches turns this list into noise nobody reads, which is the failure mode the command audit
  * records about its own patterns.
  *
+ * ## THE HOLE THAT RULE HAD, closed 2026-08-31
+ *
+ * It returned **zero** for six settings the reference demonstrably reads, because they are read in
+ * `processSessData` before the object is `sessData` at all. All six build the chat tab strip:
+ *
+ * ```js
+ * globals.chatTabs = []
+ * globals.chatTabs.push(e.altGenChannelName ? {…, name:"main"} : {displayName:"Main Chat", …})
+ * e.hasChannelTabs        && globals.chatTabs.push(e.altOffTopicChannelName ? … : {displayName:"Off Topic", …})
+ * e.hasAdminOnlyChannel   && globals.chatTabs.push({displayName:"Admins", name:"adminChat", type:"po"})
+ * e.extraAdminChannels    && e.extraAdminChannels.split(",").forEach(r => globals.chatTabs.push({…, type:"p"}))
+ * e.extraRegChannels      && e.extraRegChannels.split(",").forEach(r => globals.chatTabs.push({…, type:"r"}))
+ * ```
+ *
+ * So this room shipped an Off Topic tab to rooms whose owners had turned it off, for as long as the
+ * tab has existed, and the instrument that exists to find exactly that could not see it. Found by
+ * counting bare names as a CROSS-CHECK against this function and reading every difference.
+ *
+ * The widening is bounded to the initialiser rather than to `.<name>` anywhere, because the loose
+ * form is a false-positive machine and there is a live example: `strictBrowserMode` has two property
+ * reads in the bundle and **zero** inside `processSessData` — it is a component field on the login
+ * screen, not a session setting, and a bare-name rule would have added it to a list of work.
+ *
  * @param {string} bundle
  * @param {string} name
  * @returns {number}
  */
 export function referenceReads(bundle, name) {
-  return bundle.split(`sessData.${name}`).length - 1;
+  const onSessionData = bundle.split(`sessData.${name}`).length - 1;
+  const inInitialiser = sessionInitialiserRegion(bundle).split(`.${name}`).length - 1;
+  return onSessionData + inInitialiser;
 }
 
 export function auditSettingCoverage() {

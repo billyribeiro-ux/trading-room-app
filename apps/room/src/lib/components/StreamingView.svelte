@@ -2,9 +2,9 @@
   /**
    * `app-streaming-view` — the HLS player for one MediaMTX stream.
    *
-   * Transcribed from `docs/source/components/app-streaming-view.full.js`, all 418 lines: the
-   * template (27 decls), its `consts` array, the five sub-templates recovered from the main bundle
-   * at byte 1901148, every number in `getHlsConfig`, and the component's own embedded stylesheet.
+   * Transcribed from `app-streaming-view.full.js` of the v2 decode workspace, NOT in this
+   * checkout — every `lines N-M` below points into it. Class `xCe` is v4 bytes 1,901,122-1,914,468:
+   * 27 decls, 18 consts, 5 sub-templates at 1,901,148; `STV-01` of the room audit maps them all.
    *
    * ## Why this is HLS and not WebRTC
    *

@@ -871,7 +871,7 @@
   the first two (the presence of `def.help` is exactly what separates them), `dtNote` the third.
 -->
 {#snippet dtField(name: string)}
-  {@const def = dontTouch(name)}
+  {const def = $derived(dontTouch(name))}
   <label class="col-sm-2 control-label" for={`mg-${def.name}`}>{def.label ?? def.name}</label>
   <span id={`mg-${def.name}`}>
     <Editable {def} value={settingValue(def.name)} />
@@ -947,9 +947,16 @@
             `rosterCount`, counted with `count(*)` before any filter is applied.
 
             `rosterCount` is still a SUBSTITUTION and is stated as one: `current_capacity` is LIVE
-            occupancy, and this server receives no occupancy signal — only the room service knows who
-            is connected. The roster size is the closest fact the controller holds. The account
-            page's room list makes the same substitution, so the two agree. T5-20.
+            occupancy, and the roster size is the closest fact the controller holds. The account
+            page's room list makes the same substitution, so the two agree.
+
+            NARROWED 2026-08-31, because the reason changed. It used to read "this server receives no
+            occupancy signal". It receives one now — `internal/room-occupancy/[code]`, which is what
+            fills the DENOMINATOR beside this. But that signal is the PEAK and it arrives only when a
+            new peak happens, which is exactly what a high-water mark needs and exactly what a live
+            numerator cannot use. A live figure would need a report on every join AND every leave, or
+            a poll; neither is worth it for one cell, and the substitution stays honest rather than
+            becoming a stale sentence about a signal that now exists. T5-20.
           - "Max" was `maxUsers`, the CONFIGURED limit — and `resetMaxCount` set that to zero, so
             "Reset Counts" destroyed the value shipped to the room. It is now
             `recordedMaxCapacity`, which is what the reset clears.
@@ -2838,7 +2845,7 @@ Please click this link to attend: ______ unique link will be here_____
                   </p>
 
                   {#each settingsBeforeApiSecret as def (def.name)}
-                    {@const help = settingHelp(def)}
+                    {const help = $derived(settingHelp(def))}
                     <p class="form-control-static">
                       <!--
                         NO `for`, AND NO WRAPPER around the editable.
@@ -2941,7 +2948,7 @@ Please click this link to attend: ______ unique link will be here_____
 
                   <!-- the settings the reference lists BELOW the docs link, starting at slackPostURL -->
                   {#each settingsAfterApiSecret as def (def.name)}
-                    {@const help = settingHelp(def)}
+                    {const help = $derived(settingHelp(def))}
                     <p class="form-control-static">
                       <!-- same bare label and unwrapped editable as the loop above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->

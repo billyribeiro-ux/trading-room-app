@@ -645,11 +645,15 @@
                 documentation listing `current_max` 100 beside `recordedMaxCapacity` 150. Fixed.
 
                 The NUMERATOR is an honest substitution, stated rather than hidden: the reference's
-                `current_capacity` is LIVE occupancy, and the controller receives no occupancy signal
-                — only the room service knows who is connected. `userCount` is the ROSTER size, which
-                is the closest fact this server actually holds. It is not the same number, and the
-                same substitution is made on the manage panel title so the two pages at least agree.
-                Recorded as T5-20 along with the missing writer.
+                `current_capacity` is LIVE occupancy, and `userCount` is the ROSTER size — the
+                closest fact this server actually holds. It is not the same number, and the manage
+                panel title makes the same substitution so the two pages at least agree.
+
+                The DENOMINATOR is no longer a gap: since 2026-08-31 the room reports its own
+                subscriber count on every new peak and `recorded_max_capacity` is real. The numerator
+                stays a substitution because a peak report is not a live one — it arrives only when
+                the peak moves, which is what a high-water mark needs and what a live figure cannot
+                use. T5-20.
               -->
               <td class="acc-td-center">
                 <div class="acc-muted">{room.userCount} / {room.recordedMaxCapacity}</div>

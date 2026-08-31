@@ -88,14 +88,15 @@ const ALLOWED_PREFIXES = Object.freeze([
   'services/.env.example',
   'services/api/migrations/0009_provision_tradingroom_app.sql',
   /*
-    `0010` is the one migration whose SUBJECT is the reference name: it revokes everything
-    `ptr_clone_app` holds and drops the role when the last database in the cluster has stopped
-    granting to it. It cannot be written without naming it, and the day it can be deleted is the day
-    the name is gone from every live database — which is the outcome it exists to reach.
+    `0010` is the one migration whose SUBJECT is the reference name: it revokes every privilege
+    `ptr_clone_app` holds in the database it runs on. It cannot be written without naming it.
 
     Added 2026-08-31 with the migration, and this list is the reason to notice it: an entry here
-    should read as a claim somebody has to defend, and this one's defence is that the entry deletes
-    itself once the rollout completes.
+    should read as a claim somebody has to defend. This one's defence is that it is the only entry
+    working to shorten the list rather than to be tolerated — it takes the name out of every ACL in
+    every live database. It does NOT delete itself: the ROLE outlives the chain by design, because a
+    migration that drops a cluster-global role cannot be applied to the next database. That was
+    measured, not reasoned — see the migration's closing note.
   */
   'services/api/migrations/0010_retire_ptr_clone_app.sql',
   'services/api/tests/',
@@ -162,23 +163,19 @@ describe('the reference name never leaks into live code', () => {
       that migration must continue to mean; it quotes the name because the migration's subject is
       removing it, and it leaves the list on the same day the migration does.
 
-      The first:** The entry
+      **The first:** The entry
       is `services/api/migrations/0010_retire_ptr_clone_app.sql`, whose SUBJECT is the reference
-      name: it revokes everything `ptr_clone_app` holds and drops the role once the last database in
-      the cluster has stopped granting to it. It cannot be written without naming what it removes.
+      name: it revokes every privilege `ptr_clone_app` holds in the database it runs on. It cannot
+      be written without naming what it strips.
 
-      Every other entry on this list is a use that must be TOLERATED. This is the only one that is
-      working to shorten the list — it deletes itself, and takes the name out of every live database
-      with it, on the day the rollout completes. That is the argument, and the CHANGELOG carries the
-      evidence: three databases on a live PostgreSQL 16.13 cluster, including the refusal on one
-      where `0009` had not run.
-
-      **40 -> 41 on 2026-08-31, and it is the same admission counted twice rather than a new one.**
-      The entry is `retire-baseline-role-contract.test.ts`, the source contract over that same
-      `0010`. `d5e3391` added the migration, the contract and this ceiling in one commit but listed
-      only the migration, so `main` went red on its own boundary — this completes that change rather
-      than widening it. The two entries share one subject and one expiry: when `0010` is deleted,
-      both go with it, and this ceiling returns to 39.
+      Every other entry on this list is a use that must be TOLERATED. This is the only one working
+      to shorten the list — it takes the name out of every ACL in every live database. It does not
+      take itself off the list: the ROLE survives the chain deliberately, because dropping a
+      cluster-global role stops the next database from starting its own chain. That is the argument,
+      and the CHANGELOG carries the evidence: four databases on a live PostgreSQL 16.13 cluster,
+      the `0009` interlock refusing a database run to `0008` only — that one is in the earlier
+      three-database entry — and the convergence test that failed against the version which did
+      drop it.
     */
     expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(41);
   });
@@ -192,7 +189,7 @@ describe('the reference name never leaks into live code', () => {
       TWO FILES ARE EXEMPT, AND BOTH ARE TESTS ABOUT THE NAME ITSELF. This one, which has to quote
       what it forbids; and `retire-baseline-role-contract.test.ts`, added 2026-08-31, which asserts
       what `0010_retire_ptr_clone_app.sql` must continue to MEAN — the interlock, the absence of
-      CASCADE, the catalogue-exact residual count, the single tolerated failure.
+      CASCADE, the catalogue-exact residual count, and the drop it deliberately does not perform.
 
       The exemption is by exact FILENAME rather than by a `.test.ts` suffix, deliberately. A suffix
       rule would exempt every test in both applications at a stroke, and the rule this assertion

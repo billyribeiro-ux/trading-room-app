@@ -1,0 +1,97 @@
+[
+    {
+        "case": "active membership and active subscription",
+        "entitlements": {
+            "memberships": [
+                "pro-trader"
+            ],
+            "products": [
+                "monthly-room"
+            ],
+            "permissions": []
+        }
+    },
+    {
+        "case": "membership cancelled: the plan is gone",
+        "entitlements": {
+            "memberships": [],
+            "products": [
+                "monthly-room"
+            ],
+            "permissions": []
+        }
+    },
+    {
+        "case": "subscription cancelled: still returned, wrong status",
+        "entitlements": {
+            "memberships": [],
+            "products": [],
+            "permissions": []
+        }
+    },
+    {
+        "case": "subscription on-hold is not active either",
+        "entitlements": {
+            "memberships": [],
+            "products": [],
+            "permissions": []
+        }
+    },
+    {
+        "case": "everything lapsed",
+        "entitlements": {
+            "memberships": [],
+            "products": [],
+            "permissions": []
+        }
+    },
+    {
+        "case": "a membership with no plan is skipped",
+        "entitlements": {
+            "memberships": [
+                "pro-trader"
+            ],
+            "products": [],
+            "permissions": []
+        }
+    },
+    {
+        "case": "a line item with no product is skipped",
+        "entitlements": {
+            "memberships": [],
+            "products": [
+                "monthly-room"
+            ],
+            "permissions": []
+        }
+    },
+    {
+        "case": "duplicates and blanks are cleaned",
+        "entitlements": {
+            "memberships": [
+                "pro-trader",
+                "founding"
+            ],
+            "products": [],
+            "permissions": []
+        }
+    },
+    {
+        "case": "the permissions filter is the site's last word",
+        "entitlements": {
+            "memberships": [],
+            "products": [],
+            "permissions": [
+                "vip"
+            ]
+        }
+    },
+    {
+        "case": "a filter can take an entitlement away",
+        "entitlements": {
+            "memberships": [],
+            "products": [],
+            "permissions": []
+        }
+    }
+]

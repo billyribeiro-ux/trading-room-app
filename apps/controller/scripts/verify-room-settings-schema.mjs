@@ -32,7 +32,7 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
   through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
   WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
   lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
-  so the union is 104.
+  so the union is 105.
 
   103 -> 104 on 2026-08-30: restreamToURL, and it is the first entry that does NOT cross to every
   member. It rides a FOURTH generator list, ROOM_PRESENTER_CONSUMED, mirroring the third allow-list
@@ -359,6 +359,22 @@ const EXPECTED_WIRED_SETTINGS = [
     upstream it redirects the log fetch at ANOTHER room, and this room takes its room from the
     session row so that nothing the browser can reach names the room being read.
   */
+  /*
+    Added 2026-08-31, and it is a DEFECT closed rather than a feature wired.
+
+    The reference builds its whole tab strip in one expression (bundle bytes 1,146,625-1,147,200) and
+    only `main` is unconditional there; Off Topic sits behind this flag. This room shipped both
+    built-ins unconditionally, so a room whose owner had switched Off Topic off still showed it — a
+    control nobody asked for, which is the mirror of the dead-control rule.
+
+    Never argued, never noticed: zero occurrences anywhere in `apps/room/src`. Found by widening
+    `audit-setting-coverage.mjs`, whose `sessData.<name>` rule returns zero for the six settings the
+    reference reads inside `processSessData`, while the object is still the minifier's own local.
+
+    ABSENT MEANS TRUE, decided once in `chat-tabs.ts`: the captured default is on, and reading
+    absence as false would take the tab from every room that has never stored the setting.
+  */
+  'hasChannelTabs',
   'hasDayTradeAlerts',
   /*
     Added 2026-08-15 with the Alert Filter. Not a boolean gate like its neighbours: a STRING

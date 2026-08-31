@@ -43,13 +43,23 @@ describe('asking for more', () => {
     expect(startLoadMore(newLoadMorePaging()).loadingMore).toBe(true);
   });
 
-  it('carries NO scroll anchor, which is a gap and not an omission', () => {
+  it('carries no scroll anchor, because the anchor is not paging state', () => {
     /*
       The reference's fourth field, `loadMoreLastID`, restores the reader's position after older rows
-      are prepended. It is not modelled here because nothing could read it: our rows render through
-      `CompactMessageRow` with no `id` attribute, so the `getElementById("pcm-" + _id)` it turns on
-      would find nothing. Asserted rather than left implied, so that adding the field without its
-      reader fails here — which is how it nearly shipped.
+      are prepended, and it IS built — `RoomPrivateChat.#loadMoreAnchorId` records it before the
+      request, `restoreAfterLoadMore` in `private-chat-scroll.ts` acts on it after, and
+      `private-chat-strip-contract.test.ts`'s G14 pins both halves and the `-20`.
+
+      It is not a member of THIS type, and the split is the point. `LoadMorePaging` is three pure
+      values a reducer moves between states; the anchor is a DOM id whose whole life is one call —
+      set before the request, read after the render, cleared. Putting it here would give the reducer
+      a field it never reads and make every `newLoadMorePaging()` a claim about the document.
+
+      This assertion used to say the anchor was a GAP, and said so for the right reason at the time:
+      it was modelled here and removed because `CompactMessageRow` emitted no `id`. That row emits
+      `id="pcm-{message._id}"` now. The assertion survives its own explanation because the shape it
+      pins is still the shape that is wanted — but a test whose comment describes an absent feature
+      that has since shipped is how a tracker learns to lie.
     */
     expect(Object.keys(newLoadMorePaging()).sort()).toEqual(['hasMoreData', 'loadingMore', 'page']);
   });

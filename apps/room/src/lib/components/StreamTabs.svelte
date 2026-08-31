@@ -2,36 +2,36 @@
   /**
    * The MediaMTX streams tab bar: `ul#streamsTabs`, one tab per live stream.
    *
-   * Transcribed from `RSe` — `docs/source/components/app-presentationarea.full.js:543-588` — with
-   * every attribute resolved through the component's own const table (`:3790` onward, index by
-   * position from 0). The indices this template uses:
+   * Transcribed from `ISe` at byte 1,925,991 of the PINNED v4 bundle, every attribute resolved by
+   * bracket-walking that component's 292-entry const table BY VALUE from `consts:[[` at byte
+   * 1,994,264. RE-DECODED 2026-08-31; every index from 66 up moved DOWN by one. What it uses:
    *
    * | index | const                                                                  |
    * | ----- | ---------------------------------------------------------------------- |
-   * | 118   | `['id','streamsTabs','role','tablist',1,'nav','nav-tabs','screens-tabs']` |
+   * | 117   | `['id','streamsTabs','role','tablist',1,'nav','nav-tabs','screens-tabs']` |
    * | 31    | `['role','presentation',1,'nav-item',3,'click']`                       |
-   * | 74    | `['data-bs-toggle','tab','role','tab','aria-selected','true',1,'nav-link',3,'ngClass','id']` |
-   * | 75    | `['placement','bottom','tooltip','This is the default screen…',1,'mr-2']` |
-   * | 83    | as 76 (`'Unlock this screen?'`) plus `3,'click'`                        |
+   * | 73    | `['data-bs-toggle','tab','role','tab','aria-selected','true',1,'nav-link',3,'ngClass','id']` |
+   * | 74    | `['placement','bottom','tooltip','This is the default screen…',1,'mr-2']` |
+   * | 82    | as 75 (`'Unlock this screen?'`) plus `3,'click'`                        |
    * | 14    | `[1,'mx-1']`                                                           |
-   * | 78    | `[1,'d-inline-block']`                                                 |
-   * | 79    | `['id','dropdownMenuScreen','data-bs-toggle','dropdown','aria-expanded','false',1,'dropdown-toggle']` |
-   * | 55    | `[1,'fas','fa-cog']`                                                   |
-   * | 56    | `['aria-labelledby','dropdownMenuButton',1,'dropdown-menu']`            |
-   * | 57    | `[3,'click']`                                                          |
-   * | 58    | `['href','#',1,'dropdown-item']`                                       |
-   * | 81/86 | `['title','Lock this screen?']` / `['title','Unlock this screen?']`     |
-   * | 82/84/87 | `fa-eye` / `fa-lock` (aria-hidden) / `fa-unlock` (aria-hidden)       |
+   * | 77    | `[1,'d-inline-block']`                                                 |
+   * | 78    | `['id','dropdownMenuScreen','data-bs-toggle','dropdown','aria-expanded','false',1,'dropdown-toggle']` |
+   * | 54    | `[1,'fas','fa-cog']`                                                   |
+   * | 55    | `['aria-labelledby','dropdownMenuButton',1,'dropdown-menu']`            |
+   * | 56    | `[3,'click']`                                                          |
+   * | 57    | `['href','#',1,'dropdown-item']`                                       |
+   * | 80/85 | `['title','Lock this screen?']` / `['title','Unlock this screen?']`     |
+   * | 81/83/86 | `fa-eye` / `fa-lock` (aria-hidden) / `fa-unlock` (aria-hidden)     |
    *
    * The bar's `id` is `streamsTabs` but its CLASS is `screens-tabs` — the same class the screenshare
-   * bar (const 70, `id="screenTabs"`) carries. The two bars are styled as one thing and identified
+   * bar (const 69, `id="screenTabs"`) carries. The two bars are styled as one thing and identified
    * as two. Nothing here invents a `streams-tabs` class; there is no such class in the capture.
    *
    * ## Why this is not `ScreenTabs.svelte` with a flag
    *
    * `ScreenTabs` renders `img.presenter-img` and the label `{name}-{screenName}`, both
-   * unconditionally. `RSe` renders neither: no avatar, and the label is `mediaValue.name` alone
-   * (`:582`, `Ze(e.mediaValue.name)` — `ɵɵtextInterpolate`, so no surrounding spaces). Its dropdown
+   * unconditionally. `ISe` renders neither: no avatar, and the label is `mediaValue.name` alone
+   * (byte 1,926,697, `Ze(e.mediaValue.name)` — `ɵɵtextInterpolate`, no surrounding spaces). Its menu
    * holds two items, not four. Folding the two together would mean four flags around every line.
    *
    * ## What is inert UPSTREAM — read this before "finishing" any of it
@@ -41,31 +41,31 @@
    * for them. There is no evidence for any such protocol.
    *
    *  1. **The forced (eye) badge.** Gated on `forcedScreenMTXID`. That field appears exactly twice
-   *     in the whole 2.8 MB bundle: the template read at byte 1926192 and `forcedScreenMTXID=""` in
-   *     the constructor at byte 1952638. Nothing ever assigns it a stream id, so the badge can never
-   *     render upstream.
+   *     in all 2,891,205 bytes: the template read at byte 1,926,600 and `forcedScreenMTXID=""` in
+   *     the constructor at byte 1,954,252. Nothing ever assigns it a stream id, so the badge can
+   *     never render upstream.
    *  2. **The lock badge.** Gated on `globals.lockedScreenIDMTX`, which appears four times: the
-   *     globals initialiser `lockedScreenIDMTX=""` at byte 977288, the template read at 1926252, and
-   *     TWICE inside the one `selectStreamTabOfId` guard at 1960257, which tests the field for
-   *     emptiness and then for equality. Also never assigned. (The count is four rather than the
-   *     three a first pass reported, because a `grep -o` match window swallowed the guard's second
-   *     occurrence — `stream-tabs-contract.test.ts` now counts it by splitting the file, so the
-   *     number cannot rot.)
+   *     globals initialiser `lockedScreenIDMTX=""` at byte 977,288, the template read at byte
+   *     1,926,660, and TWICE inside the one `selectStreamTabOfId` guard, bytes 1,961,921 and
+   *     1,961,964, which tests the field for emptiness and then for equality. Also never assigned.
+   *     (The count is four rather than the three a first pass reported, because a `grep -o` match
+   *     window swallowed the guard's second occurrence — `stream-tabs-v4-contract.test.ts` counts it
+   *     by splitting the file, so the number cannot rot.)
    *  3. **"Lock Screen".** `toggleLockScreenMTX(e) { console.error('TODO: toggleLockScreenMTX') }`
-   *     — `app-presentationarea.full.js:3056-3058`. A stub, next to a working `toggleLockScreen`
-   *     for screenshares directly above it at `:3050`.
+   *     at byte 1,976,853. A stub, 147 bytes after a working `toggleLockScreen` for screenshares
+   *     that writes `globals.lockedScreenID`, at byte 1,976,706.
    *  4. **"Bring everyone here"** is the one that LOOKS live and is not. It calls the same
-   *     `bringFocusToScreen(e)` the screenshare menu uses (`:2727`), which sends
+   *     `bringFocusToScreen(e)` the screenshare menu uses (byte 1,969,281), which sends
    *     `sendServerAdminCommand('focusOnScreen', {id: e})`. But every client's receiver scans only
    *     the screenshare list — `guiEventBus.subscribe("focusOnScreen", e => { const i =
-   *     this.mediaService.screenSharingUsers; for (…) if (s._id == e) … })`, byte 1962380. It never
+   *     this.mediaService.screenSharingUsers; for (…) if (s._id == e) … })`, byte 1,964,131. Never
    *     looks in `mtxHandlerService.mtxStreams`, which is also why (1) has no writer. So a presenter
    *     clicking it on a STREAM tab broadcasts an id that no recipient can resolve.
    *
    * All four are rendered anyway, because a viewer of the reference sees them and this is a clone.
    * They are driven by props rather than hard-wired, so the branches are reachable, testable, and
-   * ready if the protocol is ever captured — see `stream-tabs-contract.test.ts`, which pins each of
-   * the four findings above so that a future reader cannot quietly "fix" one by guessing.
+   * ready if the protocol is ever captured — see `stream-tabs-v4-contract.test.ts`, which pins each
+   * of the four above against the tracked bundle so a future reader cannot "fix" one by guessing.
    */
   import type { MtxStream } from '../mtx-streams';
 
@@ -85,14 +85,14 @@
     /**
      * `globals.lockedScreenID` — the SCREENSHARE lock field, and this is not a typo.
      *
-     * The badge at the top of the tab reads `lockedScreenIDMTX` (`:580`) while the menu item's
-     * label reads `lockedScreenID` (`:586`). Two different fields deciding two halves of one
-     * feature, in the same update block, eight lines apart. It is reproduced rather than
+     * The badge at the top of the tab reads `lockedScreenIDMTX` (byte 1,926,635) while the menu
+     * item's label reads `lockedScreenID` (byte 1,926,747). Two different fields deciding two halves
+     * of one feature, 112 bytes apart in one update block. It is reproduced rather than
      * reconciled: picking either field would be inventing a decision the reference did not make,
      * and the asymmetry is invisible in practice because neither is ever set to a stream id.
      */
     lockedScreenId?: string | null;
-    /** `isP`, i.e. `globals.isPresenter`, read once in the constructor (`:2209`). */
+    /** `isP`, i.e. `globals.isPresenter`, read once in the constructor, byte 1,954,051. */
     isPresenter?: boolean;
     onselect?: (streamId: string) => void;
     onbringeveryone?: (streamId: string) => void;
@@ -112,9 +112,9 @@
   }: Props = $props();
 
   /**
-   * Const 75's `tooltip`, verbatim. Identical to the string on the screenshare bar's eye badge, so
-   * it is duplicated here rather than shared: `ScreenTabs` reads it from ITS const (75 as well) and
-   * a shared constant would imply the two are linked upstream. They are two literals in one table.
+   * Const 74's `tooltip`, byte 2,000,042, verbatim. Duplicated in `ScreenTabs` rather than shared,
+   * and the re-decode corrects why: it is ONE const entry that both `xSe` and `iSe` read, not two
+   * literals. Sharing it in TypeScript is still a decision the reference does not make for us.
    */
   const FORCED_SCREEN_TOOLTIP =
     'This is the default screen users are taken to right now. If you are a presenter and talking ' +
@@ -123,44 +123,47 @@
 
   let openMenuId = $state<string | null>(null);
 
-  function toggleMenu(streamId: string, event: MouseEvent) {
-    // The gear is a sibling of the tab anchor here, but it is inside the anchor upstream and the
-    // click still bubbles to the `li` that carries the tab-select listener. Stop it either way.
-    event.stopPropagation();
+  function toggleMenu(streamId: string) {
+    // NO stopPropagation, deliberately. Upstream the gear carries no click handler at all - const 78
+    // is `data-bs-toggle="dropdown"` and Bootstrap delegates that on `document`, ABOVE the `li` -
+    // so the click reaches the tab-select listener and opening a gear SELECTS its tab.
     openMenuId = openMenuId === streamId ? null : streamId;
   }
 
   function runItem(event: MouseEvent, streamId: string, action?: (id: string) => void) {
-    // Const 58 is `href="#"`, so without this the room navigates to `#` and scrolls to the top.
+    // Const 57 is `href="#"` and the reference hangs no handler on the anchor, so upstream a menu
+    // click DOES scroll the room to the top. That half is a defect and is not reproduced; the
+    // bubbling half is - the click reaches the `li` and selects the tab, exactly as upstream.
     event.preventDefault();
-    event.stopPropagation();
     openMenuId = null;
     action?.(streamId);
   }
 </script>
 
 <!--
-  `class="nav nav-tabs screens-tabs"` with `id="streamsTabs"` — const 118, not a copy of the
-  screenshare bar's const 70. The two differ only in the `id`.
+  `class="nav nav-tabs screens-tabs"` with `id="streamsTabs"` — const 117, not a copy of the
+  screenshare bar's const 69. The two differ only in the `id`.
 -->
 <ul id="streamsTabs" role="tablist" class="nav nav-tabs screens-tabs">
   {#each streams as stream (stream._id)}
-    <li role="presentation" class="nav-item">
+    <li role="presentation" class="nav-item" onclick={() => onselect?.(stream._id)}>
       <!-- svelte-ignore a11y_missing_attribute -->
       <!--
-        Three divergences from const 74, each one already taken on `ScreenTabs` for the same reason
+        Three divergences from const 73, each one already taken on `ScreenTabs` for the same reason
         and taken again here so the two bars behave alike:
 
         `aria-selected` — the reference hardcodes `"true"` on every tab (it is a static attribute in
-        const 74, not a binding), which tells a screen reader that every stream is selected at once.
+        const 73, not a binding), which tells a screen reader that every stream is selected at once.
         Emitted as a real boolean instead.
 
-        `tabindex` + `onkeydown` — the reference emits neither, and const 74 has no `href` either, so
+        `tabindex` + `onkeydown` — the reference emits neither, and const 73 has no `href` either, so
         upstream these tabs cannot be reached by keyboard at all. The roving tabindex is what makes
         the stream switcher operable without a mouse.
 
         `data-bs-target` — absent upstream, absent here. `data-bs-toggle` plus `aria-controls` is
-        what the reference uses and nothing is lost.
+        what the reference uses and nothing is lost. The tab-SELECT click is NOT here either: const
+        31 puts it on the `li` (byte 1,926,042), which is where it now sits; `onkeydown` stays here
+        because the anchor is the only focusable node in the tab.
       -->
       <a
         id="{stream._id}-tab"
@@ -170,7 +173,6 @@
         aria-controls={stream._id}
         aria-selected={stream._id === selectedStreamId}
         data-bs-toggle="tab"
-        onclick={() => onselect?.(stream._id)}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') onselect?.(stream._id);
         }}
@@ -184,17 +186,17 @@
           </span>
         {/if}
         <!--
-          Not keyboard-reachable, deliberately. Const 83 puts this badge's click INSIDE the tab
-          anchor, and an independently focusable control nested in a link is invalid content — the
-          same class of problem as the dropdown below, but without a placement that fixes it, since
-          hoisting the badge out of the anchor would move it out of the tab's hit area.
+          Not keyboard-reachable, deliberately. Const 82 (`MSe`, byte 1,925,474) puts this badge's
+          click INSIDE the tab anchor and does NOT stop it, so the badge locks AND selects the tab;
+          both halves are reproduced. An independently focusable control nested in a link is invalid
+          content, and hoisting the badge out would move it out of the tab's hit area.
 
           The gap is covered rather than ignored: the identical action is on the dropdown item a few
           lines down, which is a real anchor with a real `href` and is fully operable. A pointer
           user gets the shortcut; a keyboard user gets the menu.
 
           No `svelte-ignore` sits here, and that is not an oversight. The compiler cannot prove this
-          span is static because the spread below may carry a `role`, so it emits no a11y warning to
+          span is static because the spread may carry a `role`, so it emits no a11y warning to
           suppress — the autofixer reports any ignore placed here as unwarned. See the gear's span
           further down, which takes no spread and therefore does need one.
         -->
@@ -202,10 +204,7 @@
           <span
             {...{ placement: 'bottom', tooltip: 'Unlock this screen?' } as Record<string, string>}
             class="mr-2"
-            onclick={(event) => {
-              event.stopPropagation();
-              ontogglelock?.(stream._id);
-            }}
+            onclick={() => ontogglelock?.(stream._id)}
           >
             <i aria-hidden="true" class="fas fa-lock"></i>
           </span>
@@ -237,7 +236,7 @@
           data-bs-toggle="dropdown"
           aria-expanded={openMenuId === stream._id}
           class={['dropdown-toggle', { show: openMenuId === stream._id }]}
-          onclick={(event) => toggleMenu(stream._id, event)}
+          onclick={() => toggleMenu(stream._id)}
         >
           <i class="fas fa-cog"></i>
         </span>

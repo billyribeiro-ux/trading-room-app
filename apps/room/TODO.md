@@ -85,30 +85,56 @@ rows from every tenant table"_ — and it is now a measurement rather than a rea
 role is already inert with respect to tenant data.**
 
 **And that migration is written and proven — `0010_retire_ptr_clone_app.sql`, 2026-08-31.** It
-revokes every ACL class the role holds in the database it runs on and drops the role once that is
-the last database in the cluster still granting to it. Measured across three databases on the same
-PostgreSQL 16.13 cluster:
+revokes every ACL class the role holds in the database it runs on, counts the residue from
+`pg_catalog`, and refuses rather than reporting success if anything survives. Measured across four
+databases on the same PostgreSQL 16.13 cluster:
 
-| database          | chain         | outcome                                                                                                       |
-| ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
-| `ptr_clone`       | `0001`→`0009` | revoked, **role dropped** — it was the only database granting                                                 |
-| `fresh_chain`     | `0001`→`0009` | revoked, **not** dropped, and said so: another database still granted. 0 grants remaining here                |
-| `interlock_probe` | `0001`→`0008` | **REFUSED**, and the role survived the refusal. `0009` applied, then `0010` dropped the role from the cluster |
+| database          | chain         | outcome                                                                                    |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------ |
+| `ptr_clone`       | `0001`→`0009` | every privilege revoked, 0 residual                                                        |
+| `fresh_chain`     | `0001`→`0009` | every privilege revoked, 0 residual                                                        |
+| `interlock_probe` | `0001`→`0008` | **REFUSED**, and the role survived the refusal                                             |
+| `fence_probe`     | `0001`→`0010` | applied by the `migrate` binary, then a SECOND run of that binary against it — both exit 0 |
 
-Three things that only a live cluster could have taught, each now written at the migration:
+**It does NOT drop the role, and that is the most important thing this entry records.** It did, in
+its first version, tolerating `dependent_objects_still_exist` for the mid-rollout case. This
+repository's own convergence suite refused it:
 
-- **`DROP ROLE` is cluster-global while privileges are per-database.** The first draft dropped
-  unconditionally and failed with _"72 objects in database interlock_probe"_ — which is the normal
-  mid-rollout state, because `0001` re-creates this role on every new database. Exactly one failure,
-  `dependent_objects_still_exist`, is tolerated and announced; anything else propagates.
+```text
+the_chain_applies_to_a_second_database_on_the_same_cluster ... FAILED
+```
+
+Roles are cluster-global. The first database applied the chain and dropped the role; the **second
+database on that cluster could then not start its chain at all**, because the migrate preflight
+requires `ptr_clone_app` to exist before `0001` runs — `0001` would otherwise reach the forensic
+branch that creates it with the placeholder password committed at its line 26. That is the same
+non-convergence that killed the `0009` rename, arriving by a different route, and it would have
+shipped as _"the second tenant database can never be created"_.
+
+Four things that only a live cluster could have taught, each now written at the migration:
+
+- **A cluster-global drop cannot be part of a per-database chain.** Convergence is the rule
+  `migration_reappliability.rs` states in its header, and it is what the migration now obeys: it
+  strips every privilege and leaves the role. Removing the role itself is a documented **operator**
+  step for a cluster that will take no further new databases, and `DROP ROLE` without `CASCADE` is
+  its own interlock — it refuses while any database still grants.
+- **That operator step needed a code change to be takeable at all.** With the preflight requiring
+  the baseline role unconditionally, dropping it made `migrate` exit 1 on every subsequent deploy —
+  reproduced against a database that had applied the whole chain. `db::migrate::baseline_role_absence_policy`
+  now accepts an absent baseline role on exactly the databases whose ledger records `0001` applied
+  and successful, where the branch the fence guards can no longer run. Measured: `exit 1` → `exit 0`,
+  tenancy intact at 87 grants and 22 policies. On a database that has **not** applied `0001` an
+  absent role is still refused, so the fence is untouched where it can act.
 - **A LOGIN role always holds a DATABASE grant.** `CONNECT` lives in an ACL no table-level revoke
-  touches, and `DROP ROLE` refuses while it stands. The first live run failed on precisely that.
+  touches. The first live run failed on precisely that, back when the drop was still attempted.
 - **The residual count has to read the catalogue.** Through `information_schema` it was both too
   narrow (no database, schema or type ACL) and too wide (`column_privileges` reflects table grants
   onto every column: it reported 922 where 26 column ACLs existed).
 
 After retirement `tradingroom_app` kept all 87 table grants and all 22 policies, tenant A saw only
-A's room, tenant B only B's, and an unset tenant saw zero rows.
+A's room, tenant B only B's, and an unset tenant saw zero rows. What the baseline role keeps is a
+login that reaches nothing: no table, column, routine, schema, default or CONNECT privilege
+anywhere, and no RLS policy naming it. That is the whole of the risk this entry was about.
 
 **What remains of this entry is the OWNER role and the database name** — `ptr_clone` →
 `tradingroom_owner` / `tradingroom`. That half is an operator step and always was: migrations
@@ -323,7 +349,39 @@ Protocol evidence is regenerable: `node scripts/extract-realtime-protocol.mjs` �
 
 ## 6. Flaky media test
 
-**Status:** open, reproduced once.
+**Status: the race is DIAGNOSED and a fix for it is in the fixture — read 2026-08-31. What is open
+is running it, and that is blocked on a C++ toolchain rather than on this code.**
+
+The failure this entry records is `MID already exists in RTP listener [mid:0]`. That exact string,
+its mechanism and its fix are now written at `opus_send_parameters_on_mid` in
+`services/media/src/server.rs:2042-2056`:
+
+> _A MID identifies an m-line within a transport and is unique for as long as that transport lives.
+> A real mediasoup-client takes it from the SDP m-line index, which only ever counts upward, so it
+> never re-offers `"0"` on a transport that has already used it — not even after the first producer
+> is closed._
+>
+> _Reusing it here is not merely unrealistic, it races. `Producer` has no awaitable close in
+> mediasoup 0.24 (there is no `pub fn close`); the worker-side `producer.close` is only issued from
+> `Drop`, which_ spawns _the request rather than awaiting it… So `closeProducer` replies while the
+> MID may still be registered in the transport's RTP listener, and the next `produce` on the same
+> MID is rejected with "MID already exists in RTP listener"._
+
+And `the_room_is_told_when_a_producer_and_then_a_peer_goes_away` now takes the second producer on
+MID `"1"`, with its own line saying why. So the entry's _"order- or load-dependent, in a media path
+that will see far more concurrency in production"_ was right about the shape and the cause is no
+longer unknown: it is not concurrency in the media path, it is an unawaitable close in the client
+library, and the fixture stopped depending on it.
+
+**What CANNOT be done here, measured rather than assumed:** `cargo test -p tradingroom-media
+--no-run` fails in `mediasoup-sys-0.14.2/build.rs:157` with _"Failed to build
+libmediasoup-worker"_ — the C++ worker does not build in this container. So the fix is verified by
+READING and not by running, and this entry stays open on that distinction alone. **It is unblocked
+by a build environment, not by more diagnosis.**
+
+**Its git history cannot date the fix against the report** and that is worth knowing before anyone
+tries: both the test and this entry arrive in `3b4f3c5`, the squashed import, so `git log -S` on
+either returns the same single commit.
 
 `server::tests::the_room_is_told_when_a_producer_and_then_a_peer_goes_away`
 failed once under full-workspace load with `MID already exists in RTP listener

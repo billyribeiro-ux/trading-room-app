@@ -11,9 +11,10 @@
 -- because under FORCE ROW LEVEL SECURITY a role named by no policy sees nothing.
 --
 -- So the baseline role is already inert with respect to tenant data. What it still holds is object
--- privilege: 87 table grants, 922 column grants, 6 routine grants and USAGE on `public`. That is a
--- login-capable identity with broad DML rights on every table in a multi-tenant fintech database,
--- kept alive only because `0001_baseline.sql` names it.
+-- privilege: 87 table grants, 26 column grants, 6 routine grants, USAGE on `public` and CONNECT on
+-- the database. That is a login-capable identity with broad DML rights on every table in a
+-- multi-tenant fintech database, kept alive only because `0001_baseline.sql` names it. Removing
+-- exactly that, on every database, is what this migration is for.
 --
 -- ## Why this is a migration and not an operator step
 --
@@ -21,8 +22,12 @@
 -- database, so retirement cannot assume absence and cannot be done once by hand. It has to run in
 -- the chain, after `0009`, on every database that will ever exist. That is the same convergence
 -- argument `0009` makes about policies, and it is why the withdrawn `ALTER ROLE … RENAME` was wrong:
--- roles are cluster-global, so a rename collided on the second database, while a
--- revoke-then-drop reaches the identical end state every time.
+-- roles are cluster-global, so a rename collided on the second database.
+--
+-- This migration is therefore PER-DATABASE and revoke-only. It removes every privilege the baseline
+-- role holds here and leaves the cluster-global role in place, because a chain that drops a
+-- cluster-global role cannot be applied to the next database — see the long note at the end, and
+-- the test run that established it.
 --
 -- ## THE INTERLOCK, which is the most important thing here
 --
@@ -151,41 +156,67 @@ BEGIN
   END IF;
 
   /*
-    ── THE DROP IS BEST-EFFORT, AND THAT IS THE CLUSTER'S SHAPE RATHER THAN A COMPROMISE ─────────
+    ── AND IT STOPS HERE. THE ROLE IS NOT DROPPED, AND THAT IS THE WHOLE DESIGN ──────────────────
 
-    Everything above is PER-DATABASE and is this migration's actual contract: after it runs, this
-    database grants `ptr_clone_app` nothing, and the assertion above proves it by count. The ROLE,
-    though, is CLUSTER-GLOBAL — the same distinction `0009` draws about policies, arriving here with
-    more force — so `DROP ROLE` fails while any OTHER database in the cluster still grants to it:
+    This migration ended with `DROP ROLE ptr_clone_app` until 2026-08-31, tolerating
+    `dependent_objects_still_exist` for the mid-rollout case. `migration_reappliability.rs` refused
+    it, and the refusal was right. Two runs, one cluster, measured:
 
-        ERROR:  role "ptr_clone_app" cannot be dropped because some objects depend on it
-        DETAIL: 72 objects in database interlock_probe
+        the_chain_applies_to_a_second_database_on_the_same_cluster ... FAILED
 
-    That is not hypothetical and it is not an error to route around. It is the normal state of a
-    multi-tenant cluster part-way through a rollout: `0001` re-creates this role on every new
-    database, so until the LAST database has run this migration, the role is legitimately still in
-    use somewhere. A migration that failed there would block the chain on every database but the
-    final one, in an order nobody controls.
+    The first database applied the chain and dropped the role, because by then it was the only one
+    granting. The SECOND database then could not start its chain at all: the migrate preflight
+    requires `ptr_clone_app` to exist BEFORE `0001` runs, since `0001` would otherwise reach its
+    forensic branch and create the role with the placeholder password committed at its line 26.
 
-    So the drop is attempted and exactly ONE failure is tolerated — `dependent_objects_still_exist`,
-    SQLSTATE 2BP01, which is the specific answer meaning "another database still grants". Anything
-    else propagates. This is not a silent catch: both outcomes announce themselves, and the one that
-    leaves the role standing says why and what finishes it.
+    That is the exact rule this repository already states, in that file's own header:
 
-    No CASCADE, in either branch. Cascade would remove dependencies this migration has not
-    enumerated, in databases it cannot see, which is the class of quiet action a schema change to a
-    fintech cluster must never take.
+        A migration may mutate cluster-global state only if that mutation is convergent under
+        repeated application from version 1 on the same cluster.
+
+    A dropped role is not convergent. `0001` restores it only through the branch the preflight
+    forbids, so the drop destroys a starting condition the chain cannot legitimately rebuild. It is
+    the same shape as the withdrawn `0009` rename, arriving by a different route — and it would have
+    reached production as "the second tenant database can never be created".
+
+    ── WHAT IS ACTUALLY REMOVED, WHICH IS THE ENTIRE RISK ────────────────────────────────────────
+
+    The risk was never that a row existed in `pg_authid`. It was a login-capable identity holding
+    DML on every table of a multi-tenant fintech database. After the revokes above, on this database
+    `ptr_clone_app` holds: no table grant, no column grant, no routine grant, no schema USAGE, no
+    default ACL, and no CONNECT. `0009` already removed it from all 22 RLS policies, so under FORCE
+    ROW LEVEL SECURITY it reads zero rows from every tenant table even where a policy-free path
+    exists. The residual assertion above proves each of those by count rather than by claim.
+
+    What remains is a role that can authenticate and reach nothing. That is a bounded, stated
+    residual, and it is the price of a chain that converges on every database the cluster will ever
+    hold.
+
+    ── THE ROLE ITSELF IS AN OPERATOR STEP, DELIBERATELY, AND IT IS SAFE ─────────────────────────
+
+    Once a cluster will take no further NEW databases — the only case that needs `0001` to run
+    again — an operator may finish the job by hand:
+
+        DROP ROLE ptr_clone_app;   -- refuses, correctly, while any database still grants
+
+    `DROP ROLE` without CASCADE is its own interlock: it refuses while any database in the cluster
+    still holds a grant, so it cannot succeed before every database has run this migration. Nothing
+    here needs to force it, and nothing here should.
+
+    That step does not brick the deployment, and that is not an assumption either:
+    `db::migrate::baseline_role_absence_policy` accepts an absent baseline role on exactly the
+    databases whose ledger already records `0001` applied and successful — where the branch the
+    fence guards can no longer run. Measured on a live PostgreSQL 16.13 cluster on 2026-08-31, the
+    `migrate` binary against such a database went from `exit 1` to `exit 0` with the tenancy intact
+    at 87 grants and 22 policies. On a database that has NOT applied `0001`, an absent role is still
+    refused, so the fence is untouched where it can act.
+
+    No CASCADE appears in this migration, in any branch. Cascade would remove dependencies this
+    migration has not enumerated, in databases it cannot see — the class of quiet action a schema
+    change to a fintech cluster must never take.
   */
-  BEGIN
-    DROP ROLE ptr_clone_app;
-    RAISE NOTICE
-      'ptr_clone_app RETIRED: privileges revoked and role dropped; % policies name tradingroom_app',
-      runtime_policies;
-  EXCEPTION
-    WHEN dependent_objects_still_exist THEN
-      RAISE NOTICE
-        'ptr_clone_app revoked in this database (% policies name tradingroom_app), and NOT dropped: another database in this cluster still grants to it. The role is inert here. It disappears when the last database has run this migration; until then it is correctly still present.',
-        runtime_policies;
-  END;
+  RAISE NOTICE
+    'ptr_clone_app RETIRED in this database: every privilege revoked, 0 residual, % policies name tradingroom_app. The role is left in place because dropping it is not convergent across a cluster; see this migration.',
+    runtime_policies;
 END
 $$;

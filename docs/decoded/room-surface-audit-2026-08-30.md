@@ -46,8 +46,25 @@ inside the document itself. The table describes the two-verifier pass **as it ra
 refuted after the fact, by a third reading — belongs in this paragraph and not in that table,
 exactly as RM-25 belongs in the next paragraph and not in that table.
 
-**Twenty-eight rows have been appended since this document was committed**, and none of them is
-folded into the totals above — those describe the two-verifier pass and should keep describing it.
+**The running total is stated ONCE, here, and it is READ from the document rather than remembered.**
+Rows have been appended to this document in ten parallel batches since it was committed, and none of
+them is folded into the totals under *Where the work stands* — those describe the two-verifier pass
+and should keep describing it.
+
+**Each such row says so at itself**, in one fixed sentence, and that sentence is the whole mechanism:
+`room-surface-audit-counts.test.ts` counts it per surface to license the gap between a surface's
+`gaps` number and the rows filed under it, and counts it document-wide to license the gap between the
+survivor count and the row count. A row may sit outside the tables ONLY by declaring that it does,
+and it cannot escape both counts, because the same declaration is what admits it to either.
+
+**This paragraph must not contain that sentence.** It used to, while describing RM-25 — the first
+such row — which made RM-25 count twice once it also carried its own marker: **a summary of markers
+must not be a marker.** And on 2026-08-31 the opposite failure landed: three merged batches each
+arrived carrying their own "N rows have therefore been appended", computed against the document as it
+stood in that worktree, and this section came to state 132, 18 and 11 simultaneously. All three were
+stale, none agreed, and the test could not see it because the test counts the per-row markers. They
+are consolidated away here. A count that appears in three places disagrees with itself the moment one
+of them moves; the marker count is the only one that cannot, which is why no number is written here.
 
 **Each such row says so at itself**, in one sentence, and that sentence is the whole mechanism:
 `room-surface-audit-counts.test.ts` counts it per surface to license the gap between a surface's
@@ -63,9 +80,104 @@ marker.** The lesson RM-25 taught is still the cheaper half of the one UIM-03 te
 who decodes the table finds rows a reader who looks up the cited const cannot** — and this
 document's per-row byte offsets make the second reading the tempting one.
 
+**Fourteen of the hundred and thirty-two are the two surfaces added on 2026-08-31** — `MainTabStrip.svelte`
+(MTS-01 to MTS-07) and `RoomOverlays.svelte` (OVL-01 to OVL-07), read end to end at verified
+boundaries. Neither had a section here. **Three of those fourteen exist only because the consts
+tables were decoded by value rather than looked up** — MTS-04, MTS-06 and OVL-01 — which is RM-25's
+lesson holding a second time, on a second pair of surfaces, at better than one in five.
+
+**Seventeen more are `VideoPlayer.svelte`, `ScheduledAlerts.svelte` and `AvDevicePane.svelte`**,
+none of which had a section here before. They are deliberately NOT folded into the tables above, for
+the reason the two paragraphs above give, and they are countable rather than asserted — every one of
+them carries the same sentence in its body, and `room-surface-audit-counts.test.ts` requires the
+document to hold exactly `223 + <that count>` rows. A row appended without the sentence, or a
+sentence written without a row, fails it.
+
+**The three surfaces were chosen because they had NO section here at all**, and two of them proved
+the point RM-25 makes about which reading finds what. `SCH-02` is the sharpest case: a decode from
+2026-08-15 had reached that exact `ngClass` and stopped, writing *"The class NAMES are in the const
+table and were not read; do not guess them."* They are not in the const table — Angular compiles a
+multi-key `ngClass` into a shared factory beside the template functions — which is why looking where
+the note said to look found nothing, and why the note survived two weeks.
+
+**Twenty-two more are `ExtraChatPane.svelte` and `AlertQaModal.svelte`** — nine `XCP-` rows and
+thirteen `QAM-` rows — two further surfaces this document had no section for at all. Each says so in
+its own body, in the fixed sentence `room-surface-audit-counts.test.ts` counts, and the surfaces
+table above is deliberately left at eighteen for the same reason.
+
+**Twenty more are `PrivateChatComposer.svelte`, `GiphyPicker.svelte` and `SpeechRecoOverlay.svelte`**
+— `PCC-`, `GIF-` and `SRO-`. The composer batch settled a rule two earlier readings had disagreed
+about: all six of the reference's `onKey` implementations were decoded by value, five are byte-
+identical apart from the jQuery alias and the element id, and **Shift+Enter is a no-op** —
+`i.val(i.val())` assigns the value to itself, while only the ALT arm appends a newline. Both earlier
+readings had transcribed those bytes correctly and one had described them wrongly, which is the
+failure this document exists to catch, occurring between two of its own batches.
+
+**Fourteen more are `ScreenZoomControls.svelte`, `ScreenVolumeControl.svelte` and
+`StreamTabs.svelte`** — `SZC-`, `SVC-` and `STB-`, at the foot of this document. That batch found the
+same class of error three times over: **every const index those three components cited from 66 upward
+was one too high for the pinned bundle**, because the citations named `docs/source/components/*.js`,
+a capture root this repository does not hold. The neighbours are plausible enough that a slot lookup
+would have confirmed each one — 118 for the streams bar is `streamsTabsContent`, 98 for the dark
+button is the magnifier glyph inside it — which is RM-25's lesson a fourth time and the reason the
+brief for every batch says to decode by value.
+
+**The navbar batch was the one merge that had to choose between two answers.** It and an earlier
+batch extracted the same SoundCloud region on the same day — one file by feature, two by audience —
+and both reached the same ceiling by different routes. The feature split survived on a measurement
+rather than on taste: its `RoomNavbar` also builds `NAV-04` and `NAV-07`, which the other does not,
+and a seam is not worth two behaviours. Merging it then surfaced two errors in it, both settled from
+the bytes: const 176 declares `id` twice and Angular's `setUpAttributes` (`H0`, byte 16,054) calls
+`setAttribute` once per pair with no de-duplication, so the SECOND name survives and the assertion
+demanding the first was asserting an attribute the reference overwrites before paint; and the id it
+corrected to is shared with the presenter's dropdown, which made it useless as the needle for "the
+listener arm is absent for a presenter" — answered by the very element it was meant to distinguish
+from. The needle is const 97's title now. The deleted pair's keyboard route came back with it.
+
+**Seventeen more are `RoomNavbar.svelte` and `MessageMenu.svelte`** — `NAV-` and `MSM-`. The navbar
+was the largest component in this repository with no section here at all. Four of its rows are
+MEASURED REFUSALS and each is a control that is dead in the reference itself: `hasSTHelpLink` occurs
+three times in 2,891,205 bytes and the only assignment that sets it true is on the LOGIN component,
+so the room's help link can never render; `recIndicatorStart`'s one rule is a descendant selector
+that an `<i>` cannot match; `audioVolSlider` is a CLASS rule written against an ATTRIBUTE. Building
+any of them would have been reproducing dead code.
+
+**These four batches landed in parallel and were merged one at a time**, which is why the running
+total lives in ONE paragraph — the first — and each batch paragraph says only what it read. Three of
+them arrived each carrying their own "N rows have therefore been appended" sentence, computed against
+the document as it stood in that worktree, and all three were stale on arrival. A count that appears
+in four places disagrees with itself the moment two of them move; the marker count is the only one
+that cannot.
+
+That reading is worth one sentence of its own, because it repeats RM-25's lesson at a larger scale.
+`ExtraChatPane` is the SECOND compiled copy of the chat column, and reading `app-extra-chat`'s own
+const table rather than assuming it mirrors `app-chat`'s is what produced `XCP-06` — a cited const
+index that belonged to the other table — and `XCP-09`, five thousand eight hundred bytes of component
+stylesheet that no capture in this repository has ever seen, which is invisible from the markup and
+was found only by reading the bundle's `styles:` array.
+
+**The tenth batch is nineteen rows for `RoomShell.svelte` (SHL-01…06), `MessageBody.svelte`
+(MSB-01…07) and `RichTextEditor.svelte` (RTE-01…06)** — three surfaces this document named only in
+passing and, for the editor, not at all. Four of its nineteen are citations naming a function that
+EXISTS in the pinned bundle and is not the one the comment meant, so every one would have survived a
+lookup: RM-25's lesson at its sharpest yet, and the reason every batch brief says to decode by value.
+`MSB-01` is the one worth reading first — no raw-html tag on any path of `MessageBody`, now an
+assertion rather than a reading.
+
+**Fourteen rows now stand outside that pass, and this paragraph is the only place their number is
+stated.** RM-25 was the first; thirteen more arrived on 2026-08-31 with four further surfaces —
+`FollowChatStylePane` (3), `AlertSendReportModal` (3), `notes/NoteTabContent` (3) and
+`ScreenShareMenu` (4). Each carries the same marker sentence in its own body, so the disposition line
+below is derived from the rows rather than asserted beside them, and
+`room-surface-audit-counts.test.ts` fails in either direction if the two disagree. Earlier batches
+each appended a total of their own; every one was stale the moment the next batch landed, which is
+why there is one paragraph here and not six. The four new surfaces are deliberately NOT in the
+per-surface table above, for the same reason RM-25 is not: that table describes the two-verifier pass
+as it ran.
+
 ## Where the work stands
 
-**0 open · 251 closed · 251 rows.**
+**0 open · 445 closed · 445 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -4625,6 +4737,445 @@ let s=this.appService.globals.sessData[`linkedRoom${e}AlertsOther`];s=s?.trim(),
 
 > Verified: I could not refute it: the linked-room log override is genuinely not implemented anywhere in apps/room/src, and the claim's own characterisation ("deliberately not carried") matches our source exactly. Searched apps/room/src for linkedRoom, AlertsOther, alerts_other, alerts-other, alertsSource, alert_source, sourceRoom, alertsRoom, logRoo…
 
+## MainTabStrip.svelte
+
+7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts
+table opening at 1,994,264, template and update block at 2,014,221-2,017,200. Every one of the
+eight `<li>` elements and both dropdown sub-templates were decoded BY VALUE rather than by looking
+up the consts a claim names; three of the seven below exist only because of that.
+
+This surface had no section in this register. It is not counted in the surfaces table above, which
+describes the two-verifier pass as it ran.
+
+### MTS-01 — The Files cog is drawn for every member; the reference instantiates it only for a presenter
+
+**BUILT 2026-08-31.** `{#if isPresenter}` around it, and `{#if}` rather than `hidden` because `-1`
+is `ɵɵconditional`'s "instantiate nothing" — the distinction this strip already turns on. The cog
+and its menu moved into `TabGearMenu.svelte` in the same change (see MTS-07), so the gate sits at
+the call site where the value is. `main-tab-strip-gates.svelte.test.ts` mounts the strip as a member
+and asserts the ELEMENT is absent rather than hidden, with the presenter render as its control.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**high** · `missing-control` · reference byte **2,017,076**
+
+```
+H(35,ZCe,8,0,"div"), … O(35,o.isP?35:-1)
+function ZCe(t,n){if(1&t){const e=Y();d(0,"div")(1,"span",66),T(2,"i",54),u(),d(3,"ul",67)(4,"li",56),x("click",function(){return D(e),E(g().newFile())}),d(5,"a",57),T(6,"i",58),v(7," Upload File"),u()()()()}}
+```
+
+**Ours:** MainTabStrip.svelte rendered `span#dropdownMenuFiles` and its `ul.dropdown-menu`
+unconditionally, inside the Files tab's anchor. The menu's only item is mounted by
+`RoomNotes.mountUploadFileLink` (`room/notes.svelte.ts:291`), whose click opens the room's
+`file-upload` modal — so a member was shown the presenter's file uploader. Nothing downstream
+refused it either: `mountUploadFileLink` calls `this.#modals.open('file-upload')` with no role
+check, unlike its notes twin which at least refuses inside `requestNewNote`.
+
+### MTS-02 — The Notes cog has no gate; the reference instantiates it only for a presenter or a member who may author notes
+
+**BLOCKED 2026-08-31.** The gate cannot be applied from `MainTabStrip.svelte`: its eleven props
+carry `isPresenter` but nothing carrying the VIEWER's `canEditNotes`, and inventing a default is
+worse than leaving it — `false` takes the New Note cog away from a member who legitimately has it,
+`true` is no gate at all.
+
+**The one line that unblocks it:** `apps/room/src/lib/components/PresentationArea.svelte:507`, in the
+`<MainTabStrip … />` props between `{hideNotes}` and `{menus}`, add
+`canEditNotes={data.canEditNotes === true}` — `data.canEditNotes` is already on that component's
+`data` prop. Then `{#if isPresenter || canEditNotes}` around the `<TabGearMenu id="dropdownMenuNotes" …/>`,
+exactly as MTS-01 now has. That file is outside this task's editable set.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `missing-control` · reference byte **2,016,713**
+
+```
+O(23,o.isP||o.appService.globals.user.canEditNotes?23:-1)
+function KCe(t,n){if(1&t){const e=Y();d(0,"div",15)(1,"span",53),T(2,"i",54),u(),d(3,"ul",55)(4,"li",56),x("click",function(){return D(e),E(g().newNote())}),d(5,"a",57),T(6,"i",58),v(7," New Note"),u()()()()}}
+```
+
+**Ours:** the cog is drawn for everybody. It is less severe than MTS-01 because the ACTION behind
+it already refuses — `RoomNotes.requestNewNote` sets `newNoteOpen` to `this.#noteGates().editorMounted`,
+so a member who may not author gets nothing when they press it. That is precisely the shape the
+root standard names, though: a control whose only effect is nothing. The reference declines to draw
+it at all.
+
+### MTS-03 — The Recordings tab does not exist here at all
+
+**BLOCKED 2026-08-31.** Not buildable from this component or from any file in this task's editable
+set, and the block is structural rather than a missing prop: `MainTab` in `apps/room/src/lib/types.ts`
+has no `'recordings'` member, so `mainTab = 'recordings'` does not type-check, and
+`PresentationArea.svelte` has no `#recordings` pane (upstream const 25,
+`["id","recordings","role","tabpanel","aria-labelledby","recordings-tab",1,"tab-pane","position-relative","h-100",3,"ngClass"]`),
+so a tab added here would select a value nothing renders.
+
+**What unblocks it, in order:** add `| 'recordings'` to `MainTab` in `apps/room/src/lib/types.ts:16`;
+add `recsInRoom?: boolean` to `RoomSessionSettings` in `apps/room/src/lib/server/room-config-client.ts`
+and pass it through the load; add the `#recordings` pane to `PresentationArea.svelte`. The first
+half of the gate is already built — `RoomGates.archivesAvailable` (`room/gates.ts:336`) is
+`archivesAvailableTo(viewer, session)`, the transcription of the reference method at byte 1,959,447,
+and `roster-gates.test.ts:52` already pins it against these same bytes. The second half,
+`sessData.recsInRoom`, returns ZERO hits across `apps/room/src`.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `missing-control` · reference byte **2,016,775**
+
+```
+O(24,o.archivesAvailableTo()&&o.appService.globals.sessData.recsInRoom?24:-1)
+function YCe(t,n){if(1&t){const e=Y();d(0,"li",31),x("click",function(){return D(e),E(g().onMainTabChange("presAreaTabs-recordings"))}),d(1,"a",59)(2,"div",12)(3,"div"),T(4,"i",60),d(5,"span",14),v(6,"Recordings"),u()()()()()}if(2&t){const e=g();m(),z("ngClass",ct(1,mo,"presAreaTabs-recordings"==e.selectedMainTab))}}
+```
+
+**Ours:** absent. Grepping `apps/room/src` for `recsInRoom`, `recordings-tab` or a `'recordings'`
+main tab returns nothing. Const 59 is the anchor
+(`["id","recordings-tab","data-bs-toggle","tab","data-bs-target","#recordings","role","tab","aria-controls","recordings","aria-selected","false",1,"nav-link",3,"ngClass"]`)
+and const 60 the icon, `[1,"fas","fa-file-video"]`. The tab sits between Notes and VideoPlayer in
+slot order, which is also where `PresentationArea`'s own pane-order note (`PA-08`) already says the
+recordings pane belongs.
+
+### MTS-04 — `z('hidden', o.hideScreens)` on the Screens `<li>` is not reproduced
+
+**MEASURED REFUSAL 2026-08-31.** The measurement is recorded at the code, in
+`MainTabStrip.svelte`'s header. `hideScreens` occurs exactly THREE times in the 2,891,205-byte
+bundle: `this.hideScreens=!1` in the component constructor at 1,954,414, and the two template reads
+at 2,016,430 (this tab) and 2,017,196 (its pane). Nothing else in the bundle mentions it.
+
+**And its four siblings are all assigned, which is what makes this a measurement rather than a
+guess.** `ngOnInit` at 1,955,678 sets `hideNotes`, `hideFiles`, `hasSwingTradeAlerts`,
+`hasDayTradeAlerts` and `hideStreams` — `this.hideStreams=!this.appService.globals.sessData.useMediaMTX`
+— and `hideScreens` is not among them. The flag is initialised false and never written, so the
+binding can never be true. Reproducing it here would add a prop and a gate no caller could open.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `missing-behaviour` · reference byte **2,016,417**
+
+```
+2&i&&(m(),z("hidden",o.appService.globals.viewerOnlyMode),m(),z("hidden",o.hideScreens),m(),z("ngClass",ct(46,mo,"presAreaTabs-screens"==o.selectedMainTab)),m(6),z("hidden",o.hideStreams),…
+```
+
+**Ours:** MainTabStrip.svelte's Screens `<li>` carries `role="presentation" class="nav-item"` and no
+`hidden`, where its Streams, Notes and Files siblings all carry one. The asymmetry is the
+reference's own and is now explained where it is visible.
+
+### MTS-05 — Seven `onkeydown` handlers that no keyboard could reach
+
+**HALF BUILT 2026-08-31.** The seven tab anchors are fixed; the two cogs are refused with the
+measurement recorded in `TabGearMenu.svelte`.
+
+`tabindex` on every anchor read `{mainTab === … ? undefined : -1}`. `undefined` omits the attribute
+in Svelte, and an `<a>` with no `href` and no non-negative `tabindex` is not focusable in any
+browser — so the SELECTED tab could not take focus and the other six were explicitly removed from
+the tab order. Every `onkeydown` in the strip was therefore unreachable code. It is `? 0 : -1` now,
+the roving tabindex the ARIA tabs pattern asks for, and `main-tab-strip-gates.svelte.test.ts` calls
+`.focus()` and asserts `document.activeElement`, then dispatches `Enter` and asserts the tab changed.
+
+**The two cog `<span>`s are NOT repaired, and the reason is a constraint rather than an omission.**
+A `<span>` with no `tabindex` is not focusable, and the only way to make one focusable is
+`tabindex="0"` plus a role — on an element that sits inside the tab's own `<a role="tab">`, which
+nests one interactive control inside another and is invalid whichever role is chosen. The reference
+has exactly that shape and delegates the keyboard to Bootstrap, whose source is not in the bundle,
+so there is nothing to transcribe and no rendered capture to check a repair against.
+
+**This whole affordance is OURS.** The reference has no `tabindex` anywhere in the strip and no
+keyboard handling whatsoever. What was wrong was shipping half of it.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `defect` · reference byte **1,994,264**
+
+```
+["id","screens-tab","data-bs-toggle","tab","data-bs-target","#screens","role","tab","aria-controls","screens","aria-selected","true",1,"nav-link",3,"ngClass"]
+```
+
+**Ours:** MainTabStrip.svelte:103,129,151,224,257,295,326 — seven `tabindex` expressions, each
+paired with an `onkeydown` that set `mainTab`. Const 5 above is the reference's screens anchor,
+decoded by value: it carries no `tabindex` at all, and neither does any of its seven siblings.
+
+### MTS-06 — `aria-selected` is derived here and hardcoded on all eight anchors upstream
+
+**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. Decoded by value from
+`app-presentationarea`'s consts table: const 5 (`screens-tab`), 9 (`streams-tab`), 61
+(`videoplayer-tab`), 63 (`swingAlerts-tab`) and 65 (`dayTradeAlerts-tab`) each carry a literal
+`"aria-selected","true"`; const 11 (`notes-tab`), 17 (the files anchor, which carries no id) and 59
+(`recordings-tab`) each carry a literal `"false"`. Nothing in the update block from 2,016,417 onward
+writes the attribute — the only per-tab binding is `ngClass`, `ct(46,mo,…)` with
+`mo=t=>({active:t})` at byte 1,916,345.
+
+So a room with both alert entitlements announces FIVE simultaneously-selected tabs to a screen
+reader and never announces the one actually showing. Reproducing it would reproduce a defect. Ours
+binds it to `mainTab === …` on all seven anchors, and `main-tab-strip-gates.svelte.test.ts` asserts
+exactly one tab answers `true` and that it is the one showing.
+
+**The precedent is this document's own**, twice: `FP-04` and `PAM-15` refuted the identical claim
+against `FilesPane` and `PostAlertModal` — "the reference genuinely hardcodes aria-selected and ours
+genuinely binds it, and the claim's own remedy, that the divergence should stay recorded as
+deliberate, is ALREADY recorded". It was not recorded for this surface, which is why this row exists
+and is closed rather than refuted.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `divergence` · reference byte **1,994,264**
+
+**Ours:** MainTabStrip.svelte, seven anchors, `aria-selected={mainTab === '…'}`. The eighth
+reference anchor is Recordings, which this room does not have — see MTS-03.
+
+### MTS-07 — The two tab cogs were one interaction with two implementations, and they disagreed
+
+**FIXED 2026-08-31.** One implementation now, `TabGearMenu.svelte`, and the symmetry is structural:
+the sibling menu to close is DERIVED from which cog this is, so a cog cannot be added that forgets
+to close the other one.
+
+Upstream neither cog carries a click handler. `data-bs-toggle="dropdown"` hands the open/close to
+Bootstrap, and both cogs sit inside an `<li>` whose own `x("click", …)` calls `onMainTabChange` —
+const 4 is `["role","presentation",1,"nav-item",3,"click","hidden"]`. One implementation, so the
+two behave identically by construction.
+
+This room has no Bootstrap dropdown behaviour, so each cog was hand-wired, and the two hand-wirings
+had drifted. Measured before the repair: the notes cog called `event.stopPropagation()`, which
+suppressed the very anchor handler that would have selected the Notes tab, and it did not close the
+Files menu; the files cog re-set `mainTab = 'files'` by hand AND called `menus.set('notes', false)`.
+So a member who clicked the notes cog stayed on whichever tab they were on and was shown a menu
+belonging to a tab they could not see, while the files cog did the right thing twice over.
+
+Three assertions per cog in `main-tab-strip-gates.svelte.test.ts`, driven against a REAL `RoomMenus`
+rather than a recording stub — a stub would have let the two go on disagreeing about which calls to
+make while faithfully recording both.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `divergence` · reference byte **1,916,736**
+
+```
+function KCe(t,n){if(1&t){const e=Y();d(0,"div",15)(1,"span",53),T(2,"i",54),u(),d(3,"ul",55)(4,"li",56),…
+ 53  ["id","dropdownMenuNotes","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]
+ 66  ["id","dropdownMenuFiles","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]
+```
+
+**Ours:** MainTabStrip.svelte:167-188 (notes) and :340-367 (files) before the change — twenty-six
+lines each, structurally identical and behaviourally different. Decoded in passing: const 55 labels
+the notes menu `aria-labelledby="dropdownMenuButton"`, an element that exists nowhere in the
+captured page, while const 67 labels the files menu with its own cog's id. Both are transcribed
+as-is and `TabGearMenu` takes `labelledBy` explicitly for exactly that reason.
+
+---
+
+## RoomOverlays.svelte
+
+7 gaps, read 2026-08-31. The surface is a LAYER rather than one reference component: the two
+connection overlays are nodes 7-10 of `app-room`'s template (selector block at 2,533,572, consts at
+2,533,197, template at 2,546,833), the delivery effects are `app-chat`'s `chatMsg` handler
+(1,431,196) and `app-roomscroller`'s `updateAlertMsg` handler (1,408,794), and the dialogs are
+`bootbox` calls in `app-presentationarea` (1,992,730, 1,992,250) and `app-chat` (1,445,719). All
+four regions were read end to end.
+
+This surface had no section in this register. It is not counted in the surfaces table above, which
+describes the two-verifier pass as it ran.
+
+### OVL-01 — The reconnect flash renders its two children in the wrong order and drops the reference's leading space
+
+**FIXED 2026-08-31.** `<i class="fas fa-check"></i>{' Conected\n'}` — the tick first, then the text
+node with the space that separates them, written as an expression because Svelte folds whitespace at
+element boundaries. The sibling overlay four lines above already used that idiom for
+`{' Reconnecting Chat... '}`; this element had never been given it.
+
+`overlay-delivery-contract.test.ts` extracts the text node with a regex and compares it, rather than
+asking whether the element contains a string. Its first draft asserted the element did not contain
+`Connected`, to pin upstream's one-n spelling, and failed on its own subject: the element's CLASS is
+`notConnectedOverlay`. That is the same substring-answered-by-a-longer-neighbour defect this
+repository has already met twice, caught this time by its own negative control before it shipped.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `wrong-markup` · reference byte **2,547,023**
+
+```
+H(7,iRe,3,0,"div",9),d(8,"div",10),T(9,"i",11),v(10," Conected\n"),u(),T(11,"app-user-info-modal")…
+ 10  ["id","connectedMsg",1,"notConnectedOverlay","animated","fadeIn"]
+ 11  [1,"fas","fa-check"]
+```
+
+**Ours:** RoomOverlays.svelte rendered `Conected<i class="fas fa-check"></i>` — the tick trailing the
+word, with no space anywhere, so the two ran together. `T` is `ɵɵelement` and `v` is `ɵɵtext`, so
+the compiled order is unambiguous. `connection-overlay-contract.test.ts` already asserted this
+element exists and that there are exactly two `notConnectedOverlay` classes; it asserted nothing
+about what is inside it.
+
+### OVL-02 — The Q&A arrival notice and the unread marker run in rooms that never bought Q&A on alerts
+
+**BUILT 2026-08-31.** One line, `if (!messageChrome.hasQaOnAlerts) return;`, placed before the
+effect reads a single arrival — so the toast, the `qaAlert` sound, the unread marker AND the Q&A
+reaction notices all stop together, which is what the reference's early return does.
+
+**Read off `messageChrome`, not `data.sessData`.** `buildMessageChrome` resolves
+`hasQAOnAlerts === true` once for the whole page (`room-message-chrome.ts:263`) and three components
+already read the answer; a second `data.sessData?.hasQAOnAlerts === true` here would be a second
+answer to one question, which is the failure that module exists to end. The contract test asserts
+the second read is absent as well as the gate being present.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**high** · `missing-behaviour` · reference byte **1,408,794**
+
+```
+if("alerts"!=this.logType||!this.appService.globals.sessData.hasQAOnAlerts)return;if(s.uid!==this.appService.globals.user.userXrefID&&!r){const f=s.isA?"answer":"question";for(let _ of o.qa)_.uid===this.appService.globals.user.userXrefID&&(…)}
+```
+
+**Ours:** the effect at RoomOverlays.svelte had no such gate. It called `unreadQaAlertIds.add(…)`
+and `deliverQaNotice(…)` for every fresh question and ran `questionReactionNotice` unconditionally.
+`unreadQA = !0` is set FURTHER DOWN the same upstream handler, past that return, so a room without
+the entitlement flashes nothing upstream either — and the flash is what the marker feeds. The room's
+own composer already refuses to draw the ask button without it (`O(1, !e.isQAMsg &&
+sessData.hasQAOnAlerts ? 1 : -1)`, byte 1,339,784, pinned by `qa-entitlement-contract.test.ts`),
+which is what makes this a leak rather than merely a difference: the notification path was open
+where the control path was closed.
+
+### OVL-03 — The chat ding had two implementations here, and the one in this file cited a gate that does not exist
+
+**FIXED 2026-08-31.** The effect and its `chatArrivals` tracker are gone; the mention ring it was
+accidentally covering moved to the mention effect, which is where the bundle puts it (OVL-04).
+
+**The comment above it was the finding.** It claimed: *"app-chat plays `pling` for an incoming chat
+message under exactly this gate: `preferences.doNotDisturbOn || (preferences.chatSoundOn &&
+soundEffectsService.pling.play())`"*. All EIGHT `pling.play()` sites in the bundle were read —
+1,218,923, 1,431,259, 1,431,911, 2,075,972, 2,207,439, 2,377,691, 2,378,343, 2,506,579 — and no site
+carries that gate. The two in `app-chat`'s `chatMsg` handler are the MENTION ring (1,431,259, inside
+`e.isMention &&`) and the followed-sender branch quoted below.
+
+**And the correct rule was already built.** `#lib/chat-arrival-sound.ts` transcribes it and
+`room/events.svelte.ts:861-876` calls it on the SSE arrival, where the sender's hash is in hand. So
+this effect was a second copy layered on the right one: a room with `dingOnNewMessage` off and
+nobody followed — upstream's SILENT case — rang on every message, and a room with it on rang twice.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**high** · `defect` · reference byte **1,431,911**
+
+```
+!this.appService.globals.preferences.doNotDisturbOn&&this.appService.globals.preferences.chatSoundOn){const{followedUsers:i}=this.appService.globals;try{i&&Object.keys(i).length>0&&i[e.avt].followChatStyle.playSound?this.soundEffectsService.pling.play():(this.appService.globals.playChatMessageSoundFor&&this.appService.globals.playChatMessageSoundFor.length>0&&this.appService.hashEmail(this.appService.globals.user.email)!==e.avt&&this.appService.globals.playChatMessageSoundFor.includes(e.avt)||this.appService.globals.sessData.dingOnNewMessage&&this.appService.hashEmail(this.appService.globals.user.email)!==e.avt)&&this.soundEffectsService.followed.play()}catch{…}
+```
+
+**Ours:** RoomOverlays.svelte held `const chatArrivals = new RoomArrivals<…>()` and an effect
+reading `chatArrivals.fresh(data.messages)` that played `pling` whenever any arrival was not the
+viewer's own. Three ways wrong at once: the wrong sound name for the ordinary case (`followed`, not
+`pling`), no per-sender condition at all, and a second delivery of a sound the event router had
+already decided. The tracker went with it — nothing else read it, so leaving it would have left a
+marker set growing per message for a reader that no longer exists.
+
+### OVL-04 — A mention plays no sound, and the popup preference silenced the sound as well as the popup
+
+**BUILT 2026-08-31.** The ring is `if (prefs.chatSoundOn) playSoundEffect('pling');`, placed after
+the Do Not Disturb return and BEFORE the `chatPopup` return, which is the reference's own nesting.
+One ring for a batch rather than one per mention, stated as ours at the code: upstream handles
+`chatMsg` one frame at a time, and `data.messages` reaches this component as a page.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**medium** · `missing-behaviour` · reference byte **1,431,259**
+
+```
+this.appService.globals.preferences.doNotDisturbOn||(this.appService.globals.preferences.chatSoundOn&&this.soundEffectsService.pling.play(),this.appService.globals.preferences.chatPopup&&(this.alertService.info(e.txt,"Mention from @"+e.n,{enableHtml:!0}),window.Notification&&Notification.requestPermission().then(…)))
+```
+
+**Ours:** the mention effect read `if (prefs.doNotDisturbOn || !prefs.chatPopup) return;` — a single
+return on both preferences — under a comment that called it *"the outer gate on the whole block,
+sound and popup alike"*. They are two SIBLING gates under one Do Not Disturb: `chatSoundOn` decides
+the sound, `chatPopup` decides the toast and the OS notification. A member who had turned the popup
+off was therefore told nothing at all when named. It happened not to be silent in practice only
+because OVL-03's blanket ring was firing for every message including this one; fixing that alone
+would have made it silent, which is why the two rows are one change.
+
+### OVL-05 — The lightbox describes the image with a filename; the reference and this room's own other renderer both use the url
+
+**FIXED 2026-08-31.** `alt={url}`, in `ImageLightbox.svelte` — the component the lightbox was
+extracted into in the same change, so the one interesting decision it carries is argued in the file
+that makes it.
+
+Neither value is a good description of a picture and no rule this repository can apply would invent
+one: the image is a member's upload and nothing in the room knows what is in it. What settles it is
+that the filename was a preference substituted for a captured value, and that it disagreed with this
+room's OWN second renderer of the same image — `RoomModals.showImage` writes
+`<img src="${url}" alt="${url}" />` into the popped-out window (`room/modals.svelte.ts:295`). One
+image, two alt rules, neither of them the reference's.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `invented-value` · reference byte **1,992,730**
+
+```
+showImagePreview(e,i=""){e&&bootbox.dialog({title:i,message:`\n        <div class="text-center">\n          <img src="${e}"\n              class="img-fluid"\n               alt="${e}" />\n        </div>\n      `,size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download Image',className:"btn-primary btn-sm m-auto",callback:()=>(fetch(e)…,!1)}}})}
+```
+
+**Ours:** RoomOverlays.svelte computed
+`alt={modals.selectedImageUrl.substring(modals.selectedImageUrl.lastIndexOf('/') + 1)}`. Four
+reference call sites, all in `app-presentationarea` — 1,933,330, 1,936,798, 1,939,572, 1,943,143 —
+and none passes `i`, which is why the dialog's `.modal-title` renders empty here and should.
+
+### OVL-06 — The lightbox's download button sits in the body under an `<hr />`; where the reference puts it cannot be read from this checkout
+
+**MEASURED REFUSAL 2026-08-31.** The measurement is recorded in `ImageLightbox.svelte`.
+
+Upstream passes the button inside `buttons: { download: { label, className: "btn-primary btn-sm
+m-auto", … } }`, and it is **bootbox** that decides where a `buttons` entry lands in the DOM and what
+class list it ends up with. `window.bootbox` is a global in the captured page and its source is NOT
+in the 2,891,205-byte bundle — `bootbox` appears only as call sites. So `.modal-footer` versus the
+body, and whether `btn` is prepended to `btn-primary btn-sm m-auto`, are answerable only from a
+rendered DOM capture, and thirteen of the fourteen capture roots are absent from this checkout by
+design. `todo-next.md` states the same limit in general terms: a gap that turns on rendered geometry
+is not auditable here and must say so rather than be guessed.
+
+**What IS transcribed from those bytes and is now asserted:** the callback ends `…,!1)` — it returns
+false, which is bootbox's "do not dismiss" — so saving the image leaves the lightbox open. The
+button below closes nothing.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `divergence` · reference byte **1,992,730**
+
+**Ours:** `ImageLightbox.svelte` renders the button inside `.bootbox-body` after an `<hr />`, with
+`class="btn btn-primary btn-sm"`. Both the `<hr />` and the placement are this room's, are recorded
+as this room's in that file, and are evidence of nothing.
+
+### OVL-07 — Upstream raises the Q&A notice once per question the viewer asked, plus once more for a presenter; this room raises it once
+
+**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. `updateAlertMsg` runs two sibling
+blocks over the same event: a LOOP over `o.qa` that fires for every entry whose `uid` is the
+viewer's, and then a separate `user.isPresenter && (…)` block with the identical body. So a member
+who has asked three questions on an alert gets three toasts and three `qaAlert` sounds when a fourth
+arrives, and a presenter who has also asked gets four.
+
+Reproducing that would reproduce a defect: the notice says *who asked what on which alert*, and it
+says the same thing each time. `deliverQaNotice` in `RoomOverlays.svelte` resolves the audience once
+— never for your own post, otherwise every presenter plus anyone who has asked on that alert — and
+delivers once.
+
+This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.
+
+**low** · `defect` · reference byte **1,408,905**
+
+```
+for(let _ of o.qa)_.uid===this.appService.globals.user.userXrefID&&(this.appService.globals.preferences.doNotDisturbOn||(!l&&this.appService.globals.preferences.qaSoundOn&&this.soundEffectsService.qaAlert.play(),…),!l&&this.appService.globals.preferences.alertPopup&&this.alertService.info(`"${s.txt}" for alert: "${o.txt}" by ${o.n}`,`Alert ${f} from @${s.n}`),…);this.appService.globals.user.isPresenter&&(… the same body again …)
+```
+
+**Ours:** `deliverQaNotice` is called once per FRESH question, and it returns early unless the
+viewer is a presenter or has asked on that alert. The presenter branch at byte 1,409,538 is the
+duplicate — it repeats the loop body verbatim rather than being reached instead of it.
+
+---
+
 ---
 
 ## notes/NoteEditor.svelte — second reading, 2026-08-30
@@ -5089,6 +5640,3532 @@ is the half of the pair that has a consumer.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
+## ExtraChatPane.svelte
+
+Nine rows, all added on 2026-08-31 by a reading of `app-extra-chat` end to end — its consts table
+decoded by value at byte 2,393,850, its template function at 2,399,236, its class body from 2,374,375
+and its own stylesheet at 2,400,462. This surface had no section in this document before that
+reading, and it is deliberately not in the surfaces table above: that table describes the
+two-verifier pass, and this is not part of it.
+
+`ExtraChatPane` is the SECOND compiled copy of the chat column and the two copies differ, so every
+offset below says which copy it came from. Where the difference is `ChatTabStrip`'s — `acA-06` and
+the second half of `acA-11` — it is named and not touched, because that file belongs to another
+reading in progress.
+
+### XCP-01 — `#textAreaHolderExtra` is an invented id, and it cost the column its whole composer stylesheet plus the width container
+
+**FIXED 2026-08-31.** The holder wears `textAreaHolder` again, through
+`EXTRA_CHAT_COMPOSER_HOLDER_ID` in `#lib/extra-chat-surface.ts`, which carries the measurement.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The suffix was ours, added for id uniqueness, and it silently cut the second chat column off from
+five rule families at once: `#textAreaHolder` itself (`app.css:394` — the flex row, the 5px margin
+and padding, the 8px radius, the textarea background), the two 35px min-heights on its wrappers
+(`:410`, `:415`), `#textAreaHolder textarea` and its focus ring (`:420`, `:439`), all three
+`.darkTheme #textAreaHolder` rules (`:1410`, `:1414`, `:1421`), and — the one that turned a control
+into a no-op — `container-type: inline-size` at `:476`.
+
+**A container query with no container ancestor evaluates to false.** So
+`@container (width < 410px) .textAreaBtnsCol:not(.composer-options-forced) .composer-options`
+never hid the option buttons and `@container (width >= 410px) .composer-expand` never hid the "+",
+and BOTH sets rendered at every width. The only rule still biting was
+`.composer-options-forced .composer-expand`, which is not inside a query — so pressing "+" hid "+"
+and revealed nothing, because nothing was hidden. That is `CLAUDE.md`'s "no control whose only
+effect is changing its own label", in the room, reachable by any viewer with the second column on.
+
+`.textSendDiv` has NO rule in any stylesheet in this repository — grepped, zero hits — so nothing
+covered for the missing id.
+
+**high** · `defect` · reference byte **2,393,850**
+
+```
+[1,"px-0","flex-fill"],["id","textAreaHolder",1,"d-flex","align-items-center","textSendDiv"]
+```
+
+**Ours:** ExtraChatPane.svelte rendered `<div id="textAreaHolderExtra" …>`. The reference's const 25
+is byte-identical to `app-chat`'s, and `app-extra-chat`'s OWN component stylesheet addresses it by
+that id at byte **2,405,618** — `#textAreaHolder[_ngcontent-%COMP%]{background-color:var(--textarea-bg);border-radius:8px;padding:5px;margin:5px}`.
+The duplicate id is therefore the reference's own; this repository already carried it twice
+(`AlertChatArea.svelte:1208`, `AlertQaComposer.svelte`). Nothing in `src/` resolves it in script —
+every occurrence is a CSS selector, markup, or a contract test. The FIELD ids stay distinct
+(`textAreaTxt` / `textAreaTxtExtra`), which is the separation `RM-16` shows the reference itself
+makes. Pinned by `extra-chat-surface-contract.test.ts`, whose negative control (restoring the
+suffix) failed two assertions.
+
+### XCP-02 — the brand has no `&nbsp;Chat` label when the room has no channels
+
+**BUILT 2026-08-31.** `{#if chatTabs.length === 0}<span>&nbsp;Chat</span>{/if}`, in the navbar brand.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The second half of `acA-11`, which `AlertChatArea.svelte:1028` has carried since that row was
+written and this column never got. `ChatTabStrip` already suppresses the whole `<ul>` when there are
+no tabs, so without this label a room with no channels configured drew a bare comment glyph in this
+column's header and nothing said "Chat". `&nbsp;` and not a space: the capture's character is the
+escape `\xa0`, and a plain space would be folded away by the surrounding template whitespace.
+
+**low** · `missing-behaviour` · reference byte **2,367,381**
+
+```
+function j3e(t,n){1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}
+```
+
+**Ours:** ExtraChatPane.svelte's `<a class="navbar-brand ml-1 mr-1">` held the comment glyph and the
+DND badge and nothing else. The gate is `O(5,0==o.chatTabs.length?5:-1)` at byte **2,399,848**,
+inside `app-extra-chat`'s own template function at 2,399,236 — not the main column's, which is a
+separate copy at 1,453,850.
+
+### XCP-03 — Alt+Enter sends the message where the reference inserts a newline
+
+**FIXED 2026-08-31.** The captured three-way branch is now one function,
+`composerEnterAction` in `#lib/chat-composer-enter.ts`, and both composers this repository owns route
+through it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`submitOnEnter` guarded on `event.shiftKey` alone, so Alt+Enter fell through to the send. The Q&A
+modal's composer had the same rule right against the same upstream shape, so the two composers in
+this repository disagreed about one keystroke — the "three implementations, one of them unfed"
+failure `room-message-chrome.ts` records, in miniature. Falling through rather than appending `"\n"`
+by hand is a deliberate divergence and is kept: the browser puts the break at the caret and keeps
+the undo stack, which `i.val(i.val()+"\n")` does not.
+
+**medium** · `defect` · reference byte **2,386,309**
+
+```
+e.altKey?(i.val(i.val()+"\n"),this.autoExpand(e.target)):(this.showEmojiChooser=!1,this.sendMessage()
+```
+
+**Ours:** ExtraChatPane.svelte's `submitOnEnter` read
+`if (event.key !== 'Enter' || event.shiftKey) return;`. The shift branch is at byte **2,386,255** and
+the alt branch at **2,386,309**, both inside `app-extra-chat`'s `onKey` (byte 2,386,131) — the extra
+column's own handler, keyed to `#textAreaTxtExtra`.
+
+### XCP-04 — sending a message leaves the emoji picker open over the message that just arrived
+
+**BUILT 2026-08-31.** `emojiOpen = false` before `onsend()`, which is the order the reference uses.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`this.showEmojiChooser = !1` is the FIRST act of the send branch, before `sendMessage()`. It is not
+incidental: the picker is an absolutely positioned popover over the composer, so leaving it up hides
+the message the viewer just sent. `AlertQaModal` already closed its own; this column did not.
+
+**low** · `missing-behaviour` · reference byte **2,386,367**
+
+```
+this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target)
+```
+
+**Ours:** ExtraChatPane.svelte's send path called `onsend()` and touched neither `emojiOpen` nor
+`giphyOpen`.
+
+### XCP-05 — the emoji and GIF triggers carry none of their captured attributes
+
+**BUILT 2026-08-31.** Both const tables are now named constants in `#lib/extra-chat-surface.ts`,
+quoted in full beside the values they produce, and spread onto the two triggers.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The emoji trigger had `class` and `aria-describedby` and nothing else, where const 66 carries four
+popover attributes — `placement`, `container`, `autoClose`, `popoverClass`. They are the popover's
+placement and its escape rule, not decoration: `autoClose: "outside"` is what dismisses the picker on
+a click elsewhere and `container: "body"` is what stops it being clipped by the composer's overflow.
+The main column's trigger (`AlertChatArea.svelte`) and the Q&A modal's both carry them; this was the
+third of three and the only one without, which is the same one-of-two shape `EMOJI-10` records for
+`popoverId`.
+
+The GIF trigger carried the font size alone, so it was the ONE composer button in this column with no
+tooltip at all. Const 72 writes `placement` TWICE — `top` then `auto` — and `auto` is reproduced,
+because the later value is the one Angular applies and it is what `AlertChatArea` already resolved
+the same const to.
+
+Applying the two spreads removed four `svelte-ignore` lines, and that is expected rather than a
+regression: the compiler stops issuing `a11y_click_events_have_key_events` and
+`a11y_no_static_element_interactions` once a spread is present, so the ignores suppressed nothing and
+`svelte/no-unused-svelte-ignore` failed on them. Verified by removing them and re-running
+`svelte-check` — 1,495 files, 0 errors, 0 warnings — and `eslint`, clean.
+
+**low** · `divergence` · reference byte **2,393,850**
+
+```
+["placement","auto","container","body","autoClose","outside","popoverClass","popOverDiv",1,"textAreaBtns",3,"click","ngbPopover"]
+```
+
+**Ours:** ExtraChatPane.svelte's emoji `<span>` was `class="textAreaBtns"` plus `aria-describedby`;
+its GIF `<span>` was `class="textAreaBtns" style="font-size: 12px;"` plus `aria-describedby`. Const
+66 and const 72 of this component's own table are decoded in
+`extra-chat-surface-contract.test.ts`, which slices the bundle for both rather than trusting the
+transcription.
+
+### XCP-06 — a cited const number belongs to `app-chat`'s table, not this component's
+
+**FIXED 2026-08-31.** The webinar tooltip is const **53** here; the comment said 56.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The two tables are NOT an offset of one another. `app-chat` carries a "Detach Chat" button at its own
+53/54 that this column has no node for at all, so its numbering runs ahead: index 56 there is the
+webinar tooltip, index 56 here is `[1,"users-count","me-1"]` — the typing indicator's counter, a
+different control entirely. A const number is only readable against the table it came from, and this
+is the second time in a week that a cited index in this repository pointed at something else.
+
+The same reading measured `Z3e`'s fifth node — `T(4,"i")`, a bare `<i>` with no const, so no class,
+no attribute and no text — and REFUSED it. An element with no class cannot be styled and this room
+has no rule that could reach it, so reproducing it would add a tag nothing renders and nothing reads.
+
+**low** · `wrong-constant` · reference byte **2,393,850**
+
+```
+["placement","top","ngbTooltip","In webinar mode users only see their own chat messages, while Presenters see everyones messages...",1,"ml-2"]
+```
+
+**Ours:** ExtraChatPane.svelte's webinar comment read "tooltip verbatim from const 56". The tooltip
+string itself was always right; only the index pointing at it was wrong.
+`extra-chat-surface-contract.test.ts` proves the divergence by asserting that `"title","Detach Chat"`
+is in `app-chat`'s table and absent from this one.
+
+### XCP-07 — the roomscroller's `ngClass` is not bound
+
+**MEASURED REFUSAL 2026-08-31.** The class it would apply has no rule in any of the 52 stylesheets
+this repository holds, and that measurement already exists — this row points at it rather than
+repeating it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`USM-18` and `settings-preference-wiring-contract.test.ts` argued this pair for the settings checkbox
+that drives it and refused the same binding there. Binding it here would switch on a class name
+nothing reads, which is the "no `.flipped` class with no CSS" rule.
+
+**low** · `divergence` · reference byte **2,400,160**
+
+```
+("ngClass",ct(13,B3e,o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview))
+```
+
+**Ours:** ExtraChatPane.svelte's `<app-extra-roomscroller>` carries the three captured inline styles
+and no `class`. `B3e` at byte **2,367,305** is `t=>({"chat-uploaded-img-sm":t})`;
+`extra-chat-surface-contract.test.ts` reads both offsets and then asserts the class has no rule in
+`app.css` or `captured-runtime-components.css`.
+
+### XCP-08 — the "Play YouTube For All" button is absent from this composer
+
+**BLOCKED 2026-08-31.** One line in `routes/+page.svelte` unblocks it, named below.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`lMe` resolves five children and the gates at byte **2,373,334** read
+`O(2, canPostImages …)` image, `O(3, isPresenter …)` **YouTube**, `O(4, canPostImages …)` GIF,
+`O(5, …enableRTE && …enableRTE && …isPresenter …)` RTE. The main column draws the third
+(`AlertChatArea.svelte:1288`) and this one does not, so a presenter can send a video to the room from
+one chat column and not from the other.
+
+**What would unblock it:** `apps/room/src/routes/+page.svelte`, inside the `<ExtraChatPane …/>` call
+that begins at **line 1477** — add one prop:
+`onyoutube={gates.isPresenter ? () => modals.open('youtube') : undefined}`. The gate belongs on the
+page for the reason this component's own note gives: it is handed each entitlement's RESULT rather
+than the raw `isPresenter`, so authority stays decided in one place. Without a caller, an optional
+handler and its branch would be a prop nothing passes and a control nothing reaches, which is the
+scaffolding rule this repository has already paid for once.
+
+**medium** · `missing-control` · reference byte **2,371,656**
+
+```
+function iMe(t,n){1&t&&(d(0,"span",68),T(1,"i",71),u())}
+```
+
+**Ours:** ExtraChatPane.svelte draws emoji, image, GIF and RTE and nothing between the image and the
+GIF. Const 68 is
+`["data-bs-toggle","modal","data-bs-target","#play-youtube-modal",1,"textAreaBtns"]` and const 71 is
+`["ngbTooltip","Play YouTube For All","placement","left",1,"fas","fa-video"]`. The reference's span
+carries NO click — it is a Bootstrap data-target — and this room's `Modal` is not Bootstrap-driven,
+which is why `AlertChatArea` reaches its host through a prop and why this column cannot.
+
+### XCP-09 — `app-extra-chat` has no transcribed stylesheet at all, and the capture it would come from never saw the component
+
+**BLOCKED 2026-08-31.** A re-capture unblocks it; a hand-edit is forbidden.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+This is the largest single gap on the surface and it is invisible from the markup, which is why it
+was found by reading the bundle's `styles:` array rather than the template. `app-extra-chat` ships
+**5,818 bytes** of component styles — `.chatTabs` and its five `.nav-link` states, `.counterBadge`,
+`.typing-indicator-container`, `.users-count`, `.users-typing`, `.txt-area` and its focus ring,
+`.textAreaBtns` and its hover, `.textAreaBtnsCol`, `#textAreaHolder`, `.chatDisabled`,
+`.webinarMode`, `.roomLog`, and the whole Giphy popover. `src/lib/styles/captured-runtime-components.css`
+contains the string `app-extra-chat` **zero times**.
+
+The reason is in the generator's INPUT rather than the generator: `apps/room/css/complete-app-styles.css`
+— whose SHA-256 is the one that generated file's header pins — contains `extra-chat` zero times too.
+That capture was taken from a room with `preferences.extraChatColumn` OFF, so Angular never mounted
+the component and never injected its styles into the document being captured.
+
+**What would unblock it:** a re-capture of `apps/room/css/complete-app-styles.css` from a room with
+the second chat column enabled, followed by `pnpm css:sync-captured`. It is NOT a hand-edit:
+`AGENTS.md` forbids editing a generated artifact and that sheet's own header says so on line 9.
+
+**high** · `missing-behaviour` · reference byte **2,400,462**
+
+```
+styles:[".navbar[_ngcontent-%COMP%]{font-size:12px;padding:2px}.chatToolbar[_ngcontent-%COMP%], .chatHeader[_ngcontent-%COMP%]{background-color:var(--msgs-header-bg);color:var(--msgs-header-color)}
+```
+
+**Ours:** everything this column renders is styled only by rules that happen to be global or to be
+`app-chat`'s written unscoped. Spot-checked: `.chatDisabled` and `.webinarMode` exist in `app.css`;
+`.chatTabs`, `.counterBadge`, `.typing-indicator-container`, `.users-typing` and `.txt-area` exist
+ONLY under `app-chat`, `app-privchat`, `app-reply-modal` or `app-alert-qa-modal` scopes in
+`captured-runtime-components.css`, none of which reaches this component.
+`extra-chat-surface-contract.test.ts` asserts both halves — the bundle HAS the stylesheet, and
+neither the generated sheet nor its input has ever seen the component.
+
+## AlertQaModal.svelte
+
+Thirteen rows, all added on 2026-08-31 by a reading of `app-alert-qa-modal` end to end — its consts
+table decoded by value at byte 2,341,450, its template function at 2,343,416, its class body from
+2,333,560 and its own stylesheet at 2,344,356. This surface had no section in this document before
+that reading, and it is deliberately not in the surfaces table above.
+
+Four rows were built, two were fixed, one was already built, one is a measured refusal and four are
+BLOCKED on the same two lines of `ModalHost.svelte` and its render of this component. The modal
+reached its `source-size-contract` ceiling in the process, so `AlertQaAlertCard.svelte` (the
+reference's own `e3e`) and `AlertQaComposer.svelte` (its footer) came out of it; the rows name
+whichever of the three now owns the code.
+
+### QAM-01 — a Q&A thread never shows a date separator, because `showDateSeparator` is hardcoded false
+
+**BUILT 2026-08-31.** `showsDateSeparator(index)`, reproducing the reference's `prevD`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference passes each entry the PREVIOUS entry's timestamp, and `app-st-message` turns it into
+`isND`, which its own template gates the separator on — `O(2, o.isND ? 2 : -1)` at byte **1,361,572**.
+An alert's Q&A stays open for as long as the position does, so a thread running past midnight is
+ordinary rather than exotic; it showed one unbroken run of times with no day boundary anywhere.
+
+`sameCalendarDay` and NOT `getDay()`: upstream compares the day of the WEEK, so two entries exactly
+seven days apart compare equal and the separator is skipped. That is a defect and this repository
+already decided against reproducing it — the same helper draws the separator in both chat columns.
+`index > 0` reproduces the `i > 0 ? … : 0` half exactly: the first entry has no predecessor, so
+`prevD` is `0`, so `this.prevD &&` is false, so `isND` stays at its `!1` initial value.
+
+**medium** · `missing-behaviour` · reference byte **2,332,963**
+
+```
+("msg",e)("isP",o.isPresenter)("logType",o.logType)("isQAMsg",o.isQAMsg)("qaMsgID",o.qaMsg._id)("msgIndex",i)("prevD",i>0?o.msgs[i-1].t:0)
+```
+
+**Ours:** AlertQaModal.svelte passed `showDateSeparator={false}` to every entry. The same `prevD`
+binding is at byte **2,333,284** in the COMPACT renderer, and the flag it feeds is built at byte
+**1,346,064** in `app-st-message`. Pinned by `alert-qa-surface-contract.test.ts`, whose negative
+control (restoring the hardcoded `false`) went red.
+
+### QAM-02 — the composer is not emptied when the modal opens on a different alert
+
+**BUILT 2026-08-31.** Cleared on the open transition, keyed by the alert's id.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`Modal` keeps this component mounted and toggles `display`, so `qaComposer` survived every close.
+Half a question typed against alert A, abandoned, then the Q&A opened on alert B — and the fragment
+was sitting in the box addressed to the wrong alert, one Enter away from being posted there. That is
+why this is a defect rather than a tidiness point.
+
+The marker is a PLAIN field and not `$state`: nothing renders from it, and an effect that reads its
+own marker reactively re-runs on the write that was meant to end it. `arrivals.ts` records the same
+reasoning for the same shape.
+
+**medium** · `defect` · reference byte **2,334,927**
+
+```
+i&&(yi("#alertQAModal").modal("show"),this.modalId=e._id,yi("#textAreaQATxt").val(""))
+```
+
+**Ours:** AlertQaModal.svelte declared `qaComposer = $state('')` and cleared it only on a successful
+send. The clear is the `openModal` half of the `openAlertQAModal` subscription upstream, so it fires
+on an OPEN and not on the thread refreshes that follow it — which is why this is keyed on the alert
+id rather than on `open` alone.
+
+### QAM-03 — the thread opens on its oldest entry
+
+**BUILT 2026-08-31.** The modal body is scrolled to its bottom on open and on each arrival.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`scrollToBottomQA()` is called from three places upstream: on `openAlertQAModal` once the thread is
+assigned, from `ngAfterViewInit`, and at the end of `sendMessage`. Its target is the `.modal-body`
+itself — reference index 0 in the consts table, attached by `d(9,"div",10,0)`. The container really
+does scroll: `#alertQAModal .modal-body` is
+`min-height:330px; max-height:70vh; height:100%; overflow-y:auto` in the component's own stylesheet
+at byte **2,344,478**, transcribed at `captured-runtime-components.css:5400`. Without it, opening the
+Q&A on an alert with a long thread showed the OLDEST question and the answer everyone came for was
+below the fold.
+
+`tick()` rather than the reference's `setTimeout(…, 500)`: that wait exists because Bootstrap's
+`.modal("show")` animates, and what is actually being waited for is the body having a layout to
+measure. `Modal` sets `display: block` in the same flush that flips `open`.
+
+**medium** · `missing-behaviour` · reference byte **2,335,916**
+
+```
+scrollToBottomQA(){const e=this;try{setTimeout(()=>{e.qaContainer.nativeElement.scrollTop=e.qaContainer.nativeElement.scrollHeight},500)}catch{}}
+```
+
+**Ours:** AlertQaModal.svelte had no scroll of any kind. The element is reached with `bind:this` on
+the component's own host element and a `querySelector` for `.modal-body` inside it —
+`dom-reference-contract.svelte.test.ts`'s rule, taken the way it asks rather than with an attachment
+that assigns and clears a node.
+
+### QAM-04 — "the captured textarea had no handler at all" is false, and it was licence
+
+**FIXED 2026-08-31.** The claim is corrected in place, with the three bindings that refute it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The behaviour under that sentence was RIGHT and the justification was invented, which is worse than
+no comment: a handler introduced with "the capture had none" is a handler anybody may redesign. Const
+17 ends `3,"keyup","paste","placeholder"` — three bindings, not zero — the template attaches the
+first two at byte **2,343,759**, and `onKey` at byte **2,336,560** is the same three-way Enter branch
+every composer in the application carries.
+
+The correction is recorded rather than the sentence deleted, so it reaches whoever read the old one.
+The `keydown`-not-`keyup` divergence is real and stays: upstream needs a second binding
+(`onKeydown(e){e.preventDefault()}`) purely to stop the browser inserting a newline before the keyup
+arrives, and one handler on `keydown` has nothing to keep in step.
+
+**low** · `defect` · reference byte **2,342,103**
+
+```
+["name","txt-area","id","textAreaQATxt","rows","1","spellcheck","true",1,"txt-area","form-control","border-0",3,"keyup","paste","placeholder"]
+```
+
+**Ours:** AlertQaModal.svelte carried the false sentence above `handleQaKeydown`; the handler now
+lives in `AlertQaComposer.svelte` with the measurement. The Enter rule itself moved to
+`#lib/chat-composer-enter.ts`, shared with `ExtraChatPane` — which is `XCP-03`'s other half.
+
+### QAM-05 — the image-upload button has no click handler, and its gate is narrower than the reference's
+
+**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+Two defects in one node. **It does not act:** const 36 is `[1,"textAreaBtns",3,"click"]` — a click
+binding — and `l3e` at byte **2,333,483** wires it to `imgUpload()`. Ours carries no handler at all,
+so a presenter clicking the image icon in the Q&A footer gets nothing. **Its gate is the wrong
+value:** `canPostImages` is set once in `ngOnInit` at byte **2,334,626** as
+`(this.isPresenter || sessData.userUploads)`, so a room with member uploads on offers this to
+members; `isPresenter` narrows it to presenters only.
+
+**What would unblock it:** `apps/room/src/lib/components/ModalHost.svelte`, in the `<AlertQaModal …/>`
+call at **line 5636** — add one prop, `onimageupload={() => composer.openImageUpload()}`, the same
+path both chat composers already use. Building the upload call locally instead would put a second
+implementation inside a modal, which is how two of them drift.
+
+**high** · `missing-control` · reference byte **2,333,483**
+
+```
+function l3e(t,n){if(1&t){const e=Y();d(0,"span",36),x("click",function(){return D(e),E(g().imgUpload())}),T(1,"i",37),u()}}
+```
+
+**Ours:** the span is rendered — with its tooltip, its class and its gate — and does nothing. It now
+lives in `AlertQaComposer.svelte` with both measurements recorded at it.
+`alert-qa-surface-contract.test.ts` asserts the button IS drawn before asserting what it lacks, so
+the row cannot go green by the button disappearing.
+
+### QAM-06 — pasting an image into the Q&A composer does nothing
+
+**BLOCKED 2026-08-31.** The same line as `QAM-05` unblocks it.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+Const 17 declares `paste` beside `keyup`, and the template binds it to `onImagePaste` at byte
+**2,343,759**; the handler itself is at byte **2,339,887** and uploads the pasted file with whatever
+is already in the box as its message. There is no paste handler on our Q&A composer at all.
+
+Filed separately from `QAM-05` rather than folded into it because the two are different affordances
+with different failure modes — a dead button is visible, a missing paste handler is not — but they
+are unblocked by the same prop, and a reader closing one should close the other.
+
+**medium** · `missing-behaviour` · reference byte **2,342,103**
+
+```
+3,"keyup","paste","placeholder"
+```
+
+**Ours:** `AlertQaComposer.svelte`'s textarea binds `onkeydown` only. `#lib/pasted-image.ts` and
+`ImageUploadDialog.svelte` exist and are wired to the two chat composers; neither is reachable from
+this modal.
+
+### QAM-07 — `bodyStyle="max-height: 70vh;"` duplicates one declaration of a four-declaration rule
+
+**FIXED 2026-08-31.** The inline copy is gone; the transcribed rule is unchanged.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`#alertQAModal .modal-body{min-height:330px;max-height:70vh;height:100%;overflow-y:auto}` is the
+component's own stylesheet at byte **2,344,478**, transcribed at
+`captured-runtime-components.css:5400-5405`. An inline copy of one of the four wins the cascade for
+that one and says nothing about the other three, so a reader comparing the modal to the capture found
+the height in two places and the overflow in neither — and the inline copy is the one that goes
+stale, because it is not what `pnpm css:sync-captured` regenerates.
+
+**low** · `divergence` · reference byte **2,344,478**
+
+```
+#alertQAModal[_ngcontent-%COMP%]   .modal-body[_ngcontent-%COMP%]{min-height:330px;max-height:70vh;height:100%;overflow-y:auto}
+```
+
+**Ours:** AlertQaModal.svelte passed `bodyStyle="max-height: 70vh;"` to `Modal`. Removing it is what
+made `QAM-03` possible to reason about: the scroll depends on `overflow-y: auto`, which only the
+transcribed rule supplies.
+
+### QAM-08 — the alert card is drawn even when there is no alert
+
+**BUILT 2026-08-31.** `{#if alert}`, in `AlertQaAlertCard.svelte`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`O(7, o.qaMsg ? 7 : -1)` gates the whole of `e3e`, and each of the four fields inside it is gated
+again — one `hasOwnProperty` apiece for `"avt" || "pic"`, `"t"`, `"n"` and `"txt"`. Rendered
+unconditionally with a `?? ''` behind each field, an alert-less open drew the FRAME of a card: the
+bordered `admin-alert` box, a 50px mystery-man avatar, an empty `<strong>` and an empty body, under a
+heading reading "Q&A for Alert:". `Modal` keeps its subtree mounted and toggles `display`, so that is
+reachable state and not a theoretical one.
+
+**low** · `missing-behaviour` · reference byte **2,344,076**
+
+```
+O(7,o.qaMsg?7:-1)
+```
+
+**Ours:** AlertQaModal.svelte rendered the card unconditionally. `e3e` at byte **2,332,074** is a
+sub-template called once, which is the seam the card was extracted along when the modal hit its size
+ceiling — the reference's own division, not a new one.
+
+### QAM-09 — the alert sender's name loses the reference's two spaces
+
+**BUILT 2026-08-31.** `{' '}{alert.senderName}{' '}`, the repository's standing idiom.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`username` is `mx-1` on a `flex-nowrap` row beside the timestamp, so those two spaces are rendered
+separation between the name and whatever sits against it. `AGENTS.md` records the autofixer
+suggestion this repository declines for exactly this reason: every capture comparison here diffs
+rendered strings, so a space is evidence rather than formatting.
+
+**low** · `divergence` · reference byte **2,331,372**
+
+```
+Ne(" ",e.qaMsg.n," ")
+```
+
+**Ours:** AlertQaModal.svelte rendered `{targetMessage?.senderName ?? ''}`, which Prettier and HTML
+whitespace folding both collapse.
+
+### QAM-10 — the alert body in the header is rendered as plain text where the reference pipes it
+
+**BLOCKED 2026-08-31.** One line in `ModalHost.svelte` unblocks it, named below.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference binds `innerHTML` to
+`parseLinks(parseSymbols(qaMsg.txt, "chat", qaMsg.avt, null), preferences.chatGif, qaMsg._id, false)`
+and chooses between two templates on `O(0, sessData.copyTrades ? 0 : 1)` at byte **2,332,021** —
+`Xxe` with a `copyTradeOnClick` handler, `Jxe` without. So a `$TICKER` in the alert is coloured, a
+pasted URL is a link and an image URL renders as the image. Ours shows the raw string, so the same
+alert is fully piped in the log beneath the modal and markup-free inside it.
+
+**What would unblock it:** `apps/room/src/lib/components/ModalHost.svelte` at **line 529**, in the
+`targetMessage` shape — add `targetUrl?: string | null;`. `MessageBody` renders those segments and
+emits `image` clicks, which `room/message-actions.svelte.ts:497` resolves through exactly that field;
+without it this component cannot name the URL the dispatcher would open, and rendering the image with
+a click that cannot act is the control-with-no-effect this repository refuses. The value is present
+at runtime — `RoomOverlays.svelte:783` passes `messageActions.selected`, a full `MessageActionItem` —
+so this is a declaration catching up with the data, not a new dependency.
+
+**medium** · `missing-behaviour` · reference byte **2,331,625**
+
+```
+z("innerHTML",Tn(2,6,Tn(1,1,e.qaMsg.txt,"chat",e.qaMsg.avt,null),e.appService.globals.preferences.chatGif,e.qaMsg._id,!1),wn)
+```
+
+**Ours:** `AlertQaAlertCard.svelte` renders `{alert.body}` inside the captured
+`msg-left text-formated preText ml-2 mr-2 p-0` div. `messageChrome` already carries both `chatGif`
+and `copyTrades`, so the pipe's other two arguments are available; only the image click is not.
+
+### QAM-11 — the avatar fallback drops the sender's gravatar hash
+
+**BLOCKED 2026-08-31.** The same declaration as `QAM-10`, one field wider.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference falls back to THAT SENDER's gravatar, built from their email hash. Ours falls back to
+the hashless URL, which is the generic mystery-man for everyone — so a presenter with no stored
+picture is anonymous in the Q&A header and identified everywhere else in the room.
+
+**What would unblock it:** the same `targetMessage` shape at `ModalHost.svelte:529` — add
+`senderEmailHash?: string;`. Adding an optional field to this component alone would leave it
+`undefined` at the type level while the value is present at runtime, which is the invisible mismatch
+this repository keeps finding; the declaration is what has to move.
+
+**low** · `divergence` · reference byte **2,331,038**
+
+```
+z("src",e.qaMsg.pic||"https://secure.gravatar.com/avatar/"+e.qaMsg.avt+"?d=mm&s=50",Mt)
+```
+
+**Ours:** `AlertQaAlertCard.svelte` renders
+`src={alert.senderAvatarUrl ?? 'https://secure.gravatar.com/avatar/?d=mm&s=50'}`. The `width` and
+`height` beside it are OURS and stay: const 31 is `["alt","qaMsg.avt",3,"src"]` and sizes the image
+from `.avatar img { max-width: 50px }`, which is a layout shift this repository's standard forbids.
+
+### QAM-12 — the dialog's root class is bound to the alert's own id
+
+**MEASURED REFUSAL 2026-08-31.** The effect that class exists to produce is already built elsewhere.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+`Rh("modal fade ", o.qaMsg._id, "")` concatenates the alert's id onto the class list, so the dialog
+wears a class named after a database row. Its ONE reader is four hundred bytes away at 2,334,927: a
+jQuery selector finding the dialog by that class in order to hang a Bootstrap `hidden.bs.modal`
+listener that deletes the alert's `unreadQA` marker.
+
+Refused, and the refusal is safe because that effect is already built:
+`RoomModals.closeActive` (`room/modals.svelte.ts:167`) clears `unreadQaAlertIds` for the selected
+alert on the way out and quotes this very line as its reason. Nothing in this room dispatches
+`hidden.bs.modal` — the only two occurrences of the string in `src/` are that comment and the one in
+`AlertQaModal.svelte`. A class with no rule and no reader is the "no `.flipped` class with no CSS"
+case, and this one would additionally be unstable: a different string on every alert, which no
+stylesheet and no test could ever name.
+
+**low** · `divergence` · reference byte **2,344,038**
+
+```
+Rh("modal fade ",o.qaMsg._id,""),m(7),O(7,o.qaMsg?7:-1)
+```
+
+**Ours:** AlertQaModal.svelte passes `rootClass="fade modal"`. The order against the reference's
+`"modal fade "` is order alone, which CSS does not read.
+
+### QAM-13 — the thread's compact display mode
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.** `RoomMessage.svelte:578` branches on
+the mode and renders `app-st-compactmessage` itself.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+The reference chooses between two whole loops — `o3e` over `app-st-message` and `r3e` over
+`app-st-compactmessage` — which reads at first glance as a branch this modal is missing. It is not:
+the branch is one level down, in the component all three message surfaces share, so the modal's job
+is to pass `displayMode` and nothing else. Recorded rather than duplicated, and recorded at all
+because a reader decoding `a3e` will ask the same question.
+
+**low** · `missing-behaviour` · reference byte **2,333,453**
+
+```
+function a3e(t,n){1&t&&H(0,o3e,2,0)(1,r3e,2,0),2&t&&O(0,"r"==g().displayMode?0:1)}
+```
+
+**Ours:** AlertQaModal.svelte passes `{displayMode}` to every entry and `RoomMessage` does the rest.
+The mode itself is the ALERTS one, which is the reference's own choice — its `loadAlertsMode()` at
+byte 2,335,599 is the same function the alerts log calls.
+
+---
+
+## PrivateChatComposer.svelte
+
+Nine rows, read on 2026-08-31 against the pinned v4 bundle by bracket-walking `consts:[[` at byte
+2,214,572 to 2,219,021 — 79 entries, decoded by value — rather than by looking up the slots the
+existing rows name. Six of the nine are rows a slot lookup cannot produce.
+
+### PCC-01 — Shift+Enter inserts a newline here, and no composer in the bundle does that
+
+**FIXED 2026-08-31 02:15 UTC.** `chat-composer-enter.ts` now owns the branch, and
+`PrivateChatComposer.svelte` calls it: Shift+Enter SWALLOWS, Alt+Enter is the newline, plain Enter
+sends. Five negative controls, two of them on this row: flipping the swallow arm to `'newline'`
+reported `2 failed | 29 passed`, and restoring it `31 passed`.
+
+**high** · `divergence` · reference byte **2,208,387**
+
+```
+onKey(e){if(13==e.keyCode){e.preventDefault();const i=Ao("#textAreaTxtPM");e.shiftKey?(i.val(i.val()),this.autoExpand(e.target)):e.altKey?(i.val(i.val()+"\n"),this.autoExpand(e.target)):(this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target))}}
+```
+
+**Ours:** `PrivateChatComposer.svelte:172` read `if (event.shiftKey || event.altKey) { draft += '\n'; return; }` — one branch where the capture has two, so Shift+Enter put a line break into a box whose capture reassigns the value to itself and inserts nothing.
+
+**And this repository has now held three opinions about that one arm.** The bundle carries six `onKey` implementations and FIVE are the fragment above, character for character apart from the jQuery alias and the element id: 1,439,821 (`#textAreaTxt`, the main chat composer), 2,208,387 (`#textAreaTxtPM`), 2,319,787 (`#textAreaReplyTxt`), 2,336,560 (`#textAreaQATxt`), 2,386,131 (`#textAreaTxtExtra`). The count is asserted rather than quoted — `private-chat-composer-v4-contract.test.ts` splits the bundle on that fragment and requires exactly five. The sixth, 2,047,549, is the inline alert box, and `inline-alert-key.ts` has ITS branch right.
+
+**The lead this batch was given named `apps/room/src/lib/chat-composer-enter.ts` as an existing module and it does not exist in this checkout** — `ls` and `grep -rn "composer-enter" src` both return nothing, and nothing under `src/` imports such a name. So this row did not check ours against that module; it built it, from all six offsets, with the private composer as its consumer.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-02 — Sending does not close the emoji panel, and the capture closes it first
+
+**FIXED 2026-08-31 02:15 UTC.** The send arm sets `composerPopover = null` before `onsend()`, in that order, because that is the order upstream writes. **The negative control for this came back GREEN the first time and that is the useful part of the row**: deleting the line changed nothing, because the behaviour had been written and never guarded. Two source-and-bundle assertions were added and the control then reported `1 failed | 32 passed`, restoring to `33 passed`.
+
+**medium** · `missing-behaviour` · reference byte **2,208,387**
+
+```
+(this.showEmojiChooser=!1,this.sendMessage(),this.autoExpand(e.target))
+```
+
+**Ours:** the plain-Enter arm called `onsend()` alone. `showEmojiChooser` is the emoji popover's own flag — `toggleEmojiPanel()` at 2,208,614 is the only other writer — so a member who opened the picker, typed and pressed Enter left an emoji-mart panel sitting over the conversation they had just sent to.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-03 — The webinar notice says nothing: the words "Webinar Mode" were never rendered
+
+**FIXED 2026-08-31 02:15 UTC.** `v(1," Webinar Mode ")` is transcribed, spaces and all, through the `{' … '}` idiom this repository already declines the autofixer's suggestion over. Negative control: mutating the string to `' Wbinar Mode '` reported `1 failed | 30 passed`; restored, `31 passed`.
+
+**high** · `missing-behaviour` · reference byte **2,197,4xx** (`lEe`, in the run-up to `app-privchat`)
+
+```
+function lEe(t,n){1&t&&(d(0,"div",53),v(1," Webinar Mode "),d(2,"span",61),T(3,"i",62),u(),T(4,"i"),u())}
+```
+
+**Ours:** `PrivateChatComposer.svelte:222-234` rendered `<span class="px-1 webinarMode">` containing only the question-mark icon. Const 53's own rule is `.webinarMode{background-color:#aaa;color:#000;width:100%}` at byte 2,220,062 — a full-width grey banner — so what a member in webinar mode actually saw was an empty grey strip with a question mark in it, and the explanation of why their messages were private to them was reachable only by hovering an unlabelled icon.
+
+**`T(4,"i")` is NOT transcribed.** It is the reference's own trailing `<i>` with no const, no class and no content; an element with no attributes and no children renders nothing, and copying it would be copying a typo. Recorded at the code so the next reader does not file it as a gap.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-04 — The webinar notice was inside the button column, after the textarea; the capture puts it first in the row
+
+**FIXED 2026-08-31 02:15 UTC.** It is now the first child of `div.d-flex.mx-0`, before the textarea's wrapper. Asserted by index comparison on the server-rendered string — the notice's offset must be below both the textarea's and the button column's — rather than by looking for the class, because a class assertion passes wherever the element ends up.
+
+**medium** · `divergence` · reference byte **2,198,563**
+
+```
+d(0,"div",50)(1,"div",52),H(2,lEe,5,0,"div",53),d(3,"div",54)(4,"textarea",55)
+```
+
+**Ours:** the `{#if webinarMode}` block sat inside `div.textAreaBtnsCol` — the three-icon column — which is where a 100%-wide grey banner is not a thing that belongs. `H(2,…)` is at index 2 of const 52's children and `d(3,"div",54)` at index 3, so the notice precedes the textarea wrapper; the button column is `d(5,"div",56)`, two elements later still.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-05 — `ml-2` and the tooltip were folded onto the icon; consts 61 and 62 keep them apart
+
+**FIXED 2026-08-31 02:15 UTC.** The tooltip and the margin are on a wrapping `<span class="ml-2">`, and the `<i>` carries `fas fa-question-circle` and nothing else — which is what `T(3,"i",62)` means.
+
+**low** · `wrong-constant` · reference byte **2,214,572** (consts 61 and 62, decoded by value)
+
+```
+61 ["placement","top","ngbTooltip","In webinar mode users only see their own chat messages, while Presenters see everyones messages...",1,"ml-2"]
+62 [1,"fas","fa-question-circle"]
+```
+
+**Ours:** `class="fas fa-question-circle ml-2"` with the `placement`/`ngbtooltip` spread on the same `<i>`. Two elements collapsed into one, so the tooltip's hover target was the 14px glyph rather than the span around it, and the margin moved from the wrapper to the icon.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-06 — The composer binds no `paste`, and the capture binds one straight to the image uploader
+
+**BLOCKED 2026-08-31 02:15 UTC.** The component cannot take an `onimagepaste` prop that nothing passes — that is the scaffolding DPE rule 3 exists to refuse — and `PrivateChatPanel.svelte` is outside this batch's scope. **The exact one-line change that unblocks it:** insert `onimagepaste={onimagepaste}` into the `<PrivateChatComposer … />` call at `apps/room/src/lib/components/PrivateChatPanel.svelte:513`, alongside the prop and forwarding handler that line needs.
+
+**medium** · `missing-control` · reference byte **2,212,274**
+
+```
+55 ["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true","placeholder","Type your message here...",1,"txt-area","form-control",3,"keyup","paste","focus"]
+x("keyup",…)("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus",…)
+```
+
+**Ours:** the textarea binds `oninput`, `onfocus` and `onkeydown` and no `onpaste`, so pasting a screenshot into a private conversation does nothing. `onImagePaste(e)` at 2,212,274 reads `clipboardData.items`, takes the first `image/*`, and opens the upload confirm pre-filled with whatever was already typed — `Ao("#textAreaTxtPM").val().trim()` becomes the dialog's message box. `RoomOverlays.svelte:633,647,664,679` has the same machinery for the swing and day-trade forms, so what is missing is the wiring rather than the capability.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-07 — The capture binds `keyup`; every composer in this room binds `keydown`
+
+**DELIBERATE DIVERGENCE 2026-08-31 02:15 UTC.** Const 55's binding section is `3,"keyup","paste","focus"` and it is not transcribed, for a reason this repository has already written down twice: `CarouselDialog.svelte:586-587` records `onkeydown` "rather than `onkeyup` so the Enter that confirms cannot also submit", and `AlertChatArea.svelte:985` binds `onkeydown` to a handler decoded from a `keyup` composer. Recorded here so the third reader does not file it as a gap.
+
+**low** · `divergence` · reference byte **2,214,572** (const 55, decoded by value)
+
+```
+3,"keyup","paste","focus"
+```
+
+**Ours:** `onkeydown`. The measurement that settles it: `preventDefault()` on `keyup` runs after the browser has already inserted the newline, so PCC-01's swallow arm — the reference's own `i.val(i.val())` — could not swallow anything on the event the reference binds. Matching the event would reproduce a defect and lose the branch, which is the definition this document gives the disposition.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-08 — The emoji panel closed after every glyph; the capture leaves it open
+
+**FIXED 2026-08-31 02:15 UTC.** `onselect` now forwards the glyph and nothing else. Negative control: putting `composerPopover = null` back into the handler reported `1 failed | 32 passed`; restored, `33 passed`.
+
+**medium** · `divergence` · reference byte **2,208,868**
+
+```
+selectEmoji(e){console.log(e);let i=Ao("#textAreaTxtPM").val()+e.emoji.native;Ao("#textAreaTxtPM").val(i),this.selectedEmoji=e.emoji}
+```
+
+**Ours:** the handler set `composerPopover = null` after each selection. `selectEmoji` appends and touches `showEmojiChooser` not at all, and const 57 carries `autoClose: "outside"` — ng-bootstrap's value for "a click inside does not dismiss" — so upstream a member picks three emoji with three clicks where this made them reopen a panel with a search box and nine category tabs twice over. The GIF picker is deliberately the other way round in the same file, because `sendGif` at 2,214,017 closes its popover before it does anything else.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### PCC-09 — `inline-alert-key.ts` states, as its reason for existing, something the bundle refutes
+
+**BLOCKED 2026-08-31 02:15 UTC.** That module is outside this batch's scope. **The exact one-line change:** at `apps/room/src/lib/inline-alert-key.ts:30`, replace *"One column over, in the chat composer, **Shift+Enter is the newline**."* with *"One column over, in the chat composer, Shift+Enter is the same no-op; what differs is this box's SEND arm, which clears and re-heights where the five chat composers call `autoExpand`."* The module's CODE is correct and needs no change — only the sentence.
+
+**low** · `defect` · reference byte **1,439,821**
+
+```
+onKey(e){if(13==e.keyCode){e.preventDefault(),this.showTyping&&this.refreshTypingStatus(!0);const i=li("#textAreaTxt");e.shiftKey?(i.val(i.val()),this.autoExpand(e.target)):e.altKey?(…)}
+```
+
+**Ours:** `inline-alert-key.ts:30` names the chat composer as the box where Shift+Enter inserts a newline, and offers that contrast as the whole reason the alert box needs a module. Byte 1,439,821 IS the chat composer and its shift arm is `i.val(i.val())`. The sentence is not decorative — it is the argument a reader uses to decide which box behaves how, and it sent this batch's composer to a third answer before the six offsets were read together.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## GiphyPicker.svelte
+
+Six rows, from decoding all four Giphy templates in the bundle rather than the one the file's own
+comment cites. Three of the six exist only because the other three tables were read.
+
+### GIF-01 — The private chat's picker is 400px tall in the capture and 700 here, and the rule that says so cannot reach it
+
+**FIXED 2026-08-31 02:15 UTC.** `GiphyPicker` takes `panelHeight`, applied inline so it outranks the class rule from wherever the portal lands; the default is the majority `700px` and `PrivateChatComposer` passes `400px`. Negative control: changing the default to `400px` reported `1 failed | 22 passed`; restored, `23 passed`.
+
+**medium** · `wrong-constant` · reference byte **2,224,360**
+
+```
+.giphy-search[_ngcontent-%COMP%]{width:400px;height:400px;border:2px solid var(--modal-content-bg-color);background-color:#fff;overflow:hidden}
+```
+
+**Ours:** one unscoped rule, `app.css:551`, at `height: 700px`. The bundle declares this selector six times and the distribution is asserted rather than sampled — the contract test matches every `.giphy-search[_ngcontent-%COMP%]{…}` and requires six, five of them `height:700px` and exactly one `height:400px`. The 400px one is `app-privchat`'s.
+
+**And this is the `app-extra-chat` finding in reverse, which is why it took decoding to see.** The correct rule IS shipped: `captured-runtime-components.css:6595` carries `app-privchat .giphy-search:not(:root) { height: 400px }`. It has never applied. Every captured `.giphy-search` rule in that file is prefixed with its host element, and `GiphyPicker.svelte` portals its `<ngb-popover-window>` into `document.body` — which is what const 65's `container: "body"` means — so the node is not a descendant of `app-privchat` at the moment those rules are matched. Thirteen host-scoped rules for this popover ship and none of them can ever match; the unscoped copy in `app.css` is what paints it, at the majority value.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-02 — Three of the four Giphy templates have no search button at all
+
+**BUILT 2026-08-31 02:15 UTC.** A `searchButton` prop, and `PrivateChatComposer` passes `false`. Negative control: flipping the composer to `searchButton={true}` reported `1 failed | 30 passed`; restored, `31 passed`.
+
+**medium** · `divergence` · reference byte **2,197,701**
+
+```
+d(12,"input",72),Ve("ngModelChange",…),u(),d(13,"span",73),x("click",function(){return D(e),E(g(4).clearSearchGiphy())}),T(14,"i",74),u()
+```
+
+**Ours:** the component renders a search span and a clear span on every surface. The POPOVER variants each build exactly ONE `input-group-text` span and it is the clear one — `d(13,"span",73)` in `app-privchat`'s `uEe` (2,197,701), `d(13,"span",84)` in `app-chat`'s `r0e` (1,425,589), `d(13,"span",81)` in `app-extra-chat`'s `sMe` (2,372,048). Only `app-note`'s MODAL, `L0e` at 1,467,000, builds two: `d(12,"span",88)` → `searchGiphy()` then `d(14,"span",88)` → `clearSearchGiphy()`. The component styles agree — `app-privchat`'s blob has a `.giphy-search .fa-times` rule and no `.fa-search` rule.
+
+**The default is `true` and that is deliberately NOT the majority**, which is the opposite of how the `hint` prop chose its default one field above. The reason is named at the code: the only other consumer is `notes/NoteEditor.svelte`, which IS the modal variant and is outside this batch's scope, so a majority default would have silently removed a control from the one surface whose capture has it.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-03 — The "two words diverge from the capture" note is refuted by the other three tables
+
+**FIXED 2026-08-31 02:15 UTC.** The comment is replaced by the four hosts' const pairs, and the contract test asserts each of them plus the two occurrence counts.
+
+**low** · `defect` · reference byte **2,214,572** (consts 73 and 74, decoded by value)
+
+```
+73 [1,"input-group-text","text-white",3,"click"]
+74 [1,"fa","fa-2x","fa-times"]
+```
+
+**Ours:** `GiphyPicker.svelte:162-167` recorded `text-white` for `text-dark` and an added `fa-2x` as two deliberate divergences, argued from `app-note`'s consts 88/89/90 and generalised. By value, `text-white` with `fa fa-2x fa-times` is what all three POPOVER hosts declare — `app-privchat` 73/74, `app-chat` 84/85, `app-extra-chat` 81/82 — and `text-dark` with a plain `fa fa-search` / `fa fa-times` belongs to the one MODAL. The component matched its capture exactly and the note said it did not, which is the shape that gets "corrected" into a real defect later. `[1,"input-group-text","text-white",3,"click"]` occurs three times in the bundle and `…"text-dark"…` once; both counts are asserted. The input's `border` class splits the same way — present on all three popover hosts, absent from `app-note`'s const 87 — and ours has it.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-04 — A non-2xx Giphy response was parsed as an empty result set
+
+**FIXED 2026-08-31 02:15 UTC.** `searchGiphy` in `giphy-search.ts` throws on `!response.ok`, so the failure reaches the `catch` that leaves the previous grid standing instead of arriving as "no matches".
+
+**medium** · `defect` · reference byte **2,213,709**
+
+```
+searchGiphy(){const e=b_()({https:!0,apiKey:this.appService.globals.giphy_api_key}),i=this.giphySearchTerm;P("searchGiphy search: "+i),e.search(i).then(o=>{console.log(o),this.giphyResults=o.data}).catch(console.error)}
+```
+
+**Ours:** `results = payload.data ?? []` after an unconditional `response.json()`. Giphy answers a bad or rate-limited key with `200`-shaped JSON carrying `{"meta":{"status":403,…}}` and no `data`, and `?? []` turned that into an empty grid — a key problem presenting as a vocabulary problem, silently, on a surface with no other error channel. This is the repository's own "fails loud, no silent fallbacks" rule rather than a reference behaviour; the reference's shape that IS preserved is the one that matters at the UI, which is that a rejected search does not blank what is already there.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-05 — The result images have no intrinsic box, so the grid reflows as each GIF decodes
+
+**FIXED 2026-08-31 02:15 UTC.** `imageBox` reads `width`/`height` off the rendition and answers `null` unless both parse as positive integers; the `<img>` takes them when it can and carries nothing when it cannot. Negative control: deleting the two attributes reported `1 failed | 23 passed`; restored, `24 passed`.
+
+**low** · `defect` · reference byte **2,214,572** (const 77, decoded by value)
+
+```
+77 [3,"dblclick","src"]
+```
+
+**Ours:** `<img src alt ondblclick>` with no `width`, no `height` and no `aspect-ratio`. The reference has none either — its only sizing is `app-privchat img { max-width: 100% }` — so this is a defect reproduced rather than introduced, and the standard this repository states in as many words ("`<img>` always carries width + height or an aspect-ratio. No layout shift") decides it the other way. The numbers are EXTERNAL and are treated as such: they are validated integers or they are absent, they change what the browser reserves rather than what it renders, and nothing downstream reads them.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### GIF-06 — The reference tracks results by `title`, and that key is deliberately not transcribed
+
+**MEASURED REFUSAL 2026-08-31 02:15 UTC.** The `{#each}` stays keyed by `id`, with the reason at the code and the reference's own trackBy asserted beside it.
+
+**low** · `divergence` · reference byte **2,214,572** (`KDe`, the track function bound at `ht(16,dEe,2,1,"li",76,KDe)`)
+
+```
+KDe=(t,n)=>n.title
+```
+
+**Ours:** `{#each results as result (result.id)}`. The measurement that justifies not matching: `KDe` is `n.title` for `app-privchat` and `y0e` is the same for `app-note`, and Giphy titles collide constantly — the empty string is among the commonest. Angular's `trackBy` answers a collision by reusing a node; Svelte answers a duplicate key by THROWING `each_key_duplicate`, which takes the whole picker down. So the two are not the same instruction wearing different names, and copying the reference's field would convert a cosmetic reuse decision into a crash. `id` is used as the least-colliding field the payload offers, and it decides which DOM node is reused and nothing else — what is sent is the URL the member double-clicked, and the server decides whether it may be posted.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+## SpeechRecoOverlay.svelte
+
+Five rows. This surface was documented against a bundle that is not the pinned one and is not even
+present in this checkout, so every citation in it was unchecked by construction — `pnpm test` skips
+the file that reads it. Re-decoded here against `main.d1d09071be31f1ba.js`.
+
+### SRO-01 — Documented against an unpinned bundle whose const table is six entries shorter
+
+**FIXED 2026-08-31 02:15 UTC.** The component now cites the pinned bundle and its real indices, and `speech-reco-overlay-v4-contract.test.ts` asserts twenty of them by value against that file — a test that runs here, where the one reading `docs/source/` does not.
+
+**medium** · `defect` · reference byte **1,994,264** (`consts:[[`, bracket-walked to 2,014,221)
+
+```
+270 [1,"speech-reco-overlay"]   271 [1,"speech-reco-body"]   273 [1,"speech-reco-buttons"]
+289 ["type","button","title","Full Transcript History","aria-label","Full Transcript History",1,"speech-reco-history-btn",3,"click"]
+```
+
+**Ours:** `SpeechRecoOverlay.svelte:31-35` named `docs/source/main.d6d3c112b59b7d0d.js`, "286 entries", and "indices 264-285 for this overlay". The pinned table has **292** entries and the overlay's are **270-291** — the same table six entries shorter, so every index in the file was low by six. The rendered classes were right throughout; what was wrong was every footnote, and a footnote is the part a reader cannot reconstruct without the bundle open. `gate/evidence-bound-tests.mjs` excludes `speech-reco-overlay-render.test.ts` from this checkout because `docs/source/` is gitignored, so nothing was checking them either.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-02 — Two of the icon citations name other parts of `app-presentationarea` entirely
+
+**FIXED 2026-08-31 02:15 UTC.** The transcript button is const **289** with icon **79**, the history toggle **290** with icon **291**, the close button **276** with icon **92**. Negative control: restoring "button 270 + icon 93" reported `1 failed | 37 passed`; restored, `38 passed`.
+
+**low** · `defect` · reference byte **1,952,594**
+
+```
+d(0,"button",289),x("click",…openTranscriptPage()),T(1,"i",79)
+d(0,"button",290),x("click",…toggleSpeechRecoHistory(o)),T(1,"i",291)
+d(7,"button",276),x("click",…hideSpeechRecognition(o)),T(8,"i",92)
+```
+
+**Ours:** the file read "283 + icon 80 (`fa-external-link-alt`), 284 + icon 285 (`fa-history`), 270 + icon 93 (`fa-times`)". In the pinned table const **80** is `["title","Lock this screen?"]` and const **93** is the volume slider's attribute list — neither is an icon, and neither belongs to this overlay. This is worse than the uniform six-entry shift SRO-01 describes, because subtracting six does not recover it: a reader correcting for the shift lands on 74 and 87, which are the two history buttons' no-click variants. Both wrong consts are now asserted for what they ACTUALLY are, so the old citation cannot come back quietly.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-03 — The two dismissal clicks reach the presentation surface underneath
+
+**FIXED 2026-08-31 02:15 UTC.** `haltCaptionDismissal` calls `preventDefault()` and `stopPropagation()` before the close and history-toggle callbacks, and deliberately not before the transcript one. Negative control: reverting the close button to `onclick={onclose}` reported `1 failed | 37 passed`; restored, `38 passed`.
+
+**medium** · `missing-behaviour` · reference byte **1,957,104**
+
+```
+hideSpeechRecognition(e){e.preventDefault(),e.stopPropagation(),this.appService.globals.preferences.showSpeechRecoOverlay=!1,…}
+toggleSpeechRecoHistory(e){if(e.preventDefault(),e.stopPropagation(),…)}
+```
+
+**Ours:** `onclick={onclose}` and `onclick={ontogglehistory}`, with both props typed `() => void`, so the event was neither used by the component nor reachable by the parent. The overlay is `position: absolute; z-index: 9999` lying across the bottom of the presentation surface — its own captured rule — so every dismissal also landed as a click on whatever the presentation area does with clicks.
+
+**The transcript button is deliberately left alone**, and that asymmetry is the capture's: `x("click",function(){return D(e),E(g(2).openTranscriptPage())})` takes no event argument at all, because it opens a new window and has nothing to suppress. Suppressing there too would be tidiness overruling the capture on a control where the capture is explicit.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-04 — The single-line branch is a LOOP upstream and a single `{:else if}` here, and that is not a gap
+
+**ALREADY BUILT — verified by reading 2026-08-31 02:15 UTC, not rebuilt.** Recorded because the offset invites the opposite conclusion, and the reading that refutes it is one call deeper than the template.
+
+**low** · `divergence` · reference byte **1,951,573**
+
+```
+function s2e(t,n){… d(0,"div",277,1),x("scroll",…), ht(2,o2e,7,2,"div",278,BCe),u()} … pt(e.getSpeechRecognitionEntries())
+getSpeechRecognitionEntries(){return this.currentSpeechReco?[this.currentSpeechReco]:[]}   // byte 1,957,636
+```
+
+**Ours:** `{:else if current}` renders one `.speech-reco-line`. `s2e` is a `ht(…)` repeater over `getSpeechRecognitionEntries()`, which reads as a list and is not one — it is nought-or-one, always, so the loop emits exactly the DOM the single branch does. A reader who stops at the template files "the live caption is a list there and a line here"; the method one call away says otherwise, and both are now asserted so the refutation survives.
+
+**The other trackBy in this template IS transcribed and matches**: `UCe = (t,n) => n.timestamp` is the transcript's, and the history `{#each}` is keyed by `line.timestamp`. `BCe = (t,n) => n.sender` is the single-line loop's and has nothing to key.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### SRO-05 — All three overlay controls are `display: none` until the pointer hovers, and no keyboard can reach them
+
+**MEASURED REFUSAL 2026-08-31 02:15 UTC.** Not changed from this batch, and the measurement is what says why rather than a judgement about accessibility.
+
+**medium** · `defect` · reference byte **2,030,113** (within `app-presentationarea`'s `styles:` array, 2,018,629–2,032,208)
+
+```
+.speech-reco-buttons[_ngcontent-%COMP%]{display:none;gap:8px;pointer-events:auto;transition:display .2s ease}
+.speech-reco-overlay[_ngcontent-%COMP%]:hover   .speech-reco-buttons[_ngcontent-%COMP%]{display:flex}
+```
+
+**Ours:** the same two rules, shipped twice — `css/complete-app-styles.css:7880` and `:7882`, and `src/lib/styles/captured-runtime-components.css:7356` — and this component declares no styles of its own, so it inherits them. `display: none` removes an element from the tab order outright, so the close, history and transcript buttons cannot be focused, and `:focus-within` cannot rescue them because nothing inside the overlay is focusable while they are hidden. **The bundle contains no `:focus-within` arm for this selector; that absence is asserted, not assumed.**
+
+**Why it is refused rather than fixed here.** Making them reachable means replacing `display: none` with a `visibility`/`opacity` pair, which changes the captured geometry — the strip would occupy layout at all times — and both stylesheets that carry the rule are outside this batch's scope. **The one-line change that would unblock it:** in `apps/room/src/app.css`, add `.speech-reco-overlay:focus-within .speech-reco-buttons { display: flex }` AND change the base rule to keep the buttons in flow, which is two lines and a geometry decision, not one — which is precisely why it is recorded for the owner rather than made here. `PresentationArea.svelte`'s own PA-07 note assumes these buttons ARE in tab order; that assumption and this rule cannot both be true, and reconciling them is the next reader's first question.
+
+*This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+---
+
+
+---
+
+## ScreenZoomControls.svelte
+
+Four rows, appended 2026-08-31. The surface is the screen tab bar's `ms-auto` control cluster, in
+both of the arrangements the capture ships it in — `SSe`'s children 2/3/4/16/18/20 inside
+`app-presentationarea`'s const 87, and `Y0e`'s three nodes inside `app-screenshare-view`'s const 4.
+The container itself is not this component's: `ScreenTabs.svelte:308` draws const 87 and
+`ScreenPane.svelte:567` draws const 4, so the rows below are about the buttons, their order and the
+evidence the file cites for them.
+
+Read end to end at verified boundaries in the pinned v4 bundle, with both const tables
+bracket-walked BY VALUE from their `consts:[[` — `app-presentationarea`'s at byte 1,994,264, 292
+entries, and `app-screenshare-view`'s at byte 1,500,337, 20 entries. Every finding below is one a
+slot-number lookup could not produce.
+
+### SZC-01 — The const-index table and the `ngClass` factory both name a build this repository does not hold, and the factory it names is a different class
+
+**FIXED 2026-08-31.** Every const index this component cited from 66 upward was ONE TOO HIGH for the
+pinned bundle, and the entries either side of each boundary are plausible enough that following one
+reads as correct: the header said const 71 for `li.nav-item.ms-auto` (it is 70), const 88 for
+`zoom-controls-container position-relative` (87), const 89 for the floating trio (88), consts 90-97
+for the volume dropdown (89-96), const 98 for the dark button (97) and consts 101/116 for the
+fullscreen icon swap (100/115). Const 98 is the magnifier GLYPH; the button that holds it is 97. All
+re-decoded by value and corrected in place, with the bundle byte for `SSe` (1,923,312) and for the
+table itself carried in the comment so the next reader re-walks rather than trusts.
+
+**The second half is the one a by-value decode is required for.** The file said the trio's class
+came from `` `VCe = (t) => ({'viewer-only-screen-zoom-controls': t})` ``. In the pinned bundle `VCe`
+is at byte 1,916,444 and is `t => ({"viewer-only-screen-tab": t})` — a DIFFERENT class, on a
+different element. The zoom-controls factory is `HCe` at byte 1,916,482, thirty-eight bytes later,
+and `cSe` binds it at byte 1,920,974. Neither name is in the const table at all, and that is the
+general fact rather than an accident of this one entry: Angular compiles an `ngClass` object literal
+to a shared arrow beside the template functions and leaves only the marker `3,"ngClass"` in the
+const, so const 88 reads `[1,"zoom-controls","position-absolute",3,"ngClass"]` and names nothing.
+A reader looking for the class name in the table finds the nearest arrow instead, which is exactly
+how `VCe` got written down. `screen-cluster-v4-contract.test.ts` asserts the absence directly —
+the whole 19,957-byte table contains neither `viewer-only-screen-zoom-controls` nor
+`viewer-only-screen-tab` nor `show active` — so the note cannot be re-derived the wrong way.
+
+**Also corrected, and separately measured:** the file cited
+`src/lib/styles/captured-runtime-components.css:6902` for `.zoom-controls { top: -33px; left: -33px }`.
+Line 6902 is `app-presentationarea #notesTabsContent`; the rule is at 6930. And the shipped copy of
+`.viewer-only-screen-zoom-controls { top: 33px !important; left: -3px !important }` is
+`src/lib/styles/protradingroom-source.css`, not the capture the comment named — the class is not an
+orphan, which is what the citation was there to establish.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SZC-02 — The detached arrangement's HTML sketch draws a container the reference binds a class on
+
+**FIXED 2026-08-31.** The header's detached sketch read `<div class="zoom-controls-container-detached">`
+with no binding. `app-screenshare-view`'s const 4, walked out of its table by value, is
+`[1,"zoom-controls-container-detached",3,"ngClass"]`, and `Y0e`'s update block at byte 1,493,972
+binds `ct(2,$0e,!e.isDetached&&(!e.isConnected||e.isPresentingThisScreen&&!e.localpreview||e.mediaService.saveData))`
+with `$0e = t => ({hidden: t})` at byte 1,492,696.
+
+**The BINDING is not a gap and is deliberately not re-filed.** `SV-SP-14` above built it, on
+`ScreenPane.svelte:567`, which is the component that owns that container. What was wrong was only
+this file's drawing of it, which is the document a reader of `ScreenZoomControls` reaches first and
+which said the container carries no class logic at all. The sketch now shows the binding and points
+at the row that owns it.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SZC-03 — The `ondblclick` guard on all five buttons is justified by a nesting the reference does not have
+
+**DELIBERATE DIVERGENCE, measured 2026-08-31.** `swallowDoubleClick` is on every button in both
+variants, and the reason recorded for it was "in the DETACHED arrangement the cluster sits inside
+`.video-screen-container`, whose double-click maximises the screen". In the reference it does not.
+`app-screenshare-view`'s root template, read at byte 1,501,300, is
+`H(4,q0e,3,2,"h3",3)(5,Y0e,6,4,"div",4),d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)` — the
+cluster is **node 5** and the `appDoubleClick` box (const 5,
+`["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]`) is
+**node 6**. They are SIBLINGS under const 0, so upstream no double-click on the cluster can reach a
+fullscreen handler and the reference carries no guard.
+
+**Ours is nested, and on purpose.** `ScreenPane.svelte:565-578` puts the cluster inside
+`#video-screen-container-…`, which is what makes it fullscreen with the picture — the same nesting
+`SV-SP-01` relies on for the user-ID watermark, which is clipped away if it sits outside. So the
+guard is the price of a placement this repository chose, not a transcription of anything, and
+un-nesting it to match the reference would undo a row already built. Recorded at the code rather
+than removed, because a guard whose stated reason is false is a guard the next reader deletes.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SZC-04 — Nothing that runs in this checkout asserts anything about this component
+
+**BUILT 2026-08-31 — `apps/room/src/lib/screen-cluster-v4-contract.test.ts`, 29 assertions, all of
+which execute here and on CI.** The cluster's only guard was `screen-volume-contract.test.ts`, which
+opens five files under `docs/source/components/` — a directory `.gitignore` excludes because
+republishing a third party's compiled application from a public repository is not a question to
+answer by accident. `gate/evidence-bound-tests.mjs` therefore drops it: it is one of the 42 files
+the vitest banner names on every run of this suite, and every claim it makes about
+`ScreenZoomControls` and `ScreenVolumeControl` has been unasserted for as long as that has been true.
+
+**The replacement is bound to evidence that ships.** `docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`
+is TRACKED — 2,891,205 bytes, SHA-256 `40796ca8…`, verified against that directory's own
+`sha256sums.txt` — and it is the bundle this whole register is written against. The new file walks
+both const tables with `src/lib/const-table.mjs`, the repository's own tokenizer, and pins the
+consts, the three gate expressions, the icon bounds, the `HCe`/`VCe` distinction, the detached
+sibling placement and the rendered order of both variants.
+
+**One of its negative controls came back GREEN and the assertion was the thing at fault.** The
+detached case asserted `not.toContain('dropdownVolume')` while passing no `volume` snippet, so it
+was asking whether nothing renders nothing; adding the volume slot to the detached branch — the
+exact defect it names — left it passing. A `createRawSnippet` marker now makes the two branches
+distinguishable, the attached case asserts the marker IS rendered so the snippet cannot silently
+stop working, and the re-run control is red.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+---
+
+## ScreenVolumeControl.svelte
+
+Four rows, appended 2026-08-31. The surface is `#dropdownVolume` as `app-presentationarea` renders
+it — `pSe` (trigger, byte 1,921,142) and const 90's menu with its slider, its two gated buttons and
+its `room-sound-options` rows — which is a different control from the navbar dropdown of the same id
+(`app-room` const 104). Read end to end against `SSe`'s create and update blocks, with the const
+table bracket-walked by value.
+
+The transcription is faithful: every class, attribute and order below is the reference's. What the
+pass found is three citation defects and one gap in what is actually guarded.
+
+### SVC-01 — The three captured text nodes lost the reference's own leading and trailing spaces
+
+**FIXED 2026-08-31.** `SSe` emits `v(6," Volume ")` at byte 1,923,441, `fSe` emits `v(1," Mute ")`
+at byte 1,921,484 and `mSe` emits `v(1," Unmute ")` at byte 1,921,611. All three carry a leading AND
+a trailing space. This component wrote them as plain text nodes on their own lines, and Svelte drops
+whitespace-only text at an element boundary, so all six spaces were gone from the rendered strings —
+the file's own closing sentence, "every class, attribute, order and text node is the reference's,
+spaces included", was false for exactly the text nodes.
+
+All three now use the brace idiom `apps/room/AGENTS.md` records and defends for the forty-odd other
+captured strings in this repository — `{' Mute '}` — which is the standing exception to the
+autofixer's "unexpected mustache interpolation with a string literal" suggestion, argued there on
+precisely this ground: the braces preserve spaces that Prettier and HTML whitespace folding lose,
+and every capture comparison here diffs rendered strings.
+
+**One residual, stated rather than hidden.** In the `h4` the reference has ` Volume ` immediately
+followed by const 91's close span; here a comment block sits between them, so Svelte collapses the
+newline into one space and the rendered gap before the span is two characters rather than one. The
+span is `float-right`, so nothing moves. Naming it is cheaper than a reader re-finding it.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SVC-02 — The const table in the header is off by one from const 66 up, against a build that is not in this repository
+
+**FIXED 2026-08-31.** The header cited `app-presentationarea 90` for the trigger (it is 89), const 91
+for the menu (90), const 92 for the close span (91), const 94 for the slider (93), consts 95/109 and
+96/110 for Mute and Unmute (94/108 and 95/109), const 97 for `room-sound-options` (96), const 112 for
+the `value="Presenter audiob"` checkbox (111) and consts 98/102 for the two `ScreenZoomControls`
+buttons it compares itself to (97/101). The two prop docstrings naming const 109 and const 110 for
+the mute and unmute clicks were the same shift. `app-room 104` for the navbar trigger is CORRECT and
+was left alone — the app-room table did not move, which is the measurement that says this is a
+per-component boundary rather than a global one.
+
+**The source of the drift is named rather than guessed at.** The citations pointed at
+`docs/source/components/app-presentationarea.render-helpers.js` and `.compiled.js`, which are files
+of an OLDER build and are not in this repository under any path — `git ls-files` finds nothing under
+`apps/room/docs/source/`. So a reader following any of them had nothing to open, and a reader
+resolving the numbers against the pinned bundle landed one entry past every const named.
+
+**BLOCKED tail, outside this pass's three files, with the exact change.**
+`apps/room/src/lib/screen-volume.ts:51-52` carries the same shift for the same reason: "The three
+icon classes of consts 106, 107 and 108" and "const 108 is `[1,"fas","fa-volume-off"]`
+(compiled.js:2128)". In the pinned bundle they are 105, 106 and 107, decoded by value. The one-line
+change is `consts 106, 107 and 108` → `consts 105, 106 and 107` on line 51, with the sentence on 52
+becoming `const 107 is [1,"fas","fa-volume-off"] (byte 2,001,495)`. The VALUES that module ships are
+correct; only the numbers pointing at them are not.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SVC-03 — The reference gives both volume dropdowns the same presenter-row ids; ours diverges, and nothing that runs said so
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.** The divergence and its whole
+argument are in `apps/room/src/lib/screen-volume.ts:99-114`, at `presenterRowId`, and
+`PresenterMuteRows.svelte:51-59` states it again at the prop. The audit reader would have filed this
+as an invented value; it is a decision already taken, recorded, and applied in exactly one of the
+two places.
+
+**What was missing is the measurement, in a form that executes.** Re-read by value: the reference
+builds `ei("name","talkingPresenter",i,"-donot-disturb")` and its matching `id` and `for` in BOTH
+components — `vSe` at byte 1,922,603 for the overlay and `T4e` at byte 2,483,544 for the navbar —
+six occurrences of the literal `"talkingPresenter"` over two components, confirmed by splitting the
+whole 2,891,205-byte file rather than by a match window. Both dropdowns are in the document at once
+in viewer-only mode, because the navbar's is ungated and the overlay's trigger renders only there,
+so upstream every `label[for]` in the overlay resolves to the navbar's checkbox of the same index
+and the overlay's own rows cannot be muted by clicking their labels.
+
+`screen-cluster-v4-contract.test.ts` now asserts the count, both byte offsets, and that the rendered
+overlay emits `screenTalkingPresenter0-donot-disturb` and NOT `talkingPresenter0-donot-disturb`. The
+citations in `screen-volume.ts` still name the absent decoded-components paths; that file is outside
+this pass and the change is one line — `app-presentationarea.render-helpers.js:370-371` and
+`app-room.render-helpers.js:1087-1088` → `bytes 1,922,603 and 2,483,544`.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### SVC-04 — `screen-volume-contract.test.ts` cannot run in this checkout or on CI, so this control's guard is the new file and not that one
+
+**BLOCKED 2026-08-31, and the blocker is named with what would unblock it.** That file reads five
+paths under `docs/source/components/` (lines 41-55 and 539-546). `docs/source` is one of the
+fourteen evidence roots `.gitignore` excludes and `gate/evidence-bound-tests.mjs` discovers as
+missing, so vitest excludes the file on every run here and on CI. It is not deleted and not edited:
+its subject genuinely is a build this checkout cannot see, and deleting a test because its evidence
+is absent is how a repository loses the record that the evidence ever existed.
+
+**It is not a one-line repair, and saying so is the point of the row.** Re-pointing line 41 at
+`../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` would make the file run and then fail:
+its literals are the older build's minifier output. Measured against the pinned bundle, at least
+these move — `ut(` → `ct(`, `Dt(` → `Et(`, `Go` → `mo`, `hSe` → `pSe`, `CSe` → `SSe`, `bSe` → `vSe`
+— and the const numbers shift by one from 66 up, which is `SVC-02`. The honest unblocking step is
+the one taken here: a new file, bound to the tracked bundle, re-deriving each fact from the v4 bytes
+rather than copying an assertion across. What remains blocked is the OLD file, and what would
+unblock it is the owner deciding whether an evidence-bound test whose evidence is permanently
+gitignored should be retired or re-pointed. That is not this pass's call.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+---
+
+## StreamTabs.svelte
+
+Six rows, appended 2026-08-31.
+
+**`StreamTabs` is a different component from `ScreenTabs`, and this was checked before the pass
+began rather than assumed.** Both exist on disk — `apps/room/src/lib/components/StreamTabs.svelte`
+(306 lines) and `apps/room/src/lib/components/ScreenTabs.svelte` — and they transcribe two different
+reference templates from the same component: `ISe` at byte 1,925,991 renders `ul#streamsTabs` from
+the MediaMTX stream list, and `lSe` at byte 1,919,600 renders `ul#screenTabs` from
+`mediaService.screenSharingUsers`. `ISe` has no `img.presenter-img`, labels a tab with
+`Ze(e.mediaValue.name)` alone, and its menu holds two items; `lSe` has the avatar, the
+`{name}-{screenName}` join and four. So the `## StreamingView + ScreenPane + ScreenTabs` section
+above, and its `SV-SP-05`/`SV-SP-06` rows about the screenshare bar, describe a different surface,
+and nothing below re-files any of them.
+
+The two bars DO share const entries — 31, 54, 55, 56, 57, 74 and the lock/unlock consts are single
+table entries read by both — which is a fact this pass corrected a comment about, and is `STB-05`.
+
+### STB-01 — The tab-select listener is on the anchor, and three `stopPropagation` calls suppress selections the reference performs
+
+**BUILT 2026-08-31.** Const 31 is `["role","presentation",1,"nav-item",3,"click"]` and `ISe` opens
+`d(0,"li",31),x("click",function(){const o=D(e).$implicit;return E(g(2).onStreamTabChange(o._id))})`
+at byte 1,926,042 — the tab-select click is on the **`li`**. Const 73, the anchor, binds `ngClass`
+and `id` and nothing else; it carries no `click` at all. This component had the handler on the
+`<a>` and then stopped propagation in three places: the gear's `toggleMenu`, the lock badge's
+handler, and `runItem` for every dropdown item.
+
+**Nothing in the reference tab stops that click**, and the assertion is made rather than assumed:
+the 609 bytes of `ISe` contain no `stopPropagation`, and Angular's compiled listeners suppress an
+event only by RETURNING FALSE — `E(…)` is `ɵɵresetView`, which returns what the component method
+returned, and `onStreamTabChange`, `toggleLockScreenMTX` and `bringFocusToScreen` all return
+`undefined`. The gear has no handler of its own at all: const 78 is `data-bs-toggle="dropdown"` and
+Bootstrap delegates that on `document`, above the `li`, so it cannot stop the bubble either.
+
+So upstream, opening a gear menu selects its tab, clicking the lock badge locks AND selects, and
+clicking a dropdown item selects too. Here none of the three did. `onselect` now sits on the `li`
+where const 31 puts it, all three `stopPropagation` calls are gone, and `onkeydown` stays on the
+anchor because it is the only focusable node in the tab — the roving-tabindex divergence this file
+already recorded is unaffected. Two controls seen red: putting `onselect` back on the anchor, and
+reintroducing one `stopPropagation`.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-02 — Every const index this component names from 66 up is one too high for the pinned bundle
+
+**FIXED 2026-08-31.** The header carried a fourteen-row index table and eleven of its rows named the
+entry AFTER the one described: 118 for the streams bar (117 — 118 is `streamsTabsContent`), 74 for
+the tab anchor (73 — 74 is the tooltip), 75 for the forced-screen tooltip (74), 83 for the lock badge
+(82 — 83 is the padlock glyph), 78 for `d-inline-block` (77), 79 for the gear toggle (78), 55/56/57/58
+for the cog, its menu, the menu `li` and its anchor (54/55/56/57), 81/86 for the two titles (80/85)
+and 82/84/87 for the three glyphs (81/83/86). Consts 31 and 14 are unchanged, which is what places
+the boundary between 31 and 54 rather than making this a blanket shift.
+
+The table is now walked by value and the corrected numbers are asserted against the decoded entries
+rather than against each other: for each corrected index `stream-tabs-v4-contract.test.ts` also
+asserts what the STALE index holds, because an off-by-one in a table of tab markup produces
+plausible neighbours and an assertion that only checks the new number passes on both.
+
+The citations that produced it are the older build's — `app-presentationarea.full.js:543-588` and a
+const table "at `:3790` onward" — and no such file is in this repository. Replaced with the byte
+offsets of `ISe` and of `consts:[[`.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-03 — All four "inert upstream" findings hold in the pinned bundle, and all four byte offsets were the older build's
+
+**FIXED 2026-08-31.** This component's header carries the most valuable prose on the surface — four
+controls that render and do nothing upstream, recorded so nobody "finishes" one by inventing a
+protocol. Every one of the four SURVIVES re-reading in the pinned bundle, and every one of the
+offsets under them pointed somewhere else in it:
+
+| finding | cited | pinned v4 |
+| --- | --- | --- |
+| `forcedScreenMTXID` template read | 1926192 | **1,926,600** |
+| `forcedScreenMTXID=""` in the constructor | 1952638 | **1,954,252** |
+| `lockedScreenIDMTX=""` in globals | 977288 | **977,288** (unchanged) |
+| `lockedScreenIDMTX` template read | 1926252 | **1,926,660** |
+| the `selectStreamTabOfId` guard's two reads | 1960257 | **1,961,921** and **1,961,964** |
+| `toggleLockScreenMTX` stub | `full.js:3056-3058` | **1,976,853** |
+| the working `toggleLockScreen` beside it | `:3050` | **1,976,706**, 147 bytes earlier |
+| `bringFocusToScreen` | `:2727` | **1,969,281** |
+| the `focusOnScreen` subscriber | 1962380 | **1,964,131** |
+
+The COUNTS all hold: `forcedScreenMTXID` twice, `lockedScreenIDMTX` four times — the four rather
+than three that a `grep -o` match window once reported, re-confirmed here by splitting the whole
+file — and the subscriber still scans `mediaService.screenSharingUsers` and never
+`mtxHandlerService.mtxStreams`. So the four refusals stand unchanged; what was wrong was every
+address a reader would use to check them, which for a standing refusal is most of its value.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-04 — `stream-tabs-contract.test.ts` reads a bundle that is not in this repository, so the whole file asserts nothing
+
+**BLOCKED 2026-08-31, with the exact change and why it is not one line.** Line 20 reads
+`../../docs/source/main.d6d3c112b59b7d0d.js`. No file of that name exists anywhere in this
+checkout, and `docs/source` is a gitignored evidence root, so `gate/evidence-bound-tests.mjs`
+excludes the file — one of the 42 the vitest banner names on every run. All twelve of its `it`
+blocks, including the four standing refusals `STB-03` is about and the two-lock-fields test its own
+comment calls "THE test that earns this file", have been unexecuted here and on CI throughout.
+
+The exact one-line change is line 20:
+`new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url)` →
+`new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url)`.
+It is not sufficient on its own and the row would be dishonest without saying so: five of that
+file's literals are the older minifier's and fail against v4 — `ut(9,Go,` → `ct(9,mo,`, `Dt(` →
+`Et(`, `Go=t=>({active:t})` → `mo=t=>({active:t})`, and the two `O(10,…)`/`O(13,…)` node numbers sit
+inside a longer update string that must be re-quoted from byte 1,926,570.
+
+What this pass did instead is build `stream-tabs-v4-contract.test.ts`, which re-derives all twelve
+facts from the v4 bytes and RUNS: 26 assertions, five of them negative controls seen red. Retiring
+or re-pointing the old file is an owner decision about a test whose evidence is permanently
+gitignored, and is deliberately not taken here.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-05 — The forced-screen tooltip is ONE const entry read by both bars, not "two literals in one table"
+
+**FIXED 2026-08-31.** The comment above `FORCED_SCREEN_TOOLTIP` justified duplicating the 250-character
+string in `StreamTabs` and `ScreenTabs` on the ground that "`ScreenTabs` reads it from ITS const (75
+as well) … They are two literals in one table." Decoding the table says otherwise: there is exactly
+one entry, const 74 at byte 2,000,042, and both readers open it — `xSe` at byte 1,925,418 (streams)
+and `iSe` at byte 1,918,787 (screenshares) each emit `d(0,"span",74)`. Two components of ours read
+one const of theirs.
+
+**The DECISION does not change and the reason for it is now the true one.** Sharing the string in
+TypeScript is still a choice the reference does not make for us, and `ScreenTabs.svelte` is outside
+this pass, so the duplication stays. What changed is that the comment no longer claims a fact about
+the reference that the reference contradicts. The transcription itself is now asserted by value
+rather than against a copy of itself: the test joins the component's three concatenated fragments
+and compares the result to the decoded const, which is the only version of that assertion that can
+fail for a real reason — a `toContain` of the whole string would fail on a component that is
+correct, because Prettier splits the literal.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+### STB-06 — `href="#{id}"` where const 57 is a literal `href="#"`
+
+**DELIBERATE DIVERGENCE, measured 2026-08-31.** Const 57 is `["href","#",1,"dropdown-item"]`, decoded
+by value, and it is the anchor of both dropdown items. Upstream nothing prevents its default: the
+click handler is on the `li` (const 56, `[3,"click"]`), the anchor has none, and neither
+`bringFocusToScreen` nor `toggleLockScreenMTX` returns `false`. So a menu click in the reference
+runs its command AND navigates to `#`, which scrolls the room to the top.
+
+Half of that is reproduced here and half is not. The BUBBLING is reproduced as of `STB-01` — the
+click reaches the `li` and selects the tab, exactly as upstream. The JUMP is not: `runItem` keeps
+`event.preventDefault()`, and the `href` is `#` plus the stream's own id rather than a bare `#`, so
+the fragment at least names the tab it belongs to. Matching the reference literally here would
+reproduce a defect that has nothing to do with the feature, and would do it on the only control in
+this menu that a viewer can reach by keyboard.
+
+This is recorded rather than left in a handler comment because the previous comment explained the
+`preventDefault` and not the changed `href`, and an unexplained divergence is the one a future
+reader "corrects" back.
+
+This row was ADDED after this document was committed, in the 2026-08-31 pass.
+
+---
+
+## RoomNavbar.svelte
+
+Eleven rows, produced 2026-08-31 by reading the reference's navbar template `U4e` (bundle byte
+2,484,831) end to end and decoding `app-room`'s 229-entry consts array **by value**, bracket-walking
+it from `consts:[[` at byte 2,533,197. Not one of these is visible to a reader who looks up a slot
+number another row cited: `app-room`'s const 40 is the sidebar's Benzinga link and
+`app-st-message`'s const 40 is a smile icon's tooltip, three tables apart.
+
+`RoomNavbar.svelte` is the largest component in this repository and had no section here at all.
+
+### NAV-01 — The navbar's help link is dead code in the reference, and is not built
+
+**MEASURED REFUSAL 2026-08-31.** `hasSTHelpLink` occurs **three times in 2,891,205 bytes** and not
+one of them assigns the field the navbar reads. Byte 2,497,854 is `app-room`'s own initialiser,
+`this.hasSTHelpLink=!1`, inside the same constructor run that sets `showWebcams=!0`,
+`isRecordingStarting=!1` and `alwaysShowRoster=!1`. Byte 2,487,906 is the READ,
+`O(9, e.hasSTHelpLink ? 9 : -1)`. Byte 1,189,005 is `this.hasSTHelpLink=!0` on a **different class** —
+the login/auth component, whose neighbouring fields are `rememberMe`, `authMode`, `showPW` and
+`readOnlyEmail`. There is no path from one to the other: a grep for `hasSTHelpLink=` returns exactly
+those two initialisers and nothing else. **Slot 9 is therefore `-1` for the life of every room**, and
+the styled `.helpLink` rule that ships beside it (`app-room`'s own `styles:[…]`, byte 2,538,214,
+`cursor:pointer;margin:0 5px` and `font-size:18px`) paints nothing.
+
+Building it would put a hard-coded link to `https://intercom.help/simpler-trading/en/` — another
+company's support desk — into every room in a multi-tenant application, to reproduce an element the
+reference itself cannot render. The `tawkAvailable` third term two items along already records this
+repository's position on shipping somebody else's support inbox.
+
+This row was ADDED after this document was committed.
+
+**low** · `missing-control` · reference byte **2,487,906**
+
+```js
+H(9,MPe,2,0,"a",84)                                     // U4e create block, byte 2,484,831
+84 ["href","https://intercom.help/simpler-trading/en/","target","_blank",1,"helpLink","mr-auto"]
+138 [1,"fas","fa-question-circle"]
+function MPe(t,n){1&t&&(d(0,"a",84),T(1,"i",138),u())}  // byte 2,472,776
+O(9, e.hasSTHelpLink ? 9 : -1)                          // byte 2,487,906
+```
+
+**Ours:** `RoomNavbar.svelte` renders the brand anchor and goes straight to the navbar toggler; there
+is no `.helpLink`. `grep -rn helpLink apps/room/src` returns zero hits. That absence now has a reason
+recorded against it rather than being an oversight nobody measured.
+
+### NAV-02 — A member hearing the room's SoundCloud track has no way to stop it for themselves
+
+**BUILT 2026-08-31.** `NavbarSoundCloud.svelte`, which now carries both of the reference's SoundCloud
+items instead of one. The presenter's dropdown (slot 22, const 96) moved into it unchanged; the
+listener's control (slot 23, const 97) is new.
+
+The two gates are **not each other's negation** — `!scPlaying` is a term of one and of neither the
+other — so the component takes a literal `variant` and the call site owns the gate, which is what
+stops a boolean named `isPresenter` from rendering two SoundCloud icons in one bar. Const 176's
+duplicated `id` is worn as `cssSoundCloudIcon`, the one a browser keeps; its `aria-haspopup` and
+`aria-expanded` are refused, because this element opens nothing and announcing a popup that does not
+exist is the same lie as a control whose only effect is changing its own label. `playing.gif` is
+substituted by `fa-volume-up`, the resolution this file already argued for on the presenter's copy.
+
+`navbar-decoded-rows-contract.test.ts` asserts it in four directions — present for a listener while a
+track plays, absent when nothing plays, absent for a presenter, and the presenter's dropdown still
+there — and each was run against a mutated component before it was trusted.
+
+This row was ADDED after this document was committed.
+
+**high** · `missing-control` · reference byte **2,478,748**
+
+```js
+H(22,i4e,18,4,"li",96)(23,o4e,4,3,"li",97)
+96  ["title","Play music from SoundCloud for all",1,"nav-item","dropdown"]
+97  ["title","Music is playing from SoundCloud for all",1,"nav-item"]
+176 ["id","cssSoundCloudIcon","id","soundcloudDropdown","aria-haspopup","true",
+     "aria-expanded","false",1,"nav-link","d-flex","align-items-center",3,"click","ngClass"]
+O(23, isPresenter || isNonPresenterAdmin || !scPlaying ? -1 : 23)     // byte 2,488,684
+function o4e(t,n){ … d(0,"li",97)(1,"a",176), x("click", () => doSoundCloudUserStop()),
+                     T(2,"i",166)(3,"img",169) … }                    // byte 2,478,748
+```
+
+**Ours (before):** `onstopsoundcloudforme` reached `broadcasts.stopSoundCloudForMe()` and was
+reachable from exactly one element — the third entry of the presenter's dropdown, inside
+`{#if isPresenter}`. A member could only pull the master volume down, which silences the presenter
+with the music.
+
+### NAV-03 — `alwaysShowRoster` removes the hamburger entirely, and this bar kept it
+
+**BUILT 2026-08-31.** The setting appears in BOTH sidebar-toggle conditions, on the refusing side of
+each, so with it on neither slot renders and the users counter is the room's only remaining toggle —
+which is exactly why that counter's handler is `alwaysShowRoster && (showSidebar = !showSidebar, …)`.
+This bar already implemented the counter half (G12) and not this one, so in an `alwaysShowRoster`
+room it rendered a control the reference removes, and that control could close a sidebar the setting
+says is always shown.
+
+The two upstream elements stay one element here: `DPe` and `EPe` differ only in title and icon, both
+of which this file already writes as a ternary on `sidebarOpen`, and the pair is the compiler
+splitting one `@if`/`@else` rather than two authored elements.
+
+This row was ADDED after this document was committed.
+
+**medium** · `missing-behaviour` · reference byte **2,487,413**
+
+```js
+H(1,DPe,2,0,"span",77)(2,EPe,2,0,"span",78)
+77 ["title","Close Sidebar",1,"sidebar-menu","active-icon"]
+78 ["title","Open Sidebar",1,"sidebar-menu"]
+O(1, e.showSidebar && !e.alwaysShowRoster ? 1 : -1)
+O(2, e.showSidebar || e.alwaysShowRoster ? -1 : 2)
+```
+
+**Ours (before):** `RoomNavbar.svelte` rendered `<span class="sidebar-menu">` unconditionally.
+
+### NAV-04 — `breathing-rec` belongs on the presenter's recording ICON, and was nowhere
+
+**BUILT 2026-08-31.** `iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })` is at byte
+2,465,900 and is bound **exactly once in the whole bundle**, at byte 2,477,678, to element index 2 of
+`t4e` — the `<i class="far fa-2x fa-dot-circle">` inside the presenter's Start/Stop Recording anchor,
+const 153. So the reference's blinking REC is a presenter's cue on their own recording button, and
+`.breathing-rec` is a real rule: a 5s `scale` pulse plus `color: red !important`,
+`captured-runtime-components.css:4281`. This bar had it on no icon at all. This row was ADDED after
+this document was committed.
+
+Both terms of the first argument are carried: `roomState.isRecording && sessData.blinkingRec`, so a
+room with the setting on and nothing recording gets no pulse. That second term is the one a
+setting-shaped prop invites you to drop, and the contract test's negative control was run against
+dropping it.
+
+This row was ADDED after this document was committed.
+
+**medium** · `missing-behaviour` · reference byte **2,477,678**
+
+```js
+iPe = (t,n) => ({"breathing-rec":t, recIndicatorStart:n})                       // byte 2,465,900
+function t4e(t,n){ … d(0,"li",95)(1,"a",152), T(2,"i",153) … }                  // byte 2,477,354
+m(), z("ngClass", ct(4, KB, !e.mediaService.isScreenSharing)),                  // index 1 = a[152]
+m(), z("ngClass", Kn(6, iPe, roomState.isRecording && sessData.blinkingRec,
+                            e.isRecordingStarting)),                            // index 2 = i[153]
+153 [1,"far","fa-2x","fa-dot-circle",3,"ngClass"]
+```
+
+**Ours (before):** `<i class="far fa-2x fa-dot-circle"></i>`, a static class, with `blinkingRec`
+spent entirely on the room-wide `[ REC ]` badge instead — see NAV-06 and NAV-08.
+
+### NAV-05 — `recIndicatorStart` on that icon is inert in the reference, and is not worn
+
+**MEASURED REFUSAL 2026-08-31.** `iPe`'s second argument puts `recIndicatorStart` on the same `<i>`
+while `isRecordingStarting` is true. Its only rule anywhere is
+`app-room .recIndicatorStart:not(:root) a:not(:root)…` — `captured-runtime-components.css:988`, a
+DESCENDANT selector requiring an `a` inside the element carrying the class. An `<i>` with no children
+has none, so the class paints nothing there, in the reference as much as here. This row was ADDED
+after this document was committed.
+
+Const 94, `[1,"nav-item","recIndicatorStart"]`, puts the same name on the STARTING badge's `li`,
+which does contain the `a` that rule needs — and this room already wears it there. Adding a second
+copy on the icon would be a class with no CSS, which the root standard refuses by name.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **2,477,678**
+
+```
+94  [1,"nav-item","recIndicatorStart"]                        // the li that DOES have a descendant a
+css app-room .recIndicatorStart:not(:root) a:not(:root)… { line-height:41px; color:#ff0 }
+```
+
+**Ours:** `NavbarRecIndicator.svelte` renders `<li class="nav-item recIndicatorStart">` with an `<a>`
+inside it, which is the one placement the rule can match.
+
+### NAV-06 — The `blinkingRec` docblock stated the wrong element, and had since it was written
+
+**FIXED 2026-08-31.** The prop's docblock said the reference "binds `breathing-rec` through a class
+MAP on the recording `ul` (`iPe`, byte 2,477,678), alongside `recIndicatorStart`", and concluded
+"Same element breathing, one level down". Both halves are wrong: the binding is on an `<i>`, not a
+`ul`, and the element it is one level down from is the presenter's recording anchor rather than the
+`[ REC ]` badge — which carries no class map at all. The byte offset was right, which is how the
+claim survived: it cites the correct instruction and describes the wrong element. This row was ADDED
+after this document was committed.
+
+`server/room-config-client.ts:249` already spelled `iPe` correctly, so the repository held both the
+right statement and the wrong one, in two files, for as long as the prop has existed. That is the
+failure the root standard names — a rule with no recorded WHY gets simplified back into the bug —
+arriving as two records of one measurement disagreeing.
+
+This row was ADDED after this document was committed.
+
+**low** · `defect` · reference byte **2,477,678**
+
+```
+RoomNavbar.svelte, before:  "a class MAP on the recording `ul` … alongside `recIndicatorStart`"
+bundle, byte 2,477,678:     z("ngClass", Kn(6, iPe, …)) applied to i[153], inside a[152]
+```
+
+**Ours:** the docblock now quotes the two `m()` steps that identify the element and points at
+NAV-04's note at the icon. `RoomNavbar.svelte.test.ts:238` repeats the old sentence and is outside
+this batch's scope; NAV-08 names it.
+
+### NAV-07 — Both launching spinners lost `class="nav-link"`
+
+**BUILT 2026-08-31.** `r4e` (byte 2,479,346) and `p4e` (byte 2,481,414) are byte-identical bodies:
+`d(0,"li",19)(1,"a",150), T(2,"i",181)`, where const 19 is `[1,"nav-item"]`, const 150 is
+`[1,"nav-link"]` and const 181 is `[1,"fas","fa-2x","fa-spinner","fa-spin"]`. Both `<a>`s here were
+bare, so a spinner rendered without the padding and line-height every other item in the bar takes
+from `.nav-link` and the row shifted the moment the device finished opening. This row was ADDED after
+this document was committed.
+
+Worth recording beside it: **the reference gates these two on `micLaunching` / `camLaunching`
+ALONE**, not on any role — `O(25, e.mediaService.micLaunching ? 25 : -1)` and
+`O(28, e.mediaService.camLaunching ? 28 : -1)`. This bar keeps them inside its single
+`{#if isPresenter}` block, which is the divergence `room-navbar-contract.test.ts` already argues for
+and asserts; the spinner is only reachable from a control that block also owns, so the narrower gate
+costs nothing.
+
+This row was ADDED after this document was committed.
+
+**low** · `wrong-constant` · reference byte **2,479,346**
+
+```js
+function r4e(t,n){1&t&&(d(0,"li",19)(1,"a",150),T(2,"i",181),u()())}     // microphone
+function p4e(t,n){1&t&&(d(0,"li",19)(1,"a",150),T(2,"i",181),u()())}     // webcam
+150 [1,"nav-link"]
+```
+
+**Ours (before):** `<a><i class="fas fa-2x fa-spinner fa-spin"></i></a>`, twice.
+
+### NAV-08 — The `[ REC ]` badge's `breathing-rec` is ours, and removing it needs one line elsewhere
+
+**BLOCKED 2026-08-31.** Const 93 is `[1,"nav-item","recIndicator","animated","fadeIn"]` and `UPe`
+(byte 2,474,097) binds one thing on it, `ngbTooltip`. There is no class map on the room-wide badge in
+the reference, so the `breathing-rec` this bar puts there is an invention — a pulse every member sees
+where the reference shows one only to the presenter who owns the recording. NAV-04 builds the real
+placement; this row is the other half, and it cannot be closed from inside this batch's scope.
+
+**What would unblock it, exactly.** In `apps/room/src/lib/room-navbar-contract.test.ts`, the
+assertion block `it('breathes the REC badge only when the room asked for it')` pins the class to
+`.recIndicator`; its three `expect` lines must move to the presenter's icon, i.e.
+
+```
+-    expect(html({ media: recording, blinkingRec: true })).toContain('breathing-rec');
++    expect(html({ media: recording, isPresenter: true, blinkingRec: true })).toContain('breathing-rec');
+```
+
+with the matching change on the `not.toContain` line below it, and the same for
+`RoomNavbar.svelte.test.ts`'s `it('breathes only when the room asked it to')`, whose comment (line
+238) repeats NAV-06's corrected claim word for word and must be replaced with the `iPe` measurement.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **2,474,097**
+
+```js
+function UPe(t,n){if(1&t&&(d(0,"li",93)(1,"a",149),v(2,"[ REC ]"),u()()),2&t){ … xn("ngbTooltip", …) }}
+93 [1,"nav-item","recIndicator","animated","fadeIn"]
+```
+
+**Ours:** `NavbarRecIndicator.svelte` keeps the class and now records, at the code, that it is ours
+and why it stays.
+
+### NAV-09 — The recording reminder is missing `!micMuted`, and the gate string is pinned
+
+**BLOCKED 2026-08-31.** The reference's condition has five terms and this bar carries three of them:
+
+```js
+O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled
+     || e.mediaService.micMuted
+     || !roomState.isRecordingPaused && roomState.isRecording ? -1 : 5)      // byte 2,477,770
+```
+
+`micDisabled` is genuinely unmodelled here and `room/gates.ts:392` already records that. **`micMuted`
+is not** — `media.micMuted` is read three elements away, by the microphone control's own class map —
+so the banner tells a presenter "You are not recording!" while their microphone is muted, which is
+the one state where starting a recording would capture silence.
+
+**What would unblock it, exactly.** `apps/room/src/lib/recording-reminder-contract.test.ts:55`
+asserts the gate as a literal string, so the component and that line have to move together:
+
+```
+-      '{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}'
++      '{#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}'
+```
+
+That file is not this batch's to edit. Its `gatedSites`/`policySites` count is unaffected by the
+change, since both sides still count one site.
+
+This row was ADDED after this document was committed.
+
+**medium** · `missing-behaviour` · reference byte **2,477,770**
+
+**Ours:** `RoomNavbar.svelte` —
+`{#if recordingReminderAllowed && media.recordingReminder && (!media.recording || media.recordingPaused)}`.
+
+### NAV-10 — `Download Recording` has no counterpart anywhere in the reference
+
+**DELIBERATE DIVERGENCE 2026-08-31.** The string `Download Recording` occurs **zero times in
+2,891,205 bytes**; so does `recordedUrl`. The reference's recording menu is `YPe` (byte 2,475,469) on
+the MediaMTX/rec-bot path and `e4e` (byte 2,477,105) otherwise, and neither renders a download: the
+recording is made server-side and `recPreviewLocation` is where it goes. This room records in the
+browser with a `MediaRecorder`, so it HAS a blob to hand back, and the item exists because of that —
+it is a capability of this architecture rather than a transcription.
+
+Recorded rather than removed, and recorded rather than left to look like a match. The control next to
+it is a real gap in the other direction and is named here so the next reader does not have to
+re-derive it: the reference shows **Show / Hide Rec Preview** under
+`O(9, roomState.isRecording && sessData.recPreviewLocation ? 9 : -1)` — *while recording*, with a
+preview location configured — where this bar shows it under `media.recordedUrl`, i.e. only after the
+recording has stopped. `recPreviewLocation` is not modelled here at all, which is what keeps this a
+divergence rather than a fix.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **2,475,295**
+
+```js
+H(9,KPe,5,1)  …  O(9, roomState.isRecording && sessData.recPreviewLocation ? 9 : -1)
+function KPe(t,n){ … d(0,"li"),T(1,"hr",115),u(),d(2,"li",19),H(3,WPe,3,0,"a",158)(4,qPe,3,0),u() … }
+WPe: " Hide Rec Preview "     qPe: " Show Rec Preview"      // both verbatim here already
+```
+
+**Ours:** `RoomNavbar.svelte` gates the whole block on `media.recordedUrl` and puts Download
+Recording at the head of it, with a comment recording why the preview toggle is not inside
+`{#if media.recording}`.
+
+### NAV-11 — `audioVolSlider` is an attribute with no consumer, in both applications
+
+**MEASURED REFUSAL 2026-08-31.** The background-music slider (const 200) carries
+`"audioVolSlider",""` and ours does not, which reads as a transcription gap. It is not one.
+`audioVolSlider` occurs **seven times in 2,891,205 bytes** and every occurrence is accounted for:
+four are const-table entries (2,000,881 and 2,001,857 in the AV-settings component, 2,539,771 and
+2,545,086 and 2,545,418 in `app-room`), and the remaining two are **stylesheet** text —
+`.audioVolSlider[_ngcontent-%COMP%]{background-color:#fafafa}` at bytes 2,556,585 and 2,586,249. That
+rule is a CLASS selector and the markup writes an ATTRIBUTE, so it matches nothing; and no directive
+declares `selectors:[["","audioVolSlider",""]]`, so nothing reads it either. This row was ADDED after
+this document was committed.
+
+Our master slider already carries the attribute, transcribed before this was measured. It stays —
+removing a captured attribute is a change to the DOM this repository diffs against — but the second
+copy is not added, because adding an inert attribute to match an inert attribute is work with no
+consumer at either end.
+
+This row was ADDED after this document was committed.
+
+**low** · `wrong-constant` · reference byte **2,545,086**
+
+```
+200 ["audioVolSlider","","type","range","min","0","max","100","title","Background Volume",
+     1,"px-0","py-2",3,"ngModelChange","input","ngModel"]
+css .audioVolSlider[_ngcontent-%COMP%]{background-color:#fafafa}      // a CLASS rule, byte 2,556,585
+```
+
+**Ours:** `RoomNavbar.svelte`'s `#background-volume` input carries `title="Background Volume"` and
+`class="px-0 py-2"` and no `audiovolslider`.
+
+## MessageMenu.svelte
+
+Six rows, produced 2026-08-31 by reading **all four** captured kebab menus end to end — `app-st-message`'s
+`Bge` (byte 1,333,900) and `app-st-compactmessage`'s two renderers (`z1e` at 1,372,200 and the member
+row at 1,380,700) — and decoding each component's consts array by value from its own `consts:[[`
+(1,357,732 and 1,395,767).
+
+**The finding worth stating first is that the entries already match.** Twelve gates, twelve entries,
+the same source order, the same `&nbsp;&nbsp;` prefixes and the same three trigger classes in all
+four. So five of the six rows below are refusals and divergences rather than missing behaviour, and
+each carries the measurement that makes it one.
+
+### MSM-01 — The Add Reaction icon's captured tooltip repeats the label beside it
+
+**MEASURED REFUSAL 2026-08-31.** `["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]`
+is `app-st-message`'s const 40 (byte 1,359,726) and `app-st-compactmessage`'s const 37 (byte
+1,397,773), and in both it is the `T(2,"i",…)` of the reaction anchor. **The next instruction in each
+of those functions renders the visible label:** `v(3,"\xa0\xa0Add Reaction")` in `Tge` (1,330,225) and
+in `A1e` (1,368,562). The tooltip text is byte-identical to the words four characters to its right.
+
+This repository does build captured `ngbTooltip`s — `#lib/ngb-tooltip` exists for it, and
+`PrivateChatComposer.svelte` wears const 58's `["placement","left","ngbTooltip","Add Emojis",…]` on an
+icon with NO adjacent text, where the bubble is the control's only label. Here it would repeat a
+label the reader is already looking at, and our attachment's only accessibility effect is an
+`aria-describedby` pointing at that same word while the bubble is open.
+
+A second, independent measurement is recorded with it: `source-size-contract.test.ts` caps this
+component at 253 and it stood at 252, so there was one line of headroom and no unpinned seam —
+`chat-display-mode-contract.test.ts` requires `TRIGGER_CLASS`'s three strings to stay in this file's
+own code. A refusal that cannot carry its reason at the code carries it at the gate, which is where
+this one is: `message-menu-entries-contract.test.ts`.
+
+This row was ADDED after this document was committed.
+
+**low** · `missing-behaviour` · reference byte **1,359,726**
+
+```
+app-st-message        const 40 @1,359,726   ["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]
+app-st-compactmessage const 37 @1,397,773   ["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]
+Tge @1,330,225:  d(0,"a",39,1) … T(2,"i",40), v(3,"\xa0\xa0Add Reaction")
+```
+
+**Ours:** `MessageMenu.svelte` renders `<i class="far fa-smile"></i>&nbsp;&nbsp;Add Reaction`.
+
+### MSM-02 — `aria-expanded` is a static literal in all three captured triggers
+
+**DELIBERATE DIVERGENCE 2026-08-31.** `app-st-message` const 10 (1,358,083), `app-st-compactmessage`
+const 9 (1,396,029) and const 56 (1,398,736) all read
+`…"aria-haspopup","true","aria-expanded","false",1,"msgMenu",…`, and none carries a `3,"aria-expanded"`
+binding marker — so the attribute is the string `false` for the life of the element and the reference
+leaves Bootstrap's own `data-bs-toggle="dropdown"` script to correct it. This room has no Bootstrap
+JS.
+
+Transcribing the literal would announce a collapsed menu to a screen reader every time the menu is
+open. `aria-haspopup` IS worn, so this is one divergence and not a rewrite of the trigger.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **1,358,083**
+
+**Ours:** `MessageMenu.svelte:aria-expanded={menuOpen}`, asserted in both directions by
+`message-menu-entries-contract.test.ts`.
+
+### MSM-03 — `id="dropdownMenuLink"` is duplicated once per message, in both applications
+
+**DELIBERATE DIVERGENCE 2026-08-31.** The id is a static entry of all three trigger consts, and
+`aria-labelledby="dropdownMenuLink"` is a static entry of both menu consts (`app-st-message` 11 at
+1,358,243, `app-st-compactmessage` 10 at 1,396,212). One instance is rendered per message in the
+reference and one per message here, so a 200-message log holds 200 elements carrying one DOM id and
+every menu's `aria-labelledby` resolves to the first of them — the kebab of the oldest message on
+screen.
+
+Recorded and not repaired. The change is two lines in this component — a per-instance id from
+`$props.id()` on the trigger and on the `aria-labelledby` — and it would break
+`room-message-render.test.ts`, which pins the captured DOM of eighteen kebabs including that
+attribute. That file is not this batch's to edit, and unlike NAV-08 the correction is not one line:
+the eighteen fixtures each carry the literal, so the right change is to teach that test to normalise
+the id rather than to rewrite eighteen captures.
+
+This row was ADDED after this document was committed.
+
+**low** · `defect` · reference byte **1,358,083**
+
+**Ours:** `MessageMenu.svelte:118` and `:134`, transcribed, with the duplication now measured.
+
+### MSM-04 — `User Info` and `Mention` are ungated upstream, and they are ungated here
+
+**ALREADY BUILT 2026-08-31, verified by reading, not rebuilt.** In `Bge` the two anchors are element
+indices 9 and 12 and the update block has no `O(…)` for either — the conditionals run
+`O(8, …)` then straight to `O(15, …)`. `z1e` and the compact member renderer are the same shape at
+indices 8 and 11. An audit reader listing "twelve gates" would file the two as gates this room
+invented; they are not.
+
+`sourceMessageBehavior` in `message-behavior.ts` returns the literal `openUserInfo: true` and
+`mention: true`, so the only thing that can remove either is a captured menu listing that omits it,
+which is `capturedMenuAllows` doing the job it exists for.
+
+This row was ADDED after this document was committed.
+
+**low** · `missing-behaviour` · reference byte **1,333,900**
+
+```js
+d(9,"a",12), x("click", () => doUserInfo(msg.uid, msg.rid)), T(10,"i",13), v(11,"\xa0\xa0User Info")
+d(12,"a",12), x("click", () => doMention(msg.n)),            T(13,"i",14), v(14,"\xa0\xa0Mention")
+// update block: … O(8, …), m(7), O(15, …) — nothing for 9 or 12
+```
+
+**Ours:** `messageMenuAllows` maps both through `capturedMenuAllows` onto a `true` fallback.
+
+### MSM-05 — The reaction popover's `shown`/`hidden` outputs are not reproduced
+
+**MEASURED REFUSAL 2026-08-31.** Const 39 (1,359,597) and const 36 (1,397,644) end
+`3,"click","shown","hidden","ngbPopover"`, bound in `Tge`/`A1e` to `onPopoverOpen()` and
+`onPopoverClose()`. Read whole at byte 1,355,713, all three handlers write one field:
+
+```js
+addReaction(){ this.showEmojiChooser=!0, console.log("this.popover: ", this.popover.isOpen()),
+               $(".users-dropdown-options").on("click", e => (console.log("event: ",e), e.stopPropagation())) }
+onPopoverOpen(){ this.showEmojiChooser=!0, console.log(…) }
+onPopoverClose(){ setTimeout(() => { this.showEmojiChooser=!1 }, 500), console.log(…) }
+``` `shown` writes a value the CLICK handler has
+already written on the only path that opens the popover — which is what `onreactiontoggle` is here —
+so the output is a second write and not a behaviour. And `addReaction` registers a fresh jQuery
+delegation on `.users-dropdown-options` on every click, never removed: one listener per reaction
+opened, for the life of the page, on a selector matching every kebab menu in the room. Reproducing
+that is reproducing a leak.
+
+The half that is behaviour is built and asserted: while the picker is open FROM this menu the entry
+carries `aria-describedby`, which is what ngbPopover gives the reference.
+
+This row was ADDED after this document was committed.
+
+**low** · `divergence` · reference byte **1,355,713**
+
+**Ours:** one `onreactiontoggle` callback plus `reactionPopoverId`, the renderer owning which popover
+is open because the reaction pill can raise the same one.
+
+### MSM-06 — `Mark Answered ` and `Private Chat ` lost the trailing space the capture gives them
+
+**FIXED 2026-08-31.** `v(2,"\xa0\xa0Mark Answered ")` at byte 1,330,053 and
+`v(2,"\xa0\xa0Private Chat ")` at 1,330,816, with the compact renderer's `M1e` (1,368,390) and `I1e`
+(1,369,153) spelling both identically — so unlike `showAll`/`report`/`reply` these do not vary by
+renderer and belong in the markup rather than in `MESSAGE_MENU_TEXT`. Both were written here as text
+followed by a newline, which Svelte and HTML whitespace folding remove, so the room rendered
+`Mark Answered` where the capture has `Mark Answered `. This row was ADDED after this document was
+committed.
+
+Restored with `{' '}` — the braces idiom `apps/room/AGENTS.md` records as a standing exception,
+because every capture comparison in this repository diffs rendered strings. The other nine entries
+have no trailing space in any of the four menus and still have none, which is asserted as the control
+beside the fix.
+
+This row was ADDED after this document was committed.
+
+**low** · `wrong-constant` · reference byte **1,330,053**
+
+```js
+wge @1,330,053: d(0,"a",12),T(1,"i",38),v(2,"\xa0\xa0Mark Answered ")
+kge @1,330,816: d(0,"a",12),T(1,"i",43),v(2,"\xa0\xa0Private Chat ")
+```
+
+**Ours (before):** `&nbsp;&nbsp;Mark Answered` and `&nbsp;&nbsp;Private Chat`, each followed by a
+newline that folded away.
+
+## DayTradeAlertForm.svelte
+
+5 rows. `Ewe` was compared node by node and const by const against this file, and no count of
+"behaviours confirmed present" is given because none was taken: what was taken is the complete
+difference list, and it is the five rows below.
+
+> **These two sections are the FORMS, not the panes.** The section above reads
+> `DayTradeAlertsPane` and `SwingAlertsPane`; the composers inside them are named there twice and
+> once respectively, in passing, and neither carries a row. `Ewe` (byte 1,940,236) and `hwe`
+> (1,933,979) were read end to end on 2026-08-31 together with all fourteen sub-templates they
+> instantiate — `swe` 1,933,226, `rwe` 1,933,472, `awe` 1,933,621, `lwe` 1,933,754, `cwe`
+> 1,933,808, `dwe` 1,933,861, `uwe` 1,933,920, `ywe` 1,939,468, `Fwe` 1,939,723, `Cwe` 1,939,875,
+> `Swe` 1,940,011, `wwe` 1,940,065, `Twe` 1,940,118, `Dwe` 1,940,177 — and with the component's
+> whole `consts:[` table bracket-walked BY VALUE from 1,994,264 rather than looked up by slot.
+>
+> **Every const index and every style byte the two components already cited was checked against
+> that walk and all of them hold** — 92, 170-199, 222-231, and the six style offsets 2,023,059 /
+> 2,023,101 / 2,023,517 / 2,026,319 / 2,026,498 / 2,026,556. The two offsets that did NOT hold are
+> both `paste` call sites, and they are `DTF-02` and `SWF-02` below. The gate for both sections is
+> `apps/room/src/lib/trade-alert-form-contract.test.ts`.
+
+### DTF-01 — Seven text nodes render without the reference's own leading and trailing spaces
+
+**BUILT 2026-08-31 04:09 UTC, in both forms.** Fourteen nodes in all — seven here and the same seven
+in the swing twin as `SWF-01`, which is why they are one build and two rows.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+**What is user-visible, stated unevenly because it IS uneven.** Two of the seven are: ` Long ` and
+` Short ` open with a space that sits between the radio input and its word, so the reference has a
+gap here that this did not, and the label's hover target — which
+`captured-runtime-components.css:7208` gives `cursor: pointer` — is that much wider. The other five
+are trailing spaces at the end of a `<button>` or an `input-group-text`, where HTML collapses
+trailing whitespace at the end of a line box: **invisible on screen**. They are carried anyway
+because every capture comparison in this repository diffs RENDERED STRINGS, which is the argument
+`apps/room/AGENTS.md` already makes for the `{' Retry '}` idiom and the reason
+`svelte/no-useless-mustaches` is off in `eslint.config.js`. Measured outside these two files:
+**45 string-literal mustaches, 42 of them the leading-space shape.**
+
+**Measured on the compiler, not on the source**, because "the braces were typed" is not the claim.
+Svelte 5 compiles `<label>\n Long\n</label>` to `>Long</label>` inside its `from_html` template and
+`{' Long '}` to `label.textContent = ' Long ';` — both readings taken from the emitted module. The
+negative control is the same probe compiled from bare markup, and its FIRST version was green and
+worthless: it looked for a `nodeValue` assignment the bare form never produces, so an empty list
+satisfied a `not.toContain`. It asserts the trim positively now.
+
+**low** · `divergence` · reference byte **1,933,754**
+
+```
+function lwe(t,n){1&t&&(T(0,"i",196),v(1,"Discard "))}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:195, :253, :267,
+:288, :290, :295 and :297 held all seven as bare template text. The reference strings are
+`v(2," Image ")` (`Fwe` 1,939,723), `v(28," Long ")` and `v(32," Short ")` (`Ewe` nodes 28 and 32),
+`v(1,"Discard ")` (`Swe` 1,940,011), `v(1,"Cancel ")` (`wwe` 1,940,065), `v(1,"Save Changes ")`
+(`Twe` 1,940,118) and `v(1,"Submit Alert ")` (`Dwe` 1,940,177).
+
+### DTF-02 — The `paste` call site is cited 41 bytes past the construct it quotes
+
+**FIXED 2026-08-31 04:09 UTC.** 1,941,249 → **1,941,208**.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+The comment quotes `x("paste", o => onImagePaste(o, "dayTrade"))` and gave a byte that lands inside
+it, at `return D(e),E(g(2)…` — 41 bytes into the handler body rather than at the `x(` the quote
+starts with. Small, and worth a row anyway: the whole contract of a per-row offset in this document
+is that the next person re-reads AT it rather than trusting the quote, and an offset that lands
+mid-expression makes them re-derive the boundary by hand. The other byte in the same docblock,
+**1,992,037** for the deny-by-default `"swing" === i ? … : "dayTrade" === i && (…)`, was re-measured
+in the same pass and is exact.
+
+**low** · `defect` · reference byte **1,941,208**
+
+```
+x("paste",function(o){return D(e),E(g(2).onImagePaste(o,"dayTrade"))})
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:67. Pinned by
+apps/room/src/lib/trade-alert-form-contract.test.ts, which also refuses the superseded number.
+
+### DTF-03 — The reference's `cursor: pointer` rule names nine selectors; the form transcribes three
+
+**ALREADY BUILT — verified by reading 2026-08-31 04:09 UTC.** The six the form drops are all
+shipped, under a name the reader of the component would not have searched for.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`src/lib/styles/captured-runtime-components.css:7207-7215` carries all nine —
+`.uploaded-alert-image:hover`, `.form-check-label:hover`, `#dayTradeAlert-long:hover`,
+`#dayTradeAlert-short:hover`, `#swingAlert-long:hover`, `#swingAlert-short:hover`,
+`.uploaded-img-preview:hover`, `.img-upload-btn:hover`, `.remove-image-btn:hover` — host-scoped to
+`app-presentationarea`. `src/app.css:5` imports that sheet and
+`src/lib/components/PresentationArea.svelte:481` renders `<app-presentationarea>`, closing it at
+:1090, with `<SwingAlertsPane` (:922) and `<DayTradeAlertsPane` (:964) between the two. So the
+pointer cursor on the radio pair and its labels is live; the form's own three-selector copy is a
+subset, not a shortfall.
+
+**This is `UIM-03`'s lesson met for the third time**, and it is why it was filed as a row rather
+than fixed: read as a missing NAME the gap is real and survives every check that greps the
+component. What refutes it is asking whether the OUTCOME is achieved another way, and it is — by a
+generated sheet whose selectors carry a host prefix the component never mentions.
+
+**low** · `divergence` · reference byte **2,026,556**
+
+```
+.uploaded-alert-image[_ngcontent-%COMP%]:hover, .form-check-label[_ngcontent-%COMP%]:hover, #dayTradeAlert-long[_ngcontent-%COMP%]:hover, …{cursor:pointer}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:355-359 declares
+three of the nine. The reachability is now asserted rather than assumed: move either pane outside
+`<app-presentationarea>`, or drop one of the six from the generated sheet, and
+apps/room/src/lib/trade-alert-form-contract.test.ts goes red naming the selector that was lost.
+
+### DTF-04 — Every rule in the form's `<style>` block is already shipped by the generated captured sheet
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC; the block stays, and the measurement is
+now executable.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+Measured rule by rule: the form's own size rule is at `captured-runtime-components.css:7078`,
+`.input-group-text` at :7083, `.form-control` at :7090, the eight-selector radio-margin cross
+product at :7094, `.uploaded-img-preview` at :7196, `.remove-image-btn` at :7204 and the hover rule
+at :7207 — every one host-scoped to `app-presentationarea`, every one with the same declarations.
+The component's copies are therefore redundant today, and `ScreenPane.svelte:650` states this
+repository's rule in as many words: a captured rule is declared in a component *"because that file
+is GENERATED … and this rule is not in that sheet"*. By that rule these would come out.
+
+**They stay, and the reason is the failure mode rather than the tidiness.** Removing them makes the
+form's appearance depend on an ANCESTOR ELEMENT rendered by a different component; mount the form
+anywhere else and the failure is silent and total — a 12px form becomes 16px and unbounded in
+width, with nothing red anywhere. What was actually wrong is narrower and is what the row fixes:
+the block's stated justification names `styles.ee2a710065b60389.css`, the reference's global sheet,
+where these rules genuinely are not — and not the generated captured one, where they are. That
+omission is no longer invisible: if the generator ever drops one of these rules the contract fails,
+and the component copy stops being redundant and becomes load-bearing, which is exactly the moment
+somebody needs to be told.
+
+**The control on that assertion came back GREEN and it was a real hole**, recorded because it is the
+same shape twice in one batch: `includes(selector)` matched the `:hover` rule two lines below as a
+prefix, so `app-presentationarea .remove-image-btn:not(:root)` could be deleted outright with
+nothing failing — and every selector in the list has such a twin. It tests the selector BOUNDARY
+now, `, ` or ` {`.
+
+**low** · `divergence` · reference byte **2,023,059**
+
+```
+.day-trade-alert-form[_ngcontent-%COMP%], .swing-alert-form[_ngcontent-%COMP%]{font-size:12px;max-width:600px}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:304-360.
+
+### DTF-05 — `<form #alertForm="ngForm">` is not carried
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC. The measurement is an occurrence count
+with its control, not a judgement.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`d(0,"form",222,0)` ends in a LOCAL REFS index, and consts[**0**] — read by walking the table, where
+it is the first entry — is `["alertForm","ngForm"]`. So upstream the form publishes itself as a
+template reference variable.
+
+**Nothing reads it.** `alertForm` occurs **exactly once in all 2,891,205 bytes** of
+`main.d1d09071be31f1ba.js`, at byte 1,994,267, inside that consts entry itself: no template
+expression, no `@ViewChild`, no handler. The control on that count is the same search for
+`onImagePaste`, which returns the definition plus both call sites. The `NgForm` directive the ref
+names is applied to the element by `FormsModule`'s selector whether or not a ref exists, so the ref
+changes nothing — and the thing a `#alertForm` would usually be FOR, disabling submit while the form
+is invalid, is not what the reference does either: its submit button is const **190**,
+`["type","submit",1,"btn","btn-primary","btn-sm","m-1"]`, with no binding at all, and
+`onDayTradeAlertSubmit` (byte 1,985,961) re-checks the four fields itself before sending.
+
+**low** · `missing-control` · reference byte **1,994,265**
+
+```
+consts:[["alertForm","ngForm"],["speechRecoBody",""],…
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertForm.svelte:93-100 renders the
+form with `onsubmit` and no reference variable. Recorded with its count rather than left unmentioned,
+because "the reference has a template ref we do not" is the kind of observation that gets re-found
+and re-investigated at full cost.
+
+---
+
+## SwingAlertForm.svelte
+
+5 rows, and they are `DTF-01` … `DTF-05` again — `hwe` and `Ewe` differ only in the names. Filed
+per form rather than once, for the reason the twin note below gives.
+
+> **The twin, and now provably so.** `DayTradeAlertForm.svelte`'s own header states the invariant —
+> *"the ONLY differences below are the five ids, the two radio ids, the `name=` attributes and the
+> form's own class. Anything else that differs is a mistake"* — and nothing checked it until this
+> batch. Comments stripped and the day-trade half renamed mechanically, the two files are now
+> asserted EQUAL line for line, with a guard above it requiring each to contain none of the other's
+> vocabulary: a day-trade form that accidentally spelled a swing id would otherwise survive the
+> rename and match. Both halves were seen red.
+
+### SWF-01 — Seven text nodes render without the reference's own leading and trailing spaces
+
+**BUILT 2026-08-31 04:09 UTC, in both forms.** The swing half of `DTF-01`; the reasoning, the
+compiler measurement and the honest split between the two visible spaces and the five invisible ones
+are recorded there and are not repeated here.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+The four button sub-templates are content-identical to the day-trade four, which is the point of
+filing it twice rather than once: `dta-01` … `dta-04` all exist because one behaviour was missing
+from BOTH panes, and a row that names one form is a row that lets the pair drift.
+
+**low** · `divergence` · reference byte **1,933,920**
+
+```
+function uwe(t,n){1&t&&(T(0,"i",199),v(1,"Submit Alert "))}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:179, :236, :250, :269,
+:271, :276 and :278.
+
+### SWF-02 — The `paste` call site is cited at the handler's DEFINITION, 57,326 bytes away
+
+**FIXED 2026-08-31 04:09 UTC.** 1,992,250 → **1,934,924**.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+**This is the instructive half of the pair, and the reason both were re-measured at all.** The
+comment quotes `x("paste", o => onImagePaste(o, "swing"))` — a template call site — and gave
+1,992,250, which is where `onImagePaste(e,i){` begins. That is the same offset `dta-04` cites for
+the `Upload this image?` confirm, which lives inside that method. A reader following it lands on
+bytes that are genuinely about pasting, reads the loop the comment's next paragraph describes, and
+never notices that the quoted line is 57 KB away. **An offset that lands on plausible bytes is the
+one that never gets questioned** — which is why the batch instruction to re-derive every cited
+offset produced two corrections in files whose citations are otherwise exact.
+
+**low** · `defect` · reference byte **1,934,924**
+
+```
+x("paste",function(o){return D(e),E(g(2).onImagePaste(o,"swing"))})
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:57. Pinned by
+apps/room/src/lib/trade-alert-form-contract.test.ts, which also refuses the superseded number.
+
+### SWF-03 — The reference's `cursor: pointer` rule names nine selectors; the form transcribes three
+
+**ALREADY BUILT — verified by reading 2026-08-31 04:09 UTC.** The swing half of `DTF-03`, same
+generated sheet, same host: `captured-runtime-components.css:7207-7215`, imported at `app.css:5`,
+under the `<app-presentationarea>` that `PresentationArea.svelte:481` renders with
+`<SwingAlertsPane` (:922) inside it.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`#swingAlert-long:hover` and `#swingAlert-short:hover` are two of the six selectors, and they are
+UNSCOPED upstream — the rule sits at component level, not under either form class, exactly as the
+eight-selector radio-margin cross product at 2,023,517 does sit under both. That asymmetry is the
+reference's and is why the swing radios get the pointer cursor from a sheet that never names the
+swing form.
+
+**low** · `divergence` · reference byte **2,026,556**
+
+```
+… #swingAlert-long[_ngcontent-%COMP%]:hover, #swingAlert-short[_ngcontent-%COMP%]:hover, .uploaded-img-preview[_ngcontent-%COMP%]:hover, …{cursor:pointer}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:325-329 declares three of
+the nine.
+
+### SWF-04 — Every rule in the form's `<style>` block is already shipped by the generated captured sheet
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC; the block stays, for the reason
+`DTF-04` records.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+The swing selectors are at `captured-runtime-components.css:7079` (size), :7086
+(`.input-group-text`), :7091 (`.form-control`) and :7112-7113 (the two radio ids), plus the three
+image rules at :7196, :7204 and :7207 that carry no form prefix at all.
+
+**One thing IS worse on this side and is recorded rather than fixed here.** The swing block carries
+one byte citation where its day-trade twin carries four: `2,023,101` for the size rule and
+`2,026,319` for `.uploaded-img-preview`, against the day-trade file's four plus the paragraph
+explaining that the radio-margin rule lists EIGHT selectors — the cross product of the two form
+classes with all four radio ids — of which only two are reachable. Both files are at their
+`source-size-contract` ceiling exactly (331 and 361, zero headroom), so adding the missing citations
+means extracting first, and no seam in these two files is worth taking for four comment lines.
+Named here so the asymmetry is a known debt rather than a discovery.
+
+**low** · `divergence` · reference byte **2,023,101**
+
+```
+.swing-alert-form[_ngcontent-%COMP%]{font-size:12px;max-width:600px}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:285-330.
+
+### SWF-05 — `<form #alertForm="ngForm">` is not carried
+
+**MEASURED REFUSAL — read and measured 2026-08-31 04:09 UTC.** The swing half of `DTF-05`:
+`d(0,"form",170,0)`, the same consts[0] `["alertForm","ngForm"]`, the same single occurrence in
+2,891,205 bytes.
+
+**This row was ADDED after this document was committed**, by the batch that read the two composer
+forms; it is not part of the two-verifier pass and is deliberately outside the surfaces table above.
+
+`onSwingAlertSubmit` at byte 1,981,965 is the swing counterpart that re-checks the fields itself,
+and it is worth naming what it does with them, because it is the reason a form-level validity flag
+would buy nothing: it refuses on the four required fields, then trims each and refuses again per
+field by name, then asks `bootbox.confirm`. Four gates, none of them the form's `valid`.
+
+**low** · `missing-control` · reference byte **1,994,265**
+
+```
+d(0,"form",170,0),x("ngSubmit",function(){return D(e),E(g(2).onSwingAlertSubmit())})
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertForm.svelte:77-84.
+
+---
+
+---
+
+## components/RoomShell.svelte
+
+Six rows; the room's `as-split` element, its two layout effects and the child order it places. Read
+end to end against the pinned v4 bundle on 2026-08-31, decoding `app-room`'s 229-entry const table
+by value from its `decls:38,vars:9,consts:` header rather than looking up the indices the file cites.
+Four of the six are citation defects of OURS — none of them recoverable by reading the name the
+comment gave, because every one of those names resolves in the bundle to something plausible.
+
+### SHL-01 — `K4e` is named as the PHONE's template. In the pinned bundle it is the DESKTOP one, and `j4e`, `G4e`, `W4e` are not room splits at all
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The template comment read *"it selects a DIFFERENT ONE: `K4e`
+(`app-room.render-helpers.js:1783-1821`) against the desktop `j4e` (`:1616-1664`)"*, and listed the
+phone's two areas as `G4e` and `W4e`. Decoded against `main.d1d09071be31f1ba.js`, every one of those
+four names denotes something else:
+
+* `K4e` at **2,493,526** opens `d(0,"as-split",205)`, binds `x("dragEnd", … resizeEndPresentation)`
+  and `z("direction", e.directionRoom())`, and gates its children `hideChatAlerts ? -1 : 1` /
+  extra-chat / `hidePresentation ? -1 : 3`. That is the DESKTOP order, with a bound direction and a
+  recorded drag — the two properties the comment used to distinguish the phone's template from it.
+* the phone's template is **`nRe` at 2,496,317**: `d(0,"as-split",224)`, no `dragEnd`, no
+  `z("direction")`, children `hidePresentation ? -1 : 1` then `hideChatAlerts ? -1 : 2` then
+  `!hideChatAlerts && preferences.extraChatColumn ? 3 : -1`.
+* `j4e` at **2,490,857** is a single `as-split-area` (const 211) holding `app-extra-chat`.
+* `G4e` at **2,492,523** is the `Update Positions` button; `W4e` at **2,492,690** is the
+  `Show Positions` / `Hide Positions` toggle beside it.
+
+**Not a stale citation — an unverifiable one.** `app-room.render-helpers.js` has **zero files** in
+this repository (`find . -name app-room.render-helpers.js`), so the names were read from a capture
+root this checkout has never held, and nobody reading this repository alone could have checked them.
+They are consistent with each other in that other capture — `mobile-layout-contract.test.ts:177`
+records *"`j4e` binds dragEnd; `K4e` binds only gutterDblClick and dragStart"*, which is the same
+naming shifted by one build. Against the bundle this repository pins, they are wrong.
+
+**Why a slot lookup would have confirmed three of the four.** `K4e` really is a room split. `G4e`
+and `W4e` really are its neighbours in the file. A reader checking "is there a `K4e`, and is it an
+`as-split`?" gets yes twice and stops. Only walking the update block — which of the two has a
+`dragEnd` — separates them, and that is the assertion
+`shell-body-rte-reference-contract.test.ts` now makes: pointed at `K4e`, the phone's test fails on
+`the phone template acquired a dragEnd`, which is the negative control this row was closed on.
+
+**high** · `wrong-citation` · reference byte **2,496,317**
+
+```
+function nRe(t,n){if(1&t){const e=Y();d(0,"as-split",224),x("gutterDblClick",…)("dragStart",…),H(1,Z4e,5,5,"as-split-area",225)(2,eRe,6,3,"as-split-area",226)(3,tRe,4,4,"as-split-area",227),u()}if(2&t){…O(1,e.hidePresentation?-1:1),m(),O(2,e.hideChatAlerts?-1:2),m(),O(3,!e.hideChatAlerts&&e.appService.globals.preferences.extraChatColumn?3:-1)}}
+```
+
+**Ours:** RoomShell.svelte:208-231 now names `nRe`, `Z4e`, `eRe`, `tRe` and `K4e`, each with its v4
+byte offset, and records what the four old names actually are. The BEHAVIOUR the comment described
+was correct throughout and is unchanged — the child order, the gates and the vertical split all
+match `nRe`; only the labels on them were wrong.
+
+### SHL-02 — "the areas carry no `order`" is true of two of the phone's three areas, and the third binds one
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+Decoded by value, consts 225 and 226 end `3,"size"` —
+`["minSize","0",1,"presentation-box",3,"size"]` and `["minSize","0",1,"alert-chat-box",3,"size"]` —
+so presentation and chat/alerts genuinely take no `order` on a phone. Const **227** is
+`["minSize","0",1,"alert-chat-box",3,"size","order"]`, and `tRe` binds it:
+`z("size",e.chatAlertsSize)("order",e.orderChatAlerts())`.
+
+The sentence was written as a blanket rule about "the areas", which is the shape that gets carried
+into the next file — and it has been: `mobile-layout-contract.test.ts:116-118` repeats it as *"it
+follows the chat/alerts column in DOM order in both branches, which on mobile IS the layout because
+those areas carry no `order`"*. That is true of the pair it is reasoning about and false of the third.
+
+**low** · `wrong-constant` · reference byte **2,495,895**
+
+```
+function tRe(t,n){…d(0,"as-split-area",227)(1,"as-split",209),x("dragEnd",…resizeEndChat…)…z("size",e.chatAlertsSize)("order",e.orderChatAlerts())…}
+```
+
+**Ours:** RoomShell.svelte:227-228 now states the split — first two areas `3,"size"`, the third
+`("order", e.orderChatAlerts())` — and `shell-body-rte-reference-contract.test.ts` asserts consts
+225, 226 and 227 by value, so the two cannot be conflated again. Negative control: pointing the
+third-area assertion at const 226 fails with `expected [ …(3) ] to deeply equal [ …(4) ]`.
+
+### SHL-03 — "`prefs.extraChatColumn` has zero occurrences in this room" is false; it is a fully modelled preference
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The refetch effect's doc explained the missing `appHasFocusGetChatLogExtraChatColumn` emit with
+*"`prefs.extraChatColumn` has zero occurrences in this room — a pre-existing gap, not one opened
+here."* Measured: it occurs at `create-room.svelte.ts:343` (`extraColumnEnabled: () =>
+prefs.extraChatColumn`) and `:432` (`extraChatColumnEnabled: …`), and `RoomPrefs` declares it, loads
+it, exposes it and writes it (`prefs.svelte.ts:101, 309, 587, 711`). This very component receives
+`extraChatColumnVisible`, which is derived from it.
+
+The omission it was excusing is not a gap either, which is why this is a comment fix rather than a
+build: the extra column renders `feeds.visibleExtraChat` (`+page.svelte:1480`), derived from the same
+load that `invalidate('room:data')` re-runs. One invalidate refreshes both columns, so there is no
+second request to make — the true reason, and a stronger one than the false claim it replaces.
+
+**medium** · `defect` · reference byte **2,530,181**
+
+```
+onResize(e){this.isMobileScreen=e.target.innerWidth<=601,…this.appService.guiEventBus.emit("appHasFocusGetChatLog"),this.appService.globals.preferences.extraChatColumn&&this.appService.guiEventBus.emit("appHasFocusGetChatLogExtraChatColumn"),this.appService.sendServerCommand("getAlertsLog",{page:0}),this.onResizeChange=this.isMobileScreen},500))}
+```
+
+**Ours:** RoomShell.svelte:118-121. A comment that says a value does not exist is the kind that stops
+the next reader looking, which is what made this worth a row rather than a silent edit.
+
+### SHL-04 — four citations name capture roots this repository does not hold
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+`app-room.full.js:2987-2999`, `app-room.full.js:4061`, `app-room.full.js:1889` and
+`app-room.render-helpers.js:1639-1648` were all cited as authorities. Neither file exists here — the
+`app-room` root is one of the thirteen gitignored capture roots `gate/evidence-bound-tests.mjs`
+reports missing on this checkout, and `render-helpers` is not a root at all.
+
+Every quoted BODY was checked against the pinned bundle and is verbatim correct, which is why this is
+a re-citation and not a correction: `onResize` is at **2,530,181** exactly as quoted (the capture's
+own `console.log("onResize event end")` is the only line the block omits);
+`this.isMobileScreen=this.onResizeChange=window.innerWidth<=601` is in `ngOnInit` at **2,498,161**;
+`QB=t=>({"vh-100":t})` is at **2,466,015**. The one non-bundle citation that survives untouched is
+`css/complete-app-styles.css:4992`, which is present and reads
+`.vh-100 { height: 100vh !important; }`.
+
+**medium** · `wrong-citation` · reference byte **2,466,015**
+
+```
+muted:t,"text-white":n}),QB=t=>({"vh-100":t});
+```
+
+**Ours:** RoomShell.svelte:97, 127, 171. `shell-body-rte-reference-contract.test.ts` asserts the file
+contains neither `app-room.render-helpers.js:` nor `` (`app-room.full.js: ``; negative control —
+re-inserting `app-room.render-helpers.js:1783-1821` fails with `a citation came back to
+app-room.render-helpers.js`.
+
+### SHL-05 — the phone's own size fields and its static inner split
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+The phone's areas take DIFFERENT size properties from the desktop's — `Z4e` binds
+`z("size",e.presAreaSizeMobile)` and `eRe` binds `z("size",e.chatAlertsSizeMobile)`, where `q4e` and
+`V4e` bind `presAreaSize` and `chatAlertsSize` — and `eRe`'s inner split is const **228**,
+`["direction","vertical","minSize","0"]`, a static vertical stack with no `dragEnd` where the
+desktop's inner split (const 209) has both a binding and a drag.
+
+Both are modelled. `RoomSplit` holds `#mobile` as a separate fraction from `#main`
+(`split.svelte.ts:332`, `:615`, `:642`), documents the reference's own 50/50 defaults at `:108`, and
+`#innerIsVertical` (`:319`) is `roomIsHorizontal || isMobileScreen` — the static vertical the phone's
+const carries. Nothing to build; recorded because a reader decoding these two functions will find the
+`Mobile` suffix and reasonably ask whether it reached this repository.
+
+**low** · `missing-behaviour` · reference byte **2,495,149**
+
+```
+function Z4e(t,n){if(1&t&&(d(0,"as-split-area",225),…),2&t){const e=g(2);z("size",e.presAreaSizeMobile),…}}
+```
+
+**Ours:** `lib/room/split.svelte.ts:102-130, 314-332`.
+
+### SHL-06 — two sibling files carry the same misattribution, and both are outside this batch's scope
+
+**BLOCKED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+`lib/room/split.svelte.ts:423` reads *"`K4e` places it as index 3, gated `!e.hideChatAlerts &&
+preferences.extraChatColumn`"* — that gate is `nRe`'s; `K4e`'s third child is `hidePresentation ? -1
+: 3`. `lib/mobile-layout-contract.test.ts` repeats the naming in six places (`:5, :9, :79, :83,
+:116, :177`) together with the `app-room.render-helpers.js` line citations.
+
+**What unblocks each, exactly one line.**
+`split.svelte.ts:423`: replace `` `K4e` places it as index 3, gated `` with
+`` `nRe` (v4 byte 2,496,317) places it as index 3, gated ``.
+`mobile-layout-contract.test.ts:9`: replace ``(`app-room.render-helpers.js:1616-1664`) and `K4e` (`:1783-1821`)`` with
+``(`app-room.render-helpers.js:1616-1664`, the `app-room` capture — `K4e`/`nRe` in the pinned v4 bundle)``.
+
+That second one is a naming NOTE rather than a rename, deliberately: that file's assertions read
+`ROOM_COMPILED` out of the `app-room` capture root, where the names it uses are the ones that hold.
+It is excluded on this checkout (one of 42), so neither its prose nor its assertions are exercised
+here — which is exactly why the disagreement between the two captures needs writing down rather than
+resolving in favour of whichever one the reader happens to have.
+
+**low** · `wrong-citation` · reference byte **2,495,895**
+
+```
+z("size",e.chatAlertsSize)("order",e.orderChatAlerts())
+```
+
+**Ours:** `lib/room/split.svelte.ts:423`, `lib/mobile-layout-contract.test.ts:5,9,79,83,116,177`.
+
+---
+
+## components/MessageBody.svelte
+
+Seven rows; the six segment kinds one parsed message body renders, read against `urlwrapImg`
+(byte 1,325,971) and `showChatGif` in `deployed-index.html:152`. **The first thing checked was the
+one this repository cares most about, and it came back clean:** no path from this component's input
+reaches a raw-html tag.
+
+### MSB-01 — no raw-html tag on any path from a message body to the DOM
+
+**ALREADY BUILT — verified by reading 2026-08-31, and now asserted.**
+This row was ADDED after this document was committed, by the seventh batch.
+Traced every one of the six segment kinds: `text` and `stock` emit text nodes; `label` emits a
+`<span>` whose class is a constant and whose `style` comes from `alertLabelBadgeStyle`; `link` and
+`image` put `segment.url` in `href` and `src`, which Svelte sets as ATTRIBUTES and which
+`CAPTURED_URL` (`message-body-segments.ts:65`) has already required to begin `http`, `https` or
+`ftp`; `trade` renders this component again over `segment.children`. `grep -c '@html'` over the file
+returns **0**, and over the whole of `apps/room/src` returns exactly one hit —
+`routes/session/+page.svelte:264`, where the value was sanitised on the SERVER by
+`sanitizeRoomDescription` and the comment above it says so.
+
+The reference does the opposite and needs to: it builds an HTML STRING and passes it through
+`bypassSecurityTrustHtml`, so `Sw.sanitize` is load-bearing there. Emitting real elements means
+message text can never be parsed as markup in the first place, which
+`message-body-segments.ts:94-97` already argued for; this row is the check that the argument still
+holds at the renderer.
+
+`shell-body-rte-reference-contract.test.ts` now asserts it rather than leaving it to a reading.
+Negative control: replacing `{:else}{segment.text}{/if}` with the raw-html form fails with
+`expected … not to match /\{@[h]tml/`.
+
+**high** · `defect` · reference byte **1,326,195**
+
+```
+let a=Sw.sanitize(e),l="";…return`${l}<div class="img-container ${l?"d-none":""}" onclick="openImageModal(event,'${a}')">                   <img class="uploaded-img" src="${a}"><br clear="both"/>\n                </div>`
+```
+
+**Ours:** MessageBody.svelte:106-172, and the assertion in
+`src/lib/shell-body-rte-reference-contract.test.ts`.
+
+### MSB-02 — a nested body was handed five of its six props, and `extraChatMsg` was the missing one
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+A `trade` segment wraps segments, so this component renders itself — and the recursive call listed
+`stockStyle`, `chatGif`, `messageId` and `onaction` and stopped. `extraChatMsg` is `urlwrapImg`'s
+fourth argument and its only effect is the placeholder id, so a gif inside a `[{( … )}]` order would
+have rendered `gif_<id>` while every sibling in the same body rendered `gifExtra_<id>` — which is
+RM-16 reintroduced one level down.
+
+The reference has ONE `s` for the whole body and cannot have two: `filterChatMessages` inserts the
+`<span class="tradeColor">` (byte 1,414,920) BEFORE `parseLinks` runs, so `urlwrapImg` sees the
+order's text with the same fourth argument as the text around it.
+
+**UNREACHABLE ON THE DAY IT WAS FOUND, and that is measured rather than used to close the row.**
+`extraChatMsg={true}` has exactly one call site in `apps/room/src` — `ExtraChatPane.svelte:441` —
+and that site is `kind="chat"`, while `parseBodySegments` emits a `trade` segment only when
+`context.kind === 'alert'`. So no body renders today with both a trade segment and the flag set. The
+defect fixed is therefore the SHAPE, not the symptom: a hand-kept prop list one level below the
+declaration is a list that goes stale silently, and it had. It is now one spread of everything but
+`segments`, which is also a line shorter — `source-size-contract` fell 174 → 173 on it.
+
+**medium** · `defect` · reference byte **1,326,195**
+
+```
+const c=s?`gifExtra_${o}`:`gif_${o}`;l=`<div class="chat-gif-muted" id="${c}" onclick=showChatGif('${c}')>gif muted, click to show</div>`
+```
+
+**One knock-on, named rather than left to be found:** `unfed-props-contract.test.ts:288` says
+*"`RoomMessageChrome` is the only spread in this tree today"*, and it no longer is. That file's
+assertions are unaffected — `supplied` is a UNION across call sites and `RoomMessage.svelte` still
+lists all six props explicitly — but the sentence is now false and is a one-line correction in a file
+this batch did not create.
+
+**Ours:** MessageBody.svelte:75-79 and :142. The contract derives the expected spread from the props
+destructure rather than listing it, so a seventh prop is covered without anyone remembering; negative
+control — deleting `extraChatMsg` from the spread fails with
+`expected [ 'chatGif', 'messageId', …(2) ] to deeply equal [ 'chatGif', 'extraChatMsg', …(3) ]`.
+
+### MSB-03 — clicking an inline image opens the alert's attachment, or nothing at all
+
+**BLOCKED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The reference's container carries `onclick="openImageModal(event,'${a}')"`, where `a` is THAT
+image's own sanitised URL. Ours raises `onaction('image', event)`, and the handler is
+`message-actions.svelte.ts:497-499`:
+
+```ts
+if (action === 'image' && item.targetUrl) {
+  this.#openImage(payload instanceof MouseEvent ? payload : undefined, item.targetUrl);
+}
+```
+
+`item.targetUrl` is the ALERT's attachment, not the clicked segment: it is populated from
+`alerts.targetUrl` (`lib/server/alert-log.ts:38,149`) and rendered only under
+`kind === 'alert' && item.targetUrl` (`RoomMessage.svelte:1185`). So a member clicking an inline
+image inside a CHAT message gets nothing — the guard is false and the handler returns — and a member
+clicking one inside an alert that also has an attachment gets the ATTACHMENT rather than the picture
+they clicked.
+
+**What unblocks it, exactly one line**, in `apps/room/src/lib/types.ts`, extending the payload union
+at `:457` so the clicked URL can ride with the action:
+
+```ts
+export type MessageActionEvent = MouseEvent | MessageReactionPayload | TradeCopyPayload | ImageOpenPayload | undefined;
+```
+
+with `message-actions.svelte.ts:497` then preferring the payload's URL over `item.targetUrl`.
+Both files are outside this batch's editable scope, and the change cannot be made half — a payload
+type with no reader would be scaffolding, which DPE rule 3 forbids — so it is recorded whole.
+
+**high** · `missing-behaviour` · reference byte **1,326,195**
+
+```
+onclick="openImageModal(event,'${a}')"
+```
+
+**Ours:** MessageBody.svelte:163-166, `lib/room/message-actions.svelte.ts:497-499`.
+
+### MSB-04 — `chat-gif-muted-contract.test.ts` reads a file that no longer holds any of the four strings it asserts
+
+**BLOCKED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+That file's whole `describe('ours')` block reads `MESSAGE = readFileSync(new
+URL('./components/RoomMessage.svelte', …))` and asserts it contains `class="chat-gif-muted"`,
+`'click to hide' : 'gif muted, click to show'`, `return !chatGif &&
+url.toLowerCase().includes('.gif');` and `<img class="uploaded-img" src={segment.url} />`. Measured
+with `grep -n 'chat-gif-muted\|click to hide\|isMutedGif\|uploaded-img' RoomMessage.svelte`: **none
+of the four is there.** All four moved to `MessageBody.svelte` when the segment renderer was
+extracted on 2026-08-30, and the constant did not move with them.
+
+**It is invisible here and red there.** The file also reads `docs/source/`, so
+`gate/evidence-bound-tests.mjs` excludes it on any checkout without the capture symlinks — it is one
+of the 42 this run reports skipping. On the owner's machine, where those resolve, four of its
+assertions fail. This is the same shape as the `room-message-render.test.ts` finding that module's
+own header records: a test whose subject moved out from under it, kept out of sight by the exclusion
+banner.
+
+**What unblocks it, exactly one line**, at `chat-gif-muted-contract.test.ts:48`:
+
+```ts
+const MESSAGE = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
+```
+
+All four strings are in that file verbatim, including the `isMutedGif` body and the `<img>` tag,
+which is why re-pointing the constant is sufficient and nothing below it needs rewording. It is a
+test file this batch did not create, so it is named rather than edited.
+
+**high** · `defect` · reference byte **1,326,195**
+
+```
+l=`<div class="chat-gif-muted" id="${c}" onclick=showChatGif('${c}')>gif muted, click to show</div>`
+```
+
+**Ours:** `src/lib/chat-gif-muted-contract.test.ts:48`, against
+`src/lib/components/MessageBody.svelte:155-172`.
+
+### MSB-05 — the gif reveal's two labels are the capture's, and `showChatGif` is not in any bundle
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`showChatGif` occurs exactly **once** in `main.d1d09071be31f1ba.js`, and that occurrence is inside
+the template string `urlwrapImg` builds — the function itself is defined nowhere in the bundle. It
+is in `deployed-index.html:152`, an inline page script:
+
+```js
+function showChatGif(id) {
+  const el = $(`#${id}`);
+  if (el.next().hasClass('d-none')) { el.text('click to hide'); el.next().toggleClass('d-none') }
+  else { el.text('gif muted, click to show').next().toggleClass('d-none') }
+}
+```
+
+So the placeholder's label really does swap, and `{revealedGifs[segment.url] ? 'click to hide' :
+'gif muted, click to show'}` is the capture's behaviour rather than an invention — which is worth
+recording because a reader searching only the bundle will find the string `showChatGif` with no
+definition and reasonably conclude the reveal is dead code. `openImageModal` is in the same script
+and is the same shape: one occurrence in the bundle, defined in the page.
+
+**low** · `missing-behaviour` · reference byte **1,326,281**
+
+```
+onclick=showChatGif('${c}')>gif muted, click to show</div>
+```
+
+**Ours:** MessageBody.svelte:161.
+
+### MSB-06 — `rel="noreferrer"` is ours, and `Sw.sanitize` is deliberately not reproduced
+
+**DELIBERATE DIVERGENCE — recorded 2026-08-31, not matched.**
+This row was ADDED after this document was committed, by the seventh batch.
+The reference's anchor is `'<a href="'+e+'" target="_blank" class="linkColor"
+onclick="event.stopPropagation()">'+Sw.sanitize(e)+"</a>"` — no `rel`, and the SANITISED url as the
+link TEXT beside the RAW one in `href`. Ours carries `rel="noreferrer"` and puts `segment.text` in
+the text position.
+
+Both differences are the same decision. `target="_blank"` with no `rel` hands the opened page a
+`window.opener` handle back into a room a member is logged into; reproducing that would reproduce a
+defect, which is what this disposition is for. And `Sw.sanitize` exists upstream because the string
+becomes markup — here it becomes a text node, so sanitising it would only mangle a URL a member can
+read, without removing any capability.
+
+**low** · `divergence` · reference byte **1,326,527**
+
+```
+return'<a href="'+e+'" target="_blank" class="linkColor" onclick="event.stopPropagation()">'+Sw.sanitize(e)+"</a>"
+```
+
+**Ours:** MessageBody.svelte:148-154.
+
+### MSB-07 — two muted gifs in one body still share a DOM id, exactly as upstream
+
+**MEASURED REFUSAL — read, measured, deliberately not changed 2026-08-31.**
+This row was ADDED after this document was committed, by the seventh batch.
+The placeholder id is built from the MESSAGE (`` const c = s ? `gifExtra_${o}` : `gif_${o}` ``), so
+a body carrying two `.gif` links renders two elements with one id. RM-16 fixed the two-COLUMNS half
+of this; the two-gifs-in-one-message half is untouched and is upstream's.
+
+**The measurement that justifies not changing it.** `document.getElementById` is called **zero**
+times against these ids in `apps/room/src` — the reveal is keyed by URL in `revealedGifs`, so the
+duplicate is inert here. Upstream it is not inert: `showChatGif(id)` resolves `$(`#${id}`)` and then
+walks `.next()`, so the capture's own reveal acts on whichever placeholder came first. Making ours
+unique — appending the segment index, say — would produce an id the captured stylesheet and the
+captured handler do not select on, for no behaviour this repository can observe. Recorded here so the
+next reader finds the measurement instead of repeating it.
+
+**low** · `divergence` · reference byte **1,326,195**
+
+```
+const c=s?`gifExtra_${o}`:`gif_${o}`
+```
+
+**Ours:** MessageBody.svelte:157.
+
+---
+
+## components/RichTextEditor.svelte
+
+Six rows. This surface had **zero mentions** anywhere in this document before 2026-08-31. Read end to
+end against `app-rich-text-editor` — the class at byte 1,224,523, its `rteConfig` literal at
+1,224,598, and its template's twelve-entry const table at 1,226,596.
+
+### RTE-01 — the placeholder never came back once the editor had been cleared
+
+**FIXED 2026-08-31 04:05 UTC.**
+This row was ADDED after this document was committed, by the seventh batch.
+The placeholder is drawn by `.ptr-rte-body:empty::before`, and `:empty` matches an element with no
+children at all — including no text node. A `contenteditable` region does not return to that state:
+every engine leaves a lone `<br>` behind so the caret has a line to sit on. So the placeholder
+showed on first open, and never again for the rest of the session once anybody typed and deleted.
+
+**Proven at runtime rather than argued.** The contract lifts the selector out of the component and
+runs it against real elements in jsdom. With `:empty` alone, a `div.ptr-rte-body` containing one
+`<br>` returns `false` from `matches()` — that is the negative control, and it is the defect itself.
+With the shipped selector it returns `true`, an element with text returns `false`, and an element
+containing `<b>hi</b>` returns `false`.
+
+The two shapes are not invented: `retriveRTEContent()` calls exactly these nothing —
+`("" === e || "<p><br></p>" === e || "<br>" === e || "<p></p>" === e) && (e = "")`. The two
+`<p>`-wrapped forms are summernote's own block wrapping and cannot occur in a bare `contenteditable`
+div, so the rule covers the two that can.
+
+`:global` is on the selector because the `<br>` is the BROWSER's — Svelte's CSS analysis cannot see
+an element no template writes, and pruned the rule as unused, which `svelte-check` reported as
+`Unused CSS selector ":has(> br:only-child)"` before the wrapper went on.
+
+**high** · `defect` · reference byte **1,226,086**
+
+```
+retriveRTEContent(){…let e="";try{e=ga("#msgTxtContainer")?.summernote("code")?.toString().trim()||""}catch{return""}return(""===e||"<p><br></p>"===e||"<br>"===e||"<p></p>"===e)&&(e=""),e}
+```
+
+**Ours:** RichTextEditor.svelte:171-177.
+
+### RTE-02 — the three-flag gate, asked twice
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`loadRTE()` refuses to CONSTRUCT the editor unless `sessData.enableRTE && preferences.enableRTE &&
+isPresenter`, and `retriveRTEContent()` asks the same three again before reading anything out of it
+— a second fence at send time, not a duplicate.
+
+Both halves are here. `composer.svelte.ts:209-213` resolves `canUseRTE` from the same three terms;
+`ModalHost.svelte:6763` renders the editor only under `{#if name === 'rich-text' && canUseRTE}`, so a
+shut gate produces no editor rather than a disabled one; and `sendRTE()`
+(`composer.svelte.ts:545-549`) recomputes `this.canUseRTE ? this.#rteDraft.trim() : ''`, which is the
+second fence in the same words. `isPresenter` reaches all of this from `data.user.role` on the
+server, never from the client.
+
+**high** · `missing-control` · reference byte **1,225,683**
+
+```
+loadRTE(){this.appService.globals.sessData.enableRTE&&this.appService.globals.preferences.enableRTE&&this.appService.globals.isPresenter&&(this.destroyRTE(),ga("#msgTxtContainer")?.summernote({...this.rteConfig}),ga("#msgTxtContainer")?.summernote("code",""))}
+```
+
+**Ours:** `lib/room/composer.svelte.ts:186-213, 545-549`; `ModalHost.svelte:6740-6763`.
+
+### RTE-03 — `destroyRTE()` replaces the host, and mount/unmount is the equivalent
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`destroyRTE()` tears summernote down and then `e.replaceWith('<div id="msgTxtContainer"></div>')` —
+the host element itself is thrown away and rebuilt empty, and both the Close button and the end of
+`sendMessage()` call it. Every open then calls `loadRTE()`, which starts with another `destroyRTE()`
+and ends with `summernote("code", "")`.
+
+Ours mounts the component under `{#if name === 'rich-text' && canUseRTE}` inside a `#msgTxtContainer`
+that is kept for exactly that reason, so closing the modal unmounts the editor and opening it mounts
+a fresh one whose `mountEditor` attachment focuses it. The id is structural rather than decorative
+and `ModalHost.svelte:6735-6744` says so.
+
+**low** · `missing-behaviour` · reference byte **1,225,943**
+
+```
+destroyRTE(){const e=ga("#msgTxtContainer");if(e.length){try{e.summernote("destroy")}catch{}e.replaceWith('<div id="msgTxtContainer"></div>')}}
+```
+
+**Ours:** `ModalHost.svelte:6722-6782`.
+
+### RTE-04 — the empty-message refusal, in the reference's own words
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+`sendMessage()` opens `if(!e||""===e.trim())return P("Empty message. Please type a message..."),!1`,
+and `sendRTE()` raises that exact string through the dialog primitive (`composer.svelte.ts:549`).
+The four empty forms are `chat-html.ts:82` (`EMPTY_EDITOR_OUTPUT`), and `isEmptyChatHtml` widens
+them by stripping tags and `&nbsp;` — a deliberate divergence the composer's own doc argues for,
+because `<b></b>` passes the reference's four-string test and is then refused by the server with a
+400 the modal has nowhere to show.
+
+**medium** · `missing-control` · reference byte **1,225,257**
+
+```
+sendMessage(){let e=this.retriveRTEContent();if(!e||""===e.trim())return P("Empty message. Please type a message..."),!1;
+```
+
+**Ours:** `lib/room/composer.svelte.ts:521-560`; `lib/server/chat-html.ts:74-118`.
+
+### RTE-05 — the colour control is a swatch here and a summernote palette upstream, and the palette's markup is not in the capture
+
+**MEASURED REFUSAL — read, measured, deliberately not built 2026-08-31.**
+This row was ADDED after this document was committed, by the seventh batch.
+`rteConfig`'s toolbar declares `["color",["forecolor"]]`, which in summernote is a split button
+opening a two-tab colour palette. Ours is an `<input type="color">` in a Bootstrap label, and its
+`oninput` applies `foreColor` on every frame of a drag while `run()` calls `editor?.focus()` each
+time.
+
+**The measurement that justifies refusing rather than matching.** The palette's markup is not in this
+repository to match: over `main.d1d09071be31f1ba.js`, `note-color` — the class summernote renders the
+palette with — has **zero** occurrences, `note-btn` has **two**, and `forecolor` has **two**, both of
+them inside the `rteConfig` literal itself. So the only captured evidence for this control is the
+five-character config entry, which the component already reproduces exactly. Building a palette would
+mean inventing every colour, every tab label and every class in it — a value picked because it looked
+right, which is the thing this repository's standard names outright.
+
+The per-frame `oninput` is recorded, not fixed, for the same reason: changing it to `onchange` is a
+guess about which is closer to a palette pick, and neither can be checked against the capture or
+proven in a browser from this checkout. What IS asserted is the button SET — five `run(` calls and no
+sixth, so a control the captured config has no entry for cannot be added quietly.
+
+**low** · `divergence` · reference byte **1,224,598**
+
+```
+this.rteConfig={placeholder:"Type your message here...",minHeight:200,toolbar:[["font",["bold","italic","underline","clear"]],["color",["forecolor"]]],popover:{air:[]},dialogsInBody:!0,disableResizeEditor:!0}
+```
+
+**Ours:** RichTextEditor.svelte:127-138.
+
+### RTE-06 — Save or Send, chosen by `isEditing` over two embedded views
+
+**ALREADY BUILT — verified by reading 2026-08-31, not rebuilt.**
+This row was ADDED after this document was committed, by the seventh batch.
+The modal has two entry points — `doRTEModal` (compose, carrying `channel` and an optional `txt`)
+and `doRTEModalEdit` (carrying `msg`) — and the primary button's label follows:
+`H(14,xue,2,0,"span")(15,Mue,2,0)` with `O(14,o.isEditing?14:15)`, where `xue` renders
+`<span>Save</span>` and `Mue` renders `<span>Send</span>`. `sendMessage()` branches the same way,
+into `editChatMessage {msgID, newMsg}` or `sendGrpChat(channel, e)`.
+
+All of it is here: `ModalHost.svelte:6777` renders the `<span>` pair under `rteIsEditing`, and
+`sendRTE()` branches into `#editMessage('chat', target, …)` or `sendBody(…)` on `#rteEditTarget`.
+The `<span>` is the capture's own wrapper and is kept rather than flattened.
+
+**low** · `missing-control` · reference byte **1,227,414**
+
+```
+d(13,"button",11),x("click",function(){return o.sendMessage()}),H(14,xue,2,0,"span")(15,Mue,2,0),u()…2&i&&(m(14),O(14,o.isEditing?14:15))
+```
+
+**Ours:** `ModalHost.svelte:6765-6780`; `lib/room/composer.svelte.ts:545-560`.
+---
+
+## FollowChatStylePane.svelte
+
+Read end to end 2026-08-31 against `vTe` (byte 2,068,821) and consts 100-126 of
+`app-user-info-modal`, bracket-walked BY VALUE out of that component's own table (`consts:[` at byte
+2,087,748, 131 entries). Twenty-three of the twenty-four elements matched byte for byte — the five
+field rows, `[1,"py-2"]` at 12, `["title","Chat Color Mode",1,"pb-2"]` at 102,
+`G2e=(t,n,e)=>({"background-color":t,color:n,"font-size":e})` for the preview's three properties,
+`TB=t=>({color:t})` for the two colour-only ones, `[1,"fw-bold"]` at 120. Three rows came out of
+it, and the first is a defect of OURS rather than a difference.
+
+### FCS-1 — the Text Size box could write `null`, and `null + 1` is 1: an emptied field saved a followed member's username at one pixel
+
+**FIXED 2026-08-31.** This row was ADDED after this document was committed.
+
+`bind:value` on `<input type="number">` does not refuse an empty box and does not write a string: it
+writes `null`. Svelte 5.56.10, `to_number` at
+`node_modules/svelte/src/internal/client/dom/elements/bindings/input.js:287-289` —
+`value === '' ? null : +value`. `FollowChatStyle.fontSize` is declared `number` at `lib/types.ts:59`,
+so nothing in the type system, `svelte-check` or eslint sees the lie.
+
+What that `null` does is not a missing style, and that is the whole row.
+`lib/message-styles.ts` interpolates the field three times for every message from that followed
+member: `:120` `font-size: ${fontSize}px` → `nullpx`, dropped by the parser; `:126`
+`${fontSize - 2}px` → `-2px`, dropped; and **`:123` `${fontSize + 1}px` → `1px`, because `null + 1`
+is `1` in JavaScript and not `NaN`.** That line is the username. `ModalHost.svelte:3338` persists the
+object as it stands, so the `null` outlives the modal and every subsequent message from that person
+renders their name at one pixel.
+
+**A DELIBERATE DIVERGENCE, because the reference has the same hole.** Const 113 is
+`["type","number","name","follow-chat-text-size","value","followChatStyle.fontSize","id",
+"follow-chat-text-size",1,"form-check-input",3,"ngModelChange","ngModel"]` — a two-way `ngModel` with
+no `min`, no `max` and no validator, and Angular's number accessor writes `null` for an empty box
+exactly as Svelte does. Matching it would reproduce the defect.
+
+The pane now binds `value` one way and writes back through `nextFollowChatFontSize`, which keeps the
+last good value and refuses only what `font-size` itself cannot express — a non-number, and anything
+at or below zero, since zero would put the username line back at 1px through the same `+ 1`. No
+maximum is invented, because the reference has none. `follow-chat-style.test.ts` demonstrates the
+`1px` first, on `resolveMessageStyles` directly, and then that the coercion prevents it.
+
+**reference byte 2,094,127** (const 113, consumed at `(24,"input",113)` inside `vTe`)
+
+```
+["type","number","name","follow-chat-text-size","value","followChatStyle.fontSize","id","follow-chat-text-size",1,"form-check-input",3,"ngModelChange","ngModel"]
+```
+
+**Ours:** FollowChatStylePane.svelte:85-96 (`value={style.fontSize}` + `oninput`), the rule and the
+whole measurement at `lib/follow-chat-style.ts`, the demonstration and the coercion's cases at
+`lib/follow-chat-style.test.ts`.
+
+### FCS-2 — the chat-sound label's on/off word is a `<span>` in the capture and was bare text here
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+`d(29,"label",117), v(30," Chat sound "), H(31,_Te,2,0,"span")(32,bTe,2,0)`, and the two templates
+are `function _Te(t,n){1&t&&(d(0,"span"),v(1,"on"),u())}` and its `off` twin at bytes 2,068,718 and
+2,068,769. Ours rendered `Chat sound {…}` with no element around the word. Nothing styles that span
+today, which is why this is `low` rather than a defect — but it is one element of captured DOM, it
+costs nothing, and a rule that ever targets it would have had nothing to target.
+
+**reference byte 2,068,718**
+
+```
+function _Te(t,n){1&t&&(d(0,"span"),v(1,"on"),u())}function bTe(t,n){1&t&&(d(0,"span"),v(1,"off"),u())}
+```
+
+**Ours:** FollowChatStylePane.svelte:104 now renders `Chat sound <span>{…}</span>`.
+
+### FCS-3 — the pane's UIM-16 citation was four bytes into the node it named
+
+**FIXED 2026-08-31.** This row was ADDED after this document was committed.
+
+The comment carrying `fw-bold` said "Read at bundle byte 2,070,269: `d(36,"strong",120),
+v(37,"Username:")`". `d(36,` actually begins at **2,070,265**; 2,070,269 lands on the `strong`
+inside it. The const index it cites is correct — 120 really is `[1,"fw-bold"]` in that table, checked
+by bracket-walking rather than by counting — which is the useful half of this row: the same pass
+found four offsets in `ScreenShareMenu` that were 47 to 100 out (SSM-4), and the ONE checked here was
+out by four. An offset that lands inside the thing it names reads as correct to anybody who opens it.
+
+**reference byte 2,070,265**
+
+```
+d(33,"div",118)(34,"div")(35,"div",119)(36,"strong",120),v(37,"Username:")
+```
+
+**Ours:** FollowChatStylePane.svelte:114, corrected in place.
+
+---
+
+## AlertSendReportModal.svelte
+
+Read end to end 2026-08-31: `selectors:[["app-alert-send-report-modal"]]` at byte 2,413,823, its
+consts table bracket-walked from `consts:[` at 2,413,870 (39 entries), the template, the class and
+the `styles:[…]` array. RPT-01 through RPT-08 already dispositioned the report itself; these three
+rows are everything else the component carries, and all three are refusals or blocks. Nothing was
+built, and the reason each was not is a measurement.
+
+### ASR-1 — the reference component's stylesheet is thirteen rules, eleven of them for elements that cannot exist here
+
+**MEASURED REFUSAL 2026-08-31.** This row was ADDED after this document was committed.
+
+Eleven of the thirteen are scoped to `.list-group`, `.list-group-item`, `.list-group-item:hover`,
+`.report-header`, `.report-header-container`, `.report-body`, `#search-select-addon`, `.form-select`,
+`.failed-reason`, `.sent-time` and `#pie-container` — every one an element RPT-01's refusal means
+this room does not render, so transcribing them would be eleven rules matching zero elements.
+
+The other two are `.modal-dialog`, and both already hold. `{width:100%;max-width:800px}` is
+`app.css:1524` (`#alert-send-report-modal > .modal-dialog { max-width: 800px }`), and `width:auto` on
+a block box with no padding or border resolves to the same used width as `width:100%`.
+`{overflow-y:initial!important}` restates that property's own initial value, and nothing in this
+room's `.modal-dialog` rule sets `overflow-y` at all.
+
+**reference byte 2,416,190**
+
+```
+.modal-dialog[_ngcontent-%COMP%]{overflow-y:initial!important}.modal-dialog[_ngcontent-%COMP%]{width:100%;max-width:800px}
+```
+
+**Ours:** nothing added. `alert-report-modal-contract.test.ts` counts the thirteen rules in the
+bundle, names seven of the eleven orphan selectors, asserts none of them is rendered here, and
+asserts the 800px rule is still in `app.css` — so if the refusal's premise ever expires the count
+goes red rather than the rules silently being missing.
+
+### ASR-2 — `aria-labelledby` names the dialog's own id, so the dialog has no accessible name; ten of this room's twenty-two dialogs are the same shape
+
+**MEASURED REFUSAL 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 0 is
+`["id","alert-send-report-modal","tabIndex","-1","role","dialog","aria-labelledby","alert-send-report-modal","aria-hidden","true",1,"modal","fade"]`.
+`aria-labelledby` points at the element it is on; the accessible-name computation's recursion guard
+drops a self-reference, so a screen reader announces a nameless `role="dialog"`. Ours reproduces it
+attribute for attribute, because it is the capture.
+
+**NOT repaired, and the reason is a count rather than a shrug.** Measured across `lib/components`:
+**22 `<Modal>` call sites; 9 pass a distinct `titleId`; 10 — including this one — are the same
+self-reference.** Nine of those ten are in `ModalHost.svelte` and `LogArchiveModals.svelte`, which
+this pass does not own. Repairing one of ten trades a captured-value divergence for an inconsistency
+across the room's dialogs. The fix is one `titleId` per site, in one change, by somebody who owns all
+three files; the count is pinned so that "ten" cannot quietly become "eleven".
+
+**reference byte 2,413,878**
+
+```
+["id","alert-send-report-modal","tabIndex","-1","role","dialog","aria-labelledby","alert-send-report-modal","aria-hidden","true",1,"modal","fade"]
+```
+
+**Ours:** AlertSendReportModal.svelte:59-62 unchanged; the three assertions are in
+`alert-report-modal-contract.test.ts`.
+
+### ASR-3 — nothing focuses this dialog when it opens, because Bootstrap's modal plugin did that upstream
+
+**BLOCKED 2026-08-31, on one line in a file this pass does not own.**
+This row was ADDED after this document was committed.
+
+Upstream the dialog is adopted by Bootstrap's modal plugin, which calls `_element.focus()` on show.
+This room ships no Bootstrap JavaScript at all — `bootstrap-dropdown-contract.test.ts` holds that
+premise for every app in the repository — and `Modal.svelte`'s only focus management is
+`releaseFocusWhenClosed`, which blurs on CLOSE. So opening the report modal leaves focus wherever it
+was, behind an `inert` boundary that is about to move.
+
+**The exact change: `apps/room/src/lib/components/Modal.svelte:95`, `if (open) return;` becomes
+`if (open) { node.focus(); return; }`.** The root already carries `tabindex="-1"`, so it is
+programmatically focusable, and the attachment that line lives in already runs on every change of
+`open`. It is one line for all 22 dialogs in this room, which is exactly why it should not be applied
+to one of them from inside this pass.
+
+**reference byte 2,413,878** (const 0's `tabIndex","-1"`, the attribute that makes the fix possible)
+
+**Ours:** `Modal.svelte:93-99`. `alert-report-modal-contract.test.ts` asserts the absence, so the day
+the line is added the assertion goes red and this row closes.
+
+---
+
+## notes/NoteTabContent.svelte
+
+Read end to end 2026-08-31 against `app-presentationarea`, whose consts table was bracket-walked BY
+VALUE from `consts:[` at byte 1,994,257 (294 entries) rather than looked up by slot, against the tab
+template `jSe` (1,928,605), the gear menu `USe` (1,927,567) and the badge `BSe` (1,927,509). The
+dirty pen (const 123), the rename anchor (124), the trailing space on the tab name
+(`Ne("",e.name," ")`) and all six menu labels matched. Three rows came out of it.
+
+### NTC-1 — the Welcome Mat marker is a green badge carrying a whole sentence; ours was a grey icon carrying two invented words
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 122 is
+`["placement","bottom","ngbTooltip","This note is the Welcome Mat, and will be shown by default when noboby is presenting",1,"badge","badge-success","mx-1","p-0"]`
+and its template is `function BSe(t,n){1&t&&(d(0,"span",122),T(1,"i",125),u())}`, where const 125 is a
+bare `[1,"fas","fa-home"]` — so the `mx-1` belongs to the badge and not to the icon.
+
+Ours rendered `<i class="fas fa-home mx-1" title="Welcome Mat">`. Two things were wrong and both are
+visible. The badge classes were absent, so the marker was an unpainted grey house where the reference
+paints a green pill (`css/complete-app-styles.css`: `.badge-success { background-color: rgb(0, 188,
+140) }`). And `title="Welcome Mat"` is an INVENTED VALUE: `"Welcome Mat"` as a quoted literal occurs
+**zero** times in the 2,891,205-byte bundle and `"title","Welcome Mat"` occurs zero times, while the
+bare words occur twelve times and every one is inside a longer sentence. So the one place the room
+explains what a Welcome Mat DOES said two words instead.
+
+The reference's own misspelling of "nobody" is kept, and the tooltip is paired with
+`{@attach ngbTooltip}` — `ngbtooltip` is an Angular directive that does nothing in a browser, which
+is the defect `#lib/ngb-tooltip.js` exists for.
+
+**reference byte 2,002,332** (const 122 in the table) / **1,927,509** (`BSe`)
+
+```
+function BSe(t,n){1&t&&(d(0,"span",122),T(1,"i",125),u())}
+```
+
+**Ours:** NoteTabContent.svelte:59-68; the constant and the measurement at
+`components/notes/note-tab-chrome.ts`; asserted by `note-tab-content-contract.test.ts`.
+
+### NTC-2 — the gear had no keyboard path, so every note action behind it was mouse-only
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 126 is
+`["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]` —
+a `<span>` whose only child is an `<i>`, with no `role`, no `tabindex` and no text. Upstream that is
+survivable because Bootstrap's dropdown plugin adopts the element and gives it keyboard behaviour.
+`bootstrap-dropdown-contract.test.ts` measures that **no app in this repository depends on
+`bootstrap`**, so the attribute is inert here and the span was simply unreachable: Edit Note, Rename
+Note, Bring everyone here, both Welcome Mat items and Delete could be reached with a mouse and by
+nothing else, on a tab strip a presenter drives while talking.
+
+`role="button"`, `tabindex="0"`, `aria-label="Note options"` and an Enter/Space handler are OURS, on
+the precedent `GiphyPicker` and `ScreenTabs` already set for the identical shape. The captured
+`data-bs-toggle` stays beside them; this is an addition, not a replacement.
+
+**reference byte 2,002,666**
+
+```
+["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",1,"dropdown-toggle"]
+```
+
+**Ours:** NoteTabContent.svelte:99-110, with `notes-pane-render.test.ts` asserting the rendered
+attribute order and `note-tab-content-contract.test.ts` asserting all four cannot be dropped later as
+"not in the reference".
+
+### NTC-3 — the capture freezes one id on every note tab's gear, which is a duplicate id per open note
+
+**DELIBERATE DIVERGENCE 2026-08-31.** This row was ADDED after this document was committed.
+
+Const 126 names every gear `dropdownMenuNote`, and const 127 —
+`["aria-labelledby","dropdownMenuNote",1,"dropdown-menu"]` — points every menu's label at that same
+literal. Two open notes are two elements sharing one id in one document, and both menus resolve their
+label to the FIRST gear. `aria-expanded="false"` is frozen for the same reason: Bootstrap's plugin
+rewrote it at runtime, and nothing rewrites it here.
+
+Ours binds `id={menuId}` / `aria-labelledby={menuId}` from `NotesPane`'s
+`` `${componentId}-note-menu-${note.id}` `` and `aria-expanded={menuOpen}` from the state that
+actually opens the menu. Recorded rather than matched: reproducing it would reproduce a defect.
+
+**reference byte 2,002,764**
+
+```
+["aria-labelledby","dropdownMenuNote",1,"dropdown-menu"]
+```
+
+**Ours:** NoteTabContent.svelte:100/111; asserted by `note-tab-content-contract.test.ts`.
+
+---
+
+## ScreenShareMenu.svelte
+
+Read end to end 2026-08-31 against `u4e` (byte 2,480,269) and its four child templates in `app-room`,
+whose consts table was bracket-walked BY VALUE from `consts:[` at byte 2,533,190 (229 entries). Every
+const index the component cited — 99, 108, 115, 158, 163, 182, 184, 185, 186, 187, 188 — was correct;
+every BYTE OFFSET it cited was not. Four rows.
+
+### SSM-1 — the whole control had no focusable element in it, so a presenter could neither open the menu nor reach one entry from the keyboard
+
+**BUILT 2026-08-31.** This row was ADDED after this document was committed.
+
+Every row upstream is `<li title=… (click)=…><a aria-hidden="true">label</a></li>` — consts 185, 186
+and 187 carry the click and const 158 is a bare `["aria-hidden","true"]` — and the trigger is const
+182, an `<a>` with `data-bs-toggle="dropdown"` and no `href`. Transcribed faithfully that is a control
+in which **nothing is focusable and nothing has a name**: an `<a>` without `href` is out of the tab
+order, an `<li>` is never in it, and the only text-bearing node in each row is explicitly hidden from
+assistive technology. Bootstrap's dropdown plugin covers it upstream; this room ships none, so the
+navbar button that starts and stops a presenter's broadcast was mouse-only end to end.
+
+`role="menu"` on the list, and `role="menuitem"`, `tabindex="0"`, `aria-label` and an Enter/Space
+handler on each row and on the trigger. `aria-hidden` STAYS on every anchor — it is captured, and
+with the name now on the `<li>` it stops the label being announced twice rather than hiding it. The
+six rows became ONE snippet in the same change, because four attributes repeated six times are four
+attributes that will be missing from the seventh.
+
+**reference byte 2,544,009** (const 182 in the table) / **2,480,269** (`u4e`)
+
+```
+["id","dropdownScreenSharing","data-bs-toggle","dropdown","aria-haspopup","true","aria-expanded","false",1,"nav-link","dropdown-toggle","d-flex","align-items-center",3,"ngClass"]
+```
+
+**Ours:** ScreenShareMenu.svelte:71-115; the argument and the key handler at
+`lib/screen-share-menu.ts`; asserted by `screen-share-menu-contract.test.ts`.
+
+### SSM-2 — the capture splits the six clicks three on the `<li>` and three on the `<a>`; all six sit on the `<li>` here
+
+**DELIBERATE DIVERGENCE 2026-08-31.** This row was ADDED after this document was committed.
+
+Consts 185, 186 and 187 each end `3,"click"`, so Share Screen, OBS / XSPLIT and OBS / RTMP carry the
+handler on the list item. `l4e`, `c4e` and `d4e` instead do `d(2,"li")(3,"a",163)`, where const 163 is
+`["aria-hidden","true",3,"click"]` — the handler on the anchor.
+
+Measured: `.dropdown-menu li` has no rule of its own in `css/complete-app-styles.css`, and these
+anchors are not `.dropdown-item` — they are bare inline `<a>` with no `href`, so an anchor's box is
+exactly its text. Upstream's "Stop Sharing All Screens" is therefore clickable on its words and dead
+on the rest of the row, while "Share Screen" two entries above is clickable across the whole row.
+Reproducing the split would reproduce a hit-target bug, and it would also put the focusable element
+SSM-1 adds onto the one node `aria-hidden` is on.
+
+**reference byte 2,479,632**
+
+```
+function l4e(t,n){if(1&t){const e=Y();T(0,"div",115)(1,"div",115),d(2,"li")(3,"a",163),x("click",function(){return D(e),E(g(3).mediaService.stopSharingAll())}),v(4," Stop Sharing All Screens"),u()()}}
+```
+
+**Ours:** the one `entry` snippet at ScreenShareMenu.svelte:71-83, `onclick={run}` on the `<li>`.
+
+### SSM-3 — none of the six entries is inert upstream, unlike four of the stream tab's
+
+**MEASURED REFUSAL 2026-08-31 — nothing to build.**
+This row was ADDED after this document was committed.
+
+The `StreamTabs` pass found four controls in that tab that are inert UPSTREAM: a forced eye badge
+with no writer, a lock badge with no writer, a `toggleLockScreenMTX` whose body is
+`console.error("TODO: …")`, and a "Bring everyone here" whose `focusOnScreen` no receiver resolves.
+This menu was checked against that class before any of its entries was treated as a gap, and none of
+the six is in it. Upstream each reaches a real body — `mediaService.startScreenSharing`,
+`mediaService.stopSharingAll`, `mediaService.stopSharingProducer`, `openStreamingTab()` and
+`reopenPreviewWindow()`, each occurring more than once in the bundle, so each has a definition as
+well as a call — and the 2,000 bytes around the four templates contain no `TODO` at all. Here all six
+callbacks arrive from `routes/+page.svelte` (`:1203`, `:1204`, `:1223`, `:1224`, `:1225`) and land on
+a real implementation.
+
+**reference byte 2,479,414**
+
+```
+function a4e(t,n){if(1&t){const e=Y();T(0,"div",115),d(1,"li",187),x("click",function(){return D(e),E(g(3).openStreamingTab())}),d(2,"a",158),v(3," OBS / RTMP / Stream / Restream "),d(4,"span",188),v(5,"New"),u()()()}}
+```
+
+**Ours:** nothing added; the check itself is asserted in `screen-share-menu-contract.test.ts`.
+
+### SSM-4 — all four template byte offsets in the component's own entry table were 47 to 100 too high, and every one landed inside the function it named
+
+**FIXED 2026-08-31.** This row was ADDED after this document was committed.
+
+| cited | actual | out by |
+| --- | ---: | ---: |
+| `a4e` 2,479,514 | **2,479,414** | 100 |
+| `l4e` 2,479,700 | **2,479,632** | 68 |
+| `c4e` 2,479,924 | **2,479,832** | 92 |
+| `d4e` 2,480,060 | **2,480,013** | 47 |
+
+The shape is the reason this is a row and not a typo. Not one of the four is out far enough to leave
+the function it names, so opening any of them shows plausible code from the right template and
+confirms the citation to anybody who checks it that way. Only `indexOf('function a4e(')` settles it.
+The CONST indices in the same table were re-checked the same way and were all correct, which is worth
+recording beside the offsets: a recent pass found three components whose const indices were each one
+too high, and the lesson generalises in neither direction — every citation has to be re-derived, not
+spot-checked.
+
+**reference byte 2,479,414**
+
+**Ours:** ScreenShareMenu.svelte:20-34, corrected in place with the four wrong numbers kept in the
+sentence that says they were wrong. `screen-share-menu-contract.test.ts` asserts all four `indexOf`
+results and that each wrong number appears exactly once, so neither the correction nor its record can
+drift back.
+## EmojiPicker.svelte
+
+Seven rows, read end to end on 2026-08-31 against
+`apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` (2,891,205 bytes, ASCII throughout —
+`readFileSync(path).length === readFileSync(path,'utf8').length === 2,891,205`, so a character index
+IS a byte offset here and no newline translation can shift one).
+
+**Six component const tables were decoded BY VALUE rather than looked up**, by bracket-walking from
+each `consts:[` through `src/lib/const-table.mjs` — `emoji-mart-anchors` (byte 723,019, 6 entries),
+`emoji-category` (728,963, 12), `emoji-skins` (733,515, 4), `emoji-preview` (734,949, 17),
+`emoji-search` (737,828, 6) and `emoji-mart` itself (752,946, 11). Three of the seven rows below —
+`EMOJI2-02`, `EMOJI2-04`, `EMOJI2-07` — exist only because of that.
+
+**Two gaps the tables appeared to show were then refuted by reading further, and both are recorded
+rather than dropped.** `jee` binds `("size",38)` and again `("size",e.emojiSize)` on the hovered
+preview's emoji (byte 719,840), which reads as 24 against this component's 38 — until `Wee` at byte
+722,105 is read too, where the picker passes `("emojiSize",38)` into `emoji-preview`, so both are 38
+and this matches. And the swatches' `tabIndex` binding, which is `EMOJI2-04`. A refutation nobody
+writes down is a claim somebody makes again.
+
+### EMOJI2-01 — the staged first render committed one category too many, and it was the 487-cell one
+
+**FIXED** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`EMOJI-09` transcribed the reference's staging as `Math.min(this.categories.length, 3)` over
+`EMOJI_DUMP_DATA.categories`. That array is not the one the reference counts. `ngOnInit` puts two
+synthetic categories at the front before the arithmetic runs — `unshift(this.RECENT_CATEGORY)` at
+byte 747,584, then `unshift(this.SEARCH_CATEGORY)` at byte 747,681, with
+`SEARCH_CATEGORY={id:"search",name:"Search",emojis:null,anchor:!1}` defined at byte 745,709 — so by
+the time `const s=Math.min(this.categories.length,3)` runs at byte 747,768 the array is
+`[Search, Recent, Smileys & People, …]` and `slice(0, s)` commits **Search (empty), Recent (9 cells)
+and the first 60 of Smileys & People: 69 cells.**
+
+`EMOJI_DUMP_DATA.categories` has no Search entry — that section is rendered once, separately, in the
+markup. Counting it directly committed `[Recent, Smileys & People, Animals & Nature]` and capped the
+THIRD, so the first frame built **9 + 487 + 60 = 556 cells**, including the whole 487-entry Smileys
+& People category uncapped, inside the click handler this staging exists to get out of.
+
+Both numbers are measured rather than computed: `emoji-picker-contract.test.ts` mounts the picker
+and counts `.emoji-mart-emoji`, which is 71 now and was 558 under the negative control that put the
+offset back — 69 and 556 grid cells plus the two sprites the picker draws outside the grid, the
+preview and `No Emoji Found`. The
+component's own comment says the point is "the difference between a picker that opens and a picker
+that opens after a stutter"; it was giving back eight times the work it saved.
+
+Fixed by declaring the offset as the fact it is rather than folding it into a literal:
+`Math.min(categories.length + SEARCH_CATEGORY_SLOT, STAGED_CATEGORIES) - SEARCH_CATEGORY_SLOT`.
+`emoji-picker-contract.test.ts` counted sections and cells and was green throughout, because it
+asserted three sections with the third capped — which is what the code did, not what the reference
+does; its assertions now name Recent-plus-one and carry the reason.
+
+### EMOJI2-02 — the skin swatches belong to the IDLE preview, and go away while an emoji is hovered
+
+**BUILT** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-preview` renders TWO alternative blocks, not one block with a branch inside it. Its const
+table (byte 734,949) has const 0 `["class","emoji-mart-preview",4,"ngIf"]` for the hovered one and
+const 1 `[1,"emoji-mart-preview",3,"hidden"]` for the idle one, and the update block at byte 735,962
+reads `z("ngIf",o.emoji&&o.emojiData), m(), z("hidden",o.emoji)`. The hovered sub-template `jee`
+(byte 719,840) contains the preview emoji and the name/shortnames/emoticons and nothing else; the
+`emoji-mart-preview-skins` div exists only inside the second block, the one bound `[hidden]="o.emoji"`.
+
+So upstream the six swatches disappear for as long as the pointer is over a cell, and come back one
+animation frame after it leaves — which is what `EMOJI-12`'s deferred clear makes readable rather
+than a flicker. This drew them permanently, and `.emoji-mart-preview-data{left:68px;right:12px}`
+runs under them, so a long emoji name overlapped the swatch row.
+
+Built as `hidden={hovered !== null}` rather than an `{#if}`, for the reason upstream's is a
+`[hidden]`: the row keeps its `skinsOpened` state across the hover. That the attribute does anything
+at all was checked rather than assumed — the two rules that touch the class,
+`{position:absolute;top:50%;transform:translateY(-50%)}` (reference sheet byte 365,090) and
+`{right:30px;text-align:right}` (byte 365,272), set no `display` between them, so the UA's
+`[hidden]{display:none}` is not outranked.
+
+### EMOJI2-03 — three captured whitespace pads, on the runs a diff of rendered strings would catch
+
+**BUILT** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-search` emits its screen-reader label as `Ne(" ",o.i18n.search," ")` at byte 738,704 with
+`i18n.search === "Search"` from the defaults object at byte 744,221; the preview emits its
+shortnames as `Ne(" :",e,": ")` (`Bee`, byte 719,646) and its emoticons as `Ne(" ",e," ")` (`Uee`,
+byte 719,744). Angular's `Ne` writes those pads into the text node. All three rendered here without
+them.
+
+Written as `{' Search '}`, `{' :'}{shortName}{': '}` and `{' '}{emoticon}{' '}` — the idiom, and the
+declined `svelte-autofixer` suggestion, that `apps/room/AGENTS.md` already records for `{' Retry '}`
+and its forty siblings. Every capture comparison in this repository diffs rendered strings, which is
+what makes a leading space evidence rather than formatting.
+
+### EMOJI2-04 — the swatches' `tabIndex` is a BINDING upstream, and it resolves to the static 0 here
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-skins` const 3 is `["role","button",3,"click","keyup.enter","keyup.space","tabIndex"]` (table
+at byte 733,522) and `Lee` binds `z("tabIndex", i.tabIndex(e))` at byte 719,009. This markup carries
+a static `tabindex="0"` on all six swatches, which reads like a keyboard-order gap: while the row is
+closed five of the six carry `aria-hidden="true"`, and a hidden control in the tab order is a real
+defect elsewhere in this repository.
+
+It is not one, and the method is why. `tabIndex(e){return this.isVisible(e)?"0":""}` at byte 733,107
+answers `""` — not `-1` — for a hidden swatch, and `z` is `ɵɵproperty`, so the assignment is
+`element.tabIndex = ""`. `tabIndex` is a `long` IDL attribute, `ToNumber("")` is 0, and the element
+ends up with `tabindex="0"` exactly as it does here. **The binding and the static attribute produce
+the same DOM**, so transcribing it would add a function whose only effect is to compute the constant
+it replaced. Refused, and recorded here because the shape — a binding we render as a constant —
+looks like a gap every time somebody re-reads it.
+
+### EMOJI2-05 — the Frequently Used row does NOT re-sort after a pick, upstream either
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Picking an emoji here persists the new count (`rememberFrequent`) and leaves the visible Recent row
+alone until the picker is next mounted, which looks like a missed refresh. `handleEnterKey` — which
+`handleEmojiClick` calls for every pick, at byte 751,151 — ends with
+
+```js
+const o=this.categoryRefs.toArray()[1];
+o&&this.enableFrequentEmojiSort&&this.ngZone.run(()=>{o.updateRecentEmojis(),o.ref.markForCheck()})
+```
+
+at byte 750,569, and `enableFrequentEmojiSort=!1` at byte 745,271 is the picker's own default.
+
+It is an `@Input`, so "the default is false" is not on its own an answer — something could bind it.
+Nothing does: the string occurs **four times in 2,891,205 bytes**, and all four are accounted for —
+the declaration at byte 745,271, the guard at byte 750,574, and the two halves of the `inputs:` map
+at bytes 752,585 and 752,610. A template binding would be a fifth. So the guard is false for the life of the
+component upstream and `updateRecentEmojis` never runs on a pick there.
+
+The counters ARE written either way — `frequently.add` is called on the line above, outside the
+guard — so the two agree on what is stored and on what is shown. Not built.
+
+### EMOJI2-06 — the Search category is `categories[0]` with `anchor:!1`, which is why it has no anchor
+
+**ALREADY BUILT** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The markup renders the Search Results section once, on its own, ahead of the category loop, and
+draws its anchors from `EMOJI_DUMP_DATA.anchors`, which has no Search entry. Read as a claim about
+structure that looks wrong twice over: upstream the Search category is IN `categories`, and the
+anchor row iterates `o.categories` (`emoji-mart-anchors` template, byte 723,328) rather than the
+`activeCategories` the grid uses.
+
+Both resolve to what is already here. `SEARCH_CATEGORY` carries `anchor:!1` (byte 745,709) and the
+anchor sub-template is gated `z("ngIf",!1!==n.$implicit.anchor)` at byte 716,699 — a category whose
+`anchor` is literally `false` gets no anchor — and it is `unshift`ed to index 0 (byte 747,681), so
+the section is first. First and anchorless is exactly what this renders. Nothing to build; recorded
+so the next reader does not build it.
+
+### EMOJI2-07 — the clear button's `keyup.enter` would fire `clear()` twice, and is not transcribed
+
+**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-search` const 4 is `["type","button",1,"emoji-mart-search-icon",3,"click","keyup.enter","disabled"]`
+(byte 737,990) and the template binds both handlers to the same method at byte 738,430:
+`x("click",function(){return D(s),E(o.clear())})("keyup.enter",function(){return D(s),E(o.clear())})`.
+
+The element is a real `<button type="button">`. Enter on a focused button fires `click` natively, so
+upstream both handlers run for one keypress and `clear()` executes twice. It is idempotent — it sets
+`query` to `""`, re-searches and re-focuses — so the visible effect upstream is one extra search over
+1,821 entries per Enter, not a wrong result. Reproducing it would reproduce that, so the button
+carries `onclick` alone.
+
+The same pair appears on the skin swatches (`keyup.enter` and `keyup.space`, `Lee` at byte 719,148)
+and is NOT the same case: those are `role="button"` spans, where nothing is native and a handler is
+the only way the key does anything. Those are transcribed — as `keydown` with `preventDefault`,
+because Space on `keydown` scrolls the page before a `keyup` handler ever sees it.
+
+## ScreenPane.svelte
+
+Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with
+`app-screenshare-view`'s **20-entry const table decoded BY VALUE** — bracket-walked from the
+`consts:[` at byte 1,500,330 through `src/lib/const-table.mjs`, table body `[1,500,337 .. 1,501,226)`
+— and its create block read as one flat list at byte 1,501,256 rather than through the offsets the
+existing comments cite.
+
+Four of the seven exist only because of that. Three consts had no counterpart anywhere in this
+surface and none of them is named in any comment on it: const 0 `[1,"h-inherit"]`, const 5
+`["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]` and
+const 11 `[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]`. Reading the create block also
+settled the nesting, which the offsets alone cannot: `d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)`
+at byte 1,501,361 puts `div.video-screen-container` INSIDE `<pan-zoom>`, and this component had it
+outside.
+
+### SP2-01 — one derived fed the video's `hidden` and the cluster's, and upstream they differ
+
+**FIXED** — `apps/room/src/lib/components/ScreenPane.svelte`,
+`apps/room/src/lib/screen-pane-contract.test.ts`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`SV-SP-14` built `pictureHidden = !detachedHere && (!connected || saveData)` and applied it to BOTH
+the `<video>` and the detached zoom cluster, with a test asserting they share one derived so that
+"the two cannot drift apart into different conditions". The two ARE different conditions upstream:
+
+```js
+cluster  z("ngClass",ct(2,$0e,!e.isDetached&&(!e.isConnected||…||e.mediaService.saveData)))   // 1,493,972
+video    ("ngClass",Kn(18,H0e,   !o.isConnected||…||o.mediaService.saveData, …viewerOnlyMode)) // 1,502,001
+```
+
+`!isDetached` is the CLUSTER's leading term and the video's expression has no `isDetached` term at
+all. Sharing one derived therefore made `detachedHere` **un-hide** the picture: a source pane whose
+producer had gone, or whose viewer had switched Video Disabled on after detaching, drew the captured
+`Screen Detached.. Click here to re-attach` heading over a live-looking empty `<video>` instead of
+over nothing.
+
+Split into `pictureHidden = !connected || saveData` for the element and
+`detachedClusterHidden = !detachedHere && pictureHidden` for the cluster. Both reference expressions
+are now asserted at their bytes, so neither can be edited into the other again.
+
+### SP2-02 — nothing clipped the zoomed picture, and `overflow-hidden` is the class that does
+
+**BUILT** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Const 5 of `app-screenshare-view` is
+`["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]`, and
+node 6 of the create block is that div — the parent of `<pan-zoom>` and the element the pan/zoom
+classes and the double-click directive are bound to. `overflow-hidden` is Bootstrap's own
+`{overflow:hidden!important}`, at reference-sheet byte 294,501 and applied in this repository at
+`apps/room/css/complete-app-styles.css:4886`.
+
+Nothing in this pane clipped anything. The only transform is `translate(pan) scale(scale)` on
+`.pan-element`, and `scaleForZoomLevel` returns `1.1 ** (level - 2)` over twenty levels, so a zoomed
+or dragged screen painted outside its pane and over the rest of the room.
+
+**The popout is exempt, and that is captured rather than assumed.** The popout's own component is
+`app-detached-screen`, whose const 0 is `[1,"detach-screen",2,"width","100%","height","auto"]` at
+byte 2,593,102, and the sheet carries `.detach-screen .overflow-hidden{overflow:initial!important}`
+at byte 437,841 (`complete-app-styles.css:6956` here) — a rule whose only purpose is to un-clip this
+element in that window. Nothing in this application ever sets `.detach-screen`, so that rule could
+never fire here; the class is applied on `!detached` instead, which answers the same question from a
+prop the component already owns.
+
+### SP2-03 — the status headings were inside the zoom transform; upstream they are siblings of it
+
+**BUILT** — `apps/room/src/lib/components/ScreenPaneStatus.svelte` (new),
+`apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The create block at byte 1,501,256 is one flat list under the component's own root:
+
+```js
+d(0,"div",0),H(1,z0e,2,0,"h3",1)(2,G0e,2,0,"h3",1)(3,W0e,2,1,"p",2)(4,q0e,3,2,"h3",3)
+  (5,Y0e,6,4,"div",4),d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)
+```
+
+Nodes 1 to 5 are opened and closed before `d(6,…)` opens the pan container, so none of them is a
+descendant of the pan/zoom wrappers. Here all three of `Screen Detached..`, `Video Disabled` and
+`Connecting To Screen of …` were rendered inside `div.pan-element` — the element that carries
+`translate(...) scale(...)`. Zoom is global in this application (`src/lib/screen-zoom.ts` records
+that the capture broadcasts it by value to every view), so a reader zoomed into one screen saw every
+other screen's status line scaled and dragged with a picture that was not being drawn.
+
+Moved to the pane root. They became one thing with one reason, so they are one component;
+`source-size-contract.test.ts` carries its ceiling at the size it landed and
+`screen-pane-contract.test.ts` asserts the same three rows against the file that now holds them.
+
+### SP2-04 — `W0e`, the gold "click here for larger preview" line, has no counterpart and cannot
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Node 3 of the create block is a sub-template this surface has never mentioned. `W0e` at byte
+1,492,944 renders const 11 — `[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]`, a gold `<p>`;
+`#ffcc00` appears twice in the table, in const 2 and const 11, and both belong to this one line
+(const 2 is the container `H(3,W0e,2,1,"p",2)` declares, const 11 the element `W0e` opens) — with
+the text
+` (You are sharing your screen as {screenName} click here for larger preview) ` at byte 1,493,088,
+clicking through to `largePreview()` at byte 1,499,849:
+
+```js
+largePreview(){this.localpreview=!0; let e=this.mediaSoupService.screenProducers.get(this.muser.producerID);
+  … const i=$("#webcamScreen-"+this.muser._id).get(0); i.srcObject=e.localStream; try{i.play()}catch{}
+  this.isConnected=!0}
+```
+
+and it is gated `O(3, o.mediaService.isScreenSharing && o.mediaService.localSharingStreams[o.muser._id]
+&& !o.localpreview ? 3 : -1)` at byte 1,501,588. So upstream a screen you are SHARING does not show
+its own picture until you ask: `localpreview` starts false, the video's `hidden` expression carries
+`isPresentingThisScreen && !localpreview`, and this line is the invitation that attaches the local
+stream.
+
+Not built, because the third term cannot be false here. This application renders its own screens from
+the local capture (`addLocalScreen` in `+page.svelte`), so it always local-previews; `!localpreview`
+is false by construction, which is the same measurement the `<video>` comment already records for
+the `hidden` term it gates. Building the control would build a way to turn on something that is
+already on. Recorded rather than dropped because the const, the string and the method are all real
+and a later reader will find them.
+
+### SP2-05 — `z("controls", o.showControls)` is unreachable upstream, and the reason is in one file
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The `<video>` comment claims the `controls` binding is not reproduced because `showControls`'
+only writer is a click handler on an element that `pointer-events: none` makes unreachable. Re-read
+rather than trusted, because it is the kind of claim that is easy to state and hard to check.
+
+It holds, and both halves are in the same component. The writer is `x("click",function(){return
+o.showControls=!o.showControls})` at byte 1,501,442, attached to node 9 — the `<video>` itself,
+const 8. The component's own `styles:` string at byte 1,502,316 opens
+`.webcamScreen[_ngcontent-%COMP%]{width:100%;height:100%;object-fit:contain;vertical-align:top;pointer-events:none}`.
+`showControls` is initialised `this.showControls=!1` in the constructor at byte 1,494,561 and has no
+other writer in this component: the string occurs five times in the bundle and the fifth, at byte
+1,901,855, is a different component's field entirely (`this.volume=1,this.showControls=!1,this.path=""`
+— the HLS player). So it is false for the life of the component and no control bar ever appears
+upstream. Reproducing the binding would add an attribute that is provably always false.
+
+### SP2-06 — the watermark pans and zooms with the picture upstream; here it is pinned, on purpose
+
+**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The create block settles a nesting the offsets alone cannot. `d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)`
+at byte 1,501,361 nests `div.video-screen-container` (const 7) INSIDE the `<pan-zoom>` element
+(const 6), and `H(10,Q0e,2,1,"span",9)` at byte 1,501,479 puts the `overlay-userID-container` span
+(const 9, sub-template `Q0e` at byte 1,494,134) inside that same div, beside the `<video>`.
+
+**What the bundle proves and what it does not, kept apart.** Proved: the watermark is a child of
+`div.video-screen-container`, which is a child of `<pan-zoom>`. Inferred: that it therefore sits
+inside the transform, because the wrapper pair `div.pan-zoom-frame > div.pan-element` is what
+`<pan-zoom>` puts its projected content in — evidenced by the captured rules
+`div.pan-zoom-frame, div.pan-element { height: inherit !important; width: 100% }`, which this
+component already transcribes, and NOT by any bundle byte. The library is third-party and its
+templates are not in this artifact. The divergence below stands either way, because it is about
+where the watermark sits HERE.
+
+This component has the containment the other way round — `div.video-screen-container >
+div.pan-zoom-frame > div.pan-element > video`, with the watermark a sibling of the frame — so the
+watermark stays fixed over the pane while the picture moves under it.
+
+**Not matched, and the reason is what the watermark is for.** It is the anti-leak overlay
+`overlayUserIdOnScreenshare` turns on. Inside the transform it is pannable: a viewer recording the
+screen can drag the picture until the id leaves the visible pane and film what is left, and at zoom
+levels above one it can be pushed out without dragging at all. A watermark that the person it
+identifies can move off the recording is not a watermark. It is kept inside
+`#video-screen-container-{id}` so it still goes fullscreen with the picture, which is the state a
+recording would be made in.
+
+### SP2-07 — the detached cluster is a sibling of the pan container upstream, in an unpositioned parent
+
+**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Node 5 of the create block — `Y0e`, gated `O(5, o.isDetachedCtrl ? 5 : -1)` at byte 1,501,767 —
+renders const 4 `[1,"zoom-controls-container-detached",3,"ngClass"]` as a SIBLING of the pan
+container and before it, inside const 0's `div.h-inherit`. That div sets `height:inherit` and
+nothing else: the component's whole stylesheet is
+`.webcamScreen{…}.hidden{display:none}.h-inherit{height:inherit}.zoom-controls-container-detached{…}.zoom-controls{top:-33px;left:-33px}.screencast-pan-grabbing{cursor:grabbing}`
+from byte 1,502,316, and none of those positions it. The cluster is `position:absolute;right:5px;top:5px`,
+so upstream its containing block is whatever positioned ancestor happens to sit above the component
+— which is not in this component and is not in the pinned bundle either.
+
+This component nests the cluster inside `#video-screen-container-{id}`, whose captured rule is
+`.video-screen-container{position:relative;top:0;left:0;z-index:1999;width:inherit;height:inherit}`
+(reference sheet byte 441,996). So it anchors five pixels from that box's top-right corner —
+deterministically, from a rule this repository can point at.
+
+Kept, and the argument is that the reference's placement is not a specification. "Whichever ancestor
+happens to be positioned" is a value this bundle does not contain, so matching it would mean
+inventing the ancestor rather than transcribing it; and the one thing it definitely produces —
+a cluster outside the `overflow-hidden` of `SP2-02` and outside the element `toggleFullscreen`
+fullscreens — is worse in both directions here, because the popout's magnifier would then vanish
+when the popout is maximised.
+
 ## The fifty-one refuted claims
 
 Kept, not deleted. A future reader who re-derives one of these from the same offset should find it
@@ -5148,3 +9225,1875 @@ here first.
 | EMOJI-13 | Stored skin tone is read with Number() + a 1..6 clamp rather than JSON.parse | `already-built` | The behaviour is implemented, and it is observably identical to the reference across the entire domain of values the reference itself can produce. WHAT I READ IN OUR SOURCE - apps/room/src/lib/components/EmojiPicker.svelte:421-422 — the restore-on-open read: `const storedSkin = Number(storage()?.getItem(`${NAMESPACE}.s… |
 | EMOJI-14 | Reaction chip text omits the reference's trailing space | `not-in-reference` | The quoted bytes exist but do not support a gap. Two findings. |
 
+
+---
+
+## VideoPlayer.svelte
+
+Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860,
+the six template functions `WSe` / `qSe` / `KSe` / `YSe` / `QSe` / `XSe` at 1,930,621–1,931,900, the
+three that render the player itself (`ewe` / `twe` / `nwe` / `iwe`) at 1,932,050–1,932,850, and the
+room component's own consts table walked BY VALUE from its opening bracket at byte 1,994,264 —
+entries 140 to 163 are this surface, at bytes 2,003,464 to 2,003,940.
+
+Six differences. Four reference behaviours the reader looked for and found already present are worth
+naming, because a list of only gaps reads as though nothing works: the per-item `Play For All` gate
+(`O(5, videoPlayerUrl || videoPlayerUrl === e ? -1 : 5)`) is dead upstream — the whole list is behind
+`O(1, videoPlayerUrl ? 2 : 1)` in `owe`, so ours being an outer `{#if}` is the same thing; the
+`<video>` and `<iframe>` attribute sets match consts 160 and 163 exactly; `loadVideos()` is
+presenter-gated at byte 1,967,675 and so is ours; and `stopVideoForAll(e)` really does interpolate
+its verb into the question and then send the same bare command either way, which is what this file's
+`requestStopVideo` already says.
+
+### VID-01 — Both "Play For All" dialogs are hand-rolled `.bootbox.modal` markup, so neither has a backdrop, a focus move, or a focus restore
+
+**FIXED 2026-08-31.** Routed through `BootboxDialog.svelte` with its `footer` snippet — the primitive
+this repository already models `bootbox.dialog` with, and the same shape `RoomOverlays` uses for
+`randomUser()`'s two-button dialog. Passing `footer` REPLACES the default OK, so the reference's own
+button set is the dialog's only control, which is the property `dta-02` records for the alert-pane
+lightbox.
+
+**A copy of a primitive is a copy that stops tracking it, and these two had already stopped.** About
+ninety lines of `<div class="bootbox modal fade show">` were transcribed by hand, and the three
+things the copy was missing are the three that are not markup: no `.modal-backdrop`, so the room
+stayed clickable behind a dialog that asserts `aria-modal="true"`; no focus move and no focus
+restore, so a keyboard user's focus stayed on the Play For All button they had just left, behind the
+dialog; and no `bootbox-alert` class, which is what the captured stylesheet and every other dialog in
+this room are keyed on.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `defect` · reference byte **1,980,807**
+
+```
+playVideoForAll(e){bootbox.dialog({title:"Video",message:"<p>Do you want to play this video at a specific time?",buttons:{cancel:{label:"Cancel",className:"btn-danger",callback:()=>{console.log("Cancel clicked")}},noclose:{label:"Choose time?",className:"btn-success",callback:()=>{bootbox.dialog({title:"Choose time:",message:"<p><input type='datetime-local' id='video-start-datetime' name='video-start-datetime' class='form-control' /></p>",buttons:{cancel:{label:"Cancel",className:"btn-danger",…},ok:{label:"Send",className:"btn-primary",callback:()=>{…}}}})}},ok:{label:"Play now",className:"btn-primary",callback:()=>{…}}}})}
+```
+
+**Ours:** VideoPlayer.svelte:317-413 (before) rendered the two dialogs as literal `<div class="bootbox
+modal fade show" style="display: block;">` blocks with their own `.modal-dialog` / `.modal-content` /
+`.modal-header` / `.modal-footer` scaffolding, while `BootboxDialog.svelte` — imported by this same
+file three lines above for the alert and the confirm — renders `<div class="modal-backdrop fade
+show">`, moves focus to `.bootbox-accept` on mount and restores the previous focus on teardown, and
+carries the `bootbox-{mode}` class. Verified as rendered rather than as source:
+`room-surface-audit-2026-08-31-contract.test.ts` drives the `+` button, the Play For All button and
+the Choose time? button and asserts a `.modal-backdrop` behind each dialog, the reference's three
+button labels in the reference's order, and no default OK beside them.
+
+### VID-02 — Both pending-video blocks read `m-2`; const 141 is `m-4`, and `m-2` is the const the "No videos." state uses
+
+**BUILT 2026-08-31.** Const 141 is `[1,"m-4"]` at byte 2,003,492 and is taken by BOTH `d(0,"div",141)`
+in `WSe` (the " Video URL: " block) and `d(1,"div",141)` in `qSe` (the " Video scheduled for: " block).
+
+**The pair is what makes it more than a number.** Const 146 is `[1,"m-2"]` at byte 2,003,720, and it
+is the "No videos." div — the LIST state, which the pending block replaces. Upstream the pending
+notice indents further than the list precisely because it is not one; ours drew both at the same
+inset, so the two states looked like two rows of one thing.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `wrong-constant` · reference byte **2,003,492**
+
+```
+[1,"m-4"],[1,"mx-2"],["type","button","title","Remove For All",1,"btn","btn-danger","btn-sm","ms-4",3,"click"],[1,"fa","fa-trash","mr-2"],[1,"w-100","d-flex","justify-content-between","align-items-center","m-2","border-bottom"],[1,"m-2"],
+```
+
+**Ours:** VideoPlayer.svelte:186 and :195 (before) both read `<div class="m-2">`. The index was not
+guessed: the consts table was walked bracket by bracket from `consts:[[` at byte 1,994,257, and
+entries 138–166 printed by value, which is how 141 and 146 were separated at all — the two are ten
+bytes apart in the table and both are one-class arrays.
+
+### VID-03 — The `<strong>` holding the pending url carries no class; const 142 is `mx-2`
+
+**BUILT 2026-08-31.** `d(2,"strong",142)` in `WSe` at byte 1,930,621, and 142 is `[1,"mx-2"]` at byte
+2,003,502 — the SAME const the "Video scheduled for:" `<span>` already used here, which is what makes
+the omission visible: one of the two consumers of const 142 had it and the other did not.
+
+Cosmetic, and small: without it the url butts straight against the "Video URL:" label.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `wrong-constant` · reference byte **1,930,621**
+
+```
+function WSe(t,n){if(1&t&&(d(0,"div",141),v(1," Video URL: "),d(2,"strong",142),v(3),u()(),d(4,"p"),v(5," IMPORTANT: The video URL needs to be a link to an mp4 video hosted on a website or something like S3, not a YouTube/Vimeo etc... "),u()),2&t){const e=g(5);m(3),Ze(e.scheduledVideo.videoURL)}}
+```
+
+**Ours:** VideoPlayer.svelte:188 (before) `<strong>{scheduledVideo.videoURL}</strong>`, against
+VideoPlayer.svelte:196 `<span class="mx-2">` on the date twelve lines below it.
+
+### VID-04 — The IMPORTANT paragraph is nested inside the url block; `u()()` puts it outside
+
+**BUILT 2026-08-31.** Same bytes as VID-03 and the same read: `d(0,"div",141)` … `u()()` closes the
+`strong` AND the `div`, and only then does `d(4,"p")` open. The paragraph is a SIBLING of the block.
+
+**Not only nesting.** Nested inside a `m-4` div the paragraph inherited the indent and read as a
+caption on the url — as though the warning were about that url in particular. As a sibling it is a
+statement about the feature, which is what its text actually says: *"The video URL needs to be a link
+to an mp4 video hosted on a website or something like S3."* The assertion measures `closest('div.m-4')`
+rather than searching for the text near the div, because nesting is what differs and a window that
+happens to contain the right text is not containment — the lesson `av-device-pane-contract.test.ts`
+already records at `elementAt`.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **1,930,621**
+
+```
+d(0,"div",141),v(1," Video URL: "),d(2,"strong",142),v(3),u()(),d(4,"p"),v(5," IMPORTANT:
+```
+
+**Ours:** VideoPlayer.svelte:186-193 (before) opened `<div class="m-2">`, put the `<strong>` and then
+the whole `<p>` inside it, and closed the div after the paragraph.
+
+### VID-05 — The scheduled time builds a fresh `Intl.DateTimeFormat` per call, in the VIEWER's locale; the pipe is `date:'medium'`, which resolves `en-US` for every viewer upstream
+
+**FIXED 2026-08-31.** `mediumDate` from `#lib/message-formatters.js` — the room's own `date:'medium'`,
+already there, already pinned to `en-US`, and already built once at module scope.
+
+**Two defects, and the locale one is the one that could not be seen from this file.** Angular resolves
+`date:'medium'` against `LOCALE_ID`, and this bundle never calls `registerLocaleData`: the only
+occurrence of that name in all 2,891,205 bytes is inside Angular's own *"Missing extra locale data"*
+error string at byte 147,099. So the reference renders `Aug 31, 2026, 5:04:00 PM` for every viewer on
+earth, and passing `undefined` here rendered `31.08.2026, 17:04:00` for some of them. The other half
+is the one `#lib/message-formatters.ts` and `#lib/short-when.ts` were each written for: constructing
+an `Intl.DateTimeFormat` is a locale-data lookup, and this one ran on every render of the pending
+line.
+
+**Its `Invalid Date` guard went with it, deliberately.** The only writer of `videoPlayTime` is
+`scheduleVideoForAll` in `#lib/room/broadcasts.svelte.ts`, which refuses to arm an unparseable value
+(`if (!Number.isFinite(delay)) return`). A guard against a state its own writer cannot produce is a
+claim that the writer might.
+
+**And its control came back GREEN, which is recorded rather than repaired.** Restoring the
+`undefined`-locale formatter left the format assertion passing — on a box whose default locale IS
+`en-US`, both spellings render the same string. The locale is pinned by the second assertion (*"builds
+no formatter of its own"*), which went red on the same mutation; the division is written into the test.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **1,930,918**
+
+```
+function qSe(t,n){if(1&t){const e=Y();H(0,WSe,6,1),d(1,"div",141),v(2," Video scheduled for: "),d(3,"span",142),v(4),Xe(5,"date"),u()(),d(6,"button",143),x("click",function(){return D(e),E(g(4).stopVideoForAll("remove"))}),T(7,"i",144),v(8," Remove Scheduled Video "),u()}if(2&t){const e=g(4);O(0,e.scheduledVideo.videoURL?0:-1),m(4),Ze(Ct(5,2,e.scheduledVideo.videoPlayTime,"medium"))}}
+```
+
+**Ours:** VideoPlayer.svelte:167-179 (before) — `formatScheduledDate` called
+`new Intl.DateTimeFormat(undefined, {year:'numeric',month:'short',day:'numeric',hour:'numeric',
+minute:'2-digit',second:'2-digit'})` inside the function body. `mediumDateFormatter` at
+`apps/room/src/lib/message-formatters.ts:73` is the same option set plus `hour12: true`, pinned to
+`en-US`, and its own docblock records that it was moved out of `+page.svelte` for exactly this
+reason — this file was the fifth copy of the mistake it was extracted to end.
+
+### VID-06 — The reference's `videoseries` playlist URL is unreachable; ours reproduced the unreachable branch, with no record of why and no test on the four refusal sentences
+
+**MEASURED REFUSAL 2026-08-31 — the branch is reproduced by NOT being written, and the measurement is
+at the code.** `if(!o||!r) return void bootbox.alert("The youtube link seems wrong.")` demands BOTH a
+video id and a `list=`, and the ternary two characters later branches on the video id alone. Anything
+reaching the ternary has both, so `https://www.youtube.com/embed/videoseries?list=…` cannot be
+produced by any input: a YouTube url with a playlist and no video id is refused by the guard above it,
+and one with both is rendered as the single video. A presenter pasting a pure playlist link gets *"The
+youtube link seems wrong."*
+
+**Writing the arm would answer a question the reference has not answered.** So `#lib/video-list.ts`
+does not build the playlist url at all, and `video-list-contract.test.ts` asserts the REFUSAL rather
+than what the arm would return — including `expect(JSON.stringify(result)).not.toContain('videoseries')`
+— so the day somebody relaxes the guard, the test names the decision they have just taken.
+
+**The reason for the module is the other half of the row.** The four refusal sentences are every one
+of them a transcription, and the only way to reach them was to mount the component and drive an input,
+so none had ever been executed. They are pure now, and the ORDER is executed with them: emptiness is
+tested before the scheme (a blank field is told it is blank), and the duplicate test runs AFTER the
+normalisation, so `watch?v=X&list=Y` and the embed url it becomes are one entry rather than two rows
+that play the same video.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **1,979,830**
+
+```
+if(!o||!r)return void bootbox.alert("The youtube link seems wrong.");o?e=`https://www.youtube.com/embed/${o}?autoplay=1`:r&&(e=`https://www.youtube.com/embed/videoseries?list=${r}&autoplay=1&loop=1&rel=0`)
+```
+
+**Ours:** VideoPlayer.svelte:104-114 (before) carried `if (!videoId || !playlistId) { … } if (videoId)
+{ … } else if (playlistId) { … }` — the same unreachable arm, under a comment reading only *"This
+restrictive two-part guard is present in the compiled source"*, which records the guard and not the
+consequence. `#lib/video-list.ts` now carries both, and the two YouTube patterns stay character for
+character what the capture has, escapes included.
+
+---
+
+## ScheduledAlerts.svelte
+
+Read end to end on 2026-08-31 against the v4 bundle. The surface is two reference components:
+`app-scheduled-alerts-modal` whole — class at byte 2,406,725, template at 2,408,380, consts walked BY
+VALUE from byte 2,407,518 (17 entries), component styles at 2,409,000 — and the send-later fields
+inside `app-post-alert-modal`, template function `QTe` at byte 2,120,600 with its buttons `XTe` /
+`JTe` / `ZTe` / `tDe` at 2,121,700–2,122,050.
+
+Seven differences. Reference behaviours confirmed present and NOT re-litigated: the repeat select's
+three labels and their wire values (PAM-07), the timezone note and its underline (PAM-09), the
+`Ignore weekends?` wording and its `daily`-only gate (PAM-08), the confirm-before-schedule and its
+`Alert scheduled OK.` (PAM-11), the `showSendLater` mutual exclusion with Post Alert (PAM-05), and the
+`date:'short'` cell, which `#lib/short-when.ts` has served since 2026-08-30.
+
+### SCH-01 — Remove deletes a scheduled alert on the click; the reference asks first, and quotes the alert
+
+**BUILT 2026-08-31.** `removeScheduledAlertQuestion` in `#lib/scheduled-alert-table.ts`, asked through
+the pane's existing `onconfirm` prop — the room's own dialog primitive, the same one PAM-11 uses two
+functions above and for the same recorded reason: this pane does not own the dialog stack.
+
+**The most expensive kind of missing confirmation.** A presenter who meant to press Remove on the
+09:30 row and hit the 09:35 one destroyed an alert with no undo, no record of what it said, and no way
+to know which one had gone — the table simply came back one row shorter. Those are the presenter's own
+unsent words, and quoting the TEXT is what makes the answer checkable, exactly as PAM-11 quotes the
+date.
+
+`docs/decoded/alert-scheduler-filter-labels.md` already recorded the punctuation and said to reproduce
+it verbatim — *"a full stop and a space before `text:`, and no closing question mark"* — and the test
+asserts both, including `not.toContain('?')`, because a missing question mark is what a well-meaning
+edit adds back.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**high** · `missing-control` · reference byte **2,407,145**
+
+```
+removeScheduledAlert(e){bootbox.confirm("Are you sure you want to delete this alert by "+e.alert.n+". text: "+e.alert.txt,i=>{i&&this.appService.sendServerCommand("removeScheduledAlert",{scheduledAlertID:e._id})})}
+```
+
+**Ours:** ScheduledAlerts.svelte:243 (before) `<td><button type="button" onclick={() => remove(row.id)}>Remove</button></td>`,
+calling `remove(id)` at ScheduledAlerts.svelte:158-165, which goes straight to the
+`removeScheduledAlert` command. Grep over apps/room/src for `delete this alert` returned zero hits.
+The server refuses correctly (`removeScheduledAlert` is presenter-gated and room-scoped, 404 on a
+foreign row) — so the hole was never authorisation, only the absence of a question.
+
+### SCH-02 — The repeat cell renders bare text; the reference draws a coloured pill, and its three class names had been explicitly left unread
+
+**BUILT 2026-08-31.** `REPEAT_BADGE_CLASS` in `#lib/scheduled-alert-table.ts`, read at byte 2,406,323.
+
+**This row exists because a previous decode said in as many words that it stopped here.**
+`docs/decoded/alert-scheduler-filter-labels.md` decoded this table on 2026-08-15 and wrote: *"The
+repeat `span` carries a three-way `ngClass` keyed on, in order: `"" === e.repeat || !e.repeat`,
+`"daily" === e.repeat`, `"weekly" === e.repeat`. **The class NAMES are in the const table and were not
+read; do not guess them.**"* They are not in the const table, which is why looking there found
+nothing: Angular compiles a multi-key `ngClass` object literal into a shared pure-function factory
+beside the template functions, and `mMe` is that factory.
+
+**Red on "off" is the one nobody would have guessed.** A reader predicting a palette puts grey there.
+Upstream spends its loudest colour on the alert that is NOT going to repeat — the state a presenter
+most needs to pick out of a table of otherwise identical rows, because that one fires once and is then
+gone.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `missing-behaviour` · reference byte **2,406,323**
+
+```
+const fMe=(t,n)=>n.sendOn,mMe=(t,n,e)=>({"text-bg-danger":t,"text-bg-info":n,"text-bg-warning":e});function gMe(t,n){1&t&&(d(0,"span",14),v(1,"no weekends"),u())}
+```
+
+**Ours:** ScheduledAlerts.svelte:236 (before) `{row.repeat || 'off'}` as bare text in the cell, with no
+`<span>` at all — so const 13 `[1,"badge","rounded-pill",3,"ngClass"]` (byte 2,408,102) had no
+counterpart either. The positional call is read at byte 2,406,725:
+`z("ngClass",$a(9,mMe,""===e.repeat||!e.repeat,"daily"===e.repeat,"weekly"===e.repeat))`, which is what
+makes the mapping unambiguous rather than inferred.
+
+### SCH-03 — Two column headers are renamed and the fifth is empty; scope is absent, and the date cell is a `<td>` where upstream uses a row header
+
+**BUILT 2026-08-31.** `Date / Time · Sender · Alert · Repeat · Actions`, `scope="col"` on all five, and
+the date cell as `<th scope="row" class="alert-date-time-th">`.
+
+**The empty header is the half that is not cosmetic.** A `<th></th>` is a column a screen reader
+announces as nothing, and the cells under it are buttons that destroy things. `scope` is the
+reference's own on both axes and is what tells a reader which header a cell belongs to; the date is a
+row header upstream because in a table where the sender, the text and the repeat can all repeat, the
+time is the only value that identifies the row.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `divergence` · reference byte **2,408,380**
+
+```
+d(7,"div",6)(8,"table",7)(9,"thead")(10,"tr")(11,"th",8),v(12,"Date / Time"),u(),d(13,"th",8),v(14,"Sender"),u(),d(15,"th",8),v(16,"Alert"),u(),d(17,"th",8),v(18,"Repeat"),u(),d(19,"th",8),v(20,"Actions"),u()()(),d(21,"tbody"),ht(22,_Me,16,13,"tr",9,fMe),u()()()
+```
+
+**Ours:** ScheduledAlerts.svelte:229 (before)
+`<tr><th>Sends</th><th>By</th><th>Alert</th><th>Repeat</th><th></th></tr>` and
+ScheduledAlerts.svelte:234 `<td>{shortDate(row.sendOn)}</td>`. Consts 8 `["scope","col"]` (byte
+2,407,945) and 12 `["scope","row",1,"alert-date-time-th"]` (byte 2,408,063) had no counterpart
+anywhere in the file.
+
+### SCH-04 — The "no weekends" badge is an invented yellow; the reference's is `text-bg-secondary`, rounded, and `ms-1`
+
+**BUILT 2026-08-31.** Const 14 is `[1,"badge","rounded-pill","text-bg-secondary","ms-1"]` at byte
+2,408,141.
+
+**A colour picked because it looked right is the shape `CLAUDE.md` names outright**, and this was one:
+`background: #f0c040` appears nowhere in the bundle and nowhere else in this repository. Beside a
+repeat pill that is now `text-bg-info`, a hand-mixed amber read as a third state rather than as a
+qualifier on the second — which it is, being rendered only for a daily series.
+
+The gate on it was already right and stays as it was: `"daily"===e.repeat&&e.ignoreWeekends`, not the
+flag alone. The test covers the case that separates those two by giving row three `weekly` WITH
+`ignoreWeekends` set.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `invented-value` · reference byte **2,408,141**
+
+```
+[1,"badge","rounded-pill","text-bg-secondary","ms-1"],[1,"btn","btn-outline-danger","btn-sm","remove-scheduled-alert-btn",3,"click"],[1,"fas","fa-trash"]
+```
+
+**Ours:** ScheduledAlerts.svelte:240 (before) `<span class="badge">no weekends</span>`, with a scoped
+rule at ScheduledAlerts.svelte:349-354 reading `padding: 0 0.3rem; border-radius: 3px; background:
+#f0c040; font-size: 0.7rem`.
+
+### SCH-05 — Remove has no icon and no button classes, and the two component styles the reference ships with this table are absent
+
+**BUILT 2026-08-31.** `btn btn-outline-danger btn-sm remove-scheduled-alert-btn`, `<i class="fas
+fa-trash">`, and the label with the capture's own surrounding spaces (`v(15," Remove ")`, written as
+`{' Remove '}` per the idiom `AGENTS.md` records). The two rules are the reference's own, shipped in
+the same `ɵcmp`.
+
+**The one destructive control in the table looked like every other button in the pane**, which is what
+made SCH-01's missing confirmation cost what it did — nothing about the control said it was the
+dangerous one. `width: 88px` and `min-width: 150px` are not decoration either: they are what stops the
+button reflowing and the date wrapping as rows arrive and are removed, in a table whose row count
+changes under the reader.
+
+`!important` is dropped because in a scoped sheet nothing is competing with these two, and
+`font-weight: inherit` is added on the row header: a `<th>` is bold by default and this one is a
+timestamp, not a heading a reader scans.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `missing-control` · reference byte **2,409,000**
+
+```
+styles:[".remove-scheduled-alert-btn[_ngcontent-%COMP%]{width:88px!important}.alert-date-time-th[_ngcontent-%COMP%]{min-width:150px!important}"]
+```
+
+**Ours:** ScheduledAlerts.svelte:243 (before) `<button type="button" onclick={() => remove(row.id)}>Remove</button>`
+— no `class`, no icon, and `remove-scheduled-alert-btn` / `alert-date-time-th` returned zero hits
+across all of apps/room.
+
+### SCH-06 — "See Scheduled Alerts" is offered unconditionally; the reference gates it on `scheduledAlerts.length > 0`
+
+**MEASURED REFUSAL 2026-08-31, with the measurement here rather than at the code, because building it
+would mean building the thing this pane deliberately does not do.** The gate is real —
+`O(68, showSendLater && scheduledAlerts.length > 0 && hasAlertScheduler ? 68 : -1)` at byte 2,139,315,
+transcribed into `PostAlertModal.svelte`'s own comment at line 606 — and upstream can afford it because
+it FETCHES ON SESSION LOAD: `globals.sessData.hasAlertScheduler && this.send("getScheduledAlerts", null)`
+at byte 1,009,797, so `globals.scheduledAlerts` has a length before anybody opens the composer.
+
+**This pane fetches on request**, which its own comment states as the reference's shape for the
+BUTTON (`manageScheduledAlerts()` is a click and not a load) and which `listScheduledAlerts` enforces
+as a presenter-gated `query`. To gate the button on the count, the count would have to be fetched when
+the composer opens — a presenter-gated round trip on every alert anybody starts writing, for a control
+that answers "nothing is scheduled" a moment later anyway, and for a room's pending alerts, which the
+remote module records as *"what a presenter intends to say and has not said yet."*
+
+**Unblocked by** a decision to fetch the list on session load as upstream does — at which point the
+gate is one term, and the empty state below it becomes unreachable rather than merely rare.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **2,139,315**
+
+```
+O(68,e.showSendLater&&e.appService.globals.scheduledAlerts.length>0&&e.appService.globals.sessData.hasAlertScheduler?68:-1)
+```
+
+**Ours:** ScheduledAlerts.svelte:216-218 renders the manage toggle with no gate but `disabled` never
+set, and `refresh()` is called only from `toggleManage()`. `pending` starts `[]` and is not asked for
+until the button is pressed, so a length gate here would hide the button in exactly the state where
+the answer is unknown rather than zero — a control that is absent because nothing has looked is worse
+than one that opens onto "Nothing is scheduled."
+
+### SCH-07 — The modal chrome — `modal-xl`, `table table-striped text-white`, the "Manage Scheduled Alerts" title and the Close footer — is not reproduced
+
+**DELIBERATE DIVERGENCE 2026-08-31; the argument already lives in the component and is not restated
+here.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
+`ScheduledAlertsTable.svelte`'s header records why drawing a row is not the part of that decision
+being revisited. The chrome is what the merge costs: a pane embedded in `PostAlertModal`'s body cannot
+carry a second modal's dialog, title bar and Close button, because there is no second modal.
+
+`table-striped` and `text-white` go with it for a reason worth naming separately: both are Bootstrap
+globals styling a table that is now inside a SCOPED sheet, and the room already runs two Bootstrap
+generations on two surfaces (recorded in `todo-next.md`). Borrowing a global table skin into a scoped
+component is how the row-striping in one modal starts depending on which generation loaded.
+
+The two rules that are NOT chrome — `remove-scheduled-alert-btn` and `alert-date-time-th` — were built
+rather than refused, and are SCH-05.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **2,407,518**
+
+```
+consts:[["id","scheduledAlertsModal","tabindex","-1","aria-labelledby","scheduledAlertsModalLabel","aria-hidden","true",1,"modal","fade","text-white"],[1,"modal-dialog","modal-xl"],[1,"modal-content"],[1,"modal-header"],["id","scheduledAlertsModalLabel",1,"modal-title"],["type","button","data-bs-dismiss","modal","aria-label","Close",1,"btn-close","btn-close-white"],[1,"modal-body"],[1,"table","table-striped","text-white","w-100"]
+```
+
+**Ours:** `ScheduledAlertsTable.svelte` renders `<div class="scroll"><table>` with a scoped sheet, and
+`ScheduledAlerts.svelte:225` renders the whole block inline inside `PostAlertModal`'s body. Note that
+`PAM-06` in this document already closed the related half — the "See Scheduled Alerts" control and the
+`#scheduledAlertsModal` id — as `already-built` under a documented rename, so this row is the STYLING
+that the rename left behind, not the control.
+
+---
+
+## AvDevicePane.svelte
+
+Read end to end on 2026-08-31 against the v4 bundle: `loadDevices` at bytes 2,162,037–2,165,010,
+`onAudioDeviceChange` / `onVideoDeviceChange` / `submitNewDevices` / `setNewDevices` /
+`getDeviceLabel` at 2,160,900–2,162,037, the presenter template functions `dDe` / `uDe` / `hDe` /
+`pDe` / `fDe` / `mDe` / `gDe` / `_De` / `bDe` / `vDe` at 2,141,500–2,142,600, and
+`app-session-control-modal`'s consts walked BY VALUE from byte 2,175,472 — entries 44–60 and 88–104
+are this pane.
+
+**Four differences, and this section deliberately does not restate the ModalHost ones.** SC-02, SC-03,
+SC-09, SC-10, SC-11, SC-14, SC-15, SC-16 and SC-17 in the `ModalHost: session-control modal` section
+above already cover the fabricated seed devices, the inert `audioDeviceID`, the Retry button, the
+"Please connect…" fallbacks, the checkbox seeding, the non-presenter body, the Refresh disable and
+spinner, the loading alert class, and the presenter gate. Every one was re-read here and none has
+regressed; the markup matches consts 46–60 and 95–104 attribute for attribute, including the two
+crossed-out icons and the `for`/`aria-label` pairs. What follows is what those rows did not reach:
+the enumeration itself.
+
+The connectivity / AV-test modal was read first, as instructed. `CONN-01` to `CONN-07` cover its tabs,
+its title and its presenter gates; none of them touches this pane's device rules, and this pane is
+rendered from BOTH modals (`ModalHost.svelte:5112` and `:5500`), which is why the rows are filed here
+rather than under either modal.
+
+### AVD-01 — `loadDevices` does not empty the lists first, so a Refresh after a device is unplugged keeps offering the device that has gone
+
+**FIXED 2026-08-31.** `audioDevices = []` / `videoDevices = []` before the enumeration, which is where
+the reference puts them: they are the first statement of its own `loadDevices`, byte 2,162,037.
+
+**This is the same defect for the opposite gesture.** `if (nextAudio.length) audioDevices = nextAudio`
+does the right thing for a member who plugs a device IN and exactly the wrong thing for one who pulls
+a device OUT: the enumeration finds none, the assignment is skipped, and the pane keeps the previous
+list — still selected, with the green `fa-check-circle` "Selected:" tick beside it. `AvDevicePane` is
+where `audioDeviceID` is chosen and `audioCaptureConstraints` builds `deviceId: { exact: … }` from it
+(`#lib/capture-settings.ts`), and `exact` is the one constraint shape that FAILS rather than
+substituting — so the pane's confident display and the capture's refusal disagreed, with only the
+capture being right.
+
+**It also makes SC-10 reachable from a state it could not be reached from.** "Please connect audio
+devices." was previously only ever the first frame; it is now the answer to unplugging one, which is
+what makes that row true rather than merely correct.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `defect` · reference byte **2,162,037**
+
+```
+loadDevices(){var e=this;this.devicesLoading=!0,this.devicesLoadError="",this.audioDevicesList=[],this.videoDevicesList=[],
+```
+
+**Ours:** AvDevicePane.svelte:130-141 (before) — `if (nextAudio.length) { audioDevices = nextAudio; … }`
+and the video twin, with no clearing anywhere in the function; `devicesLoadError` was set only when
+BOTH lists came back empty, so a member with a working camera and no microphone got no message and a
+stale microphone list. Asserted as source rather than driven, for the reason
+`av-device-pane-contract.test.ts` already gives about `navigator.mediaDevices` under jsdom, and the
+negative half is asserted too — the guarded-assignment shape is refused by pattern.
+
+### AVD-02 — When the pane falls back to the first device it does not save that choice; the reference persists it
+
+**FIXED 2026-08-31.** `resolveSelectedDevice` in `#lib/device-enumeration.ts` returns `fellBack`, and
+the pane writes the preference only on that — which is the reference's `s ||`, byte 2,163,287.
+
+**The select's `onchange` was the only writer, and a fallback is not a change event.** So the
+"Selected:" line named one microphone while `capture.audioDeviceId` still named the one that had gone;
+the pane looked like it had resolved the problem and the capture kept failing on it, with `exact`, for
+the reason AVD-01 gives. This is the same class of defect `#lib/capture-settings.ts` was written for —
+a control whose value nothing reads — one level in: a value the control never wrote.
+
+**Written only when it fell back.** `onPreferenceChange` is a server write, so re-saving the
+already-saved value would be one request per Refresh press that changes nothing, and the reference's
+`s ||` is precisely that guard. Both directions are asserted, and both mutations were seen red — the
+write removed, and the write made unconditional.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**medium** · `defect` · reference byte **2,163,287**
+
+```
+e.audioDevicesList.length>0){const s=e.audioDevicesList.some(r=>r.deviceId===e.appService.globals.audioDeviceID);e.currentAudioDevice=s?e.appService.globals.audioDeviceID:e.audioDevicesList[0].deviceId,s||(e.appService.globals.audioDeviceID=e.currentAudioDevice,e.appService.localstorage.set("audioDeviceID",e.currentAudioDevice),P(`Set default audio device: ${e.currentAudioDevice}`))}
+```
+
+**Ours:** AvDevicePane.svelte:132-140 (before) assigned `currentAudioDevice = nextAudio[0].deviceId`
+and `currentVideoDevice = nextVideo[0].deviceId` with no call to `onPreferenceChange` on either path;
+the only call sites were the two `onchange` handlers at AvDevicePane.svelte:243 and :268.
+
+### AVD-03 — The failure message has four arms; the reference has five, and the missing one is `NotSupportedError`
+
+**BUILT 2026-08-31.** `deviceEnumerationMessage` in `#lib/device-enumeration.ts`, all five arms, each
+with its own test.
+
+**The missing arm is the one nobody would notice missing.** `NotSupportedError` is what `getUserMedia`
+throws where the API exists but the requested capture does not, so it fell through to `Error loading
+devices: <whatever the browser said>` — a sentence with no next step in it, where all four of its
+siblings name one. Every error this pane can raise is TRANSIENT, which is the argument SC-09 already
+makes at the Retry button sitting inside the alert; an arm that produces a sentence nobody can act on
+is that argument's blind spot.
+
+Our pre-flight guard (`if (!navigator.mediaDevices?.enumerateDevices)`) already used that exact
+sentence and stays — it is an addition the reference does not have, and it now agrees with the arm
+rather than being the only place the sentence appears.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `missing-behaviour` · reference byte **2,164,760**
+
+```
+e.devicesLoadError="NotFoundError"===i.name?"No audio or video devices found. Please connect a microphone and/or camera.":"NotAllowedError"===i.name?"Permission denied. Please allow access to your microphone and camera in your browser settings.":"NotSupportedError"===i.name?"Your browser does not support device enumeration. Please use a modern browser.":"SecurityError"===i.name?"Security error. Please ensure the page is loaded over HTTPS.":`Error loading devices: ${i.message||"Unknown error"}`
+```
+
+**Ours:** AvDevicePane.svelte:152-161 (before) — a four-way ternary on `NotFoundError`,
+`NotAllowedError`, `SecurityError` and the default, casting the caught value with `error as
+DOMException` (which is an assertion about a value nothing checked; the module reads `name` off an
+`instanceof Error` instead and falls through otherwise).
+
+### AVD-04 — The dropdown shows a BLANK row for an unlabelled device upstream; the reference builds the label it needs and then throws it away
+
+**DELIBERATE DIVERGENCE 2026-08-31 — matching the reference here would reproduce a defect, and the
+measurement is recorded at `labelFor` in `#lib/device-enumeration.ts`.**
+
+The reference computes the label, byte 2,162,800:
+
+`let r=s.label;(null==r||""===r)&&(r=\`${s.kind} (${s.deviceId.substring(0,8)}...)\`)`
+
+and then never uses it in the dropdown. Read the rest of that `forEach`: `r` feeds the `"default - "`
+duplicate test and a `console.log`, and the value pushed onto `audioDevicesList` is the RAW `s`. The
+option template renders `e.label` (`Ne(" ",e.label," ")`, byte 2,141,984). So a device the browser has
+not labelled — which is every device before permission is granted, and the exact state this pane opens
+in — appears as a blank entry that can be selected and names nothing.
+
+**A dropdown of blank rows is a control that cannot be operated**, and the reference had already
+written the sentence that fixes it. Using it is one line, and it is the same judgement `selectedDeviceLabel`
+records for the "Selected:" line: this pane deliberately enumerates late, so the unlabelled state is
+normal here in a way it is not upstream.
+
+One addition of ours goes with it: an empty `deviceId` yields `unknown` rather than `substring`'s
+bare `...`, which names nothing either.
+
+*This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
+the two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+**low** · `divergence` · reference byte **2,162,800**
+
+```
+o.forEach(s=>{let r=s.label;(null==r||""===r)&&(r=`${s.kind} (${s.deviceId.substring(0,8)}...)`);const a="default"===s.deviceId||"communications"===s.deviceId;let l=!1;if(r.toLowerCase().startsWith("default - ")){const h=r.substring(10);l=o.some(f=>f.kind===s.kind&&f.label===h&&f.deviceId!==s.deviceId)}const c=a||l;"audioinput"!=s.kind||c?"videoinput"==s.kind&&!c&&e.videoDevicesList.push(s):e.audioDevicesList.push(s)
+```
+
+**Ours:** the synthesised label was already used — AvDevicePane.svelte:126-131 (before) had it inline
+in `toOption` — but nothing recorded that upstream discards it, so the divergence read as a
+transcription and would have been "corrected" back by the next reader diffing against `e.label`. It is
+`#lib/device-enumeration.ts` now, with the measurement, and `device-enumeration-contract.test.ts`
+executes both the synthesis and the alias rule the same `forEach` carries — including the case a
+prefix-only reading of `"default - "` gets wrong, which is a machine with one microphone labelled
+`Default - Headset` and no plain `Headset` beside it.
+## RoomNavbar.svelte
+
+Batch 3, read 2026-08-31, end to end against `U4e` — the room's top bar, 93 decls and 42 vars, byte
+2,484,831 — and the thirty-odd hoisted templates it calls. Five rows.
+
+`app-room`'s whole 229-entry `consts` table was decoded BY VALUE first, bracket-walking it from byte
+2,533,197 to 2,546,833 with `const-table.mjs`, and two of the five rows below exist only because it
+was decoded rather than looked up. Every citation is re-read at its byte by
+`apps/room/src/lib/room-surface-audit-batch3-contract.test.ts`, which is also where the long form of
+each argument lives: all three components in this batch were AT their `source-size-contract.test.ts`
+ceilings when it ran — 1169/1169, 1081/1081, 640/640 — and that ratchet only goes down, so the fixes
+had to be line-neutral and the reasoning had to go somewhere that has no ceiling.
+
+### RNB-01 — The navbar's Simpler Trading help link is missing, and it should stay missing
+
+**MEASURED REFUSAL 2026-08-31.** `U4e`'s node 9 is `H(9,MPe,2,0,"a",84)`, `MPe` at byte 2,472,793 is
+`d(0,"a",84),T(1,"i",138)`, and const 84 at byte 2,538,141 is
+`["href","https://intercom.help/simpler-trading/en/","target","_blank",1,"helpLink","mr-auto"]` — a
+question-mark anchor between the brand logo and the mobile-nav toggle. This bar has no such element,
+and `.helpLink` carries rules in the captured sheet (`css/complete-app-styles.css:7062` and `:7064`),
+which is the shape that normally means a control was dropped.
+
+**It was not dropped: the gate cannot be turned on.** `O(9, e.hasSTHelpLink ? 9 : -1)` sits at byte
+2,487,900, and `hasSTHelpLink` occurs exactly THREE times in the whole 2,891,205-byte bundle — the
+login component's `this.hasSTHelpLink=!0`, `app-room`'s `this.hasSTHelpLink=!1` at byte 2,497,849,
+and the template read above. The room component initialises it FALSE and never assigns it again, so
+the reference's own room renders this control never.
+
+The passing control is what makes that a measurement instead of a failed search: `isTipEnabled` is a
+field in the SAME constructor, initialised `!1` in the same statement list, and it IS assigned — from
+`sessData.tipMeBtnEnabled && …` at byte 2,509,182. The method finds an assignment when there is one.
+`RS-09` built the tip button on the strength of exactly that assignment; this row refuses the help
+link on the strength of its absence, and the two are the same reading.
+
+Nothing was deleted either. `.helpLink` never appears alone — it shares both of its rules with
+`.sidebar-menu` and `.users`, which this bar does render — so the selector is not dead CSS and
+removing it would be editing a captured sheet for a class that costs nothing.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-02 — TAWK Support renders after the volume dropdown; upstream it is the item before it
+
+**FIXED 2026-08-31.** `U4e`'s node list, byte 2,485,567:
+`(29,f4e,5,0,"li",101)(30,m4e,5,0,"li",102),d(31,"li",103)`. Decoded by value, const 101 (byte
+2,539,218) is the Session Control item, const 102 (byte 2,539,326) is `["title","TAWK Support",1,
+"nav-item"]` and const 103 (byte 2,539,364) is `[1,"nav-item","dropdown","dropstart"]` — the volume
+dropdown. So the captured order is Session Control, TAWK, Volume, Reload; this bar rendered Session
+Control, Volume, TAWK, Reload.
+
+Both orders draw the same six items and nothing was broken, which is why it survived six readings of
+this file. What differs is reach: `.navbar-nav` is `ml-auto`, so these items are laid out from the
+right edge, and a presenter going for support had to travel across the volume control to get there.
+
+A pure move — twenty-six lines lifted and re-inserted with no edit to any of them, and the file's
+line count unchanged at 1,168 — because the component is at its ceiling and because a reorder that
+also rewrites what it moves is two changes reviewed as one.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-03 — "You are not recording!" nagged a presenter whose microphone was muted
+
+**BUILT 2026-08-31.** The reminder's gate is five terms at byte 2,477,744 and this room had three:
+
+```js
+O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled ||
+     e.mediaService.micMuted || (!roomState.isRecordingPaused && roomState.isRecording) ? -1 : 5)
+```
+
+`micMuted` is the missing one and it is the point of the control. The reminder exists to catch a
+presenter who has started talking and forgotten to press record; a presenter with the microphone
+muted has not started talking, and got the bubble anyway, pinned over the recording menu, for as
+long as the mute lasted. `!media.micMuted` is now the third term of the `{#if}`, which stayed one
+line, which is what let it land at all.
+
+**`micDisabled` is deliberately not added, and that is a reading rather than a preference.** The only
+thing that sets it is the `audioServerDisableMic` subscriber at byte 2,503,063, and that handler's
+very next statement is `this.recordingReminder=!1` — so on the only path that can raise the fourth
+term, the second is already false. `G11` (`lib/room/local-capture.svelte.ts`) records that this room
+has no producer for that event, so building the term would model a signal we do not receive in order
+to re-check something the reference has already answered.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-04 — The Rec Preview item is offered after the recording stops, not while it runs
+
+**DELIBERATE DIVERGENCE 2026-08-31.** `KPe` at byte 2,475,295 is the reference's whole preview block —
+a `<li>` holding an `<hr class="dropdown-divider">`, then a `<li class="nav-item">` holding one of two
+anchors, `" Hide Rec Preview "` (byte 2,475,111) or `" Show Rec Preview"` (byte 2,475,265), whose
+asymmetric trailing spaces this room already transcribes character for character. Its gate, byte
+2,476,206, is `isRecording && sessData.recPreviewLocation`.
+
+`recPreviewLocation` is a URL the server pushes in a `setRecPreview` message — byte 1,023,752,
+`this.globals.sessData.recPreviewLocation=i.url` — pointing at a still frame the RECORDER refreshes
+once a second while it runs (byte 2,352,305 sets that interval). There is no such producer here;
+`lib/room/recording.ts:317` already records the refusal. So this room gates the same control on
+`media.recordedUrl`, which is the local blob and exists only once recording has stopped.
+
+Same control, different moment, and the later moment is the only one this room can honestly offer.
+Recorded rather than closed as "built", because a reader comparing the two gates will otherwise read
+ours as a mistake.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### RNB-05 — "Download Recording" has no counterpart anywhere in the bundle
+
+**DELIBERATE DIVERGENCE 2026-08-31.** The string `Download Recording` occurs ZERO times in 2,891,205
+bytes. That is measured, not grepped-and-shrugged: the sibling label `" Show Rec Preview"` from the
+very same menu occurs exactly once, at byte 2,475,265, so the method finds this menu's strings when
+they are there.
+
+The item is ours because the RECORDING is ours. Upstream records server-side — `YPe` is selected by
+`O(6, e.mediaService.useMTX || e.mediaService.mediaSoupService.recBotMethod ? 6 : 7)`, so the whole
+Start/Stop/Pause/Resume menu belongs to an MTX or record-bot path, and there is no blob in the
+browser to hand anybody. This room's `MediaRecorder` produces one, and without this item it is lost
+when the tab closes.
+
+Filed as a divergence rather than left implicit because "nothing exists without a consumer" cuts both
+ways: this control has one, and what it did not have was a record saying it is not transcribed from
+anything.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+---
+
+## RoomOverlays.svelte
+
+Batch 3, read 2026-08-31, against `app-room`'s own template body (byte 2,546,856) — nodes 7 to 36,
+which are the connection overlays and the twenty-six modal elements — and against the two image
+viewers the pinned bundle contains. Four rows, two of them fixed and two blocked, and what blocks
+both is the same ceiling: this file was 1081 of 1081 when the batch ran.
+
+### ROV-01 — The "Conected" flash renders its tick after the word; upstream renders it first
+
+**FIXED 2026-08-31.** `app-room`'s template at byte 2,547,023:
+
+```js
+H(7,iRe,3,0,"div",9),d(8,"div",10),T(9,"i",11),v(10," Conected\n"),u()
+```
+
+Node 9 is the icon and node 10 is the text, in that order. Const 10 (byte 2,533,614) is
+`["id","connectedMsg",1,"notConnectedOverlay","animated","fadeIn"]` and const 11 (byte 2,533,680) is
+`[1,"fas","fa-check"]`. So the reference paints a check mark and then the word, and the word is
+` Conected\n` — a leading space and a trailing newline.
+
+This room rendered `Conected<i class="fas fa-check"></i>` — the tick on the wrong side of a flash
+that is on screen for three seconds and cannot be re-read. Written as `{' Conected\n'}` for the same
+reason `G03` wrote ` Reconnecting Chat... ` as an expression one element up: Svelte normalises
+whitespace at element boundaries and the spacing is evidence, not formatting.
+
+The reference's misspelling stays, as it already did.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ROV-02 — The image lightbox had no maximum height, because its rules are scoped to a component it is not inside
+
+**FIXED 2026-08-31.** `.imgur-modal` carries three rules in the capture, and all three live inside the
+MESSAGE component's encapsulated block at byte 1,364,894:
+
+```css
+.imgur-modal[_ngcontent-%COMP%]{text-align:center}
+.imgur-modal[_ngcontent-%COMP%]   .modal-dialog[_ngcontent-%COMP%]{max-width:90%;max-height:90%}
+.imgur-modal[_ngcontent-%COMP%]   img[_ngcontent-%COMP%]{width:inherit;height:inherit;
+                                    max-width:100%;max-height:calc(100vh - 150px)}
+```
+
+The generated transcription keeps that scoping honestly —
+`src/lib/styles/captured-runtime-components.css:8088-8100` writes them as `app-st-message
+.imgur-modal …`. Phase 5 slice 17 moved this room's lightbox to the overlay LAYER, where it is a
+sibling of `app-st-message` and never a descendant, so every one of the three selectors missed.
+
+The third is the one a member notices. With no `max-height`, a tall screenshot opened from chat
+renders at its natural height and takes the close button off the bottom of the viewport with it —
+and the dismiss-on-backdrop-click handler is on the element they can no longer reach.
+
+Rewritten in `src/app.css`, not in the generated file, which is generated and must not be
+hand-edited. Scoped `.bootbox.imgur-modal` — three classes — so it beats Bootstrap's own single-class
+`.modal-lg` on the dialog without an `!important`. That is arithmetic, and `app.css` already records
+the same specificity reasoning for `above-note-modal` twenty lines up.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ROV-03 — The chat-image lightbox's own markup is not in the pinned chunk, so its shape cannot be settled here
+
+**BLOCKED 2026-08-31.** The handler that opens it is an inline attribute inside a template string at
+byte 1,326,388:
+
+```js
+`${l}<div class="img-container ${l?"d-none":""}" onclick="openImageModal(event,'${a}')"> …`
+```
+
+`openImageModal` occurs exactly ONCE in 2,891,205 bytes — that call — with no declaration anywhere,
+and no markup in the bundle wears `.imgur-modal`; the class appears only inside component
+stylesheets. So this chunk does not contain the viewer that handler opens.
+
+**That is not the same as saying it does not exist, and the distinction is the row.**
+`deployed-index.html` names four scripts — `runtime.b70e5d3ff558bfdf.js`,
+`polyfills.95db17d6d6f4b89d.js`, `scripts.38973a242454fb27.js` and
+`main.d1d09071be31f1ba.js` — and this checkout holds one of them. A global installed by
+`scripts.*.js` is exactly the shape `openImageModal` has. The passing control is `showImagePreview`,
+whose five occurrences include its own definition at byte 1,992,730, so a definition in THIS file
+would have been found.
+
+What unblocks it is the other three chunks. Until then, what this room renders was built against
+`showImagePreview` — a `bootbox.dialog({title, message, size:"large", buttons:{download:…}})`, the one
+image viewer the pinned bundle does contain — and ROV-02 and ROV-04 are the two places that choice
+shows.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ROV-04 — The lightbox calls itself a bootbox and renders no backdrop
+
+**BLOCKED 2026-08-31.** Every other dialog in this room gets one: `BootboxDialog.svelte:145` renders
+`<div class="modal-backdrop fade show"></div>` as its last node, because that is what bootbox emits
+and what `.modal-backdrop`'s `z-index: 1050` is for — `app.css` already writes those three z-indexes
+down. The lightbox wears `bootbox modal fade imgur-modal show` and has no backdrop at all, so it
+opens over an undimmed room; and `showImagePreview` at byte 1,992,730, the only image viewer the
+pinned bundle contains (see ROV-03), is a plain `bootbox.dialog({…})` and therefore has one.
+
+**Not built, and the reason is the ratchet rather than doubt.** A backdrop is an element, an element
+is a line, and `RoomOverlays.svelte` was at 1081 of 1081 with `source-size-contract.test.ts` ceilings
+only going down. It is blocked behind lifting the lightbox into its own component — 41 lines with its
+own dismiss handling, worth extracting on its own terms and not this batch's work. Recorded here so
+whoever does that extraction knows the one line to add on the way.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+---
+
+## ExtraChatPane.svelte
+
+Batch 3, read 2026-08-31, against `app-extra-chat` (selector at byte 2,393,623) end to end: its
+90-entry `consts` table decoded by value from byte 2,393,850, its template body at 2,399,258, and all
+ten of its hoisted sub-templates. Four rows.
+
+The second chat column is the surface where "the same component, one column over" keeps being not
+quite true. Three of the four rows below are behaviours the MAIN column already has and this one did
+not, and in every case the main column's copy is the passing control — which is a cheaper control
+than the bundle and was available the whole time.
+
+### ECP-01 — The second column has no name when the room has no chat channels
+
+**BUILT 2026-08-31.** The brand anchor is three nodes, byte 2,399,335:
+`T(4,"i",10), H(5,j3e,2,0,"span")(6,V3e,3,0,"span",11)` — the comment glyph, the label, the DND badge.
+`j3e` at byte 2,367,398 is `{1&t&&(d(0,"span"),v(1,"\xa0Chat"),u())}` and its gate is
+`O(5, 0 == o.chatTabs.length ? 5 : -1)` at byte 2,399,848.
+
+This is `acA-11`, one column over. The main pane has carried BOTH halves since that row — the label,
+and `ChatTabStrip` suppressing its own `<ul>` at zero tabs — and the extra column inherited the second
+half and not the first, because the tab strip is a shared component and the label is inline markup.
+So a room with no channels configured drew a comment glyph with the word "Chat" beside it on the left
+and a bare glyph on the right.
+
+`&nbsp;` rather than a space, because the capture is `\xa0` and a plain space is folded away by the
+surrounding whitespace. The control for this row is `AlertChatArea.svelte`, which contains the
+identical line.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ECP-02 — The composer/Chat Disabled swap reads only half of its gate, in BOTH columns
+
+**BLOCKED 2026-08-31.** `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` at byte 2,400,361: slot 23
+is the composer, slot 24 is the Chat Disabled block. `isConnected` starts TRUE (byte 2,375,326,
+`this.isConnected=!0,this.isMediaConnected=!1`) and is driven by two subscriptions — `socketDisconnected`
+sets it false at byte 2,376,472 and `socketConnected` sets it true. So upstream, a chat connection
+that drops takes the composer away and puts a lock and a reason in its place.
+
+Both of this room's chat columns gate on `chatEnabled` alone. Their docblocks quote the whole
+expression — `ExtraChatPane.svelte:80` and `AlertChatArea.svelte:144`, verbatim, `isConnected`
+included — and neither implements the first half, which is exactly the "comment claiming X while the
+next line does something else" the root standard asks a reviewer to check for. A member whose channel
+has dropped keeps a live-looking composer, types into it, presses Enter, and watches nothing happen,
+with only the small corner overlay `G03` built to explain it.
+
+**Not built, and the blocker is a starting value rather than a line budget.** The nearest thing this
+room has is `RoomEventStream.connected`, and it starts FALSE — deliberately, with its own docblock
+saying so, because the sidebar's "Chat" line has to read *not connected* before the first open.
+Gating the composer on it would print "Chat Disabled" on first paint, which upstream never does. The
+faithful build needs a second `$state` field that starts true and follows the same two events, and
+`lib/room/events.svelte.ts` was at 1017 of 1017.
+
+Recorded against BOTH columns on purpose. `AlertChatArea` has the identical gap and its own audit
+section did not find it; this batch's scope is the extra column, so the sibling is reported here
+rather than silently edited.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ECP-03 — The header's search and settings toggles bound their click on the anchor, not the list item
+
+**BUILT 2026-08-31.** Decoded by value from `app-extra-chat`'s own table, and the PAIRING is the row:
+
+```
+15 [1,"nav-item","mx-1",3,"click"]                                    @ 2,394,394
+16 ["title","Search",1,"nav-link","p-0"]                              @ 2,394,426
+18 [1,"nav-item","dropdown","ml-2",2,"position","static",3,"click"]   @ 2,394,486
+19 ["aria-haspopup","true","aria-expanded","false",1,"nav-link", … ]  @ 2,394,551
+```
+
+Consts 15 and 18 carry `3,"click"`; consts 16 and 19 declare no bindings at all. The template
+confirms it twice — `d(10,"li",15),x("click", … toggleChatToolbarSearchOnly())` at byte 2,399,435 and
+`d(13,"li",18),x("click", … toggleChatToolbar())` at byte 2,399,551 — the handler is on the list item
+and the anchor inside it is inert.
+
+This room had both handlers on the `<a>`, and the `<a>` is `p-0` while the `<li>` is not, so every
+pixel of the row's own box outside the glyph was dead in a header that gives that box real height.
+`acA-12` is the same finding on the alerts toolbar and `NP-02` on the notes tab strip; this is the
+third, so it is transcribed rather than re-argued.
+
+The a11y suppressions moved WITH the handler — `no_noninteractive_element_interactions` for a `<li>`
+where the anchor needed `no_static_element_interactions` — because a suppression that outlives the
+thing it suppresses is a lie no compiler can catch.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+
+### ECP-04 — One id in the capture, two here, and nine stylesheet rules that followed neither
+
+**FIXED 2026-08-31.** The two composer holders decode BYTE-IDENTICALLY. `app-chat`'s const 25 at byte
+1,448,754 and `app-extra-chat`'s const 25 at byte 2,394,929 are both:
+
+```js
+["id","textAreaHolder",1,"d-flex","align-items-center","textSendDiv"]
+```
+
+Upstream renders the same id twice and gets away with it because Angular's emulated view
+encapsulation rewrites each component's rule with its own attribute: `css/complete-app-styles.css`
+carries four `#textAreaHolder[_ngcontent-…]` variants (`:7185`, `:7398`, `:7447`, `:7986`) and gives
+the private-chat composer a different id outright, `#textAreaHolderPM` (`:7716`).
+
+`ExtraChatPane` diverged to `#textAreaHolderExtra`, and **that divergence is kept** — one element per
+id in one document is the better markup, and this room already renders `#textAreaHolder` twice
+(`AlertChatArea.svelte:1214` and `AlertQaModal.svelte:310`) without needing a third. What the
+divergence did not do is bring the stylesheet with it, and `src/app.css` is global rather than
+per-component, so the second column's composer matched NONE of the nine rules: no 8px radius, no 5px
+margin, no 35px min-height, no 300px max-height, no focus ring, no container query and no dark theme.
+Nothing failed; it simply looked like a different application beside the first column.
+
+Each of the nine selectors now names both ids, and the contract test sweeps them rather than listing
+them, so a tenth rule is covered by nobody remembering. `.textSendDiv` — which both holders wear —
+was deliberately not used as the shared hook, because the private-chat composer wears it too and
+upstream gives that one different margins on purpose.
+
+*This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
+two-verifier pass the tables above describe, and therefore deliberately outside them.*
+## StreamingView.svelte
+
+**10 rows, from one end-to-end reading of class `xCe` — bytes 1,901,122 to 1,914,468 of the pinned
+v4 bundle — with its `consts` table bracket-walked BY VALUE from 1,909,054 rather than looked up by
+slot.** No count of "behaviours confirmed present" is given because none was taken; what was taken
+is the difference list, and it is the ten rows below.
+
+> **This is the PLAYER, not the screenshare pane.** `## StreamingView + ScreenPane + ScreenTabs`
+> above reads the two together and files eleven `SV-SP-` rows, of which `SV-SP-01`, `SV-SP-10` and
+> `SV-SP-13` touch this file. They are cited here and not re-argued. `SV-SP-12` — refuted in the
+> table below the fold — already established that this component's detach members are dead; `STV-08`
+> extends that from two members to ten, with the occurrence counts and a passing control, because
+> the refutation established *"these are dead"* and not *"here is everything else that came with
+> them"*.
+>
+> **Every offset in this section was re-derived rather than copied**, and the bundle is byte-for-byte
+> ASCII — `chars === bytes === 2,891,205`, measured with `readFileSync(path)` and
+> `readFileSync(path, 'utf8')` side by side — so a character index into it IS a byte offset and the
+> CRLF hazard that cost a correction earlier today cannot arise for this artefact. The gate for this
+> section and the two below it is
+> `apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts`.
+>
+> **`apps/room/docs/MEDIA-PLANE-MEASURED.md` was read before any claim here about playback**, and
+> `STV-10` records exactly what it settles and what it does not.
+
+### STV-01 — The file's only provenance pointer names a decode workspace that is not in this checkout
+
+**FIXED 2026-08-31.** The docblock's opening sentence now names the pinned v4 bundle and the byte
+range of the class, and points at this row for the per-member map.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`StreamingView.svelte:5` said *"Transcribed from `docs/source/components/app-streaming-view.full.js`,
+all 418 lines"*, and **that path does not exist here.** The glob `apps/room/docs/*/*.js` returns
+exactly two files — `source-v3-2026-08-15/main.99a5781d1d7a7775.js` and
+`source-v4-2026-08-15/main.d1d09071be31f1ba.js` — and `apps/room/docs/**/*.full.js` returns none.
+That is the absence REPORTED with its passing control, not inferred from a failed grep: the same
+glob family that finds nothing for `*.full.js` finds both bundles.
+
+**And the harness says the same thing independently**, which is the confirmation that turns a glob
+into a fact. Every `vitest` run in `apps/room` opens with
+`42 evidence-bound test file(s) excluded: this checkout is missing 13 of 14 reference-capture roots
+(docs/source, second-dump, new-evidence, …)` — `gate/evidence-bound-tests.mjs` already knows
+`docs/source` is one of the gitignored capture roots that is not here. **That is not a defect and
+nothing is being asked for**: the roots are gitignored by design and `source-v4-2026-08-15` is the
+one that IS pinned in. The defect is only that a component's docblock cites a missing root as
+though it were the artefact to re-read.
+
+**The cost is sixteen dead citations in one file**, because every other reference in it is a line
+number into that missing artefact. Counted rather than estimated —
+`grep -onE "lines? [0-9]+(-[0-9]+)?"` returns exactly sixteen, at file lines 84, 110, 113, 119, 192,
+200, 207, 238, 256, 264, 300, 311, 334, 350, 361 and 367: `lines 21-24`, `line 116`, `267-277`,
+`50-111`, `45-49`, `133-139`, `141-158`, `159-179`, `211-218`, `180-210`, `219-228`, `121-132`,
+`29-36`, `229-238`, `239-243` and `278-285`. Byte `1901148` on the old line 7 was the one citation
+that resolved, and it does: `function wCe(t,n){1&t&&(d(0,"div",2),T(1,"i",15),v(2,"\xa0Loading
+Stream..."),u())}` begins there exactly.
+
+**Two more of the same shape are in `mtx-streams.ts` and are named rather than counted here**, since
+that file is not one of this batch's three surfaces: `app-streaming-view.full.js:113-115` and `:116`
+for the `__reb` suffix and the playlist URL, and `docs/source/main.d6d3c112b59b7d0d.js` at byte
+1137300 for `MtxHandlerService` — a THIRD bundle, neither v3 nor v4. The two constructs those cite
+are live in v4 at **1,903,977** (`setupStream`) and were re-read this session; `__reb` is built and
+correct.
+
+**The map, so the next reader re-derives instead of trusting.** Each of these was found by searching
+for the member's own opening text and each occurs EXACTLY ONCE in all 2,891,205 bytes:
+
+| member | v4 byte | member | v4 byte |
+| --- | ---: | --- | ---: |
+| `const SCe=["videoPlayer"]` | 1,901,122 | `setupHlsEventListeners(e)` | 1,906,064 |
+| the five sub-templates (`wCe`) | 1,901,148 | `handleFatalError(e)` | 1,906,919 |
+| `let xCe=(()=>{class t{constructor` | 1,901,632 | `setupNativeHLS(e)` | 1,907,122 |
+| `this.BUFFER_CHECK_WINDOW=3e4` | 1,902,027 | `toggleFullscreen()` | 1,907,373 |
+| `this.MAX_RECOVERY_ATTEMPTS=2` | 1,902,104 | `toggleMute()` | 1,907,652 |
+| `ngOnInit()` | 1,902,159 | `onVolumeChange(e)` | 1,907,778 |
+| `cleanup()` | 1,902,616 | `newScreenStream(e)` | 1,907,934 |
+| `getHlsConfig()` | 1,902,786 | `reAttachScreen()` | 1,908,154 |
+| `setupStream()` | 1,903,977 | `getBufferSizeName()` | 1,908,449 |
+| `loadStream()` | 1,904,378 | `setBufferSize(e)` | 1,908,582 |
+| `startPerformanceMonitoring()` | 1,904,725 | `consts:[` | 1,909,054 |
+| `checkAndAdaptPerformance()` | 1,904,918 | the `styles:[` block | 1,910,939 |
+| `adaptToPerformanceIssues()` | 1,905,469 | end of class | 1,914,468 |
+
+**Fixed in the comment and not in the sixteen line references**, deliberately, and the fix is
+LINE-NEUTRAL — three lines rewritten in place, 604 before and 604 after. That is not tidiness: the
+file is one line under its `source-size-contract` ceiling of 605 AND is pinned at 604 by
+`todo-next.md`, which `todo-next-coverage-contract.test.ts` checks and which this batch is not
+permitted to edit, so a fourth line fails two gates at once. Both were seen red — `606 lines against
+a ceiling of 605` and `says 604, is 605` — on the first attempt at this sentence.
+
+Sixteen edits inside a docblock that this repository treats as a deliberate practice is also sixteen
+chances to mangle one, and the Svelte MCP that `CLAUDE.md` makes mandatory for `.svelte` work was
+**not available in this session**. One sentence naming the artefact, plus this table pinned by the
+contract test, makes all sixteen resolvable without touching them.
+
+**low** · `defect` · reference byte **1,901,148**
+
+```
+function wCe(t,n){1&t&&(d(0,"div",2),T(1,"i",15),v(2,"\xa0Loading Stream..."),u())}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:5-7.
+
+### STV-02 — Upstream reloads the whole HLS pipeline TWICE on one buffer-size click; ours reloads once
+
+**DELIBERATE DIVERGENCE — read and measured 2026-08-31. Matching the reference here would reproduce
+a defect, and the row exists so nobody restores it as "the reference's arrangement".**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The double is not visible from either end alone, which is why it is worth writing down. Read the
+three offsets together:
+
+1. `setBufferSize(e)` at **1,908,582** ends
+   `…this.appService.setPreference("bufferSizeLevel",e),this.hls&&this.loadStream())` — one reload.
+2. `setPreference` at **1,155,143** is
+   `setPreference(e,i){this.globals.preferences[e]=i,this.savePreferences(),this.guiEventBus.emit("preferenceChanged",{key:e,value:i})}`
+   — so step 1 emits.
+3. `ngOnInit` at **1,902,159** subscribes to that very event:
+   `"bufferSizeLevel"===e.key&&this.hls&&(…,this.loadStream())` — a second reload, synchronously,
+   before step 1's own call.
+
+So one click destroys and rebuilds the hls.js instance twice, and `preferenceChanged` is on the
+**shared** `guiEventBus`, so with N streams live one click costs 2N teardowns. `preferenceChanged`
+occurs four times in the whole bundle — 996,829 and 1,025,558 (both `profilePic`), 1,155,238 (the
+emit) and 1,902,321 (this subscription) — which is the control on "the subscription really is the
+only other reader".
+
+**Ours reloads once per instance**, from the single `$effect` keyed on `videoSrc` and
+`bufferSizeLevel`. Halving it is not a preference: a second teardown drops the media element's
+buffered range on the floor a second time and the viewer sees two stalls where the reference's own
+design intends one.
+
+**low** · `defect` · reference byte **1,908,582**
+
+```
+setBufferSize(e){e<1||e>3||this.getBufferSizeLevel()!==e&&(this.appService.globals.preferences.bufferSizeLevel=e,this.appService.setPreference("bufferSizeLevel",e),this.hls&&this.loadStream())}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:340-346 and :368-372. The refusal guards
+(`level < 1 || level > 3`, and the no-op `(bufferSizeLevel || 3) === level`) are transcribed exactly;
+it is only the second reload that is dropped.
+
+### STV-03 — The reload path has no `this.hls` guard, so a native-HLS viewer restarts their stream for a setting that cannot reach them
+
+**BLOCKED — read and measured 2026-08-31; what would unblock it is named below.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+Both of the reference's reload paths are guarded by `this.hls` — byte 1,902,159 for the
+subscription, byte 1,908,582 for `setBufferSize` — and `this.hls` is null on exactly one path:
+`loadStream()` at **1,904,378** falls through to
+`e.canPlayType("application/vnd.apple.mpegurl")&&this.setupNativeHLS(e)` when `bf.isSupported()` is
+false. That is **iOS Safari, where native HLS is the only path there is**, and every number
+`getHlsConfig()` computes is consumed by `new bf(…)` and by nothing else — so a buffer-size change
+provably cannot affect a native-HLS viewer.
+
+Ours has no such guard. `StreamingView.svelte:340-346` re-runs on any `bufferSizeLevel` change and
+calls `loadStream()`, which reaches `setupNativeHLS(media)` and assigns `media.src = videoSrc`
+again — a full reload to the live edge, losing the buffered range, for nothing. `setupNativeHLS`
+also adds a fresh `loadedmetadata` listener each time and removes none, which is the `STV-05`
+mechanism arriving on a second path.
+
+**What blocks it is the fix's shape, not its size.** The guard cannot simply be added: the same
+`$effect` serves the FIRST load, where `hls` is legitimately null, and separating "a new stream must
+always load" from "a buffer change need not" means restructuring the effect's dependencies. That is
+a Svelte-semantics change — which `$effect` tracks what, and whether `untrack` belongs in it — and
+`CLAUDE.md` makes the Svelte MCP mandatory for exactly that class of question. **The MCP was not
+available in this session.** Unblocked by a session that has it; the reference's own guard is the
+target shape and both its byte offsets are above.
+
+**medium** · `missing-behaviour` · reference byte **1,902,159**
+
+```
+ngOnInit(){console.log("Streaming view comp ngOnInit muser:"+JSON.stringify(this.muser)),this.bufferPreferenceSubscription=this.appService.guiEventBus.subscribe("preferenceChanged",e=>{"bufferSizeLevel"===e.key&&this.hls&&(console.log("Buffer size preference changed, reloading stream"),this.loadStream())})}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:340-346, :316-330.
+
+### STV-04 — The adaptive machinery is one-shot: after the first reload nothing ever restarts the monitor
+
+**MEASURED REFUSAL — read and measured 2026-08-31; ours reproduces the reference exactly and the
+measurement is now written where the constants are.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+Four offsets, read together, and the conclusion is in none of them alone:
+
+- `startPerformanceMonitoring()` (**1,904,725**) is called from exactly two places: `setupStream()`
+  (**1,903,977**, once, from `ngAfterViewInit`) and the `playing` listener inside
+  `setupHlsEventListeners` (**1,906,064**).
+- That listener's call is inside the `hasStartedPlaying` **else** branch:
+  `this.hasStartedPlaying?…:( …,this.hasStartedPlaying=!0,this.startPerformanceMonitoring())`.
+- `hasStartedPlaying` is set to `!1` in the constructor and **never reset** — not by `cleanup()`
+  (**1,902,616**), not by `loadStream()`, not by `handleFatalError()` (**1,906,919**).
+- `cleanup()` DOES `clearInterval(this.performanceMonitor)`, and `loadStream()` calls it on every
+  reload.
+
+So the first reload after playback has begun kills the interval permanently. `BUFFER_CHECK_WINDOW`
+(30 s), `BUFFER_THRESHOLD` (6) and the live-edge catch-up at `>10 s` / `>15 s` all stop running, and
+`MAX_RECOVERY_ATTEMPTS = 2` is in practice a cap of **one**: the first `adaptToPerformanceIssues()`
+calls `loadStream()`, which kills the only thing that could call it again. The single remaining
+caller is `handleFatalError`.
+
+**Ours reproduces this exactly**, member for member, and that is the right answer — but our comment
+at `:238-243` says *"`recoveryAttempts` caps it at 2 per window so a permanently bad connection
+cannot reload the stream forever"*, which is true and is not the real bound. The tighter bound is
+recorded here rather than in the file for the reason `STV-01` gives, and the contract test asserts
+the four facts it rests on so that a future repair of `cleanup()` cannot silently make this row
+stale.
+
+**Read carefully, and it is the subtlest thing in this component:**
+`o>10&&"optimal"===this.currentPerformanceLevel?i.playbackRate=1.5:o>15?i.currentTime=this.hls.liveSyncPosition-5:i.playbackRate=1`
+is a NESTED ternary, so the seek at `>15 s` is unreachable while the level is `optimal` — the first
+branch wins. `StreamingView.svelte:227-233` has the same nesting, `if / else if / else`, and is
+faithful. Flattening it to three independent `if`s would build a different feature.
+
+**low** · `divergence` · reference byte **1,904,725**
+
+```
+startPerformanceMonitoring(){!this.hls||!this.hasStartedPlaying||(console.log("Starting performance monitoring"),this.performanceMonitor=setInterval(()=>{this.checkAndAdaptPerformance()},2e3))}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:200-204, :192-198, :213-235, :244-254.
+
+### STV-05 — Every reload adds a second `playing` and `waiting` listener to the same `<video>` and removes none
+
+**MEASURED REFUSAL — read and measured 2026-08-31. The reference does the same thing and the one
+case where it changes behaviour is stated rather than generalised.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`setupHlsEventListeners(e)` at **1,906,064** ends with
+`e.addEventListener("playing",…)` and `e.addEventListener("waiting",…)`, and `e` is
+`this.videoPlayer.nativeElement` — the SAME element across every reload, because `loadStream()`
+re-reads it rather than replacing it. Nothing calls `removeEventListener` anywhere in the class.
+Ours is the same shape at `StreamingView.svelte:265-298`, with `bind:this` keeping the element
+stable across `$effect` re-runs.
+
+**The honest scope, because the tempting claim is wrong.** After N reloads there are N `waiting`
+listeners, each doing `bufferingEvents += 1`, so a single stall counts N times. That would trip
+`BUFFER_THRESHOLD` N times sooner — **except that `STV-04` proves the only reader of
+`bufferingEvents` is already dead by then**, in every case where the reload happened after playback
+began. The one case where it does change behaviour is the other one: a fatal error BEFORE playback
+destroys and retries after 2 s with `hasStartedPlaying` still false, so the second `playing` listener
+DOES fire, monitoring DOES start, and there are now two `waiting` listeners feeding it — the
+threshold of six trips at three real stalls.
+
+Not fixed here for the reason `STV-03` gives: removing listeners is a change to the component's
+lifecycle, and the Svelte MCP that `CLAUDE.md` makes mandatory for that was not available in this
+session. Recorded with the exact case it bites so the next reader does not have to re-derive it.
+
+**low** · `defect` · reference byte **1,906,064**
+
+```
+setupHlsEventListeners(e){this.hls&&(this.hls.on(bf.Events.ERROR,…),e.addEventListener("playing",()=>{this.hasStartedPlaying?this.bufferingEvents>0&&console.log("Playback resumed after buffering"):(console.log("Stream playback started successfully"),this.hasStartedPlaying=!0,this.startPerformanceMonitoring())}),e.addEventListener("waiting",()=>{this.hasStartedPlaying&&(this.bufferingEvents++,…)}))}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:265-298, called from :316-330 on every
+load.
+
+### STV-06 — The buffer button's trailing space is not rendered, measured on the compiler rather than the source
+
+**BLOCKED — read and measured 2026-08-31; what would unblock it is named below.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The reference's update block writes the button's text as `Ne(" Buffer: ",o.getBufferSizeName()," ")`
+— `ɵɵtextInterpolate1`, one text node, a leading AND a trailing space. Ours compiles to
+`$.set_text(text_1, \` Buffer: ${$.get(bufferSizeName) ?? ''}\`)`, taken from `svelte@5.57.0`'s own
+emitted module rather than from reading the template: the leading space survives, the trailing one
+does not, because Svelte trims whitespace before a closing tag.
+
+**This is `DTF-01` again**, the fourteenth node of the same shape, and its argument carries
+unchanged: the space is invisible on screen — it is the last thing in a `<button>`'s line box —
+and it is still carried, because every capture comparison in this repository diffs RENDERED STRINGS
+and `apps/room/AGENTS.md` already argues the `{' Retry '}` idiom for exactly this. The fix is one
+character in a template: `Buffer: {bufferSizeName}` becomes `Buffer: {bufferSizeName}{' '}`.
+
+**Blocked on the same thing `DTF-01` was not**: that row was built by a session with the Svelte MCP,
+whose step 3 — `svelte-autofixer` until it returns nothing — is where the `{' '}` idiom is checked
+against `svelte/no-useless-mustaches` and the repository's two standing declines. The MCP was not
+available in this session, so the one-character change is named and not made.
+
+**low** · `divergence` · reference byte **1,910,654**
+
+```
+m(6),Ne(" Buffer: ",o.getBufferSizeName()," ")
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:423.
+
+### STV-07 — `volume` is a `$state` with no writer, and the compiler proves the rune costs nothing
+
+**MEASURED REFUSAL — read and measured 2026-08-31; the declaration stays, and the measurement is
+what makes that a decision rather than an oversight.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`StreamingView.svelte:95` is `let volume = $state(1)`, and **nothing in the file assigns it.** It
+exists because const 3 of the reference's table — read by bracket-walking, not by slot —
+is `["autoplay","autoplay",1,"video-streaming",3,"dblclick","id","muted","volume"]`, so `volume` is a
+real property binding upstream: `z("muted",o.isMuted)("volume",o.volume)`.
+
+**Upstream's writer is dead too, and that is the finding.** `onVolumeChange(e)` at **1,907,778**
+occurs EXACTLY ONCE in all 2,891,205 bytes — its own definition, no call site — and
+`showVolumeSlider`, which `toggleMute()` flips at **1,907,652**, occurs twice: the constructor
+initialiser and that flip. Neither is in the 27-declaration template. The control on both counts is
+`onImagePaste`, which returns its definition PLUS both call sites. So the reference ships a volume
+slider's model with no slider, and this file's `:361` comment already says so.
+
+**The rune costs nothing, and that is measured rather than assumed.** `svelte@5.57.0` compiles
+`let volume = $state(1)` to a plain `let volume = 1;` and `{volume}` to a single
+`video.volume = volume;` outside the update effect — no signal, no `$.get`, no re-run — because no
+assignment exists to make it reactive. That answers `CLAUDE.md`'s `$state`-overhead rule with a
+measurement instead of a preference, and it is why the answer is "leave it": deleting the binding
+would drop a captured property from const 3, and demoting the rune would change nothing the compiler
+has not already changed.
+
+**low** · `divergence` · reference byte **1,909,111**
+
+```
+["autoplay","autoplay",1,"video-streaming",3,"dblclick","id","muted","volume"]
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:95, :387-395, :361-365.
+
+### STV-08 — Ten members copy-pasted from the screenshare pane are dead here, and the spelling proves which copy is which
+
+**MEASURED REFUSAL — read and measured 2026-08-31. `SV-SP-12` established that two of them are dead;
+this is the rest of them, with counts and a passing control.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`app-streaming-view`'s constructor (**1,901,632**) initialises `isConnected`, `isDetached`,
+`isDetachedCtrl`, `showVolumeSlider`, `showControls` and `path`, and the class defines
+`newScreenStream(e)` (**1,907,934**), `startWatchScreenOf(e){}` (**1,908,109**),
+`stopWatchScreenOf(e){}` (**1,908,132**), `reAttachScreen()` (**1,908,154**) and `detachScreen()`
+(**1,908,230**). Two of those bodies are literally empty. **None is reachable:** the template has
+`decls:27` and its only handlers are `dblclick`→`toggleFullscreen`, three `setBufferSize` clicks and
+`toggleMute`, and `ngOnInit` subscribes to `preferenceChanged` and to nothing else — no
+`detachScreenShare`, no `reatachScreenShare`.
+
+**The spelling is the evidence, and it is a clean control.** The screenshare pane spells it
+`reAttachScren` and that name occurs **three** times — 1,492,806 (the `<h3>`'s click), 1,495,434
+(the `reatachScreenShare` subscription) and 1,499,638 (the definition) — all live, all cited by
+`SV-SP-02`. The streaming view spells it `reAttachScreen`, correctly, and that name occurs **once**:
+its own definition, with no caller. Same for `detachScreen(){this.isDetached=!0`, which occurs twice
+— 1,499,713, live, and 1,908,230, dead. A search for the same family of needle DOES match where the
+behaviour exists, which is what makes the single-occurrence counts an absence and not a bad grep.
+
+**Ours carries none of them, and should not.** `StreamingView.svelte` has no `isDetached`, no
+`detach`, no watch stubs. `RoomScreens.detach` / `isDetachedHere` / `reattach` — built for `SV-SP-02`
+— belong to the screenshare pane, which is where the reference's live copies are. Recorded rather
+than left unmentioned because "the reference has five methods we do not" is the shape that gets
+re-found and re-investigated at full cost, twice.
+
+**low** · `missing-behaviour` · reference byte **1,908,109**
+
+```
+startWatchScreenOf(e){}stopWatchScreenOf(e){}reAttachScreen(){this.isDetached=!1,this.startWatchScreenOf(this.muser._id)}detachScreen(){this.isDetached=!0,this.stopWatchScreenOf(this.muser._id),this.popoutService.openPopoutModal("screen",{pres:this.muser})}
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte, whole file — deliberately absent.
+
+### STV-09 — The consts table decoded BY VALUE: eighteen entries, and two static attributes ours does not reproduce byte for byte
+
+**MEASURED REFUSAL — read and measured 2026-08-31. Both differences are improvements and both are
+recorded so they are not re-litigated as gaps.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The table at **1,909,054**–**1,909,708** was bracket-walked, not indexed, and holds eighteen
+entries. Every class list, id and icon this file transcribes was checked against that walk and all
+of them hold. Two entries differ from what we render, and neither is an oversight:
+
+- **const 8** is
+  `["type","button","id","bufferSizeDropdown","data-bs-toggle","dropdown","aria-expanded","false",1,"btn","btn-sm","dropdown-toggle"]`
+  — `aria-expanded` is the STATIC string `"false"`, never bound. Upstream that is correct only
+  because Bootstrap's dropdown JavaScript rewrites the attribute at runtime, and
+  `bootstrap-dropdown-contract.test.ts` records that this app ships no Bootstrap JavaScript at all.
+  `StreamingView.svelte:419` binds it to `menus.streamBuffer` instead, so the attribute tells the
+  truth on the only mechanism this app has. Reproducing the static `"false"` would ship a control
+  that permanently announces itself as closed.
+- **const 3** opens `["autoplay","autoplay",…]` — the attribute carries the value `"autoplay"`,
+  where Svelte emits the bare boolean form and renders `autoplay=""`. Semantically identical to
+  every HTML parser; different as a rendered STRING, which is the axis `DTF-01` cares about. Left
+  alone: `autoplay="autoplay"` is writable in Svelte, so this is a choice, and the choice is that a
+  boolean attribute's canonical serialisation is not a captured value the way a text node is.
+
+**And the three dead style rules are confirmed dead**, which the file already claims at `:514-517`.
+`#message`, `#lang-icon` and `#lang-list` are in the reference's `styles:` block from **1,911,064**
+to **1,912,909** — `#lang-icon` carries a 1.1 KB base64 SVG — and none of the eighteen consts names
+any of those three elements, so with `decls:27` there is nothing for them to style. The claim was
+verified against the decoded table rather than against the comment that makes it.
+
+**low** · `divergence` · reference byte **1,909,288**
+
+```
+["type","button","id","bufferSizeDropdown","data-bs-toggle","dropdown","aria-expanded","false",1,"btn","btn-sm","dropdown-toggle"]
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:415-424, :387-395, :509-518.
+
+### STV-10 — What the live MediaMTX run settles for this component, and what it does not
+
+**MEASURED REFUSAL — `apps/room/docs/MEDIA-PLANE-MEASURED.md` read in full 2026-08-31 before any
+claim here about playback. It changes nothing in this file, and saying so is the point.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+That document was produced by running MediaMTX v1.20.1 in this container, and what it measured is
+the INGEST and CONTROL plane: the `/v3/paths/list` envelope (`available` alongside the deprecated
+`ready`), the hook names `runOnAvailable` / `runOnAvailableRestart` / `runOnUnavailable` with
+`runOnReady` / `runOnNotReady` occurring zero times, the API's bind-versus-authorisation
+distinction, the duplicate-delivery defect between the hook and the reconciler, and `record` +
+`playback` as an archive service. **None of that is this component.** `StreamingView` is a pure
+consumer: it builds `https://{streamServerMTX}/{path}/index.m3u8?jwt={mtxToken}` through
+`mtxPlaylistUrl` and hands it to hls.js. The file's own docblock claim — HLS on 443 for playback,
+WHIP/RTMP on 8889/1935 for ingest, two protocols at the two ends of one path — is consistent with
+the measured run, which published over WHIP and was watched on the wire.
+
+**The one finding that reaches this surface is a NEGATIVE one, and it is stated as unmeasured.** The
+run recorded `[recorder] skipping track 2 (VP8)` and then `recording 1 track (Opus)` — a WebRTC
+publisher that negotiates VP8 records audio only. That is the fmp4 RECORDER. **Whether the HLS
+muxer accepts VP8 was not measured and is not claimed here**, and neither was H264, because that
+Chromium offered `video/VP8 video/rtx video/AV1 video/VP9 video/VP9 video/red video/ulpfec` and no
+H264 at all. What can be said from THIS component is where such a failure would surface: `isLoading`
+starts `true`, is cleared only by `MANIFEST_LOADED`, and is never set back — so a path that never
+produces a playable playlist leaves `Loading Stream...` on screen indefinitely, with a fatal-error
+retry every 2 s behind it and no timeout, no error state and no message naming the codec. That is
+the reference's behaviour too, verbatim, and it is why the row is a refusal and not a build: adding
+a timeout here would be inventing a state the capture does not have.
+
+**low** · `divergence` · reference byte **1,906,064**
+
+```
+this.hls.on(bf.Events.MANIFEST_LOADED,()=>{e.play().catch(i=>console.warn("Autoplay failed:",i)),this.isLoading=!1})
+```
+
+**Ours:** apps/room/src/lib/components/StreamingView.svelte:93, :284-287, :268-277, :377-381.
+
+---
+
+## DayTradeAlertsPane.svelte
+
+**5 rows. `Iwe` (1,945,126), its list surface `Rwe` (1,943,979) and its row `Pwe` (1,943,242) were
+read end to end**, together with `Mwe` (1,942,714), `Awe` (1,943,028), `xwe` (1,942,630) and
+`kwe` (1,942,524), and with the `consts:[` table of `app-presentationarea` bracket-walked BY VALUE
+from 1,994,264 — 292 entries, ending at 2,014,220 — rather than looked up by slot. No count of
+"behaviours confirmed present" is given because none was taken.
+
+> **This is the PANE, not the composer.** `## DayTradeAlertForm.svelte` and
+> `## SwingAlertForm.svelte` above read `Ewe` and `hwe` on 2026-08-31 and file `DTF-01` … `DTF-05`
+> and `SWF-01` … `SWF-05`; `## day-trade-alerts + swing-alerts panes` above files `dta-01` …
+> `dta-05` across both panes. All fifteen are cited here and none is re-argued.
+>
+> **Every byte this pane cites was re-derived at its offset**, and twenty-five of the twenty-seven
+> hold exactly. The two that do not are both `DTP-01`. The gate is
+> `apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts`.
+>
+> **These two panes are in better shape than any surface read in this batch**, and the rows below say
+> so rather than manufacturing gaps: the `Ze` / `Ne` split, the pipe ORDER, the `?? 0` mapping of an
+> emptied number box, the search pipe's deliberate asymmetry, the week-numbering year and the
+> twelve-hour clock are all already exact.
+
+### DTP-01 — Two byte citations land inside the constructs they quote rather than at them
+
+**FIXED 2026-08-31.** 2,017,748 → **2,017,741**, and 1,945,235 → **1,945,231**.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`DayTradeAlertsPane.svelte:45` quotes `O(49, o.hasDayTradeAlerts ? 49 : -1)` and gives 2,017,748.
+`O(49,o.hasDayTradeAlerts?49:-1)` occurs exactly once in the bundle and begins at **2,017,741**; the
+cited byte is seven characters further on, landing on the `h` of `hasDayTradeAlerts`. A reader who
+follows it sees plausible bytes — they ARE the gate — and never notices the boundary is wrong,
+which is precisely the failure `SWF-02` recorded and the reason this batch re-derived every citation
+rather than spot-checking.
+
+**The swing twin had no byte at all**, which is why it is `SWP-02` and not a second half of this
+row: `SwingAlertsPane.svelte:40` quotes `O(48, o.hasSwingTradeAlerts ? 48 : -1)` with no offset. It
+is at **2,017,703**, thirty-eight bytes before this one, in the same update block.
+
+**The second one is smaller and is the same shape.** `:275` quotes
+`v(4," Latest Day Trade Alerts (Last ")` and gave 1,945,235, which is the opening `"` of the string —
+four bytes into the `v(4,` the quote begins with. `v(4," Latest Day Trade Alerts (Last ")` occurs
+once, at **1,945,231**. Four bytes is not seven and a string's opening quote is a cleaner landing
+than the middle of an identifier, and it is corrected anyway: the whole contract of a per-row offset
+in this document is that the next person re-reads AT it, and `SWF-02`'s lesson is that the offsets
+which land on plausible bytes are the ones nobody questions.
+
+**The same wrong 2,017,748 is at `PresentationArea.svelte:947` and is deliberately NOT touched
+here.** That file is outside this batch's three surfaces; the number is named so the next reader of
+it does not have to re-derive what this row already did.
+
+**low** · `defect` · reference byte **2,017,741**
+
+```
+O(49,o.hasDayTradeAlerts?49:-1)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:45. Pinned by
+apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts, which also refuses the
+superseded number.
+
+### DTP-02 — Five text nodes render without the reference's own leading and trailing spaces
+
+**BLOCKED — read and measured on the compiler 2026-08-31; what would unblock it is named below.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+**The reference's own `Ze` / `Ne` split is what makes this precise**, and it is the reason the row
+names five nodes rather than "the table". `Pwe`'s update block writes six of the row's eight cells
+with `ɵɵtextInterpolate` — `Ze(e.direction)`, `Ze(e.entryPrice)`, `Ze(e.stop)`, `Ze(e.target)`,
+`Ze(e.senderName)` — and exactly two with `ɵɵtextInterpolate1`: `Ne(" ",e.symbol," ")` and
+`Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," ")`. **Ours honours that split everywhere it
+matters and loses it on exactly those two**, plus three more outside the row:
+
+| node | reference | ours |
+| --- | --- | --- |
+| symbol | `Ne(" ",e.symbol," ")` | `set_text(text_1, row.symbol)` |
+| alert date | `Ne(" ",Ct(10,12,…)," ")` | `set_text(text_3, $0)` |
+| empty state (`xwe`, 1,942,630) | `v(1," No Day Trade Alerts to display. ")` | `>No Day Trade Alerts to display.<` |
+| heading prefix (`Iwe`) | `v(4," Latest Day Trade Alerts (Last ")` | `>Latest Day Trade Alerts (Last ` |
+| heading suffix (`Iwe`) | `v(8," Months) ")` | ` Months)<` |
+
+Every right-hand column entry is read out of `svelte@5.57.0`'s emitted module for this file, not off
+the template. The two INTERNAL spaces of the heading — before and after the `<select>` — DO survive,
+so the sentence reads identically; it is only the block-edge ones that are lost.
+
+**All five are invisible on screen and are carried anyway**, which is `DTF-01`'s split stated
+honestly for this surface rather than borrowed. The date's spaces sit at the two edges of a `<td>`
+and collapse; the empty state's sit at the edges of an `<h4>`; the heading's sit at the edges of the
+same `<h4>`. The symbol's are the interesting case and they still come out even: upstream puts them
+INSIDE `<strong class="ms-2 font-weight-bold">`, and Svelte emits a whitespace text node between the
+presenter-conditional anchor and the `<strong>` instead — one space either way when a presenter's
+edit icons precede it, none when they do not, because leading whitespace at a block's start
+collapses in both. **Same pixels, different rendered string**, and the rendered string is what every
+capture comparison in this repository diffs.
+
+**Blocked on the same thing `STV-06` is.** The fix is five `{' '}` mustaches, which is the idiom
+`apps/room/AGENTS.md` records as one of the two `svelte-autofixer` suggestions this repository
+declines — and step 3 of the mandatory Svelte MCP workflow is where that decline is exercised. The
+MCP was not available in this session, so the five nodes are named, measured and left.
+
+**low** · `divergence` · reference byte **1,943,655**
+
+```
+m(2),Ne(" ",e.symbol," "),m(2),Ze(e.direction),m(2),Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," "),m(3),Ze(e.entryPrice),m(2),Ze(e.stop),m(2),Ze(e.target)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:393, :402, :309,
+:282 and :297.
+
+### DTP-03 — The limit box's missing `width: 100%` re-read at the whole rule, and it holds
+
+**ALREADY BUILT — verified by reading 2026-08-31. The pane's most detailed claim is also its most
+falsifiable one, and it survives.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`DayTradeAlertsPane.svelte:547-559` claims that the `width:100%` rule at 2,024,939 names exactly six
+selectors and that `.dayTradeAlert-limit-container` is in NEITHER container's half of it. **Read as
+a whole rule rather than searched for the class**, from 2,024,939 to its `{width:100%}`, it is:
+
+```
+.day-trade-alerts-container #dayTradeAlert-search, .day-trade-alerts-container #swingAlert-search,
+.day-trade-alerts-container .swingAlert-limit-container, .swing-alerts-container #dayTradeAlert-search,
+.swing-alerts-container #swingAlert-search, .swing-alerts-container .swingAlert-limit-container
+{width:100%}
+```
+
+Six selectors, the cross product of two containers with `#dayTradeAlert-search`, `#swingAlert-search`
+and `.swingAlert-limit-container` — and `.dayTradeAlert-limit-container` absent from all six. The
+control that makes that an absence rather than a bad read is in the same string twice:
+`.swingAlert-limit-container` IS there, under both containers. And the `max-width:180px` rule 915
+bytes later at **2,025,854** DOES carry all four limit-container combinations, which is the
+comment's other half and is also exact.
+
+**So the shipped build genuinely gives the Day Trade limit box a max width and no width**, and this
+pane reproduces that by declaring only `#dayTradeAlert-search { width: 100% }`. Adding the missing
+declaration would make this pane wider than the one the reference ships. The remaining twenty-five
+byte citations in the file's `<style>` block were re-read the same way and all of them hold —
+2,022,161, 2,024,764, 2,024,171, 2,024,333, 2,031,534, 2,025,489, 2,022,363, 2,022,557, 2,022,891,
+2,026,319, 2,026,556 and 2,026,976.
+
+**low** · `divergence` · reference byte **2,024,939**
+
+```
+.day-trade-alerts-container[_ngcontent-%COMP%]   #dayTradeAlert-search[_ngcontent-%COMP%], …, .swing-alerts-container[_ngcontent-%COMP%]   .swingAlert-limit-container[_ngcontent-%COMP%]{width:100%}
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:560-572.
+
+### DTP-04 — The repeater tracks by IDENTITY upstream; ours keys by `row.id`
+
+**DELIBERATE DIVERGENCE — read and measured 2026-08-31. Keying by identity here would reproduce a
+teardown the room does not need, and the row exists because nothing in either pane records the
+choice.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`ht(32,Pwe,23,17,"tr",null,Li)` — `ɵɵrepeaterCreate`, whose seventh argument is the track function.
+`Li` is `function Li(t,n){return n}` at **100,136**: it takes `(index, item)` and returns the ITEM,
+so the reference tracks by object identity. `Li=` matches zero times in the bundle and
+`function Li` matches once, which is how the definition was found by value rather than assumed from
+the name.
+
+Within one render pass the two are equivalent: `searchDayTradeLogs` returns the SAME array object
+when the term is empty and `Array.prototype.filter` / `slice` preserve element references, so
+identity is stable across every search and limit change. **They differ on a refetch.** The months
+`<select>` calls `onTradeAlertWeeksChange("DayTrade")`, the log comes back as fresh objects, and
+identity tracking tears down and rebuilds every `<tr>` — new DOM, lost focus, lost scroll anchoring
+— where `{#each visibleAlerts as row (row.id)}` reuses the rows whose id is unchanged.
+
+Not the `each-key-contract.test.ts` case, and the difference is worth stating because the two look
+alike: that file removed keys from `MessageBody`'s segments because a parsed segment **has no
+identity** and an index key would have CLAIMED a safety it did not have. An alert row has
+`_id` upstream and `id` here, so the key is a real identity and not a stand-in for one.
+
+**low** · `divergence` · reference byte **1,944,820**
+
+```
+ht(32,Pwe,23,17,"tr",null,Li)
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:362.
+
+### DTP-05 — Every const index the pane cites, checked against the bracket-walk
+
+**ALREADY BUILT — verified by reading 2026-08-31. All of them hold, and the walk found the one
+addition that is ours.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The table was walked from **1,994,264** by tracking string state and bracket depth, never by
+counting commas to a slot a comment named. 292 entries, and every index this pane names resolves to
+what it claims:
+
+| const | offset | value |
+| ---: | ---: | --- |
+| 28 | 1,996,170 | `["id","dayTradeAlerts","role","tabpanel","aria-labelledby","dayTradeAlerts-tab",1,"tab-pane","position-relative",3,"ngClass"]` |
+| 166 | 2,004,878 | `[1,"text-center","m-0","p-1","px-3"]` |
+| 167 | 2,004,915 | `[1,"form-select","form-select-sm","d-inline-block","w-auto","trade-alerts-select",3,"ngModelChange","ngModel"]` |
+| 169 | 2,005,040 | `[1,"text-center","m-0","p-1","px-3","bg-secondary"]` |
+| 204 | 2,008,042 | `[1,"fas","fa-save"]` |
+| 208 | 2,008,343 | `[3,"ngClass"]` |
+| 209 | 2,008,357 | `[1,"ms-2","font-weight-bold"]` |
+| 210 | 2,008,387 | `[1,"text-center","align-middle","p-0","m-0"]` |
+| 212 | 2,008,503 | `[1,"p-0"]` |
+| 213 | 2,008,513 | `[1,"mx-1","font-weight-bold"]` |
+| 214 | 2,008,543 | `[1,"alert-sender-img",3,"src","alt"]` |
+| 216 | 2,008,625 | `[1,"fa","fa-trash"]` |
+| 218 | 2,008,688 | `[1,"fa","fa-edit"]` |
+| 219 | 2,008,707 | `["title","Click to view image",1,"uploaded-alert-image",3,"click","src","alt"]` |
+| 221 | 2,008,829 | `[1,"day-trade-alerts-container","m-2"]` |
+| 232 | 2,010,306 | `[1,"input-group","input-group-sm","dayTradeAlert-limit-container","m-2","ms-0"]` |
+| 233 | 2,010,386 | `["type","number","step","5","min","0","id","dayTradeAlert-limit","aria-label","dayTradeAlert-limit",1,"form-control",3,"ngModelChange","ngModel"]` |
+| 234 | — | `["title","Download Day Trades",1,"m-1","ms-4","download-day-trades-btn",3,"click"]` |
+| 235 | — | `["type","search","id","dayTradeAlert-search","placeholder","Enter your search term","aria-label","dayTradeAlert-search","aria-describedby","dayTradeAlert-search",1,"form-control","form-control-sm","m-2","me-0",3,"ngModelChange","ngModel"]` |
+
+Const **204** is the one the pane's own comment at `:333` calls out — `fas fa-save` with **no**
+`me-1`, against the Save Changes icon at const 198 which has it — and the walk confirms both.
+Const **214** is the other useful one: `[1,"alert-sender-img",3,"src","alt"]` carries **no** width
+and no height, so the `width="30" height="30"` at `:434-435` is OURS, derived from the reference's
+own `?d=mm&s=30` at **1,943,900** and required by `CLAUDE.md`'s no-layout-shift rule. The file
+already says exactly that, and the walk is what makes it checkable rather than plausible.
+
+**low** · `divergence` · reference byte **1,994,264**
+
+```
+consts:[["alertForm","ngForm"],["speechRecoBody",""],[1,"mainPresentationAreaHolder"],…
+```
+
+**Ours:** apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte, whole file.
+
+---
+
+## SwingAlertsPane.svelte
+
+**6 rows. `vwe` (1,938,750), `bwe` (1,937,634) and `_we` (1,936,897) were read end to end**, with
+`mwe` (1,936,375), `gwe` (1,936,683), `fwe` (1,936,289) and `pwe` (1,936,183), against the same
+292-entry `consts` walk. Five of the six rows are the swing half of a day-trade row and say so;
+`SWP-03` is the one that is only true on this side.
+
+> **This is the PANE, not the composer**, and the same fifteen rows named at the head of
+> `## DayTradeAlertsPane.svelte` apply here. The twin invariant those two form sections established
+> — *"the only differences are the ids, the names and the class"* — is **NOT** true of the panes,
+> and `SWP-06` is the list of the ways it is not.
+
+### SWP-01 — Five text nodes render without the reference's own leading and trailing spaces
+
+**BLOCKED — read and measured on the compiler 2026-08-31.** The swing half of `DTP-02`; the
+reasoning, the compiler measurement and the honest split between the rendered string and the
+rendered pixels are recorded there and are not repeated.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The five are `Ne(" ",e.symbol," ")` and `Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," ")` in
+`_we`, `v(1," No Swing Trade Alerts to display. ")` in `fwe` (**1,936,289**), and
+`v(4," Latest Swing Trade Alerts (Last ")` / `v(8," Months) ")` in `vwe`. Filed as its own row
+rather than folded into the day-trade one for the reason `dta-01` … `dta-04` all exist: **every one
+of those four was missing from BOTH panes**, and a row that names one pane is a row that lets the
+pair drift.
+
+**low** · `divergence` · reference byte **1,937,310**
+
+```
+m(2),Ne(" ",e.symbol," "),m(2),Ze(e.direction),m(2),Ne(" ",Ct(10,12,e.entryDate,"YYYY-MM-dd hh:mm:ss")," ")
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:369, :378, :285, :259
+and :273.
+
+### SWP-02 — The entitlement gate is quoted with no byte at all
+
+**MEASURED REFUSAL — read and measured 2026-08-31; the offset is recorded here rather than added to
+the file, and why is stated.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`SwingAlertsPane.svelte:40` quotes `O(48, o.hasSwingTradeAlerts ? 48 : -1)` and gives no offset,
+where the day-trade twin gives one — and gives it wrong, which is `DTP-01`. The construct
+`O(48,o.hasSwingTradeAlerts?48:-1)` occurs exactly once, at **2,017,703**, thirty-eight bytes before
+its twin at 2,017,741, in the same update block:
+
+```
+…P?47:-1),m(),O(48,o.hasSwingTradeAlerts?48:-1),m(),O(49,o.hasDayTradeAlerts?49:-1),m(),z("ngClass",…
+```
+
+**A missing citation is a smaller defect than a wrong one and it is not nothing**, which is why it
+is recorded rather than shrugged at: `48` and `49` are `ɵɵconditional` SLOT indices and they collide
+with const indices 48 (`[1,"mt-4","text-center"]`) and 49 (`[3,"startTime","ytURL"]`) in the same
+component's table. A reader who assumes the number in a `.svelte` comment is a const index — which
+most of the numbers in these two files ARE — decodes the wrong thing and finds a plausible answer.
+The byte is what disambiguates, and it is now asserted by
+`apps/room/src/lib/streaming-view-and-alert-panes-citation-contract.test.ts` whether or not the
+comment carries it.
+
+Not added to the file, for the reason `SWF-04` gives about this pair: the file is at 577 lines
+against a `source-size-contract` ceiling of 578, and the Svelte MCP that `CLAUDE.md` makes mandatory
+for `.svelte` work was not available in this session, so the single edit made in this batch was
+spent on the WRONG number rather than the missing one.
+
+**low** · `missing-behaviour` · reference byte **2,017,703**
+
+```
+O(48,o.hasSwingTradeAlerts?48:-1)
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:40.
+
+### SWP-03 — The search pipe's missing optional chaining is deliberate, and both classes were re-read side by side
+
+**ALREADY BUILT — verified by reading 2026-08-31. The most refutable-looking thing on this surface
+is correct, and it is correct in the direction that looks like a bug.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+The two pipe classes sit 487 bytes apart and do NOT do the same thing:
+
+```
+PCe  transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>o.symbol.toLowerCase().includes(i)||o.senderName.toLowerCase().includes(i))):e:[]}
+ICe  transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>o?.symbol?.toLowerCase()?.includes(i)||o?.senderName?.toLowerCase()?.includes(i))):e:[]}
+```
+
+`PCe` is `searchSwingLogs` and dereferences bare; `ICe` is `searchDayTradeLogs` and guards every
+step. `apps/room/src/lib/swing-alerts.ts:210-221` reproduces the bare form and
+`apps/room/src/lib/day-trade-alerts.ts` the guarded one, and the comment at `:201-208` records why:
+both columns are `NOT NULL` in this room's own table, so a row that reaches the pipe without them is
+a defect that should be loud, and transcribing the swing pipe as forgiving would be quietly choosing
+the other component's behaviour.
+
+**The row is filed as verification, not as a gap**, because this is the shape that gets "tidied" by
+the next reader: an inconsistency between two sibling files reads as an oversight, the fix is one
+character in each of four places, and it would erase a decision that has a written reason and a
+reference behind it. It is now asserted rather than argued.
+
+The two limit pipes, `RCe` and `OCe`, ARE identical — `e&&0!==i?e.slice(0,i):[]` both — and the
+`?? 0` at `SwingAlertsPane.svelte:102` is what makes an emptied number box reach that `0!==i` branch
+instead of Svelte's `undefined`, which `slice` would read as "everything". That inversion is the one
+the comment at `:94-101` was written for and it is exact.
+
+**low** · `divergence` · reference byte **1,915,269**
+
+```
+transform(e,i){return e?i?(i=i.toLowerCase(),e.filter(o=>o.symbol.toLowerCase().includes(i)||o.senderName.toLowerCase().includes(i))):e:[]}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:121 via
+apps/room/src/lib/swing-alerts.ts:210-221.
+
+### SWP-04 — The repeater tracks by IDENTITY upstream; ours keys by `row.id`
+
+**DELIBERATE DIVERGENCE — read and measured 2026-08-31.** The swing half of `DTP-04`: the same
+`ht(32,_we,23,17,"tr",null,Li)` shape, the same `function Li(t,n){return n}` at **100,136**, the same
+refetch behaviour behind the months `<select>`.
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+Worth one sentence that is only true on this side: the swing months `<select>` offers **twenty**
+options against day trade's fifteen, so this is the pane where a viewer is more likely to change the
+window and therefore the pane where the identity teardown costs more. `zCe=()=>[1,…,20]` is at
+**1,916,549** and `WCe=()=>[1,…,15]` at **1,916,648**, ninety-nine bytes apart in the same const
+block, both read by value.
+
+**low** · `divergence` · reference byte **1,938,465**
+
+```
+ht(32,_we,23,17,"tr",null,Li)
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:338.
+
+### SWP-05 — The `h4` style citation points at the second selector of a two-selector rule
+
+**MEASURED REFUSAL — read and measured 2026-08-31; the asymmetry with the day-trade file is checked
+and left, and this row is why it is not a defect.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`SwingAlertsPane.svelte:493` cites 2,024,836 for *"both headings, the title and the empty state"*,
+while `DayTradeAlertsPane.svelte:523` cites 2,024,764 for the same rule. Read at both:
+
+```
+2,024,764  .day-trade-alerts-container   h4, .swing-alerts-container   h4{background-color:#08668e;color:#fff}
+2,024,836                                    ^ the swing selector begins here
+```
+
+One rule, two selectors, one declaration block. The day-trade file points at the rule's start; the
+swing file points at its OWN selector inside it, seventy-two bytes in. **Both are honest and neither
+is the `DTF-02` shape**, because 2,024,836 is a selector BOUNDARY — it is where
+`.swing-alerts-container` begins — not a position inside an expression. A reader landing there sees
+their own selector and the declarations sixty bytes to the right.
+
+Left alone deliberately. Rewriting it to the rule's start would make the swing file cite a selector
+it does not use, and rewriting the day-trade file to its own selector would lose the one citation
+that shows the rule is SHARED — which is the fact that matters, because `#08668e` is one colour
+applied to both panes through one rule and is why `--day-trade-alerts-heading-bg` aliases
+`--swing-alerts-heading-bg` in `tokens.css` rather than repeating the literal.
+
+**low** · `divergence` · reference byte **2,024,764**
+
+```
+.day-trade-alerts-container[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%], .swing-alerts-container[_ngcontent-%COMP%]   h4[_ngcontent-%COMP%]{background-color:#08668e;color:#fff}
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:493-497 and
+apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:523-527.
+
+### SWP-06 — The two panes are NOT twins, and the six ways they differ are all reference values
+
+**ALREADY BUILT — verified by reading 2026-08-31. Every one of the six is carried, and the row
+exists because the FORMS' sections above prove the opposite invariant about the composers.**
+
+**This row was ADDED after this document was committed**, by the batch that read the two alert panes
+and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
+table above.
+
+`## SwingAlertForm.svelte` asserts its two composers EQUAL line for line after a mechanical rename,
+and `trade-alert-form-contract.test.ts` enforces it. **That invariant does not extend to the panes**,
+and a reader who assumes it does will "fix" a real captured difference. The six, each read by value:
+
+| | swing | day trade |
+| --- | --- | --- |
+| months options | `zCe` 1,916,549, `[1..20]` | `WCe` 1,916,648, `[1..15]` |
+| months initialiser | `this.swingAlertMonths=2` at 1,955,344 | `this.dayTradeAlertMonths=1` at 1,955,601 |
+| search pipe | `PCe`, bare dereference | `ICe`, fully optional-chained |
+| symbol class helper | `GCe` 1,916,610, `swing-symbol-container` | `qCe` 1,916,694, `day-trade-symbol-container` |
+| limit box `width:100%` | present, in the 2,024,939 rule | absent — `DTP-03` |
+| entitlement slot | `O(48,…)` at 2,017,703 | `O(49,…)` at 2,017,741 |
+
+The two months initialisers sit **257 bytes apart in the same constructor** (1,955,601 − 1,955,344)
+and were read together, which is the only way to be sure the 2 and the 1 are not a transcription
+slip; both files already say so. The limit initialiser is the one value that IS shared — `10` on
+both, at 1,955,546 — and both files say that too.
+
+**And one difference that is OURS and is right.** Both panes' first fetch is hardcoded — 21 days for
+day trade, 42 for swing — under labels reading "Last 1 Months" and "Last 2 Months". That mismatch is
+the reference's, is documented in `day-trade-alerts.ts` and `swing-alerts.ts` at the constants, and
+is not a pane row: changing the select once reconciles them, and inventing a matching first fetch
+would be inventing a value.
+
+**low** · `divergence` · reference byte **1,955,344**
+
+```
+this.swingAlertMonths=2,this.hasDayTradeAlerts=!1,this.dayTradeAlert={alertTxt:"",direction:"long"…
+```
+
+**Ours:** apps/room/src/lib/components/swing-alerts/SwingAlertsPane.svelte:103 and
+apps/room/src/lib/components/day-trade-alerts/DayTradeAlertsPane.svelte:114, via
+apps/room/src/lib/swing-alerts.ts:131-139 and apps/room/src/lib/day-trade-alerts.ts:184-192.

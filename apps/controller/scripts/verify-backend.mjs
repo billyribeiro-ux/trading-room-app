@@ -96,30 +96,38 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
     sha256: '20b95d68bac75a698fa4e90502c2e54cc88d475d8b92bc4aada946a57700ce9c'
   }),
   /*
-    `0010` finishes what `0009` began: it revokes everything `ptr_clone_app` holds in the database
-    it runs on, and drops the role when this is the last database in the cluster still granting to
-    it. Authored here on 2026-08-31 and pinned in the same commit.
+    `0010` finishes what `0009` began: it revokes every privilege `ptr_clone_app` holds in the
+    database it runs on. Authored here on 2026-08-31 and pinned in the same commit.
 
     ## It is riskier than it looks, which is why it is here and not merely reviewed
 
-    It removes a LOGIN role that `0001_baseline.sql` names in 22 RLS policies and every grant, and
-    that `0001` RE-CREATES on every new database. Three properties make that safe, and each was
+    Its subject is a LOGIN role that `0001_baseline.sql` names in 22 RLS policies and every grant,
+    and that `0001` RE-CREATES on every new database. Four properties make that safe, and each was
     measured against a live PostgreSQL 16.13 cluster rather than argued:
 
       * an INTERLOCK — it refuses unless `tradingroom_app` is already named by an RLS policy, so a
         database where `0009` has not taken effect keeps its only working role. Verified by running
         the chain to `0008` and watching `0010` refuse; the role survived the refusal.
-      * PER-DATABASE revoke, CLUSTER-GLOBAL drop. `DROP ROLE` fails while any other database still
-        grants, and that is the normal mid-rollout state, so exactly one failure —
-        `dependent_objects_still_exist` — is tolerated and announced. Verified across three
-        databases: the last one to run it is the one that drops the role.
-      * a residual COUNT over every ACL class in the catalogue, asserted zero before the drop is
-        attempted. Its first draft counted through `information_schema` and was both too narrow and
-        too wide; the catalogue is what `DROP ROLE` itself walks.
+      * it does NOT drop the role, and that is the property that reshaped it. The first version
+        ended in `DROP ROLE`, tolerating `dependent_objects_still_exist` for the mid-rollout case;
+        `migration_reappliability.rs` then failed on
+        `the_chain_applies_to_a_second_database_on_the_same_cluster`, because roles are
+        cluster-global and the SECOND database could no longer start its chain — the migrate
+        preflight requires that role to exist before `0001` runs. A dropped role is not convergent.
+      * PER-DATABASE and complete. What the risk ever was is a login-capable identity holding DML on
+        every table of a multi-tenant fintech database; after this runs, on this database, it holds
+        no table, column, routine, schema, default or CONNECT privilege at all.
+      * a residual COUNT over every ACL class in the catalogue, asserted zero before it reports
+        success. Its first draft counted through `information_schema` and was both too narrow and
+        too wide; the catalogue is what PostgreSQL itself walks.
+
+    The role's own removal is a documented OPERATOR step for a cluster that will take no further new
+    databases, and `db::migrate::baseline_role_absence_policy` is what keeps that step from bricking
+    the next deploy — measured, `exit 1` to `exit 0` with the tenancy intact.
   */
   Object.freeze({
     path: 'services/api/migrations/0010_retire_ptr_clone_app.sql',
-    sha256: 'a134bdcf67ae8662fb9c10a0c7a80581adf23ec0f59739e0363bde6ed4d3d36a'
+    sha256: 'f38b8ee829abb7e0525d4f31ccb389ddafad9e92c309c53a18ddc9969e1e5251'
   })
 ]);
 

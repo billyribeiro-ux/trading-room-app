@@ -414,3 +414,146 @@ describe('SRCH-05 — the truncation notice is ours, and stays', () => {
     expect(modal).toContain('advancedSearchTruncated = found.truncated');
   });
 });
+
+/**
+ * ## ASR-1, ASR-2, ASR-3 — the chrome that SURVIVES the refusal, read 2026-08-31
+ *
+ * The six rows above refuse the report itself. This block is about everything else the reference
+ * component carries, decoded the same way and by value: `selectors:[["app-alert-send-report-modal"]]`
+ * at byte 2,413,823, its consts table bracket-walked from `consts:[` at 2,413,870 (39 entries), the
+ * template after it, and the `styles:[…]` array after that.
+ *
+ * **ASR-1 — the component stylesheet is THIRTEEN rules and this room needs none of them.** Eleven
+ * are scoped to `.list-group`, `.list-group-item`, `.list-group-item:hover`, `.report-header`,
+ * `.report-header-container`, `.report-body`, `#search-select-addon`, `.form-select`,
+ * `.failed-reason`, `.sent-time` and `#pie-container` — every one of them an element the refusal
+ * above means does not exist here, so transcribing them would be eleven rules matching zero
+ * elements. The other two are `.modal-dialog`, and both already hold:
+ * `.modal-dialog{width:100%;max-width:800px}` is `app.css:1524`, and `width:auto` on a block box
+ * with no padding or border resolves to the same used width as `width:100%`; and
+ * `.modal-dialog{overflow-y:initial!important}` restates that property's own initial value, which
+ * nothing in this room's `.modal-dialog` rule overrides. **MEASURED REFUSAL**, and the assertions
+ * below are what would notice if either half stopped being true.
+ *
+ * **ASR-2 — the dialog has no accessible name, and neither does the reference's.** Const 0 is
+ * `["id","alert-send-report-modal","tabIndex","-1","role","dialog","aria-labelledby",
+ * "alert-send-report-modal","aria-hidden","true",1,"modal","fade"]`: `aria-labelledby` names the
+ * element it is ON. The accname recursion guard drops a self-reference, so a screen reader
+ * announces a nameless `role="dialog"`, and ours reproduces it attribute for attribute.
+ *
+ * NOT repaired here, and the reason is a count rather than a shrug. Measured across
+ * `lib/components`: **22 `Modal` call sites, 9 of which pass a distinct `titleId`, and 10 —
+ * including this one — are the same self-reference.** Nine of those ten are in `ModalHost.svelte`
+ * and `LogArchiveModals.svelte`, which this pass does not own. Repairing one of ten would trade a
+ * captured-value divergence for an inconsistency across the room's dialogs; the fix is one
+ * `titleId` per site in one change, by somebody who owns all three files. The count is asserted
+ * below so that "ten" cannot quietly become "eleven".
+ *
+ * **ASR-3 — nothing focuses this dialog when it opens.** Bootstrap's modal plugin calls
+ * `_element.focus()` upstream and this room does not ship Bootstrap's JavaScript at all
+ * (`bootstrap-dropdown-contract.test.ts` holds that premise for every app here). `Modal.svelte`'s
+ * only focus management is `releaseFocusWhenClosed`, which blurs on CLOSE. **BLOCKED**, on one line
+ * in a file this pass does not own: `Modal.svelte:95`, `if (open) return;` becomes
+ * `if (open) { node.focus(); return; }`. The root already carries `tabindex="-1"`, so it is
+ * programmatically focusable, and the attachment it would live in already runs on every `open`
+ * change. It is one line for all 22 dialogs, which is exactly why it should not be done for one.
+ */
+describe('ASR-1 — the reference stylesheet, and the two rules of it that reach us', () => {
+  /** The `styles` array of `app-alert-send-report-modal`, sliced at bounds that were found. */
+  const componentStyles = () => {
+    const selector = BUNDLE.indexOf('selectors:[["app-alert-send-report-modal"]]');
+    expect(selector, 'the report modal component moved in the bundle').toBeGreaterThan(-1);
+    const opened = BUNDLE.indexOf('styles:["', selector);
+    expect(opened, 'the report modal has no styles array after its selector').toBeGreaterThan(-1);
+    const closed = BUNDLE.indexOf('"]})', opened);
+    expect(closed, 'the styles array is unterminated').toBeGreaterThan(opened);
+    return BUNDLE.slice(opened, closed);
+  };
+
+  it('still carries thirteen rules, eleven of them for elements the refusal removes', () => {
+    const styles = componentStyles();
+    /* Every rule in this array has exactly one declaration block, so `{` counts rules. */
+    expect([...styles.matchAll(/\{/g)]).toHaveLength(13);
+    for (const selector of [
+      '.list-group[_ngcontent-%COMP%]{',
+      '.list-group-item[_ngcontent-%COMP%]{',
+      '.report-header-container[_ngcontent-%COMP%]{',
+      '#search-select-addon[_ngcontent-%COMP%]{',
+      '.failed-reason[_ngcontent-%COMP%]{',
+      '.sent-time[_ngcontent-%COMP%]{',
+      '#pie-container[_ngcontent-%COMP%]{'
+    ]) {
+      expect(styles, `${selector} moved`).toContain(selector);
+    }
+    /* And that none of those selectors has an element here to match. */
+    for (const orphan of ['report-header-container', 'search-select-addon', 'pie-container']) {
+      expect(report, `${orphan} is rendered after all — ASR-1's premise has expired`).not.toContain(
+        orphan
+      );
+    }
+  });
+
+  it('carries the one width rule this room DOES honour, and this room honours it', () => {
+    expect(componentStyles()).toContain(
+      '.modal-dialog[_ngcontent-%COMP%]{width:100%;max-width:800px}'
+    );
+    const css = readFileSync(`${ROOT}app.css`, 'utf8');
+    const at = css.indexOf('#alert-send-report-modal > .modal-dialog');
+    expect(at, 'the 800px rule for this dialog was removed from app.css').toBeGreaterThan(-1);
+    expect(css.slice(at, at + 200)).toContain('max-width: 800px');
+  });
+});
+
+describe('ASR-2 — the self-referential aria-labelledby, and the count that keeps it', () => {
+  it('reads the same self-reference out of the reference component itself', () => {
+    const at = BUNDLE.indexOf('["id","alert-send-report-modal","tabIndex","-1"');
+    expect(at, 'const 0 of the report modal moved').toBeGreaterThan(-1);
+    expect(BUNDLE.slice(at, at + 200)).toContain('"aria-labelledby","alert-send-report-modal"');
+  });
+
+  it('reproduces it here, deliberately, and still passes no titleId', () => {
+    const at = report.indexOf('id="alert-send-report-modal"');
+    expect(at, 'the modal id moved').toBeGreaterThan(-1);
+    const props = report.slice(at, at + 300);
+    expect(props).toContain('ariaLabelledby="alert-send-report-modal"');
+    expect(props).not.toContain('titleId');
+  });
+
+  it('holds the count that says why one of ten is not repaired alone', () => {
+    /*
+      Read from the markup rather than remembered. A `Modal` with an `id="X"`, an
+      `ariaLabelledby="X"` and no `titleId` is a dialog whose name resolves to itself.
+    */
+    const sources = readdirSync(`${ROOT}lib/components`, { recursive: true, encoding: 'utf8' })
+      .filter((name) => name.endsWith('.svelte'))
+      .map((name) => readFileSync(`${ROOT}lib/components/${name}`, 'utf8'));
+    let total = 0;
+    let named = 0;
+    let selfReferential = 0;
+    for (const source of sources) {
+      for (const call of source.matchAll(/<Modal\b[^>]*>/gs)) {
+        const block = call[0];
+        if (!block.includes('id=')) continue;
+        total += 1;
+        const id = /\bid="([^"]+)"/.exec(block)?.[1];
+        const labelled = /ariaLabelledby="([^"]+)"/.exec(block)?.[1];
+        if (block.includes('titleId=')) named += 1;
+        else if (id !== undefined && id === labelled) selfReferential += 1;
+      }
+    }
+    expect({ total, named, selfReferential }).toEqual({ total: 22, named: 9, selfReferential: 10 });
+  });
+});
+
+describe('ASR-3 — the dialog is never focused when it opens, and the one line that would', () => {
+  it('confirms the only focus management in Modal.svelte is the release on close', () => {
+    const source = readFileSync(`${ROOT}lib/components/Modal.svelte`, 'utf8');
+    expect(source).toContain('const releaseFocusWhenClosed');
+    expect(source).toContain('if (open) return;');
+    /*
+      The negative half, and it is the assertion that goes red the day somebody applies the one-line
+      fix — at which point this row is closed and this test is what says so.
+    */
+    expect(source).not.toContain('node.focus()');
+  });
+});

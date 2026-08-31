@@ -2,6 +2,13 @@
   import { untrack } from 'svelte';
 
   import type { CaptureSettings } from '#lib/capture-settings.js';
+  import {
+    deviceEnumerationMessage,
+    partitionInputDevices,
+    resolveSelectedDevice,
+    selectedDeviceLabel,
+    type DeviceOption
+  } from '#lib/device-enumeration.js';
 
   /*
     THE A/V DEVICE PANE — which microphone and camera this browser captures with, and how.
@@ -63,28 +70,26 @@
   let autoGainControl = $state(untrack(() => capture.autoGainControl));
   let currentAudioDevice = $state(untrack(() => capture.audioDeviceId));
   let currentVideoDevice = $state(untrack(() => capture.videoDeviceId));
-  /* Empty until Refresh Devices is pressed — see the note above on why this is not enumerated here. */
+  /*
+    Empty until Refresh Devices is pressed — see the note above on why this is not enumerated here.
+    The shape is spelled out rather than written `DeviceOption[]`; the reason is on `DeviceOption`.
+  */
   let audioDevices = $state.raw<{ deviceId: string; label: string }[]>([]);
   let videoDevices = $state.raw<{ deviceId: string; label: string }[]>([]);
   let devicesLoading = $state(false);
   let devicesLoadError = $state('');
 
-  /**
-   * What the "Selected:" line says, in the three states it can actually be in.
-   *
-   * It used to say `Unknown Device` whenever the id was not in the list, which — now that the lists
-   * start empty — would be every open before Refresh, about a device that is very likely connected
-   * and working. Saying "not listed yet" is the true statement; saying "Unknown Device" about
-   * something the browser has simply not been asked about is the confident-but-false shape this
-   * repository refuses, and it is what the fabricated seed was hiding.
-   */
-  const selectedLabel = (devices: { deviceId: string; label: string }[], current: string) =>
-    devices.find((device) => device.deviceId === current)?.label ??
-    (devices.length > 0
-      ? 'Unknown Device'
-      : current
-        ? 'Saved — press Refresh Devices to confirm it is still connected'
-        : 'None chosen — press Refresh Devices to list them');
+  /** AVD-02 — see `resolveSelectedDevice`; the write happens only when it FELL BACK. */
+  function chooseDevice(
+    devices: readonly DeviceOption[],
+    saved: string,
+    key: 'audioDeviceID' | 'videoDeviceID',
+    assign: (deviceId: string) => void
+  ) {
+    const { deviceId, fellBack } = resolveSelectedDevice(devices, saved);
+    assign(deviceId);
+    if (fellBack) onPreferenceChange(key, deviceId);
+  }
 
   async function loadDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -95,6 +100,26 @@
 
     devicesLoading = true;
     devicesLoadError = '';
+    /*
+      ── AVD-01 — THE LISTS ARE EMPTIED BEFORE THE ENUMERATION, NOT AFTER IT ────────────────────
+
+      `loadDevices(){var e=this;this.devicesLoading=!0,this.devicesLoadError="",
+       this.audioDevicesList=[],this.videoDevicesList=[],` — byte 2,162,037, the first statement of
+      the reference's own method.
+
+      This read `if (nextAudio.length) audioDevices = nextAudio`, which is the same thing for a
+      member who plugs a device IN and the opposite of it for one who pulls a device OUT: unplug the
+      only microphone, press Refresh, and the enumeration finds none, the assignment is skipped, and
+      the pane keeps offering the microphone that is no longer there — still selected, with the
+      green "Selected:" tick beside it. `audioCaptureConstraints` then asks `getUserMedia` for that
+      id with `exact`, which is the one constraint shape that fails rather than substituting.
+
+      Emptying first also means the "Please connect audio devices." arm (SC-10) becomes reachable
+      from a state it could not previously be reached from, which is what makes it true rather than
+      only correct.
+    */
+    audioDevices = [];
+    videoDevices = [];
     const streams: MediaStream[] = [];
     try {
       try {
@@ -108,58 +133,29 @@
         // The compiled client continues and enumerates devices without labels.
       }
 
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const isDuplicateDefault = (device: MediaDeviceInfo) => {
-        const label = device.label;
-        if (device.deviceId === 'default' || device.deviceId === 'communications') return true;
-        if (!label.toLowerCase().startsWith('default - ')) return false;
-        const physicalLabel = label.slice(10);
-        return devices.some(
-          (candidate) =>
-            candidate.kind === device.kind &&
-            candidate.label === physicalLabel &&
-            candidate.deviceId !== device.deviceId
-        );
-      };
-      const toOption = (device: MediaDeviceInfo) => ({
-        deviceId: device.deviceId,
-        label:
-          device.label ||
-          `${device.kind} (${device.deviceId ? `${device.deviceId.slice(0, 8)}...` : 'unknown'})`
-      });
-
-      const nextAudio = devices
-        .filter((device) => device.kind === 'audioinput' && !isDuplicateDefault(device))
-        .map(toOption);
-      const nextVideo = devices
-        .filter((device) => device.kind === 'videoinput' && !isDuplicateDefault(device))
-        .map(toOption);
+      /* The duplicate rules and the synthesised labels are `#lib/device-enumeration.ts`. */
+      const { audio: nextAudio, video: nextVideo } = partitionInputDevices(
+        await navigator.mediaDevices.enumerateDevices()
+      );
+      audioDevices = nextAudio;
+      videoDevices = nextVideo;
       if (nextAudio.length) {
-        audioDevices = nextAudio;
-        if (!nextAudio.some((device) => device.deviceId === currentAudioDevice)) {
-          currentAudioDevice = nextAudio[0].deviceId;
-        }
+        chooseDevice(nextAudio, currentAudioDevice, 'audioDeviceID', (id) => {
+          currentAudioDevice = id;
+        });
       }
       if (nextVideo.length) {
-        videoDevices = nextVideo;
-        if (!nextVideo.some((device) => device.deviceId === currentVideoDevice)) {
-          currentVideoDevice = nextVideo[0].deviceId;
-        }
+        chooseDevice(nextVideo, currentVideoDevice, 'videoDeviceID', (id) => {
+          currentVideoDevice = id;
+        });
       }
       if (!nextAudio.length && !nextVideo.length) {
         devicesLoadError =
           'No audio or video devices detected. Please ensure devices are connected and permissions are granted.';
       }
     } catch (error) {
-      const deviceError = error as DOMException;
-      devicesLoadError =
-        deviceError.name === 'NotFoundError'
-          ? 'No audio or video devices found. Please connect a microphone and/or camera.'
-          : deviceError.name === 'NotAllowedError'
-            ? 'Permission denied. Please allow access to your microphone and camera in your browser settings.'
-            : deviceError.name === 'SecurityError'
-              ? 'Security error. Please ensure the page is loaded over HTTPS.'
-              : `Error loading devices: ${deviceError.message || 'Unknown error'}`;
+      /* AVD-03 — five sentences, including the `NotSupportedError` one this had no arm for. */
+      devicesLoadError = deviceEnumerationMessage(error);
     } finally {
       for (const stream of streams) {
         for (const track of stream.getTracks()) track.stop();
@@ -269,7 +265,7 @@
       </select>
       <small class="text-white mt-1 d-block">
         <i class="fas fa-check-circle text-success"></i>
-        Selected: {selectedLabel(audioDevices, currentAudioDevice)}
+        Selected: {selectedDeviceLabel(audioDevices, currentAudioDevice)}
       </small>
     </div>
   {:else if !devicesLoading && !devicesLoadError}
@@ -293,7 +289,7 @@
       </select>
       <small class="text-white mt-1 d-block">
         <i class="fas fa-check-circle text-success"></i>
-        Selected: {selectedLabel(videoDevices, currentVideoDevice)}
+        Selected: {selectedDeviceLabel(videoDevices, currentVideoDevice)}
       </small>
     </div>
   {:else if !devicesLoading && !devicesLoadError}

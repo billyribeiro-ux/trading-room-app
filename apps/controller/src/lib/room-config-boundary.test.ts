@@ -250,6 +250,14 @@ describe('the allow-list itself', () => {
       `scripts/room-config-seam-e2e.mjs` flipping one and watching nothing happen.
     */
     const consumers: Record<string, string> = {
+      /*
+        Added 2026-08-31, and it is a defect closed rather than a setting wired. Only `main` is
+        unconditional in the reference's tab builder; this room shipped Off Topic to every room
+        including those whose owners had switched it off. Absence means TRUE — `chat-tabs.ts` carries
+        the argument, because reading it as false would take the tab from every room that has never
+        stored the setting.
+      */
+      hasChannelTabs: 'chat-tabs.ts `chatTabsForMember` — whether the room has an Off Topic channel',
       enableBadges: 'RoomMessage `visibleBadges` — the owner master switch on chat badges',
       showBadgesToPresentersOnly: 'RoomMessage `visibleBadges` — narrows badges to presenters',
       disableStarYears: 'RoomMessage — the membership-star gate',

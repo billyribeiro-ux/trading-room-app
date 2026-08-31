@@ -21,7 +21,13 @@ use sqlx::postgres::{PgConnectOptions, PgListener};
 use sqlx::{ConnectOptions, Connection, Executor, FromRow, PgConnection};
 use tokio::time::timeout;
 use tracing::log::LevelFilter;
-use tradingroom_api::db::migrate::{EXPECTED_MIGRATOR_ROLE, EXPECTED_RUNTIME_ROLE, MIGRATOR};
+use tradingroom_api::db::migrate::{ACCEPTED_MIGRATOR_ROLES, EXPECTED_RUNTIME_ROLE, MIGRATOR};
+
+#[cfg(test)]
+// The provisioned owner, for the fixtures below. Deliberately NOT imported into the production
+// path above: every check there resolves the owner from the connection (`resolve_attested_owner`)
+// so a database that has cut over attests under its own name.
+use tradingroom_api::db::migrate::EXPECTED_MIGRATOR_ROLE;
 use uuid::Uuid;
 
 const ATTESTATION_VERSION: u32 = 1;
@@ -693,15 +699,25 @@ async fn collect_owner_snapshot(
         })?;
 
     let identity_row = query_identity(&mut transaction, ConnectionKind::Owner).await?;
-    let identity = validate_identity(
-        &identity_row,
-        EXPECTED_MIGRATOR_ROLE,
-        "owner_identity_mismatch",
-    )?;
+    /*
+       RESOLVED FIRST, then pinned — which is stronger than accepting a set at each site.
+
+       The owner rename `ptr_clone` -> `tradingroom` is staged (`ops/OWNER-ROLE-CUTOVER.md`), so a
+       cluster mid-cutover holds databases owned by either. An attestation that compared each site
+       against a two-name list independently would happily attest a database whose CONNECTION says
+       one owner and whose TABLES say the other — which is exactly the state a half-finished
+       `REASSIGN OWNED` leaves behind, and exactly the state this document exists to catch.
+
+       So the accepted name is resolved once, from this connection, and every check below is made
+       against that ONE name. The relaxation is which owner a database may have; it is never that a
+       database may have two.
+    */
+    let attested_owner = resolve_attested_owner(&identity_row)?;
+    let identity = validate_identity(&identity_row, &attested_owner, "owner_identity_mismatch")?;
     let role_row = query_current_role(&mut transaction, ConnectionKind::Owner).await?;
-    let role = validate_owner_role(&role_row)?;
+    let role = validate_owner_role(&role_row, &attested_owner)?;
     let migration_ledger = query_and_validate_migrations(&mut transaction).await?;
-    let room_events = query_and_validate_room_events(&mut transaction).await?;
+    let room_events = query_and_validate_room_events(&mut transaction, &attested_owner).await?;
     /*
        EVERY OTHER TENANT POLICY, in the same read-only transaction so both checks see one snapshot.
        `room_events` keeps its own dedicated check: it is asserted down to its policy NAME, which the
@@ -901,8 +917,30 @@ async fn query_current_role(
     })
 }
 
-fn validate_owner_role(row: &RoleRow) -> Result<OwnerRoleEvidence, AttestationError> {
-    if row.name != EXPECTED_MIGRATOR_ROLE || !row.can_login || row.membership_count != 0 {
+/// The accepted owner this database actually reports, or a refusal.
+///
+/// Reads `session_user` — the role that CONNECTED, which no `SET ROLE` can change — and requires it
+/// to be one of [`ACCEPTED_MIGRATOR_ROLES`]. `validate_identity` then enforces that `system_user` and
+/// `current_user` name the same one, so a connection that authenticated as one accepted owner and
+/// switched to the other is refused here exactly as the migration preflight refuses it.
+fn resolve_attested_owner(row: &ConnectionIdentityRow) -> Result<String, AttestationError> {
+    ACCEPTED_MIGRATOR_ROLES
+        .iter()
+        .find(|accepted| row.session_role == **accepted)
+        .map(|accepted| (*accepted).to_owned())
+        .ok_or_else(|| {
+            AttestationError::new(
+                "owner_identity_mismatch",
+                "the owner connection must authenticate as one of the accepted migration owners",
+            )
+        })
+}
+
+fn validate_owner_role(
+    row: &RoleRow,
+    attested_owner: &str,
+) -> Result<OwnerRoleEvidence, AttestationError> {
+    if row.name != attested_owner || !row.can_login || row.membership_count != 0 {
         return Err(AttestationError::new(
             "owner_role_mismatch",
             "the migration owner must be the expected LOGIN role with zero direct memberships",
@@ -1022,39 +1060,37 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// role that may bypass RLS.
 ///
 /// `0009` shipped in `b9f775e` without this list being extended, which is exactly the reviewed-act
-/// gate working: `main` went red until somebody looked.
+/// gate working: `main` went red until somebody looked. `0010` did the same thing on 2026-08-31,
+/// and the gate caught it the same way.
 ///
-/// **Extended to `0001-0010` on 2026-08-30, and it happened the same way a second time.** `0010`
-/// shipped in `d5e3391` without this list moving, so `main` went red again — the same commit also
-/// left its own contract test out of `naming-boundary.test.ts`. The gate is not being worked around
-/// here; it is being answered, and the answer required reading the migration rather than trusting
-/// that a test elsewhere had.
+/// Slot 10 is `0010_retire_ptr_clone_app.sql`, reviewed on the same terms. It finishes what `0009`
+/// began: `0009` gave `tradingroom_app` parity and took the baseline role out of all 22 policies,
+/// leaving `ptr_clone_app` inert with respect to tenant rows but still holding 87 table grants, 26
+/// column grants, 6 routine grants, schema USAGE and CONNECT. `0010` revokes every one of those, in
+/// the database it runs on, counting the residue from `pg_catalog` and refusing rather than
+/// reporting success if anything survives. It also REFUSES on a database where `0009` has not taken
+/// effect, so a database that is not ready keeps its only working role.
 ///
-/// `0010_retire_ptr_clone_app.sql` revokes everything the baseline role holds and then drops it. It
-/// is reviewed on exactly the terms `0009` was, and each of these was read in the SQL rather than
-/// taken from its prose:
-///
-/// - **Forward-only and idempotent.** A new numbered file; it edits no shipped migration, and it
-///   returns early with a notice when the role is already gone.
-/// - **It fails CLOSED, and that is the whole point.** It refuses unless `tradingroom_app` is
-///   already named by at least one RLS policy — that is, unless `0009` has taken effect on THIS
-///   database. Dropping the baseline role on a database that had not run `0009` would leave it with
-///   no identity the policies admit and every tenant read returning nothing.
-/// - **No `CASCADE`, in either branch.** Cascade would remove dependencies the migration has not
-///   enumerated, in databases it cannot see.
-/// - **Residue is counted, not assumed.** Seven ACL classes read from `pg_catalog` — database,
-///   namespace, class, attribute, proc, type, default-acl — and a non-zero count raises rather than
-///   forcing the drop. Column ACLs come from `pg_attribute.attacl`, not
-///   `information_schema.column_privileges`, which reflects table grants onto every column and
-///   reported 922 where 26 exist.
-/// - **Exactly one tolerated failure**, `dependent_objects_still_exist` (SQLSTATE 2BP01), meaning
-///   another database in the cluster still grants to the role. It is announced with what finishes
-///   it, not swallowed; everything else propagates.
-///
-/// The role is cluster-global while the ledger is per-database, so this converges only when the last
-/// database has run it — which is why it is a migration and not an operator step, and why `0001`
-/// re-creating the role on every new database does not defeat it.
+/// It does NOT drop the role, and that is a reviewed decision rather than an omission. Its first
+/// version ended in `DROP ROLE`; `migration_reappliability.rs` failed on
+/// `the_chain_applies_to_a_second_database_on_the_same_cluster`, because roles are cluster-global
+/// and a second database could no longer start its chain — the migrate preflight requires that role
+/// to exist before `0001` runs. Removing the role itself is a documented operator step, and
+/// `db::migrate::baseline_role_absence_policy` is what keeps that step from blocking later deploys.
 const ATTESTED_MIGRATION_VERSIONS: [i64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+/// The two human-facing error messages that name that chain's range in PROSE, as named constants
+/// so `the_prose_ranges_track_the_attested_chain` can hold them against
+/// `ATTESTED_MIGRATION_VERSIONS`. The ledger message below said `0001 through 0008` until
+/// 2026-08-31 — TWO chain extensions stale, found during the merge of PR #177 — because an error
+/// string has no reader until the attestation actually fails, which is exactly when a wrong range
+/// does its damage: it steers the operator toward the wrong chain length in the middle of a
+/// refused release. The embedded-contract message beside it was moved by hand both times;
+/// hand-moving is the convention that failed here, so the test moves the burden.
+const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
+    "the attestor is pinned to repository migration versions 0001 through 0010";
+const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
+     repository migrations 0001 through 0010 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1068,7 +1104,7 @@ fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
 
     Err(AttestationError::new(
         "embedded_migration_contract_changed",
-        "the attestor is pinned to repository migration versions 0001 through 0010",
+        EMBEDDED_MIGRATION_CONTRACT_MESSAGE,
     ))
 }
 
@@ -1121,12 +1157,15 @@ async fn query_and_validate_migrations(
 const fn migration_ledger_mismatch() -> AttestationError {
     AttestationError::new(
         "migration_ledger_mismatch",
-        "the SQLx ledger must contain only successful repository migrations 0001 through 0008 with exact descriptions and checksums",
+        MIGRATION_LEDGER_MISMATCH_MESSAGE,
     )
 }
 
 async fn query_and_validate_room_events(
     connection: &mut PgConnection,
+    // The ONE owner this database reports, resolved by `resolve_attested_owner`. A relation owned
+    // by the OTHER accepted name is a half-finished `REASSIGN OWNED`, not a pass.
+    attested_owner: &str,
 ) -> Result<RoomEventsEvidence, AttestationError> {
     let relation: RoomEventsRow = sqlx::query_as(
         "SELECT pg_catalog.pg_get_userbyid(class.relowner)::text AS owner_name, \
@@ -1148,10 +1187,7 @@ async fn query_and_validate_room_events(
         )
     })?;
 
-    if relation.owner_name != EXPECTED_MIGRATOR_ROLE
-        || !relation.rls_enabled
-        || !relation.rls_forced
-    {
+    if relation.owner_name != attested_owner || !relation.rls_enabled || !relation.rls_forced {
         return Err(AttestationError::new(
             "room_events_rls_mismatch",
             "public.room_events must be owned by the migration owner with enabled and forced row-level security",
@@ -2222,6 +2258,29 @@ fn write_stdout(output: &str) -> Result<(), AttestationError> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn the_prose_ranges_track_the_attested_chain() {
+        /*
+          `migration_ledger_mismatch` named `0001 through 0008` until 2026-08-31 — two chain
+          extensions stale, found during the merge of PR #177. Nothing reads an error string until
+          the check it belongs to fails, so a prose range rots invisibly and then misleads at the
+          worst moment: inside the error text of a refused production attestation. This holds both
+          range-naming messages against the const they describe, so extending
+          `ATTESTED_MIGRATION_VERSIONS` without moving the prose goes red here instead.
+        */
+        let first = ATTESTED_MIGRATION_VERSIONS[0];
+        let last = ATTESTED_MIGRATION_VERSIONS[ATTESTED_MIGRATION_VERSIONS.len() - 1];
+        let range = format!("{first:04} through {last:04}");
+        assert!(
+            EMBEDDED_MIGRATION_CONTRACT_MESSAGE.contains(&range),
+            "the embedded-contract message names a range the chain has outgrown"
+        );
+        assert!(
+            MIGRATION_LEDGER_MISMATCH_MESSAGE.contains(&range),
+            "the ledger-mismatch message names a range the chain has outgrown"
+        );
+    }
+
     fn restricted_runtime_row() -> RoleRow {
         RoleRow {
             name: EXPECTED_RUNTIME_ROLE.to_owned(),
@@ -2234,6 +2293,61 @@ mod tests {
             bypasses_rls: false,
             membership_count: 0,
         }
+    }
+
+    #[test]
+    fn the_attested_owner_is_resolved_from_the_connection_and_then_pinned() {
+        /*
+          The owner rename is staged, so a cluster mid-cutover holds databases owned by either name.
+          This resolves which one THIS database has and pins every downstream check to it.
+
+          The pinning is the point, and it is what a two-name comparison at each site would lose: a
+          database whose CONNECTION says `tradingroom` while its TABLES still say `ptr_clone` is a
+          half-finished `REASSIGN OWNED`, and that is precisely the state a release attestation must
+          refuse. So the third case below is the one that matters.
+        */
+        for owner in ACCEPTED_MIGRATOR_ROLES {
+            let mut row = connection_identity("probe");
+            row.system_identity = Some(format!("scram-sha-256:{owner}"));
+            row.session_role = owner.into();
+            row.current_role = owner.into();
+
+            let resolved = resolve_attested_owner(&row).expect("an accepted owner resolves");
+            assert_eq!(resolved, owner);
+            validate_identity(&row, &resolved, "owner_identity_mismatch")
+                .expect("the resolved owner satisfies the three-fact check");
+
+            // A relation still owned by the OTHER accepted name fails against the pin.
+            let other = ACCEPTED_MIGRATOR_ROLES
+                .iter()
+                .find(|candidate| **candidate != owner)
+                .expect("the list holds two names");
+            assert_ne!(
+                resolved.as_str(),
+                *other,
+                "the pin must name one owner, so a mixed database cannot satisfy both"
+            );
+        }
+
+        let mut stranger = connection_identity("probe");
+        stranger.session_role = "postgres".into();
+        assert!(
+            resolve_attested_owner(&stranger).is_err(),
+            "a role outside the allow-list is not an attestable owner, superuser or not"
+        );
+
+        // Authenticated as one accepted owner, executing as the other: both names are in the list
+        // and the connection is still an impersonation.
+        let [new_owner, old_owner] = ACCEPTED_MIGRATOR_ROLES;
+        let mut switched = connection_identity("probe");
+        switched.system_identity = Some(format!("scram-sha-256:{new_owner}"));
+        switched.session_role = new_owner.into();
+        switched.current_role = old_owner.into();
+        let resolved = resolve_attested_owner(&switched).expect("session_user is accepted");
+        assert!(
+            validate_identity(&switched, &resolved, "owner_identity_mismatch").is_err(),
+            "session_user and current_user must name the SAME accepted owner"
+        );
     }
 
     fn connection_identity(system_identifier: &str) -> ConnectionIdentityRow {
@@ -2442,13 +2556,14 @@ mod tests {
             bypasses_rls: false,
             membership_count: 0,
         };
-        let evidence = validate_owner_role(&managed_owner).expect("managed owner is portable");
+        let evidence = validate_owner_role(&managed_owner, EXPECTED_MIGRATOR_ROLE)
+            .expect("managed owner is portable");
         assert_eq!(evidence.elevated_capabilities, ["CREATEROLE"]);
         assert!(evidence.operator_review_required);
 
         let mut member_owner = managed_owner;
         member_owner.membership_count = 1;
-        assert!(validate_owner_role(&member_owner).is_err());
+        assert!(validate_owner_role(&member_owner, EXPECTED_MIGRATOR_ROLE).is_err());
     }
 
     #[test]

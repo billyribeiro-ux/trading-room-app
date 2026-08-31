@@ -467,6 +467,36 @@ impl Harness {
 /// nothing else.
 const SCRATCH_PREFIX: &str = "tradingroom_migrate_test_";
 
+/// Eight hex characters identifying THIS test process, embedded in every name it creates.
+///
+/// ── THE RACE THIS CLOSES, REPRODUCED RATHER THAN REASONED ────────────────────────────────────
+///
+/// [`Scratch::sweep`] argued its own safety like this: *"a database another test is using right now
+/// still has a backend attached, so its `DROP` fails and it is left alone."* That is true only once
+/// a backend has attached. Between [`Scratch::create`]'s `CREATE DATABASE` and the first
+/// [`Scratch::pool`] there is none, and every other test's `create` sweeps in that window.
+///
+/// It is not theoretical. Adding a third concurrent `Scratch::create` to
+/// `migration_reappliability.rs` made it fail on two consecutive runs:
+///
+/// ```text
+/// connect to the scratch database: database "tradingroom_migrate_test_7be62f0e…" does not exist
+/// detail: It seems to have just been dropped or renamed.
+/// ```
+///
+/// So sweeping is scoped by process instead of by liveness. Litter from an earlier `cargo test`
+/// carries a different token and is still collected, which is the whole point of the sweep; a
+/// sibling thread's half-created database carries THIS token and is left alone, which is the bug.
+///
+/// Cross-process concurrency — two `cargo test` invocations against one cluster at the same moment —
+/// is deliberately not covered. It is not how this suite is run, and covering it would need a
+/// registry the harness has no way to clean up after a panic.
+static SCRATCH_PROCESS_TOKEN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+fn scratch_process_token() -> &'static str {
+    SCRATCH_PROCESS_TOKEN.get_or_init(|| Uuid::new_v4().simple().to_string()[..8].to_owned())
+}
+
 pub fn scratch_url(base: &str, database: &str) -> String {
     let (prefix, _) = base.rsplit_once('/').expect("a database name in the url");
     format!("{prefix}/{database}")
@@ -491,7 +521,14 @@ pub struct Scratch {
 impl Scratch {
     pub async fn create() -> Self {
         let admin = owner_url();
-        let name = format!("{SCRATCH_PREFIX}{}", Uuid::new_v4().simple());
+        // `{prefix}{process token}_{unique}` - 25 + 8 + 1 + 32 = 66 characters would exceed
+        // PostgreSQL's 63-byte identifier limit, so the unique half is truncated to 24.
+        let unique = Uuid::new_v4().simple().to_string();
+        let name = format!(
+            "{SCRATCH_PREFIX}{}_{}",
+            scratch_process_token(),
+            &unique[..24]
+        );
 
         let mut conn = PgConnection::connect(&admin)
             .await
@@ -512,15 +549,22 @@ impl Scratch {
     ///
     /// Deliberately **without** `WITH (FORCE)` and ignoring every failure: a database another
     /// test is using right now still has a backend attached, so its `DROP` fails and it is
-    /// left alone. That is what makes this safe to call from tests running in parallel -
-    /// forcing the drop would let one test delete another's database mid-assertion.
+    /// left alone.
+    ///
+    /// That argument is necessary and NOT sufficient, which cost two red runs to learn: between a
+    /// sibling's `CREATE DATABASE` and its first connection no backend is attached yet, so liveness
+    /// alone does not protect it. The `NOT LIKE` below excludes every name this process created, so
+    /// a sweep can only ever collect another run's litter. See [`SCRATCH_PROCESS_TOKEN`].
     async fn sweep(conn: &mut PgConnection) {
-        let abandoned: Vec<String> =
-            sqlx::query_scalar("SELECT datname FROM pg_database WHERE datname LIKE $1 || '%'")
-                .bind(SCRATCH_PREFIX)
-                .fetch_all(&mut *conn)
-                .await
-                .unwrap_or_default();
+        let abandoned: Vec<String> = sqlx::query_scalar(
+            "SELECT datname FROM pg_database \
+             WHERE datname LIKE $1 || '%' AND datname NOT LIKE $1 || $2 || '%'",
+        )
+        .bind(SCRATCH_PREFIX)
+        .bind(scratch_process_token())
+        .fetch_all(&mut *conn)
+        .await
+        .unwrap_or_default();
 
         for database in abandoned {
             let _ = conn

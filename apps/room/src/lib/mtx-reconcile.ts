@@ -35,11 +35,42 @@
  * selection. The full list is sent once, to a client that has just connected and has no list yet —
  * which is exactly the moment the reference sends it too.
  *
- * ## The API this reads
+ * ## The API this reads, measured against the binary rather than the documentation
  *
- * `GET /v3/paths/list` on the control API, which is `api: yes` in `mediamtx.yml` and listens on
- * `127.0.0.1:9997` by default, localhost-only unless configured otherwise. Schema quoted from the
- * project's own OpenAPI document (`api/openapi.yaml` in `bluenviron/mediamtx`), not from memory.
+ * `GET /v3/paths/list` on the control API. Everything below was run against MediaMTX **v1.20.1**,
+ * downloaded from the project's own release, on 2026-08-31 — because the sentence that stood here
+ * until then was wrong in both of its halves and wrong in the dangerous direction.
+ *
+ * It said the API *"is `api: yes` in `mediamtx.yml` and listens on `127.0.0.1:9997` by default,
+ * localhost-only unless configured otherwise."* The shipped `mediamtx.yml` says:
+ *
+ * ```
+ * 147: api: false
+ * 149: apiAddress: :9997
+ * ```
+ *
+ * So the API is **off** by default, and `:9997` with no host is **every interface**, not loopback.
+ * That was measured rather than read off the colon: an instance started with `apiAddress: :9998`
+ * logs `[API] started with listener on :9998` and answers on this container's non-loopback address,
+ * while one started with `apiAddress: 127.0.0.1:9997` logs the host and refuses that same
+ * connection outright (`Couldn't connect to server`).
+ *
+ * ## What actually keeps it closed, and why the difference matters
+ *
+ * Not the bind. `authInternalUsers` ships two `any` users, and the second one — the only one
+ * carrying `action: api` — is fenced by `ips: ["127.0.0.1", "::1"]`. The same request is `200` over
+ * loopback and `401 {"status":"error","error":"authentication error"}` from the non-loopback
+ * address, on one instance, in one run.
+ *
+ * That is an **authorisation** fence, not a bind fence, and the two fail differently. A deployment
+ * that adds an internal user with an `api` permission and the default empty `ips: []`, or that
+ * points `authHTTPAddress` at its own service, has the control API answering the whole network on
+ * every interface with nothing in the address line to warn it — and this API is not read-only:
+ * `POST /v3/config/paths/add` creates paths, which is how the schema below was captured. The old
+ * sentence would have told that reader the port was already safe.
+ *
+ * `MEDIA_API_URL` must therefore be an address the room reaches over a network the operator
+ * controls. `env.ts` carries the same correction at its own entry.
  */
 
 import type { MtxStream } from './mtx-streams';
@@ -51,6 +82,20 @@ import type { MtxStream } from './mtx-streams';
  * `bytesReceived` and `bytesSent`. The live pair is `available`/`availableTime`, with
  * `online`/`onlineTime` beside it — the same rename that turned `runOnReady` into `runOnAvailable`.
  * Reading `ready` would work today and silently stop working, which is the worst failure shape.
+ *
+ * Both halves of that were confirmed against v1.20.1 on 2026-08-31 rather than left on the spec's
+ * word. The rename: the shipped `mediamtx.yml` contains `runOnAvailable`, `runOnAvailableRestart`
+ * and `runOnUnavailable`, and **zero** occurrences of `runOnReady` or `runOnNotReady`. The
+ * coexistence: a path created with `POST /v3/config/paths/add` and no publisher reports
+ *
+ * ```json
+ * { "name": "room7301-screen1", "ready": false, "readyTime": null,
+ *   "available": false, "availableTime": null, "online": false, "onlineTime": null,
+ *   "source": null, "tracks": [], "readers": [], "bytesReceived": 0, "bytesSent": 0 }
+ * ```
+ *
+ * — the deprecated pair still present and still agreeing, which is exactly the condition under
+ * which reading `ready` looks correct right up to the release that removes it.
  */
 export interface MtxPath {
   name?: unknown;

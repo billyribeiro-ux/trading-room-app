@@ -41,13 +41,26 @@ import { codeOf } from '#lib/source-comments.js';
 const read = (file: string) =>
   readFileSync(new URL(`./components/${file}`, import.meta.url), 'utf8');
 
-const FILES = ['RoomSidebar.svelte', 'RoomNavbar.svelte'] as const;
+/*
+  `NavbarTipButton.svelte` and not `RoomNavbar.svelte` since 2026-08-31: the navbar's copy was
+  extracted there, and the rule this file states — ONE render per file — is about the file that
+  draws the markup. Pointing it at the host would assert nothing, because a host that delegates
+  draws the tip zero times and `expect(0).toBe(1)` is how that showed up.
+*/
+const FILES = ['RoomSidebar.svelte', 'NavbarTipButton.svelte'] as const;
 
 describe('the tip button renders once per file, and never twice in either', () => {
   it('reads both components at all', () => {
-    /* The vacuity floor: every count below is a search over these two strings. */
+    /*
+      The vacuity floor: every count below is a search over these two strings.
+
+      A LENGTH is the wrong floor and this is why it is not one any more. It was `> 5_000`, chosen
+      when both files were whole components; `NavbarTipButton.svelte` is 2,731 bytes because it is
+      the extraction itself, and a byte count would have failed a file that is exactly right. What
+      the counts below actually need is that the SUBJECT is present — so that is what is asserted.
+    */
     for (const file of FILES) {
-      expect(read(file).length, `${file} is empty or moved`).toBeGreaterThan(5_000);
+      expect(read(file), `${file} is empty or moved`).toContain('tip.visible');
     }
   });
 

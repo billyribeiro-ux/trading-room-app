@@ -72,23 +72,129 @@ async fn force_rls_count(pool: &PgPool) -> i64 {
     .expect("count FORCE RLS tables")
 }
 
-async fn has_table_privilege(pool: &PgPool, table: &str, privilege: &str) -> bool {
-    sqlx::query_scalar("SELECT has_table_privilege('ptr_clone_app', $1, $2)")
+/// Whether a role exists at all.
+///
+/// `has_table_privilege` takes a role NAME and errors — it does not answer `false` — when no such
+/// role exists. So every assertion below about what `ptr_clone_app` may not do stops being an
+/// assertion the moment that role is retired, and starts being a panic.
+///
+/// `0010_retire_ptr_clone_app.sql` revokes every privilege the baseline role holds in the database
+/// it runs on and deliberately does NOT drop the role, because a dropped cluster-global role is not
+/// convergent — `migration_reappliability.rs` is where that was measured. So on an ordinary cluster
+/// the role is still present here and the branch below is not taken.
+///
+/// It is taken on the end state the migration documents: once a cluster will take no further new
+/// databases, an operator may finish the retirement with `DROP ROLE ptr_clone_app`. Guarding for
+/// that is not speculative — it is the difference between this file asserting on that cluster and
+/// panicking on it.
+async fn role_exists(pool: &PgPool, role: &str) -> bool {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = $1)")
+        .bind(role)
+        .fetch_one(pool)
+        .await
+        .unwrap_or_else(|error| panic!("look up role {role}: {error}"))
+}
+
+/// `server_version_num` — 160013 for PostgreSQL 16.13, 170000 and up for 17.
+///
+/// Read rather than assumed because the privilege list below is not the same on both, and the
+/// difference is not cosmetic: `has_table_privilege` RAISES on a privilege name the server does not
+/// know, so a version-blind list turns one absent keyword into a panic that hides every other
+/// assertion in this test.
+async fn server_version_num(pool: &PgPool) -> i32 {
+    sqlx::query_scalar("SELECT current_setting('server_version_num')::int")
+        .fetch_one(pool)
+        .await
+        .expect("read server_version_num")
+}
+
+/// PostgreSQL 17 introduced the `MAINTAIN` privilege (VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH).
+const MAINTAIN_MINIMUM_VERSION: i32 = 170_000;
+
+/// Whether this server knows `MAINTAIN` at all, asserted rather than inferred from the version.
+///
+/// ── WHY BOTH HALVES ARE CHECKED ──────────────────────────────────────────────────────────────
+///
+/// `services/compose.yml` pins `postgres:17`, so `MAINTAIN` is a privilege the deployed server has
+/// and `ptr_clone_app` must not hold it. A developer cluster may be older — this test first ran
+/// against 16.13 on 2026-08-31 and died with *"unrecognized privilege type: MAINTAIN"*, taking the
+/// other 21 privilege assertions with it.
+///
+/// Dropping the keyword on an old server would be a silent skip, and a silent skip on the privilege
+/// with the widest blast radius is the shape this repository refuses. So the old branch asserts the
+/// REASON it is skipping: that the server genuinely does not know the name. If a future PostgreSQL
+/// renumbers or renames it, this fails on the mismatch instead of quietly stopping checking.
+async fn maintain_is_supported(pool: &PgPool, role: &str, table: &str) -> bool {
+    let supported = server_version_num(pool).await >= MAINTAIN_MINIMUM_VERSION;
+
+    let probe: Result<bool, sqlx::Error> =
+        sqlx::query_scalar("SELECT has_table_privilege($1, $2, 'MAINTAIN')")
+            .bind(role)
+            .bind(table)
+            .fetch_one(pool)
+            .await;
+
+    match (supported, &probe) {
+        (true, Ok(_)) => true,
+        (false, Err(error)) => {
+            let code = error
+                .as_database_error()
+                .and_then(|database_error| database_error.code())
+                .map(|code| code.into_owned());
+            assert_eq!(
+                code.as_deref(),
+                Some("22023"),
+                "a server below {MAINTAIN_MINIMUM_VERSION} must reject MAINTAIN as an invalid \
+                 parameter value; got {error}"
+            );
+            false
+        }
+        (true, Err(error)) => panic!(
+            "this server reports {MAINTAIN_MINIMUM_VERSION}+ but does not know MAINTAIN: {error}"
+        ),
+        (false, Ok(_)) => panic!(
+            "this server is below {MAINTAIN_MINIMUM_VERSION} and knows MAINTAIN anyway; the \
+             version gate above is wrong and would skip a real privilege on some cluster"
+        ),
+    }
+}
+
+/// The role is a PARAMETER now, and that is the whole point of this file after `0010`.
+///
+/// Both helpers named `ptr_clone_app` in their SQL until 2026-08-31, from when it was the only role
+/// with grants. `0009` mirrored the reviewed surface onto `tradingroom_app` and `0010` revoked the
+/// baseline role's copy, so a hardcoded name now asks the wrong question twice over: it asserts the
+/// runtime surface against a role that no longer has it, and never asserts it against the role that
+/// does. Measured on a live cluster after the whole chain: `tradingroom_app` holds exactly
+/// `enterprises.id: SELECT` at column scope, and `ptr_clone_app` holds none of the four privileges
+/// on any column of the three tables below.
+async fn has_table_privilege(pool: &PgPool, role: &str, table: &str, privilege: &str) -> bool {
+    sqlx::query_scalar("SELECT has_table_privilege($1, $2, $3)")
+        .bind(role)
         .bind(table)
         .bind(privilege)
         .fetch_one(pool)
         .await
-        .unwrap_or_else(|error| panic!("inspect {privilege} on {table}: {error}"))
+        .unwrap_or_else(|error| panic!("inspect {privilege} on {table} for {role}: {error}"))
 }
 
-async fn has_column_privilege(pool: &PgPool, table: &str, column: &str, privilege: &str) -> bool {
-    sqlx::query_scalar("SELECT has_column_privilege('ptr_clone_app', $1, $2, $3)")
+async fn has_column_privilege(
+    pool: &PgPool,
+    role: &str,
+    table: &str,
+    column: &str,
+    privilege: &str,
+) -> bool {
+    sqlx::query_scalar("SELECT has_column_privilege($1, $2, $3, $4)")
+        .bind(role)
         .bind(table)
         .bind(column)
         .bind(privilege)
         .fetch_one(pool)
         .await
-        .unwrap_or_else(|error| panic!("inspect {privilege} on {table}.{column}: {error}"))
+        .unwrap_or_else(|error| {
+            panic!("inspect {privilege} on {table}.{column} for {role}: {error}")
+        })
 }
 
 fn assert_insufficient_privilege(error: sqlx::Error, operation: &str) {
@@ -754,6 +860,80 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
     let owner = scratch.pool().await;
     migrate::run(&owner).await.expect("migrations apply");
 
+    // ── WHOSE PRIVILEGES THIS TEST IS ABOUT, AND WHY THAT CHANGED ────────────────────────────
+    //
+    // Both. `0006_restrict_runtime_object_privileges.sql` cut `ptr_clone_app` down to a reviewed
+    // column-scoped surface, and until 2026-08-31 this test asserted that surface against that role,
+    // because it was the only role holding anything.
+    //
+    // `0009` mirrored every one of those grants at COLUMN precision onto `tradingroom_app` — the
+    // role the API actually authenticates as, and the one this test's own name means by "runtime" —
+    // and `0010_retire_ptr_clone_app.sql` then revoked the baseline role's copy. So the reviewed
+    // surface moved, and asserting it against the old name would assert it of a role that no longer
+    // has it while never checking the role that does.
+    //
+    // Two claims now, and the second is the retirement's own:
+    //
+    //   `tradingroom_app`  holds EXACTLY the reviewed surface
+    //   `ptr_clone_app`    holds NOTHING — not a relation-wide privilege, not a column ACL
+    //
+    // Measured against a live cluster with the whole chain applied on 2026-08-31: `tradingroom_app`
+    // holds `enterprises.id: SELECT` at column scope and nothing else on these three tables;
+    // `ptr_clone_app` holds none of the four privileges on any of their columns.
+    const RUNTIME_ROLE: &str = "tradingroom_app";
+    const BASELINE_ROLE: &str = "ptr_clone_app";
+
+    // The baseline role may also be GONE, and that is stronger still. `0010` leaves it in place —
+    // dropping a cluster-global role is not convergent, see `migration_reappliability.rs` — but the
+    // migration documents an operator `DROP ROLE` for a cluster that will take no further new
+    // databases. `has_table_privilege` ERRORS on an unknown role rather than answering false, so the
+    // baseline half is asked only when there is something to ask about.
+    let baseline_present = role_exists(&owner, BASELINE_ROLE).await;
+    assert!(
+        role_exists(&owner, RUNTIME_ROLE).await,
+        "the runtime role is absent; this database has no application identity at all, which \
+         0009 provisions and 0010's interlock exists to protect"
+    );
+
+    // No relation-wide privilege may mask the reviewed column ACLs, for either role. DELETE,
+    // TRUNCATE, TRIGGER and MAINTAIN have no column-scoped form and remain denied.
+    //
+    // MAINTAIN is checked only where the server has it — see `maintain_is_supported`, which asserts
+    // the reason rather than skipping quietly. `services/compose.yml` pins `postgres:17`, so the
+    // deployed server always takes the first branch; a 16.x developer cluster takes the second and
+    // this test still checks the other seven.
+    const RELATION_WIDE: [&str; 7] = [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER",
+    ];
+    let maintain = maintain_is_supported(&owner, RUNTIME_ROLE, "public.enterprises").await;
+
+    let roles: Vec<&str> = if baseline_present {
+        vec![RUNTIME_ROLE, BASELINE_ROLE]
+    } else {
+        vec![RUNTIME_ROLE]
+    };
+
+    for role in &roles {
+        for table in ["public.enterprises", "public.users", "public.audit_log"] {
+            for privilege in RELATION_WIDE
+                .iter()
+                .copied()
+                .chain(maintain.then_some("MAINTAIN"))
+            {
+                assert!(
+                    !has_table_privilege(&owner, role, table, privilege).await,
+                    "{role} unexpectedly has relation-wide {privilege} on {table}"
+                );
+            }
+        }
+    }
+
     let enterprise_columns = ["id", "name", "slug", "settings", "created_at", "updated_at"];
     let user_columns = [
         "id",
@@ -772,48 +952,32 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
         "is_guest",
         "guest_created_in_room_id",
     ];
-    let audit_columns = [
-        "id",
-        "enterprise_id",
-        "room_id",
-        "actor_user_id",
-        "actor_name",
-        "event_name",
-        "event_detail",
-        "target_type",
-        "target_id",
-        "metadata",
-        "created_at",
-        "updated_at",
-    ];
-
-    // No relation-wide privilege may mask the reviewed column ACLs. DELETE,
-    // TRUNCATE, TRIGGER and MAINTAIN have no column-scoped form and remain denied.
-    for table in ["public.enterprises", "public.users", "public.audit_log"] {
-        for privilege in [
-            "SELECT",
-            "INSERT",
-            "UPDATE",
-            "DELETE",
-            "TRUNCATE",
-            "REFERENCES",
-            "TRIGGER",
-            "MAINTAIN",
-        ] {
-            assert!(
-                !has_table_privilege(&owner, table, privilege).await,
-                "ptr_clone_app unexpectedly has relation-wide {privilege} on {table}"
-            );
-        }
-    }
-
     for column in enterprise_columns {
         for privilege in ["SELECT", "INSERT", "UPDATE", "REFERENCES"] {
             let expected = privilege == "SELECT" && column == "id";
             assert_eq!(
-                has_column_privilege(&owner, "public.enterprises", column, privilege).await,
+                has_column_privilege(
+                    &owner,
+                    RUNTIME_ROLE,
+                    "public.enterprises",
+                    column,
+                    privilege
+                )
+                .await,
                 expected,
-                "unexpected {privilege} ACL on enterprises.{column}"
+                "unexpected {privilege} ACL on enterprises.{column} for {RUNTIME_ROLE}"
+            );
+            assert!(
+                !baseline_present
+                    || !has_column_privilege(
+                        &owner,
+                        BASELINE_ROLE,
+                        "public.enterprises",
+                        column,
+                        privilege
+                    )
+                    .await,
+                "{BASELINE_ROLE} still holds {privilege} on enterprises.{column} after 0010"
             );
         }
     }
@@ -850,9 +1014,21 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
                 _ => false,
             };
             assert_eq!(
-                has_column_privilege(&owner, "public.users", column, privilege).await,
+                has_column_privilege(&owner, RUNTIME_ROLE, "public.users", column, privilege).await,
                 expected,
-                "unexpected {privilege} ACL on users.{column}"
+                "unexpected {privilege} ACL on users.{column} for {RUNTIME_ROLE}"
+            );
+            assert!(
+                !baseline_present
+                    || !has_column_privilege(
+                        &owner,
+                        BASELINE_ROLE,
+                        "public.users",
+                        column,
+                        privilege
+                    )
+                    .await,
+                "{BASELINE_ROLE} still holds {privilege} on users.{column} after 0010"
             );
         }
     }
@@ -869,19 +1045,49 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
         "metadata",
     ];
 
+    let audit_columns = [
+        "id",
+        "enterprise_id",
+        "room_id",
+        "actor_user_id",
+        "actor_name",
+        "event_name",
+        "event_detail",
+        "target_type",
+        "target_id",
+        "metadata",
+        "created_at",
+        "updated_at",
+    ];
+
     for column in audit_columns {
         for privilege in ["SELECT", "INSERT", "UPDATE", "REFERENCES"] {
             let expected = privilege == "INSERT" && AUDIT_INSERT.contains(&column);
             assert_eq!(
-                has_column_privilege(&owner, "public.audit_log", column, privilege).await,
+                has_column_privilege(&owner, RUNTIME_ROLE, "public.audit_log", column, privilege)
+                    .await,
                 expected,
-                "unexpected {privilege} ACL on audit_log.{column}"
+                "unexpected {privilege} ACL on audit_log.{column} for {RUNTIME_ROLE}"
+            );
+            assert!(
+                !baseline_present
+                    || !has_column_privilege(
+                        &owner,
+                        BASELINE_ROLE,
+                        "public.audit_log",
+                        column,
+                        privilege
+                    )
+                    .await,
+                "{BASELINE_ROLE} still holds {privilege} on audit_log.{column} after 0010"
             );
         }
     }
 
-    // Seed the smallest valid graph as the owner, then execute the reviewed SQL
-    // shape through a real ptr_clone_app connection.
+    // Seed the smallest valid graph as the owner, then execute the reviewed SQL shape through a
+    // real RUNTIME connection. `runtime_url()` has pointed at `tradingroom_app` since 2026-08-15;
+    // the comment here still said `ptr_clone_app`, which is the kind of stale name that makes a
+    // reader believe the wrong role is being exercised.
     let enterprise_id: Uuid =
         sqlx::query_scalar("INSERT INTO enterprises (name, slug) VALUES ($1, $2) RETURNING id")
             .bind("Privilege Fixture")
@@ -918,7 +1124,7 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
     let scratch_runtime_url = scratch_url(&runtime_url(), &scratch.name);
     let runtime = PgPool::connect(&scratch_runtime_url)
         .await
-        .expect("connect to scratch database as ptr_clone_app");
+        .expect("connect to scratch database as the runtime role");
     let runtime_db = Db::connect(&scratch_runtime_url, 1, limits::DB_ACQUIRE_TIMEOUT)
         .await
         .expect("construct the runtime database boundary");

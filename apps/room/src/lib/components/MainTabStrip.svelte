@@ -32,12 +32,31 @@
     is a real leak of what a room has paid for. `main-tab-strip-contract.test.ts` renders rather
     than greps for exactly that reason.
 
+    ## `z('hidden', o.hideScreens)` on the Screens `<li>` is NOT reproduced, and it was measured
+
+    Byte 2,016,417. The flag it reads can never be true: `hideScreens` occurs THREE times in the
+    whole 2,891,205-byte bundle — `this.hideScreens=!1` in the constructor (1,954,414) and the two
+    template reads (2,016,430 and 2,017,196, the tab and its pane). Its four siblings are all
+    assigned in `ngOnInit` — `hideNotes`, `hideFiles`, `hasSwingTradeAlerts`, `hasDayTradeAlerts`,
+    `hideStreams`, at 1,955,678 — and `hideScreens` is not among them. Nothing writes it, ever. A
+    prop and a `hidden` binding here would be a gate no caller could ever open, which is the
+    "nothing exists without a consumer" rule pointed the other way.
+
+    Two further departures — the absent `Recordings` tab and the fact that `aria-selected` is
+    DERIVED here where the capture hardcodes it on all eight anchors — are argued where they are
+    enforced, in `main-tab-strip-gates.svelte.test.ts`.
+
     ## What it does NOT decide
 
     Every gate arrives already decided. Nothing here reads `sessData`, opens a device or starts a
     stream; `mainTab` is the only value it writes, and it is `$bindable` because that is what a tab
     strip is for.
+
+    Every anchor's `tabindex={mainTab === … ? 0 : -1}` is a ROVING tabindex and the `0` half is
+    load-bearing: it read `? undefined : -1` until 2026-08-31, which left every one of the seven
+    `onkeydown` handlers below unreachable. Same file, same reason.
   */
+  import TabGearMenu from '#lib/components/TabGearMenu.svelte';
   import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
   import type { RoomFiles } from '#lib/room/files.svelte.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
@@ -100,7 +119,7 @@
       id="screens-tab"
       class={['nav-link', { active: mainTab === 'screens' }]}
       role="tab"
-      tabindex={mainTab === 'screens' ? undefined : -1}
+      tabindex={mainTab === 'screens' ? 0 : -1}
       aria-controls="screens"
       aria-selected={mainTab === 'screens'}
       data-bs-toggle="tab"
@@ -126,7 +145,7 @@
       id="streams-tab"
       class={['nav-link', { active: mainTab === 'streams' }]}
       role="tab"
-      tabindex={mainTab === 'streams' ? undefined : -1}
+      tabindex={mainTab === 'streams' ? 0 : -1}
       aria-controls="streams"
       aria-selected={mainTab === 'streams'}
       data-bs-toggle="tab"
@@ -148,7 +167,7 @@
       id="notes-tab"
       class={['nav-link presAreaTabs-notes', { active: mainTab === 'notes' }]}
       role="tab"
-      tabindex={mainTab === 'notes' ? undefined : -1}
+      tabindex={mainTab === 'notes' ? 0 : -1}
       aria-controls="notes"
       aria-selected={mainTab === 'notes'}
       data-bs-toggle="tab"
@@ -162,30 +181,24 @@
         <div>
           <i id="noteChangeIndicator" class="fas fa-edit"></i><span class="mx-1">Notes</span>
         </div>
-        <div class="dropdown">
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <span
-            id="dropdownMenuNotes"
-            data-bs-toggle="dropdown"
-            aria-expanded={menus.notes}
-            class="dropdown-toggle"
-            onclick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              menus.toggle('notes');
-            }}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') menus.toggle('notes');
-            }}
-          >
-            <i class="fas fa-cog"></i>
-          </span>
-          <ul
-            aria-labelledby="dropdownMenuButton"
-            class={['dropdown-menu', { show: menus.notes }]}
-            {@attach (menu: HTMLUListElement) => notes.mountNewNoteLink(menu)}
-          ></ul>
-        </div>
+        <!--
+          `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)` — byte 2,016,713 — is
+          the gate this cog is missing, and it cannot be applied from here: `canEditNotes` is the
+          VIEWER's own capability and no prop of this component carries it. `RoomNotes.requestNewNote`
+          already refuses on `noteGates().editorMounted`, so pressing it does nothing for a member
+          who may not author — but a control whose only effect is nothing is exactly what the
+          reference declines to draw. The one-line repair is on the call site in
+          `PresentationArea.svelte`, and `main-tab-strip-gates.svelte.test.ts` names it.
+        -->
+        <TabGearMenu
+          id="dropdownMenuNotes"
+          labelledBy="dropdownMenuButton"
+          wrapperClass="dropdown"
+          menu="notes"
+          {menus}
+          onselecttab={() => (mainTab = 'notes')}
+          mountItem={(list) => notes.mountNewNoteLink(list)}
+        />
       </div>
     </a>
   </li>
@@ -221,7 +234,7 @@
         role="tab"
         aria-controls="videoplayer"
         aria-selected={mainTab === 'videoplayer'}
-        tabindex={mainTab === 'videoplayer' ? undefined : -1}
+        tabindex={mainTab === 'videoplayer' ? 0 : -1}
         onclick={() => (mainTab = 'videoplayer')}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') mainTab = 'videoplayer';
@@ -254,7 +267,7 @@
         role="tab"
         aria-controls="swingAlerts"
         aria-selected={mainTab === 'swingAlerts'}
-        tabindex={mainTab === 'swingAlerts' ? undefined : -1}
+        tabindex={mainTab === 'swingAlerts' ? 0 : -1}
         onclick={() => (mainTab = 'swingAlerts')}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') mainTab = 'swingAlerts';
@@ -292,7 +305,7 @@
         role="tab"
         aria-controls="dayTradeAlerts"
         aria-selected={mainTab === 'dayTradeAlerts'}
-        tabindex={mainTab === 'dayTradeAlerts' ? undefined : -1}
+        tabindex={mainTab === 'dayTradeAlerts' ? 0 : -1}
         onclick={() => (mainTab = 'dayTradeAlerts')}
         onkeydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') mainTab = 'dayTradeAlerts';
@@ -323,7 +336,7 @@
     <a
       class={['nav-link', { active: mainTab === 'files' }]}
       role="tab"
-      tabindex={mainTab === 'files' ? undefined : -1}
+      tabindex={mainTab === 'files' ? 0 : -1}
       aria-controls="files"
       aria-selected={mainTab === 'files'}
       data-bs-toggle="tab"
@@ -335,36 +348,22 @@
     >
       <div class="d-flex align-items-center">
         <div><i class="fas fa-folder"></i><span class="mx-1">Files</span></div>
-        <div>
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <span
+        <!--
+          `O(35, o.isP ? 35 : -1)` — byte 2,017,076 — and `{#if}` rather than `hidden` because `-1`
+          is `ɵɵconditional`'s "instantiate nothing". This cog opens the room's file-upload dialog
+          (`RoomNotes.mountUploadFileLink`), so a member was being shown the presenter's uploader; it
+          did nothing they were entitled to do and told them the room could.
+        -->
+        {#if isPresenter}
+          <TabGearMenu
             id="dropdownMenuFiles"
-            data-bs-toggle="dropdown"
-            aria-expanded={menus.files}
-            class="dropdown-toggle"
-            onclick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              mainTab = 'files';
-              menus.set('notes', false);
-              menus.toggle('files');
-            }}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                mainTab = 'files';
-                menus.set('notes', false);
-                menus.toggle('files');
-              }
-            }}
-          >
-            <i class="fas fa-cog"></i>
-          </span>
-          <ul
-            aria-labelledby="dropdownMenuFiles"
-            class={['dropdown-menu', { show: menus.files }]}
-            {@attach (menu: HTMLUListElement) => notes.mountUploadFileLink(menu)}
-          ></ul>
-        </div>
+            labelledBy="dropdownMenuFiles"
+            menu="files"
+            {menus}
+            onselecttab={() => (mainTab = 'files')}
+            mountItem={(list) => notes.mountUploadFileLink(list)}
+          />
+        {/if}
       </div>
     </a>
   </li>

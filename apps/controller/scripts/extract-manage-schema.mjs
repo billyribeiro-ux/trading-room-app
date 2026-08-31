@@ -406,7 +406,23 @@ const ROOM_CONSUMED = [
      byte 2,477,770 reads sessData dotted onto the name AND a separate local flag of the same name,
      plus mic state and recording state. The room already has the local flag and already renders the
      banner; the policy term was the missing half, so an owner could not switch the reminder off. */
-  'recordingReminder'
+  'recordingReminder',
+  /* "OffTopic Channels/Tabs" - whether the room HAS an Off Topic channel at all.
+
+     The 105th, added 2026-08-31, and it is a DEFECT closed rather than a feature added. The
+     reference builds its whole tab strip in one expression and only `main` is unconditional there;
+     Off Topic sits behind this flag (bundle bytes 1,146,625-1,147,200). This room shipped both
+     built-ins unconditionally, so a room whose owner had turned Off Topic OFF still showed it - a
+     control nobody asked for, the mirror of the dead-control rule.
+
+     It was never an argued divergence and was never noticed: `hasChannelTabs` had zero occurrences
+     anywhere in apps/room/src. It was found by widening `audit-setting-coverage.mjs`, whose
+     `sessData.<name>` rule returned zero for six settings the reference reads inside
+     `processSessData`, before the object is `sessData` at all.
+
+     ABSENT MEANS TRUE, decided once in chat-tabs.ts: the captured default is on, and reading
+     absence as false would remove the tab from every room that has never stored the setting. */
+  'hasChannelTabs'
 ];
 
 /**
@@ -984,9 +1000,16 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // as SC-12 (the textarea never seeded) and SC-13 (the write going to a per-viewer preference that
 // nothing read), and the setting turned out to be the thing both halves were missing.
 //
+//
+// 105 since 2026-08-31: `hasChannelTabs`. Thirty-sixth find, and the first that is a DEFECT rather
+// than a gap — this room was rendering an Off Topic tab for owners who had switched it off. Not from
+// the settings enumeration either: `audit-setting-coverage.mjs` could not see it, because its
+// `sessData.<name>` rule misses every read the reference takes inside `processSessData` while the
+// object is still a local. Six settings were invisible that way; this was the one already half-built.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 104 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 105 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

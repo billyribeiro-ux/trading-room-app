@@ -47,6 +47,21 @@ function bodyOf(name: string): string {
   ROTATES the ingest credential, which is a mutation whatever the verb suggests.
 */
 const WRITERS = [
+  /*
+    `reportRoomOccupancy` — added 2026-08-31, and the one caller in this file with NO person behind
+    it.
+
+    Every other writer carries out a presenter's decision and names the member who made it. This one
+    is the room process reporting its own subscriber count so `recorded_max_capacity` can be a real
+    high-water mark instead of a column nothing writes (evidence gap T5-20). There is no member to
+    name and the controller's endpoint asks for none.
+
+    A WRITER all the same, and the list is where that gets decided rather than inherited: it moves a
+    stored number, so a capability minted to READ a room's configuration must not authorise it. It is
+    also the only caller here that does not THROW on failure — see its own docblock for why a report
+    with no decision behind it must not turn a control-plane outage into a member failing to join.
+  */
+  'reportRoomOccupancy',
   'writeRoomSetting',
   'writeRoomPermissions',
   'writeRoomBan',

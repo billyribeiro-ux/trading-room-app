@@ -51,7 +51,7 @@ import {
  * room's alert stream by guessing the path. That matters more here than on a form action - this
  * endpoint pushes every alert the moment it is posted.
  */
-export const GET: RequestHandler = async ({ params, locals, request }) => {
+export const GET: RequestHandler = async ({ params, locals, request, getClientAddress }) => {
   // Throws for an unauthenticated request rather than opening an anonymous firehose.
   const user = requireUser(locals);
   /*
@@ -220,7 +220,30 @@ export const GET: RequestHandler = async ({ params, locals, request }) => {
         roster entry deliberately: `RosterUser` is what the roster RENDERS and it is published to
         every other member, so a channel list on it would travel to the room as roster data.
       */
-        chatChannels
+        chatChannels,
+        /*
+        THE SERVER'S OWN OBSERVATION OF THIS CONNECTION, and a FOURTH argument for the same reason
+        `chatChannels` is a third: `RosterUser` is published to every other member, so an address on
+        it would travel to the whole room as roster data. This goes to the hub and is read back only
+        by `liveConnectionFor`, behind `user-detail.remote.ts`'s presenter gate.
+
+        Both come from the request, never from the client's own account of itself. A page cannot
+        learn its own public address, and a `User-Agent` a browser reports about itself is a string
+        it chose — which is the whole reason the reference asks its SERVER, holding the socket,
+        rather than asking the member.
+
+        Read once per CONNECTION, not per message, like the membership above it.
+      */
+        {
+          address: getClientAddress(),
+          /*
+            Bounded and normalised at the boundary. `User-Agent` is attacker-controlled text that
+            ends up in a presenter's table cell: unbounded it is a payload, absent it is `null`
+            rendering as the string "null". 512 is well past every real agent string and short
+            enough that the cell stays a cell.
+          */
+          userAgent: (request.headers.get('user-agent') ?? '').slice(0, 512) || 'unknown'
+        }
       );
 
       /*

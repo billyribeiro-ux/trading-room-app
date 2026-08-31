@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { removeScheduledAlertQuestion } from '#lib/scheduled-alert-table.js';
   import { REPEAT_MODES, REPEAT_MODE_LABEL, type RepeatMode } from '#lib/scheduled-alert.js';
-  import { shortWhen } from '#lib/short-when.js';
+  import ScheduledAlertsTable from './ScheduledAlertsTable.svelte';
   import {
     listScheduledAlerts,
     removeScheduledAlert,
@@ -158,6 +159,19 @@
     }
   }
 
+  /**
+   * SCH-01 — Remove ASKS, and it quotes the alert it is about to destroy.
+   *
+   * `onconfirm` is the room's own dialog primitive, the same one PAM-11 uses two functions up and for
+   * the same recorded reason: this pane does not own the dialog stack. The question itself is
+   * `#lib/scheduled-alert-table.ts`, where the capture's punctuation is argued and pinned.
+   */
+  function requestRemove(row: { id: number; senderName: string; body: string }) {
+    onconfirm(removeScheduledAlertQuestion(row.senderName, row.body), () => {
+      void remove(row.id);
+    });
+  }
+
   async function remove(id: number) {
     try {
       await removeScheduledAlert({ id });
@@ -166,9 +180,6 @@
       problem = error instanceof Error ? error.message : 'The alert could not be removed.';
     }
   }
-
-  /** `{{ sendOn | date:'short' }}` in the reference's own table. */
-  const shortDate = (epochMs: number) => shortWhen.format(new Date(epochMs));
 </script>
 
 <section class="scheduler">
@@ -245,30 +256,7 @@
     {#if pending.length === 0}
       <p class="empty">Nothing is scheduled.</p>
     {:else}
-      <div class="scroll">
-        <table>
-          <thead>
-            <tr><th>Sends</th><th>By</th><th>Alert</th><th>Repeat</th><th></th></tr>
-          </thead>
-          <tbody>
-            {#each pending as row (row.id)}
-              <tr>
-                <td>{shortDate(row.sendOn)}</td>
-                <td>{row.senderName}</td>
-                <td class="body">{row.body}</td>
-                <td>
-                  {row.repeat || 'off'}
-                  <!-- The reference shows this badge only for a daily series that skips weekends. -->
-                  {#if row.repeat === 'daily' && row.ignoreWeekends}
-                    <span class="badge">no weekends</span>
-                  {/if}
-                </td>
-                <td><button type="button" onclick={() => remove(row.id)}>Remove</button></td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+      <ScheduledAlertsTable rows={pending} onremove={requestRemove} />
     {/if}
   {/if}
 </section>
@@ -327,30 +315,5 @@
     margin: 0;
     font-size: 0.8rem;
     opacity: 0.7;
-  }
-  /* Wide content scrolls inside its own container so the modal never scrolls sideways. */
-  .scroll {
-    overflow-x: auto;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-  }
-  th,
-  td {
-    text-align: left;
-    padding: 0.2rem 0.4rem;
-    border-bottom: 1px solid rgb(0 0 0 / 0.08);
-  }
-  .body {
-    max-width: 18rem;
-    overflow-wrap: anywhere;
-  }
-  .badge {
-    padding: 0 0.3rem;
-    border-radius: 3px;
-    background: #f0c040;
-    font-size: 0.7rem;
   }
 </style>

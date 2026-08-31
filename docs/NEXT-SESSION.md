@@ -245,6 +245,15 @@ That is the real work between here and selling this — not the hosting choice.
 **Open sub-questions:** whether Postgres stays managed or moves self-hosted; whether the marketing
 site stays on Vercel or consolidates onto owned infrastructure.
 
+> **On the first of those, this document also carries a RECOMMENDATION**, in *"What should NOT
+> move"* under §4d — *"PostgreSQL stays managed … the one tier where paying for someone else's
+> on-call is straightforwardly worth it"*. That is a recommendation with its reasoning, not a
+> decision that has been taken, and the two passages were read as contradicting each other on
+> 2026-08-30 (`TODO.md` row G). They are cross-linked rather than reconciled here because striking
+> either is the owner's call. **Until one is struck, cite this line and not that one:** a
+> recommendation quoted as a settled fact is how row G was nearly narrowed on the strength of one
+> passage by a reader who had not seen the other.
+
 ---
 
 ## 4b. Hostnames and DNS — the plan
@@ -405,9 +414,15 @@ Neon ─────────────── PostgreSQL, stays managed
 
 ### What should NOT move
 
-**PostgreSQL stays managed.** Self-hosting saves perhaps €20/month and buys backups, point-in-time
-recovery, failover and a 3am pager. It is the system of record; this is the one tier where paying
-for someone else's on-call is straightforwardly worth it. Neon today; any managed Postgres later.
+**PostgreSQL stays managed — RECOMMENDED, not decided.** Self-hosting saves perhaps €20/month and
+buys backups, point-in-time recovery, failover and a 3am pager. It is the system of record; this is
+the one tier where paying for someone else's on-call is straightforwardly worth it. Neon today; any
+managed Postgres later.
+
+That is this document's recommendation and its whole argument for it. **§4a lists the same question
+as OPEN**, and `TODO.md` row G is the tracker. This heading says "should not move" and reads as
+settled, which is what made the two passages look like a contradiction; they are one recommendation
+and one open question, and the recommendation does not close the question.
 
 ### Sequencing — this matters more than the destination
 
@@ -429,7 +444,18 @@ something breaks you will not know which change caused it.
 
 ### One box or several?
 
-Start with one. Split when a measurement says to, not before:
+**This section answers a CAPACITY question, and it is not the only reason to split.** `TODO.md` row H
+argues for separating the media plane from the app tier on ISOLATION grounds — one box means a shared
+failure domain, a shared attack surface (roughly ten thousand open UDP ports beside your session
+cookies) and a shared lifecycle — and none of those is a symptom in the table below, because none of
+them is a measurement that arrives later. They are properties of the topology from the first day.
+
+The two were recorded as "opposite intents" until 2026-08-31. They are not opposite; they answer
+different questions, and this section had not noticed the other one. **Read the table as: when does
+capacity force a split. Read row H as: whether isolation requires one regardless.** The second is an
+owner decision and is still open.
+
+Start with one, on capacity. Split when a measurement says to, not before:
 
 | symptom | action |
 | --- | --- |

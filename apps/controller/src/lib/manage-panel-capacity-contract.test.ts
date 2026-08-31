@@ -177,9 +177,10 @@ describe('the panel title’s capacity readout', () => {
   });
 
   it('renders a zero high-water mark as 0 rather than hiding it', () => {
-    /* Nothing writes the mark yet (T5-20), so 0 is the honest value for every room today. It must
-       still render — a blank would read as "unknown", which is a different claim from "never
-       exceeded zero". */
+    /* 0 is what a room that has never had a subscriber reads, and since 2026-08-31 that is a real
+       observation rather than the absence of a writer: `internal/room-occupancy/[code]` raises the
+       mark on every new peak. It must still render — a blank would say "unknown", which is a
+       different claim from "never exceeded zero". */
     const html = title({ recordedMaxCapacity: 0, rosterCount: 7 });
     expect(html).toContain('0');
     expect(html).toContain('7');

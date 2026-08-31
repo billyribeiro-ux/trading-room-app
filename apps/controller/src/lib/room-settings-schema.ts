@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 104 of 269 are wired today.
+// nothing in the room reads it yet. 105 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -225,7 +225,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "strictBrowserMode", section: "settings", type: "checkbox", label: "Strict Browser?", help: "If YES, Only Chrome, Firefox, and Opera are allowed in (no try anyhow link)...", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "chatFloodDisabled", section: "settings", type: "checkbox", label: "Disable Chat Flood?", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "privMessageHugePopup", section: "settings", type: "checkbox", label: "Huge Priv Msg Alert?", help: "Some user can't see the private messages, this makes a HUGE popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "hasChannelTabs", section: "settings", type: "checkbox", label: "OffTopic Channels/Tabs", help: "This setting adds an OffTopic, channel tabs next to general chat", helpShape: "plain", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasChannelTabs", section: "settings", type: "checkbox", label: "OffTopic Channels/Tabs", help: "This setting adds an OffTopic, channel tabs next to general chat", helpShape: "plain", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "autoSwitchToOfftopics", section: "settings", type: "checkbox", label: "Auto switch to OffTopic Channels/Tabs?", help: "Auto Switch to OffTopic tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasAdminOnlyChannel", section: "settings", type: "checkbox", label: "Admin Channels/Tabs", help: "This setting adds an admin/presenter dedicated chat tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "extraAdminChannels", section: "settings", type: "textarea", label: "Extra Admin Channels", help: "Comma separated list of extra admin channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

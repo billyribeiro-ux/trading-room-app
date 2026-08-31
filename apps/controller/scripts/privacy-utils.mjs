@@ -26,7 +26,12 @@ export function findUnsafeRawEmails(content) {
   const unsafe = [];
   for (const match of content.matchAll(rawEmailPattern)) {
     const candidate = match[0];
-    if (isSafeTestEmail(candidate) || isAssetFilename(candidate, content, match.index)) continue;
+    if (
+      isSafeTestEmail(candidate) ||
+      isAssetFilename(candidate, content, match.index) ||
+      isUiRouterViewName(candidate, content, match.index)
+    )
+      continue;
     unsafe.push(candidate);
   }
   return unsafe;
@@ -39,7 +44,12 @@ export function countUnsafeRawEmails(content) {
 export function replaceUnsafeRawEmails(content, replacementFor) {
   let replacements = 0;
   const redacted = content.replace(rawEmailPattern, (candidate, offset, input) => {
-    if (isSafeTestEmail(candidate) || isAssetFilename(candidate, input, offset)) return candidate;
+    if (
+      isSafeTestEmail(candidate) ||
+      isAssetFilename(candidate, input, offset) ||
+      isUiRouterViewName(candidate, input, offset)
+    )
+      return candidate;
     replacements += 1;
     return replacementFor(candidate);
   });
@@ -91,6 +101,32 @@ function isSafeTestEmail(candidate) {
     domain === 'invalid' ||
     domain.endsWith('.invalid')
   );
+}
+
+/*
+  A ui-router VIEW NAME, which is `viewName@stateName` and is not an address.
+
+  AngularJS ui-router addresses a named view inside a named state by joining the two with an `@`, and
+  the manage bundle pinned at `evidence-dumps/manage-app-2026-08-31/` carries three of them from the
+  theme's demo mailbox screen. The email regex accepts them because the state segments after the last
+  dot are letters-only and long enough to pass for a TLD — nothing about the string ITSELF separates
+  one from a genuine address.
+
+  So the SYNTAX distinguishes it, not the string. All three occurrences sit immediately after
+  `views:{"`, which is the only place ui-router accepts this form, and there are exactly four
+  `views:{` in the file. A real address would have to be written as the first key of a `views` map to
+  slip through, and that is not a shape any leak takes.
+
+  DELIBERATELY NOT a domain allow-list. Adding `.mailbox` or `.list` to `isSafeTestEmail` would
+  exempt every address ending in those, everywhere in the repository, forever, to silence three
+  matches in one third-party minified file. This exempts a construct, in place, and nothing else.
+
+  NOTE FOR THE NEXT EDITOR: this file is scanned by the verifier that imports it, so a comment here
+  must not contain an address-shaped literal. That is why the paragraph above describes the shape
+  instead of showing one — the first draft did show one, and the verifier reported it.
+*/
+function isUiRouterViewName(candidate, content, offset) {
+  return content.slice(Math.max(0, offset - 8), offset) === 'views:{"';
 }
 
 function isAssetFilename(candidate, content, offset) {

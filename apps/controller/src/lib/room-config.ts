@@ -958,6 +958,31 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'chatTabsWithBadges',
   /*
+    "OffTopic Channels/Tabs" — whether the room HAS an Off Topic channel at all.
+
+    Added 2026-08-31, and it closes a divergence nobody had decided. The reference builds its whole
+    tab list in one function, and the Off Topic tab is conditional there:
+
+      chatTabs = []
+      chatTabs.push(altGenChannelName ? {displayName: altGenChannelName, name:"main", type:"r"}
+                                      : {displayName:"Main Chat", name:"main", type:"r"})
+      hasChannelTabs && chatTabs.push(altOffTopicChannelName
+                                      ? {displayName: altOffTopicChannelName, name:"offTopic", type:"r"}
+                                      : {displayName:"Off Topic", name:"offTopic", type:"r"})
+      …                                                        // bundle bytes 1,146,625-1,147,200
+
+    This room shipped both built-ins UNCONDITIONALLY, so a room whose owner had turned the setting
+    OFF still showed the tab — a control nobody asked for, which is the mirror of the dead-control
+    rule the root standard forbids. It was never an argued divergence: `hasChannelTabs` had zero
+    occurrences anywhere in `apps/room/src`.
+
+    It crosses as a plain boolean because the room cannot infer it. **Absent means TRUE**, which is
+    the captured default in `room-settings-profile.ts:55` and what every existing room has been
+    behaving as — so wiring it removes nobody's tab and only starts honouring the owner who turned
+    it off. `#lib/chat-tabs.ts` carries that argument at the code.
+  */
+  'hasChannelTabs',
+  /*
     "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with it.
 
     THREE behaviours behind one checkbox, read from six sites. It forces the display mode to compact

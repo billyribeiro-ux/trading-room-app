@@ -1,8 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 
+import type { UserDetail } from '../user-detail-shape';
+
 import { db } from './db';
 import { messages, users } from './db/schema';
-import { roomRoster } from './room-events';
+import { liveConnectionFor, roomRoster } from './room-events';
 
 /*
   The two rows of the user modal that no client has ever been able to fill: Last Login, and the
@@ -44,6 +46,30 @@ import { roomRoster } from './room-events';
   with no invalidation (byte 990,107), so a presenter who opens a member's card twice in a session
   sees the first answer both times. Not copied: this returns the row.
 
+  ## The five System-tab cells, and why only two of them are filled here
+
+  `ModalHost.svelte` renders `targetUser.ip`, `.userAgent`, `.appVersion`, `.streamServer` and
+  `.serverId`. Measured 2026-08-31: **none of the five had a producer anywhere in this room.** One
+  consumer each, one declaration each on `ModalTargetUser`, and nothing that ever assigned them —
+  the same shape as `loggedIn` above, five more times over.
+
+  Two are answered, and the reason is that the server OBSERVES them: `ip` and `userAgent` come from
+  the request that opened the SSE stream, which is where the reference's socket branch gets them too
+  (`socketService.getUserInfo(uid, rid, socketID, …)`, byte 1,159,275 — an invoke naming a live
+  SOCKET, answered by the server holding it; the member's browser is never asked and could not
+  answer, since a page cannot learn its own public address).
+
+  Three are NOT, and are left reading `n/a` rather than filled with something unfalsifiable:
+
+    `appVersion`    upstream's `data.cver`. Only the CLIENT knows its build, so it would have to
+                    report it — and a member whose browser is misbehaving can report any string,
+                    which is precisely the case the cell exists for.
+    `streamServer`  the media plane. Blocked on a `STREAM_SERVER_MTX` host, the same blocker
+    `serverId`      `TODO.md` rows X, AC and R name.
+
+  `location` (`privData.locStr`, byte 2,061,069) is the sixth and needs a geo-IP service this
+  repository does not have. That is an owner decision about an external dependency.
+
   **The reference decides visibility in the browser.** Its markup gates the whole block on
   `O(17, e.user.hidePrivateInfo ? -1 : 17)` (byte 2,068,096) — a flag the server puts on the payload
   and the component obeys. The data still arrives. Here the caller's authority decides what the
@@ -52,19 +78,12 @@ import { roomRoster } from './room-events';
   decision nobody made.
 */
 
-/** What the server is willing to say about another account, to a caller entitled to ask. */
-export interface UserDetail {
-  /** `userXref.email`, which the reference carries as `privData.email`. */
-  readonly email: string;
-  /**
-   * `userXref.lastLogin`, as an ISO string, or null for an account that has never logged in.
-   *
-   * A string rather than a `Date` because this crosses a remote-function boundary and the modal
-   * formats it; null rather than an omitted key so "never logged in" is a value the caller can
-   * render, not a shape it has to guess at.
-   */
-  readonly loggedIn: string | null;
-}
+/*
+  The shape is `#lib/user-detail-shape.ts`, declared once and imported by both ends of the round
+  trip. It used to be declared here AND in `room/user-detail.ts`, and the two agreed by hand until
+  this function started answering two more fields.
+*/
+export type { UserDetail };
 
 /**
  * Has this account any standing in this room at all?
@@ -119,5 +138,21 @@ export function readUserDetail(room: string, userId: number): UserDetail | null 
     .all();
   if (!row) return null;
 
-  return { email: row.email, loggedIn: row.lastLoginAt ? row.lastLoginAt.toISOString() : null };
+  /*
+    THE LIVE HALF, and it is asked LAST on purpose.
+
+    `isKnownInRoom` admits two kinds of target: somebody standing in the room, and somebody who once
+    wrote a message here and has since left. The second has a row and no connection, so this is null
+    for them — which is the honest answer and is what the reference's own split produces: its DB
+    branch carries `privData = {email}` and nothing else (bundle byte 1,159,628), while the address
+    and the agent come only from the socket branch.
+  */
+  const connection = liveConnectionFor(room, userId);
+
+  return {
+    email: row.email,
+    loggedIn: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
+    ip: connection?.address ?? null,
+    userAgent: connection?.userAgent ?? null
+  };
 }

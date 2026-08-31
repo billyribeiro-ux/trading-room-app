@@ -2,6 +2,14 @@
   import { MediaQuery } from 'svelte/reactivity';
 
   import { EMOJI_DUMP_DATA, type EmojiDumpEntry } from '#lib/emoji-data.js';
+  import {
+    FREQUENTLY_DEFAULTS,
+    NAMESPACE,
+    emojiStorage,
+    frequentIdsNow,
+    rememberFrequent
+  } from '#lib/emoji-frequently.js';
+  import { createEmojiSearch } from '#lib/emoji-search.js';
 
   interface Props {
     onselect: (glyph: string) => void;
@@ -63,15 +71,14 @@
 
   /*
     Constants read off the deployed picker (docs/source/main.d6d3c112b59b7d0d.js):
-    perLine=9, emojiSize=24, totalFrequentLines=4, maxResults=75, NAMESPACE="emoji-mart",
+    perLine=9, emojiSize=24, totalFrequentLines=4, NAMESPACE="emoji-mart",
     notFoundEmoji="sleuth_or_spy", emoji="department_store" (the idle preview).
+    `maxResults=75` went with the search it caps - `#lib/emoji-search.ts`, `MAX_RESULTS`.
   */
-  const NAMESPACE = 'emoji-mart';
   const PER_LINE = 9;
   const EMOJI_SIZE = 24;
   const PREVIEW_SIZE = 38;
   const TOTAL_FREQUENT_LINES = 4;
-  const MAX_RESULTS = 75;
 
   /*
     Upstream sizes the picker at runtime rather than in CSS:
@@ -95,26 +102,6 @@
     delete:
       'M10 8.586L2.929 1.515 1.515 2.929 8.586 10l-7.071 7.071 1.414 1.414L10 11.414l7.071 7.071 1.414-1.414L11.414 10l7.071-7.071-1.414-1.414L10 8.586z'
   };
-
-  // NR.DEFAULTS in the bundle - the Frequently Used row before anything is stored.
-  const FREQUENTLY_DEFAULTS = [
-    '+1',
-    'grinning',
-    'kissing_heart',
-    'heart_eyes',
-    'laughing',
-    'stuck_out_tongue_winking_eye',
-    'sweat_smile',
-    'joy',
-    'scream',
-    'disappointed',
-    'unamused',
-    'weary',
-    'sob',
-    'sunglasses',
-    'heart',
-    'poop'
-  ];
 
   const allEntries: EmojiDumpEntry[] = EMOJI_DUMP_DATA.categories
     .flatMap((category) => category.entries)
@@ -169,86 +156,12 @@
   // ---------------------------------------------------------------- search
 
   /*
-    buildSearch() verbatim: short_names, name and id are split on separators, keywords too,
-    emoticons are not, everything lowercased and de-duplicated, joined with commas.
+    `buildSearch()`, its per-id memo and `search()` are `#lib/emoji-search.ts` — a module, because
+    upstream they are a SERVICE (`Yee`, class body at byte 730,571) and this component is the view
+    over it, exactly as `emoji-search` the component is upstream. `runSearch` is this picker's own
+    handle on it, built once against the whole pool so the memo lives as long as the picker does.
   */
-  function buildSearch(entry: EmojiDumpEntry) {
-    const tokens: string[] = [];
-    const add = (value: string | string[] | undefined, split: boolean) => {
-      if (!value) return;
-      for (const item of Array.isArray(value) ? value : [value]) {
-        for (const part of split ? item.split(/[-|_|\s]+/) : [item]) {
-          const token = part.toLowerCase();
-          if (!tokens.includes(token)) tokens.push(token);
-        }
-      }
-    };
-    add(entry.shortNames, true);
-    add(entry.name, true);
-    add(entry.id, true);
-    add(entry.keywords, true);
-    add(entry.emoticons, false);
-
-    return tokens.join(',');
-  }
-
-  /*
-    A plain Map, not a SvelteMap: this is the same memo upstream keeps in
-    `this.emojiSearch[id]`, nothing renders from it, and making it reactive would
-    invalidate the search on its own cache writes.
-  */
-  const searchStrings = new Map<string, string>();
-  function searchStringFor(entry: EmojiDumpEntry) {
-    let value = searchStrings.get(entry.id);
-    if (value === undefined) {
-      value = buildSearch(entry);
-      searchStrings.set(entry.id, value);
-    }
-    return value;
-  }
-
-  /*
-    search() verbatim: the '-'/'+' shortcuts, at most two terms, each term matched as a
-    substring of the built search string and ranked by where it matched (0 when the term
-    is the id itself), the terms intersected, then capped at maxResults.
-  */
-  function runSearch(raw: string): EmojiDumpEntry[] | null {
-    if (!raw.length) return null;
-    if (raw === '-' || raw === '-1') {
-      const entry = entriesById.get('-1');
-      return entry ? [entry] : [];
-    }
-    if (raw === '+' || raw === '+1') {
-      const entry = entriesById.get('+1');
-      return entry ? [entry] : [];
-    }
-
-    let terms = raw
-      .toLowerCase()
-      .split(/[\s|,|\-|_]+/)
-      .filter(Boolean);
-    if (!terms.length) return null;
-    if (terms.length > 2) terms = [terms[0], terms[1]];
-
-    const perTerm = terms.map((term) => {
-      const ranks = new Map<string, number>();
-      const matched = allEntries.filter((entry) => {
-        const index = searchStringFor(entry).indexOf(term);
-        if (index === -1) return false;
-        ranks.set(entry.id, term === entry.id ? 0 : index + 1);
-        return true;
-      });
-      return matched.sort((a, b) => (ranks.get(a.id) ?? 0) - (ranks.get(b.id) ?? 0));
-    });
-
-    let results = perTerm[0] ?? [];
-    for (const list of perTerm.slice(1)) {
-      const ids = new Set(list.map((entry) => entry.id));
-      results = results.filter((entry) => ids.has(entry.id));
-    }
-
-    return results.length > MAX_RESULTS ? results.slice(0, MAX_RESULTS) : results;
-  }
+  const runSearch = createEmojiSearch(allEntries);
 
   /*
     handleSearch() upstream shows the Search category and sets every other category to
@@ -352,66 +265,13 @@
 
   // ---------------------------------------------------------------- frequently used
 
-  function storage() {
-    try {
-      return typeof localStorage === 'undefined' ? null : localStorage;
-    } catch {
-      // Storage can throw outright when cookies are blocked.
-      return null;
-    }
-  }
-
-  function readFrequently(): Record<string, number> | null {
-    const store = storage();
-    if (!store) return null;
-    try {
-      return JSON.parse(store.getItem(`${NAMESPACE}.frequently`) ?? 'null');
-    } catch {
-      return null;
-    }
-  }
-
   /*
-    frequently.get(perLine, totalFrequentLines) verbatim: with nothing stored it returns
-    the first `perLine` DEFAULTS, which is exactly the nine cells the dump captured;
-    otherwise the most-used ids, with the last-used one forced in.
+    `#lib/emoji-frequently.ts` holds the row and its storage, for the same reason the search is a
+    module: upstream `NR` (byte 723,544) is a `providedIn: "root"` SERVICE and this component is
+    the view over it. What stays here is the one reactive cell it feeds.
   */
   function loadFrequently() {
-    const stored = readFrequently();
-    if (!stored) {
-      frequentIds = FREQUENTLY_DEFAULTS.slice(0, PER_LINE);
-      return;
-    }
-
-    const ids = Object.keys(stored)
-      .sort((a, b) => stored[a] - stored[b])
-      .reverse()
-      .slice(0, PER_LINE * TOTAL_FREQUENT_LINES);
-    const last = storage()?.getItem(`${NAMESPACE}.last`);
-    if (last && !ids.includes(last)) {
-      ids.pop();
-      ids.push(last);
-    }
-    frequentIds = ids;
-  }
-
-  // frequently.add() verbatim: bump the counter, remember it as `.last`, persist both.
-  function rememberFrequent(entry: EmojiDumpEntry) {
-    const store = storage();
-    if (!store) return;
-
-    const counts =
-      readFrequently() ??
-      Object.fromEntries(
-        FREQUENTLY_DEFAULTS.slice(0, PER_LINE).map((id, index) => [id, PER_LINE - index])
-      );
-    counts[entry.id] = (counts[entry.id] ?? 0) + 1;
-    try {
-      store.setItem(`${NAMESPACE}.last`, entry.id);
-      store.setItem(`${NAMESPACE}.frequently`, JSON.stringify(counts));
-    } catch {
-      // A full or read-only store must not break picking an emoji.
-    }
+    frequentIds = frequentIdsNow(PER_LINE, TOTAL_FREQUENT_LINES);
   }
 
   const frequentEntries = $derived(
@@ -434,9 +294,11 @@
 
     `emoji-data.ts` holds 1,821 entries. Opening the picker built every one of them — 1,821 spans,
     each with a composed sprite `style` string — synchronously, inside a click handler, before the
-    popover could paint. The reference commits THREE categories with the third capped at sixty cells
-    and lets the rest arrive on the next macrotask, which is the difference between a picker that
-    opens and a picker that opens after a stutter.
+    popover could paint. The reference commits THREE categories with the LAST of the three capped at
+    sixty cells and lets the rest arrive on the next macrotask, which is the difference between a
+    picker that opens and a picker that opens after a stutter. Which three those are is decided by
+    the array upstream counts, and that array is not this one — see `SEARCH_CATEGORY_SLOT` below,
+    and `EMOJI2-01`.
 
     A bare `setTimeout` with no delay, exactly as upstream: the point is to yield to the browser once,
     not to wait for a duration. `$effect` owns it so the timer is cleared if the picker is closed
@@ -457,6 +319,38 @@
   const STAGED_CATEGORIES = 3;
   const STAGED_LAST_CELLS = 60;
 
+  /**
+   * `EMOJI2-01` — the Search category occupies one of the three, and this used to spend it on a
+   * fourth screenful of cells.
+   *
+   * `this.categories` upstream is NOT the dump's nine. `ngOnInit` builds it and then puts two
+   * synthetic categories at the front before the staging arithmetic runs:
+   *
+   * ```js
+   * i&&!o&&(this.hideRecent=!1,this.categories.unshift(this.RECENT_CATEGORY));
+   * this.categories[0]&&(this.categories[0].first=!0);
+   * this.categories.unshift(this.SEARCH_CATEGORY);
+   * ```
+   *
+   * `unshift(this.RECENT_CATEGORY)` begins at byte 747,584 and `unshift(this.SEARCH_CATEGORY)` at
+   * byte 747,681 — both before `const s=Math.min(this.categories.length,3)` at byte 747,768, which
+   * is the line already quoted above. The token `SEARCH_CATEGORY` is first defined at byte 745,709,
+   * as `SEARCH_CATEGORY={id:"search",name:"Search",emojis:null,anchor:!1}`. So the
+   * array the `Math.min(length, 3)` below counts is `[Search, Recent, Smileys & People, …]`, and
+   * `categories.slice(0, 3)` commits **Search (empty), Recent (9) and the first 60 of Smileys &
+   * People** — 69 cells.
+   *
+   * `EMOJI_DUMP_DATA.categories` has no Search entry: that section is rendered once, on its own,
+   * below. Counting the dump's array directly therefore committed `[Recent, Smileys & People,
+   * Animals & Nature]` and capped the THIRD, so the first frame built 9 + 487 + 60 = **556** cells
+   * where the reference builds 69 — the whole 487-entry Smileys & People category, uncapped, inside
+   * the click handler this staging exists to get out of.
+   *
+   * The offset is declared rather than folded into a literal 2, because it is a fact about the
+   * reference's array and not a tuning constant: one synthetic category sits ahead of the dump's.
+   */
+  const SEARCH_CATEGORY_SLOT = 1;
+
   let staged = $state(true);
 
   $effect(() => {
@@ -466,8 +360,11 @@
     return () => clearTimeout(timer);
   });
 
-  /** `Math.min(this.categories.length, 3)` — and the whole list once the first frame is past. */
-  const stagedCount = $derived(Math.min(EMOJI_DUMP_DATA.categories.length, STAGED_CATEGORIES));
+  /** `Math.min(this.categories.length, 3)`, less the Search slot — and the whole list after. */
+  const stagedCount = $derived(
+    Math.min(EMOJI_DUMP_DATA.categories.length + SEARCH_CATEGORY_SLOT, STAGED_CATEGORIES) -
+      SEARCH_CATEGORY_SLOT
+  );
   const visibleCategories = $derived(
     staged ? EMOJI_DUMP_DATA.categories.slice(0, stagedCount) : EMOJI_DUMP_DATA.categories
   );
@@ -490,7 +387,7 @@
   function selectEmoji(entry: EmojiDumpEntry) {
     onentry?.(entry);
     onselect(entry.glyph);
-    rememberFrequent(entry);
+    rememberFrequent(entry, PER_LINE);
   }
 
   /**
@@ -550,7 +447,7 @@
 
     skin = tone;
     try {
-      storage()?.setItem(`${NAMESPACE}.skin`, String(tone));
+      emojiStorage()?.setItem(`${NAMESPACE}.skin`, String(tone));
     } catch {
       // Persisting the tone is best-effort.
     }
@@ -605,7 +502,7 @@
     // work, and it has to settle before place() measures the popover.
     scrollbarWidth = measureScrollbar();
 
-    const storedSkin = Number(storage()?.getItem(`${NAMESPACE}.skin`));
+    const storedSkin = Number(emojiStorage()?.getItem(`${NAMESPACE}.skin`));
     if (storedSkin >= 1 && storedSkin <= 6) skin = storedSkin;
     loadFrequently();
 
@@ -711,7 +608,21 @@
               oninput={(event) => handleSearch(event.currentTarget.value)}
               onkeyup={handleSearchKeyup}
             />
-            <label class="emoji-mart-sr-only" for={searchInputId}>Search</label>
+            <!--
+              `EMOJI2-03` — the captured leading and trailing spaces, on all three of the picker's
+              interpolated runs.
+
+              `emoji-search` emits its label as `Ne(" ",o.i18n.search," ")` (byte 738,704) with
+              `i18n.search === "Search"` (the defaults object `VR` at byte 744,221), and the preview
+              emits `Ne(" :",e,": ")` (`Bee`, byte 719,646) and `Ne(" ",e," ")` (`Uee`, byte
+              719,744). Angular's `Ne` writes those pads into the text node; plain text in a Svelte
+              template loses them to Prettier and to HTML whitespace folding, which is why this
+              repository writes them as mustaches — the same idiom, and the same declined autofixer
+              suggestion, that `apps/room/AGENTS.md` records for `{' Retry '}` and its forty
+              siblings. Every capture comparison here diffs rendered strings, so the pads are
+              evidence rather than formatting.
+            -->
+            <label class="emoji-mart-sr-only" for={searchInputId}>{' Search '}</label>
             <button
               class="emoji-mart-search-icon"
               type="button"
@@ -841,19 +752,51 @@
                   <div class="emoji-mart-preview-name">{hovered.name}</div>
                   <div class="emoji-mart-preview-shortname">
                     {#each hovered.shortNames as shortName (shortName)}
-                      <span class="emoji-mart-preview-shortname">:{shortName}:</span>
+                      <!-- `EMOJI2-03` — `Ne(" :",e,": ")`, byte 719,646. -->
+                      <span class="emoji-mart-preview-shortname">{' :'}{shortName}{': '}</span>
                     {/each}
                   </div>
                   <div class="emoji-mart-preview-emoticons">
                     {#each hovered.emoticons as emoticon (emoticon)}
-                      <span class="emoji-mart-preview-emoticon">{emoticon}</span>
+                      <!-- `EMOJI2-03` — `Ne(" ",e," ")`, byte 719,744. -->
+                      <span class="emoji-mart-preview-emoticon">{' '}{emoticon}{' '}</span>
                     {/each}
                   </div>
                 {:else}
                   <span class="emoji-mart-title-label"></span>
                 {/if}
               </div>
-              <div class="emoji-mart-preview-skins">
+              <!--
+                `EMOJI2-02` — the swatches belong to the IDLE preview and go away while an emoji is
+                hovered.
+
+                `emoji-preview` renders TWO alternatives, not one block with a branch inside it:
+
+                ```js
+                H(0,jee,10,12,"div",0)        // *ngIf = o.emoji && o.emojiData — the hovered block
+                d(1,"div",1)(2,"div",2) …     // const 1 = [1,"emoji-mart-preview",3,"hidden"]
+                …
+                z("ngIf",o.emoji&&o.emojiData), m(), z("hidden",o.emoji)      // byte 735,962
+                ```
+
+                `jee` (byte 719,840) holds the preview emoji and the name/shortnames/emoticons and
+                NOTHING else; the skins div is inside the second block only, the one bound
+                `[hidden]="o.emoji"`. So upstream the swatch row disappears for as long as the
+                pointer is over a cell and comes back one animation frame after it leaves —
+                `EMOJI-12`'s deferred clear is what makes that readable rather than a flicker.
+
+                It is `hidden` rather than an `{#if}` for the reason upstream's is: the row keeps its
+                `skinsOpened` state across the hover. And `hidden` still works on it — the two
+                rules that touch this class, `{position:absolute;top:50%;transform:translateY(-50%)}`
+                (reference sheet byte 365,090) and `{right:30px;text-align:right}` (byte 365,272),
+                set no `display` between them, so the UA's `[hidden]{display:none}` is not outranked.
+                That is the check that decides whether this attribute does anything at all, and both
+                rules are applied here (`css/complete-app-styles.css:6247` and `:6250`).
+
+                Ours drew them permanently, and `.emoji-mart-preview-data{left:68px;right:12px}` runs
+                under the swatches, so a long emoji name overlapped them.
+              -->
+              <div class="emoji-mart-preview-skins" hidden={hovered !== null}>
                 <svelte:element this={"emoji-skins"}>
                   <section class={['emoji-mart-skin-swatches', { opened: skinsOpened }]}>
                     {#each EMOJI_DUMP_DATA.skinTones as tone, index (tone.title)}

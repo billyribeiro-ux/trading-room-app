@@ -103,9 +103,24 @@ export const variables = defineEnvVars({
   /*
     The control API MediaMTX exposes, which the reconcile polls for the true stream list.
 
-    `api: yes` in `mediamtx.yml` and `127.0.0.1:9997` by default, localhost-only unless configured
-    otherwise — so in a real deployment this is an internal address, not the public media host.
-    Unset means no reconcile runs and the room depends on hooks alone.
+    In a real deployment this is an INTERNAL address, and that is an obligation on the operator
+    rather than something the media server arranges. Measured against MediaMTX v1.20.1 on
+    2026-08-31, because the sentence that stood here said the opposite:
+
+      - the shipped `mediamtx.yml` has `api: false` (line 147) — the API is OFF by default;
+      - `apiAddress: :9997` (line 149) is EVERY interface, not loopback. An instance started with
+        `:9998` answers on this container's non-loopback address; one started with
+        `127.0.0.1:9997` refuses the same connection.
+
+    What keeps it closed out of the box is `authInternalUsers`, whose second `any` user — the only
+    one holding `action: api` — is fenced by `ips: ["127.0.0.1", "::1"]`: the same request is 200
+    over loopback and 401 from the network. An authorisation fence, not a bind fence, and a
+    deployment that grants `api` to a user with the default empty `ips: []` opens the port on every
+    interface with nothing in the address line to say so. `POST /v3/config/paths/add` is on the
+    same API, so that is a write surface, not a read one.
+
+    Unset means no reconcile runs and the room depends on hooks alone. `mtx-reconcile.ts` carries
+    the full measurement.
   */
   MEDIA_API_URL: {
     description:

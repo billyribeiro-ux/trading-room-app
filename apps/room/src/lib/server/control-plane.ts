@@ -255,6 +255,19 @@ export function roomMuteUrl(shortCode: string): string | null {
 }
 
 /**
+ * Peak simultaneous occupancy: `POST {control}/internal/room-occupancy/{shortCode}`.
+ *
+ * A MACHINE report, and the only one of these endpoints with no person behind it — which is why it
+ * takes no `?email=` and the controller gates it on the write capability alone. See that endpoint's
+ * header for the whole argument, and `T5-20` for why the reference's own bundle could not supply
+ * this signal: it computes its user count in the browser and sends it nowhere.
+ */
+export function roomOccupancyUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-occupancy/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `getRTMPToken`: `POST {control}/internal/stream-ingest/{shortCode}`.
  *
  * The reference reaches this over its admin command channel

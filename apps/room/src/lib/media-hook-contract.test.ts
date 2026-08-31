@@ -28,6 +28,22 @@ vi.mock('#lib/server/room-events.js', () => ({
   }
 }));
 
+/**
+ * The reconciler, mocked so this file can see the ONE call that stops the room announcing twice.
+ *
+ * Not a convenience: on 2026-08-31 the live chain was measured delivering every event twice, because
+ * the hook published without telling the reconciler and the next poll re-derived the same delta.
+ * `hook-reconcile-agreement-contract.test.ts` proves the reconciler side of that fix. Nothing proved
+ * the ROUTE still makes the call — delete the line from `+server.ts` and every other assertion in
+ * both files stays green while the defect returns in full. This closes that.
+ */
+const noted: Array<{ room: string; id: string; event: string }> = [];
+vi.mock('#lib/server/mtx-reconciler.js', () => ({
+  noteHookPublished: (room: string, stream: { _id: string }, event: string) => {
+    noted.push({ room, id: stream._id, event });
+  }
+}));
+
 const { POST } = await import('../routes/internal/media-hook/+server');
 
 type HookBody = { event?: unknown; path?: unknown };
@@ -45,6 +61,7 @@ function call(body: HookBody | string, bearer: string | null = SECRET) {
 
 beforeEach(() => {
   published.length = 0;
+  noted.length = 0;
   configuredSecret = SECRET;
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -189,6 +206,39 @@ describe('it publishes the delta the room already knows how to apply', () => {
     await call({ event: 'available', path: 'room__9999__someone' });
     expect(published[0].room).toBe('9999');
     expect(published[0].room).not.toBe('3625');
+  });
+
+  it('tells the reconciler what it just published, in both directions', async () => {
+    /*
+      The line that stops the duplicate. Measured on a live MediaMTX v1.20.1 on 2026-08-31: without
+      it, the hook's `mtxStartStream` at 04:33:52.676 was followed by an identical one from the poll
+      at 04:33:55.427 — and `applyMtxStartStream` appends without checking `_id`, so every viewer got
+      two tabs for one stream.
+
+      Asserted per event, because a fix that only handled `available` would leave the stop half
+      duplicating and that half is the one that reads as "the tab flickered".
+    */
+    await call({ event: 'available', path: 'room__3625__Dana_Vero' });
+    expect(noted).toEqual([{ room: '3625', id: 'room__3625__Dana_Vero', event: 'available' }]);
+
+    noted.length = 0;
+    await call({ event: 'unavailable', path: 'room__3625__Dana_Vero' });
+    expect(noted).toEqual([{ room: '3625', id: 'room__3625__Dana_Vero', event: 'unavailable' }]);
+  });
+
+  it('does not tell the reconciler about a call it refused', async () => {
+    /*
+      Deny-by-default, applied to the baseline as well as to the publish. A bad bearer, an unknown
+      event or an unparseable path must leave the reconciler's memory alone — otherwise an
+      unauthenticated caller who could not publish a frame could still make the room MISS the next
+      real one, by moving the baseline the poll diffs against.
+    */
+    await call({ event: 'available', path: 'room__3625__Dana_Vero' }, 'wrong-secret');
+    await call({ event: 'sideways', path: 'room__3625__Dana_Vero' });
+    await call({ event: 'available', path: 'not-a-room-path' });
+
+    expect(published, 'nothing was published, which is the existing contract').toEqual([]);
+    expect(noted, 'and nothing moved the reconciler baseline either').toEqual([]);
   });
 
   it('answers 200 even when nobody is listening', async () => {

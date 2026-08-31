@@ -211,10 +211,61 @@ export function visibleBadgeTabs(
 export function chatTabsForMember(
   raw: string | null | undefined,
   memberBadges: readonly string[],
-  isPresenter: boolean
+  isPresenter: boolean,
+  /**
+   * `hasChannelTabs` — whether this room has an Off Topic channel at all.
+   *
+   * ## The divergence this closes, and why it was invisible
+   *
+   * The reference builds its whole tab list in ONE function, decoded whole from the pinned bundle at
+   * bytes 1,146,625-1,147,200:
+   *
+   * ```js
+   * chatTabs = []
+   * chatTabs.push(altGenChannelName ? {displayName: altGenChannelName, name:"main", type:"r"}
+   *                                 : {displayName:"Main Chat", name:"main", type:"r"})
+   * hasChannelTabs && chatTabs.push(altOffTopicChannelName
+   *                                 ? {displayName: altOffTopicChannelName, name:"offTopic", type:"r"}
+   *                                 : {displayName:"Off Topic", name:"offTopic", type:"r"})
+   * hasAdminOnlyChannel && chatTabs.push({displayName:"Admins", name:"adminChat", type:"po"})
+   * extraAdminChannels && extraAdminChannels.split(",").forEach(r =>
+   *   chatTabs.push({displayName:r, name:r, type:"p"}))
+   * extraRegChannels && extraRegChannels.split(",").forEach(r =>
+   *   chatTabs.push({displayName:r, name:r, type:"r"}))
+   * ```
+   *
+   * **Only `main` is unconditional there.** This room shipped both built-ins unconditionally, so a
+   * room whose owner had turned Off Topic OFF still showed it — a control nobody asked for, which is
+   * the mirror of the dead-control rule the root standard forbids.
+   *
+   * It was never an argued divergence. It was never noticed: `hasChannelTabs` had **zero occurrences
+   * anywhere in `apps/room/src`** before 2026-08-31, and it was found by measuring which of the
+   * schema's unwired settings the reference actually reads rather than by anything failing.
+   *
+   * ## ABSENT MEANS TRUE, and that is load-bearing
+   *
+   * `undefined` is not "off". `room-settings-profile.ts:55` captures the default as `true`, and this
+   * room has behaved as `true` for every room since the tab existed. Reading absence as `false` would
+   * remove a tab from every room that has never stored the setting — a silent regression dressed as a
+   * fix. Only an owner who explicitly turned it off loses the tab, which is exactly upstream.
+   *
+   * The default lives HERE, once, rather than at each call site: `chat-channels.ts` passes the raw
+   * optional straight through, so there is one place that decides what absence means.
+   *
+   * ## What is still NOT built, named so it is not rediscovered
+   *
+   * Five more settings feed that same function and none of them is wired: `altGenChannelName` and
+   * `altOffTopicChannelName` rename the two built-ins, `hasAdminOnlyChannel` adds an `adminChat` tab
+   * of type `po`, and `extraAdminChannels` / `extraRegChannels` are comma-separated lists pushed as
+   * types `p` and `r`. All five are recorded in `setting-coverage-contract.test.ts`'s
+   * `REFERENCE_READS_AND_WE_DO_NOT`. Note their types: the reference has THREE (`r`, `p`, `po`) where
+   * this room has one, so building them is a channel-model change and not five more pushes.
+   */
+  hasChannelTabs: boolean | undefined = undefined
 ): string[] {
+  const offTopicVisible = hasChannelTabs ?? true;
   return [
-    ...BUILT_IN_CHAT_TABS,
+    ...BUILT_IN_CHAT_TABS.filter((tab) => tab !== 'off-topic' || offTopicVisible),
     ...visibleBadgeTabs(parseChatTabsWithBadges(raw), memberBadges, isPresenter).map(
       (tab) => tab.name
     )

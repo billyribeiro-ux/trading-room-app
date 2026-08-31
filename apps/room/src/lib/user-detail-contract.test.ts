@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import type { UserDetail } from './room/user-detail';
 import { RoomUserDetail } from './room/user-detail';
 import type { ModalTargetUser } from './types';
 
@@ -56,7 +57,12 @@ const target = (id: number): ModalTargetUser => ({
 /** Lets a test resolve the lookup at the moment it chooses, which is when a modal is already open. */
 function deferredDetail() {
   const asked: number[] = [];
-  let settle: (value: { email: string; loggedIn: string | null } | null) => void = () => {};
+  /*
+    Typed as `UserDetail` rather than as a literal shape. The literal was a second declaration of the
+    same contract and it went stale the day the server started answering `ip` and `userAgent`:
+    `RoomUserDetail` took the wider type and this fixture could no longer produce one.
+  */
+  let settle: (value: UserDetail | null) => void = () => {};
   const detail = new RoomUserDetail({
     fetch: (userId) => {
       asked.push(userId);
@@ -81,20 +87,33 @@ describe('the offline user lookup', () => {
     const before = target(7);
     expect(detail.decorate(before)).toBe(before);
 
-    resolve({ email: 'member@example.test', loggedIn: '2026-08-29T23:40:00.000Z' });
+    resolve({
+      email: 'member@example.test',
+      loggedIn: '2026-08-29T23:40:00.000Z',
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)'
+    });
     await Promise.resolve();
 
     expect(detail.decorate(target(7))).toMatchObject({
       id: 7,
       email: 'member@example.test',
-      loggedIn: '2026-08-29T23:40:00.000Z'
+      loggedIn: '2026-08-29T23:40:00.000Z',
+      /*
+        The two System-tab cells, which had no producer at all until 2026-08-31 — see
+        `#lib/server/user-detail.ts`. They ride the same answer as the two above because they are the
+        same question with the same authority, not because it was convenient: `decorate` spreads
+        whatever the server said, so a cell filled here is a cell the presenter is entitled to.
+      */
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)'
     });
   });
 
   it('leaves everybody else alone', async () => {
     const { detail, resolve } = deferredDetail();
     detail.hydrate(7);
-    resolve({ email: 'member@example.test', loggedIn: null });
+    resolve({ email: 'member@example.test', loggedIn: null, ip: null, userAgent: null });
     await Promise.resolve();
 
     const other = target(8);
@@ -105,7 +124,7 @@ describe('the offline user lookup', () => {
     const { asked, detail, resolve } = deferredDetail();
     detail.hydrate(7);
     detail.hydrate(7);
-    resolve({ email: 'member@example.test', loggedIn: null });
+    resolve({ email: 'member@example.test', loggedIn: null, ip: null, userAgent: null });
     await Promise.resolve();
     detail.hydrate(7);
 

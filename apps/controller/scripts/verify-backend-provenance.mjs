@@ -99,7 +99,7 @@ const LOCALLY_AUTHORED = new Map([
     // must be appliable to any number of databases on one cluster. Nothing in the imported tree
     // stated that rule, which is why a non-convergent migration passed review and shipped.
     'services/api/tests/migration_reappliability.rs',
-    '3faadc515e1f228c3abf261cdfc1f30ba7523a8ea181d0adfe293affc8a107a1'
+    '600967960d80695a40ea5c83d2ac608627056e06aa51e24d53d5fead2fe72ef3'
   ],
   [
     'services/api/migrations/0009_provision_tradingroom_app.sql',
@@ -108,12 +108,16 @@ const LOCALLY_AUTHORED = new Map([
   [
     // Authored here on 2026-08-31, and the pair to `migration_reappliability.rs` above: that test
     // states the chain must apply to any number of databases on one cluster, and this migration is
-    // where that rule stops being about SQL and becomes about a cluster-global ROLE. It revokes
-    // per-database and drops only when it is the last database still granting — verified across
-    // three databases on a live PostgreSQL 16.13 cluster, including the refusal on one where 0009
-    // had not run. `CHANGELOG.md` carries the full evidence.
+    // where that rule stops being about SQL and becomes about a cluster-global ROLE.
+    //
+    // It revokes PER-DATABASE and does not drop the role. The first version did drop it, and that
+    // test is what refused it — `the_chain_applies_to_a_second_database_on_the_same_cluster`, on a
+    // live PostgreSQL 16.13 cluster: the first database dropped the role and the second could no
+    // longer start its chain, because the migrate preflight requires it before `0001` runs. The pair
+    // held. `CHANGELOG.md` carries the full evidence, including the refusal on a database where
+    // `0009` had not run.
     'services/api/migrations/0010_retire_ptr_clone_app.sql',
-    'a134bdcf67ae8662fb9c10a0c7a80581adf23ec0f59739e0363bde6ed4d3d36a'
+    'f38b8ee829abb7e0525d4f31ccb389ddafad9e92c309c53a18ddc9969e1e5251'
   ]
 ]);
 
@@ -252,9 +256,31 @@ const DIVERGED_FROM_IMPORT = new Map([
     them — the 1:1 this evidence exists to state — and exactly two distinct `USING` expressions, the
     general tenant predicate and `room_events`' member-scoped one.
   */
+  /*
+    Re-pinned 2026-08-31 (owner cutover): `resolve_attested_owner` reads the owner from the
+    CONNECTION and every downstream check is pinned to that one name, instead of each comparing
+    against `EXPECTED_MIGRATOR_ROLE`. The reviewed act: the owner rename `ptr_clone` ->
+    `tradingroom` is staged (`ops/OWNER-ROLE-CUTOVER.md`), so a cluster mid-cutover holds databases
+    owned by either — and an attestation comparing each site against a two-name list independently
+    would pass a database whose connection says one owner while its tables still say the other,
+    which is precisely a half-finished `REASSIGN OWNED`. Resolving once and pinning is strictly
+    stronger than the single constant was: the relaxation is WHICH owner a database may have, never
+    that it may have two.
+
+    Re-pinned 2026-08-31: `ATTESTED_MIGRATION_VERSIONS` extended 0001-0009 -> 0001-0010 when
+    `0010_retire_ptr_clone_app.sql` landed, with the reviewed-act paragraph that list requires. The
+    attestor's own test caught the omission — the same way it caught `0009` shipping in `b9f775e`
+    without the list being extended.
+
+    Re-pinned 2026-08-31 (PR #177 merge follow-up): `migration_ledger_mismatch` still said
+    `0001 through 0008` — TWO chain extensions stale, because an error string has no reader until
+    the attestation fails. Both range-naming messages are now named constants held against
+    `ATTESTED_MIGRATION_VERSIONS` by `the_prose_ranges_track_the_attested_chain`, whose negative
+    control was run red-then-green, so the next extension moves the prose or goes red.
+  */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    'a8df58ae8b19031c383816b90a392294126a433fa05f6c7e01ad7bed6b01f8cd'
+    '607e1df8bfb387b531d6ef7b8efb81088bd4130ed1f40eeda1cd7186a123d13f'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -268,13 +294,40 @@ const DIVERGED_FROM_IMPORT = new Map([
   // and PostgreSQL reports a nonexistent role as `28P01 password authentication failed`, naming the
   // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
   ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
-  ['services/api/src/db/mod.rs', '95294947a9963004ff2204d3e1b305d05d9b26cc19d4c643d48ba7126c0d65d9'],
-  ['services/api/tests/migrations.rs', 'da2739797a45c6eb27beb61d55fd000a500357bfa6ad3b373931bd3ba7165136'],
+  /*
+    Re-pinned 2026-08-31: `RUNTIME_OBJECT_PRIVILEGES_SQL` names `MAINTAIN` only where the server has
+    it. `has_table_privilege` RAISES `22023 unrecognized privilege type` on a name the server does
+    not know, and this query gates the API BINDING to the database — so on PostgreSQL 16 the API
+    refused to start with "unrecognized privilege type: MAINTAIN" rather than anything about its
+    runtime role. Measured through that function on 16.13.
+
+    Not a relaxation, which is why it is safe: below 17 the privilege does not exist, cannot be
+    granted, and cannot be held. `services/compose.yml` pins `postgres:17`, where the check is
+    unchanged. Negative control: the version gate removed, the same 22023 back.
+  */
+  ['services/api/src/db/mod.rs', '149a07ad65c3bb7668f0b7c99f50ea5d399d6e48775b7002c6a562f6e9318537'],
+  ['services/api/tests/migrations.rs', 'b4e46a6a7b8d10e8317ef5d549d6ef289ba97d7b817c925bdfb1be48f43750ad'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
   ],
-  ['services/api/src/db/migrate.rs', '0df32e9c11c3ace6739f1a6ea9f17610f3263652dc90cc6a07172ba966864e6c'],
+  /*
+    Re-pinned 2026-08-31 (owner cutover): `EXPECTED_MIGRATOR_ROLE` was a single `&str`, which makes
+    the `ptr_clone` -> `tradingroom` owner rename a FLAG DAY — the database's ownership and the
+    deployed binary must change in the same instant, and in the window between them one of the two
+    refuses a healthy database. `ACCEPTED_MIGRATOR_ROLES` is that window, an ordered allow-list of
+    exactly two names, and `EXPECTED_MIGRATOR_ROLE` remains what a cluster is PROVISIONED with.
+
+    The reviewed act, because this is the one place a reviewer will ask "is this the fail-open that
+    was taken out?": it is not. That one was a catalogue lookup — `WHERE rolname IN ($1, $2) …
+    LIMIT 1` — returning role Y's posture when asked about role X. This is an equality test against
+    three facts about the current connection, checked together for ONE entry at a time, so a
+    connection authenticated as one accepted owner and executing as the other is refused. Measured
+    on a live PG 16.13 cluster through the `migrate` binary: `session_user=tradingroom,
+    current_user=ptr_clone` -> exit 1. The negative control rewrote it as "each fact is in the list"
+    and turned the unanimity test red on all four impersonation rows.
+  */
+  ['services/api/src/db/migrate.rs', '6057a6e5c9dfa8bf149b4c57954329bdc6d652224cb4bade027e4a96f3af9487'],
   /*
     Diverged 2026-08-15 by the SECOND half of the runtime-role cutover — the half the first half
     missed. Each was an untouched import until now, and each leaves the aggregate for its own pin
@@ -303,7 +356,18 @@ const DIVERGED_FROM_IMPORT = new Map([
                  roots are in fact our own direct dependencies, traced with `cargo tree -i`.
   */
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
-  ['services/api/tests/support/mod.rs', 'ebdc169b422d4f700a73de6c5ebd2e41f3b452732b11cdf419c76cf3b0664787'],
+  [
+    'services/api/tests/support/mod.rs',
+    '1f878cd85b80d4450b08d3ec4d24e8edc8cc1a090880e138d2de88fe928f9950'
+    /*
+      Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
+      Its safety argument — a live database keeps a backend attached, so its DROP fails — held only
+      after a backend attached; between `CREATE DATABASE` and the first connect there is none, and a
+      sibling thread's sweep collected the database out from under it. Adding a third concurrent
+      `Scratch::create` to `migration_reappliability.rs` reproduced it on two consecutive runs
+      ("It seems to have just been dropped or renamed"), and three runs are green after.
+    */
+  ],
   ['services/api/tests/auth_http.rs', '79a5b173119977db1ec1eac94a03b86897d40a42c0f25474d5fbd8cadedac98c'],
   ['services/api/tests/realtime.rs', '62c6629bed604164b3f9709220f737da51708c794e1b0062210a18d7ee7d0056'],
   ['services/api/tests/refresh_rotation.rs', '65531ae9d457eacedb87755fd673a6999fa607ea4822e37081d2a553637c49d7'],

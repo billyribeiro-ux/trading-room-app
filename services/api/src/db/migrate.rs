@@ -34,8 +34,63 @@ pub const BASELINE_VERSION: i64 = 1;
 pub const BASELINE_SHA256: &str =
     "c8baed853578437e18de0fae3406bfa1ee2791b2e625db8d13e2b72a51ac27d9";
 
-/// The only authenticated identity permitted to execute this migration chain.
-pub const EXPECTED_MIGRATOR_ROLE: &str = "ptr_clone";
+/// The owner identities permitted to execute this migration chain, most-preferred first.
+///
+/// ── WHY A SET, AND WHY THIS IS NOT THE FAIL-OPEN THAT WAS REMOVED ────────────────────────────
+///
+/// `TODO.md` prescribes the owner rename `ptr_clone` -> `tradingroom` as **"add, prove, cut over,
+/// retire — never rename"**, and names the withdrawn `0009_rename_runtime_roles` as the mistake to
+/// avoid. A single accepted name makes that impossible: it forces a FLAG DAY, where the database's
+/// ownership and this binary have to change in the same instant. Between them there is a window in
+/// which either the old binary refuses the new owner or the new binary refuses the old one, and
+/// every deploy in that window fails closed on a database that is perfectly healthy.
+///
+/// So the cutover window is expressed here, as an ordered allow-list, and it is deliberately TWO
+/// entries and not "any role that looks like an owner".
+///
+/// **This is not the tolerance that was taken out of the runtime-role preflight**, and the
+/// difference is the reason that one failed open and this one cannot. That one was a CATALOGUE
+/// LOOKUP — `WHERE rolname IN ($1, $2) ORDER BY (rolname = $2) DESC LIMIT 1` — so asking about role
+/// X returned role Y's row whenever Y existed, and the posture of a role that was not there got
+/// reported under the name of one that was. There is no lookup here. This is an equality test
+/// against three facts the server states about the CURRENT connection, and the three must name the
+/// same accepted entry as each other:
+///
+/// ```text
+///   system_user   scram-sha-256:tradingroom   who authenticated
+///   session_user  tradingroom                 who connected
+///   current_user  tradingroom                 who is executing
+/// ```
+///
+/// A connection authenticated as `tradingroom` that has done `SET ROLE ptr_clone` names two
+/// different entries and is REFUSED, exactly as it was when the list had one entry.
+/// `validate_migrator_identity` enforces that unanimity, and
+/// `the_migrator_allow_list_requires_all_three_facts_to_name_the_same_role` is its negative control.
+///
+/// `migration_reappliability.rs` asserts on this module's source that the runtime-role posture query
+/// never grows a second bound name again. That assertion is untouched and still passes: it names the
+/// `ORDER BY (runtime_role.rolname = $2) DESC` shape, which is the lookup, and the list below is not
+/// one.
+pub const ACCEPTED_MIGRATOR_ROLES: [&str; 2] = [
+    // The target name. Preferred, so a cluster that has cut over is the normal case rather than
+    // the exception.
+    "tradingroom",
+    // The name `0001_baseline.sql` creates, at the line this module's `BASELINE_SHA256` pins. Every
+    // database that exists today is owned by it, and it is the LAST entry to be removed — after the
+    // runbook's cut-over and retire steps have run on every database in the cluster.
+    "ptr_clone",
+];
+
+/// The owner a cluster provisioned TODAY still gets, and the name every existing database uses.
+///
+/// Separate from [`ACCEPTED_MIGRATOR_ROLES`] on purpose: that list is what a running chain will
+/// ACCEPT, while this is what the provisioner CREATES and what the release attestation records as
+/// the expected owner on a cluster that has not cut over. Conflating "what we accept" with "what we
+/// make" is what turns a staged cutover back into a rename.
+///
+/// It moves to `"tradingroom"` in the cut-over commit, not before, and `ops/OWNER-ROLE-CUTOVER.md`
+/// is the runbook that says when.
+pub const EXPECTED_MIGRATOR_ROLE: &str = ACCEPTED_MIGRATOR_ROLES[1];
 
 /// The login the application authenticates as at runtime.
 ///
@@ -108,22 +163,134 @@ struct RuntimeRolePosture {
     membership_count: i64,
 }
 
+/// Whether this preflight may accept an ABSENT baseline role.
+///
+/// Two states of one database, and they want opposite answers from the same check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AbsentBaselineRole {
+    /// Absence is a refusal. Everything except the one case below.
+    Refuse,
+    /// Absence is the intended end state, and refusing it would block every future deploy.
+    Accept,
+}
+
+/// Decides whether `ptr_clone_app` may be absent, from whether `0001` has already been applied.
+///
+/// ── WHY THIS EXISTS, MEASURED RATHER THAN REASONED ──────────────────────────────────────────
+///
+/// [`BASELINE_PROVISIONED_ROLE`] is a FENCE, and the thing it fences is precise: `0001_baseline.sql`
+/// carries a forensic branch that creates `ptr_clone_app` with the placeholder password committed at
+/// its line 26. Requiring the role to exist *before the chain runs* keeps that branch unreachable.
+///
+/// That branch is only reachable while `0001` is PENDING. Once SQLx has recorded `0001` as applied,
+/// it never executes again on that database, so on that database the fence is guarding a branch that
+/// cannot run — and the requirement has no remaining subject.
+///
+/// It does, however, still have an effect, and on 2026-08-31 that effect was measured on a live
+/// PostgreSQL 16.13 cluster. `migrations/0010_retire_ptr_clone_app.sql` strips every privilege the
+/// baseline role holds, and its closing note documents the operator step that finishes the job on a
+/// cluster which will take no further new databases:
+///
+/// ```text
+/// DROP ROLE ptr_clone_app;   -- refuses, correctly, while any database still grants
+/// ```
+///
+/// With the requirement unconditional, that step BRICKS THE DEPLOYMENT. The very next run of the
+/// `migrate` binary against a database that had already applied the entire chain — the ordinary
+/// shape of a deploy — exited 1:
+///
+/// ```text
+/// migrate failed: migration preflight requires preprovisioned runtime role ptr_clone_app;
+///                 run the role provisioner before migrations
+/// ```
+///
+/// So the unconditional requirement and the retirement cannot both stand: it makes the documented
+/// end state permanently un-deployable, and it does so for a database where the branch it guards is
+/// already unreachable. This is that step's consumer — without it the step is not takeable, and
+/// `0010` says so where it prescribes it.
+///
+/// ── WHY THIS IS NOT A WEAKENING ─────────────────────────────────────────────────────────────
+///
+/// The fence is untouched in every state where it can act. Absence is accepted on exactly one
+/// condition — `0001` already recorded applied and successful — and in that state `0001` will not
+/// run, so no placeholder password can be created. On a fresh database, on a database whose ledger
+/// does not exist yet, and on a database where `0001` is recorded as FAILED and will therefore be
+/// retried, this returns [`AbsentBaselineRole::Refuse`] and the preflight behaves exactly as before.
+///
+/// Presence is not weakened either, in either state: an existing baseline role is still put through
+/// the complete posture check by [`validate_runtime_role_posture`]. A cluster that re-provisions the
+/// role after retirement — which is what `docker/postgres/10-provision-roles.sh` does at cluster
+/// init — is therefore still refused if it provisions it unsafely.
+///
+/// Fail-closed by construction: the only input that unlocks acceptance is positive evidence read
+/// from the database's own ledger. Every failure to obtain that evidence lands on `false`.
+const fn baseline_role_absence_policy(baseline_migration_applied: bool) -> AbsentBaselineRole {
+    if baseline_migration_applied {
+        AbsentBaselineRole::Accept
+    } else {
+        AbsentBaselineRole::Refuse
+    }
+}
+
+/// Whether SQLx's ledger records [`BASELINE_VERSION`] as applied AND successful on this database.
+///
+/// Two queries rather than one, because a relation name is resolved at PARSE time: a single
+/// `SELECT … FROM _sqlx_migrations WHERE to_regclass('_sqlx_migrations') IS NOT NULL` still fails
+/// with `relation does not exist` on a fresh database, since the guard never gets to run.
+///
+/// `to_regclass` is unqualified on purpose, so it resolves through the same `search_path` SQLx
+/// itself uses to create and read the table. A hardcoded `public.` would answer about a different
+/// relation than the one the migrator is about to write to.
+async fn baseline_migration_is_applied(
+    connection: &mut PgConnection,
+) -> Result<bool, MigrateError> {
+    let ledger_exists: bool =
+        sqlx::query_scalar("SELECT to_regclass('_sqlx_migrations') IS NOT NULL")
+            .fetch_one(&mut *connection)
+            .await?;
+
+    if !ledger_exists {
+        return Ok(false);
+    }
+
+    // `success` is load-bearing: a FAILED `0001` will be retried, so its forensic branch is
+    // reachable again and the fence must stand.
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM _sqlx_migrations WHERE version = $1 AND success)",
+    )
+    .bind(BASELINE_VERSION)
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(MigrateError::from)
+}
+
 fn validate_migrator_identity(
     system_user: Option<&str>,
     session_role: &str,
     current_role: &str,
-    expected: &str,
+    accepted: &[&str],
 ) -> Result<(), MigrateError> {
-    let authenticated_as_expected = system_user
-        .and_then(|identity| identity.split_once(':'))
-        .is_some_and(|(method, identity)| !method.is_empty() && identity == expected);
+    /*
+      UNANIMITY, not "each fact is somewhere in the list".
 
-    if authenticated_as_expected && session_role == expected && current_role == expected {
-        return Ok(());
+      The three facts are checked together for one accepted entry at a time, so a connection that
+      authenticated as one owner and did `SET ROLE` to another names two entries and matches none.
+      Checking them independently against the list would accept exactly that — which is the
+      privilege-expansion shape the three-fact check exists to refuse, and the reason a superuser
+      cannot satisfy it by impersonating the owner.
+    */
+    for expected in accepted {
+        let authenticated_as_expected = system_user
+            .and_then(|identity| identity.split_once(':'))
+            .is_some_and(|(method, identity)| !method.is_empty() && identity == *expected);
+
+        if authenticated_as_expected && session_role == *expected && current_role == *expected {
+            return Ok(());
+        }
     }
 
     Err(MigrateError::UnexpectedMigratorIdentity {
-        expected: expected.to_owned(),
+        expected: accepted.join(" or "),
         session_role: session_role.to_owned(),
         current_role: current_role.to_owned(),
     })
@@ -171,8 +338,9 @@ fn validate_runtime_role_posture(
 
 async fn preflight_for_roles_on_connection(
     connection: &mut PgConnection,
-    expected_migrator: &str,
+    accepted_migrators: &[&str],
     expected_runtime: &str,
+    absent_runtime_role: AbsentBaselineRole,
 ) -> Result<(), MigrateError> {
     let (system_user, session_role, current_role): (Option<String>, String, String) =
         sqlx::query_as("SELECT system_user, session_user::text, current_user::text")
@@ -182,7 +350,7 @@ async fn preflight_for_roles_on_connection(
         system_user.as_deref(),
         &session_role,
         &current_role,
-        expected_migrator,
+        accepted_migrators,
     )?;
 
     // EXACTLY ONE NAME, and that is a security property rather than a simplification.
@@ -214,9 +382,34 @@ async fn preflight_for_roles_on_connection(
     .bind(expected_runtime)
     .fetch_optional(&mut *connection)
     .await?;
+
+    // ABSENCE is the only case the caller can relax, and PRESENCE is never relaxed: a role that is
+    // here still goes through the complete posture check below, in both policies. See
+    // `baseline_role_absence_policy` for the whole argument and the run that established it.
+    if posture.is_none() && absent_runtime_role == AbsentBaselineRole::Accept {
+        tracing::info!(
+            role = expected_runtime,
+            "baseline role is absent and the baseline migration is already applied; \
+             accepting the retired end state"
+        );
+        return Ok(());
+    }
+
     validate_runtime_role_posture(expected_runtime, posture.as_ref())?;
 
     Ok(())
+}
+
+/// Exposes the ledger read that decides the baseline-role absence policy.
+///
+/// The policy function itself is a pure `const fn` with a unit test; this is the half that talks to
+/// a database, and the half whose failure mode — answering `true` on a database that has NOT applied
+/// `0001` — would silently disarm the fence.
+#[cfg(feature = "testing")]
+#[doc(hidden)]
+pub async fn baseline_migration_is_applied_for_tests(pool: &PgPool) -> Result<bool, MigrateError> {
+    let mut connection = pool.acquire().await?;
+    baseline_migration_is_applied(&mut connection).await
 }
 
 /// Exercises the production preflight query with isolated, uniquely named role fixtures.
@@ -227,8 +420,21 @@ pub async fn preflight_for_tests(
     expected_migrator: &str,
     expected_runtime: &str,
 ) -> Result<(), MigrateError> {
+    // ONE name here, not the allow-list. This entry point exists so a test can name the exact role
+    // it provisioned and see it accepted or refused on its own; handing it the production list would
+    // let a fixture pass because the real owner happens to exist on the same cluster.
     let mut connection = pool.acquire().await?;
-    preflight_for_roles_on_connection(&mut connection, expected_migrator, expected_runtime).await
+    // `Refuse`, always. This entry point exists to exercise the fence with isolated role fixtures,
+    // and the fixtures are named roles that no migration ledger knows about — so the retirement
+    // relaxation must not reach them, or `preflight_rejects_absent_and_unsafe_isolated_runtime_roles`
+    // would stop asserting the absent case on any database that has run its chain.
+    preflight_for_roles_on_connection(
+        &mut connection,
+        &[expected_migrator],
+        expected_runtime,
+        AbsentBaselineRole::Refuse,
+    )
+    .await
 }
 
 /// Proves the migration identities and applies every pending migration on one connection.
@@ -251,10 +457,17 @@ pub async fn run(pool: &PgPool) -> Result<(), MigrateError> {
     // refuse to run the migration that creates it. The runtime role's own posture is asserted twice
     // elsewhere — by `0009` when it provisions it, and by `assert_runtime_role_is_restricted` at
     // API startup.
+    //
+    // The absence policy is read from this database's own ledger rather than assumed, because
+    // `0010_retire_ptr_clone_app.sql` prescribes dropping this very role once the cluster has
+    // converged. See `baseline_role_absence_policy`.
+    let absent_baseline_role =
+        baseline_role_absence_policy(baseline_migration_is_applied(&mut connection).await?);
     preflight_for_roles_on_connection(
         &mut connection,
-        EXPECTED_MIGRATOR_ROLE,
+        &ACCEPTED_MIGRATOR_ROLES,
         BASELINE_PROVISIONED_ROLE,
+        absent_baseline_role,
     )
     .await?;
     tracing::info!("migration identity and runtime-role preflight passed");
@@ -328,7 +541,7 @@ mod tests {
             Some("scram-sha-256:ptr_clone"),
             EXPECTED_MIGRATOR_ROLE,
             EXPECTED_MIGRATOR_ROLE,
-            EXPECTED_MIGRATOR_ROLE,
+            &[EXPECTED_MIGRATOR_ROLE],
         )
         .expect("the exact authenticated owner is accepted");
 
@@ -359,7 +572,7 @@ mod tests {
                 system_user,
                 session_role,
                 current_role,
-                EXPECTED_MIGRATOR_ROLE,
+                &[EXPECTED_MIGRATOR_ROLE],
             ) {
                 Err(MigrateError::UnexpectedMigratorIdentity {
                     expected,
@@ -373,6 +586,119 @@ mod tests {
                 other => panic!("expected a migrator-identity error, got {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn the_migrator_allow_list_accepts_either_owner_during_the_cutover() {
+        /*
+          The whole point of the list: BOTH names work while a cluster is being cut over, so the
+          database's ownership and this binary do not have to change in the same instant.
+        */
+        for owner in ACCEPTED_MIGRATOR_ROLES {
+            validate_migrator_identity(
+                Some(&format!("scram-sha-256:{owner}")),
+                owner,
+                owner,
+                &ACCEPTED_MIGRATOR_ROLES,
+            )
+            .unwrap_or_else(|error| {
+                panic!("{owner} must be accepted during the cutover: {error:?}")
+            });
+        }
+    }
+
+    #[test]
+    fn the_migrator_allow_list_requires_all_three_facts_to_name_the_same_role() {
+        /*
+          THE NEGATIVE CONTROL FOR THE LIST, and the reason it is checked entry by entry rather than
+          fact by fact.
+
+          A connection that authenticated as one accepted owner and then did `SET ROLE` to the other
+          names two entries. Every individual fact is "in the list", and the connection is still an
+          impersonation — precisely the privilege-expansion shape the three-fact check exists to
+          refuse. Checking each fact against the list independently would accept all four rows below,
+          and each of them would be a role acting under an authority it did not authenticate with.
+        */
+        let [new_owner, old_owner] = ACCEPTED_MIGRATOR_ROLES;
+
+        for (system_user, session_role, current_role) in [
+            (
+                Some(format!("scram-sha-256:{new_owner}")),
+                new_owner,
+                old_owner,
+            ),
+            (
+                Some(format!("scram-sha-256:{new_owner}")),
+                old_owner,
+                old_owner,
+            ),
+            (
+                Some(format!("scram-sha-256:{old_owner}")),
+                new_owner,
+                new_owner,
+            ),
+            (
+                Some(format!("scram-sha-256:{old_owner}")),
+                old_owner,
+                new_owner,
+            ),
+        ] {
+            let outcome = validate_migrator_identity(
+                system_user.as_deref(),
+                session_role,
+                current_role,
+                &ACCEPTED_MIGRATOR_ROLES,
+            );
+            assert!(
+                matches!(
+                    outcome,
+                    Err(MigrateError::UnexpectedMigratorIdentity { .. })
+                ),
+                "a connection authenticated as {system_user:?} running as \
+                 session={session_role}/current={current_role} names two different accepted owners \
+                 and must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn the_migrator_allow_list_is_an_allow_list_and_not_a_shape() {
+        /*
+          Deny by default, stated. A third name — however owner-shaped — is refused, so the list
+          shrinking back to one entry after the cutover is a deletion rather than a rewrite.
+        */
+        for stranger in [
+            "postgres",
+            "tradingroom_app",
+            "ptr_clone_app",
+            "tradingroom_owner",
+        ] {
+            let outcome = validate_migrator_identity(
+                Some(&format!("scram-sha-256:{stranger}")),
+                stranger,
+                stranger,
+                &ACCEPTED_MIGRATOR_ROLES,
+            );
+            assert!(
+                matches!(
+                    outcome,
+                    Err(MigrateError::UnexpectedMigratorIdentity { .. })
+                ),
+                "{stranger} is not an accepted migration owner"
+            );
+        }
+
+        assert_eq!(
+            ACCEPTED_MIGRATOR_ROLES.len(),
+            2,
+            "the cutover window is exactly two names wide; a third is a new decision, not a tweak"
+        );
+        assert_eq!(
+            EXPECTED_MIGRATOR_ROLE, "ptr_clone",
+            "EXPECTED_MIGRATOR_ROLE is what a cluster is PROVISIONED with and what the release \
+             attestation expects on a database that has not cut over. It moves to `tradingroom` in \
+             the cut-over commit, with ops/OWNER-ROLE-CUTOVER.md, and not before."
+        );
     }
 
     #[test]
@@ -416,6 +742,58 @@ mod tests {
             let mut posture = restricted_runtime_role();
             mutate(&mut posture);
             assert_runtime_role_rejected(posture, expected_reason);
+        }
+    }
+
+    /// The four states of the fence, all four asserted, because only one of them changed.
+    ///
+    /// `0010_retire_ptr_clone_app.sql` prescribes dropping `ptr_clone_app` once the cluster has
+    /// converged, and an unconditional requirement then refuses every subsequent deploy — measured
+    /// on a live cluster on 2026-08-31, `migrate` exiting 1 on a database that had applied the whole
+    /// chain.
+    ///
+    /// The relaxation is one cell of this table. The other three are here so a later edit that
+    /// widens it has to widen a stated assertion rather than a single boolean.
+    #[test]
+    fn the_baseline_role_may_be_absent_only_after_the_baseline_has_been_applied() {
+        /*
+          THE FENCE, unchanged. `0001` is still pending, so its forensic branch is still reachable
+          and an absent role would be created with the placeholder password committed at its line 26.
+        */
+        assert_eq!(
+            baseline_role_absence_policy(false),
+            AbsentBaselineRole::Refuse,
+            "a database that has not applied 0001 must still refuse an absent baseline role"
+        );
+
+        /*
+          THE RELAXATION, and the whole of it. SQLx never re-executes a migration it has recorded as
+          applied, so on this database the branch the fence guards cannot run.
+        */
+        assert_eq!(
+            baseline_role_absence_policy(true),
+            AbsentBaselineRole::Accept,
+            "after 0001 is applied, an absent baseline role is 0010's intended end state"
+        );
+
+        /*
+          PRESENCE is never relaxed, in either policy — the relaxation is reached only when the
+          lookup returned None. This is the assertion that would go red if somebody moved the
+          short-circuit above the posture check instead of beside it.
+        */
+        validate_runtime_role_posture(BASELINE_PROVISIONED_ROLE, Some(&restricted_runtime_role()))
+            .expect("a restricted baseline role is accepted whatever the ledger says");
+
+        let mut unsafe_posture = restricted_runtime_role();
+        unsafe_posture.bypasses_rls = true;
+        match validate_runtime_role_posture(BASELINE_PROVISIONED_ROLE, Some(&unsafe_posture)) {
+            Err(MigrateError::UnsafeRuntimeRole { role, reason }) => {
+                assert_eq!(role, BASELINE_PROVISIONED_ROLE);
+                assert_eq!(reason, "BYPASSRLS disables row-level security");
+            }
+            other => {
+                panic!("a re-provisioned unsafe baseline role must still be refused, got {other:?}")
+            }
         }
     }
 

@@ -336,6 +336,62 @@ controls were seen red. That is the second inherited blocker in one day to disso
 
 ---
 
+### The channel model — five settings and one function
+
+**Added 2026-08-31, and they were invisible to this triage until then.** `audit-setting-coverage.mjs`
+counted `sessData.<name>` and these are read in **`processSessData`**, before the object is
+`sessData`, off the minifier's own local. Six settings, zero hits, for as long as the instrument had
+existed. They were found by counting bare names as a cross-check and reading every difference — and
+the sixth, `hasChannelTabs`, turned out to be a live defect rather than a gap.
+
+The reference builds its entire tab strip in one expression (pinned bundle, bytes 1,146,625-1,147,200):
+
+```js
+globals.chatTabs = []
+globals.chatTabs.push(e.altGenChannelName ? {displayName: e.altGenChannelName, name:"main", type:"r"}
+                                          : {displayName:"Main Chat", name:"main", type:"r"})
+e.hasChannelTabs      && globals.chatTabs.push(e.altOffTopicChannelName
+                                          ? {displayName: e.altOffTopicChannelName, name:"offTopic", type:"r"}
+                                          : {displayName:"Off Topic", name:"offTopic", type:"r"})
+e.hasAdminOnlyChannel && globals.chatTabs.push({displayName:"Admins", name:"adminChat", type:"po"})
+e.extraAdminChannels  && e.extraAdminChannels.split(",").forEach(r =>
+                            globals.chatTabs.push({displayName:r, name:r, type:"p"}))
+e.extraRegChannels    && e.extraRegChannels.split(",").forEach(r =>
+                            globals.chatTabs.push({displayName:r, name:r, type:"r"}))
+```
+
+**Only `main` is unconditional.** `hasChannelTabs` is now WIRED and is therefore not on the pinned
+list: this room had shipped an Off Topic tab to every room including those whose owners had turned it
+off — a control nobody asked for, which is the mirror of the dead-control rule. `chat-tabs.ts`
+carries the argument and `chat-tabs-contract.test.ts` the five cases, including that **absent means
+true**, because reading absence as false would have removed the tab from every room that never stored
+the setting.
+
+The five below are genuinely unbuilt, and they are ONE piece of work rather than five:
+
+| setting | reads | what it does upstream |
+| --- | --- | --- |
+| `altGenChannelName` | 2 | Renames the Main Chat tab. Absent → `"Main Chat"`. The channel NAME stays `main`; only `displayName` changes. |
+| `altOffTopicChannelName` | 2 | The same for Off Topic. Absent → `"Off Topic"`. |
+| `hasAdminOnlyChannel` | 1 | Adds an `adminChat` tab labelled `Admins`, **type `po`**. Captured default is ON (`room-settings-profile.ts:56`), so upstream rooms have a tab this room does not. |
+| `extraAdminChannels` | 2 | Comma-separated. Each becomes `{displayName: r, name: r, type: "p"}` — the typed name IS the channel name, with no sanitisation upstream. |
+| `extraRegChannels` | 2 | The same, **type `r`**. |
+
+**Why this is a model change and not four pushes.** The reference has THREE channel types — `r`,
+`p` and `po` — where this room has one. `BUILT_IN_CHAT_TABS` is a flat list of names and
+`memberChatChannels` resolves an allow-list of strings; there is nowhere for a type to live, and the
+types are what decide who may read and post. Building these means giving a channel a type first, and
+that touches the SSE hub's per-listener `chatChannels`, `chat-log.ts`'s reads and the archive sweep.
+
+**Two things to settle before building, neither of which the capture answers.** Upstream pushes the
+owner-typed name as BOTH `displayName` and `name`, unsanitised — this room already refuses a badge
+channel whose name collides with a built-in (`chat-tabs.ts`), and the same rule has to apply here or
+an owner can type `main` and land messages in every member's main log. And `po` versus `p` is
+undecoded: both are private, and nothing in the capture says what the `o` distinguishes.
+
+**Not started, deliberately.** A partial channel model is worse than none: a tab that renders and
+cannot be posted to is the dead scaffolding this repository forbids.
+
 ## BLOCKED
 
 | setting | blocked on |

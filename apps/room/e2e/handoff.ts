@@ -27,6 +27,17 @@ export interface HandoffOptions {
   email?: string;
   /** `site` is an owner launching a room they own — the presenter path this suite drives. */
   type?: 'site' | 'guest';
+  /**
+   * The account id, and it is NOT free to choose: `handoff-token.ts:149` refuses
+   * `type === 'guest' && id !== ''` as `bad-claims`, because a guest is not an account and an id
+   * would be the beginning of one inheriting a membership.
+   *
+   * So the default follows the type rather than being a constant — `''` for a guest, `'1'` for a
+   * site handoff. A spec that wanted to drive the guest door and passed only `type: 'guest'` got a
+   * 403 and an error page, which reads as "the room refused a valid guest" rather than as "this
+   * helper minted a token the rule forbids". Overridable, so the refusal itself stays testable.
+   */
+  id?: string;
   /** Seconds from now. The room's own tokens live 60s; a spec run is shorter than that. */
   lifetimeSeconds?: number;
 }
@@ -37,7 +48,7 @@ export function mintHandoff(options: HandoffOptions = {}): string {
   const payload = {
     name: options.name ?? 'E2E Presenter',
     email: options.email ?? 'e2e-presenter@example.com',
-    id: '1',
+    id: options.id ?? (options.type === 'guest' ? '' : '1'),
     type: options.type ?? 'site',
     // Milliseconds, as the reference mints it — the one claim whose unit differs from its neighbours.
     issued: Date.now(),

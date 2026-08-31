@@ -52,6 +52,7 @@ import { timingSafeEqual } from 'node:crypto';
 */
 import { MEDIA_HOOK_SECRET } from '$app/env/private';
 import { mtxStreamFromPath } from '#lib/mtx-reconcile.js';
+import { noteHookPublished } from '#lib/server/mtx-reconciler.js';
 import { publishToRoom } from '#lib/server/room-events.js';
 import type { RequestHandler } from './$types';
 
@@ -124,6 +125,21 @@ export const POST: RequestHandler = async ({ request }) => {
         ? { cmd: 'mtxStartStream', muser: parsed }
         : { cmd: 'mtxStopStream', muser: parsed }
   });
+
+  /*
+    TELL THE RECONCILER WHAT WE JUST SAID, or it will say it again 5 seconds later.
+
+    The reconcile publishes the DIFFERENCE between what the room has been told and what MediaMTX
+    reports. Publishing here without updating that baseline leaves the two disagreeing, and the next
+    poll re-derives the same delta — measured live on 2026-08-31 as a second `mtxStartStream` 2.75s
+    after this one, which puts two identical tabs in every viewer's room because
+    `applyMtxStartStream` appends without checking `_id`.
+
+    AFTER the publish, deliberately: the baseline records what subscribers have been told, so it must
+    not be updated before they have been told it. `noteHookPublished` is a no-op when no reconcile is
+    running, which is the case for a deployment with no `MEDIA_API_URL` at all.
+  */
+  noteHookPublished(roomShortCode, parsed, event);
 
   /*
     200 whether or not anybody was listening. A room with no connected members is not an error, and
