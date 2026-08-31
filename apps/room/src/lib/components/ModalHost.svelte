@@ -30,16 +30,15 @@
     FollowChatStyle,
     ManagedChatUser,
     MessageAction,
+    MessageActionEvent,
     MessageActionItem,
-    MessageReactionPayload,
     MessageReactions,
     ModalName,
     ModalTargetUser,
     RoomMessageItem,
     SavedPoll,
     SettingsTab,
-    Theme,
-    TradeCopyPayload
+    Theme
   } from '#lib/types.js';
   import type { AlertLabel } from '#lib/alert-labels.js';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
@@ -216,7 +215,7 @@
      * which this component receives, and reading them from there is what stops the Q&A header
      * disagreeing with every other body in the room about the same two preferences.
      */
-    onQaAlertBodyAction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
+    onQaAlertBodyAction: (action: MessageAction, payload?: MessageActionEvent) => void;
     alertQuestions?: readonly {
       id: number;
       alertId: number;
@@ -277,7 +276,7 @@
     onQaAction: (
       action: MessageAction,
       item: MessageActionItem,
-      payload?: MouseEvent | MessageReactionPayload | TradeCopyPayload
+      payload?: MessageActionEvent
     ) => void;
     onMentionUser: (name: string) => void;
     onPrivateChat: (user: ModalTargetUser) => void;

@@ -2,7 +2,7 @@
   import MessageBody from './MessageBody.svelte';
   import { ALERT_LABEL_BADGE_CLASS, alertLabelBadgeStyle } from '#lib/alert-labels.js';
   import type { BodySegment } from '#lib/message-body-segments.js';
-  import type { MessageAction, TradeCopyPayload } from '#lib/types.js';
+  import type { MessageAction, MessageActionEvent } from '#lib/types.js';
 
   /**
    * One parsed message body, rendered — the six segment kinds and nothing else.
@@ -76,7 +76,16 @@
     chatGif?: boolean;
     messageId: number;
     extraChatMsg?: boolean;
-    onaction: (action: MessageAction, payload?: MouseEvent | TradeCopyPayload) => void;
+    /*
+      `MSB-03` — typed as the SHARED union rather than a local restatement of two of its members.
+
+      It listed `MouseEvent | TradeCopyPayload`, which is the same union `RoomMessage` restated with
+      three members and `AlertQaAlertCard` with two — four spellings of one type, and every one of
+      them a place the union can be extended without. Adding `ImageOpenPayload` in `types.ts` broke
+      all of them at once, which is the only reason it was noticed rather than silently narrowed at
+      one boundary. `AlertChatArea.svelte:277` had already been on the shared name.
+    */
+    onaction: (action: MessageAction, payload?: MessageActionEvent) => void;
   } = $props();
 
   let revealedGifs = $state.raw<Record<string, boolean>>({});
@@ -176,7 +185,7 @@
       </div>{/if}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       class={['img-container', { 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }]}
-      onclick={(event) => onaction('image', event)}
+      onclick={(event) => onaction('image', { url: segment.url!, event })}
     >
       <!-- svelte-ignore a11y_missing_attribute -->
       <img class="uploaded-img" src={segment.url} /><br

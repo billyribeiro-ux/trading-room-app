@@ -2,6 +2,7 @@
 import { flushSync } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
 
+import { isImageOpenPayload } from '#lib/image-open-payload.js';
 import type { MessageActionItem, ModalTargetUser } from '#lib/types.js';
 
 import { RoomChat } from './chat.svelte';
@@ -65,6 +66,8 @@ const make = (
   const opened: string[] = [];
   const selected: (ModalTargetUser | null)[] = [];
   const privateChats: number[] = [];
+  /** `MSB-03` — every image the dispatcher opened, in order, with the URL it was given. */
+  const imagesOpened: { url: string; shiftKey: boolean }[] = [];
   let invalidated = 0;
 
   const composer = new RoomComposer({
@@ -123,7 +126,9 @@ const make = (
     selectUser: (user) => selected.push(user),
     patchEvidence: (target, patch) => patches.push([target.evidenceKey ?? '', patch]),
     openPrivateChat: (peerId) => privateChats.push(peerId),
-    openImage: () => {},
+    /** `MSB-03` — records (url, modifiers) so the dispatch can be asserted end to end. */
+    openImage: (event: MouseEvent | undefined, url: string) =>
+      imagesOpened.push({ url, shiftKey: event?.shiftKey ?? false }),
     clearUnreadQa: () => {},
     focusComposer: () => {},
     onChanged: () => ((invalidated += 1), Promise.resolve()),
@@ -152,9 +157,104 @@ const make = (
     opened,
     selected,
     privateChats,
+    imagesOpened,
     invalidated: () => invalidated
   };
 };
+
+/**
+ * `MSB-03` — the image that opens is the image that was CLICKED.
+ *
+ * ```js
+ * onclick="openImageModal(event,'${a}')"      // bundle byte 1,326,195, inside `urlwrapImg`
+ * ```
+ *
+ * `a` is that image's own sanitised URL, written into each container's handler as the pipe builds
+ * it. So upstream the opener is TOLD which picture; it never has to work it out.
+ *
+ * This dispatcher worked it out, from `item.targetUrl` — the ALERT's attachment. Two defects fell
+ * out of that, and the tests below are one per defect rather than one for the pair, because they
+ * fail for different reasons and a single case would let one of them come back:
+ *
+ *   - a chat message has no `targetUrl`, so the guard was false and the click did NOTHING;
+ *   - an alert that has BOTH an attachment and an inline image opened the attachment, which is a
+ *     different picture from the one the member clicked.
+ *
+ * The second is the worse one and the harder to notice: something opens, so it looks like it works.
+ */
+describe('MSB-03 — the clicked image is the opened image', () => {
+  it('opens an inline image in a CHAT message, which used to do nothing at all', () => {
+    const { actions, imagesOpened } = make();
+    actions.handle('chat', 'image', item(), {
+      url: 'https://cdn.example/inline.png',
+      event: new MouseEvent('click')
+    });
+    expect(imagesOpened).toEqual([{ url: 'https://cdn.example/inline.png', shiftKey: false }]);
+  });
+
+  it('opens the INLINE image, not the alert attachment, when the row has both', () => {
+    /*
+      The corner the old code got wrong while appearing to work. `targetUrl` is set here precisely
+      so a dispatcher that still consults the row would pass with the wrong picture.
+    */
+    const { actions, imagesOpened } = make();
+    actions.handle(
+      'alert',
+      'image',
+      item({ targetUrl: 'https://cdn.example/attachment.png' } as Partial<MessageActionItem>),
+      { url: 'https://cdn.example/inline.png', event: new MouseEvent('click') }
+    );
+    expect(imagesOpened.map((entry) => entry.url)).toEqual(['https://cdn.example/inline.png']);
+  });
+
+  it('carries the modifier keys, which choose the popped-out window over the lightbox', () => {
+    /*
+      `RoomModals.openImage` reads `shiftKey`, `altKey` and the synthesised `ctrlClick`. The event
+      rides INSIDE the payload rather than beside it, and this is the assertion that says so: a
+      payload carrying the URL and dropping the event would open the right picture in the wrong
+      place, silently, for the one gesture nobody tests by hand.
+    */
+    const { actions, imagesOpened } = make();
+    actions.handle('chat', 'image', item(), {
+      url: 'https://cdn.example/inline.png',
+      event: new MouseEvent('click', { shiftKey: true })
+    });
+    expect(imagesOpened).toEqual([{ url: 'https://cdn.example/inline.png', shiftKey: true }]);
+  });
+
+  it('and opens NOTHING when the payload is not an image open, rather than falling back', () => {
+    /*
+      There is deliberately no `item.targetUrl` fallback. A caller that raises `image` without
+      naming one is a bug, and opening the row's attachment instead is the exact wrong-picture
+      behaviour this row is about — a fallback would reintroduce it for any future call site that
+      forgets, which is the only way it can come back.
+
+      A bare `MouseEvent` is what the old call sites sent, so this is also the assertion that the
+      old shape cannot silently keep working.
+    */
+    const { actions, imagesOpened } = make();
+    actions.handle(
+      'alert',
+      'image',
+      item({ targetUrl: 'https://cdn.example/attachment.png' } as Partial<MessageActionItem>),
+      new MouseEvent('click')
+    );
+    expect(imagesOpened).toEqual([]);
+  });
+
+  it('and the guard separates the payload from its three siblings in the union', () => {
+    /*
+      Unit, not source text: `MessageActionEvent` has four members and the other three must not be
+      mistaken for an image open. `TradeCopyPayload` is the near miss — an object with one string
+      field — and a guard written as "is an object" would take it.
+    */
+    expect(isImageOpenPayload({ url: 'u', event: new MouseEvent('click') })).toBe(true);
+    expect(isImageOpenPayload(new MouseEvent('click'))).toBe(false);
+    expect(isImageOpenPayload({ text: '[{(BUY)}]' })).toBe(false);
+    expect(isImageOpenPayload({ key: 'k', emoji: '\u{1F44D}' })).toBe(false);
+    expect(isImageOpenPayload(undefined)).toBe(false);
+  });
+});
 
 describe('every optimistic write has exactly one undo', () => {
   it('hides a deleted row, and puts it BACK when the server refuses', async () => {

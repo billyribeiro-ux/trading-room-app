@@ -1855,8 +1855,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The comment records the direction of the failure, because a bare `= true` reads as arbitrary
       and the next reader flipping it back would find nothing to stop them — `chat-gif-muted-contract`
       now asserts BOTH declarations, which is the test half of the same pair.
+
+      187 -> 196, 2026-08-31 (MSB-03). Nine lines, of which ONE is the image container's handler:
+      the click now names the segment's own url instead of raising a bare event. That is what the
+      reference does — `urlwrapImg` writes each container's own url into its own handler at byte
+      1,326,195 — and without it the dispatcher resolved one from the ROW, so a click inside a chat
+      message did nothing and a click inside an alert opened the attachment rather than the picture.
+      The other eight are the note on `onaction`'s type, which is the shared `MessageActionEvent`
+      now rather than the fourth local restatement of two of its members.
     */
-    max: 187,
+    max: 196,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
@@ -2108,7 +2116,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       text in the Q&A header. That is upstream's behaviour, it is surprising, and without the
       paragraph it is exactly the kind of thing a later reader "fixes".
     */
-    max: 244,
+    /*
+      244 -> 245, 2026-08-31 (MSB-03). One line: `onaction`'s payload is the shared
+      `MessageActionEvent` and carries a pointer to the row, rather than the local
+      `MouseEvent | TradeCopyPayload` it restated — one of four spellings of that union, all of them
+      places it could be extended without.
+    */
+    max: 245,
     why: 'the alert card the Q&A modal reproduces in its own header - `e3e`, called once'
   },
   {
@@ -4268,7 +4282,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       modal hides on the image path and NOT on the text one, the URL goes first with the message
       appended, and the box is cleared only when a message travels.
     */
-    max: 857,
+    /*
+      857 -> 874, 2026-08-31 (MSB-03). Seventeen lines, of which THREE are the handler: the image
+      action now takes its url from the payload the click carries rather than from `item.targetUrl`.
+
+      The reference writes each container's own url into its own handler
+      (`onclick="openImageModal(event,'${a}')"`, byte 1,326,195) and this resolved one from the ROW
+      instead — the alert's ATTACHMENT — so a click inside a chat message hit a false guard and did
+      nothing, and a click inside an alert that also had an attachment opened the attachment rather
+      than the picture. The second is the worse one: something opens, so it looks like it works.
+
+      The rest is the note saying there is NO `item.targetUrl` fallback and why. Both call sites name
+      the url they are showing, so a fallback could only ever fire for a caller that forgot to — and
+      firing with the row's url is precisely the wrong-picture bug. Doing nothing is the honest
+      response to a caller error here.
+    */
+    max: 874,
     why: 'what a click on a message can do; four optimistic paths, one refusal, one undo each'
   },
   {
@@ -6527,8 +6556,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `reactionStrip`, differing only by an inner gate that the container's own gate already implies
       (in the reference as well as here — `b_e`'s `O(36, …)` entails `g_e`'s `O(3, …)`). One snippet,
       three call sites.
+
+      1259 -> 1255, 2026-08-31 (MSB-03), and it falls because a DUPLICATION left rather than because
+      anything was extracted. Two interfaces at the top of this file — `MessageReactionPayload` and
+      `TradeCopyPayload` — were local re-declarations of types in `#lib/types.ts`, the second under a
+      comment saying so in as many words. They stayed structurally compatible by luck; the luck ran
+      out when `MessageActionEvent` gained a fourth member and this file could not describe it. The
+      prop and `runAction` both take the shared union now.
     */
-    max: 1259,
+    max: 1255,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {

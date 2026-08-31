@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 20:10 UTC — The image that opens is the image that was clicked
+
+**Runtime impact: YES.** Clicking an inline image in a chat message did nothing at all. Clicking one
+inside an alert that also carried an attachment opened the ATTACHMENT — a different picture. Both
+are fixed. The second was the worse of the two and the harder to notice, because something opened.
+
+The reference writes each container's own URL into its own handler as it builds it:
+`onclick="openImageModal(event,'${a}')"` at bundle byte 1,326,195, inside `urlwrapImg`. So upstream
+every inline image already knows its own address and the opener is told it.
+
+This room raised `onaction('image', event)` with no URL, and the dispatcher worked one out from
+`item.targetUrl` — the alert's attachment. For a chat row that field is empty, so the guard was false
+and the click was swallowed; for an alert with both, it named the wrong picture.
+
+`ImageOpenPayload` is `{ url, event }` and the two call sites each name what they are showing. The
+event rides INSIDE the payload rather than beside it because `RoomModals.openImage` reads its
+modifier keys — shift, alt and the synthesised `ctrlClick` open the popped-out window instead of the
+lightbox — and passing them separately is what let a caller supply one and not the other.
+
+**There is no `item.targetUrl` fallback, and that is a decision rather than an omission.** The
+register row prescribed one ("preferring the payload's URL over `item.targetUrl`"). A fallback can
+only ever fire for a caller that forgot to name a URL, and firing with the row's URL is precisely the
+wrong-picture bug — it would guarantee the defect returns for the next call site anyone adds. A
+payload that is not an image open is a caller error; opening nothing is the honest response.
+
+**The type error found a duplication.** Adding a fourth member to `MessageActionEvent` broke
+compilation in four places, because four boundaries had each restated the union locally instead of
+importing it. `RoomMessage.svelte` re-declared `MessageReactionPayload` and `TradeCopyPayload`
+outright — the second under a comment reading *"`#lib/types.ts`'s `TradeCopyPayload`, restated
+locally beside its sibling above"*, a duplication with its own note explaining that it was one.
+`MessageBody`, `AlertQaAlertCard`, `AlertQaModal` and `ModalHost` each spelled two or three members
+inline. Only `AlertChatArea.svelte:277` was already on the shared name. They stayed compatible by
+luck, and the luck running out is the only reason any of it surfaced. All six are on
+`MessageActionEvent` now, and `RoomMessage`'s ratchet ceiling FELL, 1259 -> 1255.
+
+**Verified — seven negative controls, each red on exactly its own assertion, green after restore.**
+
+The dispatcher is driven through `RoomMessageActions.handle` with a recording `openImage`: an inline
+image in a chat message; an alert carrying both an attachment and an inline image, with the
+attachment URL set precisely so a dispatcher still consulting the row would pass with the wrong
+picture; the modifier keys; and nothing opening for a non-image payload. Controls: the original
+handler restored (four red), a `targetUrl` fallback added (one), the event dropped (one), the guard
+loosened to "is an object" (two).
+
+The call sites needed their own file, because every assertion in the dispatcher's would still pass
+with both components left exactly as they were. `message-image-click.svelte.test.ts` MOUNTS
+`MessageBody` and clicks it — one image; **two** images in one body clicked in reverse order, which
+is the case that fails for anything resolving the URL from the message rather than the element; and
+the modifier keys. `RoomMessage`'s attachment site is asserted as text with the reason at the
+assertion: forty-odd props would make a mount there a fixture larger than the assertion, and the
+behaviour either side of it is executed. Controls: each call site reverted to a bare `MouseEvent`
+(three red, then one), and `MessageBody` resolving from the segment LIST rather than the clicked
+segment (one red, on the two-image case alone, which is why that case exists).
+
+One assertion elsewhere moved. `alert-qa-surface-contract.test.ts` pinned the old dispatcher guard as
+text under `QAM-10`/`QAM-11`; it asserts the renderer instead now — `targetUrl` declared on the
+modal's shape, and `RoomMessage` reading it — which is what those rows were blocked on. The
+dispatcher branch it used to name no longer decides anything.
+
+Svelte MCP: `svelte-autofixer` clean on `MessageBody.svelte` and on the `RoomMessage` attachment
+region. rust-analyzer MCP: not used and not needed — no `.rs` file was touched.
+
 ### 2026-08-31 19:40 UTC — Four BLOCKED rows closed, and three of the four blockers were not real
 
 **Runtime impact: YES**, three changes a person in a room can see. The image lightbox dims the room
