@@ -33,6 +33,46 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 01:40 UTC — Three tracker rows that described work already shipped
+
+**Runtime impact: NO.** No behaviour changed. What changed is that three rows and two docblocks
+stopped describing a repository that no longer exists.
+
+Found by trying to BUILD row PC, which is the only way this class of staleness surfaces.
+
+**Row PC — private-chat Load More scroll restoration — is fully built.** The row said
+`CompactMessageRow` "emits no `id` attribute, so the lookup would find nothing", and prescribed two
+pieces. Both exist: the row emits `id="pcm-{message._id}"`, `RoomPrivateChat.#loadMoreAnchorId`
+records the top row BEFORE the request at `private-chat.svelte.ts:641`, and `restoreAfterLoadMore`
+in `room/private-chat-scroll.ts` scrolls to it after the render that inserted the rows and backs off
+`LOAD_MORE_OVERSCROLL_PX = 20`. `private-chat-strip-contract.test.ts`'s **G14** already pinned the
+anchor string, the order and the constant.
+
+Two docblocks were still arguing for the absent version, and both are the exact shape `CLAUDE.md`
+names — a comment claiming something that no longer matches the next line:
+
+- `chat-paging.ts` — *"`loadMoreLastID` is deliberately absent … NOTHING COULD READ IT"*. The reason
+  is kept in the past tense rather than deleted, because "a field written and never read is the thing
+  this repository refuses" is still why `LoadMorePaging` has three members and not four. The anchor
+  is a DOM id with a one-call life; a reducer carrying it would never read it.
+- `load-more-paging.test.ts` — the case named *"carries NO scroll anchor, which is a gap and not an
+  omission"*. The assertion is unchanged and still correct; only its reason moved.
+
+**Row 5 — the room's four Chromium gates cannot run in CI — was resolved by taking its second
+option.** `apps/room/gate/` holds six published measurement scripts, no `package.json` entry names
+the gitignored `scripts/` any more (the thirty that did are recorded in
+`apps/room/docs/UNPUBLISHED-SCRIPTS.md` rather than dropped silently), and the `room-e2e` job at
+`.github/workflows/quality.yml:386` drives a real browser over 25 assertions. `.gitignore:176` still
+excludes the collectors, which is the half of the decision that stands.
+
+**The runtime-role cutover section is down to one row**, and the row that was closed had asked for
+something wrong — see the 00:57 entry. Row 3 had been marked `DONE` in place, which this
+repository's own rule forbids: a finished row is removed and the CHANGELOG carries the evidence.
+
+**Verified:** `manifest-scripts-contract` 38, `load-more-paging` + `private-chat-strip-contract` 42,
+and the five contracts that read `TODO.md` — `evidence-gap-register-counts`, `naming-boundary`,
+`notes-account-action`, `setting-coverage`, `user-action-disposition` — 52. All green.
+
 ### 2026-08-31 01:30 UTC — Four parallel audits merged, and the three counts they each kept privately
 
 **Runtime impact: YES** — via the three audits merged, not via this entry. Fifty-three rows across

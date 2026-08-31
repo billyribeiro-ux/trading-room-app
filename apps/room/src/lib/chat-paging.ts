@@ -182,21 +182,27 @@ export function mergeOlderMessagesBy<T>(
 */
 
 /**
- * THREE of the reference's four fields.
+ * THREE of the reference's four fields, and the fourth lives somewhere else on purpose.
  *
- * `loadMoreLastID` is deliberately absent, and its absence is recorded rather than quietly dropped.
- * It is a SCROLL RESTORATION: the id of the row that was at the top when Load More was pressed, used
- * by the `getPCLog` subscriber above to `scrollIntoView` that row once older messages have been
- * prepended and then back off 20px. Without it the reader's view jumps by however many rows arrived.
+ * `loadMoreLastID` is the SCROLL RESTORATION: the id of the row that was at the top when Load More
+ * was pressed, used by the `getPCLog` subscriber above to `scrollIntoView` that row once older
+ * messages have been prepended and then back off 20px. Without it the reader's view jumps by however
+ * many rows arrived.
  *
- * It was modelled here first, and then removed, because NOTHING COULD READ IT: our rows render as
- * `<CompactMessageRow>` with no `id` attribute at all, so the `getElementById("pcm-" + _id)` the
- * restoration turns on would find nothing. A field written and never read is the thing this
- * repository refuses, and carrying it would have looked like the behaviour existed.
+ * **It is built.** `RoomPrivateChat.#loadMoreAnchorId` records it before the request,
+ * `restoreAfterLoadMore` in `room/private-chat-scroll.ts` acts on it after the render that inserted
+ * the rows, and `private-chat-strip-contract.test.ts`'s G14 pins the order and the `-20`.
  *
- * Building it means giving the row an id — which is a shared component used by the all-user modal
- * too — and a `scrollToAnchor` beside `scrollToBottom` in `RoomPrivateChat`. `TODO.md` carries it
- * with these bytes so the next pass does not re-derive them.
+ * It is not a field of THIS type because it is not paging state. These three are pure values a
+ * reducer moves between states and a component renders; the anchor is a DOM id whose whole life is
+ * one call — set, read once, cleared. A reducer that carried it would never read it.
+ *
+ * This block used to say the field was deliberately absent because NOTHING COULD READ IT: our rows
+ * rendered as `<CompactMessageRow>` with no `id`, so `getElementById("pcm-" + _id)` would have found
+ * nothing. That was true and it is the reason the field was removed before it first shipped. The row
+ * emits `id="pcm-{message._id}"` now and the restoration was built on top of it; the paragraph is
+ * kept in the past tense rather than deleted, because "a field written and never read is the thing
+ * this repository refuses" is why the shape below is still three and not four.
  */
 export type LoadMorePaging = {
   /** `currPage` — REQUESTS made, not rows held. That distinction is the whole defect. */
