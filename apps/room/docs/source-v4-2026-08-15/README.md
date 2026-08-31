@@ -17,6 +17,52 @@ Full digests are in `sha256sums.txt` beside this file.
 
 ---
 
+## RE-VERIFIED 2026-08-31 — still byte-identical, and the version paths have changed
+
+**This capture is not stale.** Sixteen days on, `https://chat.protradingroom.com/` serves exactly
+what is pinned here:
+
+| artefact | live 2026-08-31 | pinned |
+| --- | --- | --- |
+| index | `d1f84087…a220`, 16,094 B | identical |
+| `main.d1d09071be31f1ba.js` | `40796ca8…7524`, 2,891,205 B | identical |
+
+Worth stating because this directory exists to answer *"is our evidence simply older than what the
+owner is looking at?"*, and today the answer is no. That question was not hypothetical: the whole
+reason this capture was taken is the `st-fileSortBar` incident, where a search reported a feature
+missing and the real cause was a capture that predated it.
+
+### What DID change, and why it matters to the v5 question
+
+The version aliases are gone. On 2026-08-15 this file recorded `/v3` serving a real, separate, older
+build (`89ed9e7b…`, 15,796 B) and `/v4` byte-identical to `/`. **Today all of them 404:**
+
+```
+/     200  16,094 B
+/v3   404     169 B
+/v4   404     169 B
+/v5   404     169 B
+/v6   404     169 B
+```
+
+So the note below — *"On v5, stated carefully … The 404 above establishes only that `/v5/` is not
+served as a URL PATH on this host"* — is now weaker still, and should not be cited as evidence about
+v5 at all. `/v3` and `/v4` demonstrably EXISTED on this host and answer 404 today, which means a 404
+here distinguishes nothing: it is what this host now returns for every version path, present or
+absent. The paragraph's own conclusion is unaffected and stands on its other measurement — zero
+occurrences of `useV3`/`useV4`/`useV5` across the bundle, so the server selects the build per room —
+and settling where v5 lives still needs a room whose `useV5` is on.
+
+**Reproduce:**
+
+```sh
+curl -sS -o - https://chat.protradingroom.com/ | sha256sum          # d1f84087…
+curl -sS -o - https://chat.protradingroom.com/main.d1d09071be31f1ba.js | sha256sum   # 40796ca8…
+for p in / /v3 /v4 /v5; do curl -sS -o /dev/null -w "$p %{http_code}\n" "https://chat.protradingroom.com$p"; done
+```
+
+---
+
 ## How it was verified
 
 Three independent captures, all agreeing on every hash:

@@ -348,7 +348,19 @@ it was planning.
    including the catch that its fmp4 recorder skips VP8 — a WebRTC screenshare recorded server-side
    is audio-only unless the publisher sends a codec the recorder keeps. **That is what the design
    decision is now about**, and it is a smaller question than "is there an archive service at all".
-3. **Part 3 v5** — when an account is cleared for it.
+3. **Part 3 v5** — when an account is cleared for it. **Re-tested 2026-08-31 and the block HOLDS, but
+   one piece of evidence for it must stop being cited.** The room host's version paths were probed
+   again: `/` answers 200, and `/v3`, `/v4`, `/v5` and `/v6` all answer **404**. On 2026-08-15 `/v3`
+   served a real, separate, older build and `/v4` was byte-identical to `/` — both are gone. So a 404
+   on `/v5` distinguishes nothing: it is what this host now returns for every version path, present
+   or absent. The conclusion is unchanged and rests on its other measurement — zero occurrences of
+   `useV3`/`useV4`/`useV5` in 2,891,205 bytes, so the SERVER selects the build per room — and it
+   still needs a room whose `useV5` is on.
+
+   The same probe re-verified the pinned capture: `apps/room/docs/source-v4-2026-08-15/` is **still
+   byte-identical to what is deployed** sixteen days on, index and bundle both. Recorded in that
+   directory's README, because "is our evidence simply older than what the owner is looking at?" is
+   the question it exists to answer, and today the answer is no.
 
 **Then `docs/decoded/missing-commands-triage.md`** — the only complete list of what the reference has
 and we do not. **This paragraph pointed at work that is finished, and is corrected 2026-08-30 by
