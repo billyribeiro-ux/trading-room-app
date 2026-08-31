@@ -87,8 +87,22 @@ import type { MainTab } from './types.js';
  * built from this component: `MainTab` in `#lib/types.ts` has no `'recordings'` member and
  * `PresentationArea` has no `#recordings` pane (const 25 upstream), so a tab added here would
  * select a value nothing renders. `RoomGates.archivesAvailable` already carries the first half of
- * the gate; the second, `sessData.recsInRoom`, appears nowhere in this repository — grep returns
- * zero hits across `src/`.
+ * the gate.
+ *
+ * **The second half is `sessData.recsInRoom`, and this paragraph used to say it "appears nowhere in
+ * this repository — grep returns zero hits across `src/`". Both halves of that were wrong, corrected
+ * 2026-08-31.** It is a DECLARED controller setting — `room-settings-schema.ts:247`, typed at `:702`,
+ * defaulting to `true` in `room-settings-profile.ts:78` — and even inside `apps/room/src` it has a
+ * hit, in `setting-coverage-contract.test.ts`'s `REFERENCE_READS_AND_WE_DO_NOT`.
+ *
+ * The CONCLUSION is unchanged and is now stated from the right fact: `recsInRoom` is not in
+ * `ROOM_VISIBLE_SETTINGS` (`apps/controller/src/lib/room-config.ts` carries `hideRecs` at :214 and
+ * not this one), so it never crosses to the room and there is no value here to gate on. That is a
+ * missing WIRE, not a missing setting, and the difference decides what building this costs.
+ *
+ * Recorded rather than quietly edited because it is the failure `CLAUDE.md`'s own checklist names:
+ * a comment claiming something is absent, written from a grep, surviving long enough that the next
+ * reader plans around it.
  */
 
 type Stub = Record<string, unknown>;

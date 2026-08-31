@@ -33,6 +33,44 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 12:55 UTC — The Recordings tab, specified from the bundle, and one comment that was wrong twice
+
+**Runtime impact: NO.** Nothing is built. A blocked row stops being an investigation, and a stale
+claim is corrected.
+
+`NEW-TODO.md`'s `presAreaTabs-recordings` row is correctly blocked — there is no archive service —
+and it had been left at *"needs an archive service first, which is a design decision"*. Everything
+AROUND that decision is now read from the pinned bundle, so building it later is a transcription
+rather than a re-investigation.
+
+**The entitlement is already built here, and is an exact transcription.** `archivesAvailableTo`
+appears twice in the reference, byte-identical, at 1,959,906 and 2,568,449, and
+`roster-gates.ts:60` is it line for line. The asymmetry is the part worth knowing:
+`showArchivesToSpecificPresenters` is an allow-list that only ever NARROWS full presenters (absent
+means everyone), while members and limited presenters need `showArchivesToUsers` on AND the per-user
+`denyArchivesAccess` off. All three exist here. It also already has a live consumer — the speech-reco
+overlay's "Full Transcript History" button — so it is not a predicate waiting for one.
+
+**There are TWO archive routes, in two different applications, and they are not the same one.** The
+room's is `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{sesionToken}`; the manage app's is
+`/users/v1/archives/recordings/{sessData._id}/{jwtToken}`. NEW-TODO cites the room's and is right.
+`sesionToken` is the reference's own spelling, one `s`, and is what its globals are keyed on.
+
+Of the three consumers, we have one: `getRecordingsUrl()` and both `launchRecordings()` sites are
+absent, correctly — each opens the archive URL.
+
+**And a comment that was wrong twice, found by checking it rather than by anything failing.**
+`main-tab-strip-gates.svelte.test.ts` said the Recordings tab's second gate, `sessData.recsInRoom`,
+*"appears nowhere in this repository — grep returns zero hits across `src/`"*. It is a DECLARED
+controller setting (`room-settings-schema.ts:247`, typed at `:702`, defaulting to `true` in the
+profile), and even inside `apps/room/src` it has a hit. The conclusion survives and is now stated
+from the right fact: `recsInRoom` is not in `ROOM_VISIBLE_SETTINGS`, so it never crosses to the room
+and there is no value here to gate on. **A missing WIRE, not a missing setting** — and the difference
+decides what building the tab costs.
+
+That is the failure `CLAUDE.md`'s own checklist names: a comment claiming absence, written from a
+grep, surviving long enough that the next reader plans around it.
+
 ### 2026-08-31 12:40 UTC — The coverage tracker was under-reporting by thirteen batches
 
 **Runtime impact: NO.** A number was wrong. Nothing shipped changes.

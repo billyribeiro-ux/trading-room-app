@@ -301,6 +301,53 @@ it was planning.
    Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
    repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
    `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
+
+   **FULLY SPECIFIED 2026-08-31, so that building it is a transcription rather than an
+   investigation.** The blocker is unchanged and is still only the SERVICE; everything around it is
+   now read from the pinned bundle rather than left to be rediscovered.
+
+   *The entitlement is already built and is an exact transcription.* `archivesAvailableTo` appears
+   twice in the reference, byte-identical, at bytes 1,959,906 and 2,568,449:
+
+   ```js
+   archivesAvailableTo(){return isPresenter && !isLimitedPresenter
+     ? !(sessData.showArchivesToSpecificPresenters
+         && !sessData.showArchivesToSpecificPresenters.includes(user.email))
+     : !(!sessData.showArchivesToUsers || user.denyArchivesAccess)}
+   ```
+
+   `apps/room/src/lib/roster-gates.ts:60` is that, line for line. Two branches, and the asymmetry is
+   the part worth knowing: for a FULL presenter `showArchivesToSpecificPresenters` is an allow-list
+   that only ever NARROWS (absent means everyone), while for members and limited presenters
+   `showArchivesToUsers` must be on AND the per-user `denyArchivesAccess` off. All three exist here —
+   the two settings in `room-settings-schema.ts:152-153`, and `denyArchivesAccess` already on the
+   wire at `create-room.svelte.ts:375`.
+
+   *The URL in this row is the ROOM's and is correct.* There are TWO archive routes in the reference,
+   in two different applications, and they are not the same one:
+
+   | app | route | how it opens |
+   | --- | --- | --- |
+   | room (`main.d1d09071be31f1ba.js`) | `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{sesionToken}` | the pane's iframe, plus `window.open(…, "_blank")` twice |
+   | manage (`app.min.js`, pinned 2026-08-31) | `/users/v1/archives/recordings/{sessData._id}/{jwtToken}` | `openRecs`, a new window |
+
+   `sesionToken` is the reference's own spelling, one `s`, and it is what the room's globals are
+   keyed on — transcribe it rather than correcting it.
+
+   *Three consumers, of which we have one.* `getRecordingsUrl()` (the pane) and two
+   `launchRecordings()` sites (byte 2,522,214 and 2,568,449) are absent here, correctly: each opens
+   the archive URL. The fourth use of the same predicate — the speech-reco overlay's "Full Transcript
+   History" button, `O(5, e.archivesAvailableTo() ? 5 : -1)` — IS built, in
+   `SpeechRecoOverlay.svelte:199`. So the entitlement has a live consumer already and is not a
+   predicate waiting for one.
+
+   *And the service now has a candidate that was measured rather than assumed.* MediaMTX v1.20.1 was
+   run on 2026-08-31 with `record: yes` and `playback: yes`: it wrote a real `.mp4` and its playback
+   server answered `GET /list?path=…` with `[{start, duration, url}]`, which maps onto every cell the
+   reference's own recordings response carries. `apps/room/docs/MEDIA-PLANE-MEASURED.md` has the run,
+   including the catch that its fmp4 recorder skips VP8 — a WebRTC screenshare recorded server-side
+   is audio-only unless the publisher sends a codec the recorder keeps. **That is what the design
+   decision is now about**, and it is a smaller question than "is there an archive service at all".
 3. **Part 3 v5** — when an account is cleared for it.
 
 **Then `docs/decoded/missing-commands-triage.md`** — the only complete list of what the reference has
