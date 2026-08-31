@@ -51,6 +51,16 @@ vi.mock('#lib/server/room-config-client.js', () => ({
     how this line came to be written.
   */
   checkAlertDeletePasswordRemotely: async () => ({ required: false, ok: true }),
+  /*
+    The peak-occupancy report, added 2026-08-31. `room-events.ts` calls it from `subscribeToRoom`, so
+    every file that mocks this module and then subscribes needs it present — and vitest says so
+    loudly rather than letting the hub call `undefined`.
+
+    `false` is "not reported", which is what a room with no control plane configured answers. This
+    file is about the BROADCAST, and the mark it would raise is asserted where it belongs, in
+    `peak-occupancy-contract.test.ts`.
+  */
+  reportRoomOccupancy: async () => false,
   readRoomConfig: async (_request: unknown, shortCode: string, email?: string) => ({
     room: {
       shortCode,

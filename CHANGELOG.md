@@ -33,6 +33,93 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 12:15 UTC — The Manage panel's "Max" figure gets a writer, four months late
+
+**Runtime impact: YES.** `recorded_max_capacity` has read 0 for every room since migration `0011`
+shipped, because nothing wrote it. It is a real high-water mark now.
+
+**The row was blocked on a premise, and the premise was false.** `T5-20` said the next step was to
+*"capture whether the original pushes occupancy on its command channel and under what name"*, with
+the warning *"do not substitute the roster size — the number who ever registered is not the number
+ever simultaneously present."* Measured across all 455,329 bytes of the reference's manage bundle:
+`occupancy`, `maxCapacity`, `maxCap`, `recorded_max` and `peakUsers` occur **zero** times, against a
+passing control that `userCount` and `simUserCount` do. `chatModel.userCount` is computed in the
+browser from the two roster sizes at four sites and read only by two helpers that write it into
+`#rosterLen` and `#rosterLenSide`. **There was never a signal to capture.**
+
+So it came from the one place that can see simultaneous presence: this room's own SSE hub.
+`roomSubscriberCount()` counts open `/sess/[room]/events` streams — which is exactly the distinction
+the row's warning draws, and the opposite of a roster.
+
+**The controller endpoint is `POST /internal/room-occupancy/[code]`, and three things about it are
+deliberate:**
+
+*One atomic conditional statement.* `UPDATE … WHERE recorded_max_capacity < $1 RETURNING`, per
+`CLAUDE.md`'s rule. Two processes reporting 11 and 12 cannot leave 11 whatever order they land in.
+Zero rows here is the COMMON case rather than a lost race — it means somebody was already this high —
+so it answers 200 with the stored value read back, not the value the caller sent.
+
+*No member, and no presenter check.* Every sibling (`room-setting`, `room-ban`, `room-mute`,
+`room-permissions`) takes `?email=` and requires that member to be a presenter, because each carries
+out a person's decision. **Nobody decided this one.** Requiring a member would mean inventing an
+actor. Its authority is the `config-write:` capability alone, and
+`config-read-cannot-write-contract.test.ts` refused to pass until the route was declared in that
+list.
+
+*It cannot lower the mark at all*, which is why no reset lives there. "Reset Counts" is a presenter's
+decision on the Manage page and stays gated as one; a machine door that could zero the figure would
+be a second way to do it with no person attached.
+
+**On the room side the counter is the whole reason this is cheap.** `notePeakOccupancy` reports only
+when the count beats the highest THIS PROCESS has reported, so a busy room makes at most `peak`
+requests over its life instead of one per arrival. It is dropped when the room empties — a `Map` that
+grows one key per room that ever existed is a leak — and a restart re-reports from 1, which the
+controller's `lt` turns into a no-op against the durable value.
+
+**Failure is soft here, deliberately unlike every other writer in `room-config-client.ts`.** Those
+throw because a presenter who pressed Ban must never be told it worked when it did not. This one
+carries nobody's decision and runs on the request path of a member opening their event stream, so a
+control-plane outage must not reach the call that decides whether they are in the room. It returns
+whether it reported and logs the reason — the opposite of the `.catch(() => {})` the root standard
+forbids.
+
+**Stated divergence:** one member with two tabs counts twice. The reference's `userCount` is keyed on
+`uid` and would say one. De-duplicating would mean the SSE hub carrying identity per connection for a
+statistic nobody acts on, so it is recorded at `reportRoomOccupancy` rather than corrected.
+
+**Four docblocks that said "nothing writes it" were corrected**, and two of them needed narrowing
+rather than replacing: the account page and the manage panel both explain that their NUMERATOR is a
+roster-size substitution "because the controller receives no occupancy signal". It receives one now —
+but a peak report is not a live one, and a live numerator would need a report on every join AND every
+leave. The substitution stays; the reason for it is now accurate.
+
+**Three negative controls, each isolating one assertion:** the peak counter removed (the room reports
+on every join → the "says NOTHING when somebody re-joins below the peak" case goes red); the `lt`
+guard removed (last-writer-wins → the atomicity case); `Number.isSafeInteger` relaxed to
+`typeof === 'number'` (`NaN`, `Infinity` and `1.5` reach an INTEGER column → the validation case).
+
+**Two censuses refused the change until it was declared, which is what they are for:**
+`config-read-cannot-write-contract` (the new `internal/*` route belonged to neither list) and
+`config-write-capability-contract` (14 Bearer headers against 13 named callers).
+
+**One cascade worth recording rather than calling a flake.** The full room gate reported 14 failures
+across THREE files. Two were the censuses above. The third —
+`trade-alerts-mirror-delete.test.ts`, `UNIQUE constraint failed: users.email` — passed in isolation
+and passed again once the first file's mock was fixed. It was a consequence, not an independent
+failure: `message-mutation-broadcast-contract.test.ts` died during module init because its
+`room-config-client` mock lacked the new export, so its fixture cleanup never ran and left rows behind
+in the shared SQLite database for the next file to collide with. Both halves were run before that was
+written down.
+
+**Verified:** room gate 298 files, 5,098 passed, 1 skipped, `gate-exit=0`; controller gate 102 files,
+1,089 passed, 21 skipped, `gate-exit=0`. Both read from their logs. `svelte-check` clean in both apps.
+
+**The evidence-gap register is now 70 CLOSED, 2 OPEN, 15 parked** — the recount is
+`evidence-gap-register-counts.test.ts`'s, which refused the tally until it matched. **The two that
+remain are the same sentence:** `T5-24` and `T5-25` both need one line from the owner naming the
+field, and §B says exactly what it is. Four attempts have been refused by the credential guard; a
+fifth is not to be made without it.
+
 ### 2026-08-31 11:40 UTC — Three "needs a capture run" rows closed from a file with no login on it
 
 **Runtime impact: NO.** Nothing shipped changes. What changes is that three blocked rows are answered

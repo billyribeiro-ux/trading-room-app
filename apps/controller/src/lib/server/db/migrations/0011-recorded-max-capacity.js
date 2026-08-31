@@ -46,7 +46,9 @@
  *
  * A high-water mark needs live occupancy, and the controller receives no occupancy signal — the room
  * service is the only thing that knows who is currently connected. So this column has a reader (the
- * panel title and the reset) and no writer until the room reports. That gap is T5-20 in
+ * panel title and the reset) and no writer until the room reports. **The room reports since
+ * 2026-08-31** — `internal/room-occupancy/[code]`, raising this column and never lowering it. That
+ * gap was T5-20 in
  * `docs/reference/evidence-gap-register.md`, with what it blocks.
  *
  * Deliberately NOT faked by substituting the roster size: the number of people who have ever

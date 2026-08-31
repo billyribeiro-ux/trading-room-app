@@ -124,7 +124,16 @@ describe('every internal route verifies the credential its job needs', () => {
     read/write split, so it is the first door that never inherited the caveat its three siblings
     carried; this list is where that was decided rather than copied.
   */
-  const WRITES = ['room-ban', 'room-mute', 'room-permissions', 'room-setting', 'stream-ingest'];
+  /*
+    `room-occupancy` joined 2026-08-31, and it is the one WRITE with no person behind it.
+
+    Every other entry carries out a presenter's decision and so also names a member and checks that
+    they are one. This is the room process reporting a fact about itself — nobody pressed anything —
+    so there is no member to name, and requiring one would mean inventing an actor. Its authority is
+    the write capability alone, which is exactly what this list is here to assert: a token minted to
+    READ a room's configuration cannot move a stored number.
+  */
+  const WRITES = ['room-ban', 'room-mute', 'room-occupancy', 'room-permissions', 'room-setting', 'stream-ingest'];
   /*
     `room-notes-auth` joined 2026-08-29. It POSTs a candidate the controller compares against
     `needPasswordForUserNotes` and answers two booleans; nothing on the controller changes, which is

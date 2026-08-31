@@ -31,6 +31,7 @@ import {
   roomWelcomeMatAuthUrl,
   roomBanUrl,
   roomMuteUrl,
+  roomOccupancyUrl,
   roomPermissionsUrl,
   roomSettingUrl,
   streamIngestUrl,
@@ -1621,4 +1622,76 @@ export async function checkWelcomeMatPasswordRemotely(
     throw new RoomConfigUnavailable('the controller answered an unrecognised room list');
   }
   return { required: decision.required, ok: decision.ok, rooms: decision.rooms };
+}
+
+/**
+ * Report a new peak occupancy for this room to the controller.
+ *
+ * ## What this closes, and why it is not the roster
+ *
+ * `recorded_max_capacity` — the Manage panel's "Max" figure — has had a column, a reader and a
+ * reset since the controller's migration `0011` and **nothing has ever written it**. Evidence gap
+ * `T5-20` said the next step was to capture how the reference pushes occupancy. Measured 2026-08-31
+ * over the whole of its manage bundle: it does not push one at all. `chatModel.userCount` is
+ * computed in the browser from the two roster sizes and read only by two display helpers.
+ *
+ * So the signal has to come from a server that can see connections, and this one can.
+ * `roomSubscriberCount()` counts open `/sess/[room]/events` streams — **simultaneous presence**,
+ * which is precisely the distinction T5-20's own warning draws against the roster: the number of
+ * people who ever registered is not the number ever simultaneously present.
+ *
+ * ## The overcount, stated rather than corrected
+ *
+ * One member with two tabs is two subscribers and is counted twice. That is a real divergence from
+ * the reference, whose `userCount` is keyed on `uid` and would say one. It is left in deliberately:
+ * de-duplicating would mean the SSE hub tracking identity per connection purely to feed a statistic,
+ * and the hub's listener map is keyed by connection because everything else it does is per
+ * connection. A high-water mark that is occasionally generous is a smaller defect than a hot path
+ * that carries identity for a number nobody acts on.
+ *
+ * ## FAILURE IS SOFT HERE, and the distinction from the other writers is the point
+ *
+ * Every other function in this file throws: they carry out a person's decision, and a presenter who
+ * pressed Ban must never be told it worked when it did not. This one carries nobody's decision. A
+ * failed report means the "Max" figure lags until the next new peak; nothing is admitted, denied or
+ * lost. Throwing would propagate an outage in the CONTROL plane into the room's own subscribe path,
+ * which is the one place a member's ability to be in the room is decided — trading a cosmetic
+ * statistic for the feature.
+ *
+ * That is not a silent fallback: it returns whether it reported and logs the reason, and the caller
+ * is a fire-and-forget in the hub. `CLAUDE.md` forbids `.catch(() => {})` — a swallow with nothing
+ * recorded — and this is the opposite of one.
+ */
+export async function reportRoomOccupancy(shortCode: string, count: number): Promise<boolean> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) return false;
+
+  const base = roomOccupancyUrl(shortCode);
+  // No control plane configured is the normal state for a local room, not a fault to log per join.
+  if (!base) return false;
+
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ count }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    console.warn('[room-occupancy] could not reach the control plane', { shortCode, cause });
+    return false;
+  }
+
+  if (!response.ok) {
+    console.warn('[room-occupancy] the controller refused', {
+      shortCode,
+      status: response.status
+    });
+    return false;
+  }
+  return true;
 }

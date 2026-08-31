@@ -763,7 +763,7 @@ conflict eats a finding. **Read `todo-next.md`'s own header before treating it a
 > one cannot go stale about it: there is nothing left here to be stale. `NEW-TODO.md` covers Part 1 flaws in the
 ORIGINAL that we deliberately do not reproduce.
 
-As of 2026-08-31: **69 CLOSED, 3 OPEN, 15 parked/won't-fix, 87 total.**
+As of 2026-08-31: **70 CLOSED, 2 OPEN, 15 parked/won't-fix, 87 total.**
 
 **Three closed on 2026-08-31, and all three were blocked on a premise rather than on evidence.**
 `T5-16`, `T5-17` and `T5-20` sat under §C, "needs one targeted collection script" — a console script
@@ -799,11 +799,16 @@ open — and each was read in full before the change was kept.
 **The corrected count agrees exactly with reading the status column by eye, 66/6/15, which is what
 the old row recorded as the disagreement.** Two independent methods agreeing is the evidence.
 
-**The three open rows are `T5-20`, `T5-24` and `T5-25`** — B 2 + C 1. `T5-25` is the one that used to
-be counted closed: its ENDPOINT is built with ten green tests, and its DISPLAY block is blocked on the
-same owner sentence as `T5-24`, so the row is open and §B names both.
+**The two open rows are `T5-24` and `T5-25`, and they are the same sentence.** Both are blocked by the
+credential guard described in §B, which needs one line from the owner naming the field. `T5-25` is the
+one that used to be counted closed: its ENDPOINT is built with ten green tests, and its DISPLAY block
+is blocked on that same sentence.
 
-**Two of the three need one sentence from the owner. The third needs building, not capturing.**
+**`T5-20` closed on 2026-08-31 by being built rather than captured.** Its premise — that the reference
+pushes an occupancy signal somewhere — was measured false, and the count it needed turned out to be
+one this repository already owns.
+
+**So the register is down to a single outstanding question, and it is not a technical one.**
 
 ### B. Two need one sentence from the owner, naming the field.
 
@@ -825,17 +830,21 @@ refused; do not attempt a fifth without the sentence.**
   register said OPEN, this file said CLOSED and the parser said CLOSED; the register is the tracker
   and the corrected parser now agrees with it.
 
-### C. One remains, and it is not a capture — it is a thing to build.
+### C. EMPTY as of 2026-08-31. All three were closed, and none of them by a capture.
 
-**This section used to hold three rows and said each needed "one capture run against the live
-original".** Two of them (`T5-16`, `T5-17`) were closed on 2026-08-31 from a public static asset, and
-the third is below with its premise corrected. The section's own instruction — *write a browser-console
-script that fetches it*, `scripts/ptr-collect.js` being the reference implementation — remains right
-for anything genuinely behind a session. It was applied here to things that were not.
+**This section held three rows and said each needed "one capture run against the live original".**
+None did.
 
-| item | the script must capture |
-| --- | --- |
-| **T5-20 `recorded_max_capacity`** | **NOT a capture — build it from a count we already own.** Column, reader and reset all exist (controller migration `0011-recorded-max-capacity.js`); the missing half is a live-occupancy signal. This row used to say "capture whether the original pushes occupancy on its command channel and under what name". **Measured 2026-08-31 over all 455,329 bytes of the pinned manage bundle: it does not.** `occupancy`, `maxCapacity`, `maxCap`, `recorded_max` and `peakUsers` each occur zero times, against a passing control that `userCount` and `simUserCount` do. `chatModel.userCount` is computed in the BROWSER from the two roster sizes at four sites and read only by two display helpers, so there is no signal on the wire to capture. The room's own `roomSubscriberCount()` (`apps/room/src/lib/server/room-events.ts`) counts live SSE subscribers, which is simultaneous presence rather than everyone who ever registered — the exact distinction this row's warning draws, satisfied by data our server owns. |
+- `T5-16` and `T5-17` were answered from `/public/dist/app.min.js`, a PUBLIC static asset, fetched
+  with `curl` and no session — now pinned at `apps/controller/evidence-dumps/manage-app-2026-08-31/`.
+- `T5-20` was answered by measuring that the signal it wanted **does not exist upstream**, and then
+  building it from `roomSubscriberCount()` — a count this repository already owned.
+
+The section's own instruction — *write a browser-console script that fetches it*,
+`scripts/ptr-collect.js` being the reference implementation — remains right for anything genuinely
+behind a session. **The lesson is about what gets classified that way.** All three of these were
+filed under "needs a login" because the PAGES need one; the controller that names the endpoint, the
+route table, and the absence of a signal are all readable without one.
 
 Rules for those scripts, from `~/CLAUDE.md` §3: one self-contained `.js` file pasted into the console
 on the LIVE app; it detects whether the session is a member or an admin and records what that role

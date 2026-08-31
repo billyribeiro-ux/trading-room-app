@@ -200,11 +200,21 @@ export const rooms = pgTable(
      * own API example has it at 150 against a `current_max` of 100, which is only coherent for a
      * recorded observation rather than a limit.
      *
-     * NOTHING WRITES IT YET. A high-water mark needs live occupancy and the controller receives no
-     * occupancy signal — only the room service knows who is connected. Recorded as T5-20 rather than
-     * faked by substituting the roster size: the number of people who ever registered is not the
-     * number ever simultaneously present, and rendering one as the other is an invented value that
-     * looks right. See migration `0011-recorded-max-capacity`.
+     * WRITTEN SINCE 2026-08-31 by `internal/room-occupancy/[code]`, and only ever upward. The room
+     * reports its own `roomSubscriberCount()` — open `/sess/[room]/events` streams, which is
+     * simultaneous presence — whenever that beats the highest its process has already reported.
+     *
+     * It stayed empty for a long time on a premise that turned out to be false. T5-20 said the next
+     * step was to capture how the reference pushes occupancy; measured across the whole of its
+     * manage bundle (pinned at `evidence-dumps/manage-app-2026-08-31/`), **it never pushes one** —
+     * `chatModel.userCount` is computed in the browser from the two roster sizes and read only by
+     * two display helpers. There was no signal to capture, and the one that exists is ours.
+     *
+     * Still NOT the roster size, which was the original refusal and remains right: the number of
+     * people who ever registered is not the number ever simultaneously present. One member with two
+     * tabs IS counted twice, which is a stated divergence recorded at `reportRoomOccupancy` rather
+     * than corrected — de-duplicating would mean the SSE hub carrying identity per connection for a
+     * statistic. See migration `0011-recorded-max-capacity`.
      */
     recordedMaxCapacity: integer('recorded_max_capacity').notNull().default(0),
     /**
@@ -609,8 +619,8 @@ export const badges = pgTable('badges', {
    * NOT changed here yet, and that is deliberate. The STORAGE is proven and so is the DISPLAY, but
    * the control that SETS it is not: `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` hands
    * back the current value, which is the shape of a picker, and no picker appears in any capture.
-   * Migrating to an id column now would leave a column nothing can write — the same defect recorded
-   * as T5-20. Tracked as **T5-27** with the migration plan; the boolean stays until the setter is
+   * Migrating to an id column now would leave a column nothing can write — the defect T5-20 was,
+   * for four months, until the room started reporting its own subscriber count on 2026-08-31. Tracked as **T5-27** with the migration plan; the boolean stays until the setter is
    * evidenced, and is now known to be a placeholder rather than the model.
    *
    * Equally honest: nothing here invents what a dark-theme badge LOOKS like. No CSS in our evidence

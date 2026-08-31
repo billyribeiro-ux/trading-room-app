@@ -40,6 +40,7 @@ import { BUILT_IN_CHAT_TABS } from '../chat-tabs';
 import { isMentionOf } from '../mention';
 
 import type { PrivateChatMessage } from './private-chat';
+import { reportRoomOccupancy } from './room-config-client';
 import { typistsIn } from './typing';
 
 export type RoomEvent =
@@ -582,6 +583,9 @@ export function subscribeToRoom(
     });
   }
 
+  // A join is the only event that can raise a high-water mark. See `notePeakOccupancy`.
+  notePeakOccupancy(room, listeners.size);
+
   return () => {
     listeners.delete(listener);
     if (user !== null && !heldBy(listeners, user.id)) {
@@ -591,7 +595,11 @@ export function subscribeToRoom(
       });
     }
     // Drop the room once nobody is listening, so an empty room costs nothing.
-    if (listeners.size === 0) subscribers.delete(room);
+    if (listeners.size === 0) {
+      subscribers.delete(room);
+      // And its peak with it — the durable value is the controller's, which this never lowers.
+      reportedPeak.delete(room);
+    }
   };
 }
 
@@ -952,6 +960,39 @@ export function publishToUsers(room: string, userIds: readonly number[], event: 
 /** Listener count, for tests and for proving fan-out actually happened. */
 export function roomSubscriberCount(room: string): number {
   return subscribers.get(room)?.size ?? 0;
+}
+
+/**
+ * The highest occupancy THIS PROCESS has already reported, per room.
+ *
+ * The reason a counter lives here rather than the reporter just POSTing on every join: without it a
+ * busy room makes one control-plane request per arrival, forever, to move a number that changes a
+ * handful of times a day. With it the requests are bounded by the number of NEW PEAKS this process
+ * sees — at most `peak` of them over a room's whole life, and typically a short burst as a room
+ * fills and then nothing.
+ *
+ * It is deliberately process-local and deliberately never lowered, which makes a restart re-report
+ * from zero and re-establish the true mark on the way up. That is correct rather than merely
+ * tolerable: the controller's write is `WHERE recorded_max_capacity < $1`, so a re-report below the
+ * stored mark changes nothing, and the stored value is the one that outlives every process.
+ *
+ * Cleared when the room empties, for the same reason the listener map is: a `Map` that grows one key
+ * per room that ever existed is a leak in a long-lived server.
+ */
+const reportedPeak = new Map<string, number>();
+
+/**
+ * Report `count` as this room's occupancy if it beats everything this process has reported.
+ *
+ * Fire-and-forget on purpose. `subscribeToRoom` runs on the request path of a member opening their
+ * event stream, and awaiting a call to another service there would put the control plane's latency —
+ * and its outages — in front of somebody joining a room. `reportRoomOccupancy` never throws and
+ * logs its own failures, so there is nothing here to catch and nothing to swallow.
+ */
+function notePeakOccupancy(room: string, count: number): void {
+  if (count <= (reportedPeak.get(room) ?? 0)) return;
+  reportedPeak.set(room, count);
+  void reportRoomOccupancy(room, count);
 }
 
 /**
