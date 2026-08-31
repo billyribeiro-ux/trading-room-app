@@ -140,29 +140,54 @@ describe('EMOJI-09 — the first render is staged', () => {
     the staging.
   */
   const dumpCategory = (index: number) => EMOJI_DUMP_DATA.categories[index].entries.length;
-  /* Every entry beyond the three the reference commits, which is what the deferred pass adds. */
+  /*
+    Every entry beyond the ones the reference commits, which is what the deferred pass adds.
+
+    TWO of the dump's categories, not three, and `EMOJI2-01` is why: upstream's `this.categories`
+    carries the synthetic Search category at index 0 (`unshift(this.SEARCH_CATEGORY)`, byte
+    747,681), so `slice(0, 3)` spends one of the three on it and commits Recent plus the first
+    sixty of Smileys & People. `EMOJI_DUMP_DATA.categories` has no Search entry, so counting it
+    directly committed one category too many — 556 cells against the reference's 69.
+  */
   const beyondStaged = EMOJI_DUMP_DATA.categories
-    .slice(3)
+    .slice(2)
     .reduce((sum, category) => sum + category.entries.length, 0);
 
-  it('commits three categories, the last capped at sixty cells', () => {
+  it('reports what it actually commits, measured', () => {
+    /*
+      A number, printed, so `EMOJI2-01`'s figures are re-measurable rather than recalled. `cellsNow`
+      counts every `.emoji-mart-emoji` in the document, and the picker draws two outside the grid —
+      the preview sprite and the `No Emoji Found` sprite — so the grid total is this less two.
+    */
+    const one = open();
+    const committed = cellsNow();
+    one.close();
+    expect(committed, `first-frame cells (grid + 2 non-grid): ${committed}`).toBe(71);
+  });
+
+  it('commits Recent and one capped category, which is what three slots buy', () => {
     /*
       `const s = Math.min(this.categories.length, 3); … this.categories[s-1].emojis = r.slice(0, 60)`
       — byte 747,768. 1,821 spans built synchronously inside a click handler is the stutter this
-      removes; the SECOND category is the reference's own 487-cell one and is committed whole, which
-      is why the saving is measured against the tail rather than against a round number.
+      removes, and committing the whole 487-cell Smileys & People category on top of that was most
+      of the stutter coming back.
     */
     const one = open();
     const staged = cellsNow();
-    const frequent = staged - dumpCategory(1) - 60;
 
-    expect(
-      frequent,
-      'the arithmetic below only holds if category 2 is capped'
-    ).toBeGreaterThanOrEqual(0);
-    expect(staged, 'the third category is not capped at 60').toBe(frequent + dumpCategory(1) + 60);
-    expect(staged, 'nothing beyond the first three is committed').toBeLessThan(
-      frequent + dumpCategory(1) + dumpCategory(2) + beyondStaged
+    /*
+      Asserted against the DUMP's own numbers rather than against a figure derived from `staged`
+      itself. `staged === (staged - 60) + 60` was the first form of this and it is a tautology: it
+      survived the negative control that set `SEARCH_CATEGORY_SLOT` to 0, which is the whole defect
+      `EMOJI2-01` records. What the row actually claims is that Smileys & People is CAPPED, so the
+      claim is that the first frame is smaller than that one category — 69 against 487, not 556.
+    */
+    expect(staged, 'the whole 487-cell category is being committed again').toBeLessThan(
+      dumpCategory(1)
+    );
+    expect(staged, 'the last committed category is not capped at 60').toBeGreaterThanOrEqual(60);
+    expect(staged, 'nothing beyond the first two is committed').toBeLessThan(
+      dumpCategory(0) + dumpCategory(1) + beyondStaged
     );
     one.close();
   });
@@ -190,26 +215,29 @@ describe('EMOJI-09 — the first render is staged', () => {
 
     const one = open();
     const stagedSections = sections().length;
-    const stagedThird = cellsIn(sections()[2]);
+    const stagedLast = cellsIn(sections()[1]);
     const staged = cellsNow();
 
-    expect(stagedSections, 'three categories are committed').toBe(3);
-    expect(stagedThird, 'the third is capped at sixty').toBe(60);
+    expect(stagedSections, 'two dump categories are committed').toBe(2);
+    expect(stagedLast, 'the last committed one is capped at sixty').toBe(60);
 
     vi.runAllTimers();
     flushSync();
 
     expect(sections().length, 'the rest never arrived').toBe(EMOJI_DUMP_DATA.categories.length);
-    expect(cellsIn(sections()[2]), 'the cap was never lifted').toBeGreaterThan(60);
+    expect(cellsIn(sections()[1]), 'the cap was never lifted').toBeGreaterThan(60);
     expect(cellsNow(), 'the deferred pass never ran').toBeGreaterThan(staged);
     expect(cellsNow() - staged, 'the tail is what arrived').toBeGreaterThanOrEqual(beyondStaged);
     one.close();
   });
 
-  it('caps by INDEX, not by the literal 2', () => {
-    // `s-1`: a picker with fewer than three categories caps whichever one is last.
+  it('caps by INDEX, not by the literal 1', () => {
+    // `s-1`: a picker with fewer categories than slots caps whichever one is last.
     expect(picker).toContain('categoryIndex === stagedCount - 1');
-    expect(picker).toContain('Math.min(EMOJI_DUMP_DATA.categories.length, STAGED_CATEGORIES)');
+    expect(picker).toContain(
+      'Math.min(EMOJI_DUMP_DATA.categories.length + SEARCH_CATEGORY_SLOT, STAGED_CATEGORIES) -'
+    );
+    expect(picker).toContain('const SEARCH_CATEGORY_SLOT = 1;');
   });
 
   it('clears its timer, so closing inside the first frame writes to nothing', () => {
@@ -315,6 +343,92 @@ describe('EMOJI-12 — the preview clears a frame late, and the next cell cancel
     expect(picker).not.toContain('onmouseleave={() => (hovered = null)}');
     expect(picker.split('onmouseleave={hoverLeave}').length - 1).toBe(2);
     expect(picker.split('onmouseenter={() => hoverEnter(entry)}').length - 1).toBe(2);
+  });
+});
+
+describe('EMOJI2-02 — the skin swatches are the idle preview s, and go while an emoji is hovered', () => {
+  const swatchRow = () => document.querySelector('.emoji-mart-preview-skins');
+  /*
+    A cell from a real category, NOT the first `.emoji-mart-emoji` in the scroller. That one is the
+    `No Emoji Found` sprite inside the always-present Search Results section, which carries the same
+    class and no hover handlers — dispatching at it made this assertion green for the wrong reason
+    on its first run.
+  */
+  const firstCell = () => {
+    const section = [...document.querySelectorAll('section.emoji-mart-category')].find(
+      (candidate) =>
+        candidate.querySelector('.emoji-mart-category-label')?.getAttribute('data-name') !==
+        'Search'
+    );
+    return section?.querySelector('.emoji-mart-emoji') ?? null;
+  };
+
+  it('draws them when nothing is hovered', () => {
+    const one = open();
+    const row = swatchRow();
+    expect(row, 'the swatch row is gone entirely').not.toBeNull();
+    expect((row as HTMLElement).hidden, 'hidden with no emoji hovered').toBe(false);
+    expect(document.querySelectorAll('.emoji-mart-skin-swatch')).toHaveLength(6);
+    one.close();
+  });
+
+  it('takes them away on hover and gives them back a frame after the pointer leaves', () => {
+    /*
+      Upstream's mechanism is `[hidden]="o.emoji"` on the whole IDLE `div.emoji-mart-preview`, the
+      block that CONTAINS the skins — the hovered block (`jee`) has no skins div at all. The element
+      is kept and hidden rather than removed, exactly as upstream keeps it, so `skinsOpened`
+      survives the hover.
+
+      The return is deferred by one animation frame because `EMOJI-12` defers the preview clear, so
+      this drives rAF rather than asserting synchronously — asserting straight after `mouseleave`
+      would test the timing this room deliberately does NOT have.
+    */
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+
+    const one = open();
+    const cell = firstCell();
+    expect(cell, 'no emoji cells rendered — the assertion below would be vacuous').not.toBeNull();
+
+    cell!.dispatchEvent(new MouseEvent('mouseenter'));
+    flushSync();
+    expect((swatchRow() as HTMLElement).hidden, 'still shown while hovering a cell').toBe(true);
+
+    cell!.dispatchEvent(new MouseEvent('mouseleave'));
+    flushSync();
+    expect((swatchRow() as HTMLElement).hidden, 'came back before the frame elapsed').toBe(true);
+
+    for (const frame of frames.splice(0)) frame(0);
+    flushSync();
+    expect((swatchRow() as HTMLElement).hidden, 'never came back').toBe(false);
+    one.close();
+  });
+});
+
+describe('EMOJI2-03 — the captured whitespace pads survive Prettier and HTML folding', () => {
+  it('pads the search label, the shortnames and the emoticons as the reference does', () => {
+    /*
+      Read off the RENDERED text, not the source, because the whole risk is that the markup keeps a
+      space the DOM then folds away. `textContent` is what a capture diff compares.
+    */
+    const one = open();
+    const label = document.querySelector('label.emoji-mart-sr-only');
+    expect(label?.textContent, 'Ne(" ",o.i18n.search," ") — byte 738,704').toBe(' Search ');
+    one.close();
+  });
+
+  it('keeps them in the source in the form that survives formatting', () => {
+    /*
+      The idiom `apps/room/AGENTS.md` records as one of the two declined autofixer suggestions:
+      plain text loses a leading space to Prettier, a mustache does not.
+    */
+    expect(picker).toContain("{' Search '}");
+    expect(picker).toContain("{' :'}{shortName}{': '}");
+    expect(picker).toContain("{' '}{emoticon}{' '}");
   });
 });
 

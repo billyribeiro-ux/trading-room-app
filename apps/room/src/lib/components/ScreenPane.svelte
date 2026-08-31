@@ -49,6 +49,7 @@
     SCREEN_TOO_SMALL_DELAY_MS,
     SCREEN_TOO_SMALL_PIXELS
   } from '#lib/room/media-transport.svelte.js';
+  import ScreenPaneStatus from './ScreenPaneStatus.svelte';
   import ScreenZoomControls from './ScreenZoomControls.svelte';
 
   type Props = {
@@ -196,15 +197,38 @@
   const connecting = $derived(!connected && !detachedHere);
 
   /**
+   * `SP2-01` — the `<video>`'s own hide condition, which is NOT the cluster's.
+   *
+   * ```js
+   * z("controls",o.showControls)("ngClass",Kn(18,H0e,
+   *   !o.isConnected||o.isPresentingThisScreen&&!o.localpreview||o.mediaService.saveData,
+   *   o.appService.globals.viewerOnlyMode))                                   // byte 1,502,001
+   * ```
+   *
+   * **There is no `isDetached` term here.** One derived used to feed this binding and the detached
+   * cluster's, and the two are different expressions upstream — see `detachedClusterHidden` below,
+   * whose leading `!e.isDetached` this one does not have. Sharing one made `detachedHere` UNHIDE the
+   * picture: a source pane whose producer had gone, or whose viewer had switched Video Disabled on,
+   * drew the captured `Screen Detached..` heading over a live-looking empty `<video>` instead of
+   * over nothing.
+   *
+   * `isPresentingThisScreen && !localpreview` is false by construction here and is not modelled;
+   * the note at the `<video>` records why, and `SP2-04` records the control it gates upstream —
+   * `W0e`, the invitation to attach the local stream that this application never needs.
+   */
+  const pictureHidden = $derived(!connected || saveData);
+
+  /**
    * `$0e = t => ({hidden: t})` over `!e.isDetached && (!e.isConnected || … || saveData)` —
    * byte 1,493,686, and `SV-SP-14`.
    *
-   * The detached zoom cluster collapses under exactly the conditions that hide the `<video>`, so a
-   * popout whose stream has not arrived does not float a magnifier over an empty box. `!isDetached`
-   * is upstream's own leading term and is `!detachedHere` here for the reason the two props record:
-   * this pane is the SOURCE window when that is true, and it draws no cluster at all.
+   * The detached zoom cluster collapses under the conditions that hide the `<video>` AND the extra
+   * `!isDetached` term, so a popout whose stream has not arrived does not float a magnifier over an
+   * empty box. `!isDetached` is upstream's own leading term and is `!detachedHere` here for the
+   * reason the two props record: this pane is the SOURCE window when that is true, and it draws no
+   * cluster at all — the cluster is behind `detached`, the popout's own flag.
    */
-  const pictureHidden = $derived(!detachedHere && (!connected || saveData));
+  const detachedClusterHidden = $derived(!detachedHere && pictureHidden);
 
   /**
    * Dragging is gated behind the zoom toggle, which is the part the class names give away. The
@@ -399,10 +423,45 @@
   role="tabpanel"
   aria-labelledby="{id}-tab"
 >
+  <!--
+    `SP2-03` — the status headings are SIBLINGS of the pan container upstream, not contents of it,
+    so they sit here rather than inside the transformed `div.pan-element`. The create block, the
+    three gates and why the placement matters are all in `ScreenPaneStatus.svelte`.
+  -->
+  <ScreenPaneStatus
+    {detachedHere}
+    {saveData}
+    {connecting}
+    {presenterName}
+    {screenName}
+    {onreattach}
+  />
+  <!--
+    `SP2-02` — `overflow-hidden`, the clip the zoom needs.
+
+    Const 5 of `app-screenshare-view` is
+    `["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]`
+    (table at byte 1,500,337), and `.overflow-hidden{overflow:hidden!important}` is Bootstrap's own
+    rule in the reference sheet (`styles.ee2a710065b60389.css` byte 294,501) and is already applied
+    here (`css/complete-app-styles.css:4886`), so this class is not a new one. Without it a screen at
+    `scalePerZoomLevel ** (level - 2)` above 1 — or dragged — paints outside its pane over the rest
+    of the room, because the only transform is on `.pan-element` and nothing bounds it.
+
+    OFF in the popout, and that is captured too rather than assumed: the popout's own component is
+    `app-detached-screen`, whose const 0 is `[1,"detach-screen",…]` (byte 2,593,102), and the sheet
+    carries `.detach-screen .overflow-hidden{overflow:initial!important}` (CSS byte 437,841, applied
+    here at `css/complete-app-styles.css:6956`) — one rule whose only purpose is to un-clip this
+    element in that window. Nothing in this application ever sets `.detach-screen`, so that rule
+    would never fire; `detached` is the flag that answers the same question from data we own.
+  -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     id="video-screen-container-{id}"
-    class={['video-screen-container', { 'screencast-pan': !showZoomCtrl, 'screencast-pan-grabbing': showZoomCtrl }]}
+    class={[
+      'video-screen-container',
+      { 'screencast-pan': !showZoomCtrl, 'screencast-pan-grabbing': showZoomCtrl },
+      { 'overflow-hidden': !detached }
+    ]}
     ondblclick={(event) => toggleFullscreen(event.currentTarget)}
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
@@ -458,57 +517,10 @@
           therefore false for the life of the component upstream, and no control bar ever appears.
         -->
         <!--
-          `Video Disabled` — `G0e` at `app-screenshare-view.render-helpers.js`, rendered by
-          `O(2, o.mediaService.saveData ? 2 : -1)` (`…compiled.js:313`). Class order is `mt-4
-          text-center`, which is const 1 of that component and is NOT the order the presentation
-          area uses for its own h3 (const 23 is `text-center mt-4`). Reproduced as captured.
+          `SP2-03` moved the three status headings OUT of this element and up to the pane root,
+          where the reference's create block has them. See the note above the first of them: they
+          are siblings of the pan container upstream, so they are not inside the transform.
         -->
-        <!--
-          `SV-SP-02` — `z0e`, const 10 `[1,"mt-4","text-center",3,"click"]`, gated
-          `O(1, o.isDetached ? 1 : -1)` at byte 1,501,523.
-
-          The pane the screen was detached FROM blanks and offers the way back. Before this the
-          source window kept rendering the same producer, so one share fed two live decoders and the
-          only way to re-attach was to find and close the popout.
-
-          ONE DIVERGENCE, and it is the accessible one. Upstream hangs the click on the `<h3>`
-          itself, which is not focusable, not keyboard operable, and announced to a screen reader as
-          a heading rather than as the control it is. Putting a real `<button>` inside the captured
-          heading keeps the class, the text and the position exactly where the capture has them and
-          makes the control an actual control — `role="button"` plus a `tabindex` on the heading was
-          tried first and is what `a11y_no_noninteractive_element_to_interactive_role` refuses, with
-          reason: it would have SAID button and still been a heading.
-
-          The scoped rule below strips the button chrome, so nothing about the rendering changes.
-        -->
-        {#if detachedHere}
-          <h3 class="mt-4 text-center">
-            <button type="button" class="reattach" onclick={() => onreattach?.()}>
-              Screen Detached.. Click here to re-attach
-            </button>
-          </h3>
-        {/if}
-        {#if saveData}
-          <h3 class="mt-4 text-center">Video Disabled</h3>
-        {/if}
-        <!--
-          `SV-SP-03` — `q0e`, byte 1,493,278: const 3 is
-          `[1,"text-center","mt-4","animated","fadeIn",2,"color","#fff"]` and const 12 the
-          `fas fa-spinner fa-pulse` glyph.
-
-          An un-arrived screen used to render NOTHING — the `<video>` is hidden while `stream` is
-          null, and nothing stood in its place, so a viewer clicking a tab saw an empty box with no
-          way to tell whether it was loading or broken. `StreamingView` has had its counterpart
-          (`Loading Stream...`) all along; this pane did not.
-
-          The hyphen between the two names is the capture's own separator, not a choice.
-        -->
-        {#if connecting}
-          <h3 class="text-center mt-4 animated fadeIn" style="color: #fff;">
-            <i class="fas fa-spinner fa-pulse"></i>
-            Connecting To Screen of {presenterName}-{screenName}
-          </h3>
-        {/if}
         <!--
           `SV-SP-10` — `muted` is a STATIC attribute here, as it is in const 8:
 
@@ -563,8 +575,12 @@
       nothing here at all.
     -->
     {#if detached}
-      <!-- `SV-SP-14` — `$0e = t => ({hidden: t})`, the same conditions that hide the picture. -->
-      <div class={['zoom-controls-container-detached', { hidden: pictureHidden }]}>
+      <!--
+        `SV-SP-14` — `$0e = t => ({hidden: t})` at byte 1,492,696, bound at byte 1,493,972 over
+        `!e.isDetached && (…)`. That leading term is what makes this expression DIFFERENT from the
+        `<video>`'s, which is why `SP2-01` gives it its own derived rather than sharing one.
+      -->
+      <div class={['zoom-controls-container-detached', { hidden: detachedClusterHidden }]}>
         <ScreenZoomControls
           variant="detached"
           showZoomCtrl={showZoomCtrlDetached}
@@ -580,20 +596,6 @@
 </div>
 
 <style>
-  /*
-    `SV-SP-02`'s re-attach control. The capture's own element is the `<h3>` and its own styling is
-    the two Bootstrap classes on it; this button exists only so the control is focusable and
-    announced correctly, so it inherits everything and adds nothing.
-  */
-  .reattach {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-  }
-
   /*
    * The captured component's own rule, from
    * `docs/source/components/app-screenshare-view.component.css`:

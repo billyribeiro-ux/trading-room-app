@@ -15,6 +15,16 @@ import { codeOf } from './source-comments';
 const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf8');
 
 const pane = codeOf('components/ScreenPane.svelte', read('./components/ScreenPane.svelte'));
+/*
+  The three status headings moved out of `ScreenPane.svelte` on 2026-08-31 — see `SP2-03`: the
+  reference renders them as SIBLINGS of the pan container and they were inside the element that
+  carries the zoom transform. They are asserted against the file that now holds them rather than
+  dropped, because the byte offsets they cite are the same offsets and the rows are the same rows.
+*/
+const status = codeOf(
+  'components/ScreenPaneStatus.svelte',
+  read('./components/ScreenPaneStatus.svelte')
+);
 const tabs = codeOf('components/ScreenTabs.svelte', read('./components/ScreenTabs.svelte'));
 const area = codeOf(
   'components/PresentationArea.svelte',
@@ -44,9 +54,12 @@ describe('SV-SP-02 — the pane a screen was detached FROM blanks and offers the
   });
 
   it('draws the captured heading with the captured text', () => {
-    expect(pane).toContain('{#if detachedHere}');
-    expect(pane).toContain('<h3 class="mt-4 text-center">');
-    expect(pane).toContain('Screen Detached.. Click here to re-attach');
+    expect(status).toContain('{#if detachedHere}');
+    expect(status).toContain('<h3 class="mt-4 text-center">');
+    expect(status).toContain('Screen Detached.. Click here to re-attach');
+    /* And the pane still renders it, or the block above would be dead markup nothing mounts. */
+    expect(pane).toContain('<ScreenPaneStatus');
+    expect(pane).toContain('{detachedHere}');
   });
 
   it('makes the control a real control, which upstream does not', () => {
@@ -56,8 +69,8 @@ describe('SV-SP-02 — the pane a screen was detached FROM blanks and offers the
       `a11y_no_noninteractive_element_to_interactive_role` refuses — it would have SAID button and
       still been a heading.
     */
-    expect(pane).toContain('<button type="button" class="reattach"');
-    expect(pane).not.toContain('role="button"');
+    expect(status).toContain('<button type="button" class="reattach"');
+    expect(status).not.toContain('role="button"');
   });
 
   it('tracks which screens THIS window has detached, separately from being a popout', () => {
@@ -118,9 +131,73 @@ describe('SV-SP-03 — an un-arrived screen says so', () => {
   });
 
   it('draws the captured classes, the spinner and the hyphenated label', () => {
-    expect(pane).toContain('class="text-center mt-4 animated fadeIn"');
-    expect(pane).toContain('<i class="fas fa-spinner fa-pulse"></i>');
-    expect(pane).toContain('Connecting To Screen of {presenterName}-{screenName}');
+    expect(status).toContain('class="text-center mt-4 animated fadeIn"');
+    expect(status).toContain('<i class="fas fa-spinner fa-pulse"></i>');
+    expect(status).toContain('Connecting To Screen of {presenterName}-{screenName}');
+  });
+});
+
+describe('SP2-02 — the pan container clips, except in the popout', () => {
+  it('is the reference behaviour, read at the offset', () => {
+    /*
+      Const 5 of `app-screenshare-view` — the div the pan/zoom classes and the double-click
+      directive are bound to, and the parent of `<pan-zoom>`. Read out of the table BY VALUE rather
+      than by slot number: the needle is the entry itself, so a re-ordered table fails here instead
+      of silently changing which const this row is about.
+    */
+    expect(BUNDLE.slice(1_500_337, 1_500_337 + 400)).toContain(
+      '["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]'
+    );
+    /* And the popout's own wrapper, which is what the `overflow:initial` override selects. */
+    expect(BUNDLE.slice(2_593_102, 2_593_102 + 60)).toContain('[1,"detach-screen"');
+  });
+
+  it('applies the captured class, and only outside the popout', () => {
+    expect(pane).toContain("{ 'overflow-hidden': !detached }");
+  });
+
+  it('has a rule behind the class, in the sheet this app actually loads', () => {
+    /*
+      A class with no CSS is the `.flipped` failure this repository already records. Both rules are
+      read out of the APPLIED sheet rather than the reference one, because that is the file that
+      decides whether the class does anything here.
+    */
+    const applied = read('../../css/complete-app-styles.css');
+    expect(applied).toContain('.overflow-hidden { overflow: hidden !important; }');
+    expect(applied).toContain('.detach-screen .overflow-hidden { overflow: initial !important; }');
+  });
+});
+
+describe('SP2-03 — the status headings are outside the zoom transform', () => {
+  it('is the reference behaviour, read at the offset', () => {
+    /*
+      Nodes 1-5 are opened and CLOSED before `d(6,…)` opens the pan container. The needle carries
+      both halves for that reason — a slice holding only the `H(…)` run would be satisfied by a
+      template that nested them.
+    */
+    expect(BUNDLE.slice(1_501_256, 1_501_256 + 220)).toContain(
+      'd(0,"div",0),H(1,z0e,2,0,"h3",1)(2,G0e,2,0,"h3",1)(3,W0e,2,1,"p",2)(4,q0e,3,2,"h3",3)(5,Y0e,6,4,"div",4),d(6,"div",5)'
+    );
+  });
+
+  it('renders them before the pan container, not inside it', () => {
+    /*
+      Position, not presence. They were inside `div.pan-element` — the element carrying
+      `translate(...) scale(...)` — so with the shared zoom on they were scaled and dragged with a
+      picture that was not being drawn. `toContain` cannot see that; the ORDER can.
+    */
+    const at = pane.indexOf('<ScreenPaneStatus');
+    const container = pane.indexOf('id="video-screen-container-{id}"');
+    const panElement = pane.indexOf('class="pan-element"');
+    expect(at, 'the status component is not rendered').toBeGreaterThan(-1);
+    expect(container, 'the pan container is gone').toBeGreaterThan(-1);
+    expect(panElement, 'the transformed element is gone').toBeGreaterThan(-1);
+    expect(at, 'the headings are inside the pan container again').toBeLessThan(container);
+    expect(container).toBeLessThan(panElement);
+  });
+
+  it('keeps the transform on the element the headings are no longer in', () => {
+    expect(pane).toContain('transform: translate({pan.x}px, {pan.y}px) scale({scale})');
   });
 });
 
@@ -255,17 +332,33 @@ describe('SV-SP-14 — the detached zoom cluster hides with the picture', () => 
     expect(BUNDLE.indexOf('zoom-controls-container-detached')).toBe(1_500_490);
   });
 
-  it('collapses under exactly the conditions that hide the video', () => {
+  it('collapses under the video conditions PLUS the term the video does not have', () => {
     /*
-      `$0e = t => ({hidden: t})` over `!e.isDetached && (!e.isConnected || … || saveData)`. ONE
-      derived feeds both, so a popout whose stream has not arrived cannot float a magnifier over an
-      empty box — and the two cannot drift apart into different conditions.
+      ## The assertion this replaced, and why it was green while being wrong
+
+      It read `const pictureHidden = $derived(!detachedHere && (!connected || saveData));` and
+      required the SAME derived on the `<video>` and on the cluster, arguing that "the two cannot
+      drift apart into different conditions". Upstream they ARE different conditions, and reading
+      both out settles it rather than arguing it — the cluster's expression carries a leading
+      `!e.isDetached` and the video's does not. Sharing one derived therefore let `detachedHere`
+      UN-hide the picture; `SP2-01` in the surface audit records what that looked like on screen.
+
+      Both expressions are asserted at their offsets below, so neither can be edited into the other
+      again without the bytes disagreeing.
     */
+    expect(BUNDLE.slice(1_493_972, 1_493_972 + 130)).toContain(
+      'ct(2,$0e,!e.isDetached&&(!e.isConnected||e.isPresentingThisScreen&&!e.localpreview||e.mediaService.saveData))'
+    );
+    expect(BUNDLE.slice(1_502_001, 1_502_001 + 200)).toContain(
+      'Kn(18,H0e,!o.isConnected||o.isPresentingThisScreen&&!o.localpreview||o.mediaService.saveData,o.appService.globals.viewerOnlyMode)'
+    );
+
+    expect(pane).toContain('const pictureHidden = $derived(!connected || saveData);');
     expect(pane).toContain(
-      'const pictureHidden = $derived(!detachedHere && (!connected || saveData));'
+      'const detachedClusterHidden = $derived(!detachedHere && pictureHidden);'
     );
     expect(pane).toContain(
-      "class={['zoom-controls-container-detached', { hidden: pictureHidden }]}"
+      "class={['zoom-controls-container-detached', { hidden: detachedClusterHidden }]}"
     );
     expect(pane).toContain("{ hidden: pictureHidden, 'viewer-only-screen-video': viewerOnlyMode }");
   });

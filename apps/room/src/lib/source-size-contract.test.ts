@@ -6505,6 +6505,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the per-screen volume slider and the dropdown that now opens it'
   },
   {
+    file: 'lib/components/ScreenPaneStatus.svelte',
+    /*
+      NEW on 2026-08-31, at the size it landed, as an EXTRACTION from `ScreenPane.svelte` rather
+      than as new surface: `SP2-03` found the three status headings inside `div.pan-element`, the
+      element that carries the zoom transform, where the reference has them as siblings of the pan
+      container. Moving them meant they became one thing, and one thing with a shared reason is a
+      component. The prose moved with them, which is why this is 112 lines for three `{#if}` blocks.
+    */
+    max: 112,
+    why: 'what a screen pane says when it is not showing a picture — the three captured headings'
+  },
+  {
     file: 'lib/components/ScreenZoomControls.svelte',
     max: 237,
     why: 'the zoom and pan controls over a shared screen'

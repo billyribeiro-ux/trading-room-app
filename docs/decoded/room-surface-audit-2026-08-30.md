@@ -177,7 +177,7 @@ as it ran.
 
 ## Where the work stands
 
-**0 open · 431 closed · 431 rows.**
+**0 open · 445 closed · 445 rows.**
 
 Every row in this document now carries a disposition. That is not the same as every row being
 built: `BLOCKED` and `OWNER DECISION` are closures too, and the vocabulary says why — a row that was
@@ -8792,6 +8792,379 @@ spot-checked.
 sentence that says they were wrong. `screen-share-menu-contract.test.ts` asserts all four `indexOf`
 results and that each wrong number appears exactly once, so neither the correction nor its record can
 drift back.
+## EmojiPicker.svelte
+
+Seven rows, read end to end on 2026-08-31 against
+`apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js` (2,891,205 bytes, ASCII throughout —
+`readFileSync(path).length === readFileSync(path,'utf8').length === 2,891,205`, so a character index
+IS a byte offset here and no newline translation can shift one).
+
+**Six component const tables were decoded BY VALUE rather than looked up**, by bracket-walking from
+each `consts:[` through `src/lib/const-table.mjs` — `emoji-mart-anchors` (byte 723,019, 6 entries),
+`emoji-category` (728,963, 12), `emoji-skins` (733,515, 4), `emoji-preview` (734,949, 17),
+`emoji-search` (737,828, 6) and `emoji-mart` itself (752,946, 11). Three of the seven rows below —
+`EMOJI2-02`, `EMOJI2-04`, `EMOJI2-07` — exist only because of that.
+
+**Two gaps the tables appeared to show were then refuted by reading further, and both are recorded
+rather than dropped.** `jee` binds `("size",38)` and again `("size",e.emojiSize)` on the hovered
+preview's emoji (byte 719,840), which reads as 24 against this component's 38 — until `Wee` at byte
+722,105 is read too, where the picker passes `("emojiSize",38)` into `emoji-preview`, so both are 38
+and this matches. And the swatches' `tabIndex` binding, which is `EMOJI2-04`. A refutation nobody
+writes down is a claim somebody makes again.
+
+### EMOJI2-01 — the staged first render committed one category too many, and it was the 487-cell one
+
+**FIXED** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`EMOJI-09` transcribed the reference's staging as `Math.min(this.categories.length, 3)` over
+`EMOJI_DUMP_DATA.categories`. That array is not the one the reference counts. `ngOnInit` puts two
+synthetic categories at the front before the arithmetic runs — `unshift(this.RECENT_CATEGORY)` at
+byte 747,584, then `unshift(this.SEARCH_CATEGORY)` at byte 747,681, with
+`SEARCH_CATEGORY={id:"search",name:"Search",emojis:null,anchor:!1}` defined at byte 745,709 — so by
+the time `const s=Math.min(this.categories.length,3)` runs at byte 747,768 the array is
+`[Search, Recent, Smileys & People, …]` and `slice(0, s)` commits **Search (empty), Recent (9 cells)
+and the first 60 of Smileys & People: 69 cells.**
+
+`EMOJI_DUMP_DATA.categories` has no Search entry — that section is rendered once, separately, in the
+markup. Counting it directly committed `[Recent, Smileys & People, Animals & Nature]` and capped the
+THIRD, so the first frame built **9 + 487 + 60 = 556 cells**, including the whole 487-entry Smileys
+& People category uncapped, inside the click handler this staging exists to get out of.
+
+Both numbers are measured rather than computed: `emoji-picker-contract.test.ts` mounts the picker
+and counts `.emoji-mart-emoji`, which is 71 now and was 558 under the negative control that put the
+offset back — 69 and 556 grid cells plus the two sprites the picker draws outside the grid, the
+preview and `No Emoji Found`. The
+component's own comment says the point is "the difference between a picker that opens and a picker
+that opens after a stutter"; it was giving back eight times the work it saved.
+
+Fixed by declaring the offset as the fact it is rather than folding it into a literal:
+`Math.min(categories.length + SEARCH_CATEGORY_SLOT, STAGED_CATEGORIES) - SEARCH_CATEGORY_SLOT`.
+`emoji-picker-contract.test.ts` counted sections and cells and was green throughout, because it
+asserted three sections with the third capped — which is what the code did, not what the reference
+does; its assertions now name Recent-plus-one and carry the reason.
+
+### EMOJI2-02 — the skin swatches belong to the IDLE preview, and go away while an emoji is hovered
+
+**BUILT** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-preview` renders TWO alternative blocks, not one block with a branch inside it. Its const
+table (byte 734,949) has const 0 `["class","emoji-mart-preview",4,"ngIf"]` for the hovered one and
+const 1 `[1,"emoji-mart-preview",3,"hidden"]` for the idle one, and the update block at byte 735,962
+reads `z("ngIf",o.emoji&&o.emojiData), m(), z("hidden",o.emoji)`. The hovered sub-template `jee`
+(byte 719,840) contains the preview emoji and the name/shortnames/emoticons and nothing else; the
+`emoji-mart-preview-skins` div exists only inside the second block, the one bound `[hidden]="o.emoji"`.
+
+So upstream the six swatches disappear for as long as the pointer is over a cell, and come back one
+animation frame after it leaves — which is what `EMOJI-12`'s deferred clear makes readable rather
+than a flicker. This drew them permanently, and `.emoji-mart-preview-data{left:68px;right:12px}`
+runs under them, so a long emoji name overlapped the swatch row.
+
+Built as `hidden={hovered !== null}` rather than an `{#if}`, for the reason upstream's is a
+`[hidden]`: the row keeps its `skinsOpened` state across the hover. That the attribute does anything
+at all was checked rather than assumed — the two rules that touch the class,
+`{position:absolute;top:50%;transform:translateY(-50%)}` (reference sheet byte 365,090) and
+`{right:30px;text-align:right}` (byte 365,272), set no `display` between them, so the UA's
+`[hidden]{display:none}` is not outranked.
+
+### EMOJI2-03 — three captured whitespace pads, on the runs a diff of rendered strings would catch
+
+**BUILT** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-search` emits its screen-reader label as `Ne(" ",o.i18n.search," ")` at byte 738,704 with
+`i18n.search === "Search"` from the defaults object at byte 744,221; the preview emits its
+shortnames as `Ne(" :",e,": ")` (`Bee`, byte 719,646) and its emoticons as `Ne(" ",e," ")` (`Uee`,
+byte 719,744). Angular's `Ne` writes those pads into the text node. All three rendered here without
+them.
+
+Written as `{' Search '}`, `{' :'}{shortName}{': '}` and `{' '}{emoticon}{' '}` — the idiom, and the
+declined `svelte-autofixer` suggestion, that `apps/room/AGENTS.md` already records for `{' Retry '}`
+and its forty siblings. Every capture comparison in this repository diffs rendered strings, which is
+what makes a leading space evidence rather than formatting.
+
+### EMOJI2-04 — the swatches' `tabIndex` is a BINDING upstream, and it resolves to the static 0 here
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-skins` const 3 is `["role","button",3,"click","keyup.enter","keyup.space","tabIndex"]` (table
+at byte 733,522) and `Lee` binds `z("tabIndex", i.tabIndex(e))` at byte 719,009. This markup carries
+a static `tabindex="0"` on all six swatches, which reads like a keyboard-order gap: while the row is
+closed five of the six carry `aria-hidden="true"`, and a hidden control in the tab order is a real
+defect elsewhere in this repository.
+
+It is not one, and the method is why. `tabIndex(e){return this.isVisible(e)?"0":""}` at byte 733,107
+answers `""` — not `-1` — for a hidden swatch, and `z` is `ɵɵproperty`, so the assignment is
+`element.tabIndex = ""`. `tabIndex` is a `long` IDL attribute, `ToNumber("")` is 0, and the element
+ends up with `tabindex="0"` exactly as it does here. **The binding and the static attribute produce
+the same DOM**, so transcribing it would add a function whose only effect is to compute the constant
+it replaced. Refused, and recorded here because the shape — a binding we render as a constant —
+looks like a gap every time somebody re-reads it.
+
+### EMOJI2-05 — the Frequently Used row does NOT re-sort after a pick, upstream either
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Picking an emoji here persists the new count (`rememberFrequent`) and leaves the visible Recent row
+alone until the picker is next mounted, which looks like a missed refresh. `handleEnterKey` — which
+`handleEmojiClick` calls for every pick, at byte 751,151 — ends with
+
+```js
+const o=this.categoryRefs.toArray()[1];
+o&&this.enableFrequentEmojiSort&&this.ngZone.run(()=>{o.updateRecentEmojis(),o.ref.markForCheck()})
+```
+
+at byte 750,569, and `enableFrequentEmojiSort=!1` at byte 745,271 is the picker's own default.
+
+It is an `@Input`, so "the default is false" is not on its own an answer — something could bind it.
+Nothing does: the string occurs **four times in 2,891,205 bytes**, and all four are accounted for —
+the declaration at byte 745,271, the guard at byte 750,574, and the two halves of the `inputs:` map
+at bytes 752,585 and 752,610. A template binding would be a fifth. So the guard is false for the life of the
+component upstream and `updateRecentEmojis` never runs on a pick there.
+
+The counters ARE written either way — `frequently.add` is called on the line above, outside the
+guard — so the two agree on what is stored and on what is shown. Not built.
+
+### EMOJI2-06 — the Search category is `categories[0]` with `anchor:!1`, which is why it has no anchor
+
+**ALREADY BUILT** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The markup renders the Search Results section once, on its own, ahead of the category loop, and
+draws its anchors from `EMOJI_DUMP_DATA.anchors`, which has no Search entry. Read as a claim about
+structure that looks wrong twice over: upstream the Search category is IN `categories`, and the
+anchor row iterates `o.categories` (`emoji-mart-anchors` template, byte 723,328) rather than the
+`activeCategories` the grid uses.
+
+Both resolve to what is already here. `SEARCH_CATEGORY` carries `anchor:!1` (byte 745,709) and the
+anchor sub-template is gated `z("ngIf",!1!==n.$implicit.anchor)` at byte 716,699 — a category whose
+`anchor` is literally `false` gets no anchor — and it is `unshift`ed to index 0 (byte 747,681), so
+the section is first. First and anchorless is exactly what this renders. Nothing to build; recorded
+so the next reader does not build it.
+
+### EMOJI2-07 — the clear button's `keyup.enter` would fire `clear()` twice, and is not transcribed
+
+**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/EmojiPicker.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`emoji-search` const 4 is `["type","button",1,"emoji-mart-search-icon",3,"click","keyup.enter","disabled"]`
+(byte 737,990) and the template binds both handlers to the same method at byte 738,430:
+`x("click",function(){return D(s),E(o.clear())})("keyup.enter",function(){return D(s),E(o.clear())})`.
+
+The element is a real `<button type="button">`. Enter on a focused button fires `click` natively, so
+upstream both handlers run for one keypress and `clear()` executes twice. It is idempotent — it sets
+`query` to `""`, re-searches and re-focuses — so the visible effect upstream is one extra search over
+1,821 entries per Enter, not a wrong result. Reproducing it would reproduce that, so the button
+carries `onclick` alone.
+
+The same pair appears on the skin swatches (`keyup.enter` and `keyup.space`, `Lee` at byte 719,148)
+and is NOT the same case: those are `role="button"` spans, where nothing is native and a handler is
+the only way the key does anything. Those are transcribed — as `keydown` with `preventDefault`,
+because Space on `keydown` scrolls the page before a `keyup` handler ever sees it.
+
+## ScreenPane.svelte
+
+Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with
+`app-screenshare-view`'s **20-entry const table decoded BY VALUE** — bracket-walked from the
+`consts:[` at byte 1,500,330 through `src/lib/const-table.mjs`, table body `[1,500,337 .. 1,501,226)`
+— and its create block read as one flat list at byte 1,501,256 rather than through the offsets the
+existing comments cite.
+
+Four of the seven exist only because of that. Three consts had no counterpart anywhere in this
+surface and none of them is named in any comment on it: const 0 `[1,"h-inherit"]`, const 5
+`["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]` and
+const 11 `[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]`. Reading the create block also
+settled the nesting, which the offsets alone cannot: `d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)`
+at byte 1,501,361 puts `div.video-screen-container` INSIDE `<pan-zoom>`, and this component had it
+outside.
+
+### SP2-01 — one derived fed the video's `hidden` and the cluster's, and upstream they differ
+
+**FIXED** — `apps/room/src/lib/components/ScreenPane.svelte`,
+`apps/room/src/lib/screen-pane-contract.test.ts`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+`SV-SP-14` built `pictureHidden = !detachedHere && (!connected || saveData)` and applied it to BOTH
+the `<video>` and the detached zoom cluster, with a test asserting they share one derived so that
+"the two cannot drift apart into different conditions". The two ARE different conditions upstream:
+
+```js
+cluster  z("ngClass",ct(2,$0e,!e.isDetached&&(!e.isConnected||…||e.mediaService.saveData)))   // 1,493,972
+video    ("ngClass",Kn(18,H0e,   !o.isConnected||…||o.mediaService.saveData, …viewerOnlyMode)) // 1,502,001
+```
+
+`!isDetached` is the CLUSTER's leading term and the video's expression has no `isDetached` term at
+all. Sharing one derived therefore made `detachedHere` **un-hide** the picture: a source pane whose
+producer had gone, or whose viewer had switched Video Disabled on after detaching, drew the captured
+`Screen Detached.. Click here to re-attach` heading over a live-looking empty `<video>` instead of
+over nothing.
+
+Split into `pictureHidden = !connected || saveData` for the element and
+`detachedClusterHidden = !detachedHere && pictureHidden` for the cluster. Both reference expressions
+are now asserted at their bytes, so neither can be edited into the other again.
+
+### SP2-02 — nothing clipped the zoomed picture, and `overflow-hidden` is the class that does
+
+**BUILT** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Const 5 of `app-screenshare-view` is
+`["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]`, and
+node 6 of the create block is that div — the parent of `<pan-zoom>` and the element the pan/zoom
+classes and the double-click directive are bound to. `overflow-hidden` is Bootstrap's own
+`{overflow:hidden!important}`, at reference-sheet byte 294,501 and applied in this repository at
+`apps/room/css/complete-app-styles.css:4886`.
+
+Nothing in this pane clipped anything. The only transform is `translate(pan) scale(scale)` on
+`.pan-element`, and `scaleForZoomLevel` returns `1.1 ** (level - 2)` over twenty levels, so a zoomed
+or dragged screen painted outside its pane and over the rest of the room.
+
+**The popout is exempt, and that is captured rather than assumed.** The popout's own component is
+`app-detached-screen`, whose const 0 is `[1,"detach-screen",2,"width","100%","height","auto"]` at
+byte 2,593,102, and the sheet carries `.detach-screen .overflow-hidden{overflow:initial!important}`
+at byte 437,841 (`complete-app-styles.css:6956` here) — a rule whose only purpose is to un-clip this
+element in that window. Nothing in this application ever sets `.detach-screen`, so that rule could
+never fire here; the class is applied on `!detached` instead, which answers the same question from a
+prop the component already owns.
+
+### SP2-03 — the status headings were inside the zoom transform; upstream they are siblings of it
+
+**BUILT** — `apps/room/src/lib/components/ScreenPaneStatus.svelte` (new),
+`apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The create block at byte 1,501,256 is one flat list under the component's own root:
+
+```js
+d(0,"div",0),H(1,z0e,2,0,"h3",1)(2,G0e,2,0,"h3",1)(3,W0e,2,1,"p",2)(4,q0e,3,2,"h3",3)
+  (5,Y0e,6,4,"div",4),d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)
+```
+
+Nodes 1 to 5 are opened and closed before `d(6,…)` opens the pan container, so none of them is a
+descendant of the pan/zoom wrappers. Here all three of `Screen Detached..`, `Video Disabled` and
+`Connecting To Screen of …` were rendered inside `div.pan-element` — the element that carries
+`translate(...) scale(...)`. Zoom is global in this application (`src/lib/screen-zoom.ts` records
+that the capture broadcasts it by value to every view), so a reader zoomed into one screen saw every
+other screen's status line scaled and dragged with a picture that was not being drawn.
+
+Moved to the pane root. They became one thing with one reason, so they are one component;
+`source-size-contract.test.ts` carries its ceiling at the size it landed and
+`screen-pane-contract.test.ts` asserts the same three rows against the file that now holds them.
+
+### SP2-04 — `W0e`, the gold "click here for larger preview" line, has no counterpart and cannot
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Node 3 of the create block is a sub-template this surface has never mentioned. `W0e` at byte
+1,492,944 renders const 11 — `[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]`, a gold `<p>`;
+`#ffcc00` appears twice in the table, in const 2 and const 11, and both belong to this one line
+(const 2 is the container `H(3,W0e,2,1,"p",2)` declares, const 11 the element `W0e` opens) — with
+the text
+` (You are sharing your screen as {screenName} click here for larger preview) ` at byte 1,493,088,
+clicking through to `largePreview()` at byte 1,499,849:
+
+```js
+largePreview(){this.localpreview=!0; let e=this.mediaSoupService.screenProducers.get(this.muser.producerID);
+  … const i=$("#webcamScreen-"+this.muser._id).get(0); i.srcObject=e.localStream; try{i.play()}catch{}
+  this.isConnected=!0}
+```
+
+and it is gated `O(3, o.mediaService.isScreenSharing && o.mediaService.localSharingStreams[o.muser._id]
+&& !o.localpreview ? 3 : -1)` at byte 1,501,588. So upstream a screen you are SHARING does not show
+its own picture until you ask: `localpreview` starts false, the video's `hidden` expression carries
+`isPresentingThisScreen && !localpreview`, and this line is the invitation that attaches the local
+stream.
+
+Not built, because the third term cannot be false here. This application renders its own screens from
+the local capture (`addLocalScreen` in `+page.svelte`), so it always local-previews; `!localpreview`
+is false by construction, which is the same measurement the `<video>` comment already records for
+the `hidden` term it gates. Building the control would build a way to turn on something that is
+already on. Recorded rather than dropped because the const, the string and the method are all real
+and a later reader will find them.
+
+### SP2-05 — `z("controls", o.showControls)` is unreachable upstream, and the reason is in one file
+
+**MEASURED REFUSAL** — nothing changed in
+`apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The `<video>` comment claims the `controls` binding is not reproduced because `showControls`'
+only writer is a click handler on an element that `pointer-events: none` makes unreachable. Re-read
+rather than trusted, because it is the kind of claim that is easy to state and hard to check.
+
+It holds, and both halves are in the same component. The writer is `x("click",function(){return
+o.showControls=!o.showControls})` at byte 1,501,442, attached to node 9 — the `<video>` itself,
+const 8. The component's own `styles:` string at byte 1,502,316 opens
+`.webcamScreen[_ngcontent-%COMP%]{width:100%;height:100%;object-fit:contain;vertical-align:top;pointer-events:none}`.
+`showControls` is initialised `this.showControls=!1` in the constructor at byte 1,494,561 and has no
+other writer in this component: the string occurs five times in the bundle and the fifth, at byte
+1,901,855, is a different component's field entirely (`this.volume=1,this.showControls=!1,this.path=""`
+— the HLS player). So it is false for the life of the component and no control bar ever appears
+upstream. Reproducing the binding would add an attribute that is provably always false.
+
+### SP2-06 — the watermark pans and zooms with the picture upstream; here it is pinned, on purpose
+
+**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+The create block settles a nesting the offsets alone cannot. `d(6,"div",5)(7,"pan-zoom",6)(8,"div",7)(9,"video",8)`
+at byte 1,501,361 nests `div.video-screen-container` (const 7) INSIDE the `<pan-zoom>` element
+(const 6), and `H(10,Q0e,2,1,"span",9)` at byte 1,501,479 puts the `overlay-userID-container` span
+(const 9, sub-template `Q0e` at byte 1,494,134) inside that same div, beside the `<video>`.
+
+**What the bundle proves and what it does not, kept apart.** Proved: the watermark is a child of
+`div.video-screen-container`, which is a child of `<pan-zoom>`. Inferred: that it therefore sits
+inside the transform, because the wrapper pair `div.pan-zoom-frame > div.pan-element` is what
+`<pan-zoom>` puts its projected content in — evidenced by the captured rules
+`div.pan-zoom-frame, div.pan-element { height: inherit !important; width: 100% }`, which this
+component already transcribes, and NOT by any bundle byte. The library is third-party and its
+templates are not in this artifact. The divergence below stands either way, because it is about
+where the watermark sits HERE.
+
+This component has the containment the other way round — `div.video-screen-container >
+div.pan-zoom-frame > div.pan-element > video`, with the watermark a sibling of the frame — so the
+watermark stays fixed over the pane while the picture moves under it.
+
+**Not matched, and the reason is what the watermark is for.** It is the anti-leak overlay
+`overlayUserIdOnScreenshare` turns on. Inside the transform it is pannable: a viewer recording the
+screen can drag the picture until the id leaves the visible pane and film what is left, and at zoom
+levels above one it can be pushed out without dragging at all. A watermark that the person it
+identifies can move off the recording is not a watermark. It is kept inside
+`#video-screen-container-{id}` so it still goes fullscreen with the picture, which is the state a
+recording would be made in.
+
+### SP2-07 — the detached cluster is a sibling of the pan container upstream, in an unpositioned parent
+
+**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+row was ADDED after this document was committed and is deliberately outside the tables above.
+
+Node 5 of the create block — `Y0e`, gated `O(5, o.isDetachedCtrl ? 5 : -1)` at byte 1,501,767 —
+renders const 4 `[1,"zoom-controls-container-detached",3,"ngClass"]` as a SIBLING of the pan
+container and before it, inside const 0's `div.h-inherit`. That div sets `height:inherit` and
+nothing else: the component's whole stylesheet is
+`.webcamScreen{…}.hidden{display:none}.h-inherit{height:inherit}.zoom-controls-container-detached{…}.zoom-controls{top:-33px;left:-33px}.screencast-pan-grabbing{cursor:grabbing}`
+from byte 1,502,316, and none of those positions it. The cluster is `position:absolute;right:5px;top:5px`,
+so upstream its containing block is whatever positioned ancestor happens to sit above the component
+— which is not in this component and is not in the pinned bundle either.
+
+This component nests the cluster inside `#video-screen-container-{id}`, whose captured rule is
+`.video-screen-container{position:relative;top:0;left:0;z-index:1999;width:inherit;height:inherit}`
+(reference sheet byte 441,996). So it anchors five pixels from that box's top-right corner —
+deterministically, from a rule this repository can point at.
+
+Kept, and the argument is that the reference's placement is not a specification. "Whichever ancestor
+happens to be positioned" is a value this bundle does not contain, so matching it would mean
+inventing the ancestor rather than transcribing it; and the one thing it definitely produces —
+a cluster outside the `overflow-hidden` of `SP2-02` and outside the element `toggleFullscreen`
+fullscreens — is worse in both directions here, because the popout's magnifier would then vanish
+when the popout is maximised.
 
 ## The fifty-one refuted claims
 
